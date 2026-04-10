@@ -4829,6 +4829,7 @@ const buildDiagonalMetricObserverAuditTensorInput = (
         : null,
     );
   const tensorRef = metricT00Ref ?? "warp.metricStressEnergy";
+  const upstreamDriverRef = metricT00Ref ?? "warp.metricStressEnergy.T00";
   const rapidityCap =
     toFiniteNumber(
       (state.gr?.matter?.stressEnergy as StressEnergyStats | undefined)?.observerRobust?.rapidityCap,
@@ -4860,6 +4861,14 @@ const buildDiagonalMetricObserverAuditTensorInput = (
         note: "Metric-required tensor unavailable.",
       },
       missingInputs: ["metric_tensor_missing", ...structuralMissing],
+      upstreamDriverRef,
+      upstreamDriverClass: "metric_t00_density",
+      upstreamDriverDependencyStatus: "direct_same_surface_driver",
+      upstreamDriverNote:
+        "metric_required WEC traces directly to the emitted metric T00 density surface.",
+      firstUpstreamRemediationTarget: upstreamDriverRef,
+      firstUpstreamRemediationWhy:
+        "Inspect the emitted metric T00 density because metric_required WEC reduces directly to rho on this surface.",
     };
   }
 
@@ -4897,6 +4906,14 @@ const buildDiagonalMetricObserverAuditTensorInput = (
           "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
       },
       missingInputs: [...diagonalMissing, ...structuralMissing],
+      upstreamDriverRef,
+      upstreamDriverClass: "metric_t00_density",
+      upstreamDriverDependencyStatus: "direct_same_surface_driver",
+      upstreamDriverNote:
+        "metric_required WEC traces directly to the emitted metric T00 density surface.",
+      firstUpstreamRemediationTarget: upstreamDriverRef,
+      firstUpstreamRemediationWhy:
+        "Inspect the emitted metric T00 density because metric_required WEC reduces directly to rho on this surface.",
     };
   }
   const diagonal = buildDiagonalObserverConditions(rho, px, py, pz);
@@ -4931,13 +4948,24 @@ const buildDiagonalMetricObserverAuditTensorInput = (
         "Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep.",
     },
     missingInputs: structuralMissing,
+    upstreamDriverRef,
+    upstreamDriverClass: "metric_t00_density",
+    upstreamDriverDependencyStatus: "direct_same_surface_driver",
+    upstreamDriverNote:
+      "metric_required WEC traces directly to the emitted metric T00 density surface.",
+    firstUpstreamRemediationTarget: upstreamDriverRef,
+    firstUpstreamRemediationWhy:
+      "Inspect the emitted metric T00 density because metric_required WEC reduces directly to rho on this surface.",
   };
 };
+
+const NHM2_TILE_EFFECTIVE_UPSTREAM_DRIVER_REF =
+  "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
 
 const buildTileObserverAuditTensorInput = (
   state: EnergyPipelineState,
 ): BuildNhm2ObserverAuditTensorInput => {
-  const warpState = (state as any).warp as Record<string, unknown> | undefined;
+  const { warpState, nhm2Active } = resolveNhm2ArtifactContext(state);
   const stressStats = (state.gr?.matter?.stressEnergy ??
     null) as StressEnergyStats | null;
   const tileTensor =
@@ -4965,6 +4993,9 @@ const buildTileObserverAuditTensorInput = (
           tileTensor.T33 as number,
         )
       : null;
+  const upstreamDriverRef = nhm2Active
+    ? NHM2_TILE_EFFECTIVE_UPSTREAM_DRIVER_REF
+    : "warp.tileEffectiveStressEnergy.T00";
   return {
     tensorRef: "warp.tileEffectiveStressEnergy",
     sampleCount: globalRegion?.sampleCount ?? null,
@@ -5059,6 +5090,14 @@ const buildTileObserverAuditTensorInput = (
         : diagonalReady
           ? ["tile_t0i_flux_channels_missing"]
           : ["tile_observer_diagnostics_missing"],
+    upstreamDriverRef,
+    upstreamDriverClass: "tile_energy_density_proxy",
+    upstreamDriverDependencyStatus: "proxy_derived_driver",
+    upstreamDriverNote:
+      "tile_effective WEC traces to the emitted tile energy-density proxy surface rather than a full flux/shear-resolved tensor.",
+    firstUpstreamRemediationTarget: upstreamDriverRef,
+    firstUpstreamRemediationWhy:
+      "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface.",
   };
 };
 

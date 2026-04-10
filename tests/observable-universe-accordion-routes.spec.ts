@@ -46,6 +46,60 @@ describe("observable universe accordion ETA route", () => {
     );
   });
 
+  it("keeps unsupported nearby entries visible as render-only when a supported target is present", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/helix/relativistic-map/project")
+      .send({
+        projectionKind: "sun_centered_accessibility",
+        sourceModel: "warp_worldline_route_time",
+        etaMode: "proper_time",
+        catalog: [
+          { id: "alpha-cen-a", label: "Alpha Centauri A", position_m: [4, 0, 0] },
+          { id: "tau-ceti", label: "Tau Ceti", position_m: [0, 4, 0] },
+        ],
+      })
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.projection?.status).toBe("computed");
+    expect(
+      res.body.projection?.entries?.find((entry: any) => entry.id === "alpha-cen-a")?.etaSupport,
+    ).toBe("contract_backed");
+    const tau = res.body.projection?.entries?.find((entry: any) => entry.id === "tau-ceti");
+    expect(tau?.etaSupport).toBe("render_only");
+    expect(tau?.mappedRadius_m).toBeNull();
+    expect(tau?.renderOnlyReason).toMatch(/render-only/i);
+  });
+
+  it("can resolve the nearby local-rest preset into a mixed accordion catalog", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/helix/relativistic-map/project")
+      .send({
+        projectionKind: "sun_centered_accessibility",
+        sourceModel: "warp_worldline_route_time",
+        catalogPreset: "nearby_local_rest_small",
+      })
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.projection?.status).toBe("computed");
+    expect(
+      res.body.projection?.entries?.some((entry: any) => entry.id === "alpha-cen-a"),
+    ).toBe(true);
+    expect(
+      res.body.projection?.entries?.some((entry: any) => entry.id === "proxima"),
+    ).toBe(true);
+    expect(
+      res.body.projection?.entries?.some((entry: any) => entry.id === "barnard"),
+    ).toBe(true);
+    expect(
+      res.body.projection?.entries?.filter((entry: any) => entry.etaSupport === "render_only")
+        ?.length,
+    ).toBeGreaterThan(0);
+  });
+
   it("remains fail-closed when the explicit contract source is missing", async () => {
     const originalReadFileSync = fs.readFileSync.bind(fs);
     vi.spyOn(fs, "readFileSync").mockImplementation(

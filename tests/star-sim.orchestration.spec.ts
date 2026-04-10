@@ -88,15 +88,40 @@ describe("star-sim resolve-first orchestration", () => {
     expect(submit.body.source_resolution_ref).toMatch(/resolve-response\.json$/);
     expect(submit.body.resolved_draft_ref).toMatch(/canonical-request\.json$/);
     expect(submit.body.lane_plan.runnable_lanes).toEqual(["structure_mesa"]);
+    expect(submit.body.benchmark_backed).toBe(true);
+    expect(submit.body.benchmark_receipt_ref).toMatch(/benchmark-receipt\.json$/);
+    expect(submit.body.benchmark_input_signature).toMatch(/^sha256:/);
+    expect(submit.body.previous_benchmark_receipt_ref).toBeNull();
+    expect(submit.body.benchmark_repeatability).toBeUndefined();
     expect(["demo_solar_a", "demo_solar_b"]).toContain(submit.body.benchmark_target_id);
     expect(submit.body.benchmark_target_match_mode).toBe("matched_by_identifier");
     expect(submit.body.benchmark_target_identity_basis).toBe("trusted_identifier");
     expect(submit.body.identifiers_trusted.gaia_dr3_source_id).toBe("123456789012345678");
+    const queuedReceipt = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), submit.body.benchmark_receipt_ref), "utf8"),
+    );
+    expect(queuedReceipt.benchmark_target_id).toBe("demo_solar_a");
+    expect(queuedReceipt.benchmark_input_signature).toBe(submit.body.benchmark_input_signature);
+    expect(queuedReceipt.observable_envelope_diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field_path: "spectroscopy.teff_K",
+          status: "in_envelope",
+        }),
+      ]),
+    );
 
     await waitForJob(app, submit.body.job_id, "completed");
     const result = await request(app).get(`/api/star-sim/v1/jobs/${submit.body.job_id}/result`).expect(200);
     const structureLane = result.body.lanes.find((lane: { requested_lane: string }) => lane.requested_lane === "structure_mesa");
     expect(structureLane?.status).toBe("available");
+    expect(result.body.benchmark_backed).toBe(true);
+    expect(result.body.benchmark_receipt_ref).toBe(submit.body.benchmark_receipt_ref);
+    expect(result.body.benchmark_input_signature).toBe(submit.body.benchmark_input_signature);
+    const completedReceipt = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), result.body.benchmark_receipt_ref), "utf8"),
+    );
+    expect(completedReceipt.lane_diagnostics.structure_mesa.fit_quality).toBeTruthy();
 
     const canonicalRequestRef = structureLane.artifact_refs.find(
       (artifact: { kind: string }) => artifact.kind === "canonical_request",
@@ -136,19 +161,41 @@ describe("star-sim resolve-first orchestration", () => {
     expect(structureLane?.status).toBe("available");
     expect(oscillationLane?.status).toBe("available");
     expect(oscillationLane?.tree_dag.parent_claim_ids).toContain(structureLane?.tree_dag.claim_id);
+    const receipt = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), result.body.benchmark_receipt_ref), "utf8"),
+    );
+    expect(receipt.lane_diagnostics.structure_mesa.fit_quality).toBeTruthy();
+    expect(receipt.lane_diagnostics.oscillation_gyre.comparison_quality).toBeTruthy();
   });
 
   it("blocks strict requested-lane orchestration when oscillation inputs are unresolved", async () => {
     const app = await buildApp();
+    const prior = await request(app)
+      .post("/api/star-sim/v1/jobs")
+      .send({
+        resolve_before_run: true,
+        target: {
+          name: "Demo Solar A",
+        },
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+        },
+        requested_lanes: ["structure_mesa"],
+      })
+      .expect(202);
+    await waitForJob(app, prior.body.job_id, "completed");
+    process.env.STAR_SIM_TASOC_MODE = "disabled";
+    process.env.STAR_SIM_TESS_MAST_MODE = "disabled";
+
     const blocked = await request(app)
       .post("/api/star-sim/v1/jobs")
       .send({
         resolve_before_run: true,
         target: {
-          name: "Demo Solar B",
+          name: "Demo Solar A",
         },
         identifiers: {
-          gaia_dr3_source_id: "987654321098765432",
+          gaia_dr3_source_id: "123456789012345678",
         },
         requested_lanes: ["structure_mesa", "oscillation_gyre"],
       })
@@ -160,6 +207,44 @@ describe("star-sim resolve-first orchestration", () => {
     expect(blocked.body.lane_plan.runnable_lanes).toEqual(["structure_mesa"]);
     expect(blocked.body.lane_plan.blocked_lanes).toContain("oscillation_gyre");
     expect(blocked.body.blocked_reasons).toContain("seismology_unresolved");
+    expect(blocked.body.benchmark_backed).toBe(true);
+    expect(blocked.body.benchmark_receipt_ref).toMatch(/benchmark-receipt\.json$/);
+    expect(blocked.body.previous_benchmark_receipt_ref).toBeTruthy();
+    expect(blocked.body.benchmark_repeatability.same_input_signature).toBe(false);
+    expect(blocked.body.benchmark_repeatability.drift_categories).toEqual(
+      expect.arrayContaining(["lane_plan_changed", "blocked_reasons_changed", "diagnostic_summary_changed"]),
+    );
+    const blockedReceipt = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), blocked.body.benchmark_receipt_ref), "utf8"),
+    );
+    expect(blockedReceipt.blocked_lanes).toContain("oscillation_gyre");
+    expect(blockedReceipt.blocked_reasons).toContain("seismology_unresolved");
+  });
+
+  it("preserves trusted-identifier conflict semantics without assigning a benchmark target", async () => {
+    const app = await buildApp();
+    const submit = await request(app)
+      .post("/api/star-sim/v1/jobs")
+      .send({
+        resolve_before_run: true,
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+          lamost_obsid: "LAMOST-B-0002",
+        },
+        requested_lanes: ["structure_mesa"],
+      })
+      .expect(202);
+
+    expect(submit.body.job_enqueued).toBe(true);
+    expect(submit.body.benchmark_target_id).toBeUndefined();
+    expect(submit.body.benchmark_target_match_mode).toBe("conflicted_trusted_identifiers");
+    expect(submit.body.benchmark_target_conflict_reason).toBe("multiple_trusted_identifier_targets");
+    expect(submit.body.benchmark_target_identity_basis).toBe("conflicted_trusted_identifiers");
+    expect(submit.body.benchmark_target_quality_ok).toBe(false);
+    expect(submit.body.benchmark_backed).toBe(false);
+    expect(submit.body.benchmark_receipt_ref).toBeNull();
+    expect(submit.body.benchmark_input_signature).toBeNull();
+    await waitForJob(app, submit.body.job_id, "completed");
   });
 
   it("runs the available prefix when requested and leaves oscillation blocked", async () => {
@@ -236,6 +321,72 @@ describe("star-sim resolve-first orchestration", () => {
 
     expect(first.body.source_cache_key).not.toBe(second.body.source_cache_key);
     expect(first.body.job_id).not.toBe(second.body.job_id);
+    expect(first.body.benchmark_input_signature).not.toBe(second.body.benchmark_input_signature);
+    expect(second.body.previous_benchmark_receipt_ref).toBeTruthy();
+    expect(second.body.benchmark_repeatability.same_input_signature).toBe(false);
+    expect(second.body.benchmark_repeatability.drift_categories).toContain("selected_field_origins_changed");
+    await waitForJob(app, first.body.job_id, "completed");
+    await waitForJob(app, second.body.job_id, "completed");
+  });
+
+  it("keeps the benchmark input signature stable for equivalent benchmark-backed runs", async () => {
+    const app = await buildApp();
+    const payload = {
+      resolve_before_run: true,
+      target: {
+        name: "Demo Solar A",
+      },
+      identifiers: {
+        gaia_dr3_source_id: "123456789012345678",
+      },
+      requested_lanes: ["structure_mesa"],
+    };
+
+    const first = await request(app).post("/api/star-sim/v1/jobs").send(payload).expect(202);
+    await waitForJob(app, first.body.job_id, "completed");
+    const second = await request(app).post("/api/star-sim/v1/jobs").send(payload).expect(202);
+
+    expect(first.body.benchmark_input_signature).toBe(second.body.benchmark_input_signature);
+    expect(first.body.benchmark_receipt_ref).toBe(second.body.benchmark_receipt_ref);
+    expect(second.body.previous_benchmark_receipt_ref).toBeTruthy();
+    expect(second.body.benchmark_repeatability).toEqual(
+      expect.objectContaining({
+        repeatable: true,
+        same_input_signature: true,
+      }),
+    );
+    await waitForJob(app, second.body.job_id, "completed");
+  });
+
+  it("does not emit benchmark receipts for non-benchmark manual jobs", async () => {
+    const app = await buildApp();
+    const submit = await request(app)
+      .post("/api/star-sim/v1/jobs")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+          epoch_iso: "2026-01-01T00:00:00.000Z",
+        },
+        spectroscopy: {
+          teff_K: 5772,
+          logg_cgs: 4.438,
+          metallicity_feh: 0,
+        },
+        structure: {
+          mass_Msun: 1,
+          radius_Rsun: 1,
+        },
+        requested_lanes: ["structure_mesa"],
+      })
+      .expect(202);
+
+    expect(submit.body.benchmark_backed).toBe(false);
+    expect(submit.body.benchmark_receipt_ref).toBeNull();
+    expect(submit.body.benchmark_input_signature).toBeNull();
+    expect(submit.body.previous_benchmark_receipt_ref).toBeNull();
+    expect(submit.body.benchmark_repeatability).toBeUndefined();
+    await waitForJob(app, submit.body.job_id, "completed");
   });
 
 });

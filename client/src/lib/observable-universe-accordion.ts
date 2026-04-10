@@ -22,27 +22,22 @@ export type ObservableUniverseAccordionProjectRequest = {
   sourceModel: "warp_worldline_route_time";
   etaMode: ObservableUniverseSupportedEtaMode;
   renderEpoch_tcb_jy: number;
-  catalog: ObservableUniverseAccordionCatalogSeed[];
+  catalogPreset?: "nearby_local_rest_small";
+  catalog?: ObservableUniverseAccordionCatalogSeed[];
 };
 
 export const DEFAULT_OBSERVABLE_UNIVERSE_RENDER_EPOCH_TCB_JY = 2016.0;
 
-export const OBSERVABLE_UNIVERSE_SUPPORTED_TARGET: ObservableUniverseAccordionCatalogSeed = {
+export const OBSERVABLE_UNIVERSE_ACTIVE_TARGET = {
   id: "alpha-cen-a",
   label: "Alpha Centauri A",
-  frame_id: "ICRS",
-  reference_epoch_tcb_jy: 2016.0,
-  time_scale: "TCB",
-  provenance_class: "observed",
-  astrometry: {
-    ra_deg: 219.9021,
-    dec_deg: -60.8339,
-    parallax_mas: 747.17,
-    proper_motion_ra_masyr: -3619.4,
-    proper_motion_dec_masyr: 686.1,
-    radial_velocity_kms: -22.4,
-  },
-};
+} as const;
+
+export const OBSERVABLE_UNIVERSE_NEARBY_VISIBLE_TARGETS = [
+  OBSERVABLE_UNIVERSE_ACTIVE_TARGET,
+  { id: "proxima", label: "Proxima Centauri" },
+  { id: "barnard", label: "Barnard's Star" },
+] as const;
 
 export const buildObservableUniverseAccordionRequest = (
   estimateKind: ObservableUniverseSupportedEtaMode = "proper_time",
@@ -51,7 +46,7 @@ export const buildObservableUniverseAccordionRequest = (
   sourceModel: "warp_worldline_route_time",
   etaMode: estimateKind,
   renderEpoch_tcb_jy: DEFAULT_OBSERVABLE_UNIVERSE_RENDER_EPOCH_TCB_JY,
-  catalog: [OBSERVABLE_UNIVERSE_SUPPORTED_TARGET],
+  catalogPreset: "nearby_local_rest_small",
 });
 
 export async function fetchObservableUniverseAccordionSurface(

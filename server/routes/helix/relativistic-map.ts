@@ -26,6 +26,7 @@ import {
 } from "../../modules/astronomy/epoch-propagation";
 import { buildAstronomyFrameLayer } from "../../modules/astronomy/reference-frames";
 import { summarizeAstronomyProvenance } from "../../modules/astronomy/provenance";
+import { buildLocalRestSnapshot } from "../../modules/stellar/local-rest";
 
 const helixRelativisticMapRouter = express.Router();
 
@@ -93,15 +94,38 @@ const ProjectSchema = z
     etaMode: z.enum(["proper_time", "coordinate_time"]).optional(),
     renderEpoch_tcb_jy: z.number().finite().optional(),
     includeHiddenAnchorsDebug: z.boolean().optional(),
-    catalog: z.array(CatalogEntrySchema).min(1),
+    catalogPreset: z.enum(["nearby_local_rest_small"]).optional(),
+    catalog: z.array(CatalogEntrySchema).min(1).optional(),
     control: ControlSchema.optional(),
   })
   .superRefine((value, ctx) => {
+    if ((!value.catalog || value.catalog.length === 0) && !value.catalogPreset) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "catalog or catalogPreset is required",
+        path: ["catalog"],
+      });
+    }
     if (value.sourceModel === "flat_sr_flip_burn_control" && !value.control) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "control is required when sourceModel=flat_sr_flip_burn_control",
         path: ["control"],
+      });
+    }
+    if (
+      value.catalogPreset &&
+      !(
+        value.catalogPreset === "nearby_local_rest_small" &&
+        value.sourceModel === "warp_worldline_route_time" &&
+        value.projectionKind === "sun_centered_accessibility"
+      )
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "catalogPreset is only supported for the warp-worldline sun-centered accordion route",
+        path: ["catalogPreset"],
       });
     }
   });
@@ -155,6 +179,79 @@ const loadObservableUniverseAccordionEtaProjection = () => {
   });
 };
 
+const OBSERVABLE_UNIVERSE_LOCAL_REST_PRESET = [
+  { id: "alpha-cen-a", label: "Alpha Centauri A" },
+  { id: "proxima", label: "Proxima Centauri" },
+  { id: "barnard", label: "Barnard's Star" },
+] as const;
+
+const LOCAL_REST_PRESET_RADIUS_PC = 6;
+
+const julianYearToIsoString = (julianYear: number): string => {
+  const wholeYear = Math.trunc(julianYear);
+  const yearFraction = julianYear - wholeYear;
+  const startMs = Date.UTC(wholeYear, 0, 1);
+  const offsetMs = yearFraction * 365.25 * 24 * 60 * 60 * 1000;
+  return new Date(startMs + offsetMs).toISOString();
+};
+
+const mjdToJulianYear = (mjd: number | undefined): number =>
+  typeof mjd === "number" && Number.isFinite(mjd)
+    ? 2000 + (mjd - 51544.5) / 365.25
+    : 2016.0;
+
+const buildNearbyLocalRestSmallCatalog = async (
+  renderEpoch_tcb_jy?: number,
+): Promise<Array<z.infer<typeof CatalogEntrySchema>>> => {
+  const snapshot = await buildLocalRestSnapshot({
+    radius_pc: LOCAL_REST_PRESET_RADIUS_PC,
+    page: 1,
+    per_page: 5000,
+    epoch:
+      typeof renderEpoch_tcb_jy === "number" && Number.isFinite(renderEpoch_tcb_jy)
+        ? julianYearToIsoString(renderEpoch_tcb_jy)
+        : undefined,
+  });
+  const starsById = new Map(snapshot.stars.map((star) => [star.id, star]));
+
+  return OBSERVABLE_UNIVERSE_LOCAL_REST_PRESET.flatMap((target) => {
+    const star = starsById.get(target.id);
+    if (!star) return [];
+    return [
+      {
+        id: target.id,
+        label: target.label,
+        frame_id: "ICRS" as const,
+        reference_epoch_tcb_jy: mjdToJulianYear(star.epoch_mjd),
+        time_scale: "TCB" as const,
+        provenance_class: "observed" as const,
+        astrometry: {
+          ra_deg: star.ra_deg,
+          dec_deg: star.dec_deg,
+          parallax_mas: star.plx_mas,
+          proper_motion_ra_masyr: star.pmra_masyr ?? null,
+          proper_motion_dec_masyr: star.pmdec_masyr ?? null,
+          radial_velocity_kms: star.rv_kms ?? null,
+        },
+      },
+    ];
+  });
+};
+
+const resolveAccordionCatalogRequest = async (args: {
+  catalog?: Array<z.infer<typeof CatalogEntrySchema>>;
+  catalogPreset?: "nearby_local_rest_small";
+  renderEpoch_tcb_jy?: number;
+}) => {
+  if (args.catalog && args.catalog.length > 0) {
+    return args.catalog;
+  }
+  if (args.catalogPreset === "nearby_local_rest_small") {
+    return buildNearbyLocalRestSmallCatalog(args.renderEpoch_tcb_jy);
+  }
+  return [];
+};
+
 const buildAstronomyCatalogForAccordionRender = (args: {
   catalog: Array<z.infer<typeof CatalogEntrySchema>>;
   renderEpoch_tcb_jy?: number;
@@ -190,7 +287,7 @@ const buildAstronomyCatalogForAccordionRender = (args: {
   };
 };
 
-helixRelativisticMapRouter.post("/project", (req, res) => {
+helixRelativisticMapRouter.post("/project", async (req, res) => {
   setCors(res);
   const parsed = ProjectSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
@@ -198,65 +295,79 @@ helixRelativisticMapRouter.post("/project", (req, res) => {
     return;
   }
 
-  if (
-    parsed.data.sourceModel === "warp_worldline_route_time" &&
-    parsed.data.projectionKind === "sun_centered_accessibility"
-  ) {
-    const astronomyCatalog = buildAstronomyCatalogForAccordionRender({
-      catalog: parsed.data.catalog,
-      renderEpoch_tcb_jy: parsed.data.renderEpoch_tcb_jy,
-    });
-    const projection = buildObservableUniverseAccordionEtaSurface({
-      contract: loadObservableUniverseAccordionEtaProjection(),
-      catalog: astronomyCatalog.visibleCatalog,
-      estimateKind:
-        (parsed.data.etaMode as ObservableUniverseSupportedEtaMode | undefined) ??
-        "proper_time",
-      canonicalFrameId: "ICRS",
-      canonicalFrameRealization: "Gaia_CRF3",
-      renderEpoch_tcb_jy: astronomyCatalog.renderEpoch,
-      propagationApplied: astronomyCatalog.propagationApplied,
-      hiddenAnchorCount: astronomyCatalog.frameLayer.hidden_anchor_count,
-      hiddenAnchorsUsed: true,
-      frameLayer: astronomyCatalog.frameLayer,
+  try {
+    if (
+      parsed.data.sourceModel === "warp_worldline_route_time" &&
+      parsed.data.projectionKind === "sun_centered_accessibility"
+    ) {
+      const requestedCatalog = await resolveAccordionCatalogRequest({
+        catalog: parsed.data.catalog,
+        catalogPreset: parsed.data.catalogPreset,
+        renderEpoch_tcb_jy: parsed.data.renderEpoch_tcb_jy,
+      });
+      const astronomyCatalog = buildAstronomyCatalogForAccordionRender({
+        catalog: requestedCatalog,
+        renderEpoch_tcb_jy: parsed.data.renderEpoch_tcb_jy,
+      });
+      const projection = buildObservableUniverseAccordionEtaSurface({
+        contract: loadObservableUniverseAccordionEtaProjection(),
+        catalog: astronomyCatalog.visibleCatalog,
+        estimateKind:
+          (parsed.data.etaMode as ObservableUniverseSupportedEtaMode | undefined) ??
+          "proper_time",
+        canonicalFrameId: "ICRS",
+        canonicalFrameRealization: "Gaia_CRF3",
+        renderEpoch_tcb_jy: astronomyCatalog.renderEpoch,
+        propagationApplied: astronomyCatalog.propagationApplied,
+        hiddenAnchorCount: astronomyCatalog.frameLayer.hidden_anchor_count,
+        hiddenAnchorsUsed: true,
+        frameLayer: astronomyCatalog.frameLayer,
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        ok: projection.status === "computed",
+        projection,
+      });
+      return;
+    }
+
+    const pipelineState = getGlobalPipelineState() as Record<string, unknown> | null;
+    const warpWorldline =
+      parsed.data.sourceModel === "flat_sr_flip_burn_control"
+        ? undefined
+        : ((pipelineState as any)?.warpWorldline ?? null);
+    const warpRouteTimeWorldline =
+      parsed.data.sourceModel === "warp_worldline_route_time"
+        ? ((pipelineState as any)?.warpRouteTimeWorldline ?? null)
+        : undefined;
+    const warpMissionTimeEstimator =
+      parsed.data.sourceModel === "warp_worldline_route_time"
+        ? ((pipelineState as any)?.warpMissionTimeEstimator ?? null)
+        : undefined;
+    const warpMissionTimeComparison =
+      parsed.data.sourceModel === "warp_worldline_route_time"
+        ? ((pipelineState as any)?.warpMissionTimeComparison ?? null)
+        : undefined;
+    const projection = buildRelativisticMapProjection({
+      ...parsed.data,
+      catalog: parsed.data.catalog ?? [],
+      warpWorldline,
+      warpRouteTimeWorldline,
+      warpMissionTimeEstimator,
+      warpMissionTimeComparison,
     });
     res.setHeader("Cache-Control", "no-store");
     res.json({
       ok: projection.status === "computed",
       projection,
     });
-    return;
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: "projection-build-failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
-
-  const pipelineState = getGlobalPipelineState() as Record<string, unknown> | null;
-  const warpWorldline =
-    parsed.data.sourceModel === "flat_sr_flip_burn_control"
-      ? undefined
-      : ((pipelineState as any)?.warpWorldline ?? null);
-  const warpRouteTimeWorldline =
-    parsed.data.sourceModel === "warp_worldline_route_time"
-      ? ((pipelineState as any)?.warpRouteTimeWorldline ?? null)
-      : undefined;
-  const warpMissionTimeEstimator =
-    parsed.data.sourceModel === "warp_worldline_route_time"
-      ? ((pipelineState as any)?.warpMissionTimeEstimator ?? null)
-      : undefined;
-  const warpMissionTimeComparison =
-    parsed.data.sourceModel === "warp_worldline_route_time"
-      ? ((pipelineState as any)?.warpMissionTimeComparison ?? null)
-      : undefined;
-  const projection = buildRelativisticMapProjection({
-    ...parsed.data,
-    warpWorldline,
-    warpRouteTimeWorldline,
-    warpMissionTimeEstimator,
-    warpMissionTimeComparison,
-  });
-  res.setHeader("Cache-Control", "no-store");
-  res.json({
-    ok: projection.status === "computed",
-    projection,
-  });
 });
 
 export { helixRelativisticMapRouter };

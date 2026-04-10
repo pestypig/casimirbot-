@@ -36,7 +36,10 @@ const buildSurface = () => {
   if (!projection) throw new Error("expected observable universe ETA projection");
   return buildObservableUniverseAccordionEtaSurface({
     contract: projection,
-    catalog: [{ id: "alpha-cen-a", label: "Alpha Centauri A", position_m: [1, 0, 0] }],
+    catalog: [
+      { id: "alpha-cen-a", label: "Alpha Centauri A", position_m: [1, 0, 0] },
+      { id: "barnard", label: "Barnard's Star", position_m: [0, 1, 0] },
+    ],
     estimateKind: "proper_time",
   });
 };
@@ -76,6 +79,8 @@ describe("ObservableUniverseAccordionPanel", () => {
     expect(screen.getByTestId("observable-universe-accordion-map")).toBeDefined();
     expect(screen.getByText("Sol")).toBeDefined();
     expect(screen.getByText("canonical")).toBeDefined();
+    expect(screen.getAllByText("Barnard's Star").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/render-only/i).length).toBeGreaterThan(0);
   });
 
   it("shows fail-closed deferred state when contract data is missing", () => {
@@ -111,6 +116,7 @@ describe("ObservableUniverseAccordionPanel", () => {
       "/api/helix/relativistic-map/project",
       expect.objectContaining({
         method: "POST",
+        body: expect.stringContaining("nearby_local_rest_small"),
       }),
     );
   });

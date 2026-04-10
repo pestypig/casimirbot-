@@ -453,7 +453,13 @@ export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
 
 const calculateMetricStressEnergyFromShiftField = (
   evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
-  opts: { sampleScale_m: number; derivativeStep_m?: number; samplePoints?: Vec3[] },
+  opts: {
+    sampleScale_m: number;
+    derivativeStep_m?: number;
+    samplePoints?: Vec3[];
+    warpFieldType?: NatarioWarpParams["warpFieldType"];
+    alphaCenterline?: number;
+  },
 ) => {
   const scale = opts.sampleScale_m;
   if (!Number.isFinite(scale) || scale <= 0) return null;
@@ -495,9 +501,24 @@ const calculateMetricStressEnergyFromShiftField = (
   }
 
   if (count === 0) return null;
-  const rhoGeomMean = sumRho / count;
-  const kTraceMean = sumTrace / count;
-  const kSquaredMean = sumKsq / count;
+  const baseRhoGeomMean = sumRho / count;
+  const baseKTraceMean = sumTrace / count;
+  const baseKSquaredMean = sumKsq / count;
+  const resolveShiftLapseAttenuation = () => {
+    if (opts.warpFieldType !== "nhm2_shift_lapse") return 1;
+    const alphaCenterline = Number.isFinite(opts.alphaCenterline)
+      ? clamp(Number(opts.alphaCenterline), 1e-6, 1)
+      : 1;
+    // NHM2 shift+lapse publishes a lapse-weighted metric source branch. Attenuate
+    // the quadratic K_ij K^ij contribution by the selected centerline lapse so the
+    // metric-required T00 path actually responds to the chosen shift+lapse profile.
+    return alphaCenterline ** 4;
+  };
+  const shiftLapseAttenuation = resolveShiftLapseAttenuation();
+  const kScale = Math.sqrt(shiftLapseAttenuation);
+  const rhoGeomMean = baseRhoGeomMean * shiftLapseAttenuation;
+  const kTraceMean = baseKTraceMean * kScale;
+  const kSquaredMean = baseKSquaredMean * shiftLapseAttenuation;
   const rhoEuler = rhoGeomMean * GEOM_TO_SI_STRESS;
   return {
     stress: {
@@ -990,7 +1011,11 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
             Math.max(1e-9, 2 / Math.max(1e-9, params.hullWallThickness_m ?? 1)),
           amplitude: shift.amplitude,
         })
-      : calculateMetricStressEnergyFromShiftField(shiftForMetric, { sampleScale_m: scale_m });
+      : calculateMetricStressEnergyFromShiftField(shiftForMetric, {
+          sampleScale_m: scale_m,
+          warpFieldType: fieldType,
+          alphaCenterline: lapseSummary?.alphaCenterline,
+        });
   const metricStress = metricStressResult?.stress ?? null;
   const metricStressDiagnostics = metricStressResult?.diagnostics;
   const pipelineStress = calculateStressEnergyTensor(

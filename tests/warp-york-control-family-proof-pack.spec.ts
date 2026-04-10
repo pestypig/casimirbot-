@@ -2190,8 +2190,24 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerMetricPrimaryDriver).toBeTruthy();
     expect((json as any).observerTilePrimaryDriver).toBeTruthy();
     expect((json as any).observerPrimaryDriverAgreement).toBeTruthy();
+    expect((json as any).observerSharedRootDriverStatus).toBeTruthy();
+    expect((json as any).observerSharedUpstreamDriverStatus).toBeTruthy();
+    expect((json as any).observerWecPropagationStatus).toBeTruthy();
+    expect((json as any).observerRemediationSequenceStatus).toBeTruthy();
     expect((json as any).tensors.metricRequired.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.tileEffective.primaryBlockingCondition).toBeTruthy();
+    expect((json as any).tensors.metricRequired.rootCauseClass).toBeTruthy();
+    expect((json as any).tensors.tileEffective.rootCauseClass).toBeTruthy();
+    expect((json as any).tensors.metricRequired.firstRemediationTarget).toBeTruthy();
+    expect((json as any).tensors.tileEffective.firstRemediationTarget).toBeTruthy();
+    expect((json as any).tensors.metricRequired.upstreamDriverRef).toBeTruthy();
+    expect((json as any).tensors.tileEffective.upstreamDriverRef).toBeTruthy();
+    expect((json as any).tensors.metricRequired.firstUpstreamRemediationTarget).toBeTruthy();
+    expect((json as any).tensors.tileEffective.firstUpstreamRemediationTarget).toBeTruthy();
+    expect((json as any).tensors.metricRequired.wecProbeApplied).not.toBeUndefined();
+    expect((json as any).tensors.tileEffective.wecProbeApplied).not.toBeUndefined();
+    expect((json as any).tensors.metricRequired.wecProbeInterpretation).toBeTruthy();
+    expect((json as any).tensors.tileEffective.wecProbeInterpretation).toBeTruthy();
 
     const markdown = fs.readFileSync(
       published.observerAuditArtifact.latestMdPath,
@@ -2208,7 +2224,14 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect(markdown).toContain("observerBlockingAssessmentStatus");
     expect(markdown).toContain("observerMetricPrimaryDriver");
+    expect(markdown).toContain("observerSharedRootDriverStatus");
+    expect(markdown).toContain("observerSharedUpstreamDriverStatus");
+    expect(markdown).toContain("observerWecPropagationStatus");
+    expect(markdown).toContain("observerRemediationSequenceStatus");
     expect(markdown).toContain("primaryBlockingCondition");
+    expect(markdown).toContain("rootCauseClass");
+    expect(markdown).toContain("upstreamDriverRef");
+    expect(markdown).toContain("wecProbeApplied");
     expect(markdown).toContain((json as any).observerBlockingAssessmentStatus);
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
@@ -2286,6 +2309,9 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).sections.observer_audit.observerPrimaryDriverAgreement).toBe(
       (observerJson as any).observerPrimaryDriverAgreement,
     );
+    expect((json as any).sections.observer_audit.observerSharedRootDriverStatus).toBe(
+      (observerJson as any).observerSharedRootDriverStatus,
+    );
     expect(
       (json as any).sections.observer_audit.observerMetricFirstInspectionTarget,
     ).toBe((observerJson as any).observerMetricFirstInspectionTarget);
@@ -2334,11 +2360,15 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect(markdown).toContain("observerBlockingAssessmentStatus");
     expect(markdown).toContain("observerMetricPrimaryDriver");
+    expect(markdown).toContain("observerSharedRootDriverStatus");
     expect(markdown).toContain(
       (observerJson as any).observerBlockingAssessmentStatus,
     );
     expect(markdown).toContain(
       (observerJson as any).observerMetricPrimaryDriver,
+    );
+    expect(markdown).toContain(
+      (observerJson as any).observerSharedRootDriverStatus,
     );
   });
 

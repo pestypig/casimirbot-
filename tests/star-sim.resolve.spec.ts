@@ -211,6 +211,27 @@ describe("star-sim source resolution route", () => {
     expect(res.body.benchmark_target_id).not.toBe("demo_solar_a");
   });
 
+  it("surfaces conflicting trusted identifiers instead of picking an arbitrary benchmark target", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+          lamost_obsid: "LAMOST-B-0002",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.identifiers_trusted.gaia_dr3_source_id).toBe("123456789012345678");
+    expect(res.body.identifiers_trusted.lamost_obsid).toBe("LAMOST-B-0002");
+    expect(res.body.benchmark_target_id).toBeUndefined();
+    expect(res.body.benchmark_target_match_mode).toBe("conflicted_trusted_identifiers");
+    expect(res.body.benchmark_target_conflict_reason).toBe("multiple_trusted_identifier_targets");
+    expect(res.body.benchmark_target_identity_basis).toBe("conflicted_trusted_identifiers");
+    expect(res.body.benchmark_target_quality_ok).toBe(false);
+  });
+
   it("does not promote name-only non-Gaia secondary records into trusted benchmark identity", async () => {
     process.env.STAR_SIM_GAIA_DR3_MODE = "disabled";
     process.env.STAR_SIM_SDSS_ASTRA_MODE = "disabled";

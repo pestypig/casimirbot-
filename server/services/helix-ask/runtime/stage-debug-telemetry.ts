@@ -24,7 +24,9 @@ const normalizeStage0TelemetryInvariant = (
   };
 };
 
-const isStage05SoftCodePathGapTelemetry = (stage05: Stage05Telemetry | undefined): boolean => {
+export const isStage05SoftCodePathGapTelemetry = (
+  stage05: Stage05Telemetry | undefined,
+): boolean => {
   if (!stage05?.summary_hard_fail) return false;
   const missing = (stage05.slot_coverage?.missing ?? []).map((slot) => String(slot).trim());
   if (missing.length !== 1 || missing[0] !== "code_path") return false;
@@ -33,13 +35,17 @@ const isStage05SoftCodePathGapTelemetry = (stage05: Stage05Telemetry | undefined
   return true;
 };
 
-const isStage05SoftRuntimeFailTelemetry = (stage05: Stage05Telemetry | undefined): boolean => {
+export const isStage05SoftRuntimeFailTelemetry = (
+  stage05: Stage05Telemetry | undefined,
+): boolean => {
   if (!stage05?.summary_hard_fail) return false;
   const reason = String(stage05.summary_fail_reason ?? stage05.fallback_reason ?? "");
   return /^stage05_llm_/i.test(reason);
 };
 
-const isStage05CoverageGapTelemetry = (stage05: Stage05Telemetry | undefined): boolean => {
+export const isStage05CoverageGapTelemetry = (
+  stage05: Stage05Telemetry | undefined,
+): boolean => {
   if (!stage05?.summary_required) return false;
   const missing = (stage05.slot_coverage?.missing ?? [])
     .map((slot) => String(slot).trim())

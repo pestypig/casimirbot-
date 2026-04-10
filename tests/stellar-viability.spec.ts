@@ -9,14 +9,17 @@ import {
   SOLAR_RADIUS_M,
   type StellarBenchmarkFixture,
   buildBenchmarkObservation,
+  makeAngularContinuumSolarLikeFixture,
   makeCanonicalStellarBenchmarkFixtures,
   makeContinuumMask,
   makeFullSpectrumSolarLikeFixture,
   makeLineMask,
   makeMuGrid,
+  makeQualityMaskedUvSolarLikeFixture,
   makeUvMask,
   makeVisibleBandSolarLikeFixture,
   makeWavelengthGrid,
+  makeWeightedFullSpectrumSolarLikeFixture,
 } from "./helpers/stellar-benchmark-fixtures";
 
 function nearestIndex(wavelengths: ArrayLike<number>, target: number): number {
@@ -33,11 +36,16 @@ function nearestIndex(wavelengths: ArrayLike<number>, target: number): number {
 }
 
 function fixtureObservablesActive(fixture: StellarBenchmarkFixture) {
+  const qualityMask = fixture.quality_mask ? Array.from(fixture.quality_mask, Boolean) : null;
+  const effective = (mask?: Float64Array) =>
+    mask
+      ? Array.from(mask, (value, index) => Boolean(value) && (qualityMask ? qualityMask[index] : true))
+      : [];
   return {
-    continuum: Boolean(fixture.continuum_mask?.some(Boolean)),
-    uv: Boolean(fixture.uv_mask?.some(Boolean)),
-    line: Boolean(fixture.line_mask?.some(Boolean)),
-    angular: false,
+    continuum: effective(fixture.continuum_mask).some(Boolean),
+    uv: effective(fixture.uv_mask).some(Boolean),
+    line: effective(fixture.line_mask).some(Boolean),
+    angular: Boolean(fixture.mu_grid && fixture.intensity_by_mu),
     polarization: false,
   };
 }
@@ -49,16 +57,49 @@ function expectBenchmarkSummary(
     wavelength_min_m: number;
     wavelength_max_m: number;
     coverage_fraction: number | null;
+    reference_kind: string | null;
+    valid_domain: { lambda_min_m: number; lambda_max_m: number } | null;
+    intended_observables: string[];
+    quality_mask_used: boolean;
+    uncertainty_used: boolean;
+    valid_sample_fraction: number | null;
+    quality_label: string | null;
   },
   fixture: StellarBenchmarkFixture,
 ) {
+  const validSampleFraction = fixture.quality_mask
+    ? Array.from(fixture.quality_mask, Boolean).filter(Boolean).length / fixture.quality_mask.length
+    : null;
   expect(benchmark).toEqual({
     id: fixture.benchmark_id,
     coverage_mode: fixture.coverage_mode,
     wavelength_min_m: fixture.wavelength_m[0],
     wavelength_max_m: fixture.wavelength_m[fixture.wavelength_m.length - 1],
     coverage_fraction: fixture.coverage_fraction,
+    reference_kind: fixture.reference_kind,
+    valid_domain: fixture.valid_domain,
+    intended_observables: fixture.intended_observables,
+    quality_mask_used: Boolean(fixture.quality_mask),
+    uncertainty_used: Boolean(fixture.uncertainty),
+    valid_sample_fraction: validSampleFraction,
+    quality_label: fixture.quality_label ?? null,
   });
+}
+
+function activeObservableNames(observablesActive: {
+  continuum: boolean;
+  uv: boolean;
+  line: boolean;
+  angular: boolean;
+  polarization: boolean;
+}): string[] {
+  const names: string[] = [];
+  if (observablesActive.continuum) names.push("continuum_fit");
+  if (observablesActive.uv) names.push("uv_residual");
+  if (observablesActive.line) names.push("line_residual");
+  if (observablesActive.angular) names.push("angular_residual");
+  if (observablesActive.polarization) names.push("polarization_penalty");
+  return names;
 }
 
 describe("stellar viability contract", () => {
@@ -79,7 +120,9 @@ describe("stellar viability contract", () => {
     const report = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: buildBenchmarkObservation(fixture, nullModel?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, nullModel?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: nullModel?.bolometric_flux_W_m2,
+      }),
       structure: {
         xi: 0.4,
         alpha_xi: 0.25,
@@ -103,8 +146,24 @@ describe("stellar viability contract", () => {
       polarization: false,
     });
     expect(report.benchmark.coverage_mode).toBe("full_spectrum");
-    expect(report.benchmark.id).toBe("solar-like-full-spectrum");
+    expect(report.benchmark.id).toBe("solar_tsis_sim_tim_full");
     expect(report.benchmark.coverage_fraction).toBe(1);
+    expect(report.benchmark.reference_kind).toBe("tsis_sim_tim_composite");
+    expect(report.benchmark.valid_domain).toEqual({
+      lambda_min_m: 200e-9,
+      lambda_max_m: 2400e-9,
+    });
+    expect(report.benchmark.intended_observables).toEqual([
+      "continuum_fit",
+      "uv_residual",
+      "line_residual",
+      "band_flux_closure",
+      "bolometric_closure",
+    ]);
+    expect(report.benchmark.quality_mask_used).toBe(false);
+    expect(report.benchmark.uncertainty_used).toBe(false);
+    expect(report.benchmark.valid_sample_fraction).toBeNull();
+    expect(report.benchmark.quality_label).toBeNull();
   });
 
   it("keeps default M0 behavior unchanged when no atmosphere hardening inputs are supplied", () => {
@@ -234,12 +293,16 @@ describe("stellar viability contract", () => {
     const baselineFit = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: hardenedM0?.bolometric_flux_W_m2,
+      }),
     });
     const hardenedFit = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: hardenedM0?.bolometric_flux_W_m2,
+      }),
       atmosphere: {
         line_opacity: 1.2,
         line_source_contrast: -0.15,
@@ -269,18 +332,27 @@ describe("stellar viability contract", () => {
       const report = evaluateStellarSpectralViability({
         luminosity_W: SOLAR_LUMINOSITY_W,
         radius_m: SOLAR_RADIUS_M,
-        observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array()),
+        observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array(), {
+          reference_flux_W_m2:
+            fixture.coverage_mode === "full_spectrum" ? m0Seed?.bolometric_flux_W_m2 : undefined,
+        }),
       });
 
       expect(report.winner, fixture.benchmark_id).toBe("M0_planck_atmosphere");
       expect(report.promotable_winner, fixture.benchmark_id).toBe("M0_planck_atmosphere");
       expect(report.observables_active, fixture.benchmark_id).toEqual(fixtureObservablesActive(fixture));
       expectBenchmarkSummary(report.benchmark, fixture);
+      const activeNames = activeObservableNames(report.observables_active);
+      expect(activeNames.every((observable) => fixture.intended_observables.includes(observable)), fixture.benchmark_id).toBe(
+        true,
+      );
     }
   });
 
   it("allows challenger observations to win across reusable benchmark fixtures", () => {
-    const fixtures = makeCanonicalStellarBenchmarkFixtures().filter((fixture) => fixture.benchmark_id !== "solar-like-uv-band");
+    const fixtures = makeCanonicalStellarBenchmarkFixtures().filter(
+      (fixture) => fixture.benchmark_id !== "solar_solstice_uv_200_310",
+    );
     for (const fixture of fixtures) {
       const structure = { xi: 0.9, alpha_xi: 0.45 };
       const seed = evaluateStellarSpectralViability({
@@ -299,7 +371,10 @@ describe("stellar viability contract", () => {
         luminosity_W: SOLAR_LUMINOSITY_W,
         radius_m: SOLAR_RADIUS_M,
         structure,
-        observation: buildBenchmarkObservation(fixture, m1Seed?.predicted_intensity ?? new Float64Array()),
+        observation: buildBenchmarkObservation(fixture, m1Seed?.predicted_intensity ?? new Float64Array(), {
+          reference_flux_W_m2:
+            fixture.coverage_mode === "full_spectrum" ? m1Seed?.bolometric_flux_W_m2 : undefined,
+        }),
       });
 
       expect(report.winner, fixture.benchmark_id).toBe("M1_lattice_emissivity");
@@ -363,7 +438,202 @@ describe("stellar viability contract", () => {
       wavelength_min_m: wavelengths[0],
       wavelength_max_m: wavelengths[wavelengths.length - 1],
       coverage_fraction: 0.38,
+      reference_kind: "tsis_sim_tim_composite",
+      valid_domain: {
+        lambda_min_m: 200e-9,
+        lambda_max_m: 2400e-9,
+      },
+      intended_observables: ["continuum_fit", "line_residual", "band_flux_closure"],
+      quality_mask_used: false,
+      uncertainty_used: false,
+      valid_sample_fraction: null,
+      quality_label: null,
     });
+  });
+
+  it("surfaces a strict intended-vs-active observable contract for UV benchmark runs", () => {
+    const fixture = makeCanonicalStellarBenchmarkFixtures().find((entry) => entry.benchmark_id === "solar_solstice_uv_200_310");
+    expect(fixture).toBeDefined();
+
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(
+        fixture ?? makeFullSpectrumSolarLikeFixture(),
+        Float64Array.from({ length: fixture?.wavelength_m.length ?? 0 }, () => 1),
+      ),
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const report = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(fixture ?? makeFullSpectrumSolarLikeFixture(), m0Seed?.predicted_intensity ?? new Float64Array()),
+    });
+
+    expect(report.benchmark.reference_kind).toBe("solstice_tsis_adjusted_uv");
+    expect(report.benchmark.valid_domain).toEqual({
+      lambda_min_m: 200e-9,
+      lambda_max_m: 310e-9,
+    });
+    expect(report.benchmark.intended_observables).toEqual(["uv_residual", "band_flux_closure"]);
+    expect(report.observables_active).toEqual({
+      continuum: false,
+      uv: true,
+      line: false,
+      angular: false,
+      polarization: false,
+    });
+    const activeNames = activeObservableNames(report.observables_active);
+    expect(activeNames).toEqual(["uv_residual"]);
+    expect(activeNames.length).toBeLessThan(report.benchmark.intended_observables.length);
+    expect(activeNames.every((observable) => report.benchmark.intended_observables.includes(observable))).toBe(true);
+  });
+
+  it("surfaces the angular benchmark contract separately from runtime-active angular evidence", () => {
+    const fixture = makeAngularContinuumSolarLikeFixture();
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(
+        fixture,
+        Float64Array.from({ length: fixture.wavelength_m.length }, () => 1),
+      ),
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const report = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array()),
+    });
+
+    expect(report.benchmark.id).toBe("solar_neckel_labs_clv");
+    expect(report.benchmark.reference_kind).toBe("neckel_labs_continuum_clv");
+    expect(report.benchmark.valid_domain).toEqual({
+      lambda_min_m: 303e-9,
+      lambda_max_m: 1099e-9,
+    });
+    expect(report.benchmark.intended_observables).toEqual(["continuum_fit", "angular_residual"]);
+    expect(report.observables_active).toEqual({
+      continuum: true,
+      uv: false,
+      line: false,
+      angular: true,
+      polarization: false,
+    });
+    expect(report.models.find((entry) => entry.id === "M0_planck_atmosphere")?.metrics.status.anisotropy_penalty).toBe(
+      "computed",
+    );
+  });
+
+  it("excludes masked UV samples from residuals and reports benchmark quality usage", () => {
+    const fixture = makeQualityMaskedUvSolarLikeFixture();
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(
+        fixture,
+        Float64Array.from({ length: fixture.wavelength_m.length }, () => 1),
+      ),
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const maskedQuality = Array.from(fixture.quality_mask ?? [], Boolean);
+    const distorted = Float64Array.from(m0Seed?.predicted_intensity ?? new Float64Array(), (value, index) =>
+      maskedQuality[index] ? value : value * 1.35,
+    );
+    const report = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(fixture, distorted),
+    });
+    const m0 = report.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0?.metrics.uv_residual).toBeLessThan(1e-12);
+    expect(m0?.metrics.status.uv_residual).toBe("computed");
+    expect(m0?.metrics.band_flux_closure).toBeLessThan(1e-12);
+    expect(report.benchmark.quality_mask_used).toBe(true);
+    expect(report.benchmark.uncertainty_used).toBe(false);
+    expect(report.benchmark.valid_sample_fraction).toBeCloseTo(49 / 56, 12);
+    expect(report.benchmark.quality_label).toBe("synthetic_uv_quality_mask");
+  });
+
+  it("weights full-spectrum residuals by uncertainty and reports uncertainty use explicitly", () => {
+    const weightedFixture = makeWeightedFullSpectrumSolarLikeFixture();
+    const unweightedFixture = makeFullSpectrumSolarLikeFixture(weightedFixture.wavelength_m);
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(
+        weightedFixture,
+        Float64Array.from({ length: weightedFixture.wavelength_m.length }, () => 1),
+      ),
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const distorted = Float64Array.from(m0Seed?.predicted_intensity ?? new Float64Array(), (value, index) => {
+      const lambda = weightedFixture.wavelength_m[index];
+      return lambda < 600e-9 ? value * 1.2 : value;
+    });
+    const weightedReport = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(weightedFixture, distorted, {
+        reference_flux_W_m2: m0Seed?.bolometric_flux_W_m2,
+      }),
+    });
+    const unweightedReport = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(unweightedFixture, distorted, {
+        reference_flux_W_m2: m0Seed?.bolometric_flux_W_m2,
+      }),
+    });
+
+    const weightedM0 = weightedReport.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const unweightedM0 = unweightedReport.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(weightedM0?.metrics.continuum_rms).toBeLessThan(unweightedM0?.metrics.continuum_rms ?? 0);
+    expect(weightedReport.benchmark.quality_mask_used).toBe(false);
+    expect(weightedReport.benchmark.uncertainty_used).toBe(true);
+    expect(weightedReport.benchmark.valid_sample_fraction).toBeNull();
+    expect(weightedReport.benchmark.quality_label).toBe("synthetic_full_spectrum_uncertainty");
+  });
+
+  it("gates fully masked observable families and closure metrics instead of inventing values", () => {
+    const fixture = makeQualityMaskedUvSolarLikeFixture();
+    const fullyMasked = Float64Array.from({ length: fixture.wavelength_m.length }, () => 0);
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(
+        fixture,
+        Float64Array.from({ length: fixture.wavelength_m.length }, () => 1),
+      ),
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const report = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array(), {
+        quality_mask: fullyMasked,
+        quality_label: "synthetic_all_invalid_uv",
+      }),
+    });
+    const m0 = report.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0?.metrics.uv_residual).toBeNull();
+    expect(m0?.metrics.status.uv_residual).toBe("gated");
+    expect(m0?.metrics.band_flux_closure).toBeNull();
+    expect(m0?.metrics.status.band_flux_closure).toBe("gated");
+    expect(report.observables_active.uv).toBe(false);
+    expect(report.benchmark.valid_sample_fraction).toBe(0);
+    expect(report.benchmark.quality_mask_used).toBe(true);
+    expect(report.benchmark.quality_label).toBe("synthetic_all_invalid_uv");
   });
 
   it("applies reference_flux_W_m2 to the active closure path deterministically", () => {
@@ -421,7 +691,9 @@ describe("stellar viability contract", () => {
     const report = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: buildBenchmarkObservation(fixture, lattice?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, lattice?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: lattice?.bolometric_flux_W_m2,
+      }),
       structure: {
         xi: 0.8,
         alpha_xi: 0.35,
@@ -467,7 +739,9 @@ describe("stellar viability contract", () => {
     const baselineReport = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: buildBenchmarkObservation(fixture, baselineM0?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, baselineM0?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: baselineM0?.bolometric_flux_W_m2,
+      }),
     });
     const hardenedReport = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
@@ -476,7 +750,9 @@ describe("stellar viability contract", () => {
         continuum_opacity: 0.25,
         line_opacity: 0.8,
       },
-      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: hardenedM0?.bolometric_flux_W_m2,
+      }),
     });
     const challengerReport = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
@@ -485,12 +761,14 @@ describe("stellar viability contract", () => {
         xi: 0.8,
         alpha_xi: 0.35,
       },
-      observation: buildBenchmarkObservation(fixture, challengerM1?.predicted_intensity ?? new Float64Array()),
+      observation: buildBenchmarkObservation(fixture, challengerM1?.predicted_intensity ?? new Float64Array(), {
+        reference_flux_W_m2: challengerM1?.bolometric_flux_W_m2,
+      }),
     });
 
-    expect(baselineReport.benchmark.id).toBe("solar-like-full-spectrum");
-    expect(hardenedReport.benchmark.id).toBe("solar-like-full-spectrum");
-    expect(challengerReport.benchmark.id).toBe("solar-like-full-spectrum");
+    expect(baselineReport.benchmark.id).toBe("solar_tsis_sim_tim_full");
+    expect(hardenedReport.benchmark.id).toBe("solar_tsis_sim_tim_full");
+    expect(challengerReport.benchmark.id).toBe("solar_tsis_sim_tim_full");
     expect(baselineReport.winner).toBe("M0_planck_atmosphere");
     expect(hardenedReport.winner).toBe("M0_planck_atmosphere");
     expect(challengerReport.winner).toBe("M1_lattice_emissivity");

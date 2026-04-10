@@ -328,6 +328,64 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect(typeof artifact.tensors.tileEffective.typeI.fraction).toBe("number");
   });
 
+  it("applies the selected NHM2 shift-lapse profile on the metric T00 lane without automatic tile proxy lift", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+
+    const baselineState = initializePipelineState();
+    baselineState.warpFieldType = "nhm2_shift_lapse" as any;
+    baselineState.dynamicConfig = {
+      ...(baselineState.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    } as any;
+
+    const tunedState = initializePipelineState();
+    tunedState.warpFieldType = "nhm2_shift_lapse" as any;
+    tunedState.shiftLapseProfileId = "stage1_centerline_alpha_0p995_v1" as any;
+    tunedState.dynamicConfig = {
+      ...(tunedState.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+    } as any;
+
+    const baselineSnapshot = await calculateEnergyPipeline(baselineState);
+    const tunedSnapshot = await calculateEnergyPipeline(tunedState);
+    const baselineObserver = (baselineSnapshot as any).nhm2ObserverAudit;
+    const tunedObserver = (tunedSnapshot as any).nhm2ObserverAudit;
+
+    expect((baselineSnapshot as any).warp?.metricT00Ref).toBe(
+      "warp.metric.T00.nhm2.shift_lapse",
+    );
+    expect((tunedSnapshot as any).warp?.metricT00Ref).toBe(
+      "warp.metric.T00.nhm2.shift_lapse",
+    );
+    expect((tunedSnapshot as any).warp?.metricT00).toBeGreaterThan(
+      (baselineSnapshot as any).warp?.metricT00,
+    );
+    expect(
+      tunedObserver.tensors.metricRequired.conditions.wec.robustMin,
+    ).toBeGreaterThan(
+      baselineObserver.tensors.metricRequired.conditions.wec.robustMin,
+    );
+    expect(
+      tunedObserver.tensors.metricRequired.conditions.dec.robustMin,
+    ).toBeGreaterThan(
+      baselineObserver.tensors.metricRequired.conditions.dec.robustMin,
+    );
+    expect(
+      tunedObserver.tensors.tileEffective.conditions.wec.robustMin,
+    ).toBeCloseTo(
+      baselineObserver.tensors.tileEffective.conditions.wec.robustMin,
+      12,
+    );
+    expect(
+      tunedObserver.tensors.tileEffective.conditions.dec.robustMin,
+    ).toBeCloseTo(
+      baselineObserver.tensors.tileEffective.conditions.dec.robustMin,
+      12,
+    );
+  });
+
   it("preserves configured QI tau/sampler for guard evaluation after telemetry refresh", async () => {
     process.env.WARP_STRICT_CONGRUENCE = "1";
     const { initializePipelineState, updateParameters, evaluateQiGuardrail } = await loadPipeline();

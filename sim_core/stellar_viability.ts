@@ -4,6 +4,10 @@ const LIGHT_C = 299792458;
 const STEFAN_BOLTZMANN = 5.670374419e-8;
 const PI = Math.PI;
 const TINY = 1e-30;
+const MIN_CLOSURE_VALID_SAMPLE_COUNT = 2;
+const MIN_CLOSURE_VALID_SAMPLE_FRACTION = 0.1;
+const MIN_UNCERTAINTY_SIGMA = 1e-4;
+const MAX_UNCERTAINTY_WEIGHT = 1e6;
 
 export type StellarRadiationModelId =
   | "M0_planck_atmosphere"
@@ -13,6 +17,20 @@ export type StellarRadiationModelId =
 
 export type StellarCoverageMode = "full_spectrum" | "band_limited";
 
+export type StellarBenchmarkObservable =
+  | "continuum_fit"
+  | "uv_residual"
+  | "line_residual"
+  | "band_flux_closure"
+  | "bolometric_closure"
+  | "angular_residual"
+  | "polarization_penalty";
+
+export interface StellarBenchmarkDomain {
+  lambda_min_m: number;
+  lambda_max_m: number;
+}
+
 export interface StellarSpectrumObservation {
   wavelength_m: ArrayLike<number>;
   intensity: ArrayLike<number>;
@@ -20,6 +38,12 @@ export interface StellarSpectrumObservation {
   coverage_mode?: StellarCoverageMode;
   reference_flux_W_m2?: number;
   coverage_fraction?: number;
+  reference_kind?: string;
+  valid_domain?: StellarBenchmarkDomain;
+  intended_observables?: StellarBenchmarkObservable[];
+  uncertainty?: ArrayLike<number>;
+  quality_mask?: ArrayLike<number | boolean>;
+  quality_label?: string;
   continuum_mask?: ArrayLike<number | boolean>;
   uv_mask?: ArrayLike<number | boolean>;
   line_mask?: ArrayLike<number | boolean>;
@@ -137,6 +161,13 @@ export interface StellarViabilityReport {
     wavelength_min_m: number;
     wavelength_max_m: number;
     coverage_fraction: number | null;
+    reference_kind: string | null;
+    valid_domain: StellarBenchmarkDomain | null;
+    intended_observables: StellarBenchmarkObservable[];
+    quality_mask_used: boolean;
+    uncertainty_used: boolean;
+    valid_sample_fraction: number | null;
+    quality_label: string | null;
   };
   contract: {
     continuum_rms_max: number;
@@ -208,6 +239,13 @@ function toOptionalMask(values: ArrayLike<number | boolean> | undefined, length:
     return null;
   }
   return Array.from({ length }, (_, index) => Boolean(values[index]));
+}
+
+function toOptionalSeries(values: ArrayLike<number> | undefined, length: number): Float64Array | null {
+  if (!values || values.length !== length) {
+    return null;
+  }
+  return toFloat64(values);
 }
 
 function averageSeries(values: ArrayLike<number> | undefined): number {
@@ -283,17 +321,59 @@ function maxFinite(values: ArrayLike<number>): number {
   return best;
 }
 
-function relativeRms(observed: Float64Array, predicted: Float64Array, mask: boolean[]): number {
-  let sumSq = 0;
+function countTrue(mask: boolean[] | null): number {
+  if (!mask) return 0;
   let count = 0;
+  for (let index = 0; index < mask.length; index += 1) {
+    if (mask[index]) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function maskSampleFraction(mask: boolean[] | null, length: number): number | null {
+  if (!mask || length === 0) {
+    return null;
+  }
+  return countTrue(mask) / length;
+}
+
+function intersectMasks(primary: boolean[] | null, secondary: boolean[] | null): boolean[] | null {
+  if (!primary) {
+    return null;
+  }
+  if (!secondary) {
+    return [...primary];
+  }
+  return primary.map((value, index) => value && secondary[index]);
+}
+
+function uncertaintyWeight(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+  const sigma = Math.max(Math.abs(value), MIN_UNCERTAINTY_SIGMA);
+  return Math.min(MAX_UNCERTAINTY_WEIGHT, 1 / (sigma * sigma));
+}
+
+function relativeRms(
+  observed: Float64Array,
+  predicted: Float64Array,
+  mask: boolean[],
+  uncertainty: Float64Array | null = null,
+): number {
+  let weightedSq = 0;
+  let weightTotal = 0;
   for (let index = 0; index < observed.length; index += 1) {
     if (!mask[index]) continue;
     const scale = Math.max(Math.abs(observed[index]), TINY);
     const delta = (predicted[index] - observed[index]) / scale;
-    sumSq += delta * delta;
-    count += 1;
+    const weight = uncertainty ? uncertaintyWeight(uncertainty[index]) : 1;
+    weightedSq += weight * delta * delta;
+    weightTotal += weight;
   }
-  return count > 0 ? Math.sqrt(sumSq / count) : 0;
+  return weightTotal > 0 ? Math.sqrt(weightedSq / weightTotal) : 0;
 }
 
 function normalizeByPeak(values: Float64Array): Float64Array {
@@ -305,18 +385,56 @@ function computeMaskedResidual(
   observed: Float64Array,
   predicted: Float64Array,
   mask: boolean[] | null,
+  uncertainty: Float64Array | null = null,
 ): { value: number | null; status: "computed" | "gated" } {
-  if (!mask || !mask.some(Boolean)) {
+  if (!mask || countTrue(mask) === 0) {
     return { value: null, status: "gated" };
   }
   return {
-    value: relativeRms(observed, predicted, mask),
+    value: relativeRms(observed, predicted, mask, uncertainty),
     status: "computed",
   };
 }
 
-function computeFluxClosure(referenceFlux: number | null | undefined, predictedFlux: number): { value: number | null; status: "computed" | "gated" } {
+function integrateTrapezoidMasked(
+  x: Float64Array,
+  y: Float64Array,
+  mask: boolean[] | null,
+): { value: number; validCount: number; validFraction: number | null } {
+  if (!mask) {
+    return {
+      value: integrateTrapezoid(x, y),
+      validCount: x.length,
+      validFraction: null,
+    };
+  }
+  const validCount = countTrue(mask);
+  const validFraction = maskSampleFraction(mask, x.length);
+  if (validCount < MIN_CLOSURE_VALID_SAMPLE_COUNT) {
+    return { value: 0, validCount, validFraction };
+  }
+  let area = 0;
+  for (let index = 0; index < x.length - 1; index += 1) {
+    if (!(mask[index] && mask[index + 1])) continue;
+    const dx = x[index + 1] - x[index];
+    area += 0.5 * (y[index] + y[index + 1]) * dx;
+  }
+  return { value: area, validCount, validFraction };
+}
+
+function computeFluxClosure(
+  referenceFlux: number | null | undefined,
+  predictedFlux: number,
+  qualitySummary: { validCount: number; validFraction: number | null },
+): { value: number | null; status: "computed" | "gated" } {
   if (!(referenceFlux != null && Number.isFinite(referenceFlux) && referenceFlux > 0)) {
+    return { value: null, status: "gated" };
+  }
+  if (
+    qualitySummary.validFraction != null &&
+    (qualitySummary.validCount < MIN_CLOSURE_VALID_SAMPLE_COUNT ||
+      qualitySummary.validFraction < MIN_CLOSURE_VALID_SAMPLE_FRACTION)
+  ) {
     return { value: null, status: "gated" };
   }
   return {
@@ -530,9 +648,11 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
 
   const observedIntensity = toFloat64(observation.intensity);
   const coverageMode: StellarCoverageMode = observation.coverage_mode ?? "full_spectrum";
-  const continuumMask = toOptionalMask(observation.continuum_mask, wavelength_m.length);
-  const uvMask = toOptionalMask(observation.uv_mask, wavelength_m.length);
-  const lineMask = toOptionalMask(observation.line_mask, wavelength_m.length);
+  const qualityMask = toOptionalMask(observation.quality_mask, wavelength_m.length);
+  const uncertainty = toOptionalSeries(observation.uncertainty, wavelength_m.length);
+  const continuumMask = intersectMasks(toOptionalMask(observation.continuum_mask, wavelength_m.length), qualityMask);
+  const uvMask = intersectMasks(toOptionalMask(observation.uv_mask, wavelength_m.length), qualityMask);
+  const lineMask = intersectMasks(toOptionalMask(observation.line_mask, wavelength_m.length), qualityMask);
   const muGrid =
     observation.mu_grid && observation.intensity_by_mu && observation.mu_grid.length === observation.intensity_by_mu.length
       ? toFloat64(observation.mu_grid)
@@ -543,15 +663,19 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
   const observedPolarization = observation.polarization ? averageSeries(observation.polarization) : null;
   const expectedBolometricFlux = STEFAN_BOLTZMANN * Math.pow(teff_K, 4);
   const observedBolometricFlux = PI * integrateTrapezoid(wavelength_m, observedIntensity);
+  const observedQualityAwareFluxIntegral = integrateTrapezoidMasked(wavelength_m, observedIntensity, qualityMask);
+  const observedQualityAwareFlux = PI * observedQualityAwareFluxIntegral.value;
   const bolometricReferenceFlux =
-    coverageMode === "full_spectrum" ? (observation.reference_flux_W_m2 ?? expectedBolometricFlux) : null;
+    coverageMode === "full_spectrum"
+      ? observation.reference_flux_W_m2 ?? (qualityMask ? observedQualityAwareFlux : expectedBolometricFlux)
+      : null;
   const bandReferenceFlux =
-    coverageMode === "band_limited" ? (observation.reference_flux_W_m2 ?? observedBolometricFlux) : null;
+    coverageMode === "band_limited" ? (observation.reference_flux_W_m2 ?? observedQualityAwareFlux) : null;
   const weights: StellarViabilityWeights = { ...DEFAULT_WEIGHTS, ...(input.weights ?? {}) };
   const observablesActive = {
-    continuum: Boolean(continuumMask?.some(Boolean)),
-    uv: Boolean(uvMask?.some(Boolean)),
-    line: Boolean(lineMask?.some(Boolean)),
+    continuum: Boolean(continuumMask && countTrue(continuumMask) > 0),
+    uv: Boolean(uvMask && countTrue(uvMask) > 0),
+    line: Boolean(lineMask && countTrue(lineMask) > 0),
     angular: Boolean((muGrid && observedMuProfile) || (observation.anisotropy && observation.anisotropy.length > 0)),
     polarization: Boolean(observation.polarization && observation.polarization.length > 0),
   };
@@ -567,15 +691,24 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
     wavelength_min_m: wavelength_m[0] ?? 0,
     wavelength_max_m: wavelength_m[wavelength_m.length - 1] ?? 0,
     coverage_fraction: benchmarkCoverageFraction,
+    reference_kind: observation.reference_kind ?? null,
+    valid_domain: observation.valid_domain ?? null,
+    intended_observables: observation.intended_observables ? [...observation.intended_observables] : [],
+    quality_mask_used: Boolean(qualityMask),
+    uncertainty_used: Boolean(uncertainty),
+    valid_sample_fraction: maskSampleFraction(qualityMask, wavelength_m.length),
+    quality_label: observation.quality_label ?? null,
   };
 
   const models = buildModelPredictions(input, wavelength_m, base).map((entry) => {
     const predictedFlux = PI * integrateTrapezoid(wavelength_m, entry.predicted);
-    const continuumResidual = computeMaskedResidual(observedIntensity, entry.predicted, continuumMask);
-    const uvResidual = computeMaskedResidual(observedIntensity, entry.predicted, uvMask);
-    const lineResidual = computeMaskedResidual(observedIntensity, entry.predicted, lineMask);
-    const bolometricClosure = computeFluxClosure(bolometricReferenceFlux, predictedFlux);
-    const bandFluxClosure = computeFluxClosure(bandReferenceFlux, predictedFlux);
+    const predictedQualityAwareFluxIntegral = integrateTrapezoidMasked(wavelength_m, entry.predicted, qualityMask);
+    const predictedQualityAwareFlux = PI * predictedQualityAwareFluxIntegral.value;
+    const continuumResidual = computeMaskedResidual(observedIntensity, entry.predicted, continuumMask, uncertainty);
+    const uvResidual = computeMaskedResidual(observedIntensity, entry.predicted, uvMask, uncertainty);
+    const lineResidual = computeMaskedResidual(observedIntensity, entry.predicted, lineMask, uncertainty);
+    const bolometricClosure = computeFluxClosure(bolometricReferenceFlux, predictedQualityAwareFlux, predictedQualityAwareFluxIntegral);
+    const bandFluxClosure = computeFluxClosure(bandReferenceFlux, predictedQualityAwareFlux, predictedQualityAwareFluxIntegral);
     const activeClosure = coverageMode === "band_limited" ? bandFluxClosure : bolometricClosure;
     const predictedMuProfile = muGrid ? buildAngularProfile(muGrid, input.atmosphere, entry.anisotropy) : null;
     const anisotropyMetric =

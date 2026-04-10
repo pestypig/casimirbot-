@@ -10,10 +10,14 @@ Benchmark assignment is computed from trusted post-crossmatch identity, not from
 
 Match provenance is explicit:
 
-- `benchmark_target_match_mode`: `matched_by_identifier`, `matched_by_name`, `conflicted_name_vs_identifier`, or `no_match`
+- `benchmark_target_match_mode`: `matched_by_identifier`, `matched_by_name`, `conflicted_trusted_identifiers`, `conflicted_name_vs_identifier`, or `no_match`
 - `benchmark_target_conflict_reason` (present on conflicts)
-- `benchmark_target_identity_basis`: `trusted_identifier`, `name_label`, `conflicted_trusted_identifier_vs_name`, or `none`
+- `benchmark_target_identity_basis`: `trusted_identifier`, `name_label`, `conflicted_trusted_identifiers`, `conflicted_trusted_identifier_vs_name`, or `none`
 - `benchmark_target_quality_ok`
+
+Trusted identifiers must converge on one benchmark target before `benchmark_target_id` is assigned.
+If trusted identifiers point at different benchmark targets, the resolver intentionally returns no benchmark assignment with `benchmark_target_match_mode: "conflicted_trusted_identifiers"`.
+This stricter rule applies to benchmark identity only; ordinary field resolution can still remain usable while benchmark assignment is withheld.
 
 ## Crossmatch quality rules
 
@@ -63,3 +67,40 @@ Rejected-source identifiers stay visible in `identifiers_observed` for operator 
 - domain-backed only: within supported domain without benchmark target match.
 
 Both paths preserve existing maturity policy; diagnostics do not inflate maturity by themselves.
+
+## Benchmark receipts
+
+Resolve-first benchmark-backed runs now emit:
+
+- `benchmark_receipt_ref`
+- `benchmark_input_signature`
+- `previous_benchmark_receipt_ref`
+- `benchmark_repeatability`
+
+The benchmark receipt is a compact reproducibility artifact under `artifacts/research/starsim/benchmarks/...`.
+It records the trusted benchmark identity basis, observed/trusted identifiers, selected field origins, lane plan, blocked reasons, observable-envelope checks, and any completed lane diagnostic summaries.
+
+`benchmark_input_signature` is deterministic over benchmark-relevant inputs:
+
+- trusted identifiers
+- benchmark target id and identity basis
+- selected field origins
+- selected benchmark observables from the frozen draft
+- requested lanes and precondition policy
+- source cache key and resolved draft hash
+
+Equivalent benchmark-backed runs should emit the same signature.
+If trusted identity or selected source origins change, the signature should change as well.
+
+Blocked benchmark-backed runs can still emit a receipt when benchmark assignment succeeded.
+Non-benchmark runs intentionally do not emit benchmark receipts.
+
+`benchmark_repeatability` is a compact comparison against the most relevant previous benchmark receipt for the same benchmark target.
+It reports:
+
+- whether the run is repeatable
+- whether the benchmark input signature stayed the same
+- drift categories such as identity, selected-field-origin, lane-plan, blocked-reason, envelope-status, or diagnostic-summary changes
+
+Completed benchmark-backed runs compare against previous completed receipts first.
+Blocked or preview-stage benchmark-backed runs can fall back to the most recent receipt for the same target so readiness drift is still visible.

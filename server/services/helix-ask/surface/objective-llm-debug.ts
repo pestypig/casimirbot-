@@ -1,0 +1,81 @@
+type MutableDebugPayload = Record<string, unknown>;
+
+export const applyObjectiveLlmDebugPayload = (args: {
+  debugPayload: MutableDebugPayload;
+  objectiveMiniAnswers: unknown[];
+  objectiveMiniValidation: unknown;
+  objectiveMiniSynthMode: unknown;
+  objectiveMiniSynthLlmAttempted: unknown;
+  objectiveMiniSynthLlmInvoked: unknown;
+  objectiveMiniSynthFailReason: unknown;
+  objectiveMiniSynthPromptPreview: unknown;
+  objectiveMiniSynthRepairAttempted: unknown;
+  objectiveMiniSynthRepairSuccess: unknown;
+  objectiveMiniSynthRepairFailReason: unknown;
+  objectiveMiniCriticMode: unknown;
+  objectiveMiniCriticLlmAttempted: unknown;
+  objectiveMiniCriticLlmInvoked: unknown;
+  objectiveMiniCriticFailReason: unknown;
+  objectiveMiniCriticPromptPreview: unknown;
+  objectiveMiniCriticRepairAttempted: unknown;
+  objectiveMiniCriticRepairSuccess: unknown;
+  objectiveMiniCriticRepairFailReason: unknown;
+  objectiveAssemblyMode: unknown;
+  objectiveAssemblyFailReason: unknown;
+  objectiveAssemblyBlockedReason: unknown;
+  objectiveAssemblyLlmAttempted: unknown;
+  objectiveAssemblyLlmInvoked: unknown;
+  objectiveAssemblyPromptPreview: unknown;
+  objectiveAssemblyRescuePromptPreview: unknown;
+  objectiveAssemblyRescueAttempted: unknown;
+  objectiveAssemblyRescueSuccess: unknown;
+  objectiveAssemblyRescueFailReason: unknown;
+  objectiveAssemblyRepairAttempted: unknown;
+  objectiveAssemblyRepairSuccess: unknown;
+  objectiveAssemblyRepairFailReason: unknown;
+  objectiveAssemblyRescueRepairAttempted: unknown;
+  objectiveAssemblyRescueRepairSuccess: unknown;
+  objectiveAssemblyRescueRepairFailReason: unknown;
+  objectiveAssemblyWeakRejectCount: unknown;
+}): void => {
+  args.debugPayload.objective_mini_answers = args.objectiveMiniAnswers.slice(0, 12);
+  args.debugPayload.objective_mini_validation = args.objectiveMiniValidation;
+  args.debugPayload.objective_mini_synth_mode = args.objectiveMiniSynthMode;
+  args.debugPayload.objective_mini_synth_attempted = args.objectiveMiniSynthLlmAttempted;
+  args.debugPayload.objective_mini_synth_invoked = args.objectiveMiniSynthLlmInvoked;
+  args.debugPayload.objective_mini_synth_fail_reason = args.objectiveMiniSynthFailReason;
+  args.debugPayload.objective_mini_synth_prompt_preview = args.objectiveMiniSynthPromptPreview;
+  args.debugPayload.objective_mini_synth_repair_attempted = args.objectiveMiniSynthRepairAttempted;
+  args.debugPayload.objective_mini_synth_repair_success = args.objectiveMiniSynthRepairSuccess;
+  args.debugPayload.objective_mini_synth_repair_fail_reason = args.objectiveMiniSynthRepairFailReason;
+  args.debugPayload.objective_mini_critic_mode = args.objectiveMiniCriticMode;
+  args.debugPayload.objective_mini_critic_attempted = args.objectiveMiniCriticLlmAttempted;
+  args.debugPayload.objective_mini_critic_invoked = args.objectiveMiniCriticLlmInvoked;
+  args.debugPayload.objective_mini_critic_fail_reason = args.objectiveMiniCriticFailReason;
+  args.debugPayload.objective_mini_critic_prompt_preview = args.objectiveMiniCriticPromptPreview;
+  args.debugPayload.objective_mini_critic_repair_attempted = args.objectiveMiniCriticRepairAttempted;
+  args.debugPayload.objective_mini_critic_repair_success = args.objectiveMiniCriticRepairSuccess;
+  args.debugPayload.objective_mini_critic_repair_fail_reason = args.objectiveMiniCriticRepairFailReason;
+  args.debugPayload.objective_assembly_mode = args.objectiveAssemblyMode;
+  args.debugPayload.objective_assembly_input_count = args.objectiveMiniAnswers.length;
+  args.debugPayload.objective_assembly_fail_reason = args.objectiveAssemblyFailReason;
+  args.debugPayload.objective_assembly_blocked_reason = args.objectiveAssemblyBlockedReason;
+  args.debugPayload.objective_assembly_llm_attempted = args.objectiveAssemblyLlmAttempted;
+  args.debugPayload.objective_assembly_llm_invoked = args.objectiveAssemblyLlmInvoked;
+  args.debugPayload.objective_assembly_prompt_preview = args.objectiveAssemblyPromptPreview;
+  args.debugPayload.objective_assembly_rescue_prompt_preview =
+    args.objectiveAssemblyRescuePromptPreview;
+  args.debugPayload.objective_assembly_rescue_attempted = args.objectiveAssemblyRescueAttempted;
+  args.debugPayload.objective_assembly_rescue_success = args.objectiveAssemblyRescueSuccess;
+  args.debugPayload.objective_assembly_rescue_fail_reason = args.objectiveAssemblyRescueFailReason;
+  args.debugPayload.objective_assembly_repair_attempted = args.objectiveAssemblyRepairAttempted;
+  args.debugPayload.objective_assembly_repair_success = args.objectiveAssemblyRepairSuccess;
+  args.debugPayload.objective_assembly_repair_fail_reason = args.objectiveAssemblyRepairFailReason;
+  args.debugPayload.objective_assembly_rescue_repair_attempted =
+    args.objectiveAssemblyRescueRepairAttempted;
+  args.debugPayload.objective_assembly_rescue_repair_success =
+    args.objectiveAssemblyRescueRepairSuccess;
+  args.debugPayload.objective_assembly_rescue_repair_fail_reason =
+    args.objectiveAssemblyRescueRepairFailReason;
+  args.debugPayload.objective_assembly_weak_reject_count = args.objectiveAssemblyWeakRejectCount;
+};

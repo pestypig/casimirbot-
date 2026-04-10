@@ -1,10 +1,73 @@
+export type HelixAskTraceEvent = {
+  ts: string;
+  tool: string;
+  stage: string;
+  detail?: string;
+  ok?: boolean;
+  durationMs?: number;
+  text?: string;
+  meta?: Record<string, unknown>;
+};
+
+export type HelixAskTraceSummary = {
+  stage: string;
+  detail?: string;
+  ok?: boolean;
+  durationMs?: number;
+  meta?: Record<string, unknown>;
+};
+
 type MutableDebugPayload = Record<string, unknown> | null | undefined;
+
+export const buildTraceSummary = (
+  events: HelixAskTraceEvent[],
+  limit = 12,
+): HelixAskTraceSummary[] => {
+  if (!events.length) return [];
+  return events
+    .filter((entry) => {
+      const fn = (entry.meta as { fn?: unknown } | undefined)?.fn;
+      return (
+        typeof entry.durationMs === "number" &&
+        Number.isFinite(entry.durationMs) &&
+        entry.durationMs > 0 &&
+        typeof fn === "string" &&
+        fn.trim().length > 0
+      );
+    })
+    .sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))
+    .slice(0, limit)
+    .map((entry) => ({
+      stage: entry.stage,
+      detail: entry.detail,
+      ok: entry.ok,
+      durationMs: entry.durationMs,
+      meta: entry.meta,
+    }));
+};
+
+export const attachTraceSummaryDebugPayload = (args: {
+  debugPayload: MutableDebugPayload;
+  traceEvents: HelixAskTraceEvent[];
+  attachReasoningSidebarToDebug?: (args: {
+    debugRecord: Record<string, unknown>;
+    traceEvents: HelixAskTraceEvent[];
+  }) => void;
+}): void => {
+  if (!args.debugPayload) return;
+  args.debugPayload.live_events = args.traceEvents;
+  args.debugPayload.trace_events = args.traceEvents;
+  args.debugPayload.trace_summary = buildTraceSummary(args.traceEvents);
+  args.attachReasoningSidebarToDebug?.({
+    debugRecord: args.debugPayload,
+    traceEvents: args.traceEvents,
+  });
+};
 
 export const attachFinalTraceDebugPayload = (args: {
   debugPayload: MutableDebugPayload;
   captureLiveHistory: boolean;
-  traceEvents: Record<string, unknown>[];
-  buildTraceSummary: (events: Record<string, unknown>[]) => unknown;
+  traceEvents: HelixAskTraceEvent[];
   buildEventStableFields: (args: {
     retrievalRoute: string;
     fallbackDecision: string;
@@ -18,7 +81,7 @@ export const attachFinalTraceDebugPayload = (args: {
   hashStableJson: (value: unknown) => string;
   attachReasoningSidebarToDebug: (args: {
     debugRecord: Record<string, unknown>;
-    traceEvents: Record<string, unknown>[];
+    traceEvents: HelixAskTraceEvent[];
   }) => void;
   retrievalRoute: string;
   fallbackDecision: string;
@@ -30,9 +93,11 @@ export const attachFinalTraceDebugPayload = (args: {
   };
 }): void => {
   if (!args.debugPayload || !args.captureLiveHistory) return;
-  args.debugPayload.live_events = args.traceEvents;
-  args.debugPayload.trace_events = args.traceEvents;
-  args.debugPayload.trace_summary = args.buildTraceSummary(args.traceEvents);
+  attachTraceSummaryDebugPayload({
+    debugPayload: args.debugPayload,
+    traceEvents: args.traceEvents,
+    attachReasoningSidebarToDebug: args.attachReasoningSidebarToDebug,
+  });
   const stableEventFields = args.buildEventStableFields({
     retrievalRoute: args.retrievalRoute,
     fallbackDecision: args.fallbackDecision,
@@ -48,10 +113,6 @@ export const attachFinalTraceDebugPayload = (args: {
     event_hash: args.hashStableJson(args.traceEvents),
     stable_fields: stableEventFields,
   };
-  args.attachReasoningSidebarToDebug({
-    debugRecord: args.debugPayload,
-    traceEvents: args.traceEvents,
-  });
 };
 
 export const attachOverflowRetryDebugPayload = (args: {

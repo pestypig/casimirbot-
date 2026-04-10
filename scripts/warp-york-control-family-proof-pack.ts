@@ -29148,6 +29148,15 @@ const toObserverAuditTensorInput = (
     | Nhm2ObserverAuditArtifact["tensors"]["metricRequired"]
     | Nhm2ObserverAuditArtifact["tensors"]["tileEffective"],
   tensorRef: string,
+  upstreamTrace?: Pick<
+    BuildNhm2ObserverAuditTensorInput,
+    | "upstreamDriverRef"
+    | "upstreamDriverClass"
+    | "upstreamDriverDependencyStatus"
+    | "upstreamDriverNote"
+    | "firstUpstreamRemediationTarget"
+    | "firstUpstreamRemediationWhy"
+  >,
 ): BuildNhm2ObserverAuditTensorInput => ({
   tensorRef,
   sampleCount: tensor.sampleCount,
@@ -29233,7 +29242,58 @@ const toObserverAuditTensorInput = (
     note: tensor.model.note,
   },
   missingInputs: tensor.missingInputs,
+  ...upstreamTrace,
 });
+
+const buildPublishedObserverUpstreamTrace = (args: {
+  tensorId: "metric_required" | "tile_effective";
+  tensorSemanticRef: string | null;
+}): Pick<
+  BuildNhm2ObserverAuditTensorInput,
+  | "upstreamDriverRef"
+  | "upstreamDriverClass"
+  | "upstreamDriverDependencyStatus"
+  | "upstreamDriverNote"
+  | "firstUpstreamRemediationTarget"
+  | "firstUpstreamRemediationWhy"
+> => {
+  if (args.tensorId === "metric_required") {
+    const upstreamDriverRef =
+      args.tensorSemanticRef ?? "warp.metric.T00.nhm2.shift_lapse";
+    return {
+      upstreamDriverRef,
+      upstreamDriverClass: "metric_t00_density",
+      upstreamDriverDependencyStatus: "direct_same_surface_driver",
+      upstreamDriverNote:
+        "metric_required WEC traces directly to the emitted metric T00 density surface.",
+      firstUpstreamRemediationTarget: upstreamDriverRef,
+      firstUpstreamRemediationWhy:
+        "Inspect the emitted metric T00 density because metric_required WEC reduces directly to rho on this surface.",
+    };
+  }
+  const upstreamDriverRef =
+    args.tensorSemanticRef ??
+    "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
+  const usesProxy =
+    upstreamDriverRef.includes("proxy") ||
+    upstreamDriverRef.includes("tensorSampledSummaries");
+  return {
+    upstreamDriverRef,
+    upstreamDriverClass: usesProxy
+      ? "tile_energy_density_proxy"
+      : "tile_t00_density",
+    upstreamDriverDependencyStatus: usesProxy
+      ? "proxy_derived_driver"
+      : "direct_same_surface_driver",
+    upstreamDriverNote: usesProxy
+      ? "tile_effective WEC traces to the emitted tile energy-density proxy surface rather than a full flux/shear-resolved tensor."
+      : "tile_effective WEC traces directly to the emitted tile T00 density surface.",
+    firstUpstreamRemediationTarget: upstreamDriverRef,
+    firstUpstreamRemediationWhy: usesProxy
+      ? "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface."
+      : "Inspect the emitted tile T00 density because tile_effective WEC reduces directly to rho on this surface.",
+  };
+};
 
 const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
   transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
@@ -29281,10 +29341,18 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
     metricRequired: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.metricRequired,
       normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
+      buildPublishedObserverUpstreamTrace({
+        tensorId: "metric_required",
+        tensorSemanticRef: metricTensorSnapshot.tensorSemanticRef,
+      }),
     ),
     tileEffective: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.tileEffective,
       normalizePath(tensorSnapshotPaths.tileEffectiveLatestJsonPath),
+      buildPublishedObserverUpstreamTrace({
+        tensorId: "tile_effective",
+        tensorSemanticRef: tileTensorSnapshot.tensorSemanticRef,
+      }),
     ),
   });
 };
@@ -29339,6 +29407,26 @@ const renderNhm2ObserverAuditMarkdown = (
 | primaryBlockingValue | ${tensor.primaryBlockingValue ?? "null"} |
 | primaryBlockingReference | ${tensor.primaryBlockingReference ?? "null"} |
 | primaryBlockingWhy | ${tensor.primaryBlockingWhy ?? "null"} |
+| rootCauseClass | ${tensor.rootCauseClass} |
+| blockingDependencyStatus | ${tensor.blockingDependencyStatus} |
+| blockingDependencyNote | ${tensor.blockingDependencyNote ?? "null"} |
+| firstRemediationTarget | ${tensor.firstRemediationTarget ?? "null"} |
+| firstRemediationWhy | ${tensor.firstRemediationWhy ?? "null"} |
+| upstreamDriverRef | ${tensor.upstreamDriverRef ?? "null"} |
+| upstreamDriverClass | ${tensor.upstreamDriverClass} |
+| upstreamDriverDependencyStatus | ${tensor.upstreamDriverDependencyStatus} |
+| upstreamDriverNote | ${tensor.upstreamDriverNote ?? "null"} |
+| firstUpstreamRemediationTarget | ${tensor.firstUpstreamRemediationTarget ?? "null"} |
+| firstUpstreamRemediationWhy | ${tensor.firstUpstreamRemediationWhy ?? "null"} |
+| wecProbeApplied | ${String(tensor.wecProbeApplied)} |
+| wecProbeScale | ${tensor.wecProbeScale ?? "null"} |
+| wecProbeBaseline | ${tensor.wecProbeBaseline ?? "null"} |
+| wecProbeResult | ${tensor.wecProbeResult ?? "null"} |
+| wecProbeDelta | ${tensor.wecProbeDelta ?? "null"} |
+| decProbeBaseline | ${tensor.decProbeBaseline ?? "null"} |
+| decProbeResult | ${tensor.decProbeResult ?? "null"} |
+| decProbeDelta | ${tensor.decProbeDelta ?? "null"} |
+| wecProbeInterpretation | ${tensor.wecProbeInterpretation ?? "null"} |
 | rapidityCap | ${tensor.rapidityCap ?? "null"} |
 | rapidityCapBeta | ${tensor.rapidityCapBeta ?? "null"} |
 | typeI.count | ${tensor.typeI.count ?? "null"} |
@@ -29393,6 +29481,13 @@ const renderNhm2ObserverAuditMarkdown = (
 | observerPrimaryDriverNote | ${payload.observerPrimaryDriverNote ?? "null"} |
 | observerMetricFirstInspectionTarget | ${payload.observerMetricFirstInspectionTarget ?? "null"} |
 | observerTileFirstInspectionTarget | ${payload.observerTileFirstInspectionTarget ?? "null"} |
+| observerSharedRootDriverStatus | ${payload.observerSharedRootDriverStatus} |
+| observerSharedRootDriverNote | ${payload.observerSharedRootDriverNote ?? "null"} |
+| observerSharedUpstreamDriverStatus | ${payload.observerSharedUpstreamDriverStatus} |
+| observerSharedUpstreamDriverNote | ${payload.observerSharedUpstreamDriverNote ?? "null"} |
+| observerWecPropagationStatus | ${payload.observerWecPropagationStatus} |
+| observerWecPropagationNote | ${payload.observerWecPropagationNote ?? "null"} |
+| observerRemediationSequenceStatus | ${payload.observerRemediationSequenceStatus} |
 | observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
 | metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
 | tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
@@ -34654,6 +34749,13 @@ ${tierRows}
 | observerPrimaryDriverNote | ${observerAudit.observerPrimaryDriverNote ?? "null"} |
 | observerMetricFirstInspectionTarget | ${observerAudit.observerMetricFirstInspectionTarget ?? "null"} |
 | observerTileFirstInspectionTarget | ${observerAudit.observerTileFirstInspectionTarget ?? "null"} |
+| observerSharedRootDriverStatus | ${observerAudit.observerSharedRootDriverStatus} |
+| observerSharedRootDriverNote | ${observerAudit.observerSharedRootDriverNote ?? "null"} |
+| observerSharedUpstreamDriverStatus | ${observerAudit.observerSharedUpstreamDriverStatus} |
+| observerSharedUpstreamDriverNote | ${observerAudit.observerSharedUpstreamDriverNote ?? "null"} |
+| observerWecPropagationStatus | ${observerAudit.observerWecPropagationStatus} |
+| observerWecPropagationNote | ${observerAudit.observerWecPropagationNote ?? "null"} |
+| observerRemediationSequenceStatus | ${observerAudit.observerRemediationSequenceStatus} |
 | observerBlockingAssessmentNote | ${observerAudit.observerBlockingAssessmentNote ?? "null"} |
 | metric.wecMinOverAllTimelike | ${observerAudit.metric.wecMinOverAllTimelike ?? "null"} |
 | metric.necMinOverAllNull | ${observerAudit.metric.necMinOverAllNull ?? "null"} |
@@ -35835,6 +35937,20 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         observerAuditArtifact?.observerMetricFirstInspectionTarget ?? null,
       observerTileFirstInspectionTarget:
         observerAuditArtifact?.observerTileFirstInspectionTarget ?? null,
+      observerSharedRootDriverStatus:
+        observerAuditArtifact?.observerSharedRootDriverStatus ?? "unknown",
+      observerSharedRootDriverNote:
+        observerAuditArtifact?.observerSharedRootDriverNote ?? null,
+      observerSharedUpstreamDriverStatus:
+        observerAuditArtifact?.observerSharedUpstreamDriverStatus ?? "unknown",
+      observerSharedUpstreamDriverNote:
+        observerAuditArtifact?.observerSharedUpstreamDriverNote ?? null,
+      observerWecPropagationStatus:
+        observerAuditArtifact?.observerWecPropagationStatus ?? "unknown",
+      observerWecPropagationNote:
+        observerAuditArtifact?.observerWecPropagationNote ?? null,
+      observerRemediationSequenceStatus:
+        observerAuditArtifact?.observerRemediationSequenceStatus ?? "unknown",
       metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
       tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
     },

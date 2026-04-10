@@ -1,5 +1,6 @@
 import type {
   StarSimBenchmarkTargetIdentityBasis,
+  StarSimBenchmarkTargetMatchMode,
   StarSimRequest,
   StarSimSourceCatalog,
   StarSimSourceIdentifiers,
@@ -26,11 +27,8 @@ const normalize = (value: string | null | undefined): string =>
     .replace(/\s+/g, " ")
     .replace(/[^a-z0-9:._+\- ]+/g, "");
 
-export type StarSimBenchmarkTargetMatchMode =
-  | "matched_by_identifier"
-  | "matched_by_name"
-  | "conflicted_name_vs_identifier"
-  | "no_match";
+const uniqueById = (targets: StarSimBenchmarkTarget[]): StarSimBenchmarkTarget[] =>
+  Array.from(new Map(targets.map((target) => [target.id, target])).values());
 
 export interface StarSimBenchmarkTargetMatchResult {
   benchmark_target: StarSimBenchmarkTarget | null;
@@ -100,7 +98,18 @@ export const resolveBenchmarkTarget = (args: {
     .map((value) => normalize(value))
     .filter(Boolean);
   const identifierMatches = BENCHMARK_TARGETS.filter((target) => findMatchedId(target, args.identifiersResolved));
+  const distinctIdentifierMatchIds = uniqueById(identifierMatches);
   const nameMatches = BENCHMARK_TARGETS.filter((target) => matchesName(target, objectIds));
+
+  if (distinctIdentifierMatchIds.length > 1) {
+    return {
+      benchmark_target: null,
+      benchmark_target_match_mode: "conflicted_trusted_identifiers",
+      benchmark_target_conflict_reason: "multiple_trusted_identifier_targets",
+      benchmark_target_identity_basis: "conflicted_trusted_identifiers",
+      benchmark_target_quality_ok: false,
+    };
+  }
 
   if (identifierMatches.length > 0 && nameMatches.length > 0) {
     const shared = identifierMatches.find((target) => nameMatches.some((match) => match.id === target.id));
@@ -131,7 +140,7 @@ export const resolveBenchmarkTarget = (args: {
   }
   if (identifierMatches.length > 0) {
     return {
-      benchmark_target: identifierMatches[0],
+      benchmark_target: distinctIdentifierMatchIds[0],
       benchmark_target_match_mode: "matched_by_identifier",
       benchmark_target_identity_basis: "trusted_identifier",
       benchmark_target_quality_ok: true,

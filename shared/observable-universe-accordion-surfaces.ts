@@ -32,21 +32,18 @@ export type ObservableUniverseAccordionCatalogEntry = {
   propagation_limitations?: string[];
 };
 
-export type ObservableUniverseAccordionEtaSurfaceEntry = {
+export type ObservableUniverseAccordionEtaSupport = "contract_backed" | "render_only";
+
+export type ObservableUniverseAccordionEtaSupportReason =
+  | "explicit_contract_target"
+  | "target_outside_explicit_contract";
+
+type ObservableUniverseAccordionEtaSurfaceEntryBase = {
   id: string;
   label?: string;
   inputPosition_m: [number, number, number];
   inputDistance_m: number;
   inputDirectionUnit: [number, number, number];
-  outputPosition_m: [number, number, number];
-  mappedRadius_m: number;
-  estimateKind: ObservableUniverseSupportedEtaMode;
-  estimateSeconds: number;
-  estimateYears: number;
-  drivingProfileId: string;
-  drivingCenterlineAlpha: number;
-  withinSupportedBand: boolean;
-  sourceArtifactPath: string;
   provenance_class: AstronomyProvenanceClass;
   source_epoch_tcb_jy: number | null;
   render_epoch_tcb_jy: number | null;
@@ -57,6 +54,42 @@ export type ObservableUniverseAccordionEtaSurfaceEntry = {
   canonicalPosition_m: [number, number, number];
   propagation_limitations: string[];
 };
+
+export type ObservableUniverseAccordionEtaSurfaceContractBackedEntry =
+  ObservableUniverseAccordionEtaSurfaceEntryBase & {
+    etaSupport: "contract_backed";
+    etaSupportReason: "explicit_contract_target";
+    outputPosition_m: [number, number, number];
+    mappedRadius_m: number;
+    estimateKind: ObservableUniverseSupportedEtaMode;
+    estimateSeconds: number;
+    estimateYears: number;
+    drivingProfileId: string;
+    drivingCenterlineAlpha: number;
+    withinSupportedBand: boolean;
+    sourceArtifactPath: string;
+    renderOnlyReason: null;
+  };
+
+export type ObservableUniverseAccordionEtaSurfaceRenderOnlyEntry =
+  ObservableUniverseAccordionEtaSurfaceEntryBase & {
+    etaSupport: "render_only";
+    etaSupportReason: "target_outside_explicit_contract";
+    outputPosition_m: [number, number, number];
+    mappedRadius_m: null;
+    estimateKind: null;
+    estimateSeconds: null;
+    estimateYears: null;
+    drivingProfileId: null;
+    drivingCenterlineAlpha: null;
+    withinSupportedBand: null;
+    sourceArtifactPath: null;
+    renderOnlyReason: string;
+  };
+
+export type ObservableUniverseAccordionEtaSurfaceEntry =
+  | ObservableUniverseAccordionEtaSurfaceContractBackedEntry
+  | ObservableUniverseAccordionEtaSurfaceRenderOnlyEntry;
 
 type ObservableUniverseAccordionEtaSurfaceBase = {
   kind: "observable_universe_accordion_eta_surface";
@@ -274,6 +307,27 @@ const isCoveredTarget = (
   return keys.some((key) => key.length > 0 && targetKeys.includes(key));
 };
 
+const buildEntryBase = (
+  catalogEntry: ObservableUniverseAccordionCatalogEntry,
+  inputDirectionUnit: [number, number, number],
+): ObservableUniverseAccordionEtaSurfaceEntryBase => ({
+  id: catalogEntry.id,
+  label: catalogEntry.label,
+  inputPosition_m: catalogEntry.position_m,
+  inputDistance_m: norm(catalogEntry.position_m),
+  inputDirectionUnit,
+  provenance_class: catalogEntry.provenance_class ?? "observed",
+  source_epoch_tcb_jy: catalogEntry.source_epoch_tcb_jy ?? null,
+  render_epoch_tcb_jy: catalogEntry.render_epoch_tcb_jy ?? null,
+  frame_id: catalogEntry.frame_id ?? "ICRS",
+  frame_realization: catalogEntry.frame_realization ?? "Gaia_CRF3",
+  dynamic_state: catalogEntry.dynamic_state ?? "legacy_render_seed",
+  render_transform_id:
+    catalogEntry.render_transform_id ?? ASTRONOMY_ACCORDION_RENDER_TRANSFORM_ID,
+  canonicalPosition_m: catalogEntry.canonical_position_m ?? catalogEntry.position_m,
+  propagation_limitations: [...(catalogEntry.propagation_limitations ?? [])],
+});
+
 export const buildObservableUniverseAccordionEtaSurface = (args: {
   contract: WarpCatalogEtaProjectionV1 | null | undefined;
   catalog: ObservableUniverseAccordionCatalogEntry[];
@@ -337,7 +391,7 @@ export const buildObservableUniverseAccordionEtaSurface = (args: {
 
   if (
     args.catalog.length === 0 ||
-    args.catalog.some((catalogEntry) => !isCoveredTarget(catalogEntry, contractEntry))
+    !args.catalog.some((catalogEntry) => isCoveredTarget(catalogEntry, contractEntry))
   ) {
     return {
       ...buildBase(contract, contractEntry.radiusMeaning, {
@@ -359,18 +413,32 @@ export const buildObservableUniverseAccordionEtaSurface = (args: {
 
   const entries: ObservableUniverseAccordionEtaSurfaceEntry[] = args.catalog.map(
     (catalogEntry) => {
-      const inputDistance = norm(catalogEntry.position_m);
       const inputDirectionUnit = directionUnitFor(catalogEntry.position_m);
-      const outputPosition_m = scale(
-        inputDirectionUnit,
-        contractEntry.outputRadius_m,
-      );
+      const entryBase = buildEntryBase(catalogEntry, inputDirectionUnit);
+      if (!isCoveredTarget(catalogEntry, contractEntry)) {
+        return {
+          ...entryBase,
+          etaSupport: "render_only",
+          etaSupportReason: "target_outside_explicit_contract",
+          outputPosition_m: entryBase.canonicalPosition_m,
+          mappedRadius_m: null,
+          estimateKind: null,
+          estimateSeconds: null,
+          estimateYears: null,
+          drivingProfileId: null,
+          drivingCenterlineAlpha: null,
+          withinSupportedBand: null,
+          sourceArtifactPath: null,
+          renderOnlyReason:
+            "Visible in the nearby-star accordion catalog, but outside the explicit NHM2 target contract. The entry remains render-only and does not receive a fabricated ETA.",
+        };
+      }
+
+      const outputPosition_m = scale(inputDirectionUnit, contractEntry.outputRadius_m);
       return {
-        id: catalogEntry.id,
-        label: catalogEntry.label,
-        inputPosition_m: catalogEntry.position_m,
-        inputDistance_m: inputDistance,
-        inputDirectionUnit,
+        ...entryBase,
+        etaSupport: "contract_backed",
+        etaSupportReason: "explicit_contract_target",
         outputPosition_m,
         mappedRadius_m: contractEntry.outputRadius_m,
         estimateKind,
@@ -380,16 +448,9 @@ export const buildObservableUniverseAccordionEtaSurface = (args: {
         drivingCenterlineAlpha: contractEntry.drivingCenterlineAlpha,
         withinSupportedBand: contractEntry.withinSupportedBand,
         sourceArtifactPath: contractEntry.sourceArtifactPath,
-        provenance_class: catalogEntry.provenance_class ?? "observed",
-        source_epoch_tcb_jy: catalogEntry.source_epoch_tcb_jy ?? null,
-        render_epoch_tcb_jy: catalogEntry.render_epoch_tcb_jy ?? args.renderEpoch_tcb_jy ?? null,
-        frame_id: catalogEntry.frame_id ?? "ICRS",
-        frame_realization: catalogEntry.frame_realization ?? "Gaia_CRF3",
-        dynamic_state: catalogEntry.dynamic_state ?? "legacy_render_seed",
-        render_transform_id:
-          catalogEntry.render_transform_id ?? ASTRONOMY_ACCORDION_RENDER_TRANSFORM_ID,
-        canonicalPosition_m: catalogEntry.canonical_position_m ?? catalogEntry.position_m,
-        propagation_limitations: [...(catalogEntry.propagation_limitations ?? [])],
+        render_epoch_tcb_jy:
+          catalogEntry.render_epoch_tcb_jy ?? args.renderEpoch_tcb_jy ?? null,
+        renderOnlyReason: null,
       };
     },
   );

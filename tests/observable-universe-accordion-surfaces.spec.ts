@@ -75,6 +75,32 @@ describe("observable universe accordion ETA surfaces", () => {
     );
   });
 
+  it("keeps unsupported nearby stars visible as render-only when a supported target is present", () => {
+    const projection = loadProjection();
+    const surface = buildObservableUniverseAccordionEtaSurface({
+      contract: projection,
+      catalog: [
+        { id: "alpha-cen-a", label: "Alpha Centauri A", position_m: [1, 0, 0] },
+        { id: "barnard", label: "Barnard's Star", position_m: [0, 1, 0] },
+      ],
+      estimateKind: "proper_time",
+    });
+
+    expect(surface.status).toBe("computed");
+    if (surface.status !== "computed") return;
+
+    const alpha = surface.entries.find((entry) => entry.id === "alpha-cen-a");
+    const barnard = surface.entries.find((entry) => entry.id === "barnard");
+
+    expect(alpha?.etaSupport).toBe("contract_backed");
+    expect(alpha?.estimateKind).toBe("proper_time");
+    expect(barnard?.etaSupport).toBe("render_only");
+    expect(barnard?.mappedRadius_m).toBeNull();
+    expect(barnard?.estimateYears).toBeNull();
+    expect(barnard?.renderOnlyReason).toMatch(/render-only/i);
+    expect(barnard?.outputPosition_m).toEqual(barnard?.canonicalPosition_m);
+  });
+
   it("remains fail-closed when the explicit contract is absent", () => {
     const surface = buildObservableUniverseAccordionEtaSurface({
       contract: null,

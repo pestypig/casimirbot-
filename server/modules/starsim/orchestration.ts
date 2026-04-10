@@ -8,8 +8,11 @@ import type {
   StarSimResolveBeforeRunResponse,
   StarSimRequest,
   StarSimSourceContext,
-  StarSimSourceSelectionOrigin,
 } from "./contract";
+import {
+  buildAndPersistStarSimBenchmarkReceipt,
+  buildSelectedFieldOriginsSnapshot,
+} from "./benchmark-receipts";
 import { evaluateStarSimPreflight } from "./preflight";
 import { resolveStarSimSources } from "./sources/registry";
 
@@ -18,15 +21,6 @@ const artifactRefByKind = (artifactRefs: StarSimArtifactRef[], kind: string): st
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value && value.trim()))));
-
-const buildSelectedFieldOrigins = (
-  fields: Record<string, { selected_from: StarSimSourceSelectionOrigin }>,
-): Record<string, StarSimSourceSelectionOrigin> =>
-  Object.fromEntries(
-    Object.entries(fields)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([fieldPath, field]) => [fieldPath, field.selected_from]),
-  );
 
 const buildLanePlan = (args: {
   policy: StarSimPreconditionPolicy;
@@ -82,6 +76,11 @@ export type StarSimResolveBeforeRunSubmission =
         source_cache_key: string;
         lane_plan: StarSimLanePlan;
         precondition_policy: StarSimPreconditionPolicy;
+        benchmark_backed: boolean;
+        benchmark_receipt_ref: string | null;
+        benchmark_input_signature: string | null;
+        previous_benchmark_receipt_ref: string | null;
+        benchmark_repeatability?: NonNullable<StarSimResolveBeforeRunResponse["benchmark_repeatability"]>;
       };
     };
 
@@ -112,6 +111,26 @@ export const prepareStarSimResolveBeforeRun = async (
     blockedLanes: preflight.blocked_lanes,
     byLane: preflight.by_lane,
   });
+  const selectedFieldOrigins = buildSelectedFieldOriginsSnapshot(resolved.source_resolution.selection_manifest.fields);
+  const benchmarkReceipt = await buildAndPersistStarSimBenchmarkReceipt({
+    receiptStage: preflight.enqueue_allowed ? "resolve_preview" : "preflight_blocked",
+    benchmarkTargetId: resolved.benchmark_target_id,
+    benchmarkTargetMatchMode: resolved.benchmark_target_match_mode,
+    benchmarkTargetConflictReason: resolved.benchmark_target_conflict_reason,
+    benchmarkTargetIdentityBasis: resolved.benchmark_target_identity_basis,
+    benchmarkTargetQualityOk: resolved.benchmark_target_quality_ok,
+    identifiersObserved: resolved.identifiers_observed,
+    identifiersTrusted: resolved.identifiers_trusted,
+    selectedFieldOrigins,
+    requestedLanes: preflight.requested_lanes,
+    lanePlan,
+    blockedReasons: preflight.blocked_reasons,
+    sourceCacheKey: resolved.source_resolution.cache_key,
+    sourceResolutionRef,
+    resolvedDraftHash,
+    requestDraft: resolved.canonical_request_draft,
+  });
+  const benchmarkBacked = Boolean(resolved.benchmark_target_id);
 
   const baseResponse: StarSimResolveBeforeRunResponse = {
     schema_version: "star-sim-resolve-run-v1",
@@ -132,6 +151,11 @@ export const prepareStarSimResolveBeforeRun = async (
     preflight,
     lane_plan: lanePlan,
     blocked_reasons: preflight.blocked_reasons,
+    benchmark_backed: benchmarkBacked,
+    benchmark_receipt_ref: benchmarkReceipt?.benchmark_receipt_ref,
+    benchmark_input_signature: benchmarkReceipt?.benchmark_input_signature,
+    previous_benchmark_receipt_ref: benchmarkReceipt?.previous_benchmark_receipt_ref,
+    benchmark_repeatability: benchmarkReceipt?.benchmark_repeatability,
     benchmark_target_id: resolved.benchmark_target_id,
     benchmark_target_match_mode: resolved.benchmark_target_match_mode,
     benchmark_target_conflict_reason: resolved.benchmark_target_conflict_reason,
@@ -161,11 +185,13 @@ export const prepareStarSimResolveBeforeRun = async (
       resolved_draft_ref: resolvedDraftRef ?? undefined,
       resolved_draft_hash: resolvedDraftHash,
       identifiers_resolved: resolved.identifiers_resolved,
+      identifiers_observed: resolved.identifiers_observed,
       identifiers_trusted: resolved.identifiers_trusted,
       fetch_modes_by_catalog: resolved.source_resolution.fetch_modes_by_catalog,
-      selected_field_origins: buildSelectedFieldOrigins(resolved.source_resolution.selection_manifest.fields),
+      selected_field_origins: selectedFieldOrigins,
       benchmark_target_id: resolved.benchmark_target_id,
       benchmark_target_match_mode: resolved.benchmark_target_match_mode,
+      benchmark_target_identity_basis: resolved.benchmark_target_identity_basis,
       benchmark_target_conflict_reason: resolved.benchmark_target_conflict_reason,
       benchmark_target_quality_ok: resolved.benchmark_target_quality_ok,
     },
@@ -184,6 +210,11 @@ export const prepareStarSimResolveBeforeRun = async (
       source_cache_key: resolved.source_resolution.cache_key,
       lane_plan: lanePlan,
       precondition_policy: policy,
+      benchmark_backed: benchmarkBacked,
+      benchmark_receipt_ref: benchmarkReceipt?.benchmark_receipt_ref ?? null,
+      benchmark_input_signature: benchmarkReceipt?.benchmark_input_signature ?? null,
+      previous_benchmark_receipt_ref: benchmarkReceipt?.previous_benchmark_receipt_ref ?? null,
+      benchmark_repeatability: benchmarkReceipt?.benchmark_repeatability,
     },
   };
 };

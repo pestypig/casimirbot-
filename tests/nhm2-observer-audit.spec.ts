@@ -116,6 +116,23 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerPrimaryDriverAgreement).toBe("unknown");
     expect(artifact.observerMetricFirstInspectionTarget).toBeNull();
     expect(artifact.observerTileFirstInspectionTarget).toBeNull();
+    expect(artifact.observerSharedRootDriverStatus).toBe("unknown");
+    expect(artifact.observerSharedRootDriverNote).toBeNull();
+    expect(artifact.observerSharedUpstreamDriverStatus).toBe("unknown");
+    expect(artifact.observerSharedUpstreamDriverNote).toBeNull();
+    expect(artifact.observerWecPropagationStatus).toBe("unknown");
+    expect(artifact.observerWecPropagationNote).toBeNull();
+    expect(artifact.observerRemediationSequenceStatus).toBe("unknown");
+    expect(artifact.tensors.metricRequired.rootCauseClass).toBe("unknown");
+    expect(artifact.tensors.tileEffective.rootCauseClass).toBe("unknown");
+    expect(artifact.tensors.metricRequired.firstRemediationTarget).toBeNull();
+    expect(artifact.tensors.tileEffective.firstRemediationTarget).toBeNull();
+    expect(artifact.tensors.metricRequired.upstreamDriverRef).toBeNull();
+    expect(artifact.tensors.tileEffective.upstreamDriverRef).toBeNull();
+    expect(artifact.tensors.metricRequired.upstreamDriverClass).toBe("unknown");
+    expect(artifact.tensors.tileEffective.upstreamDriverClass).toBe("unknown");
+    expect(artifact.tensors.metricRequired.wecProbeApplied).toBe(false);
+    expect(artifact.tensors.tileEffective.wecProbeApplied).toBe(false);
     expect(artifact.tensors.metricRequired.fluxDiagnostics.status).toBe(
       "assumed_zero",
     );
@@ -195,6 +212,29 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerTileFirstInspectionTarget).toBe(
       "tile_effective.conditions.wec",
     );
+    expect(artifact.tensors.tileEffective.rootCauseClass).toBe(
+      "negative_energy_density",
+    );
+    expect(artifact.tensors.tileEffective.blockingDependencyStatus).toBe(
+      "primary_only",
+    );
+    expect(artifact.tensors.tileEffective.firstRemediationTarget).toBe(
+      "tile_effective.conditions.wec",
+    );
+    expect(artifact.observerSharedRootDriverStatus).toBe("unknown");
+    expect(artifact.tensors.tileEffective.upstreamDriverClass).toBe(
+      "tile_energy_density_proxy",
+    );
+    expect(artifact.tensors.tileEffective.upstreamDriverDependencyStatus).toBe(
+      "proxy_derived_driver",
+    );
+    expect(artifact.observerSharedUpstreamDriverStatus).toBe("unknown");
+    expect(artifact.tensors.tileEffective.wecProbeApplied).toBe(true);
+    expect(artifact.tensors.tileEffective.wecProbeScale).toBe(0.5);
+    expect(artifact.tensors.tileEffective.wecProbeBaseline).toBe(-0.2);
+    expect(artifact.tensors.tileEffective.wecProbeResult).toBe(-0.2);
+    expect(artifact.tensors.tileEffective.wecProbeDelta).toBe(0);
+    expect(artifact.observerWecPropagationStatus).toBe("unknown");
   });
 
   it("classifies same-surface observer blockers when robust failing evidence is complete enough", () => {
@@ -250,6 +290,30 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.tensors.tileEffective.primaryBlockingMode).toBe(
       "robust_only",
     );
+    expect(artifact.tensors.metricRequired.rootCauseClass).toBe(
+      "negative_energy_density",
+    );
+    expect(artifact.tensors.metricRequired.blockingDependencyStatus).toBe(
+      "primary_only",
+    );
+    expect(artifact.tensors.tileEffective.rootCauseClass).toBe(
+      "mixed_independent",
+    );
+    expect(artifact.tensors.tileEffective.blockingDependencyStatus).toBe(
+      "primary_only",
+    );
+    expect(artifact.tensors.tileEffective.firstRemediationTarget).toBe(
+      "tile_effective.conditions.dec",
+    );
+    expect(artifact.observerSharedRootDriverStatus).toBe(
+      "mixed",
+    );
+    expect(artifact.tensors.metricRequired.upstreamDriverClass).toBe(
+      "metric_t00_density",
+    );
+    expect(artifact.tensors.tileEffective.upstreamDriverClass).toBe("unknown");
+    expect(artifact.observerSharedUpstreamDriverStatus).toBe("unknown");
+    expect(artifact.observerWecPropagationStatus).toBe("unknown");
     expect(artifact.observerPrimaryDriverNote).toContain(
       "metric_required first localizes to WEC",
     );
@@ -358,6 +422,72 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerTileFirstInspectionTarget).toBe(
       "tile_effective.conditions.wec",
     );
+    expect(artifact.tensors.metricRequired.rootCauseClass).toBe(
+      "negative_energy_density",
+    );
+    expect(artifact.tensors.metricRequired.blockingDependencyStatus).toBe(
+      "dec_downstream_of_wec",
+    );
+    expect(artifact.tensors.tileEffective.rootCauseClass).toBe(
+      "negative_energy_density",
+    );
+    expect(artifact.tensors.tileEffective.blockingDependencyStatus).toBe(
+      "dec_downstream_of_wec",
+    );
+    expect(artifact.tensors.metricRequired.firstRemediationTarget).toBe(
+      "metric_required.conditions.wec",
+    );
+    expect(artifact.tensors.tileEffective.firstRemediationTarget).toBe(
+      "tile_effective.conditions.wec",
+    );
+    expect(artifact.observerSharedRootDriverStatus).toBe(
+      "shared_root_driver_confirmed",
+    );
+    expect(artifact.observerSharedRootDriverNote).toContain(
+      "negative-energy-density root driver",
+    );
+    expect(artifact.tensors.metricRequired.upstreamDriverClass).toBe(
+      "metric_t00_density",
+    );
+    expect(artifact.tensors.tileEffective.upstreamDriverClass).toBe(
+      "tile_energy_density_proxy",
+    );
+    expect(artifact.tensors.metricRequired.upstreamDriverDependencyStatus).toBe(
+      "direct_same_surface_driver",
+    );
+    expect(artifact.tensors.tileEffective.upstreamDriverDependencyStatus).toBe(
+      "proxy_derived_driver",
+    );
+    expect(artifact.observerSharedUpstreamDriverStatus).toBe(
+      "surface_specific_upstream_refs",
+    );
+    expect(artifact.observerSharedUpstreamDriverNote).toContain(
+      "not the same emitted upstream driver",
+    );
+    expect(artifact.observerWecPropagationStatus).toBe(
+      "tile_proxy_independent",
+    );
+    expect(artifact.observerRemediationSequenceStatus).toBe(
+      "metric_then_tile_proxy",
+    );
+    expect(artifact.tensors.metricRequired.wecProbeApplied).toBe(true);
+    expect(artifact.tensors.metricRequired.wecProbeScale).toBe(0.5);
+    expect(artifact.tensors.metricRequired.wecProbeBaseline).toBe(-0.5);
+    expect(artifact.tensors.metricRequired.wecProbeResult).toBe(-0.25);
+    expect(artifact.tensors.metricRequired.wecProbeDelta).toBe(0.25);
+    expect(artifact.tensors.metricRequired.decProbeBaseline).toBe(-1);
+    expect(artifact.tensors.metricRequired.decProbeResult).toBe(-0.5);
+    expect(artifact.tensors.metricRequired.decProbeDelta).toBe(0.5);
+    expect(artifact.tensors.tileEffective.wecProbeApplied).toBe(true);
+    expect(artifact.tensors.tileEffective.wecProbeBaseline).toBe(-0.4);
+    expect(artifact.tensors.tileEffective.wecProbeResult).toBe(-0.4);
+    expect(artifact.tensors.tileEffective.wecProbeDelta).toBe(0);
+    expect(artifact.tensors.tileEffective.decProbeBaseline).toBe(-0.6);
+    expect(artifact.tensors.tileEffective.decProbeResult).toBe(-0.6);
+    expect(artifact.tensors.tileEffective.decProbeDelta).toBe(0);
+    expect(artifact.observerWecPropagationNote).toContain(
+      "leaves the tile_effective proxy effectively unchanged",
+    );
   });
 
   it("classifies robust-search-amplified primaries when Eulerian negativity is deepened", () => {
@@ -390,6 +520,211 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerMetricFirstInspectionTarget).toBe(
       "metric_required.conditions.dec",
     );
+    expect(artifact.tensors.metricRequired.rootCauseClass).toBe(
+      "mixed_independent",
+    );
+    expect(artifact.tensors.metricRequired.blockingDependencyStatus).toBe(
+      "primary_only",
+    );
+    expect(artifact.tensors.metricRequired.firstRemediationTarget).toBe(
+      "metric_required.conditions.dec",
+    );
+    expect(artifact.tensors.metricRequired.upstreamDriverClass).toBe("unknown");
+    expect(artifact.observerSharedUpstreamDriverStatus).toBe("unknown");
+    expect(artifact.observerWecPropagationStatus).toBe("unknown");
+  });
+
+  it("classifies shared upstream driver families and exact refs when explicit trace metadata is present", () => {
+    const exactShared = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        upstreamDriverRef: "shared.emitted.t00",
+        upstreamDriverClass: "metric_t00_density",
+        upstreamDriverDependencyStatus: "direct_same_surface_driver",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: {
+            ...positiveCondition(-0.3),
+            eulerianMin: -0.3,
+            eulerianMean: -0.3,
+            robustMin: -0.3,
+            robustMean: -0.3,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.05),
+          dec: positiveCondition(0.02),
+        },
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        upstreamDriverRef: "shared.emitted.t00",
+        upstreamDriverClass: "tile_t00_density",
+        upstreamDriverDependencyStatus: "direct_same_surface_driver",
+        conditions: {
+          nec: positiveCondition(0.08),
+          wec: {
+            ...positiveCondition(-0.2),
+            eulerianMin: -0.2,
+            eulerianMean: -0.2,
+            robustMin: -0.2,
+            robustMean: -0.2,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.03),
+          dec: positiveCondition(0.01),
+        },
+      },
+    });
+
+    expect(exactShared.observerSharedUpstreamDriverStatus).toBe(
+      "shared_exact_ref",
+    );
+    expect(exactShared.observerSharedUpstreamDriverNote).toContain(
+      "shared.emitted.t00",
+    );
+    expect(exactShared.observerWecPropagationStatus).toBe(
+      "shared_propagation_detected",
+    );
+    expect(exactShared.observerRemediationSequenceStatus).toBe(
+      "shared_metric_first",
+    );
+    expect(exactShared.tensors.metricRequired.wecProbeResult).toBeCloseTo(-0.15);
+    expect(exactShared.tensors.tileEffective.wecProbeResult).toBeCloseTo(-0.1);
+
+    const sharedClass = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        upstreamDriverRef: "warp.metric.T00.nhm2.shift_lapse",
+        upstreamDriverClass: "metric_t00_density",
+        upstreamDriverDependencyStatus: "direct_same_surface_driver",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: {
+            ...positiveCondition(-0.3),
+            eulerianMin: -0.3,
+            eulerianMean: -0.3,
+            robustMin: -0.3,
+            robustMean: -0.3,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.05),
+          dec: positiveCondition(0.02),
+        },
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        upstreamDriverRef: "warp.tileEffectiveStressEnergy.T00",
+        upstreamDriverClass: "tile_t00_density",
+        upstreamDriverDependencyStatus: "direct_same_surface_driver",
+        conditions: {
+          nec: positiveCondition(0.08),
+          wec: {
+            ...positiveCondition(-0.2),
+            eulerianMin: -0.2,
+            eulerianMean: -0.2,
+            robustMin: -0.2,
+            robustMean: -0.2,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.03),
+          dec: positiveCondition(0.01),
+        },
+      },
+    });
+
+    expect(sharedClass.observerSharedUpstreamDriverStatus).toBe(
+      "shared_driver_class",
+    );
+    expect(sharedClass.observerSharedUpstreamDriverNote).toContain(
+      "same emitted t00_density driver family",
+    );
+    expect(sharedClass.observerWecPropagationStatus).toBe(
+      "metric_only_propagation",
+    );
+    expect(sharedClass.observerRemediationSequenceStatus).toBe(
+      "metric_then_tile_proxy",
+    );
+  });
+
+  it("classifies weak cross-surface propagation when the tile probe moves only partially", () => {
+    const artifact = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: {
+            ...positiveCondition(-0.4),
+            eulerianMin: -0.4,
+            eulerianMean: -0.4,
+            robustMin: -0.4,
+            robustMean: -0.4,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.03),
+          dec: {
+            ...positiveCondition(-0.4),
+            eulerianMin: -0.4,
+            eulerianMean: -0.4,
+            robustMin: -0.8,
+            robustMean: -0.8,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: -0.4,
+          },
+        },
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        upstreamDriverRef: "tile.proxy.surface",
+        upstreamDriverClass: "tile_energy_density_proxy",
+        upstreamDriverDependencyStatus: "proxy_derived_driver",
+        wecProbeResponseFactor: 0.2,
+        conditions: {
+          nec: positiveCondition(0.05),
+          wec: {
+            ...positiveCondition(-0.2),
+            eulerianMin: -0.2,
+            eulerianMean: -0.2,
+            robustMin: -0.2,
+            robustMean: -0.2,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.03),
+          dec: {
+            ...positiveCondition(-0.2),
+            eulerianMin: -0.2,
+            eulerianMean: -0.2,
+            robustMin: -0.4,
+            robustMean: -0.4,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: -0.2,
+          },
+        },
+      },
+    });
+
+    expect(artifact.observerWecPropagationStatus).toBe(
+      "weak_cross_surface_propagation",
+    );
+    expect(artifact.observerRemediationSequenceStatus).toBe(
+      "metric_then_tile_proxy",
+    );
+    expect(artifact.tensors.tileEffective.wecProbeScale).toBe(0.5);
+    expect(artifact.tensors.tileEffective.wecProbeResult).toBeCloseTo(-0.18);
+    expect(artifact.tensors.tileEffective.wecProbeDelta).toBeCloseTo(0.02);
   });
 
   it("marks missing tensor inputs as incomplete and unavailable", () => {

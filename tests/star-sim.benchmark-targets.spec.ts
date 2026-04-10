@@ -38,4 +38,38 @@ describe("star-sim benchmark target matching", () => {
     expect(match.benchmark_target_conflict_reason).toBe("name_identifier_disagreement_conflict_unresolved");
     expect(match.benchmark_target_identity_basis).toBe("conflicted_trusted_identifier_vs_name");
   });
+
+  it("returns an explicit conflict when trusted identifiers point at different benchmark targets", () => {
+    const match = resolveBenchmarkTarget({
+      request: {
+        target: {},
+      } as any,
+      identifiersResolved: {
+        gaia_dr3_source_id: "123456789012345678",
+        lamost_obsid: "LAMOST-B-0002",
+      },
+    });
+    expect(match.benchmark_target).toBeNull();
+    expect(match.benchmark_target_match_mode).toBe("conflicted_trusted_identifiers");
+    expect(match.benchmark_target_conflict_reason).toBe("multiple_trusted_identifier_targets");
+    expect(match.benchmark_target_identity_basis).toBe("conflicted_trusted_identifiers");
+    expect(match.benchmark_target_quality_ok).toBe(false);
+  });
+
+  it("accepts multiple trusted identifiers when they converge on the same benchmark target", () => {
+    const match = resolveBenchmarkTarget({
+      request: {
+        target: {},
+      } as any,
+      identifiersResolved: {
+        gaia_dr3_source_id: "123456789012345678",
+        tess_tic_id: "100000001",
+        tasoc_target_id: "TASOC-A-0001",
+      },
+    });
+    expect(match.benchmark_target?.id).toBe("demo_solar_a");
+    expect(match.benchmark_target_match_mode).toBe("matched_by_identifier");
+    expect(match.benchmark_target_identity_basis).toBe("trusted_identifier");
+    expect(match.benchmark_target_quality_ok).toBe(true);
+  });
 });

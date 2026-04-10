@@ -375,6 +375,9 @@ import {
 import {
   applyStage0DebugFields,
   applyStage05DebugFields,
+  isStage05CoverageGapTelemetry,
+  isStage05SoftCodePathGapTelemetry,
+  isStage05SoftRuntimeFailTelemetry,
   mergeRepoSearchStage0Telemetry,
   mergeStage05Telemetry,
 } from "../services/helix-ask/runtime/stage-debug-telemetry";
@@ -484,9 +487,34 @@ import {
   applyOpenWorldFinalContractLock,
 } from "../services/helix-ask/surface/final-contract-locks";
 import {
+  attachTraceSummaryDebugPayload,
   attachFinalTraceDebugPayload,
   attachOverflowRetryDebugPayload,
+  type HelixAskTraceEvent,
+  type HelixAskTraceSummary,
 } from "../services/helix-ask/surface/response-debug-payload";
+import {
+  applyObjectiveGateDebugPayload,
+} from "../services/helix-ask/surface/objective-gate-debug";
+import {
+  applyObjectiveLlmDebugPayload,
+} from "../services/helix-ask/surface/objective-llm-debug";
+import {
+  applyObjectiveRecoveryDebugPayload,
+} from "../services/helix-ask/surface/objective-recovery-debug";
+import {
+  applyObjectiveStateDebugPayload,
+} from "../services/helix-ask/surface/objective-state-debug";
+import {
+  applyObjectiveTraceDebugPayload,
+} from "../services/helix-ask/surface/objective-trace-debug";
+import {
+  applyObjectiveValidationDebugPayload,
+} from "../services/helix-ask/surface/objective-validation-debug";
+import {
+  attachHelixAskReasoningSidebarToDebug,
+  type HelixAskReasoningSidebar,
+} from "../services/helix-ask/surface/reasoning-sidebar";
 import {
   scrubSkippedLlmTransportErrors,
 } from "../services/helix-ask/surface/response-debug-scrub";
@@ -37162,54 +37190,6 @@ type HelixAskAgentAction = {
   ts: string;
 };
 
-type HelixAskTraceEvent = {
-  ts: string;
-  tool: string;
-  stage: string;
-  detail?: string;
-  ok?: boolean;
-  durationMs?: number;
-  text?: string;
-  meta?: Record<string, unknown>;
-};
-
-type HelixAskTraceSummary = {
-  stage: string;
-  detail?: string;
-  ok?: boolean;
-  durationMs?: number;
-  meta?: Record<string, unknown>;
-};
-
-type HelixAskReasoningSidebarStepStatus = "done" | "partial" | "blocked" | "skipped";
-
-type HelixAskReasoningSidebarStep = {
-  step: number;
-  title: string;
-  status: HelixAskReasoningSidebarStepStatus;
-  summary: string;
-  detail?: string | null;
-  debug_refs?: string[];
-  at?: string | null;
-};
-
-type HelixAskReasoningSidebarEventClockEntry = {
-  idx: number;
-  ts: string;
-  stage: string;
-  detail?: string | null;
-  ok?: boolean | null;
-  duration_ms?: number | null;
-};
-
-type HelixAskReasoningSidebar = {
-  version: "v1";
-  generated_at: string;
-  steps: HelixAskReasoningSidebarStep[];
-  event_clock: HelixAskReasoningSidebarEventClockEntry[];
-  markdown: string;
-};
-
 type HelixAskControllerStep = {
   step: string;
   action?: string;
@@ -38177,383 +38157,6 @@ const coerceHelixAskDebugObjectArray = (value: unknown): Array<Record<string, un
       )
     : [];
 
-const buildHelixAskReasoningSidebarFromDebug = (args: {
-  debugRecord: Record<string, unknown>;
-  traceEvents: HelixAskTraceEvent[];
-}): HelixAskReasoningSidebar => {
-  const { debugRecord, traceEvents } = args;
-  const findEventTimestamp = (...tokens: string[]): string | null => {
-    const normalized = tokens.map((token) => token.trim().toLowerCase()).filter(Boolean);
-    if (normalized.length === 0) return null;
-    const match = traceEvents.find((event) => {
-      const signal = `${event.stage ?? ""} ${event.detail ?? ""}`.toLowerCase();
-      return normalized.some((token) => signal.includes(token));
-    });
-    return match?.ts ?? null;
-  };
-  const steps: HelixAskReasoningSidebarStep[] = [];
-  const pushStep = (step: Omit<HelixAskReasoningSidebarStep, "step">): void => {
-    steps.push({ step: steps.length + 1, ...step });
-  };
-
-  const intentDomain = coerceHelixAskDebugString(debugRecord.intent_domain) ?? "n/a";
-  const promptFamily = coerceHelixAskDebugString(debugRecord.policy_prompt_family) ?? "n/a";
-  const fallbackTaxonomy =
-    coerceHelixAskDebugString(debugRecord.fallback_reason_taxonomy) ??
-    coerceHelixAskDebugString(debugRecord.fallback_reason) ??
-    "none";
-  const openWorldMode = coerceHelixAskDebugString(debugRecord.open_world_bypass_mode) ?? "n/a";
-  pushStep({
-    title: "Routing + Policy",
-    status: intentDomain !== "n/a" && promptFamily !== "n/a" ? "done" : "partial",
-    summary: `intent=${intentDomain}; family=${promptFamily}; fallback=${fallbackTaxonomy}`,
-    detail: `open_world_mode=${openWorldMode}`,
-    debug_refs: [
-      "intent_domain",
-      "policy_prompt_family",
-      "fallback_reason_taxonomy",
-      "open_world_bypass_mode",
-    ],
-    at: findEventTimestamp("Routing prior", "Fallback"),
-  });
-
-  const objectiveStates = coerceHelixAskDebugObjectArray(debugRecord.objective_loop_state);
-  const objectiveLabels = objectiveStates
-    .map((entry) => coerceHelixAskDebugString(entry.objective_label))
-    .filter((entry): entry is string => Boolean(entry))
-    .slice(0, 8);
-  const objectiveTotal =
-    coerceHelixAskDebugNumber(debugRecord.objective_total_count) ??
-    (objectiveStates.length > 0 ? objectiveStates.length : 0);
-  pushStep({
-    title: "Planner Objectives",
-    status: objectiveTotal > 0 ? "done" : "skipped",
-    summary: `objectives=${objectiveTotal}; labels=${objectiveLabels.length}`,
-    detail: objectiveLabels.length > 0 ? objectiveLabels.join(" | ") : "(no objectives recorded)",
-    debug_refs: ["objective_total_count", "objective_loop_state"],
-    at: findEventTimestamp("Controller step", "objective"),
-  });
-
-  const retrievalRows = coerceHelixAskDebugObjectArray(debugRecord.objective_retrieval_queries);
-  const retrievalQueryLines: string[] = [];
-  let retrievalQueryCount = 0;
-  for (const row of retrievalRows.slice(0, 16)) {
-    const objectiveId = coerceHelixAskDebugString(row.objective_id) ?? "unknown";
-    const passIndex = coerceHelixAskDebugNumber(row.pass_index);
-    const queries = Array.isArray(row.queries)
-      ? row.queries
-          .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-          .filter(Boolean)
-      : [];
-    retrievalQueryCount += queries.length;
-    for (const query of queries.slice(0, 4)) {
-      retrievalQueryLines.push(
-        `objective=${objectiveId}; pass=${passIndex ?? "n/a"}; query=${clipAskText(query, 140)}`,
-      );
-      if (retrievalQueryLines.length >= 10) break;
-    }
-    if (retrievalQueryLines.length >= 10) break;
-  }
-  pushStep({
-    title: "Retrieval Passes",
-    status:
-      retrievalQueryCount > 0 ? "done" : objectiveTotal > 0 ? "partial" : "skipped",
-    summary: `passes=${retrievalRows.length}; queries=${retrievalQueryCount}`,
-    detail:
-      retrievalQueryLines.length > 0
-        ? retrievalQueryLines.join(" | ")
-        : "(no objective retrieval queries recorded)",
-    debug_refs: ["objective_retrieval_queries"],
-    at: findEventTimestamp("Retrieval", "Repo search"),
-  });
-
-  const retrieveProposalMode =
-    coerceHelixAskDebugString(debugRecord.objective_retrieve_proposal_mode) ?? "none";
-  const retrieveProposalAttempted = coerceHelixAskDebugBoolean(
-    debugRecord.objective_retrieve_proposal_attempted,
-  );
-  const retrieveProposalFailReason =
-    coerceHelixAskDebugString(debugRecord.objective_retrieve_proposal_fail_reason) ?? "none";
-  const retrieveProposalPromptPreview = clipAskText(
-    coerceHelixAskDebugString(debugRecord.objective_retrieve_proposal_prompt_preview) ?? "",
-    280,
-  );
-  pushStep({
-    title: "Retrieve Proposal",
-    status:
-      retrieveProposalMode === "llm"
-        ? "done"
-        : retrieveProposalMode === "heuristic_fallback"
-          ? "partial"
-          : "skipped",
-    summary: `mode=${retrieveProposalMode}; attempted=${String(retrieveProposalAttempted)}; fail=${retrieveProposalFailReason}`,
-    detail: retrieveProposalPromptPreview || "(no retrieve-proposal prompt preview)",
-    debug_refs: [
-      "objective_retrieve_proposal_mode",
-      "objective_retrieve_proposal_attempted",
-      "objective_retrieve_proposal_fail_reason",
-      "objective_retrieve_proposal_prompt_preview",
-    ],
-    at: findEventTimestamp("Retrieval objective-recovery", "objective_recovery"),
-  });
-
-  const transitions = coerceHelixAskDebugObjectArray(debugRecord.objective_transition_log);
-  const transitionLines = transitions.slice(-8).map((entry) => {
-    const objectiveId = coerceHelixAskDebugString(entry.objective_id) ?? "unknown";
-    const from = coerceHelixAskDebugString(entry.from) ?? "unknown";
-    const to = coerceHelixAskDebugString(entry.to) ?? "unknown";
-    const reason = coerceHelixAskDebugString(entry.reason) ?? "unknown";
-    return `${objectiveId}: ${from} -> ${to} (${reason})`;
-  });
-  const finalizeMode = coerceHelixAskDebugString(debugRecord.objective_finalize_gate_mode) ?? "n/a";
-  const unresolvedCount = coerceHelixAskDebugNumber(debugRecord.objective_unresolved_count) ?? 0;
-  const coverageUnresolvedCount =
-    coerceHelixAskDebugNumber(debugRecord.objective_coverage_unresolved_count) ?? unresolvedCount;
-  const unknownBlockCount = coerceHelixAskDebugNumber(debugRecord.objective_unknown_block_count) ?? 0;
-  const objectiveStatus: HelixAskReasoningSidebarStepStatus =
-    finalizeMode === "strict_covered"
-      ? "done"
-      : finalizeMode === "blocked"
-        ? "blocked"
-        : finalizeMode === "unknown_terminal"
-          ? "partial"
-          : "partial";
-  pushStep({
-    title: "Objective Loop State",
-    status: objectiveStatus,
-    summary: `finalize=${finalizeMode}; unresolved=${unresolvedCount}; coverage_unresolved=${coverageUnresolvedCount}; unknown_blocks=${unknownBlockCount}`,
-    detail: transitionLines.length > 0 ? transitionLines.join(" | ") : "(no transitions recorded)",
-    debug_refs: [
-      "objective_transition_log",
-      "objective_finalize_gate_mode",
-      "objective_unresolved_count",
-      "objective_coverage_unresolved_count",
-      "objective_unknown_block_count",
-    ],
-    at: findEventTimestamp("objective", "critiqued", "recovery"),
-  });
-
-  const objectiveReasoningTraceRows = coerceHelixAskDebugObjectArray(debugRecord.objective_reasoning_trace);
-  const objectiveReasoningPreview = objectiveReasoningTraceRows
-    .slice(0, 3)
-    .map((entry) => {
-      const objectiveId = coerceHelixAskDebugString(entry.objective_id) ?? "unknown";
-      const status = coerceHelixAskDebugString(entry.final_status) ?? "unknown";
-      const plainReasoning = clipAskText(
-        coerceHelixAskDebugString(entry.plain_reasoning) ?? "",
-        140,
-      );
-      return `${objectiveId}[${status}] ${plainReasoning || "(no plain reasoning)"}`;
-    })
-    .join(" | ");
-  pushStep({
-    title: "Objective Reasoning",
-    status: objectiveReasoningTraceRows.length > 0 ? "done" : "skipped",
-    summary: `entries=${objectiveReasoningTraceRows.length}; coverage_unresolved=${coverageUnresolvedCount}`,
-    detail: objectiveReasoningPreview || "(no objective reasoning trace)",
-    debug_refs: [
-      "objective_reasoning_trace",
-      "objective_telemetry_used",
-      "objective_coverage_unresolved_count",
-    ],
-    at: findEventTimestamp("objective", "critic", "unknown_terminal"),
-  });
-
-  const miniSynthMode = coerceHelixAskDebugString(debugRecord.objective_mini_synth_mode) ?? "none";
-  const miniSynthAttempted = coerceHelixAskDebugBoolean(debugRecord.objective_mini_synth_attempted);
-  const miniSynthFailReason =
-    coerceHelixAskDebugString(debugRecord.objective_mini_synth_fail_reason) ?? "none";
-  const miniSynthPromptPreview = clipAskText(
-    coerceHelixAskDebugString(debugRecord.objective_mini_synth_prompt_preview) ?? "",
-    280,
-  );
-  pushStep({
-    title: "Mini-Synth",
-    status: miniSynthMode === "llm" ? "done" : miniSynthMode === "heuristic_fallback" ? "partial" : "skipped",
-    summary: `mode=${miniSynthMode}; attempted=${String(miniSynthAttempted)}; fail=${miniSynthFailReason}`,
-    detail: miniSynthPromptPreview || "(no mini-synth prompt preview)",
-    debug_refs: [
-      "objective_mini_synth_mode",
-      "objective_mini_synth_attempted",
-      "objective_mini_synth_fail_reason",
-      "objective_mini_synth_prompt_preview",
-    ],
-    at: findEventTimestamp("mini", "synth"),
-  });
-
-  const miniCriticMode = coerceHelixAskDebugString(debugRecord.objective_mini_critic_mode) ?? "none";
-  const miniCriticAttempted = coerceHelixAskDebugBoolean(debugRecord.objective_mini_critic_attempted);
-  const miniCriticFailReason =
-    coerceHelixAskDebugString(debugRecord.objective_mini_critic_fail_reason) ?? "none";
-  const miniCriticPromptPreview = clipAskText(
-    coerceHelixAskDebugString(debugRecord.objective_mini_critic_prompt_preview) ?? "",
-    280,
-  );
-  pushStep({
-    title: "Mini-Critic",
-    status: miniCriticMode === "llm" ? "done" : miniCriticMode === "heuristic_fallback" ? "partial" : "skipped",
-    summary: `mode=${miniCriticMode}; attempted=${String(miniCriticAttempted)}; fail=${miniCriticFailReason}`,
-    detail: miniCriticPromptPreview || "(no mini-critic prompt preview)",
-    debug_refs: [
-      "objective_mini_critic_mode",
-      "objective_mini_critic_attempted",
-      "objective_mini_critic_fail_reason",
-      "objective_mini_critic_prompt_preview",
-    ],
-    at: findEventTimestamp("mini", "critic"),
-  });
-
-  const objectiveStepTranscripts = coerceHelixAskDebugObjectArray(debugRecord.objective_step_transcripts);
-  const transcriptLlmCalls = objectiveStepTranscripts.filter((entry) =>
-    Boolean(coerceHelixAskDebugString(entry.llm_model)),
-  ).length;
-  const transcriptPreview = objectiveStepTranscripts
-    .slice(-6)
-    .map((entry) => {
-      const objectiveId = coerceHelixAskDebugString(entry.objective_id) ?? "unknown";
-      const verb = coerceHelixAskDebugString(entry.verb) ?? "unknown";
-      const decision = coerceHelixAskDebugString(entry.decision) ?? "unknown";
-      return `${objectiveId}:${verb}:${decision}`;
-    })
-    .join(" | ");
-  pushStep({
-    title: "Objective Step Transcripts",
-    status: objectiveStepTranscripts.length > 0 ? "done" : "partial",
-    summary: `transcripts=${objectiveStepTranscripts.length}; llm_calls=${transcriptLlmCalls}`,
-    detail: transcriptPreview || "(no objective step transcripts captured)",
-    debug_refs: [
-      "objective_step_transcripts",
-      "objective_step_transcript_count",
-      "objective_step_llm_call_count",
-      "per_step_llm_call_rate",
-      "transcript_completeness_rate",
-    ],
-    at: findEventTimestamp("objective", "assembly", "critic"),
-  });
-
-  const assemblyMode = coerceHelixAskDebugString(debugRecord.objective_assembly_mode) ?? "none";
-  const assemblyBlockedReason =
-    coerceHelixAskDebugString(debugRecord.objective_assembly_blocked_reason) ?? "none";
-  const rescueAttempted = coerceHelixAskDebugBoolean(debugRecord.objective_assembly_rescue_attempted);
-  const rescueSuccess = coerceHelixAskDebugBoolean(debugRecord.objective_assembly_rescue_success);
-  const assemblyPromptPreview = clipAskText(
-    coerceHelixAskDebugString(debugRecord.objective_assembly_prompt_preview) ?? "",
-    220,
-  );
-  const rescuePromptPreview = clipAskText(
-    coerceHelixAskDebugString(debugRecord.objective_assembly_rescue_prompt_preview) ?? "",
-    220,
-  );
-  const assemblyStatus: HelixAskReasoningSidebarStepStatus =
-    assemblyMode === "llm"
-      ? assemblyBlockedReason !== "none"
-        ? "partial"
-        : "done"
-      : assemblyMode === "deterministic_fallback"
-        ? "partial"
-        : assemblyBlockedReason !== "none"
-          ? "blocked"
-          : "skipped";
-  pushStep({
-    title: "Assembly",
-    status: assemblyStatus,
-    summary: `mode=${assemblyMode}; rescue=${String(rescueSuccess ?? false)}; blocked=${assemblyBlockedReason}`,
-    detail:
-      `primary_prompt=${assemblyPromptPreview || "(none)"} | rescue_prompt=${rescuePromptPreview || "(none)"} | rescue_attempted=${String(
-        rescueAttempted ?? false,
-      )}`,
-    debug_refs: [
-      "objective_assembly_mode",
-      "objective_assembly_blocked_reason",
-      "objective_assembly_rescue_attempted",
-      "objective_assembly_rescue_success",
-      "objective_assembly_prompt_preview",
-      "objective_assembly_rescue_prompt_preview",
-    ],
-    at: findEventTimestamp("objectiveAssembly", "Finalization"),
-  });
-
-  const finalFailReason = coerceHelixAskDebugString(debugRecord.helix_ask_fail_reason) ?? "none";
-  const finalFailClass = coerceHelixAskDebugString(debugRecord.helix_ask_fail_class) ?? "none";
-  const finalAnswerPreview = clipAskText(
-    coerceHelixAskDebugString(debugRecord.answer_final_text) ?? "",
-    280,
-  );
-  const finalStatus: HelixAskReasoningSidebarStepStatus =
-    finalFailReason !== "none" || finalFailClass !== "none"
-      ? "blocked"
-      : /fallback/i.test(fallbackTaxonomy)
-        ? "partial"
-        : "done";
-  pushStep({
-    title: "Final Output",
-    status: finalStatus,
-    summary: `fail_reason=${finalFailReason}; fail_class=${finalFailClass}; fallback=${fallbackTaxonomy}`,
-    detail: finalAnswerPreview || "(no final answer preview captured)",
-    debug_refs: ["helix_ask_fail_reason", "helix_ask_fail_class", "answer_final_text"],
-    at: findEventTimestamp("Finalization", "Answer cleaned preview"),
-  });
-
-  const maxEventClockEntries = 64;
-  const clippedEvents = traceEvents.slice(-maxEventClockEntries);
-  const eventClock = clippedEvents.map((entry, index) => ({
-    idx: index + 1,
-    ts: entry.ts,
-    stage: coerceHelixAskDebugString(entry.stage) ?? "unknown",
-    detail: coerceHelixAskDebugString(entry.detail) ?? null,
-    ok: typeof entry.ok === "boolean" ? entry.ok : null,
-    duration_ms:
-      typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs)
-        ? Math.max(0, Math.floor(entry.durationMs))
-        : null,
-  }));
-
-  const markdown = [
-    "# Reasoning Sidebar",
-    ...steps.map((step) => {
-      const header = `${step.step}. ${step.title} [${step.status}]`;
-      const summary = `summary: ${step.summary}`;
-      const detail = step.detail ? `detail: ${step.detail}` : null;
-      const refs =
-        step.debug_refs && step.debug_refs.length > 0
-          ? `refs: ${step.debug_refs.join(", ")}`
-          : null;
-      return [header, summary, detail, refs].filter(Boolean).join("\n");
-    }),
-    "",
-    "## Event Clock",
-    ...(eventClock.length > 0
-      ? eventClock.map((entry) => {
-          const duration = entry.duration_ms !== null ? `; ${entry.duration_ms}ms` : "";
-          const detail = entry.detail ? `; ${clipAskText(entry.detail, 140)}` : "";
-          return `- [${entry.idx}] ${entry.ts} | ${entry.stage} | ok=${String(entry.ok)}${duration}${detail}`;
-        })
-      : ["- (no events)"]),
-  ]
-    .join("\n")
-    .trim();
-
-  return {
-    version: "v1",
-    generated_at: new Date().toISOString(),
-    steps,
-    event_clock: eventClock,
-    markdown: clipAskText(markdown, 8000),
-  };
-};
-
-const attachHelixAskReasoningSidebarToDebug = (args: {
-  debugRecord: Record<string, unknown>;
-  traceEvents: HelixAskTraceEvent[];
-}): void => {
-  const sidebar = buildHelixAskReasoningSidebarFromDebug(args);
-  args.debugRecord.reasoning_sidebar_enabled = true;
-  args.debugRecord.reasoning_sidebar = sidebar;
-  args.debugRecord.reasoning_sidebar_markdown = sidebar.markdown;
-  args.debugRecord.reasoning_sidebar_step_count = sidebar.steps.length;
-  args.debugRecord.reasoning_sidebar_event_count = sidebar.event_clock.length;
-};
-
 const executeHelixAsk = async ({
   request,
   personaId,
@@ -38625,32 +38228,6 @@ const executeHelixAsk = async ({
     if (liveEventHistory.length > HELIX_ASK_EVENT_HISTORY_LIMIT) {
       liveEventHistory.splice(0, liveEventHistory.length - HELIX_ASK_EVENT_HISTORY_LIMIT);
     }
-  };
-  const buildTraceSummary = (
-    events: HelixAskTraceEvent[],
-    limit = 12,
-  ): HelixAskTraceSummary[] => {
-    if (!events.length) return [];
-    return events
-      .filter((entry) => {
-        const fn = (entry.meta as { fn?: unknown } | undefined)?.fn;
-        return (
-          typeof entry.durationMs === "number" &&
-          Number.isFinite(entry.durationMs) &&
-          entry.durationMs > 0 &&
-          typeof fn === "string" &&
-          fn.trim().length > 0
-        );
-      })
-      .sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))
-      .slice(0, limit)
-      .map((entry) => ({
-        stage: entry.stage,
-        detail: entry.detail,
-        ok: entry.ok,
-        durationMs: entry.durationMs,
-        meta: entry.meta,
-      }));
   };
   const logProgress = (stage: string, detail?: string, startedAt?: number, ok?: boolean): void => {
     logHelixAskProgress({
@@ -41971,12 +41548,19 @@ const executeHelixAsk = async ({
         debugPayload.report_blocks_detail = reportBlockDetails as any;
         debugPayload.report_metrics = reportMetrics as any;
         const combinedEvents = [...liveEventHistory, ...reportLiveEvents];
-        debugPayload.live_events = combinedEvents;
-        debugPayload.trace_events = combinedEvents;
-        debugPayload.trace_summary = buildTraceSummary(combinedEvents);
-        attachHelixAskReasoningSidebarToDebug({
-          debugRecord: debugPayload as Record<string, unknown>,
+        attachTraceSummaryDebugPayload({
+          debugPayload: debugPayload as Record<string, unknown>,
           traceEvents: combinedEvents,
+          attachReasoningSidebarToDebug: ({ debugRecord, traceEvents }) =>
+            attachHelixAskReasoningSidebarToDebug({
+              debugRecord,
+              traceEvents,
+              coerceDebugString: coerceHelixAskDebugString,
+              coerceDebugBoolean: coerceHelixAskDebugBoolean,
+              coerceDebugNumber: coerceHelixAskDebugNumber,
+              coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+              clipText: clipAskText,
+            }),
         });
       }
       attachContextCapsuleToResult(reportPayload, reportText);
@@ -45403,133 +44987,85 @@ const executeHelixAsk = async ({
         : unknownTerminalPass
           ? "unknown_terminal"
           : "blocked";
-      debugPayload.objective_finalize_gate_passed = objectiveFinalizeGatePassed;
-      debugPayload.objective_finalize_gate_mode = objectiveFinalizeGateMode;
-      (debugPayload as Record<string, unknown>).objective_finalize_gate_unknown_terminal_eligible =
-        unknownTerminalPass;
-      if (strictCoveredPass) {
-        const softReasons = [
-          objectiveAnswerObligationsMissingCount > 0 ? "answer_obligations_missing" : null,
-          objectiveComposerValidationFailCount > 0 ? "composer_validation_fail" : null,
-        ].filter((entry): entry is string => Boolean(entry));
-        if (softReasons.length > 0) {
-          (debugPayload as Record<string, unknown>).objective_finalize_gate_soft_reasons = softReasons;
-        }
-      }
-      (debugPayload as Record<string, unknown>).objective_mode_gate_consistency_blocked =
-        !strictCoveredPass;
-      if (!strictCoveredPass) {
-        const objectiveModeGateReasons = [
-          summary.unresolvedCount > 0 ? "objective_unresolved" : null,
-          summary.blockedCount > 0 ? "objective_blocked" : null,
-          objectiveAnswerObligationsMissingCount > 0 ? "answer_obligations_missing" : null,
-          objectiveComposerValidationFailCount > 0 ? "composer_validation_fail" : null,
-        ].filter((reason): reason is string => Boolean(reason));
-        (debugPayload as Record<string, unknown>).objective_mode_gate_consistency_reasons =
-          objectiveModeGateReasons;
-      }
-      debugPayload.objective_loop_state = objectiveLoopState.slice(0, 16);
-      debugPayload.objective_transition_log = objectiveTransitionLog.slice(-64);
-      debugPayload.objective_retrieval_passes = objectiveRetrievalPasses.slice(-24);
-      debugPayload.objective_retrieval_queries = objectiveRetrievalQueriesLog.slice(-24);
-      debugPayload.objective_retrieval_selected_files = objectiveRetrievalSelectedFilesLog.slice(-24);
-      debugPayload.objective_retrieval_confidence_delta =
-        objectiveRetrievalConfidenceDeltaLog.slice(-24);
-      debugPayload.objective_retrieval_exhausted = objectiveRetrievalExhausted;
-      debugPayload.objective_retrieve_proposal_mode = objectiveRetrieveProposalMode;
-      debugPayload.objective_retrieve_proposal_attempted = objectiveRetrieveProposalLlmAttempted;
-      debugPayload.objective_retrieve_proposal_invoked = objectiveRetrieveProposalLlmInvoked;
-      debugPayload.objective_retrieve_proposal_fail_reason = objectiveRetrieveProposalFailReason;
-      debugPayload.objective_retrieve_proposal_prompt_preview =
-        objectiveRetrieveProposalPromptPreview;
-      debugPayload.objective_retrieve_proposal_applied_count = objectiveRetrieveProposalAppliedCount;
-      (debugPayload as Record<string, unknown>).objective_retrieve_proposal_repair_attempted =
-        objectiveRetrieveProposalRepairAttempted;
-      (debugPayload as Record<string, unknown>).objective_retrieve_proposal_repair_success =
-        objectiveRetrieveProposalRepairSuccess;
-      (debugPayload as Record<string, unknown>).objective_retrieve_proposal_repair_fail_reason =
-        objectiveRetrieveProposalRepairFailReason;
-      (debugPayload as Record<string, unknown>).objective_recovery_no_context_retryable_count =
-        objectiveRecoveryNoContextRetryableCount;
-      (debugPayload as Record<string, unknown>).objective_recovery_no_context_terminal_count =
-        objectiveRecoveryNoContextTerminalCount;
-      (debugPayload as Record<string, unknown>).objective_recovery_error_retryable_count =
-        objectiveRecoveryErrorRetryableCount;
-      (debugPayload as Record<string, unknown>).objective_recovery_error_terminal_count =
-        objectiveRecoveryErrorTerminalCount;
-      debugPayload.objective_mini_answers = objectiveMiniAnswers.slice(0, 12);
-      debugPayload.objective_mini_validation = objectiveMiniValidation;
-      debugPayload.objective_mini_synth_mode = objectiveMiniSynthMode;
-      debugPayload.objective_mini_synth_attempted = objectiveMiniSynthLlmAttempted;
-      debugPayload.objective_mini_synth_invoked = objectiveMiniSynthLlmInvoked;
-      debugPayload.objective_mini_synth_fail_reason = objectiveMiniSynthFailReason;
-      debugPayload.objective_mini_synth_prompt_preview = objectiveMiniSynthPromptPreview;
-      (debugPayload as Record<string, unknown>).objective_mini_synth_repair_attempted =
-        objectiveMiniSynthRepairAttempted;
-      (debugPayload as Record<string, unknown>).objective_mini_synth_repair_success =
-        objectiveMiniSynthRepairSuccess;
-      (debugPayload as Record<string, unknown>).objective_mini_synth_repair_fail_reason =
-        objectiveMiniSynthRepairFailReason;
-      debugPayload.objective_mini_critic_mode = objectiveMiniCriticMode;
-      debugPayload.objective_mini_critic_attempted = objectiveMiniCriticLlmAttempted;
-      debugPayload.objective_mini_critic_invoked = objectiveMiniCriticLlmInvoked;
-      debugPayload.objective_mini_critic_fail_reason = objectiveMiniCriticFailReason;
-      debugPayload.objective_mini_critic_prompt_preview = objectiveMiniCriticPromptPreview;
-      (debugPayload as Record<string, unknown>).objective_mini_critic_repair_attempted =
-        objectiveMiniCriticRepairAttempted;
-      (debugPayload as Record<string, unknown>).objective_mini_critic_repair_success =
-        objectiveMiniCriticRepairSuccess;
-      (debugPayload as Record<string, unknown>).objective_mini_critic_repair_fail_reason =
-        objectiveMiniCriticRepairFailReason;
-      debugPayload.objective_assembly_mode = objectiveAssemblyMode;
-      debugPayload.objective_assembly_input_count = objectiveMiniAnswers.length;
-      debugPayload.objective_assembly_fail_reason = objectiveAssemblyFailReason;
-      debugPayload.objective_assembly_blocked_reason = objectiveAssemblyBlockedReason;
-      debugPayload.objective_assembly_llm_attempted = objectiveAssemblyLlmAttempted;
-      debugPayload.objective_assembly_llm_invoked = objectiveAssemblyLlmInvoked;
-      debugPayload.objective_assembly_prompt_preview = objectiveAssemblyPromptPreview;
-      debugPayload.objective_assembly_rescue_prompt_preview =
-        objectiveAssemblyRescuePromptPreview;
-      debugPayload.objective_assembly_rescue_attempted = objectiveAssemblyRescueAttempted;
-      debugPayload.objective_assembly_rescue_success = objectiveAssemblyRescueSuccess;
-      debugPayload.objective_assembly_rescue_fail_reason = objectiveAssemblyRescueFailReason;
-      (debugPayload as Record<string, unknown>).objective_assembly_repair_attempted =
-        objectiveAssemblyRepairAttempted;
-      (debugPayload as Record<string, unknown>).objective_assembly_repair_success =
-        objectiveAssemblyRepairSuccess;
-      (debugPayload as Record<string, unknown>).objective_assembly_repair_fail_reason =
-        objectiveAssemblyRepairFailReason;
-      (debugPayload as Record<string, unknown>).objective_assembly_rescue_repair_attempted =
-        objectiveAssemblyRescueRepairAttempted;
-      (debugPayload as Record<string, unknown>).objective_assembly_rescue_repair_success =
-        objectiveAssemblyRescueRepairSuccess;
-      (debugPayload as Record<string, unknown>).objective_assembly_rescue_repair_fail_reason =
-        objectiveAssemblyRescueRepairFailReason;
-      (debugPayload as Record<string, unknown>).objective_assembly_weak_reject_count =
-        objectiveAssemblyWeakRejectCount;
+      applyObjectiveGateDebugPayload({
+        debugPayload,
+        objectiveFinalizeGatePassed,
+        objectiveFinalizeGateMode,
+        unknownTerminalPass,
+        strictCoveredPass,
+        unresolvedCount: summary.unresolvedCount,
+        blockedCount: summary.blockedCount,
+        objectiveAnswerObligationsMissingCount,
+        objectiveComposerValidationFailCount,
+      });
+      applyObjectiveStateDebugPayload({
+        debugPayload,
+        objectiveLoopState,
+        objectiveTransitionLog,
+      });
+      applyObjectiveRecoveryDebugPayload({
+        debugPayload,
+        objectiveRetrievalPasses,
+        objectiveRetrievalQueriesLog,
+        objectiveRetrievalSelectedFilesLog,
+        objectiveRetrievalConfidenceDeltaLog,
+        objectiveRetrievalExhausted,
+        objectiveRetrieveProposalMode,
+        objectiveRetrieveProposalLlmAttempted,
+        objectiveRetrieveProposalLlmInvoked,
+        objectiveRetrieveProposalFailReason,
+        objectiveRetrieveProposalPromptPreview,
+        objectiveRetrieveProposalAppliedCount,
+        objectiveRetrieveProposalRepairAttempted,
+        objectiveRetrieveProposalRepairSuccess,
+        objectiveRetrieveProposalRepairFailReason,
+        objectiveRecoveryNoContextRetryableCount,
+        objectiveRecoveryNoContextTerminalCount,
+        objectiveRecoveryErrorRetryableCount,
+        objectiveRecoveryErrorTerminalCount,
+      });
+      applyObjectiveLlmDebugPayload({
+        debugPayload,
+        objectiveMiniAnswers,
+        objectiveMiniValidation,
+        objectiveMiniSynthMode,
+        objectiveMiniSynthLlmAttempted,
+        objectiveMiniSynthLlmInvoked,
+        objectiveMiniSynthFailReason,
+        objectiveMiniSynthPromptPreview,
+        objectiveMiniSynthRepairAttempted,
+        objectiveMiniSynthRepairSuccess,
+        objectiveMiniSynthRepairFailReason,
+        objectiveMiniCriticMode,
+        objectiveMiniCriticLlmAttempted,
+        objectiveMiniCriticLlmInvoked,
+        objectiveMiniCriticFailReason,
+        objectiveMiniCriticPromptPreview,
+        objectiveMiniCriticRepairAttempted,
+        objectiveMiniCriticRepairSuccess,
+        objectiveMiniCriticRepairFailReason,
+        objectiveAssemblyMode,
+        objectiveAssemblyFailReason,
+        objectiveAssemblyBlockedReason,
+        objectiveAssemblyLlmAttempted,
+        objectiveAssemblyLlmInvoked,
+        objectiveAssemblyPromptPreview,
+        objectiveAssemblyRescuePromptPreview,
+        objectiveAssemblyRescueAttempted,
+        objectiveAssemblyRescueSuccess,
+        objectiveAssemblyRescueFailReason,
+        objectiveAssemblyRepairAttempted,
+        objectiveAssemblyRepairSuccess,
+        objectiveAssemblyRepairFailReason,
+        objectiveAssemblyRescueRepairAttempted,
+        objectiveAssemblyRescueRepairSuccess,
+        objectiveAssemblyRescueRepairFailReason,
+        objectiveAssemblyWeakRejectCount,
+      });
       const objectiveCoverageUnresolvedObjectiveIds = objectiveMiniAnswers
         .filter((entry) => entry.status !== "covered")
         .map((entry) => entry.objective_id)
         .slice(0, 12);
-      debugPayload.objective_coverage_unresolved_count = objectiveCoverageUnresolvedObjectiveIds.length;
-      debugPayload.objective_coverage_unresolved_objective_ids =
-        objectiveCoverageUnresolvedObjectiveIds.slice();
-      debugPayload.objective_unknown_block_count = objectiveUnknownBlockObjectiveIds.length;
-      debugPayload.objective_unknown_block_objective_ids =
-        objectiveUnknownBlockObjectiveIds.slice(0, 12);
-      debugPayload.objective_unresolved_without_unknown_block_count =
-        objectiveUnresolvedWithoutUnknownBlockIds.length;
-      debugPayload.objective_unresolved_without_unknown_block_ids =
-        objectiveUnresolvedWithoutUnknownBlockIds.slice(0, 12);
-      debugPayload.unresolved_without_unknown_block_rate =
-        objectiveMiniValidation && objectiveMiniValidation.unresolved > 0
-          ? Number(
-              (
-                objectiveUnresolvedWithoutUnknownBlockIds.length /
-                Math.max(1, objectiveMiniValidation.unresolved)
-              ).toFixed(4),
-            )
-          : 0;
       const unresolvedWithGenericUnknown = objectiveMiniAnswers
         .filter((entry) => entry.status !== "covered")
         .filter((entry) => hasHelixAskObjectiveUnknownBlock(entry.unknown_block))
@@ -45540,16 +45076,16 @@ const executeHelixAsk = async ({
             [block.unknown, block.why, block.what_i_checked.join(" "), block.next_retrieval].join(" "),
           );
         }).length;
-      debugPayload.generic_unknown_renderer_rate =
-        objectiveMiniValidation && objectiveMiniValidation.unresolved > 0
-          ? Number((unresolvedWithGenericUnknown / Math.max(1, objectiveMiniValidation.unresolved)).toFixed(4))
-          : 0;
-      debugPayload.objective_oes_scores = objectiveOesScores.slice(0, 12);
-      debugPayload.objective_terminalization_reasons = {
-        ...objectiveTerminalizationReasons,
-      };
-      debugPayload.objective_terminalization_reason =
-        Object.values(objectiveTerminalizationReasons)[0] ?? null;
+      applyObjectiveValidationDebugPayload({
+        debugPayload,
+        objectiveCoverageUnresolvedObjectiveIds,
+        objectiveUnknownBlockObjectiveIds,
+        objectiveUnresolvedWithoutUnknownBlockIds,
+        unresolvedObjectiveCount: objectiveMiniValidation?.unresolved ?? 0,
+        unresolvedWithGenericUnknownCount: unresolvedWithGenericUnknown,
+        objectiveOesScores,
+        objectiveTerminalizationReasons,
+      });
       const objectiveReasoningTrace = buildHelixAskObjectivePlainReasoningTrace({
         miniAnswers: objectiveMiniAnswers,
         states: objectiveLoopState,
@@ -45559,8 +45095,7 @@ const executeHelixAsk = async ({
         retrievalQueries: objectiveRetrievalQueriesLog,
         terminalizationReasons: objectiveTerminalizationReasons,
       });
-      debugPayload.objective_reasoning_trace = objectiveReasoningTrace.slice(0, 12);
-      debugPayload.objective_telemetry_used = {
+      const objectiveTelemetryUsed = {
         version: "v1",
         objective_unresolved_count_terminal: summary.unresolvedCount,
         objective_coverage_unresolved_count: objectiveCoverageUnresolvedObjectiveIds.length,
@@ -45591,20 +45126,18 @@ const executeHelixAsk = async ({
           "objective_assembly_mode",
         ],
       };
-      debugPayload.objective_step_transcripts = stepTranscripts;
-      debugPayload.objective_step_transcript_count = stepTranscripts.length;
-      debugPayload.objective_step_llm_call_count = llmStepCount;
-      debugPayload.per_step_llm_call_rate =
-        expectedLlmSteps.length > 0
-          ? Number((llmStepCount / expectedLlmSteps.length).toFixed(4))
-          : 0;
-      debugPayload.transcript_completeness_rate =
-        stepTranscripts.length > 0
-          ? Number((transcriptCompleteCount / stepTranscripts.length).toFixed(4))
-          : 0;
-      debugPayload.routing_salvage_applied = routingSalvageApplied;
-      debugPayload.routing_salvage_reason = routingSalvageReason;
-      debugPayload.routing_salvage_retrieval_added_count = routingSalvageRetrievalAddedCount;
+      applyObjectiveTraceDebugPayload({
+        debugPayload,
+        objectiveReasoningTrace,
+        objectiveTelemetryUsed,
+        stepTranscripts,
+        llmStepCount,
+        expectedLlmStepCount: expectedLlmSteps.length,
+        transcriptCompleteCount,
+        routingSalvageApplied,
+        routingSalvageReason,
+        routingSalvageRetrievalAddedCount,
+      });
     };
     const pushObjectiveRetrievalProbe = (args: {
       objectiveId: string;
@@ -53110,12 +52643,19 @@ const executeHelixAsk = async ({
         }
         if (debugPayload && captureLiveHistory) {
           const traceEvents = liveEventHistory.slice();
-          debugPayload.live_events = traceEvents;
-          debugPayload.trace_events = traceEvents;
-          debugPayload.trace_summary = buildTraceSummary(traceEvents);
-          attachHelixAskReasoningSidebarToDebug({
-            debugRecord: debugPayload as Record<string, unknown>,
+          attachTraceSummaryDebugPayload({
+            debugPayload: debugPayload as Record<string, unknown>,
             traceEvents,
+            attachReasoningSidebarToDebug: ({ debugRecord, traceEvents: sidebarTraceEvents }) =>
+              attachHelixAskReasoningSidebarToDebug({
+                debugRecord,
+                traceEvents: sidebarTraceEvents,
+                coerceDebugString: coerceHelixAskDebugString,
+                coerceDebugBoolean: coerceHelixAskDebugBoolean,
+                coerceDebugNumber: coerceHelixAskDebugNumber,
+                coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+                clipText: clipAskText,
+              }),
           });
         }
         if (debugPayload && overflowHistory.length > 0) {
@@ -65183,14 +64723,18 @@ const executeHelixAsk = async ({
     attachFinalTraceDebugPayload({
       debugPayload: debugPayload as Record<string, unknown> | null | undefined,
       captureLiveHistory,
-      traceEvents: liveEventHistory.slice() as Record<string, unknown>[],
-      buildTraceSummary: (events) => buildTraceSummary(events as HelixAskTraceEvent[]),
+      traceEvents: liveEventHistory.slice(),
       buildEventStableFields,
       hashStableJson,
       attachReasoningSidebarToDebug: ({ debugRecord, traceEvents }) =>
         attachHelixAskReasoningSidebarToDebug({
           debugRecord,
-          traceEvents: traceEvents as HelixAskTraceEvent[],
+          traceEvents,
+          coerceDebugString: coerceHelixAskDebugString,
+          coerceDebugBoolean: coerceHelixAskDebugBoolean,
+          coerceDebugNumber: coerceHelixAskDebugNumber,
+          coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+          clipText: clipAskText,
         }),
       retrievalRoute: graphPack?.primaryTreeId
         ? `graph:${graphPack.primaryTreeId}`

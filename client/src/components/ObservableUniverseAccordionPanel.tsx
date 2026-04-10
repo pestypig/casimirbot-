@@ -8,7 +8,10 @@ import type {
   ObservableUniverseAccordionEtaSurfaceResult,
 } from "@shared/observable-universe-accordion-surfaces";
 import { useObservableUniverseAccordion } from "@/hooks/useObservableUniverseAccordion";
-import { OBSERVABLE_UNIVERSE_SUPPORTED_TARGET } from "@/lib/observable-universe-accordion";
+import {
+  OBSERVABLE_UNIVERSE_ACTIVE_TARGET,
+  OBSERVABLE_UNIVERSE_NEARBY_VISIBLE_TARGETS,
+} from "@/lib/observable-universe-accordion";
 import { Button } from "@/components/ui/button";
 
 type ObservableUniverseAccordionPanelProps = {
@@ -90,6 +93,9 @@ const buildMapGeometry = (entries: ObservableUniverseAccordionEtaSurfaceEntry[])
 const modeLabel = (value: ObservableUniverseSupportedEtaMode | undefined): string =>
   value === "coordinate_time" ? "coordinate_time" : "proper_time";
 
+const supportLabelFor = (entry: ObservableUniverseAccordionEtaSurfaceEntry): string =>
+  entry.etaSupport === "contract_backed" ? "contract-backed ETA" : "render-only";
+
 const AccordionMap = ({
   entries,
 }: {
@@ -161,29 +167,43 @@ const AccordionMap = ({
               strokeWidth={1.5}
               strokeDasharray="5 5"
             />
-            <line
-              x1={center}
-              y1={center}
-              x2={outputPoint[0]}
-              y2={outputPoint[1]}
-              stroke="rgba(34,211,238,0.95)"
-              strokeWidth={2.5}
-            />
             <circle
               cx={canonicalPoint[0]}
               cy={canonicalPoint[1]}
-              r={4}
-              fill="rgba(148,163,184,0.95)"
+              r={entry.etaSupport === "contract_backed" ? 4 : 5}
+              fill={
+                entry.etaSupport === "contract_backed"
+                  ? "rgba(148,163,184,0.95)"
+                  : "rgba(251,191,36,0.95)"
+              }
             />
-            <circle
-              cx={outputPoint[0]}
-              cy={outputPoint[1]}
-              r={6}
-              fill="rgba(34,211,238,1)"
-            />
+            {entry.etaSupport === "contract_backed" ? (
+              <>
+                <line
+                  x1={center}
+                  y1={center}
+                  x2={outputPoint[0]}
+                  y2={outputPoint[1]}
+                  stroke="rgba(34,211,238,0.95)"
+                  strokeWidth={2.5}
+                />
+                <circle
+                  cx={outputPoint[0]}
+                  cy={outputPoint[1]}
+                  r={6}
+                  fill="rgba(34,211,238,1)"
+                />
+              </>
+            ) : null}
             <text
-              x={outputPoint[0] + 10}
-              y={outputPoint[1] - 10}
+              x={
+                (entry.etaSupport === "contract_backed" ? outputPoint[0] : canonicalPoint[0]) +
+                10
+              }
+              y={
+                (entry.etaSupport === "contract_backed" ? outputPoint[1] : canonicalPoint[1]) -
+                10
+              }
               fill="rgba(226,232,240,1)"
               fontSize="12"
             >
@@ -192,10 +212,14 @@ const AccordionMap = ({
             <text
               x={canonicalPoint[0] + 8}
               y={canonicalPoint[1] + 16}
-              fill="rgba(148,163,184,0.95)"
+              fill={
+                entry.etaSupport === "contract_backed"
+                  ? "rgba(148,163,184,0.95)"
+                  : "rgba(251,191,36,0.95)"
+              }
               fontSize="11"
             >
-              canonical
+              {entry.etaSupport === "contract_backed" ? "canonical" : "render-only"}
             </text>
           </g>
         ))}
@@ -221,8 +245,17 @@ export function ObservableUniverseAccordionPanel({
   estimateKind = "proper_time",
   onEstimateKindChange,
   onRefresh,
-  targetLabel = OBSERVABLE_UNIVERSE_SUPPORTED_TARGET.label,
+  targetLabel = OBSERVABLE_UNIVERSE_ACTIVE_TARGET.label,
 }: ObservableUniverseAccordionPanelProps) {
+  const computedEntries = surface?.status === "computed" ? surface.entries : [];
+  const activeEntry =
+    surface?.status === "computed"
+      ? computedEntries.find((entry) => entry.etaSupport === "contract_backed") ?? null
+      : null;
+  const renderOnlyEntries =
+    surface?.status === "computed"
+      ? computedEntries.filter((entry) => entry.etaSupport === "render_only")
+      : [];
   const statusLabel =
     surface?.status === "computed"
       ? "contract-backed"
@@ -231,7 +264,6 @@ export function ObservableUniverseAccordionPanel({
         : isLoading
           ? "loading"
           : "deferred";
-  const firstEntry = surface?.status === "computed" ? surface.entries[0] : null;
 
   return (
     <section className="flex h-full flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-200">
@@ -241,8 +273,9 @@ export function ObservableUniverseAccordionPanel({
             Observable Universe Accordion
           </h3>
           <p className="mt-1 text-xs text-slate-400">
-            Target-coupled NHM2 trip-estimate surface. Sol stays fixed, the sky
-            direction stays canonical, and only the render radius is remapped.
+            Small nearby-star catalog with one explicit NHM2 ETA lane. Sol stays
+            fixed, the sky direction stays canonical, and only contract-backed
+            targets receive radius remaps.
           </p>
         </div>
         <span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-cyan-200">
@@ -252,10 +285,18 @@ export function ObservableUniverseAccordionPanel({
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
         <span className="uppercase tracking-[0.18em] text-slate-500">
-          Supported target
+          ETA-backed target
         </span>
         <span className="rounded border border-slate-700 px-2 py-1 text-slate-100">
-          {targetLabel}
+          {activeEntry?.label ?? targetLabel}
+        </span>
+        <span className="uppercase tracking-[0.18em] text-slate-500">
+          Visible nearby catalog
+        </span>
+        <span className="rounded border border-slate-700 px-2 py-1 text-slate-100">
+          {surface?.status === "computed"
+            ? `${computedEntries.length} stars`
+            : `${OBSERVABLE_UNIVERSE_NEARBY_VISIBLE_TARGETS.length} stars`}
         </span>
         <label className="ml-auto flex items-center gap-2">
           <span className="uppercase tracking-[0.18em] text-slate-500">Mode</span>
@@ -289,7 +330,7 @@ export function ObservableUniverseAccordionPanel({
 
       {isLoading && !surface && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-slate-300">
-          Resolving the contract-backed accordion surface...
+          Resolving the nearby-star accordion surface...
         </div>
       )}
 
@@ -299,34 +340,41 @@ export function ObservableUniverseAccordionPanel({
         </div>
       )}
 
-      {surface?.status === "computed" && surface.entries.length > 0 ? (
+      {surface?.status === "computed" && computedEntries.length > 0 ? (
         <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-          <AccordionMap entries={surface.entries} />
+          <AccordionMap entries={computedEntries} />
 
           <div className="space-y-4">
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
                 Active projection
               </div>
-              <div className="mt-3 space-y-2 text-sm text-slate-200">
-                <div>
-                  {firstEntry?.label ?? firstEntry?.id}:{" "}
-                  {firstEntry?.estimateYears.toFixed(3)} yr
+              {activeEntry ? (
+                <div className="mt-3 space-y-2 text-sm text-slate-200">
+                  <div>
+                    {activeEntry.label ?? activeEntry.id}:{" "}
+                    {activeEntry.estimateYears?.toFixed(3)} yr
+                  </div>
+                  <div>Mode: {modeLabel(activeEntry.estimateKind ?? undefined)}</div>
+                  <div>Driving profile: {activeEntry.drivingProfileId}</div>
+                  <div>
+                    Supported band membership:{" "}
+                    {activeEntry.withinSupportedBand
+                      ? "within supported band"
+                      : "outside supported band"}
+                  </div>
+                  <div>Frame: {activeEntry.frame_id}</div>
+                  <div>Frame realization: {activeEntry.frame_realization ?? "Gaia_CRF3"}</div>
+                  <div>Render epoch: {formatMaybeDateEpoch(activeEntry.render_epoch_tcb_jy)}</div>
+                  <div>Provenance: {activeEntry.provenance_class}</div>
+                  <div>Source artifact: {activeEntry.sourceArtifactPath}</div>
                 </div>
-                <div>Mode: {modeLabel(firstEntry?.estimateKind)}</div>
-                <div>Driving profile: {firstEntry?.drivingProfileId}</div>
-                <div>
-                  Supported band membership:{" "}
-                  {firstEntry?.withinSupportedBand
-                    ? "within supported band"
-                    : "outside supported band"}
+              ) : (
+                <div className="mt-3 text-sm text-amber-100">
+                  No contract-backed ETA target is active. The panel stays honest
+                  and does not substitute a fallback estimate.
                 </div>
-                <div>Frame: {firstEntry?.frame_id}</div>
-                <div>Frame realization: {firstEntry?.frame_realization ?? "Gaia_CRF3"}</div>
-                <div>Render epoch: {formatMaybeDateEpoch(firstEntry?.render_epoch_tcb_jy)}</div>
-                <div>Provenance: {firstEntry?.provenance_class}</div>
-                <div>Source artifact: {firstEntry?.sourceArtifactPath}</div>
-              </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4">
@@ -343,23 +391,66 @@ export function ObservableUniverseAccordionPanel({
                 {renderRow("Support buffer", formatNumber(surface.supportBufferDeltaCenterlineAlpha))}
                 {renderRow("Contract status", surface.supportedBandStatus ?? "deferred")}
                 {renderRow("Hidden anchors", String(surface.hiddenAnchorCount))}
+                {renderRow(
+                  "Render-only nearby stars",
+                  String(renderOnlyEntries.length),
+                )}
               </dl>
             </div>
 
-            {firstEntry && (
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                Visible nearby catalog
+              </div>
+              <div className="mt-3 space-y-3 text-xs text-slate-300">
+                {computedEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="rounded-xl border border-slate-800 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-slate-100">
+                        {entry.label ?? entry.id}
+                      </span>
+                      <span
+                        className={
+                          entry.etaSupport === "contract_backed"
+                            ? "rounded border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-cyan-200"
+                            : "rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-200"
+                        }
+                      >
+                        {supportLabelFor(entry)}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-slate-400">
+                      Frame {entry.frame_id} · provenance {entry.provenance_class}
+                    </div>
+                    {entry.etaSupport === "render_only" ? (
+                      <div className="mt-2 text-amber-100">{entry.renderOnlyReason}</div>
+                    ) : (
+                      <div className="mt-2 text-slate-300">
+                        {entry.estimateYears?.toFixed(3)} yr via {entry.drivingProfileId}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {activeEntry && (
               <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
                   Entry vectors
                 </div>
                 <div className="mt-3 space-y-2 text-xs text-slate-300">
-                  <div>Input direction unit: {formatVector(firstEntry.inputDirectionUnit)}</div>
-                  <div>Canonical position: {formatVector(firstEntry.canonicalPosition_m)}</div>
-                  <div>Rendered position: {formatVector(firstEntry.outputPosition_m)}</div>
-                  <div>Mapped radius (m): {firstEntry.mappedRadius_m.toExponential(3)}</div>
+                  <div>Input direction unit: {formatVector(activeEntry.inputDirectionUnit)}</div>
+                  <div>Canonical position: {formatVector(activeEntry.canonicalPosition_m)}</div>
+                  <div>Rendered position: {formatVector(activeEntry.outputPosition_m)}</div>
+                  <div>Mapped radius (m): {activeEntry.mappedRadius_m?.toExponential(3)}</div>
                   <div>
                     Propagation limitations:{" "}
-                    {firstEntry.propagation_limitations.length > 0
-                      ? firstEntry.propagation_limitations.join(", ")
+                    {activeEntry.propagation_limitations.length > 0
+                      ? activeEntry.propagation_limitations.join(", ")
                       : "none surfaced"}
                   </div>
                 </div>
@@ -397,7 +488,7 @@ export default function ObservableUniverseAccordionConnectedPanel() {
       onRefresh={() => {
         void refetch();
       }}
-      targetLabel={OBSERVABLE_UNIVERSE_SUPPORTED_TARGET.label}
+      targetLabel={OBSERVABLE_UNIVERSE_ACTIVE_TARGET.label}
     />
   );
 }

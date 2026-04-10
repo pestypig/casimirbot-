@@ -201,9 +201,31 @@ const starSimSourceContextSchema = z
     resolved_draft_ref: z.string().min(1).optional(),
     resolved_draft_hash: z.string().min(1).optional(),
     identifiers_resolved: starSimIdentifiersSchema,
+    identifiers_observed: starSimIdentifiersSchema,
+    identifiers_trusted: starSimIdentifiersSchema,
     fetch_modes_by_catalog: z.record(starSimSourceFetchModeSchema).optional(),
     selected_field_origins: z.record(starSimSourceSelectionOriginSchema).optional(),
     benchmark_target_id: z.string().min(1).optional(),
+    benchmark_target_match_mode: z
+      .enum([
+        "matched_by_identifier",
+        "matched_by_name",
+        "conflicted_trusted_identifiers",
+        "conflicted_name_vs_identifier",
+        "no_match",
+      ])
+      .optional(),
+    benchmark_target_identity_basis: z
+      .enum([
+        "trusted_identifier",
+        "name_label",
+        "conflicted_trusted_identifiers",
+        "conflicted_trusted_identifier_vs_name",
+        "none",
+      ])
+      .optional(),
+    benchmark_target_conflict_reason: z.string().min(1).optional(),
+    benchmark_target_quality_ok: z.boolean().optional(),
   })
   .optional();
 
@@ -353,11 +375,13 @@ export interface StarSimSourceContext {
   resolved_draft_ref?: string;
   resolved_draft_hash?: string;
   identifiers_resolved?: StarSimSourceIdentifiers;
+  identifiers_observed?: StarSimSourceIdentifiers;
   identifiers_trusted?: StarSimSourceIdentifiers;
   fetch_modes_by_catalog?: Partial<Record<StarSimSourceCatalog, StarSimSourceFetchMode>>;
   selected_field_origins?: Record<string, StarSimSourceSelectionOrigin>;
   benchmark_target_id?: string;
   benchmark_target_match_mode?: StarSimBenchmarkTargetMatchMode;
+  benchmark_target_identity_basis?: StarSimBenchmarkTargetIdentityBasis;
   benchmark_target_conflict_reason?: string;
   benchmark_target_quality_ok?: boolean;
 }
@@ -365,12 +389,14 @@ export interface StarSimSourceContext {
 export type StarSimBenchmarkTargetMatchMode =
   | "matched_by_identifier"
   | "matched_by_name"
+  | "conflicted_trusted_identifiers"
   | "conflicted_name_vs_identifier"
   | "no_match";
 
 export type StarSimBenchmarkTargetIdentityBasis =
   | "trusted_identifier"
   | "name_label"
+  | "conflicted_trusted_identifiers"
   | "conflicted_trusted_identifier_vs_name"
   | "none";
 
@@ -411,6 +437,61 @@ export interface StarSimDiagnosticSummary {
     requested: number;
     ratio: number;
   };
+}
+
+export interface StarSimBenchmarkEnvelopeDiagnostic {
+  field_path: "spectroscopy.teff_K" | "asteroseismology.numax_uHz" | "asteroseismology.deltanu_uHz";
+  status: "in_envelope" | "out_of_envelope" | "missing";
+  actual?: number;
+  min: number;
+  max: number;
+}
+
+export type StarSimBenchmarkReceiptStage = "resolve_preview" | "preflight_blocked" | "completed";
+
+export type StarSimBenchmarkDriftCategory =
+  | "trusted_identity_changed"
+  | "selected_field_origins_changed"
+  | "lane_plan_changed"
+  | "blocked_reasons_changed"
+  | "envelope_status_changed"
+  | "diagnostic_summary_changed";
+
+export interface StarSimBenchmarkRepeatability {
+  repeatable: boolean;
+  same_input_signature: boolean;
+  drift_categories: StarSimBenchmarkDriftCategory[];
+  notes: string[];
+}
+
+export const STAR_SIM_BENCHMARK_RECEIPT_SCHEMA_VERSION = "star-sim-benchmark-receipt/2" as const;
+
+export interface StarSimBenchmarkReceipt {
+  schema_version: typeof STAR_SIM_BENCHMARK_RECEIPT_SCHEMA_VERSION;
+  benchmark_backed: true;
+  receipt_stage: StarSimBenchmarkReceiptStage;
+  written_at_iso: string;
+  job_id?: string | null;
+  benchmark_target_id: string;
+  benchmark_family_or_pack_ids: string[];
+  benchmark_target_match_mode?: StarSimBenchmarkTargetMatchMode;
+  benchmark_target_conflict_reason?: string;
+  benchmark_target_identity_basis?: StarSimBenchmarkTargetIdentityBasis;
+  benchmark_target_quality_ok?: boolean;
+  benchmark_input_signature: string;
+  identifiers_observed?: StarSimSourceIdentifiers;
+  identifiers_trusted?: StarSimSourceIdentifiers;
+  selected_field_origins: Record<string, StarSimSourceSelectionOrigin>;
+  requested_lanes: RequestedLane[];
+  runnable_lanes: RequestedLane[];
+  blocked_lanes: RequestedLane[];
+  blocked_reasons: string[];
+  policy_used: StarSimPreconditionPolicy;
+  source_cache_key: string | null;
+  source_resolution_ref: string | null;
+  resolved_draft_hash: string | null;
+  observable_envelope_diagnostics: StarSimBenchmarkEnvelopeDiagnostic[];
+  lane_diagnostics: Partial<Record<RequestedLane, StarSimDiagnosticSummary>>;
 }
 
 export interface StarSimSourceCandidate {
@@ -571,6 +652,11 @@ export interface StarSimResolveBeforeRunResponse {
   preflight: StarSimPreflight;
   lane_plan: StarSimLanePlan;
   blocked_reasons: string[];
+  benchmark_backed?: boolean;
+  benchmark_receipt_ref?: string;
+  benchmark_input_signature?: string;
+  previous_benchmark_receipt_ref?: string;
+  benchmark_repeatability?: StarSimBenchmarkRepeatability;
   benchmark_target_id?: string;
   benchmark_target_match_mode?: StarSimBenchmarkTargetMatchMode;
   benchmark_target_conflict_reason?: string;
@@ -756,6 +842,11 @@ export interface StarSimResponse {
     executed_lanes: string[];
     unavailable_requested_lanes: RequestedLane[];
   };
+  benchmark_backed?: boolean;
+  benchmark_receipt_ref?: string;
+  benchmark_input_signature?: string;
+  previous_benchmark_receipt_ref?: string;
+  benchmark_repeatability?: StarSimBenchmarkRepeatability;
   lanes: StarSimLaneResult[];
   congruence: StarSimCongruence;
 }
@@ -785,4 +876,9 @@ export interface StarSimJobRecord {
   source_resolution_ref: string | null;
   source_cache_key: string | null;
   lane_plan: StarSimLanePlan | null;
+  benchmark_backed?: boolean;
+  benchmark_receipt_ref?: string | null;
+  benchmark_input_signature?: string | null;
+  previous_benchmark_receipt_ref?: string | null;
+  benchmark_repeatability?: StarSimBenchmarkRepeatability;
 }

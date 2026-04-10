@@ -76,6 +76,11 @@ starSimRouter.post("/v1/jobs", async (req, res) => {
         source_resolution_ref: orchestration.job_meta.source_resolution_ref,
         source_cache_key: orchestration.job_meta.source_cache_key,
         lane_plan: orchestration.job_meta.lane_plan,
+        benchmark_backed: orchestration.job_meta.benchmark_backed,
+        benchmark_receipt_ref: orchestration.job_meta.benchmark_receipt_ref,
+        benchmark_input_signature: orchestration.job_meta.benchmark_input_signature,
+        previous_benchmark_receipt_ref: orchestration.job_meta.previous_benchmark_receipt_ref,
+        benchmark_repeatability: orchestration.job_meta.benchmark_repeatability,
       });
       return res.status(202).json(buildResolveBeforeRunEnqueuedResponse({
         base: orchestration.response,

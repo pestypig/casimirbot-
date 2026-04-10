@@ -3,10 +3,18 @@ import {
   NHM2_OBSERVER_PRIMARY_DRIVER_AGREEMENT_VALUES,
   NHM2_OBSERVER_PROMOTION_BLOCKING_CONDITION_VALUES,
   NHM2_OBSERVER_PROMOTION_BLOCKING_SURFACE_VALUES,
+  NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES,
+  NHM2_OBSERVER_SHARED_UPSTREAM_DRIVER_STATUS_VALUES,
+  NHM2_OBSERVER_WEC_PROPAGATION_STATUS_VALUES,
   type Nhm2ObserverBlockingAssessmentStatus,
   type Nhm2ObserverPrimaryDriverAgreement,
   type Nhm2ObserverPromotionBlockingCondition,
   type Nhm2ObserverPromotionBlockingSurface,
+  type Nhm2ObserverRemediationSequenceStatus,
+  type Nhm2ObserverSharedRootDriverStatus,
+  type Nhm2ObserverSharedUpstreamDriverStatus,
+  type Nhm2ObserverWecPropagationStatus,
+  NHM2_OBSERVER_SHARED_ROOT_DRIVER_STATUS_VALUES,
 } from "./nhm2-observer-audit.v1";
 
 export const NHM2_FULL_LOOP_AUDIT_CONTRACT_VERSION = "nhm2_full_loop_audit/v1";
@@ -218,6 +226,13 @@ export type Nhm2ObserverAuditSection =
     observerPrimaryDriverNote: string | null;
     observerMetricFirstInspectionTarget: string | null;
     observerTileFirstInspectionTarget: string | null;
+    observerSharedRootDriverStatus: Nhm2ObserverSharedRootDriverStatus;
+    observerSharedRootDriverNote: string | null;
+    observerSharedUpstreamDriverStatus: Nhm2ObserverSharedUpstreamDriverStatus;
+    observerSharedUpstreamDriverNote: string | null;
+    observerWecPropagationStatus: Nhm2ObserverWecPropagationStatus;
+    observerWecPropagationNote: string | null;
+    observerRemediationSequenceStatus: Nhm2ObserverRemediationSequenceStatus;
     metric: Nhm2ObserverFamilyAudit;
     tile: Nhm2ObserverFamilyAudit;
   };
@@ -248,6 +263,13 @@ type Nhm2ObserverAuditSectionInput =
       observerPrimaryDriverNote?: string | null;
       observerMetricFirstInspectionTarget?: string | null;
       observerTileFirstInspectionTarget?: string | null;
+      observerSharedRootDriverStatus?: Nhm2ObserverSharedRootDriverStatus;
+      observerSharedRootDriverNote?: string | null;
+      observerSharedUpstreamDriverStatus?: Nhm2ObserverSharedUpstreamDriverStatus;
+      observerSharedUpstreamDriverNote?: string | null;
+      observerWecPropagationStatus?: Nhm2ObserverWecPropagationStatus;
+      observerWecPropagationNote?: string | null;
+      observerRemediationSequenceStatus?: Nhm2ObserverRemediationSequenceStatus;
     };
 
 export type Nhm2GrStabilitySafetySection =
@@ -485,6 +507,34 @@ const isObserverPrimaryDriverAgreement = (
     value as Nhm2ObserverPrimaryDriverAgreement,
   );
 
+const isObserverSharedRootDriverStatus = (
+  value: unknown,
+): value is Nhm2ObserverSharedRootDriverStatus =>
+  NHM2_OBSERVER_SHARED_ROOT_DRIVER_STATUS_VALUES.includes(
+    value as Nhm2ObserverSharedRootDriverStatus,
+  );
+
+const isObserverSharedUpstreamDriverStatus = (
+  value: unknown,
+): value is Nhm2ObserverSharedUpstreamDriverStatus =>
+  NHM2_OBSERVER_SHARED_UPSTREAM_DRIVER_STATUS_VALUES.includes(
+    value as Nhm2ObserverSharedUpstreamDriverStatus,
+  );
+
+const isObserverWecPropagationStatus = (
+  value: unknown,
+): value is Nhm2ObserverWecPropagationStatus =>
+  NHM2_OBSERVER_WEC_PROPAGATION_STATUS_VALUES.includes(
+    value as Nhm2ObserverWecPropagationStatus,
+  );
+
+const isObserverRemediationSequenceStatus = (
+  value: unknown,
+): value is Nhm2ObserverRemediationSequenceStatus =>
+  NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES.includes(
+    value as Nhm2ObserverRemediationSequenceStatus,
+  );
+
 const isSectionIdArray = (
   value: unknown,
   expected?: Nhm2FullLoopAuditSectionId[],
@@ -656,6 +706,20 @@ const cloneSections = (
       sections.observer_audit.observerMetricFirstInspectionTarget ?? null,
     observerTileFirstInspectionTarget:
       sections.observer_audit.observerTileFirstInspectionTarget ?? null,
+    observerSharedRootDriverStatus:
+      sections.observer_audit.observerSharedRootDriverStatus ?? "unknown",
+    observerSharedRootDriverNote:
+      sections.observer_audit.observerSharedRootDriverNote ?? null,
+    observerSharedUpstreamDriverStatus:
+      sections.observer_audit.observerSharedUpstreamDriverStatus ?? "unknown",
+    observerSharedUpstreamDriverNote:
+      sections.observer_audit.observerSharedUpstreamDriverNote ?? null,
+    observerWecPropagationStatus:
+      sections.observer_audit.observerWecPropagationStatus ?? "unknown",
+    observerWecPropagationNote:
+      sections.observer_audit.observerWecPropagationNote ?? null,
+    observerRemediationSequenceStatus:
+      sections.observer_audit.observerRemediationSequenceStatus ?? "unknown",
     metric: cloneObserverFamilyAudit(sections.observer_audit.metric),
     tile: cloneObserverFamilyAudit(sections.observer_audit.tile),
     supportedClaimTiers: computeTierListForSection("observer_audit"),
@@ -911,6 +975,20 @@ const isObserverAuditSection = (
       asText(record.observerMetricFirstInspectionTarget) != null) &&
     (record.observerTileFirstInspectionTarget === null ||
       asText(record.observerTileFirstInspectionTarget) != null) &&
+    isObserverSharedRootDriverStatus(record.observerSharedRootDriverStatus) &&
+    (record.observerSharedRootDriverNote === null ||
+      asText(record.observerSharedRootDriverNote) != null) &&
+    isObserverSharedUpstreamDriverStatus(
+      record.observerSharedUpstreamDriverStatus,
+    ) &&
+    (record.observerSharedUpstreamDriverNote === null ||
+      asText(record.observerSharedUpstreamDriverNote) != null) &&
+    isObserverWecPropagationStatus(record.observerWecPropagationStatus) &&
+    (record.observerWecPropagationNote === null ||
+      asText(record.observerWecPropagationNote) != null) &&
+    isObserverRemediationSequenceStatus(
+      record.observerRemediationSequenceStatus,
+    ) &&
     isObserverFamilyAudit(record.metric) &&
     isObserverFamilyAudit(record.tile)
   );

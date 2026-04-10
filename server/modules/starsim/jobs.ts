@@ -9,6 +9,7 @@ import {
   readPersistedStarSimJobResult,
   resolveStarSimJobPaths,
 } from "./artifacts";
+import { buildAndPersistStarSimBenchmarkReceipt } from "./benchmark-receipts";
 import { canonicalizeStarSimRequest } from "./canonicalize";
 import type {
   RequestedLane,
@@ -112,6 +113,11 @@ const publicJobRecord = (job: InternalJobRecord): StarSimJobRecord => ({
   source_resolution_ref: job.source_resolution_ref,
   source_cache_key: job.source_cache_key,
   lane_plan: job.lane_plan,
+  benchmark_backed: job.benchmark_backed,
+  benchmark_receipt_ref: job.benchmark_receipt_ref,
+  benchmark_input_signature: job.benchmark_input_signature,
+  previous_benchmark_receipt_ref: job.previous_benchmark_receipt_ref,
+  benchmark_repeatability: job.benchmark_repeatability,
 });
 
 const readPersistedRequest = async (requestPath: string): Promise<StarSimRequest> => {
@@ -278,12 +284,52 @@ const executeJob = async (jobId: string): Promise<void> => {
       return;
     }
 
+    const benchmarkReceipt =
+      job.request.source_context?.selected_field_origins && job.lane_plan
+        ? await buildAndPersistStarSimBenchmarkReceipt({
+            receiptStage: "completed",
+            jobId: job.job_id,
+            benchmarkTargetId: job.request.source_context.benchmark_target_id,
+            benchmarkTargetMatchMode: job.request.source_context.benchmark_target_match_mode,
+            benchmarkTargetConflictReason: job.request.source_context.benchmark_target_conflict_reason,
+            benchmarkTargetIdentityBasis: job.request.source_context.benchmark_target_identity_basis,
+            benchmarkTargetQualityOk: job.request.source_context.benchmark_target_quality_ok,
+            identifiersObserved: job.request.source_context.identifiers_observed,
+            identifiersTrusted: job.request.source_context.identifiers_trusted,
+            selectedFieldOrigins: job.request.source_context.selected_field_origins,
+            requestedLanes: job.requested_lanes,
+            lanePlan: job.lane_plan,
+            blockedReasons: job.lane_plan.blocked_lanes.flatMap(
+              (lane) => job.lane_plan?.blocked_reasons_by_lane[lane] ?? [],
+            ),
+            sourceCacheKey: job.source_cache_key,
+            sourceResolutionRef: job.source_resolution_ref,
+            resolvedDraftHash: job.resolved_draft_hash,
+            requestDraft: job.request,
+            response: result,
+          })
+        : null;
+
     job.status = "completed";
     job.stage = "completed";
     job.status_reason = null;
     job.completed_at_iso = new Date().toISOString();
-    job.result = result;
+    job.result = {
+      ...result,
+      benchmark_backed: Boolean(benchmarkReceipt),
+      benchmark_receipt_ref: benchmarkReceipt?.benchmark_receipt_ref,
+      benchmark_input_signature: benchmarkReceipt?.benchmark_input_signature,
+      previous_benchmark_receipt_ref: benchmarkReceipt?.previous_benchmark_receipt_ref,
+      benchmark_repeatability: benchmarkReceipt?.benchmark_repeatability,
+    };
     job.result_path = resolveStarSimJobPaths(job.job_id).resultPath;
+    job.benchmark_backed = Boolean(benchmarkReceipt ?? job.benchmark_backed);
+    job.benchmark_receipt_ref = benchmarkReceipt?.benchmark_receipt_ref ?? job.benchmark_receipt_ref ?? null;
+    job.benchmark_input_signature =
+      benchmarkReceipt?.benchmark_input_signature ?? job.benchmark_input_signature ?? null;
+    job.previous_benchmark_receipt_ref =
+      benchmarkReceipt?.previous_benchmark_receipt_ref ?? job.previous_benchmark_receipt_ref ?? null;
+    job.benchmark_repeatability = benchmarkReceipt?.benchmark_repeatability ?? job.benchmark_repeatability;
     await persistJob(job);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -345,6 +391,11 @@ export const submitStarSimJobWithMeta = async (
     source_resolution_ref?: string | null;
     source_cache_key?: string | null;
     lane_plan?: StarSimLanePlan | null;
+    benchmark_backed?: boolean;
+    benchmark_receipt_ref?: string | null;
+    benchmark_input_signature?: string | null;
+    previous_benchmark_receipt_ref?: string | null;
+    benchmark_repeatability?: StarSimJobRecord["benchmark_repeatability"];
   },
 ): Promise<StarSimJobRecord> => {
   await ensureJobsLoaded();
@@ -389,6 +440,11 @@ export const submitStarSimJobWithMeta = async (
       source_resolution_ref: meta?.source_resolution_ref ?? request.source_context?.source_resolution_ref ?? null,
       source_cache_key: meta?.source_cache_key ?? request.source_context?.source_cache_key ?? null,
       lane_plan: meta?.lane_plan ?? null,
+      benchmark_backed: meta?.benchmark_backed ?? Boolean(request.source_context?.benchmark_target_id),
+      benchmark_receipt_ref: meta?.benchmark_receipt_ref ?? null,
+      benchmark_input_signature: meta?.benchmark_input_signature ?? null,
+      previous_benchmark_receipt_ref: meta?.previous_benchmark_receipt_ref ?? null,
+      benchmark_repeatability: meta?.benchmark_repeatability,
       request,
       result: null,
     };

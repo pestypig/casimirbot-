@@ -111,6 +111,13 @@ const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
     observerPrimaryDriverNote: null,
     observerMetricFirstInspectionTarget: null,
     observerTileFirstInspectionTarget: null,
+    observerSharedRootDriverStatus: "unknown",
+    observerSharedRootDriverNote: null,
+    observerSharedUpstreamDriverStatus: "unknown",
+    observerSharedUpstreamDriverNote: null,
+    observerWecPropagationStatus: "unknown",
+    observerWecPropagationNote: null,
+    observerRemediationSequenceStatus: "unknown",
     metric: {
       state: "pass",
       wecMinOverAllTimelike: 0,
