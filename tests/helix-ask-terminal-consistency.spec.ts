@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectFinalModeGateConsistencyReasons,
   collectGlobalTerminalValidatorReasons,
+  shouldSuppressRelationFallbackObjectiveObligations,
 } from "../server/services/helix-ask/surface/terminal-consistency";
 import {
   applyFinalModeGateSoftSuppression,
@@ -66,6 +67,30 @@ describe("helix ask terminal consistency helpers", () => {
       "sources_missing",
       "objective_obligations_missing",
     ]);
+  });
+
+  it("suppresses stale objective obligations for grounded relation fallback output", () => {
+    expect(
+      shouldSuppressRelationFallbackObjectiveObligations({
+        objectiveLoopEnabled: true,
+        relationIntent: true,
+        relationPacketPresent: true,
+        relationPacketFloorsOk: true,
+        relationDualDomainOk: true,
+        relationFallbackApplied: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldSuppressRelationFallbackObjectiveObligations({
+        objectiveLoopEnabled: true,
+        relationIntent: true,
+        relationPacketPresent: true,
+        relationPacketFloorsOk: false,
+        relationDualDomainOk: true,
+        relationFallbackApplied: true,
+      }),
+    ).toBe(false);
   });
 });
 

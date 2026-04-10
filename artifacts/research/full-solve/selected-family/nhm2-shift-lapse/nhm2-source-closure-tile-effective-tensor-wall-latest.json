@@ -15,5 +15,5 @@
     "T22": 27108804644.765415,
     "T33": 27108804644.765415
   },
-  "note": "Selected-profile runtime-emitted tile-effective diagonal tensor over the shared wall stress-energy brick mask. wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
+  "note": "Selected-profile runtime-emitted tile-effective diagonal tensor over the shared wall stress-energy brick mask. wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published"
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyRelationFinalSurfaceRepair,
   applyFinalAnswerSurfaceReconciliation,
 } from "../server/services/helix-ask/surface/final-answer-surface";
 import {
@@ -88,6 +89,52 @@ describe("helix ask final contract lock helpers", () => {
 });
 
 describe("helix ask final answer surface reconciliation helper", () => {
+  it("repairs relation answers to a conversational fallback when tree walk leaks survive", () => {
+    const result = { text: "before", envelope: { answer: "before" } };
+    const answerPath: string[] = [];
+    const debugPayload: Record<string, unknown> = {};
+
+    const updated = applyRelationFinalSurfaceRepair({
+      cleanedText: "Tree Walk\nTree Walk: Ethos Knowledge Walk\n1. anchor",
+      relationIntent: true,
+      relationPacket: {
+        question: "How does warp relate to mission ethos?",
+        domains: ["ethos", "warp"],
+        definitions: {
+          warp_definition: "A warp bubble is a bounded spacetime configuration under this repository's warp model.",
+          ethos_definition: "Mission ethos constrains capability claims to verified, non-harmful operation.",
+        },
+        bridge_claims: [
+          "Mission ethos constrains warp development to measured, auditable checkpoints before deployment.",
+        ],
+        constraints: [
+          "Ford-Roman and GR gates must pass before viability claims are accepted.",
+        ],
+        falsifiability_hooks: [
+          "Re-run adapter verification and require PASS certificate integrity OK.",
+        ],
+        evidence: [],
+        source_map: {
+          ev_1: "docs/knowledge/warp/warp-bubble.md#L1-L1",
+          ev_2: "docs/ethos/ideology.json#L1-L1",
+        },
+      },
+      answerPath,
+      debugPayload,
+      applyText: applyTerminalAnswerText,
+      result,
+      detectFallbackReasons: () => ["tree_walk_leak"],
+      ensureRelationFallbackDomainAnchors: (packet) => packet,
+      renderConversationalFallback: () =>
+        "A warp bubble is a bounded spacetime configuration under this repository's warp model. Mission ethos constrains capability claims to verified, non-harmful operation. Mission ethos constrains warp development to measured, auditable checkpoints before deployment.",
+    });
+
+    expect(updated).toContain("Mission ethos constrains warp development");
+    expect(updated).not.toMatch(/\bTree Walk\b/i);
+    expect(answerPath).toEqual(["relationFallback:final_surface_guard"]);
+    expect(debugPayload.relation_final_surface_repair_applied).toBe(true);
+  });
+
   it("applies final answer surface updates and records visible source mode", () => {
     const result = { text: "before", envelope: { answer: "before" } };
     const answerPath: string[] = [];

@@ -8,6 +8,7 @@ import {
   ensureRelationAssemblyPacketFallback,
   ensureRelationFallbackDomainAnchors,
   evaluateRelationPacketFloors,
+  renderRelationAssemblyConversationalFallback,
   renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
 } from "../server/services/helix-ask/relation-assembly";
@@ -405,6 +406,73 @@ describe("relation assembly packet", () => {
     expect(rendered).toContain("Warp bubble geometry is constrained by viability gates.");
     expect(rendered).toContain("Mission ethos requires stewardship and non-harm.");
     expect(rendered).toContain("Sources:");
+  });
+
+  it("renders conversational relation fallback without tree-walk headings or path prefixes", () => {
+    const conversational = renderRelationAssemblyConversationalFallback(
+      ensureRelationAssemblyPacketFallback(
+        {
+          question: "Explain the relation between warp bubble physics and mission ethos in this repo.",
+          domains: ["ethos", "warp"],
+          definitions: {
+            warp_definition:
+              "docs/knowledge/warp/warp-bubble.md - A warp bubble is a bounded spacetime configuration under this repository's warp model.",
+            ethos_definition:
+              "docs/ethos/ideology.json.. - Mission ethos constrains capability claims to verified, non-harmful operation.",
+          },
+          bridge_claims: [
+            "Mission ethos constrains warp development to measured, auditable checkpoints before deployment.",
+            "Verification hooks translate design ambition into falsifiable tests across physics and policy layers.",
+          ],
+          constraints: [
+            "Physics bounds: Ford-Roman QI and GR constraint gates must pass before viability claims.",
+          ],
+          falsifiability_hooks: [
+            "Re-run /api/agi/adapter/run with updated action payload and require PASS with certificate integrity OK.",
+          ],
+          evidence: [],
+          source_map: {
+            ev_1: "docs/knowledge/warp/warp-bubble.md#L1-L2",
+            ev_2: "docs/ethos/ideology.json#L1-L2",
+          },
+        },
+        "Explain the relation between warp bubble physics and mission ethos in this repo.",
+      ),
+    );
+
+    expect(conversational).toContain("A warp bubble is a bounded spacetime configuration");
+    expect(conversational).toContain("Mission ethos constrains capability claims");
+    expect(conversational).toContain("Verification hooks translate design ambition");
+    expect(conversational).not.toMatch(/^Direct Answer:/im);
+    expect(conversational).not.toMatch(/\bTree Walk\b/i);
+    expect(conversational).not.toMatch(/\bdocs\/ethos\/ideology\.json\b/i);
+    expect(conversational).not.toMatch(/^\.\.\s*-/);
+    expect(conversational.length).toBeGreaterThan(220);
+  });
+
+  it("falls back to safe relation sentences when packet fields contain tree-walk artifacts", () => {
+    const conversational = renderRelationAssemblyConversationalFallback({
+      question: "How does a warp bubble fit in with the mission ethos?",
+      domains: ["ethos", "warp"],
+      definitions: {
+        warp_definition:
+          "Tree Walk: Warp Mechanics Walk (tree-derived; source: docs/knowledge/warp/warp-mechanics-tree.json) Chain scaffold: root_to_anchor 1. Walk: Warp Mechanics Tree - A walkable map of warp geometry, proxies, and control levers.",
+        ethos_definition:
+          "Tree Walk: Mission Ethos Tree (tree-derived; source: docs/ethos/ideology.json) Chain scaffold: root_to_leaf 1. Role:anchor: Mission Ethos - The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.",
+      },
+      bridge_claims: [
+        "Tree Walk: Ethos Knowledge Walk (tree-derived; source: docs/knowledge/ethos/ethos-knowledge-tree.json) Chain scaffold: root_to_leaf 1. Hint: Civic and Governance Systems - Navigation hint only.",
+      ],
+      constraints: [],
+      falsifiability_hooks: [],
+      evidence: [],
+      source_map: {},
+    });
+
+    expect(conversational).toContain("A warp bubble is a bounded spacetime configuration");
+    expect(conversational).toContain("Mission ethos constrains capability claims");
+    expect(conversational).not.toMatch(/\bTree Walk\b/i);
+    expect(conversational).not.toMatch(/\bChain scaffold\b/i);
   });
 
   it("blocks over-promotion above diagnostic maturity ceiling", () => {

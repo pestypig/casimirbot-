@@ -40,6 +40,13 @@ describe("helix ask relation contract leakage guards", () => {
     expect(reasons).toContain("artifact_json_spill");
   });
 
+  it("flags tree-walk leakage in relation deterministic fallback reasons", () => {
+    const reasons = __testHelixAskReliabilityGuards.detectRelationDeterministicFallbackReasons(
+      "Tree Walk\nTree Walk: Ethos Knowledge Walk\n1. Walk: Mission Ethos\n\nKey files\n- docs/ethos/ideology.json",
+    );
+    expect(reasons).toContain("tree_walk_leak");
+  });
+
   it("falls back to natural relation definitions when packet definitions are path-only or code-like", () => {
     const contract = __testHelixAskReliabilityGuards.buildRelationModeContractFromPacket({
       question: "How does warp relate to mission ethos?",
@@ -82,6 +89,6 @@ describe("helix ask relation contract leakage guards", () => {
     expect(rendered).not.toMatch(/\bWhat it is:\b/i);
     expect(rendered).not.toMatch(/\bWhy it matters:\b/i);
     expect(rendered).not.toMatch(/\bConstraint:\b/i);
-    expect(rendered).toContain("- Mission ethos requires stewardship and non-harm.");
+    expect(rendered).toContain("Mission ethos requires stewardship and non-harm.");
   });
 });

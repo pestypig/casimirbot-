@@ -7,10 +7,10 @@
 |---|---|
 | artifactId | nhm2_source_closure |
 | schemaVersion | nhm2_source_closure/v2 |
-| status | fail |
+| status | review |
 | completeness | complete |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-source-closure |
-| reasonCodes | tensor_residual_exceeded |
+| reasonCodes | region_basis_diagnostic_only, assumption_drift |
 | tensorRefs.metricRequired | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json |
 | tensorRefs.tileEffective | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json |
 | residualNorms.relL2 | 9.228761628158325e-10 |
@@ -18,7 +18,7 @@
 | residualNorms.toleranceRelLInf | 0.1 |
 | regional.status | available |
 | regional.regionIds | hull, wall, exterior_shell |
-| assumptionsDrifted | false |
+| assumptionsDrifted | true |
 | scalarCl3RhoDeltaRel | 0 |
 | scalarCongruenceSecondary | true |
 | scalarSurfaceId | CL3_RhoDelta |
@@ -34,16 +34,27 @@
 ## Regional Comparisons (Summary)
 | regionId | basis | status | sampleCount | relLInf | dominantComponent | dominantRel | scaleSide | scaleRatio | signStatus | accounting | note |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| hull | same_basis | fail | 1096760 | 0.9771894650674532 | T00 | 0.9771894650674532 | metric | 0.02281053493254683 | match | accounting_unknown | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
-| wall | same_basis | fail | 3352 | 14.950679233985802 | T00 | 14.950679233985802 | tile | 15.950679233985802 | match | accounting_unknown | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
-| exterior_shell | same_basis | fail | 2504 | 2.0213853465619396 | T00 | 2.0213853465619396 | tile | 3.0213853465619396 | match | accounting_unknown | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| hull | diagnostic_only | review | 1096760 | 0.9771894650674532 | T00 | 0.9771894650674532 | metric | 0.02281053493254683 | match | accounting_unknown | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
+| wall | diagnostic_only | review | 3352 | 14.950679233985802 | T00 | 14.950679233985802 | tile | 15.950679233985802 | match | accounting_unknown | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
+| exterior_shell | diagnostic_only | review | 2504 | 2.0213853465619396 | T00 | 2.0213853465619396 | tile | 3.0213853465619396 | match | accounting_unknown | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
 
 ## Regional Component Details
 ### Region: hull
 | field | value |
 |---|---|
-| comparisonBasisStatus | same_basis |
-| status | fail |
+| comparisonBasisStatus | diagnostic_only |
+| comparisonBasisAuthorityStatus | counterpart_missing |
+| comparisonBasisAuthorityReason | metric direct T00 expects tile_effective_counterpart, but resolved tile direct T00 publishes gr_matter_channel_observation |
+| metricExpectedCounterpartRole | tile_effective_counterpart |
+| resolvedTileCounterpartRef | null |
+| counterpartResolutionStatus | missing |
+| counterpartResolutionNote | no tile-side tile_effective_counterpart surface is currently published; current direct T00 resolves to gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 |
+| regionalComparisonContractStatus | narrowed_to_observation_only |
+| regionalComparisonContractNote | regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
+| regionalComparisonPolicyStatus | not_required_for_same_basis_promotion |
+| regionalComparisonPolicyNote | regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional tile_effective_counterpart surface is defined |
+| comparisonContractNote | current tile direct T00 at gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 is an observation path, not the expected same-basis counterpart |
+| status | review |
 | residualNorms.relLInf | 0.9771894650674532 |
 | metricDiagonal | T00=-733553902.6786809, T11=733553902.6786809, T22=733553902.6786809, T33=733553902.6786809 |
 | tileDiagonal | T00=-16732756.921958108, T11=16732756.921958108, T22=16732756.921958108, T33=16732756.921958108 |
@@ -81,8 +92,8 @@
 | t00TraceContractMismatchClass | comparison_contract_mismatch |
 | t00TraceFirstSemanticBoundary | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
 | t00TraceNextInspectionTarget | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
-| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field; metric_required_t00) at warp.metric.T00.nhm2.shift_lapse.region.hull.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick; gr_matter_channel_t00) at gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00; contract=semantically_misaligned/comparison_contract_mismatch; first semantic boundary=modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary; inspect modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
-| note | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field; metric_required_t00) at warp.metric.T00.nhm2.shift_lapse.region.hull.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick; gr_matter_channel_t00) at gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00; contract=semantically_misaligned/comparison_contract_mismatch; basisAuthority=counterpart_missing; first semantic boundary=modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary; inspect modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
+| note | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
 |---|---|---|---|---|
@@ -169,8 +180,19 @@
 ### Region: wall
 | field | value |
 |---|---|
-| comparisonBasisStatus | same_basis |
-| status | fail |
+| comparisonBasisStatus | diagnostic_only |
+| comparisonBasisAuthorityStatus | counterpart_missing |
+| comparisonBasisAuthorityReason | metric direct T00 expects tile_effective_counterpart, but resolved tile direct T00 publishes gr_matter_channel_observation |
+| metricExpectedCounterpartRole | tile_effective_counterpart |
+| resolvedTileCounterpartRef | null |
+| counterpartResolutionStatus | missing |
+| counterpartResolutionNote | no tile-side tile_effective_counterpart surface is currently published; current direct T00 resolves to gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 |
+| regionalComparisonContractStatus | narrowed_to_observation_only |
+| regionalComparisonContractNote | regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
+| regionalComparisonPolicyStatus | not_required_for_same_basis_promotion |
+| regionalComparisonPolicyNote | regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional tile_effective_counterpart surface is defined |
+| comparisonContractNote | current tile direct T00 at gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 is an observation path, not the expected same-basis counterpart |
+| status | review |
 | residualNorms.relLInf | 14.950679233985802 |
 | metricDiagonal | T00=-1699539201.2526472, T11=1699539201.2526472, T22=1699539201.2526472, T33=1699539201.2526472 |
 | tileDiagonal | T00=-27108804644.765415, T11=27108804644.765415, T22=27108804644.765415, T33=27108804644.765415 |
@@ -208,8 +230,8 @@
 | t00TraceContractMismatchClass | comparison_contract_mismatch |
 | t00TraceFirstSemanticBoundary | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
 | t00TraceNextInspectionTarget | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
-| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field; metric_required_t00) at warp.metric.T00.nhm2.shift_lapse.region.wall.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick; gr_matter_channel_t00) at gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00; contract=semantically_misaligned/comparison_contract_mismatch; first semantic boundary=modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary; inspect modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
-| note | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field; metric_required_t00) at warp.metric.T00.nhm2.shift_lapse.region.wall.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick; gr_matter_channel_t00) at gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00; contract=semantically_misaligned/comparison_contract_mismatch; basisAuthority=counterpart_missing; first semantic boundary=modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary; inspect modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
+| note | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
 |---|---|---|---|---|
@@ -296,8 +318,19 @@
 ### Region: exterior_shell
 | field | value |
 |---|---|
-| comparisonBasisStatus | same_basis |
-| status | fail |
+| comparisonBasisStatus | diagnostic_only |
+| comparisonBasisAuthorityStatus | counterpart_missing |
+| comparisonBasisAuthorityReason | metric direct T00 expects tile_effective_counterpart, but resolved tile direct T00 publishes gr_matter_channel_observation |
+| metricExpectedCounterpartRole | tile_effective_counterpart |
+| resolvedTileCounterpartRef | null |
+| counterpartResolutionStatus | missing |
+| counterpartResolutionNote | no tile-side tile_effective_counterpart surface is currently published; current direct T00 resolves to gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 |
+| regionalComparisonContractStatus | narrowed_to_observation_only |
+| regionalComparisonContractNote | regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
+| regionalComparisonPolicyStatus | not_required_for_same_basis_promotion |
+| regionalComparisonPolicyNote | regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional tile_effective_counterpart surface is defined |
+| comparisonContractNote | current tile direct T00 at gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 is an observation path, not the expected same-basis counterpart |
+| status | review |
 | residualNorms.relLInf | 2.0213853465619396 |
 | metricDiagonal | T00=-1699157799.1011546, T11=1699157799.1011546, T22=1699157799.1011546, T33=1699157799.1011546 |
 | tileDiagonal | T00=-5133810475.7006645, T11=5133810475.7006645, T22=5133810475.7006645, T33=5133810475.7006645 |
@@ -335,8 +368,8 @@
 | t00TraceContractMismatchClass | comparison_contract_mismatch |
 | t00TraceFirstSemanticBoundary | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
 | t00TraceNextInspectionTarget | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
-| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field; metric_required_t00) at warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick; gr_matter_channel_t00) at gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00; contract=semantically_misaligned/comparison_contract_mismatch; first semantic boundary=modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary; inspect modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
-| note | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field; metric_required_t00) at warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick; gr_matter_channel_t00) at gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00; contract=semantically_misaligned/comparison_contract_mismatch; basisAuthority=counterpart_missing; first semantic boundary=modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary; inspect modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary |
+| note | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
 |---|---|---|---|---|

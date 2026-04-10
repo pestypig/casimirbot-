@@ -766,8 +766,14 @@ describe("non-report guard ordering for runtime fallback", () => {
         "Tree Walk: Mission Ethos Tree (tree-derived; source: docs/ethos/ideology.json)",
         "1. Walk: Mission Ethos - The warp vessel is a vow to return radiance to the Sun.",
         "",
+        "Tree Walk: Ethos Knowledge Walk (tree-derived; source: docs/knowledge/ethos/ethos-knowledge-tree.json)",
+        "1. Walk: Feedback Loop Hygiene - public decisions stay tied to civic signals.",
+        "",
         "Key files",
         "- docs/ethos/ideology.json",
+        "",
+        "Proof",
+        "- docs/knowledge/ethos/ethos-knowledge-tree.json",
       ].join("\n"),
       question:
         "In plain language, how does Feedback Loop Hygiene affect society in the Ideology tree?",
@@ -780,6 +786,7 @@ describe("non-report guard ordering for runtime fallback", () => {
     expect(finalized.mode).toBe("conversational");
     expect(finalized.text).not.toMatch(/^Tree Walk/im);
     expect(finalized.text).not.toMatch(/^Key files/im);
+    expect(finalized.text).not.toMatch(/^Proof/im);
     expect(finalized.text).toMatch(/\bMission Ethos\b/i);
     expect(finalized.text).toMatch(/\bFeedback Loop Hygiene\b/i);
   });

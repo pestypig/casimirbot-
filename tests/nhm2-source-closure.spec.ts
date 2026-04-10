@@ -795,6 +795,42 @@ describe("nhm2 source closure artifact v2", () => {
     });
 
     const region = artifact.regionComparisons.regions[0];
+    expect(artifact.status).toBe("review");
+    expect(artifact.reasonCodes).toEqual(
+      expect.arrayContaining(["region_basis_diagnostic_only", "assumption_drift"]),
+    );
+    expect(artifact.assumptionsDrifted).toBe(true);
+    expect(region.comparisonBasisStatus).toBe("diagnostic_only");
+    expect(region.comparisonBasisAuthorityStatus).toBe("counterpart_missing");
+    expect(region.comparisonBasisAuthorityReason).toContain(
+      "metric direct T00 expects tile_effective_counterpart",
+    );
+    expect(region.metricExpectedCounterpartRole).toBe("tile_effective_counterpart");
+    expect(region.resolvedTileCounterpartRef).toBeNull();
+    expect(region.counterpartResolutionStatus).toBe("missing");
+    expect(region.counterpartResolutionNote).toContain(
+      "no tile-side tile_effective_counterpart surface is currently published",
+    );
+    expect(region.regionalComparisonContractStatus).toBe(
+      "narrowed_to_observation_only",
+    );
+    expect(region.regionalComparisonContractNote).toContain(
+      "intentionally narrowed to diagnostic observation only",
+    );
+    expect(region.regionalComparisonPolicyStatus).toBe(
+      "not_required_for_same_basis_promotion",
+    );
+    expect(region.regionalComparisonPolicyNote).toContain(
+      "is not treated as an authoritative same-basis promotion requirement",
+    );
+    expect(region.comparisonContractNote).toContain(
+      "not the expected same-basis counterpart",
+    );
+    expect(region.status).toBe("review");
+    expect(region.note).not.toContain("Same-basis regional closure compares");
+    expect(region.note).toContain(
+      "regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only",
+    );
     expect(region.metricT00Diagnostics?.sourceRef).toBe(
       "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
     );
@@ -902,6 +938,129 @@ describe("nhm2 source closure artifact v2", () => {
     expect(region.mismatchDiagnostics?.t00TraceNextInspectionTarget).toBe(
       "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
     );
+  });
+
+  it("keeps same-basis authority when a semantically aligned tile direct T00 counterpart is present", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          sampleCount: 16,
+          metricAccounting: makeAccounting(16, "metric"),
+          tileAccounting: makeAccounting(16, "tile"),
+          metricT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: 16,
+            skippedCount: 0,
+            nonFiniteCount: 0,
+            meanT00: -100,
+            sumT00: -1600,
+            sourceRef: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
+            derivationMode: "runtime_integrated_metric_region_mean",
+            trace: makeT00Trace({
+              sampleCount: 16,
+              valueRef: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
+              tensorRef: "artifact://metric-wall",
+              boundaryRef:
+                "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+              traceStage: "region_mean_from_shift_field",
+              pathFacts: {
+                comparisonRole: "metric_required_reference",
+                expectedCounterpartRole: "tile_effective_counterpart",
+                semanticEquivalenceExpected: true,
+                semanticQuantityRef: "warp.metric.required_t00.eulerian_energy_density",
+                semanticQuantityKind: "direct_t00_energy_density",
+                physicalMeaningRef: "warp.metric.required_t00.eulerian_energy_density",
+              },
+            }),
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "measured",
+          },
+          tileT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: 16,
+            skippedCount: 0,
+            nonFiniteCount: 0,
+            meanT00: -100,
+            sumT00: -1600,
+            sourceRef: "warp.tileEffective.regionMeans.wall.directT00",
+            derivationMode: "tile_effective_direct_t00_region_mean",
+            trace: makeT00Trace({
+              sampleCount: 16,
+              valueRef: "warp.tileEffective.regionMeans.wall.directT00",
+              tensorRef: "artifact://tile-wall",
+              boundaryRef: "server/energy-pipeline.ts::buildSelectedShiftLapseRuntimeState",
+              traceStage: "region_mean_from_gr_matter_brick",
+              pathFacts: {
+                comparisonRole: "tile_effective_counterpart",
+                expectedCounterpartRole: "metric_required_reference",
+                semanticEquivalenceExpected: true,
+                semanticQuantityRef: "warp.metric.required_t00.eulerian_energy_density",
+                semanticQuantityKind: "direct_t00_energy_density",
+                physicalMeaningRef: "warp.metric.required_t00.eulerian_energy_density",
+              },
+            }),
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "measured",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: 0,
+    });
+
+    const region = artifact.regionComparisons.regions[0];
+    expect(artifact.status).toBe("pass");
+    expect(artifact.assumptionsDrifted).toBe(false);
+    expect(region.comparisonBasisStatus).toBe("same_basis");
+    expect(region.comparisonBasisAuthorityStatus).toBe("authoritative_same_basis");
+    expect(region.comparisonBasisAuthorityReason).toContain(
+      "reciprocal aligned counterpart roles",
+    );
+    expect(region.metricExpectedCounterpartRole).toBe("tile_effective_counterpart");
+    expect(region.resolvedTileCounterpartRef).toBe(
+      "warp.tileEffective.regionMeans.wall.directT00",
+    );
+    expect(region.counterpartResolutionStatus).toBe("resolved");
+    expect(region.counterpartResolutionNote).toContain(
+      "satisfies the expected same-basis counterpart role",
+    );
+    expect(region.regionalComparisonContractStatus).toBe(
+      "same_basis_counterpart_available",
+    );
+    expect(region.regionalComparisonContractNote).toContain(
+      "same-basis closure is backed by the resolved tile-side counterpart",
+    );
+    expect(region.regionalComparisonPolicyStatus).toBe(
+      "same_basis_counterpart_defined",
+    );
+    expect(region.regionalComparisonPolicyNote).toContain(
+      "participates in authoritative same-basis promotion",
+    );
+    expect(region.comparisonContractNote).toContain("semantically aligned");
+    expect(region.status).toBe("pass");
   });
 
   it("preserves null includedCount when reducer-native evidence is absent", () => {

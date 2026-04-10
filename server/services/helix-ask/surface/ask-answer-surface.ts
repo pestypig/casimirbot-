@@ -92,9 +92,24 @@ const coerceObjectRecord = (value: unknown): Record<string, unknown> | null =>
 const coerceTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const RELATION_INTENT_ID = "hybrid.warp_ethos_relation";
+const ARTIFACT_SECTION_TITLE_RE = /^(?:Tree Walk|Key files|Proof|Context sources|Additional Repo Context)$/i;
+const WEAK_RELATION_VISIBLE_TEXT_RE = /^(?:\.+\s*[-:]\s*)|(?:^|\n)\s*(?:Tree Walk|Key files)\b/i;
+
 const resolveGroundedAnswerCompletionFloor = (
   payload: Record<string, unknown>,
+  question: string,
+  preferRelationFallback: boolean,
 ): { text: string; source: "envelope_answer" | "envelope_sections" | "memory_citation" } | null => {
+  if (preferRelationFallback && question) {
+    const relationFallback = renderRelationAssemblyConversationalFallback(
+      ensureRelationAssemblyPacketFallback(null, question),
+    ).trim();
+    if (relationFallback) {
+      return { text: relationFallback, source: "envelope_answer" };
+    }
+  }
+
   const envelope = coerceObjectRecord(payload.envelope);
   const envelopeAnswer = coerceTrimmedString(envelope?.answer);
   if (envelopeAnswer) {
@@ -109,6 +124,7 @@ const resolveGroundedAnswerCompletionFloor = (
       const body = coerceTrimmedString(section.body);
       if (!body) continue;
       const title = coerceTrimmedString(section.title);
+      if (preferRelationFallback && ARTIFACT_SECTION_TITLE_RE.test(title)) continue;
       sectionBlocks.push(title ? `${title}\n${body}` : body);
       if (sectionBlocks.length >= 3) break;
     }
@@ -164,21 +180,46 @@ export const applyHelixAskSuccessSurface = (
   const existingVisibleText = coerceTrimmedString(
     typedPayload.text ?? typedPayload.answer ?? typedPayload.message,
   );
-  if (!existingVisibleText && typedPayload.report_mode !== true && typedPayload.dry_run !== true) {
-    const completionFloor = resolveGroundedAnswerCompletionFloor(typedPayload);
+  const debugPayload = coerceObjectRecord(typedPayload.debug);
+  const sourceQuestion =
+    coerceTrimmedString(args.requestData.question) ||
+    coerceTrimmedString(args.requestData.sourceQuestion);
+  const relationCompletionEligible =
+    typedPayload.report_mode !== true &&
+    typedPayload.dry_run !== true &&
+    coerceTrimmedString(debugPayload?.intent_id) === RELATION_INTENT_ID &&
+    Boolean(sourceQuestion) &&
+    (!existingVisibleText ||
+      existingVisibleText.length < 160 ||
+      WEAK_RELATION_VISIBLE_TEXT_RE.test(existingVisibleText));
+  if (
+    (!existingVisibleText || relationCompletionEligible) &&
+    typedPayload.report_mode !== true &&
+    typedPayload.dry_run !== true
+  ) {
+    const completionFloor = resolveGroundedAnswerCompletionFloor(
+      typedPayload,
+      sourceQuestion,
+      relationCompletionEligible,
+    );
     if (completionFloor) {
       typedPayload.text = completionFloor.text;
       if (!coerceTrimmedString(typedPayload.answer)) {
         typedPayload.answer = completionFloor.text;
+      } else if (relationCompletionEligible) {
+        typedPayload.answer = completionFloor.text;
       }
       const typedEnvelope = coerceObjectRecord(typedPayload.envelope);
-      if (typedEnvelope && !coerceTrimmedString(typedEnvelope.answer)) {
+      if (typedEnvelope && (!coerceTrimmedString(typedEnvelope.answer) || relationCompletionEligible)) {
         typedEnvelope.answer = completionFloor.text;
       }
-      const typedDebug = coerceObjectRecord(typedPayload.debug);
+      const typedDebug = debugPayload;
       if (typedDebug) {
         typedDebug.answer_completion_floor_applied = true;
         typedDebug.answer_completion_floor_source = completionFloor.source;
+        if (relationCompletionEligible) {
+          typedDebug.answer_completion_floor_relation_repair = true;
+        }
       }
     }
   }
@@ -394,3 +435,7 @@ export const applyHelixAskSuccessSurface = (
 
   return typedPayload;
 };
+import {
+  ensureRelationAssemblyPacketFallback,
+  renderRelationAssemblyConversationalFallback,
+} from "../relation-assembly";

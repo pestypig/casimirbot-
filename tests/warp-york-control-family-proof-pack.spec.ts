@@ -1356,10 +1356,11 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).artifactId).toBe("nhm2_source_closure");
     expect(isNhm2SourceClosureV2Artifact(json)).toBe(true);
     expect((json as any).schemaVersion).toBe("nhm2_source_closure/v2");
-    expect((json as any).status).toBe("fail");
+    expect((json as any).status).toBe("review");
     expect((json as any).completeness).toBe("complete");
-    expect((json as any).reasonCodes).toContain("tensor_residual_exceeded");
-    expect((json as any).reasonCodes).not.toContain("assumption_drift");
+    expect((json as any).reasonCodes).toContain("region_basis_diagnostic_only");
+    expect((json as any).reasonCodes).toContain("assumption_drift");
+    expect((json as any).reasonCodes).not.toContain("tensor_residual_exceeded");
     expect((json as any).tensorRefs.metricRequired).toContain(
       "nhm2-source-closure-metric-required-tensor-latest.json",
     );
@@ -1398,10 +1399,35 @@ describe("nhm2 publication completion surfaces", () => {
       "wall",
       "exterior_shell",
     ]);
-    expect((json as any).assumptionsDrifted).toBe(false);
+    expect((json as any).assumptionsDrifted).toBe(true);
     for (const region of (json as any).regionComparisons.regions) {
-      expect(region.comparisonBasisStatus).toBe("same_basis");
-      expect(region.status).toBe("fail");
+      expect(region.comparisonBasisStatus).toBe("diagnostic_only");
+      expect(region.comparisonBasisAuthorityStatus).toBe("counterpart_missing");
+      expect(region.comparisonBasisAuthorityReason).toContain(
+        "metric direct T00 expects tile_effective_counterpart",
+      );
+      expect(region.metricExpectedCounterpartRole).toBe("tile_effective_counterpart");
+      expect(region.resolvedTileCounterpartRef).toBeNull();
+      expect(region.counterpartResolutionStatus).toBe("missing");
+      expect(region.counterpartResolutionNote).toContain(
+        "no tile-side tile_effective_counterpart surface is currently published",
+      );
+      expect(region.regionalComparisonContractStatus).toBe(
+        "narrowed_to_observation_only",
+      );
+      expect(region.regionalComparisonContractNote).toContain(
+        "intentionally narrowed to diagnostic observation only",
+      );
+      expect(region.regionalComparisonPolicyStatus).toBe(
+        "not_required_for_same_basis_promotion",
+      );
+      expect(region.regionalComparisonPolicyNote).toContain(
+        "is not treated as an authoritative same-basis promotion requirement",
+      );
+      expect(region.comparisonContractNote).toContain(
+        "not the expected same-basis counterpart",
+      );
+      expect(region.status).toBe("review");
       expect(region.completeness).toBe("complete");
       expect(region.metricTensorRef).toContain(`${region.regionId}`.replace("_", "-"));
       expect(region.tileTensorRef).toContain(`${region.regionId}`.replace("_", "-"));
@@ -1579,7 +1605,10 @@ describe("nhm2 publication completion surfaces", () => {
         "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
       );
       expect(region.residualNorms.relLInf).toBeGreaterThan(0.1);
-      expect(region.note).toContain("Same-basis regional closure compares");
+      expect(region.note).not.toContain("Same-basis regional closure compares");
+      expect(region.note).toContain(
+        "regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only",
+      );
     }
 
     const markdown = fs.readFileSync(
@@ -1602,6 +1631,17 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| t00TraceContractMismatchClass |");
     expect(markdown).toContain("| t00TraceFirstSemanticBoundary |");
     expect(markdown).toContain("| t00TraceNextInspectionTarget |");
+    expect(markdown).toContain("| comparisonBasisAuthorityStatus |");
+    expect(markdown).toContain("| comparisonBasisAuthorityReason |");
+    expect(markdown).toContain("| metricExpectedCounterpartRole |");
+    expect(markdown).toContain("| resolvedTileCounterpartRef |");
+    expect(markdown).toContain("| counterpartResolutionStatus |");
+    expect(markdown).toContain("| counterpartResolutionNote |");
+    expect(markdown).toContain("| regionalComparisonContractStatus |");
+    expect(markdown).toContain("| regionalComparisonContractNote |");
+    expect(markdown).toContain("| regionalComparisonPolicyStatus |");
+    expect(markdown).toContain("| regionalComparisonPolicyNote |");
+    expect(markdown).toContain("| comparisonContractNote |");
     expect(markdown).toContain("| directT00LocalizationNote |");
     expect(markdown).toContain("| t00 diagnostic field | metric | tile |");
     expect(markdown).toContain("| sourceRef |");
@@ -1705,6 +1745,39 @@ describe("nhm2 publication completion surfaces", () => {
       expect(publishedRegion).toBeTruthy();
       expect(publishedRegion?.comparisonBasisStatus).toBe(
         runtimeRegion.comparisonBasisStatus,
+      );
+      expect(publishedRegion?.comparisonBasisAuthorityStatus).toBe(
+        runtimeRegion.comparisonBasisAuthorityStatus,
+      );
+      expect(publishedRegion?.comparisonBasisAuthorityReason).toBe(
+        runtimeRegion.comparisonBasisAuthorityReason,
+      );
+      expect(publishedRegion?.metricExpectedCounterpartRole).toBe(
+        runtimeRegion.metricExpectedCounterpartRole,
+      );
+      expect(publishedRegion?.resolvedTileCounterpartRef).toBe(
+        runtimeRegion.resolvedTileCounterpartRef,
+      );
+      expect(publishedRegion?.counterpartResolutionStatus).toBe(
+        runtimeRegion.counterpartResolutionStatus,
+      );
+      expect(publishedRegion?.counterpartResolutionNote).toBe(
+        runtimeRegion.counterpartResolutionNote,
+      );
+      expect(publishedRegion?.regionalComparisonContractStatus).toBe(
+        runtimeRegion.regionalComparisonContractStatus,
+      );
+      expect(publishedRegion?.regionalComparisonContractNote).toBe(
+        runtimeRegion.regionalComparisonContractNote,
+      );
+      expect(publishedRegion?.regionalComparisonPolicyStatus).toBe(
+        runtimeRegion.regionalComparisonPolicyStatus,
+      );
+      expect(publishedRegion?.regionalComparisonPolicyNote).toBe(
+        runtimeRegion.regionalComparisonPolicyNote,
+      );
+      expect(publishedRegion?.comparisonContractNote).toBe(
+        runtimeRegion.comparisonContractNote,
       );
       expect(publishedRegion?.status).toBe(runtimeRegion.status);
       expect(publishedRegion?.residualNorms?.relLInf).toBe(
@@ -1985,14 +2058,14 @@ describe("nhm2 publication completion surfaces", () => {
       fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect(isNhm2FullLoopAuditContract(json)).toBe(true);
-    expect((json as any).sections.source_closure.state).toBe("fail");
-    expect((json as any).sections.source_closure.reasons).toContain(
+    expect((json as any).sections.source_closure.state).toBe("review");
+    expect((json as any).sections.source_closure.reasons).not.toContain(
       "source_closure_residual_exceeded",
     );
     expect((json as any).sections.source_closure.reasons).not.toContain(
       "source_closure_missing",
     );
-    expect((json as any).sections.source_closure.reasons).not.toContain(
+    expect((json as any).sections.source_closure.reasons).toContain(
       "policy_review_required",
     );
     expect((json as any).sections.source_closure.metricTensorRef).toContain(
@@ -2009,7 +2082,7 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).sections.source_closure.residualByRegion.exteriorShell).toBeGreaterThan(
       0.1,
     );
-    expect((json as any).sections.source_closure.assumptionsDrifted).toBe(false);
+    expect((json as any).sections.source_closure.assumptionsDrifted).toBe(true);
     expect((json as any).sections.source_closure.artifactRefs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

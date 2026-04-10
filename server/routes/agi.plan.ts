@@ -454,6 +454,7 @@ import {
   ensureRelationAssemblyPacketFallback,
   ensureRelationFallbackDomainAnchors,
   evaluateRelationPacketFloors,
+  renderRelationAssemblyConversationalFallback,
   renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
   type RelationAssemblyPacket,
@@ -468,6 +469,7 @@ import {
   type CitationCompletionMetrics,
 } from "../services/helix-ask/surface/citation-completion";
 import {
+  applyRelationFinalSurfaceRepair,
   applyFinalAnswerSurfaceReconciliation,
 } from "../services/helix-ask/surface/final-answer-surface";
 import {
@@ -514,6 +516,7 @@ import {
 import {
   collectFinalModeGateConsistencyReasons,
   collectGlobalTerminalValidatorReasons,
+  shouldSuppressRelationFallbackObjectiveObligations,
 } from "../services/helix-ask/surface/terminal-consistency";
 import {
   applyFinalModeGateSoftSuppression,
@@ -18178,8 +18181,18 @@ const detectRelationDeterministicFallbackReasons = (value: string): string[] => 
   if (RELATION_MODEL_PLACEHOLDER_RE.test(normalized)) {
     reasons.add("placeholder");
   }
-  if (normalized.length < 160) {
+  if (
+    normalized.length <
+    Math.max(160, Math.min(220, HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS))
+  ) {
     reasons.add("too_short");
+  }
+  if (
+    /(?:^|\n)\s*Tree Walk\b/i.test(value) ||
+    /\bchain scaffold\b/i.test(normalized) ||
+    /(?:^|\n)\s*Key files\b/i.test(value)
+  ) {
+    reasons.add("tree_walk_leak");
   }
   const hasWarpSignal =
     /\b(warp|bubble|alcubierre|natario|spacetime|shift vector|expansion)\b/i.test(normalized);
@@ -35225,9 +35238,15 @@ const stripHelixAskSecondaryArtifactBlocks = (value: string): string => {
       continue;
     }
     if (skippingArtifactBlock) {
-      if (!trimmed) {
-        skippingArtifactBlock = false;
+      if (HELIX_ASK_SECONDARY_ARTIFACT_BLOCK_RE.test(trimmed)) {
+        continue;
       }
+      if (!trimmed) {
+        continue;
+      }
+      skippingArtifactBlock = false;
+    }
+    if (!trimmed && kept.length === 0) {
       continue;
     }
     kept.push(line);
@@ -57103,7 +57122,7 @@ const executeHelixAsk = async ({
       if (relationDeterministicGuardEligible && relationPacket) {
         const relationFallbackReasons = detectRelationDeterministicFallbackReasons(cleaned);
         if (relationFallbackReasons.length > 0 || relationSecondPassFailed) {
-          cleaned = renderRelationAssemblyFallback(relationPacket);
+          cleaned = renderRelationAssemblyConversationalFallback(relationPacket);
           answerPath.push("relationFallback:deterministic_guard");
           logEvent(
             "Relation fallback",
@@ -65284,6 +65303,8 @@ const executeHelixAsk = async ({
           }
         }
       }
+      const relationFallbackSurfaceEligible =
+        intentProfile.id === "hybrid.warp_ethos_relation" || Boolean(relationPacket);
       if (
         finalModeGateVisibleSourcesRequired &&
         (finalModeGateFrontierIntent || finalModeGateRepoOrHybrid) &&
@@ -65358,13 +65379,31 @@ const executeHelixAsk = async ({
           globalTerminalMode.startsWith("rewrite")) &&
         hasSourcesLine(cleanedText) &&
         hasAcceptedHelixAskRepoFallbackShape(cleanedText);
+      const suppressObjectiveObligationsForRelationFallback =
+        shouldSuppressRelationFallbackObjectiveObligations({
+          objectiveLoopEnabled,
+          relationIntent: relationFallbackSurfaceEligible,
+          relationPacketPresent: Boolean(relationPacket),
+          relationPacketFloorsOk: relationPacketFloorCheck.ok,
+          relationDualDomainOk,
+          relationFallbackApplied:
+            answerPath.includes("relationFallback:deterministic_guard") ||
+            Boolean((debugPayload as Record<string, unknown> | null)?.relation_fallback_applied),
+        });
       const finalEffectiveObligationsMissingCount =
-        suppressObjectiveObligationsForFallbackShape ? 0 : finalObligationsMissingCount;
+        suppressObjectiveObligationsForFallbackShape || suppressObjectiveObligationsForRelationFallback
+          ? 0
+          : finalObligationsMissingCount;
       if (debugPayload) {
         const debugRecord = debugPayload as Record<string, unknown>;
         debugRecord.objective_obligations_missing_stale_suppressed =
-          suppressObjectiveObligationsForFallbackShape;
-        if (suppressObjectiveObligationsForFallbackShape) {
+          suppressObjectiveObligationsForFallbackShape || suppressObjectiveObligationsForRelationFallback;
+        debugRecord.objective_obligations_missing_relation_fallback_suppressed =
+          suppressObjectiveObligationsForRelationFallback;
+        if (
+          suppressObjectiveObligationsForFallbackShape ||
+          suppressObjectiveObligationsForRelationFallback
+        ) {
           debugRecord.answer_obligations_missing = [];
         }
       }
@@ -65390,6 +65429,7 @@ const executeHelixAsk = async ({
         finalTurnContractGroundingMode === "open";
       const objectiveObligationsSuppressed =
         suppressObjectiveObligationsForFallbackShape ||
+        suppressObjectiveObligationsForRelationFallback ||
         suppressObjectiveObligationsForOpenComparison;
       const finalObjectiveObligationsMissingCount = objectiveObligationsSuppressed
         ? 0
@@ -65600,6 +65640,19 @@ const executeHelixAsk = async ({
         answerPath,
         debugPayload: debugPayload as Record<string, unknown> | null | undefined,
         applyText: applyTerminalAnswerText,
+      });
+      cleanedText = applyRelationFinalSurfaceRepair({
+        cleanedText,
+        relationIntent:
+          intentProfile.id === "hybrid.warp_ethos_relation" || Boolean(relationPacket),
+        relationPacket,
+        answerPath,
+        debugPayload: debugPayload as Record<string, unknown> | null | undefined,
+        applyText: applyTerminalAnswerText,
+        result,
+        detectFallbackReasons: detectRelationDeterministicFallbackReasons,
+        ensureRelationFallbackDomainAnchors,
+        renderConversationalFallback: renderRelationAssemblyConversationalFallback,
       });
     }
     cleanedText = applyFinalAnswerSurfaceReconciliation({

@@ -1,10 +1,11 @@
 {
   "artifactId": "nhm2_source_closure",
   "schemaVersion": "nhm2_source_closure/v2",
-  "status": "fail",
+  "status": "review",
   "completeness": "complete",
   "reasonCodes": [
-    "tensor_residual_exceeded"
+    "region_basis_diagnostic_only",
+    "assumption_drift"
   ],
   "comparedComponents": [
     "T00",
@@ -76,8 +77,19 @@
     "regions": [
       {
         "regionId": "hull",
-        "comparisonBasisStatus": "same_basis",
-        "status": "fail",
+        "comparisonBasisStatus": "diagnostic_only",
+        "comparisonBasisAuthorityStatus": "counterpart_missing",
+        "comparisonBasisAuthorityReason": "metric direct T00 expects tile_effective_counterpart, but resolved tile direct T00 publishes gr_matter_channel_observation",
+        "metricExpectedCounterpartRole": "tile_effective_counterpart",
+        "resolvedTileCounterpartRef": null,
+        "counterpartResolutionStatus": "missing",
+        "counterpartResolutionNote": "no tile-side tile_effective_counterpart surface is currently published; current direct T00 resolves to gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00",
+        "regionalComparisonContractStatus": "narrowed_to_observation_only",
+        "regionalComparisonContractNote": "regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published",
+        "regionalComparisonPolicyStatus": "not_required_for_same_basis_promotion",
+        "regionalComparisonPolicyNote": "regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional tile_effective_counterpart surface is defined",
+        "comparisonContractNote": "current tile direct T00 at gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 is an observation path, not the expected same-basis counterpart",
+        "status": "review",
         "completeness": "complete",
         "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-hull-latest.json",
         "tileTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-hull-latest.json",
@@ -381,12 +393,23 @@
         "dominantResidualComponent": "T00",
         "dominantResidualAbs": 716821145.7567228,
         "dominantResidualRel": 0.9771894650674532,
-        "note": "inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
+        "note": "inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published"
       },
       {
         "regionId": "wall",
-        "comparisonBasisStatus": "same_basis",
-        "status": "fail",
+        "comparisonBasisStatus": "diagnostic_only",
+        "comparisonBasisAuthorityStatus": "counterpart_missing",
+        "comparisonBasisAuthorityReason": "metric direct T00 expects tile_effective_counterpart, but resolved tile direct T00 publishes gr_matter_channel_observation",
+        "metricExpectedCounterpartRole": "tile_effective_counterpart",
+        "resolvedTileCounterpartRef": null,
+        "counterpartResolutionStatus": "missing",
+        "counterpartResolutionNote": "no tile-side tile_effective_counterpart surface is currently published; current direct T00 resolves to gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+        "regionalComparisonContractStatus": "narrowed_to_observation_only",
+        "regionalComparisonContractNote": "regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published",
+        "regionalComparisonPolicyStatus": "not_required_for_same_basis_promotion",
+        "regionalComparisonPolicyNote": "regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional tile_effective_counterpart surface is defined",
+        "comparisonContractNote": "current tile direct T00 at gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 is an observation path, not the expected same-basis counterpart",
+        "status": "review",
         "completeness": "complete",
         "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-wall-latest.json",
         "tileTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-wall-latest.json",
@@ -690,12 +713,23 @@
         "dominantResidualComponent": "T00",
         "dominantResidualAbs": 25409265443.512768,
         "dominantResidualRel": 14.950679233985802,
-        "note": "wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
+        "note": "wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published"
       },
       {
         "regionId": "exterior_shell",
-        "comparisonBasisStatus": "same_basis",
-        "status": "fail",
+        "comparisonBasisStatus": "diagnostic_only",
+        "comparisonBasisAuthorityStatus": "counterpart_missing",
+        "comparisonBasisAuthorityReason": "metric direct T00 expects tile_effective_counterpart, but resolved tile direct T00 publishes gr_matter_channel_observation",
+        "metricExpectedCounterpartRole": "tile_effective_counterpart",
+        "resolvedTileCounterpartRef": null,
+        "counterpartResolutionStatus": "missing",
+        "counterpartResolutionNote": "no tile-side tile_effective_counterpart surface is currently published; current direct T00 resolves to gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00",
+        "regionalComparisonContractStatus": "narrowed_to_observation_only",
+        "regionalComparisonContractNote": "regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published",
+        "regionalComparisonPolicyStatus": "not_required_for_same_basis_promotion",
+        "regionalComparisonPolicyNote": "regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional tile_effective_counterpart surface is defined",
+        "comparisonContractNote": "current tile direct T00 at gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 is an observation path, not the expected same-basis counterpart",
+        "status": "review",
         "completeness": "complete",
         "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-exterior-shell-latest.json",
         "tileTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-exterior-shell-latest.json",
@@ -999,7 +1033,7 @@
         "dominantResidualComponent": "T00",
         "dominantResidualAbs": 3434652676.59951,
         "dominantResidualRel": 2.0213853465619396,
-        "note": "exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
+        "note": "exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional tile_effective_counterpart surface is currently published"
       }
     ]
   },
@@ -1014,5 +1048,5 @@
     "scalarSurfaceId": "CL3_RhoDelta",
     "tensorSurfaceId": "nhm2_source_closure"
   },
-  "assumptionsDrifted": false
+  "assumptionsDrifted": true
 }

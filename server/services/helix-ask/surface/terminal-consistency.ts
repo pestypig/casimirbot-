@@ -106,3 +106,18 @@ export const collectFinalModeGateConsistencyReasons = (args: {
   }
   return reasons;
 };
+
+export const shouldSuppressRelationFallbackObjectiveObligations = (args: {
+  objectiveLoopEnabled: boolean;
+  relationIntent: boolean;
+  relationPacketPresent: boolean;
+  relationPacketFloorsOk: boolean;
+  relationDualDomainOk: boolean;
+  relationFallbackApplied: boolean;
+}): boolean =>
+  args.objectiveLoopEnabled &&
+  args.relationIntent &&
+  args.relationPacketPresent &&
+  args.relationPacketFloorsOk &&
+  args.relationDualDomainOk &&
+  args.relationFallbackApplied;

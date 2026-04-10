@@ -65,14 +65,28 @@ const RELATION_CODE_LINE_RE =
   /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|const\s+[a-z_]\w*\s*=\s*(?:\(|async\b|{)|let\s+[a-z_]\w*\s*=|function\s+[a-z_]\w*\s*\(|=>|usestate|from\s+["']react["'])\b/i;
 const RELATION_PATH_ONLY_RE =
   /^(?:[A-Za-z]:)?[A-Za-z0-9_./\\-]+\.(?:md|json|ts|tsx|js|jsx|py)(?:#[A-Za-z0-9:_-]+)?\.?$/i;
+const RELATION_TREE_WALK_ARTIFACT_RE =
+  /\b(?:Tree Walk|Chain scaffold|Role:anchor|Hint:|Key files|root_to_leaf|root_to_anchor)\b/i;
+const RELATION_ARTIFACT_PREFIX_RE =
+  /^(?:(?:[A-Za-z]:)?(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:md|json|ts|tsx|js|jsx|py)(?:#[A-Za-z0-9:_-]+)?\.?\s*(?:[-:]\s*)?)+/i;
+
+const sanitizeSentenceSeed = (value: string): string =>
+  value
+    .replace(/\[(?:[^\]]*?)\]/g, " ")
+    .replace(RELATION_ARTIFACT_PREFIX_RE, "")
+    .replace(/^(?:\.+\s*[-:]\s*)+/, "")
+    .replace(/^[\-*•]+\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const ensureSentence = (value: string, fallback: string): string => {
-  const normalized = value.replace(/\s+/g, " ").trim();
+  const normalized = sanitizeSentenceSeed(value);
   if (!normalized) return fallback;
   if (RELATION_CODE_LINE_RE.test(normalized)) return fallback;
   if (/\bexport\s+default\s+function\b/i.test(normalized)) return fallback;
   if (/\bconst\s+[A-Za-z_]\w*\s*=/.test(normalized) && /[;{}()]/.test(normalized)) return fallback;
   if (RELATION_PATH_ONLY_RE.test(normalized)) return fallback;
+  if (RELATION_TREE_WALK_ARTIFACT_RE.test(normalized)) return fallback;
   return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
 };
 
@@ -878,4 +892,49 @@ export function renderRelationAssemblyFallback(packet: RelationAssemblyPacket): 
     .filter(Boolean)
     .join("\n\n")
     .trim();
+}
+
+export function renderRelationAssemblyConversationalFallback(
+  packet: RelationAssemblyPacket,
+): string {
+  const anchored = ensureRelationFallbackDomainAnchors(
+    ensureRelationAssemblyPacketFallback(packet, packet.question),
+  );
+  const warpDefinition = ensureSentence(
+    anchored.definitions.warp_definition,
+    "A warp bubble is a bounded spacetime configuration under this repository's warp model.",
+  );
+  const ethosDefinition = ensureSentence(
+    anchored.definitions.ethos_definition,
+    "Mission ethos constrains capability claims to verified, non-harmful operation.",
+  );
+  const bridgeMechanism = ensureSentence(
+    anchored.bridge_claims.slice(0, 3).join(" "),
+    "The bridge is that mission-ethos checkpoints require warp claims to pass reproducible evidence before deployment.",
+  );
+  const constraintsAndFalsifiability = ensureSentence(
+    [anchored.constraints.join(" "), anchored.falsifiability_hooks[0] ?? ""]
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .join(" "),
+    "That bridge only holds when the physics constraints and falsifiability hooks are checked before viability claims are accepted.",
+  );
+  const practicalEffect = ensureSentence(
+    anchored.bridge_claims[0] ?? "",
+    "In practice, mission-ethos checkpoints bind warp-physics claims to reproducible verification.",
+  );
+  const uniqueSentences: string[] = [];
+  for (const sentence of [
+    warpDefinition,
+    ethosDefinition,
+    bridgeMechanism,
+    constraintsAndFalsifiability,
+    practicalEffect,
+  ]) {
+    const trimmed = sentence.trim();
+    if (!trimmed) continue;
+    if (uniqueSentences.some((entry) => entry.toLowerCase() === trimmed.toLowerCase())) continue;
+    uniqueSentences.push(trimmed);
+  }
+  return uniqueSentences.join(" ").trim();
 }

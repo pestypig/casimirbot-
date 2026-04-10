@@ -159,6 +159,40 @@ describe("helix ask answer surface", () => {
     );
   });
 
+  it("rebuilds weak relation answers from deterministic relation fallback instead of artifact sections", () => {
+    const args = buildBaseArgs();
+    args.requestData.question = "How does a warp bubble fit in with the mission ethos?";
+    args.payload = {
+      text: "Tree Walk\nTree Walk: Ethos Knowledge Walk",
+      answer: "Tree Walk\nTree Walk: Ethos Knowledge Walk",
+      envelope: {
+        answer: "",
+        sections: [
+          {
+            title: "Tree Walk",
+            body: "Tree Walk: Ethos Knowledge Walk (tree-derived; source: docs/knowledge/ethos/ethos-knowledge-tree.json)",
+          },
+          {
+            title: "Key files",
+            body: "- docs/ethos/ideology.json",
+          },
+        ],
+      },
+      debug: {
+        intent_id: "hybrid.warp_ethos_relation",
+      },
+    } as Record<string, unknown>;
+
+    const result = applyHelixAskSuccessSurface(args);
+
+    expect(String(result.text)).toContain("A warp bubble is a modeled spacetime geometry");
+    expect(String(result.text)).toContain("Mission ethos");
+    expect(String(result.text)).not.toMatch(/\bTree Walk\b/i);
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_relation_repair).toBe(
+      true,
+    );
+  });
+
   it("does not invent answer text when no grounded substrate exists", () => {
     const args = buildBaseArgs();
     args.payload = {

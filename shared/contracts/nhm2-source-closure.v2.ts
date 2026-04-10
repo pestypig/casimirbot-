@@ -122,6 +122,27 @@ export type Nhm2SourceClosureV2RegionT00TraceContractMismatchClass =
   | "domain_mapping_mismatch"
   | "same_contract_value_mismatch"
   | "unknown";
+export type Nhm2SourceClosureV2RegionBasisAuthorityStatus =
+  | "authoritative_same_basis"
+  | "contract_misaligned"
+  | "counterpart_missing"
+  | "alignment_unproven"
+  | "unknown";
+export type Nhm2SourceClosureV2RegionCounterpartResolutionStatus =
+  | "resolved"
+  | "missing"
+  | "ambiguous"
+  | "unknown";
+export type Nhm2SourceClosureV2RegionComparisonContractStatus =
+  | "narrowed_to_observation_only"
+  | "pending_counterpart_surface"
+  | "same_basis_counterpart_available"
+  | "unknown";
+export type Nhm2SourceClosureV2RegionComparisonPolicyStatus =
+  | "not_required_for_same_basis_promotion"
+  | "awaiting_new_counterpart_surface"
+  | "same_basis_counterpart_defined"
+  | "unknown";
 
 export type Nhm2SourceClosureV2RegionAccounting = {
   sampleCount: number | null;
@@ -279,6 +300,17 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
 export type Nhm2SourceClosureV2RegionComparison = {
   regionId: string;
   comparisonBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  comparisonBasisAuthorityStatus: Nhm2SourceClosureV2RegionBasisAuthorityStatus;
+  comparisonBasisAuthorityReason: string | null;
+  metricExpectedCounterpartRole: string | null;
+  resolvedTileCounterpartRef: string | null;
+  counterpartResolutionStatus: Nhm2SourceClosureV2RegionCounterpartResolutionStatus;
+  counterpartResolutionNote: string | null;
+  regionalComparisonContractStatus: Nhm2SourceClosureV2RegionComparisonContractStatus;
+  regionalComparisonContractNote: string | null;
+  regionalComparisonPolicyStatus: Nhm2SourceClosureV2RegionComparisonPolicyStatus;
+  regionalComparisonPolicyNote: string | null;
+  comparisonContractNote: string | null;
   status: Nhm2SourceClosureStatus;
   completeness: Nhm2SourceClosureCompleteness;
   metricTensorRef: string | null;
@@ -1377,6 +1409,342 @@ const resolveT00TraceFirstSemanticBoundary = (args: {
   return metricBoundary ?? tileBoundary ?? null;
 };
 
+const resolveComparisonBasisAuthority = (args: {
+  requestedBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): {
+  status: Nhm2SourceClosureV2RegionBasisAuthorityStatus;
+  reason: string | null;
+  metricExpectedCounterpartRole: string | null;
+  resolvedTileCounterpartRef: string | null;
+  counterpartResolutionStatus: Nhm2SourceClosureV2RegionCounterpartResolutionStatus;
+  counterpartResolutionNote: string | null;
+  comparisonContractNote: string | null;
+} => {
+  const metricFacts = args.metricT00Diagnostics?.trace?.pathFacts ?? null;
+  const tileFacts = args.tileT00Diagnostics?.trace?.pathFacts ?? null;
+  const metricExpectedCounterpartRole = toText(metricFacts?.expectedCounterpartRole);
+  const tileComparisonRole = toText(tileFacts?.comparisonRole);
+  const tileObservedRef = toText(
+    args.tileT00Diagnostics?.sourceRef ?? tileFacts?.semanticQuantityRef ?? null,
+  );
+  const contractStatus = resolveT00TraceComparisonContractStatus({
+    metricT00Diagnostics: args.metricT00Diagnostics,
+    tileT00Diagnostics: args.tileT00Diagnostics,
+  });
+
+  if (args.requestedBasisStatus === "unavailable") {
+    return {
+      status: "unknown",
+      reason: null,
+      metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef: null,
+      counterpartResolutionStatus: "unknown",
+      counterpartResolutionNote: null,
+      comparisonContractNote: null,
+    };
+  }
+
+  if (!metricFacts || !tileFacts) {
+    return {
+      status: args.requestedBasisStatus === "same_basis" ? "alignment_unproven" : "unknown",
+      reason:
+        args.requestedBasisStatus === "same_basis"
+          ? "same-basis authority is unproven because direct T00 contract facts are incomplete"
+          : null,
+      metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef: null,
+      counterpartResolutionStatus:
+        args.requestedBasisStatus === "same_basis" ? "unknown" : "unknown",
+      counterpartResolutionNote:
+        args.requestedBasisStatus === "same_basis"
+          ? "direct T00 contract facts are incomplete, so counterpart resolution remains unknown"
+          : null,
+      comparisonContractNote:
+        args.requestedBasisStatus === "same_basis"
+          ? "regional tensors are present, but direct T00 provenance is incomplete for authoritative same-basis closure"
+          : null,
+    };
+  }
+
+  if (contractStatus === "semantically_aligned") {
+    return {
+      status:
+        args.requestedBasisStatus === "same_basis"
+          ? "authoritative_same_basis"
+          : "unknown",
+      reason:
+        args.requestedBasisStatus === "same_basis"
+          ? "direct T00 traces publish reciprocal aligned counterpart roles for same-basis closure"
+          : null,
+      metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef:
+        args.requestedBasisStatus === "same_basis" ? tileObservedRef : null,
+      counterpartResolutionStatus:
+        args.requestedBasisStatus === "same_basis" ? "resolved" : "unknown",
+      counterpartResolutionNote:
+        args.requestedBasisStatus === "same_basis"
+          ? tileObservedRef == null
+            ? "a semantically aligned tile-side direct T00 counterpart is implied by the trace, but the resolved tile reference is unavailable"
+            : `resolved tile-side direct T00 counterpart at ${tileObservedRef} satisfies the expected same-basis counterpart role`
+          : null,
+      comparisonContractNote:
+        args.requestedBasisStatus === "same_basis"
+          ? "metric-required direct T00 and the resolved tile-side direct T00 are semantically aligned for same-basis closure"
+          : null,
+    };
+  }
+
+  if (
+    contractStatus === "semantically_misaligned" &&
+    metricExpectedCounterpartRole != null &&
+    tileComparisonRole != null &&
+    metricExpectedCounterpartRole !== tileComparisonRole
+  ) {
+    return {
+      status: "counterpart_missing",
+      reason: `metric direct T00 expects ${metricExpectedCounterpartRole}, but resolved tile direct T00 publishes ${tileComparisonRole}`,
+      metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef: null,
+      counterpartResolutionStatus: "missing",
+      counterpartResolutionNote:
+        tileObservedRef == null
+          ? `no tile-side ${metricExpectedCounterpartRole} surface is currently published for same-basis direct T00 closure`
+          : `no tile-side ${metricExpectedCounterpartRole} surface is currently published; current direct T00 resolves to ${tileObservedRef}`,
+      comparisonContractNote:
+        tileObservedRef == null
+          ? "no semantically aligned tile-side direct T00 counterpart is currently surfaced for same-basis closure"
+          : `current tile direct T00 at ${tileObservedRef} is an observation path, not the expected same-basis counterpart`,
+    };
+  }
+
+  if (contractStatus === "semantically_misaligned") {
+    return {
+      status: "contract_misaligned",
+      reason: "direct T00 traces are semantically misaligned for same-basis closure",
+      metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef: null,
+      counterpartResolutionStatus: "ambiguous",
+      counterpartResolutionNote:
+        "direct T00 traces are semantically misaligned, but the current runtime evidence does not isolate a publishable same-basis tile counterpart",
+      comparisonContractNote:
+        "current direct T00 paths do not publish a semantically valid same-basis comparison contract",
+    };
+  }
+
+  if (contractStatus === "alignment_unproven") {
+    return {
+      status: args.requestedBasisStatus === "same_basis" ? "alignment_unproven" : "unknown",
+      reason:
+        args.requestedBasisStatus === "same_basis"
+          ? "same-basis authority is unproven because the current direct T00 contract evidence is incomplete"
+          : null,
+      metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef: null,
+      counterpartResolutionStatus:
+        args.requestedBasisStatus === "same_basis" ? "unknown" : "unknown",
+      counterpartResolutionNote:
+        args.requestedBasisStatus === "same_basis"
+          ? "the runtime trace does not yet provide enough evidence to resolve a same-basis tile-side counterpart"
+          : null,
+      comparisonContractNote:
+        args.requestedBasisStatus === "same_basis"
+          ? "direct T00 path facts are insufficient to certify authoritative same-basis closure"
+          : null,
+    };
+  }
+
+  return {
+    status: "unknown",
+    reason: null,
+    metricExpectedCounterpartRole,
+    resolvedTileCounterpartRef: null,
+    counterpartResolutionStatus: "unknown",
+    counterpartResolutionNote: null,
+    comparisonContractNote: null,
+  };
+};
+
+const resolveEffectiveComparisonBasisStatus = (args: {
+  requestedBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  authorityStatus: Nhm2SourceClosureV2RegionBasisAuthorityStatus;
+}): Nhm2SourceClosureRegionBasisStatus => {
+  if (args.requestedBasisStatus !== "same_basis") {
+    return args.requestedBasisStatus;
+  }
+  return args.authorityStatus === "contract_misaligned" ||
+    args.authorityStatus === "counterpart_missing"
+    ? "diagnostic_only"
+    : "same_basis";
+};
+
+const LEGACY_SAME_BASIS_REGION_NOTE =
+  "Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask.";
+
+const resolveRegionalComparisonContract = (args: {
+  requestedBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  effectiveBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  authorityStatus: Nhm2SourceClosureV2RegionBasisAuthorityStatus;
+  metricExpectedCounterpartRole: string | null;
+  resolvedTileCounterpartRef: string | null;
+  counterpartResolutionStatus: Nhm2SourceClosureV2RegionCounterpartResolutionStatus;
+}): {
+  status: Nhm2SourceClosureV2RegionComparisonContractStatus;
+  note: string | null;
+} => {
+  if (
+    args.requestedBasisStatus === "unavailable" ||
+    args.effectiveBasisStatus === "unavailable"
+  ) {
+    return {
+      status: "unknown",
+      note: null,
+    };
+  }
+
+  if (
+    args.authorityStatus === "authoritative_same_basis" &&
+    args.effectiveBasisStatus === "same_basis"
+  ) {
+    return {
+      status: "same_basis_counterpart_available",
+      note:
+        args.resolvedTileCounterpartRef == null
+          ? "regional direct T00 same-basis closure is backed by a semantically aligned tile-side counterpart"
+          : `regional direct T00 same-basis closure is backed by the resolved tile-side counterpart at ${args.resolvedTileCounterpartRef}`,
+    };
+  }
+
+  if (
+    args.authorityStatus === "counterpart_missing" ||
+    args.counterpartResolutionStatus === "missing"
+  ) {
+    const expectedRole = args.metricExpectedCounterpartRole ?? "tile-side same-basis counterpart";
+    return {
+      status: "narrowed_to_observation_only",
+      note: `regional direct T00 same-basis closure is intentionally narrowed to diagnostic observation only because no regional ${expectedRole} surface is currently published`,
+    };
+  }
+
+  if (
+    args.authorityStatus === "contract_misaligned" ||
+    args.authorityStatus === "alignment_unproven" ||
+    args.counterpartResolutionStatus === "ambiguous"
+  ) {
+    return {
+      status: "pending_counterpart_surface",
+      note:
+        "regional direct T00 same-basis closure remains pending counterpart/contract resolution on the current runtime surface",
+    };
+  }
+
+  return {
+    status: "unknown",
+    note: null,
+  };
+};
+
+const resolveRegionalComparisonPolicy = (args: {
+  requestedBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  effectiveBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  authorityStatus: Nhm2SourceClosureV2RegionBasisAuthorityStatus;
+  metricExpectedCounterpartRole: string | null;
+  resolvedTileCounterpartRef: string | null;
+  counterpartResolutionStatus: Nhm2SourceClosureV2RegionCounterpartResolutionStatus;
+  regionalComparisonContractStatus: Nhm2SourceClosureV2RegionComparisonContractStatus;
+}): {
+  status: Nhm2SourceClosureV2RegionComparisonPolicyStatus;
+  note: string | null;
+} => {
+  if (
+    args.requestedBasisStatus === "unavailable" ||
+    args.effectiveBasisStatus === "unavailable"
+  ) {
+    return {
+      status: "unknown",
+      note: null,
+    };
+  }
+
+  if (
+    args.authorityStatus === "authoritative_same_basis" &&
+    args.regionalComparisonContractStatus === "same_basis_counterpart_available"
+  ) {
+    return {
+      status: "same_basis_counterpart_defined",
+      note:
+        args.resolvedTileCounterpartRef == null
+          ? "regional direct T00 participates in authoritative same-basis promotion because a dedicated tile-side counterpart surface is defined"
+          : `regional direct T00 participates in authoritative same-basis promotion through the dedicated tile-side counterpart at ${args.resolvedTileCounterpartRef}`,
+    };
+  }
+
+  if (
+    args.authorityStatus === "counterpart_missing" ||
+    args.counterpartResolutionStatus === "missing" ||
+    args.regionalComparisonContractStatus === "narrowed_to_observation_only"
+  ) {
+    const expectedRole = args.metricExpectedCounterpartRole ?? "tile-side same-basis counterpart";
+    return {
+      status: "not_required_for_same_basis_promotion",
+      note: `regional direct T00 remains observation-only diagnostics on current runtime surfaces and is not treated as an authoritative same-basis promotion requirement until a dedicated regional ${expectedRole} surface is defined`,
+    };
+  }
+
+  if (
+    args.authorityStatus === "contract_misaligned" ||
+    args.authorityStatus === "alignment_unproven" ||
+    args.counterpartResolutionStatus === "ambiguous" ||
+    args.regionalComparisonContractStatus === "pending_counterpart_surface"
+  ) {
+    return {
+      status: "awaiting_new_counterpart_surface",
+      note:
+        "regional direct T00 remains outside authoritative same-basis promotion until a dedicated semantically aligned tile-side counterpart surface is defined",
+    };
+  }
+
+  return {
+    status: "unknown",
+    note: null,
+  };
+};
+
+const mergeRegionalComparisonNote = (args: {
+  rawNote: string | null;
+  comparisonBasisStatus: Nhm2SourceClosureRegionBasisStatus;
+  contractNote: string | null;
+}): string | null => {
+  const stripContractNote = (value: string | null): string | null => {
+    if (value == null) {
+      return null;
+    }
+    const withoutContract =
+      args.contractNote == null ? value : value.replace(args.contractNote, "");
+    const normalized = withoutContract.replace(/\s+/g, " ").trim();
+    return normalized.length > 0 ? normalized : null;
+  };
+  const trimmedRaw = args.rawNote?.trim() ?? null;
+  const normalizedRaw = stripContractNote(trimmedRaw);
+  const sanitizedRaw = stripContractNote(
+    trimmedRaw == null
+      ? null
+      : trimmedRaw
+          .replace(LEGACY_SAME_BASIS_REGION_NOTE, "")
+          .replace(/\s+/g, " ")
+          .trim(),
+  );
+  const parts =
+    args.comparisonBasisStatus === "same_basis"
+      ? [normalizedRaw, args.contractNote]
+      : [sanitizedRaw, args.contractNote];
+  const unique = Array.from(
+    new Set(parts.filter((value): value is string => value != null && value.length > 0)),
+  );
+  return unique.length > 0 ? unique.join(" ") : null;
+};
+
 const resolveT00TraceNextInspectionTarget = (args: {
   metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
@@ -1497,7 +1865,7 @@ const buildRegionComparison = (args: {
     residualComponents,
     args.toleranceRelLInf,
   );
-  const comparisonBasisStatus = normalizeRegionBasisStatus(
+  const requestedComparisonBasisStatus = normalizeRegionBasisStatus(
     args.input.comparisonBasisStatus,
   );
   const dominantResidual = resolveDominantResidualComponent(residualComponents);
@@ -1554,6 +1922,32 @@ const buildRegionComparison = (args: {
         tileT00Diagnostics,
       });
   }
+  const comparisonBasisAuthority = resolveComparisonBasisAuthority({
+    requestedBasisStatus: requestedComparisonBasisStatus,
+    metricT00Diagnostics,
+    tileT00Diagnostics,
+  });
+  const comparisonBasisStatus = resolveEffectiveComparisonBasisStatus({
+    requestedBasisStatus: requestedComparisonBasisStatus,
+    authorityStatus: comparisonBasisAuthority.status,
+  });
+  const regionalComparisonContract = resolveRegionalComparisonContract({
+    requestedBasisStatus: requestedComparisonBasisStatus,
+    effectiveBasisStatus: comparisonBasisStatus,
+    authorityStatus: comparisonBasisAuthority.status,
+    metricExpectedCounterpartRole: comparisonBasisAuthority.metricExpectedCounterpartRole,
+    resolvedTileCounterpartRef: comparisonBasisAuthority.resolvedTileCounterpartRef,
+    counterpartResolutionStatus: comparisonBasisAuthority.counterpartResolutionStatus,
+  });
+  const regionalComparisonPolicy = resolveRegionalComparisonPolicy({
+    requestedBasisStatus: requestedComparisonBasisStatus,
+    effectiveBasisStatus: comparisonBasisStatus,
+    authorityStatus: comparisonBasisAuthority.status,
+    metricExpectedCounterpartRole: comparisonBasisAuthority.metricExpectedCounterpartRole,
+    resolvedTileCounterpartRef: comparisonBasisAuthority.resolvedTileCounterpartRef,
+    counterpartResolutionStatus: comparisonBasisAuthority.counterpartResolutionStatus,
+    regionalComparisonContractStatus: regionalComparisonContract.status,
+  });
   const sampleCount = toFiniteOrNull(args.input.sampleCount);
   const resolvedSampleCount =
     metricAccounting?.sampleCount ?? tileAccounting?.sampleCount ?? sampleCount;
@@ -1587,6 +1981,17 @@ const buildRegionComparison = (args: {
     region: {
       regionId: args.input.regionId,
       comparisonBasisStatus,
+      comparisonBasisAuthorityStatus: comparisonBasisAuthority.status,
+      comparisonBasisAuthorityReason: comparisonBasisAuthority.reason,
+      metricExpectedCounterpartRole: comparisonBasisAuthority.metricExpectedCounterpartRole,
+      resolvedTileCounterpartRef: comparisonBasisAuthority.resolvedTileCounterpartRef,
+      counterpartResolutionStatus: comparisonBasisAuthority.counterpartResolutionStatus,
+      counterpartResolutionNote: comparisonBasisAuthority.counterpartResolutionNote,
+      regionalComparisonContractStatus: regionalComparisonContract.status,
+      regionalComparisonContractNote: regionalComparisonContract.note,
+      regionalComparisonPolicyStatus: regionalComparisonPolicy.status,
+      regionalComparisonPolicyNote: regionalComparisonPolicy.note,
+      comparisonContractNote: comparisonBasisAuthority.comparisonContractNote,
       status,
       completeness,
       metricTensorRef: toRepoPath(args.input.metricTensorRef),
@@ -1605,10 +2010,14 @@ const buildRegionComparison = (args: {
       dominantResidualComponent: dominantResidual.component,
       dominantResidualAbs: dominantResidual.absResidual,
       dominantResidualRel: dominantResidual.relResidual,
-      note:
-        typeof args.input.note === "string" && args.input.note.trim().length > 0
-          ? args.input.note.trim()
-          : null,
+      note: mergeRegionalComparisonNote({
+        rawNote:
+          typeof args.input.note === "string" && args.input.note.trim().length > 0
+            ? args.input.note.trim()
+            : null,
+        comparisonBasisStatus,
+        contractNote: regionalComparisonContract.note,
+      }),
     },
     reasonCodes: Array.from(reasonCodes),
     indicatesAssumptionDrift: comparisonBasisStatus !== "same_basis",

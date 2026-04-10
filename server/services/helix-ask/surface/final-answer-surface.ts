@@ -1,3 +1,5 @@
+import type { RelationAssemblyPacket } from "../relation-assembly";
+
 type MutableResult = {
   text?: string;
   answer_surface_mode?: string;
@@ -16,6 +18,43 @@ type FinalAnswerSurface = {
 };
 
 type ApplyText = (args: { result: MutableResult; nextText: string }) => string;
+
+export const applyRelationFinalSurfaceRepair = (args: {
+  cleanedText: string;
+  relationIntent: boolean;
+  relationPacket: RelationAssemblyPacket | null;
+  answerPath: string[];
+  debugPayload: MutableDebugPayload;
+  applyText: ApplyText;
+  result: MutableResult;
+  detectFallbackReasons: (text: string) => string[];
+  ensureRelationFallbackDomainAnchors: (packet: RelationAssemblyPacket) => RelationAssemblyPacket;
+  renderConversationalFallback: (packet: RelationAssemblyPacket) => string;
+}): string => {
+  if (!args.relationIntent || !args.relationPacket) {
+    return args.cleanedText;
+  }
+  const reasons = args.detectFallbackReasons(args.cleanedText);
+  if (reasons.length === 0) {
+    return args.cleanedText;
+  }
+  const repaired = args.renderConversationalFallback(
+    args.ensureRelationFallbackDomainAnchors(args.relationPacket),
+  ).trim();
+  if (!repaired || repaired === args.cleanedText.trim()) {
+    return args.cleanedText;
+  }
+  const nextText = args.applyText({
+    result: args.result,
+    nextText: repaired,
+  });
+  args.answerPath.push("relationFallback:final_surface_guard");
+  if (args.debugPayload) {
+    args.debugPayload.relation_final_surface_repair_applied = true;
+    args.debugPayload.relation_final_surface_repair_reasons = reasons;
+  }
+  return nextText;
+};
 
 export const applyFinalAnswerSurfaceReconciliation = (args: {
   cleanedText: string;

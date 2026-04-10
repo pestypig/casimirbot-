@@ -27799,6 +27799,61 @@ const renderNhm2SourceClosureMarkdown = (
   ) => {
     return region.mismatchDiagnostics?.t00TraceNextInspectionTarget ?? "null";
   };
+  const summarizeComparisonBasisAuthorityStatus = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.comparisonBasisAuthorityStatus ?? "unknown";
+  };
+  const summarizeComparisonBasisAuthorityReason = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.comparisonBasisAuthorityReason ?? "null";
+  };
+  const summarizeMetricExpectedCounterpartRole = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.metricExpectedCounterpartRole ?? "null";
+  };
+  const summarizeResolvedTileCounterpartRef = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.resolvedTileCounterpartRef ?? "null";
+  };
+  const summarizeCounterpartResolutionStatus = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.counterpartResolutionStatus ?? "unknown";
+  };
+  const summarizeCounterpartResolutionNote = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.counterpartResolutionNote ?? "null";
+  };
+  const summarizeRegionalComparisonContractStatus = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.regionalComparisonContractStatus ?? "unknown";
+  };
+  const summarizeRegionalComparisonContractNote = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.regionalComparisonContractNote ?? "null";
+  };
+  const summarizeRegionalComparisonPolicyStatus = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.regionalComparisonPolicyStatus ?? "unknown";
+  };
+  const summarizeRegionalComparisonPolicyNote = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.regionalComparisonPolicyNote ?? "null";
+  };
+  const summarizeComparisonContractNote = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.comparisonContractNote ?? "null";
+  };
   const summarizeDirectT00LocalizationNote = (
     region: Nhm2SourceClosureV2RegionComparison,
   ) => {
@@ -27827,7 +27882,8 @@ const renderNhm2SourceClosureMarkdown = (
     const contractMismatch = summarizeT00TraceContractMismatchClass(region);
     const semanticBoundary = summarizeT00TraceFirstSemanticBoundary(region);
     const inspectionTarget = summarizeT00TraceNextInspectionTarget(region);
-    return `direct T00 compares ${metricMode} (${metricTraceStage}; ${metricSemantic}) at ${metricSourceRef} against ${tileMode} (${tileTraceStage}; ${tileSemantic}) at ${tileSourceRef}; contract=${contractStatus}/${contractMismatch}; first semantic boundary=${semanticBoundary}; inspect ${inspectionTarget}`;
+    const basisAuthority = summarizeComparisonBasisAuthorityStatus(region);
+    return `direct T00 compares ${metricMode} (${metricTraceStage}; ${metricSemantic}) at ${metricSourceRef} against ${tileMode} (${tileTraceStage}; ${tileSemantic}) at ${tileSourceRef}; contract=${contractStatus}/${contractMismatch}; basisAuthority=${basisAuthority}; first semantic boundary=${semanticBoundary}; inspect ${inspectionTarget}`;
   };
   const renderAccountingRows = (
     accounting: ReturnType<typeof summarizeAccounting>,
@@ -27912,6 +27968,27 @@ const renderNhm2SourceClosureMarkdown = (
             summarizeT00TraceFirstSemanticBoundary(region);
           const t00TraceNextInspectionTarget =
             summarizeT00TraceNextInspectionTarget(region);
+          const comparisonBasisAuthorityStatus =
+            summarizeComparisonBasisAuthorityStatus(region);
+          const comparisonBasisAuthorityReason =
+            summarizeComparisonBasisAuthorityReason(region);
+          const metricExpectedCounterpartRole =
+            summarizeMetricExpectedCounterpartRole(region);
+          const resolvedTileCounterpartRef =
+            summarizeResolvedTileCounterpartRef(region);
+          const counterpartResolutionStatus =
+            summarizeCounterpartResolutionStatus(region);
+          const counterpartResolutionNote =
+            summarizeCounterpartResolutionNote(region);
+          const regionalComparisonContractStatus =
+            summarizeRegionalComparisonContractStatus(region);
+          const regionalComparisonContractNote =
+            summarizeRegionalComparisonContractNote(region);
+          const regionalComparisonPolicyStatus =
+            summarizeRegionalComparisonPolicyStatus(region);
+          const regionalComparisonPolicyNote =
+            summarizeRegionalComparisonPolicyNote(region);
+          const comparisonContractNote = summarizeComparisonContractNote(region);
           const directT00LocalizationNote = summarizeDirectT00LocalizationNote(region);
           const tileProxy = region.tileProxyDiagnostics ?? null;
           const detailRows = renderComponentRows(region.residualComponents);
@@ -27921,6 +27998,17 @@ const renderNhm2SourceClosureMarkdown = (
 | field | value |
 |---|---|
 | comparisonBasisStatus | ${region.comparisonBasisStatus} |
+| comparisonBasisAuthorityStatus | ${comparisonBasisAuthorityStatus} |
+| comparisonBasisAuthorityReason | ${comparisonBasisAuthorityReason} |
+| metricExpectedCounterpartRole | ${metricExpectedCounterpartRole} |
+| resolvedTileCounterpartRef | ${resolvedTileCounterpartRef} |
+| counterpartResolutionStatus | ${counterpartResolutionStatus} |
+| counterpartResolutionNote | ${counterpartResolutionNote} |
+| regionalComparisonContractStatus | ${regionalComparisonContractStatus} |
+| regionalComparisonContractNote | ${regionalComparisonContractNote} |
+| regionalComparisonPolicyStatus | ${regionalComparisonPolicyStatus} |
+| regionalComparisonPolicyNote | ${regionalComparisonPolicyNote} |
+| comparisonContractNote | ${comparisonContractNote} |
 | status | ${region.status} |
 | residualNorms.relLInf | ${region.residualNorms.relLInf ?? "null"} |
 | metricDiagonal | T00=${metricTensor.T00 ?? "null"}, T11=${metricTensor.T11 ?? "null"}, T22=${metricTensor.T22 ?? "null"}, T33=${metricTensor.T33 ?? "null"} |
@@ -28571,6 +28659,30 @@ const assertNhm2SourceClosureAuthorityParity = (args: {
     }
     if (publishedRegion.comparisonBasisStatus !== runtimeRegion.comparisonBasisStatus) {
       mismatch(`region:${publishedRegion.regionId}:comparisonBasisStatus`);
+    }
+    if (
+      publishedRegion.regionalComparisonContractStatus !==
+      runtimeRegion.regionalComparisonContractStatus
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:regionalComparisonContractStatus`);
+    }
+    if (
+      publishedRegion.regionalComparisonContractNote !==
+      runtimeRegion.regionalComparisonContractNote
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:regionalComparisonContractNote`);
+    }
+    if (
+      publishedRegion.regionalComparisonPolicyStatus !==
+      runtimeRegion.regionalComparisonPolicyStatus
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:regionalComparisonPolicyStatus`);
+    }
+    if (
+      publishedRegion.regionalComparisonPolicyNote !==
+      runtimeRegion.regionalComparisonPolicyNote
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:regionalComparisonPolicyNote`);
     }
     if (publishedRegion.status !== runtimeRegion.status) {
       mismatch(`region:${publishedRegion.regionId}:status`);

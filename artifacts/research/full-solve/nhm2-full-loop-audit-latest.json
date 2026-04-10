@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-10T01:29:22.028Z",
+  "generatedAt": "2026-04-10T03:47:57.817Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -177,16 +177,16 @@
     },
     "source_closure": {
       "sectionId": "source_closure",
-      "state": "fail",
+      "state": "review",
       "reasons": [
-        "source_closure_residual_exceeded"
+        "policy_review_required"
       ],
       "artifactRefs": [
         {
           "artifactId": "nhm2_source_closure",
           "path": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
           "contractVersion": "nhm2_source_closure/v2",
-          "status": "fail"
+          "status": "review"
         },
         {
           "artifactId": "nhm2_source_closure_metric_required_tensor",
@@ -247,7 +247,7 @@
         "exteriorShell": 2.0213853465619396
       },
       "toleranceRef": "tensor_residual_relLInf",
-      "assumptionsDrifted": false,
+      "assumptionsDrifted": true,
       "supportedClaimTiers": [
         "reduced-order",
         "certified"
@@ -556,7 +556,6 @@
         "shift_vs_lapse_decomposition"
       ],
       "blockingReasons": [
-        "source_closure_residual_exceeded",
         "observer_audit_incomplete",
         "observer_blocking_violation",
         "policy_review_required"
@@ -587,7 +586,6 @@
         "shift_vs_lapse_decomposition"
       ],
       "blockingReasons": [
-        "source_closure_residual_exceeded",
         "observer_audit_incomplete",
         "observer_blocking_violation",
         "certificate_missing",
@@ -600,7 +598,6 @@
   "highestPassingClaimTier": "diagnostic",
   "overallState": "fail",
   "blockingReasons": [
-    "source_closure_residual_exceeded",
     "observer_audit_incomplete",
     "observer_blocking_violation",
     "certificate_missing",
