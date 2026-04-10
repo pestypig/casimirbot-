@@ -1,3 +1,14 @@
+import {
+  NHM2_OBSERVER_BLOCKING_ASSESSMENT_STATUS_VALUES,
+  NHM2_OBSERVER_PRIMARY_DRIVER_AGREEMENT_VALUES,
+  NHM2_OBSERVER_PROMOTION_BLOCKING_CONDITION_VALUES,
+  NHM2_OBSERVER_PROMOTION_BLOCKING_SURFACE_VALUES,
+  type Nhm2ObserverBlockingAssessmentStatus,
+  type Nhm2ObserverPrimaryDriverAgreement,
+  type Nhm2ObserverPromotionBlockingCondition,
+  type Nhm2ObserverPromotionBlockingSurface,
+} from "./nhm2-observer-audit.v1";
+
 export const NHM2_FULL_LOOP_AUDIT_CONTRACT_VERSION = "nhm2_full_loop_audit/v1";
 export const NHM2_FULL_LOOP_AUDIT_ID = "nhm2_full_loop";
 export const NHM2_FULL_LOOP_AUDIT_LANE_ID = "nhm2_shift_lapse";
@@ -197,9 +208,47 @@ export type Nhm2ObserverFamilyAudit = {
 
 export type Nhm2ObserverAuditSection =
   Nhm2FullLoopAuditSectionBase<"observer_audit"> & {
+    observerBlockingAssessmentStatus: Nhm2ObserverBlockingAssessmentStatus;
+    observerBlockingAssessmentNote: string | null;
+    observerPromotionBlockingSurface: Nhm2ObserverPromotionBlockingSurface;
+    observerPromotionBlockingCondition: Nhm2ObserverPromotionBlockingCondition;
+    observerMetricPrimaryDriver: Nhm2ObserverPromotionBlockingCondition;
+    observerTilePrimaryDriver: Nhm2ObserverPromotionBlockingCondition;
+    observerPrimaryDriverAgreement: Nhm2ObserverPrimaryDriverAgreement;
+    observerPrimaryDriverNote: string | null;
+    observerMetricFirstInspectionTarget: string | null;
+    observerTileFirstInspectionTarget: string | null;
     metric: Nhm2ObserverFamilyAudit;
     tile: Nhm2ObserverFamilyAudit;
   };
+
+type Nhm2ObserverAuditSectionInput =
+  Nhm2FullLoopAuditSectionBaseInput<"observer_audit"> &
+    Omit<
+      Nhm2ObserverAuditSection,
+      | keyof Nhm2FullLoopAuditSectionBase<"observer_audit">
+      | "observerBlockingAssessmentStatus"
+      | "observerBlockingAssessmentNote"
+      | "observerPromotionBlockingSurface"
+      | "observerPromotionBlockingCondition"
+      | "observerMetricPrimaryDriver"
+      | "observerTilePrimaryDriver"
+      | "observerPrimaryDriverAgreement"
+      | "observerPrimaryDriverNote"
+      | "observerMetricFirstInspectionTarget"
+      | "observerTileFirstInspectionTarget"
+    > & {
+      observerBlockingAssessmentStatus?: Nhm2ObserverBlockingAssessmentStatus;
+      observerBlockingAssessmentNote?: string | null;
+      observerPromotionBlockingSurface?: Nhm2ObserverPromotionBlockingSurface;
+      observerPromotionBlockingCondition?: Nhm2ObserverPromotionBlockingCondition;
+      observerMetricPrimaryDriver?: Nhm2ObserverPromotionBlockingCondition;
+      observerTilePrimaryDriver?: Nhm2ObserverPromotionBlockingCondition;
+      observerPrimaryDriverAgreement?: Nhm2ObserverPrimaryDriverAgreement;
+      observerPrimaryDriverNote?: string | null;
+      observerMetricFirstInspectionTarget?: string | null;
+      observerTileFirstInspectionTarget?: string | null;
+    };
 
 export type Nhm2GrStabilitySafetySection =
   Nhm2FullLoopAuditSectionBase<"gr_stability_safety"> & {
@@ -294,8 +343,7 @@ export type Nhm2FullLoopAuditSectionsInput = {
       >;
   source_closure: Nhm2FullLoopAuditSectionBaseInput<"source_closure"> &
     Omit<Nhm2SourceClosureSection, keyof Nhm2FullLoopAuditSectionBase<"source_closure">>;
-  observer_audit: Nhm2FullLoopAuditSectionBaseInput<"observer_audit"> &
-    Omit<Nhm2ObserverAuditSection, keyof Nhm2FullLoopAuditSectionBase<"observer_audit">>;
+  observer_audit: Nhm2ObserverAuditSectionInput;
   gr_stability_safety:
     Nhm2FullLoopAuditSectionBaseInput<"gr_stability_safety"> &
       Omit<
@@ -408,6 +456,34 @@ const isReasonCodeArray = (
   value: unknown,
 ): value is Nhm2FullLoopAuditReasonCode[] =>
   Array.isArray(value) && value.every((entry) => isReasonCode(entry));
+
+const isObserverBlockingAssessmentStatus = (
+  value: unknown,
+): value is Nhm2ObserverBlockingAssessmentStatus =>
+  NHM2_OBSERVER_BLOCKING_ASSESSMENT_STATUS_VALUES.includes(
+    value as Nhm2ObserverBlockingAssessmentStatus,
+  );
+
+const isObserverPromotionBlockingSurface = (
+  value: unknown,
+): value is Nhm2ObserverPromotionBlockingSurface =>
+  NHM2_OBSERVER_PROMOTION_BLOCKING_SURFACE_VALUES.includes(
+    value as Nhm2ObserverPromotionBlockingSurface,
+  );
+
+const isObserverPromotionBlockingCondition = (
+  value: unknown,
+): value is Nhm2ObserverPromotionBlockingCondition =>
+  NHM2_OBSERVER_PROMOTION_BLOCKING_CONDITION_VALUES.includes(
+    value as Nhm2ObserverPromotionBlockingCondition,
+  );
+
+const isObserverPrimaryDriverAgreement = (
+  value: unknown,
+): value is Nhm2ObserverPrimaryDriverAgreement =>
+  NHM2_OBSERVER_PRIMARY_DRIVER_AGREEMENT_VALUES.includes(
+    value as Nhm2ObserverPrimaryDriverAgreement,
+  );
 
 const isSectionIdArray = (
   value: unknown,
@@ -560,6 +636,26 @@ const cloneSections = (
   observer_audit: {
     ...sections.observer_audit,
     reasons: orderReasonCodes([...sections.observer_audit.reasons]),
+    observerBlockingAssessmentStatus:
+      sections.observer_audit.observerBlockingAssessmentStatus ?? "unknown",
+    observerBlockingAssessmentNote:
+      sections.observer_audit.observerBlockingAssessmentNote ?? null,
+    observerPromotionBlockingSurface:
+      sections.observer_audit.observerPromotionBlockingSurface ?? "unknown",
+    observerPromotionBlockingCondition:
+      sections.observer_audit.observerPromotionBlockingCondition ?? "unknown",
+    observerMetricPrimaryDriver:
+      sections.observer_audit.observerMetricPrimaryDriver ?? "unknown",
+    observerTilePrimaryDriver:
+      sections.observer_audit.observerTilePrimaryDriver ?? "unknown",
+    observerPrimaryDriverAgreement:
+      sections.observer_audit.observerPrimaryDriverAgreement ?? "unknown",
+    observerPrimaryDriverNote:
+      sections.observer_audit.observerPrimaryDriverNote ?? null,
+    observerMetricFirstInspectionTarget:
+      sections.observer_audit.observerMetricFirstInspectionTarget ?? null,
+    observerTileFirstInspectionTarget:
+      sections.observer_audit.observerTileFirstInspectionTarget ?? null,
     metric: cloneObserverFamilyAudit(sections.observer_audit.metric),
     tile: cloneObserverFamilyAudit(sections.observer_audit.tile),
     supportedClaimTiers: computeTierListForSection("observer_audit"),
@@ -801,6 +897,20 @@ const isObserverAuditSection = (
   const record = asRecord(value);
   return (
     hasValidSectionBase(record, "observer_audit") &&
+    isObserverBlockingAssessmentStatus(record.observerBlockingAssessmentStatus) &&
+    (record.observerBlockingAssessmentNote === null ||
+      asText(record.observerBlockingAssessmentNote) != null) &&
+    isObserverPromotionBlockingSurface(record.observerPromotionBlockingSurface) &&
+    isObserverPromotionBlockingCondition(record.observerPromotionBlockingCondition) &&
+    isObserverPromotionBlockingCondition(record.observerMetricPrimaryDriver) &&
+    isObserverPromotionBlockingCondition(record.observerTilePrimaryDriver) &&
+    isObserverPrimaryDriverAgreement(record.observerPrimaryDriverAgreement) &&
+    (record.observerPrimaryDriverNote === null ||
+      asText(record.observerPrimaryDriverNote) != null) &&
+    (record.observerMetricFirstInspectionTarget === null ||
+      asText(record.observerMetricFirstInspectionTarget) != null) &&
+    (record.observerTileFirstInspectionTarget === null ||
+      asText(record.observerTileFirstInspectionTarget) != null) &&
     isObserverFamilyAudit(record.metric) &&
     isObserverFamilyAudit(record.tile)
   );

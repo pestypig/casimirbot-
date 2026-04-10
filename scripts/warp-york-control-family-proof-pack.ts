@@ -29294,6 +29294,19 @@ const renderNhm2ObserverAuditMarkdown = (
 ): string => {
   const reasonCodes =
     payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
+  const renderTensorBlockingSummary = (
+    tensor:
+      | Nhm2ObserverAuditArtifact["tensors"]["metricRequired"]
+      | Nhm2ObserverAuditArtifact["tensors"]["tileEffective"],
+  ): string => {
+    const failingConditions = (["wec", "nec", "dec", "sec"] as const)
+      .filter((condition) => tensor.conditions[condition].status === "fail")
+      .map(
+        (condition) =>
+          `${condition.toUpperCase()}=${tensor.conditions[condition].robustMin ?? "null"}`,
+      );
+    return failingConditions.length > 0 ? failingConditions.join("; ") : "none";
+  };
   const renderTensorSection = (
     label: string,
     tensor:
@@ -29321,6 +29334,11 @@ const renderNhm2ObserverAuditMarkdown = (
 | tensorRef | ${tensor.tensorRef ?? "null"} |
 | sampleCount | ${tensor.sampleCount ?? "null"} |
 | reasonCodes | ${tensorReasonCodes} |
+| primaryBlockingCondition | ${tensor.primaryBlockingCondition} |
+| primaryBlockingMode | ${tensor.primaryBlockingMode} |
+| primaryBlockingValue | ${tensor.primaryBlockingValue ?? "null"} |
+| primaryBlockingReference | ${tensor.primaryBlockingReference ?? "null"} |
+| primaryBlockingWhy | ${tensor.primaryBlockingWhy ?? "null"} |
 | rapidityCap | ${tensor.rapidityCap ?? "null"} |
 | rapidityCapBeta | ${tensor.rapidityCapBeta ?? "null"} |
 | typeI.count | ${tensor.typeI.count ?? "null"} |
@@ -29366,6 +29384,18 @@ const renderNhm2ObserverAuditMarkdown = (
 | familyId | ${payload.familyId} |
 | shiftLapseProfileId | ${payload.shiftLapseProfileId ?? "null"} |
 | reasonCodes | ${reasonCodes} |
+| observerBlockingAssessmentStatus | ${payload.observerBlockingAssessmentStatus} |
+| observerPromotionBlockingSurface | ${payload.observerPromotionBlockingSurface} |
+| observerPromotionBlockingCondition | ${payload.observerPromotionBlockingCondition} |
+| observerMetricPrimaryDriver | ${payload.observerMetricPrimaryDriver} |
+| observerTilePrimaryDriver | ${payload.observerTilePrimaryDriver} |
+| observerPrimaryDriverAgreement | ${payload.observerPrimaryDriverAgreement} |
+| observerPrimaryDriverNote | ${payload.observerPrimaryDriverNote ?? "null"} |
+| observerMetricFirstInspectionTarget | ${payload.observerMetricFirstInspectionTarget ?? "null"} |
+| observerTileFirstInspectionTarget | ${payload.observerTileFirstInspectionTarget ?? "null"} |
+| observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
+| metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
+| tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
 
 ${renderTensorSection("Metric Required Tensor", payload.tensors.metricRequired)}
 ${renderTensorSection("Tile Effective Tensor", payload.tensors.tileEffective)}
@@ -34585,6 +34615,7 @@ const renderNhm2FullLoopAuditMarkdown = (args: {
         `| ${entry.tier} | ${entry.state} | ${entry.satisfiedSections.join(", ") || "none"} | ${entry.blockingReasons.join(", ") || "none"} |`,
     )
     .join("\n");
+  const observerAudit = args.audit.sections.observer_audit;
   return `# NHM2 Full-Loop Audit (${DATE_STAMP})
 
 "This checklist audits the currently selected nhm2_shift_lapse profile against the existing NHM2 full-loop contract using emitted artifact evidence only. Missing or mismatched publication surfaces remain explicit blockers and do not widen route ETA, transport, gravity, or viability claims."
@@ -34608,6 +34639,30 @@ const renderNhm2FullLoopAuditMarkdown = (args: {
 | tier | state | satisfiedSections | blockingReasons |
 |---|---|---|---|
 ${tierRows}
+
+## Observer Audit Summary
+| field | value |
+|---|---|
+| state | ${observerAudit.state} |
+| reasons | ${observerAudit.reasons.join(", ") || "none"} |
+| observerBlockingAssessmentStatus | ${observerAudit.observerBlockingAssessmentStatus} |
+| observerPromotionBlockingSurface | ${observerAudit.observerPromotionBlockingSurface} |
+| observerPromotionBlockingCondition | ${observerAudit.observerPromotionBlockingCondition} |
+| observerMetricPrimaryDriver | ${observerAudit.observerMetricPrimaryDriver} |
+| observerTilePrimaryDriver | ${observerAudit.observerTilePrimaryDriver} |
+| observerPrimaryDriverAgreement | ${observerAudit.observerPrimaryDriverAgreement} |
+| observerPrimaryDriverNote | ${observerAudit.observerPrimaryDriverNote ?? "null"} |
+| observerMetricFirstInspectionTarget | ${observerAudit.observerMetricFirstInspectionTarget ?? "null"} |
+| observerTileFirstInspectionTarget | ${observerAudit.observerTileFirstInspectionTarget ?? "null"} |
+| observerBlockingAssessmentNote | ${observerAudit.observerBlockingAssessmentNote ?? "null"} |
+| metric.wecMinOverAllTimelike | ${observerAudit.metric.wecMinOverAllTimelike ?? "null"} |
+| metric.necMinOverAllNull | ${observerAudit.metric.necMinOverAllNull ?? "null"} |
+| metric.decStatus | ${observerAudit.metric.decStatus ?? "null"} |
+| metric.secStatus | ${observerAudit.metric.secStatus ?? "null"} |
+| tile.wecMinOverAllTimelike | ${observerAudit.tile.wecMinOverAllTimelike ?? "null"} |
+| tile.necMinOverAllNull | ${observerAudit.tile.necMinOverAllNull ?? "null"} |
+| tile.decStatus | ${observerAudit.tile.decStatus ?? "null"} |
+| tile.secStatus | ${observerAudit.tile.secStatus ?? "null"} |
 
 ## Closure Checklist
 | section | expected evidence | found artifact/ref | contract parse status | lane/profile match | stale/mismatch status | section state | blocking reasons |
@@ -35465,18 +35520,17 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
   const observerAuditReasons: Nhm2FullLoopAuditReasonCode[] = [];
   if (observerAuditArtifact != null) {
     if (
-      observerAuditArtifact.reasonCodes.some((entry) =>
-        [
-          "metric_tensor_missing",
-          "tile_tensor_missing",
-          "metric_audit_incomplete",
-          "tile_audit_incomplete",
-        ].includes(entry),
-      )
+      observerAuditArtifact.observerBlockingAssessmentStatus ===
+      "observer_contract_incomplete"
     ) {
       observerAuditReasons.push("observer_audit_incomplete");
     }
-    if (observerAuditArtifact.reasonCodes.includes("observer_condition_failed")) {
+    if (
+      observerAuditArtifact.observerBlockingAssessmentStatus ===
+        "same_surface_violation_confirmed" ||
+      (observerAuditArtifact.observerBlockingAssessmentStatus === "unknown" &&
+        observerAuditArtifact.reasonCodes.includes("observer_condition_failed"))
+    ) {
       observerAuditReasons.push("observer_blocking_violation");
     }
     if (observerAuditArtifact.reasonCodes.includes("surrogate_model_limited")) {
@@ -35761,6 +35815,26 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       state: observerAuditState,
       reasons: observerAuditReasons,
       artifactRefs: collectFullLoopArtifactRefs(observerAuditInspections),
+      observerBlockingAssessmentStatus:
+        observerAuditArtifact?.observerBlockingAssessmentStatus ?? "unknown",
+      observerBlockingAssessmentNote:
+        observerAuditArtifact?.observerBlockingAssessmentNote ?? null,
+      observerPromotionBlockingSurface:
+        observerAuditArtifact?.observerPromotionBlockingSurface ?? "unknown",
+      observerPromotionBlockingCondition:
+        observerAuditArtifact?.observerPromotionBlockingCondition ?? "unknown",
+      observerMetricPrimaryDriver:
+        observerAuditArtifact?.observerMetricPrimaryDriver ?? "unknown",
+      observerTilePrimaryDriver:
+        observerAuditArtifact?.observerTilePrimaryDriver ?? "unknown",
+      observerPrimaryDriverAgreement:
+        observerAuditArtifact?.observerPrimaryDriverAgreement ?? "unknown",
+      observerPrimaryDriverNote:
+        observerAuditArtifact?.observerPrimaryDriverNote ?? null,
+      observerMetricFirstInspectionTarget:
+        observerAuditArtifact?.observerMetricFirstInspectionTarget ?? null,
+      observerTileFirstInspectionTarget:
+        observerAuditArtifact?.observerTileFirstInspectionTarget ?? null,
       metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
       tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
     },

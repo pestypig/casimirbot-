@@ -106,6 +106,16 @@ describe("nhm2 observer audit artifact", () => {
         "surrogate_model_limited",
       ]),
     );
+    expect(artifact.observerBlockingAssessmentStatus).toBe(
+      "observer_contract_incomplete",
+    );
+    expect(artifact.observerPromotionBlockingSurface).toBe("unknown");
+    expect(artifact.observerPromotionBlockingCondition).toBe("unknown");
+    expect(artifact.observerMetricPrimaryDriver).toBe("unknown");
+    expect(artifact.observerTilePrimaryDriver).toBe("unknown");
+    expect(artifact.observerPrimaryDriverAgreement).toBe("unknown");
+    expect(artifact.observerMetricFirstInspectionTarget).toBeNull();
+    expect(artifact.observerTileFirstInspectionTarget).toBeNull();
     expect(artifact.tensors.metricRequired.fluxDiagnostics.status).toBe(
       "assumed_zero",
     );
@@ -174,6 +184,212 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.tensors.tileEffective.status).toBe("fail");
     expect(artifact.tensors.tileEffective.conditions.wec.status).toBe("fail");
     expect(artifact.tensors.tileEffective.conditions.wec.robustMin).toBe(-0.2);
+    expect(artifact.observerBlockingAssessmentStatus).toBe(
+      "observer_contract_incomplete",
+    );
+    expect(artifact.observerTilePrimaryDriver).toBe("wec");
+    expect(artifact.tensors.tileEffective.primaryBlockingCondition).toBe("wec");
+    expect(artifact.tensors.tileEffective.primaryBlockingMode).toBe(
+      "robust_only",
+    );
+    expect(artifact.observerTileFirstInspectionTarget).toBe(
+      "tile_effective.conditions.wec",
+    );
+  });
+
+  it("classifies same-surface observer blockers when robust failing evidence is complete enough", () => {
+    const artifact = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        typeI: { count: 1, fraction: 1, tolerance: 0 },
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: {
+            ...positiveCondition(-0.4),
+            robustMin: -0.4,
+            robustMean: -0.4,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.05),
+          dec: positiveCondition(0.02),
+        },
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        typeI: { count: 1, fraction: 1, tolerance: 0 },
+        conditions: {
+          nec: positiveCondition(0.08),
+          wec: positiveCondition(0.04),
+          sec: positiveCondition(0.03),
+          dec: {
+            ...positiveCondition(-0.1),
+            robustMin: -0.1,
+            robustMean: -0.1,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: -0.05,
+          },
+        },
+      },
+    });
+
+    expect(artifact.status).toBe("fail");
+    expect(artifact.observerBlockingAssessmentStatus).toBe(
+      "same_surface_violation_confirmed",
+    );
+    expect(artifact.observerPromotionBlockingSurface).toBe("both");
+    expect(artifact.observerPromotionBlockingCondition).toBe("mixed");
+    expect(artifact.observerMetricPrimaryDriver).toBe("wec");
+    expect(artifact.observerTilePrimaryDriver).toBe("dec");
+    expect(artifact.observerPrimaryDriverAgreement).toBe("diverged");
+    expect(artifact.tensors.metricRequired.primaryBlockingMode).toBe(
+      "robust_search_amplified",
+    );
+    expect(artifact.tensors.tileEffective.primaryBlockingMode).toBe(
+      "robust_only",
+    );
+    expect(artifact.observerPrimaryDriverNote).toContain(
+      "metric_required first localizes to WEC",
+    );
+    expect(artifact.observerPrimaryDriverNote).toContain(
+      "tile_effective first localizes to DEC",
+    );
+    expect(artifact.observerBlockingAssessmentNote).toContain(
+      "missedViolationFraction=0",
+    );
+  });
+
+  it("prefers Eulerian-native WEC over downstream DEC and secondary robust-only conditions", () => {
+    const artifact = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: {
+            ...positiveCondition(-0.5),
+            eulerianMin: -0.5,
+            eulerianMean: -0.5,
+            robustMin: -0.5,
+            robustMean: -0.5,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: positiveCondition(0.05),
+          dec: {
+            ...positiveCondition(-0.6),
+            eulerianMin: -0.5,
+            eulerianMean: -0.5,
+            robustMin: -1.0,
+            robustMean: -1.0,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: -0.5,
+          },
+        },
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        conditions: {
+          nec: {
+            ...positiveCondition(-0.2),
+            eulerianMin: 0,
+            eulerianMean: 0,
+            robustMin: -0.2,
+            robustMean: -0.2,
+            robustViolationFraction: 1,
+            missedViolationFraction: 1,
+            maxRobustMinusEulerian: -0.2,
+          },
+          wec: {
+            ...positiveCondition(-0.4),
+            eulerianMin: -0.4,
+            eulerianMean: -0.4,
+            robustMin: -0.4,
+            robustMean: -0.4,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: 0,
+          },
+          sec: {
+            ...positiveCondition(-0.1),
+            eulerianMin: 0.05,
+            eulerianMean: 0.05,
+            robustMin: -0.1,
+            robustMean: -0.1,
+            robustViolationFraction: 1,
+            missedViolationFraction: 1,
+            maxRobustMinusEulerian: -0.15,
+          },
+          dec: {
+            ...positiveCondition(-0.3),
+            eulerianMin: -0.2,
+            eulerianMean: -0.2,
+            robustMin: -0.6,
+            robustMean: -0.6,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: -0.4,
+          },
+        },
+      },
+    });
+
+    expect(artifact.observerMetricPrimaryDriver).toBe("wec");
+    expect(artifact.observerTilePrimaryDriver).toBe("wec");
+    expect(artifact.observerPrimaryDriverAgreement).toBe("aligned");
+    expect(artifact.tensors.metricRequired.primaryBlockingMode).toBe(
+      "eulerian_native",
+    );
+    expect(artifact.tensors.tileEffective.primaryBlockingMode).toBe(
+      "eulerian_native",
+    );
+    expect(artifact.tensors.metricRequired.primaryBlockingWhy).toContain(
+      "DEC co-fails downstream",
+    );
+    expect(artifact.tensors.tileEffective.primaryBlockingWhy).toContain(
+      "NEC/SEC remain secondary search-driven failures",
+    );
+    expect(artifact.observerMetricFirstInspectionTarget).toBe(
+      "metric_required.conditions.wec",
+    );
+    expect(artifact.observerTileFirstInspectionTarget).toBe(
+      "tile_effective.conditions.wec",
+    );
+  });
+
+  it("classifies robust-search-amplified primaries when Eulerian negativity is deepened", () => {
+    const artifact = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: positiveCondition(0.05),
+          sec: positiveCondition(0.02),
+          dec: {
+            ...positiveCondition(-0.2),
+            eulerianMin: -0.1,
+            eulerianMean: -0.1,
+            robustMin: -0.4,
+            robustMean: -0.4,
+            robustViolationFraction: 1,
+            missedViolationFraction: 0,
+            maxRobustMinusEulerian: -0.3,
+          },
+        },
+      },
+      tileEffective: null,
+    });
+
+    expect(artifact.tensors.metricRequired.primaryBlockingCondition).toBe("dec");
+    expect(artifact.tensors.metricRequired.primaryBlockingMode).toBe(
+      "robust_search_amplified",
+    );
+    expect(artifact.observerMetricFirstInspectionTarget).toBe(
+      "metric_required.conditions.dec",
+    );
   });
 
   it("marks missing tensor inputs as incomplete and unavailable", () => {

@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-10T03:47:57.817Z",
+  "generatedAt": "2026-04-10T04:24:41.893Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -257,7 +257,6 @@
       "sectionId": "observer_audit",
       "state": "fail",
       "reasons": [
-        "observer_audit_incomplete",
         "observer_blocking_violation",
         "policy_review_required"
       ],
@@ -269,6 +268,10 @@
           "status": "fail"
         }
       ],
+      "observerBlockingAssessmentStatus": "same_surface_violation_confirmed",
+      "observerBlockingAssessmentNote": "metric_required and tile_effective tensors emit concrete failing mixed WEC and DEC conditions with missedViolationFraction=0 and non-positive maxRobustMinusEulerian. Policy review remains required because surrogate-model limitations are still present.",
+      "observerPromotionBlockingSurface": "both",
+      "observerPromotionBlockingCondition": "mixed",
       "metric": {
         "state": "fail",
         "wecMinOverAllTimelike": -58267450.98955891,
@@ -556,7 +559,6 @@
         "shift_vs_lapse_decomposition"
       ],
       "blockingReasons": [
-        "observer_audit_incomplete",
         "observer_blocking_violation",
         "policy_review_required"
       ]
@@ -586,7 +588,6 @@
         "shift_vs_lapse_decomposition"
       ],
       "blockingReasons": [
-        "observer_audit_incomplete",
         "observer_blocking_violation",
         "certificate_missing",
         "policy_review_required"
@@ -598,7 +599,6 @@
   "highestPassingClaimTier": "diagnostic",
   "overallState": "fail",
   "blockingReasons": [
-    "observer_audit_incomplete",
     "observer_blocking_violation",
     "certificate_missing",
     "policy_review_required"

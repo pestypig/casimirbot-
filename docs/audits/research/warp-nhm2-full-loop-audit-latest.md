@@ -8,21 +8,39 @@
 | contractVersion | nhm2_full_loop_audit/v1 |
 | auditId | nhm2_full_loop |
 | laneId | nhm2_shift_lapse |
-| generatedAt | 2026-04-10T03:47:57.817Z |
+| generatedAt | 2026-04-10T04:24:41.893Z |
 | selectedProfileId | stage1_centerline_alpha_0p995_v1 |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit |
 | currentClaimTier | diagnostic |
 | maximumClaimTier | reduced-order |
 | highestPassingClaimTier | diagnostic |
 | overallState | fail |
-| blockingReasons | observer_audit_incomplete, observer_blocking_violation, certificate_missing, policy_review_required |
+| blockingReasons | observer_blocking_violation, certificate_missing, policy_review_required |
 
 ## Tier Readiness
 | tier | state | satisfiedSections | blockingReasons |
 |---|---|---|---|
 | diagnostic | pass | family_semantics, claim_tier, lapse_provenance, mission_time_outputs | none |
-| reduced-order | fail | family_semantics, claim_tier, lapse_provenance, strict_signal_readiness, mission_time_outputs, shift_vs_lapse_decomposition | observer_audit_incomplete, observer_blocking_violation, policy_review_required |
-| certified | fail | family_semantics, claim_tier, lapse_provenance, strict_signal_readiness, mission_time_outputs, shift_vs_lapse_decomposition | observer_audit_incomplete, observer_blocking_violation, certificate_missing, policy_review_required |
+| reduced-order | fail | family_semantics, claim_tier, lapse_provenance, strict_signal_readiness, mission_time_outputs, shift_vs_lapse_decomposition | observer_blocking_violation, policy_review_required |
+| certified | fail | family_semantics, claim_tier, lapse_provenance, strict_signal_readiness, mission_time_outputs, shift_vs_lapse_decomposition | observer_blocking_violation, certificate_missing, policy_review_required |
+
+## Observer Audit Summary
+| field | value |
+|---|---|
+| state | fail |
+| reasons | observer_blocking_violation, policy_review_required |
+| observerBlockingAssessmentStatus | same_surface_violation_confirmed |
+| observerPromotionBlockingSurface | both |
+| observerPromotionBlockingCondition | mixed |
+| observerBlockingAssessmentNote | metric_required and tile_effective tensors emit concrete failing mixed WEC and DEC conditions with missedViolationFraction=0 and non-positive maxRobustMinusEulerian. Policy review remains required because surrogate-model limitations are still present. |
+| metric.wecMinOverAllTimelike | -58267450.98955891 |
+| metric.necMinOverAllNull | 0 |
+| metric.decStatus | fail |
+| metric.secStatus | pass |
+| tile.wecMinOverAllTimelike | -0.11480523685564506 |
+| tile.necMinOverAllNull | -0.05740261842782253 |
+| tile.decStatus | fail |
+| tile.secStatus | fail |
 
 ## Closure Checklist
 | section | expected evidence | found artifact/ref | contract parse status | lane/profile match | stale/mismatch status | section state | blocking reasons |
@@ -32,7 +50,7 @@
 | lapse_provenance | selected-family transport result contract<br/>selected-family worldline contract<br/>selected-family mission-time comparison contract | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json | pass | pass | ok | pass | none |
 | strict_signal_readiness | published nhm2 strict-signal readiness contract | artifacts/research/full-solve/nhm2-strict-signal-readiness-latest.json | pass | pass | ok | pass | none |
 | source_closure | published nhm2 source-closure tensor contract | artifacts/research/full-solve/nhm2-source-closure-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-hull-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-wall-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-exterior-shell-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-hull-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-wall-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-exterior-shell-latest.json | pass | pass | ok | review | policy_review_required |
-| observer_audit | published nhm2 observer audit contract | artifacts/research/full-solve/nhm2-observer-audit-latest.json | pass | pass | ok | fail | observer_audit_incomplete, observer_blocking_violation, policy_review_required |
+| observer_audit | published nhm2 observer audit contract | artifacts/research/full-solve/nhm2-observer-audit-latest.json | pass | pass | ok | fail | observer_blocking_violation, policy_review_required |
 | gr_stability_safety | selected-family transport gate evidence<br/>root NHM2 envelope perturbation suite<br/>selected-family envelope perturbation suite<br/>selected-family in-hull proper-acceleration contract | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json<br/>artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope/nhm2-envelope-perturbation-suite-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-in-hull-proper-acceleration-latest.json | pass | pass | ok | review | policy_review_required |
 | mission_time_outputs | selected-family worldline contract<br/>selected-family cruise-envelope preflight contract<br/>selected-family route-time contract<br/>selected-family mission-time estimator contract<br/>selected-family mission-time comparison contract | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-cruise-envelope-preflight-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-route-time-worldline-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-estimator-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json | pass | pass | ok | pass | none |
 | shift_vs_lapse_decomposition | selected-family shift-vs-lapse decomposition contract<br/>root shift-vs-lapse decomposition contract | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-vs-lapse-decomposition-latest.json<br/>artifacts/research/full-solve/nhm2-shift-vs-lapse-decomposition-latest.json | pass | pass | ok | pass | none |

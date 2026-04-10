@@ -11,6 +11,10 @@
     "observer_condition_failed",
     "surrogate_model_limited"
   ],
+  "observerBlockingAssessmentStatus": "same_surface_violation_confirmed",
+  "observerBlockingAssessmentNote": "metric_required and tile_effective tensors emit concrete failing mixed WEC and DEC conditions with missedViolationFraction=0 and non-positive maxRobustMinusEulerian. Policy review remains required because surrogate-model limitations are still present.",
+  "observerPromotionBlockingSurface": "both",
+  "observerPromotionBlockingCondition": "mixed",
   "tensors": {
     "metricRequired": {
       "tensorId": "metric_required",

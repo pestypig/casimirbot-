@@ -2184,6 +2184,14 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect((json as any).tensors.metricRequired.model.pressureModel).not.toBeNull();
     expect((json as any).tensors.tileEffective.model.pressureModel).not.toBeNull();
+    expect((json as any).observerBlockingAssessmentStatus).toBeTruthy();
+    expect((json as any).observerPromotionBlockingSurface).toBeTruthy();
+    expect((json as any).observerPromotionBlockingCondition).toBeTruthy();
+    expect((json as any).observerMetricPrimaryDriver).toBeTruthy();
+    expect((json as any).observerTilePrimaryDriver).toBeTruthy();
+    expect((json as any).observerPrimaryDriverAgreement).toBeTruthy();
+    expect((json as any).tensors.metricRequired.primaryBlockingCondition).toBeTruthy();
+    expect((json as any).tensors.tileEffective.primaryBlockingCondition).toBeTruthy();
 
     const markdown = fs.readFileSync(
       published.observerAuditArtifact.latestMdPath,
@@ -2198,6 +2206,10 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain(
       "nhm2-source-closure-tile-effective-tensor-latest.json",
     );
+    expect(markdown).toContain("observerBlockingAssessmentStatus");
+    expect(markdown).toContain("observerMetricPrimaryDriver");
+    expect(markdown).toContain("primaryBlockingCondition");
+    expect(markdown).toContain((json as any).observerBlockingAssessmentStatus);
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
     );
@@ -2256,17 +2268,50 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).sections.observer_audit.state).toBe(
       (observerJson as any).status,
     );
-    if ((observerJson as any).reasonCodes.includes("metric_audit_incomplete")) {
+    expect((json as any).sections.observer_audit.observerBlockingAssessmentStatus).toBe(
+      (observerJson as any).observerBlockingAssessmentStatus,
+    );
+    expect((json as any).sections.observer_audit.observerPromotionBlockingSurface).toBe(
+      (observerJson as any).observerPromotionBlockingSurface,
+    );
+    expect((json as any).sections.observer_audit.observerPromotionBlockingCondition).toBe(
+      (observerJson as any).observerPromotionBlockingCondition,
+    );
+    expect((json as any).sections.observer_audit.observerMetricPrimaryDriver).toBe(
+      (observerJson as any).observerMetricPrimaryDriver,
+    );
+    expect((json as any).sections.observer_audit.observerTilePrimaryDriver).toBe(
+      (observerJson as any).observerTilePrimaryDriver,
+    );
+    expect((json as any).sections.observer_audit.observerPrimaryDriverAgreement).toBe(
+      (observerJson as any).observerPrimaryDriverAgreement,
+    );
+    expect(
+      (json as any).sections.observer_audit.observerMetricFirstInspectionTarget,
+    ).toBe((observerJson as any).observerMetricFirstInspectionTarget);
+    expect(
+      (json as any).sections.observer_audit.observerTileFirstInspectionTarget,
+    ).toBe((observerJson as any).observerTileFirstInspectionTarget);
+    if (
+      (observerJson as any).observerBlockingAssessmentStatus ===
+      "observer_contract_incomplete"
+    ) {
       expect((json as any).sections.observer_audit.reasons).toContain(
         "observer_audit_incomplete",
       );
-    }
-    if ((observerJson as any).reasonCodes.includes("tile_audit_incomplete")) {
-      expect((json as any).sections.observer_audit.reasons).toContain(
+    } else {
+      expect((json as any).sections.observer_audit.reasons).not.toContain(
         "observer_audit_incomplete",
       );
     }
-    if ((observerJson as any).reasonCodes.includes("observer_condition_failed")) {
+    if (
+      (observerJson as any).observerBlockingAssessmentStatus ===
+      "same_surface_violation_confirmed"
+    ) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "observer_blocking_violation",
+      );
+    } else if ((observerJson as any).reasonCodes.includes("observer_condition_failed")) {
       expect((json as any).sections.observer_audit.reasons).toContain(
         "observer_blocking_violation",
       );
@@ -2286,6 +2331,14 @@ describe("nhm2 publication completion surfaces", () => {
     const markdown = fs.readFileSync(published.auditArtifact.latestMdPath, "utf8");
     expect(markdown).toContain(
       "artifacts/research/full-solve/nhm2-observer-audit-latest.json",
+    );
+    expect(markdown).toContain("observerBlockingAssessmentStatus");
+    expect(markdown).toContain("observerMetricPrimaryDriver");
+    expect(markdown).toContain(
+      (observerJson as any).observerBlockingAssessmentStatus,
+    );
+    expect(markdown).toContain(
+      (observerJson as any).observerMetricPrimaryDriver,
     );
   });
 
