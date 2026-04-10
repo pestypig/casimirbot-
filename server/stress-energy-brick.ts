@@ -386,6 +386,156 @@ const defaultHullBounds = () => {
   };
 };
 
+const resolveShiftLapseTileSourceAttenuation = (args: {
+  state: ReturnType<typeof getGlobalPipelineState>;
+  familyContext: StressEnergyFamilyContext;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return 1;
+  }
+  const warpState = (args.state as any)?.warp;
+  const dynamicConfig = (args.state as any)?.dynamicConfig;
+  const alphaCenterline =
+    Number.isFinite(warpState?.lapseSummary?.alphaCenterline)
+      ? Number(warpState.lapseSummary.alphaCenterline)
+      : Number.isFinite(warpState?.metricAdapter?.lapseSummary?.alphaCenterline)
+        ? Number(warpState.metricAdapter.lapseSummary.alphaCenterline)
+        : Number.isFinite(warpState?.metricAdapter?.alpha)
+          ? Number(warpState.metricAdapter.alpha)
+          : Number.isFinite(dynamicConfig?.alphaCenterline)
+            ? Number(dynamicConfig.alphaCenterline)
+            : 1;
+  const clampedAlpha = Math.max(1e-6, Math.min(1, alphaCenterline));
+  // Keep the tile proxy source on the same selected lapse profile branch as the
+  // selected brick proxy lane so NHM2 shift+lapse production changes reach the
+  // emitted tile-effective density path even when the brick is seeded from metric T00.
+  return clampedAlpha ** 4;
+};
+
+const resolveShiftLapseTileSupportSigma = (args: {
+  familyContext: StressEnergyFamilyContext;
+  wallSigma: number;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return args.wallSigma;
+  }
+  // Keep the NHM2 tile proxy on a broadened shell-support lane so the
+  // production proxy does not collapse the full shift+lapse support into an
+  // excessively sharp wall-localized density spike. The residual tile WEC lane
+  // is still dominated by shell concentration, so we keep widening this
+  // support modestly until the proxy density flattens on the real production
+  // surface instead of only at the observer layer.
+  return args.wallSigma * 1.5;
+};
+
+const resolveShiftLapseTileSupportFalloffExponent = (args: {
+  familyContext: StressEnergyFamilyContext;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return 1;
+  }
+  // The residual NHM2 tile blocker is still a wall-localized proxy-density
+  // spike. Keep the widened support width fixed and instead flatten the
+  // support falloff slightly so the production proxy redistributes density
+  // across the same shell rather than deepening the peak at the same location.
+  return 0.9;
+};
+
+const resolveShiftLapseTileSectorSigma = (args: {
+  familyContext: StressEnergyFamilyContext;
+  sectorSigma: number;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return args.sectorSigma;
+  }
+  // The remaining NHM2 tile blocker is now dominated by azimuthal peak
+  // concentration on the real production proxy lane. Widen the sector support
+  // slightly so the same normalized source spreads across nearby sectors
+  // instead of deepening the wall-local minimum at a single phase slice.
+  return args.sectorSigma * 1.08;
+};
+
+const resolveShiftLapseTileLocalShellBias = (args: {
+  familyContext: StressEnergyFamilyContext;
+  shellSharpen: number;
+  volumeEnvelope: number;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return 1;
+  }
+  // After widening support and sector spread, the remaining NHM2 tile blocker is
+  // the sharp wall-local residual sitting on comparatively low-volume support.
+  // Reduce only that residual shell bias so the normalized source redistributes
+  // into nearby support instead of keeping the deepest minimum at the same wall voxel.
+  const shellPeakPenalty = clamp01(args.shellSharpen) * (1 - clamp01(args.volumeEnvelope));
+  return 1 - 0.2 * shellPeakPenalty;
+};
+
+const resolveShiftLapseTileAftSupportSigmaMultiplier = (args: {
+  familyContext: StressEnergyFamilyContext;
+  signedLongitudinal: number;
+  shellSharpen: number;
+  volumeEnvelope: number;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return 1;
+  }
+  // The residual NHM2 worst-case direction remains aft-facing. Broaden only the
+  // aft shell support on sharp, low-volume wall voxels so the production proxy
+  // redistributes the same normalized source across nearby aft support instead
+  // of deepening the minimum on the aft wall.
+  const aftSpreadDriver =
+    clamp01(-args.signedLongitudinal) *
+    clamp01(args.shellSharpen) *
+    (1 - clamp01(args.volumeEnvelope));
+  return 1 + 2.6 * aftSpreadDriver;
+};
+
+const resolveShiftLapseTileAftAggregationWeight = (args: {
+  familyContext: StressEnergyFamilyContext;
+  signedLongitudinal: number;
+  shellSharpen: number;
+  volumeEnvelope: number;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return 1;
+  }
+  // The current worst-case direction is still aft-facing, but directly
+  // suppressing the aft core deepened the normalized minimum. Instead, boost
+  // only the aft support shoulder on sharp, low-volume voxels so the same
+  // normalized source aggregates across nearby aft support instead of staying
+  // pinned to the deepest aft wall sample.
+  const shellSharpen = clamp01(args.shellSharpen);
+  const shellShoulder = clamp01(4 * shellSharpen * (1 - shellSharpen));
+  const aftSupportShoulder =
+    clamp01(-args.signedLongitudinal) *
+    shellShoulder *
+    (1 - clamp01(args.volumeEnvelope));
+  return 1 + 0.24 * aftSupportShoulder;
+};
+
+const resolveShiftLapseTileAftFalloffExponentMultiplier = (args: {
+  familyContext: StressEnergyFamilyContext;
+  signedLongitudinal: number;
+  shellSharpen: number;
+  volumeEnvelope: number;
+}): number => {
+  if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
+    return 1;
+  }
+  // The remaining NHM2 worst-case stays aft-facing after widening the aft
+  // support shoulder. Flatten only the aft wall taper on broad shoulder voxels
+  // so the proxy redistributes across nearby aft wall support instead of
+  // keeping the deepest minimum on the same aft shell slice.
+  const shellSharpen = clamp01(args.shellSharpen);
+  const shellShoulder = clamp01(4 * shellSharpen * (1 - shellSharpen));
+  const aftTaperDriver =
+    clamp01(-args.signedLongitudinal) *
+    shellShoulder *
+    (1 - clamp01(args.volumeEnvelope));
+  return 1 - 0.46 * aftTaperDriver;
+};
+
 const ellipsoidNormal = (pos: Vec3, axesSq: Vec3): Vec3 => {
   const [x, y, z] = pos;
   const nx = x / Math.max(axesSq[0], 1e-6);
@@ -1470,6 +1620,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     redesignFamilyContext,
     sourceReformulationMode,
   );
+  const shiftLapseTileSourceAttenuation = resolveShiftLapseTileSourceAttenuation({
+    state,
+    familyContext,
+  });
 
   const { rho_avg: rhoAvgPipeline, rho_inst: rhoInstPipeline } = enhancedAvgEnergyDensity({
     gap_m,
@@ -1481,8 +1635,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     deltaAOverA: qSpoil,
     dutyEff,
   });
-  const rho_avg = metricMode ? (metricT00Raw as number) : rhoAvgPipeline;
-  const rho_inst = metricMode ? (metricT00Raw as number) : rhoInstPipeline;
+  const rhoAvgSource = metricMode ? (metricT00Raw as number) : rhoAvgPipeline;
+  const rhoInstSource = metricMode ? (metricT00Raw as number) : rhoInstPipeline;
+  const rho_avg = rhoAvgSource * shiftLapseTileSourceAttenuation;
+  const rho_inst = rhoInstSource * shiftLapseTileSourceAttenuation;
 
   const [nx, ny, nz] = dims;
   const dx = (bounds.max[0] - bounds.min[0]) / nx;
@@ -1503,6 +1659,17 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
 
   const axesSq: Vec3 = [axes[0] * axes[0], axes[1] * axes[1], axes[2] * axes[2]];
   const wallSigma = Math.max(input.hullWall ?? defaults.wall, 0.1);
+  const tileSupportSigma = resolveShiftLapseTileSupportSigma({
+    familyContext,
+    wallSigma,
+  });
+  const tileSupportFalloffExponent = resolveShiftLapseTileSupportFalloffExponent({
+    familyContext,
+  });
+  const tileSectorSigma = resolveShiftLapseTileSectorSigma({
+    familyContext,
+    sectorSigma: sigmaSector,
+  });
   const totalVoxels = nx * ny * nz;
   const envelope = new Float32Array(totalVoxels);
   let envelopeSum = 0;
@@ -1574,9 +1741,38 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const dir = pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : ([0, 0, 0] as Vec3);
         const radius = resolveHullRadius(dir, axes, radialMap);
         const centerDist = pLen - radius;
-        const wallEnvelope = Math.exp(-0.5 * Math.pow(centerDist / wallSigma, 2));
+        const structuralBase = computeNhm2StructuralScalars({
+          px,
+          py,
+          pz,
+          centerDist,
+          wallSigma: tileSupportSigma,
+          axes,
+        });
+        const tileAftSupportSigma =
+          tileSupportSigma *
+          resolveShiftLapseTileAftSupportSigmaMultiplier({
+            familyContext,
+            signedLongitudinal: structuralBase.signedLongitudinal,
+            shellSharpen: structuralBase.shellSharpen,
+            volumeEnvelope: structuralBase.volumeEnvelope,
+          });
+        const tileAftFalloffExponent =
+          tileSupportFalloffExponent *
+          resolveShiftLapseTileAftFalloffExponentMultiplier({
+            familyContext,
+            signedLongitudinal: structuralBase.signedLongitudinal,
+            shellSharpen: structuralBase.shellSharpen,
+            volumeEnvelope: structuralBase.volumeEnvelope,
+          });
+        const wallEnvelopeBase = Math.exp(-0.5 * Math.pow(centerDist / tileAftSupportSigma, 2));
+        const wallEnvelope = Math.pow(wallEnvelopeBase, tileAftFalloffExponent);
         const theta = azimuth01(px, pz);
-        const sectorEnvelope = computeSectorEnvelope(theta, phase01, { sigma: sigmaSector, splitEnabled, splitFrac });
+        const sectorEnvelope = computeSectorEnvelope(theta, phase01, {
+          sigma: tileSectorSigma,
+          splitEnabled,
+          splitFrac,
+        });
         const phaseDelta = shortestPhaseDelta(theta, phase01);
         const strobeEnvelope = 0.5 + 0.5 * Math.cos(TWO_PI * wrap01(strobePhase - phaseDelta));
         const structural = computeNhm2StructuralScalars({
@@ -1584,7 +1780,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
           py,
           pz,
           centerDist,
-          wallSigma,
+          wallSigma: tileAftSupportSigma,
           axes,
         });
         const familyEnvelope =
@@ -1617,12 +1813,25 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
                 : familyContext.familyId === "vdb_control"
                   ? 0.75 + 0.25 / (1 + Math.abs(centerDist) / Math.max(wallSigma, 1e-6))
                   : 0.95 + 0.05 * Math.cos(TWO_PI * phaseDelta);
+        const tileLocalShellBias = resolveShiftLapseTileLocalShellBias({
+          familyContext,
+          shellSharpen: structural.shellSharpen,
+          volumeEnvelope: structural.volumeEnvelope,
+        });
+        const tileAftAggregationWeight = resolveShiftLapseTileAftAggregationWeight({
+          familyContext,
+          signedLongitudinal: structural.signedLongitudinal,
+          shellSharpen: structural.shellSharpen,
+          volumeEnvelope: structural.volumeEnvelope,
+        });
         const value =
           wallEnvelope *
           sectorEnvelope *
           driveGain *
           (0.65 + 0.35 * strobeEnvelope) *
-          familyEnvelope;
+          familyEnvelope *
+          tileLocalShellBias *
+          tileAftAggregationWeight;
         envelope[idx] = value;
         envelopeSum += value;
         envelopeAbsSum += Math.abs(value);
@@ -1692,7 +1901,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
           py,
           pz,
           centerDist,
-          wallSigma,
+          wallSigma: tileSupportSigma,
           axes,
         });
         const familyAxialScale =
@@ -2205,3 +2414,10 @@ export const serializeStressEnergyBrickBinary = (brick: StressEnergyBrick): Stre
     ],
   };
 };
+
+
+
+
+
+
+

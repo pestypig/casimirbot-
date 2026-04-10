@@ -1,4 +1,4 @@
-# NHM2 Shift-vs-Lapse Decomposition (2026-04-08)
+# NHM2 Shift-vs-Lapse Decomposition (2026-04-10)
 
 "This artifact decomposes the bounded NHM2 mission-time result for one selected shift+lapse profile into fixed shift-family transport time, lapse-dial clock-rate contribution, and residual remainder. The lapse term is an approximate projection from the metric-derived centerline lapse dial; any unexplained drift is preserved in the residual."
 

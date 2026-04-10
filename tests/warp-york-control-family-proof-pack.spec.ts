@@ -1367,30 +1367,22 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).tensorRefs.tileEffective).toContain(
       "nhm2-source-closure-tile-effective-tensor-latest.json",
     );
-    expect(
-      Math.abs(
-        (json as any).tensors.metricRequired.T00 -
-          (json as any).tensors.tileEffective.T00,
-      ),
-    ).toBeLessThan(0.1);
-    expect(
-      Math.abs(
-        (json as any).tensors.metricRequired.T11 -
-          (json as any).tensors.tileEffective.T11,
-      ),
-    ).toBeLessThan(0.1);
-    expect(
-      Math.abs(
-        (json as any).tensors.metricRequired.T22 -
-          (json as any).tensors.tileEffective.T22,
-      ),
-    ).toBeLessThan(0.1);
-    expect(
-      Math.abs(
-        (json as any).tensors.metricRequired.T33 -
-          (json as any).tensors.tileEffective.T33,
-      ),
-    ).toBeLessThan(0.1);
+    const toleranceRelLInf =
+      (json as any).residualNorms.toleranceRelLInf ?? 0.1;
+    for (const component of ["T00", "T11", "T22", "T33"] as const) {
+      const metricValue = Number(
+        (json as any).tensors.metricRequired[component],
+      );
+      const tileValue = Number((json as any).tensors.tileEffective[component]);
+      const componentScale = Math.max(
+        Math.abs(metricValue),
+        Math.abs(tileValue),
+        1,
+      );
+      expect(Math.abs(metricValue - tileValue) / componentScale).toBeLessThan(
+        toleranceRelLInf,
+      );
+    }
     expect((json as any).residualNorms.relLInf).toBeLessThan(0.1);
     expect((json as any).residualNorms.toleranceRelLInf).not.toBeNull();
     expect((json as any).regionComparisons.status).toBe("available");

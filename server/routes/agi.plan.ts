@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { ToolManifestEntry } from "@shared/skills";
 import type { TCollapseTraceEntry, TTaskTrace } from "@shared/essence-persona";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
-import type { ConsoleTelemetryBundle, PanelTelemetry } from "@shared/desktop";
+import type { ConsoleTelemetryBundle } from "@shared/desktop";
 import type { ResonanceBundle, ResonanceCollapse, ResonancePatch } from "@shared/code-lattice";
 import type { GroundingReport, GroundingSource } from "@shared/grounding";
 import type { HelixAskEnvelopeSection, HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
@@ -58,8 +58,7 @@ import {
   recordResonancePatchSources,
   seedWarpPaths,
 } from "../services/planner/grounding";
-import { saveConsoleTelemetry, getConsoleTelemetry } from "../services/console-telemetry/store";
-import { persistConsoleTelemetrySnapshot } from "../services/console-telemetry/persist";
+import { getConsoleTelemetry } from "../services/console-telemetry/store";
 import { summarizeConsoleTelemetry } from "../services/console-telemetry/summarize";
 import { ensureCasimirTelemetry } from "../services/casimir/telemetry";
 import { buildWhyBelongs } from "../services/planner/why-belongs";
@@ -313,9 +312,6 @@ import {
 } from "../services/helix-ask/job-store";
 import {
   getHelixThreadSessionMemory,
-  getHelixThreadSessionGraphLock,
-  setHelixThreadSessionGraphLock,
-  clearHelixThreadSessionGraphLock,
   recordHelixThreadCarryForward,
   type HelixAskSessionMemory,
 } from "../services/helix-thread/carry-forward";
@@ -387,6 +383,44 @@ import {
   isHelixAskGenericUnknownScaffold,
   sanitizeHelixAskObjectiveUnknownBlock,
 } from "../services/helix-ask/objectives/objective-assembly";
+import {
+  applyHelixAskObjectiveCoverageSnapshotRuntime,
+  HELIX_ASK_OBJECTIVE_OES_BLOCKED_THRESHOLD,
+  HELIX_ASK_OBJECTIVE_OES_COVERED_THRESHOLD,
+  applyHelixAskObjectiveCoverageSnapshot,
+  beginHelixAskObjectiveRetrievalPass,
+  buildHelixAskObjectiveLoopState,
+  buildHelixAskObjectivePlainReasoningTrace,
+  clampHelixAskUnitInterval,
+  enforceHelixAskObjectiveEvidenceSufficiency,
+  enforceHelixAskObjectiveUnknownBlocks,
+  finalizeHelixAskObjectiveLoopState,
+  finalizeHelixAskObjectiveLoopRuntime,
+  hasHelixAskObjectiveUnknownBlock,
+  initializeHelixAskObjectiveLoopRuntime,
+  isHelixAskObjectiveCoverageSatisfied,
+  isHelixAskObjectiveTerminalStatus,
+  rebuildHelixAskObjectiveLoopStateFromContract,
+  reconcileHelixAskObjectiveLoopFromSupport,
+  recordHelixAskObjectiveTransition,
+  scoreHelixAskObjectiveEvidenceSufficiency,
+  setHelixAskObjectiveLoopPhase,
+  summarizeHelixAskObjectiveLoopState,
+  transitionHelixAskObjectiveState,
+  type HelixAskObjectiveEvidenceScore,
+  type HelixAskObjectiveLoopState,
+  type HelixAskObjectiveLoopStatus,
+  type HelixAskObjectiveMiniAnswer,
+  type HelixAskObjectiveMiniAnswerStatus,
+  type HelixAskObjectiveMiniValidation,
+  type HelixAskObjectivePlainReasoningTrace,
+  type HelixAskObjectiveRetrievalPass,
+  type HelixAskObjectiveStepTranscript,
+  type HelixAskObjectiveStepVerb,
+  type HelixAskObjectiveTelemetryUsed,
+  type HelixAskObjectiveTransition,
+  type HelixAskObjectiveUnknownBlock,
+} from "../services/helix-ask/objectives/objective-loop-debug";
 import {
   buildHelixAskObjectiveScopedRecoveryEscalationHints,
   buildHelixAskObjectiveScopedRecoveryQueryVariants,
@@ -494,23 +528,20 @@ import {
   type HelixAskTraceSummary,
 } from "../services/helix-ask/surface/response-debug-payload";
 import {
-  applyObjectiveGateDebugPayload,
-} from "../services/helix-ask/surface/objective-gate-debug";
-import {
-  applyObjectiveLlmDebugPayload,
-} from "../services/helix-ask/surface/objective-llm-debug";
-import {
-  applyObjectiveRecoveryDebugPayload,
-} from "../services/helix-ask/surface/objective-recovery-debug";
-import {
-  applyObjectiveStateDebugPayload,
-} from "../services/helix-ask/surface/objective-state-debug";
-import {
-  applyObjectiveTraceDebugPayload,
-} from "../services/helix-ask/surface/objective-trace-debug";
-import {
-  applyObjectiveValidationDebugPayload,
-} from "../services/helix-ask/surface/objective-validation-debug";
+  appendObjectiveRetrievalProbe,
+  appendObjectiveStepTranscript,
+  applyObjectiveComposerShadowDebugPayload,
+  applyObjectiveLoopReportTailDebugPayload,
+  applyObjectivePlanStreamSeedDebugPayload,
+  applyObjectiveTurnContractDebugPayload,
+  createObjectivePromptRewriteTelemetry,
+  HELIX_ASK_OBJECTIVE_LOOP_PATCH_REVISION,
+  OBJECTIVE_RETRIEVAL_PASS_LOG_MAX,
+  OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX,
+  OBJECTIVE_STEP_TRANSCRIPT_MAX,
+  OBJECTIVE_TRANSITION_LOG_MAX,
+  recordObjectivePromptRewriteStage as recordObjectivePromptRewriteTelemetryStage,
+} from "../services/helix-ask/surface/objective-report-tail-debug";
 import {
   attachHelixAskReasoningSidebarToDebug,
   type HelixAskReasoningSidebar,
@@ -628,9 +659,8 @@ import {
 import { mergeKnowledgeBundles } from "../services/knowledge/merge";
 import { buildResonanceBundle } from "../services/code-lattice/resonance";
 import { getLatticeVersion, loadCodeLattice } from "../services/code-lattice/loader";
-import { collectBadgeTelemetry } from "../services/telemetry/badges";
-import { collectPanelSnapshots } from "../services/telemetry/panels";
 import { smallLlmCallSpecTriage } from "../services/small-llm";
+import { registerAgiPlanAncillaryRoutes } from "./agi.plan.ancillary";
 
 const planRouter = Router();
 const MISSION_FORBIDDEN_CONTROL_TERMS = /(torque|pwm|servo\s*gain|joint\s*pid|actuator\s*write|motor\s*current|can\s*write)/i;
@@ -696,21 +726,6 @@ const TRACE_SSE_LIMIT = (() => {
 })();
 const toolEventAdapter = createToolEventAdapter();
 const DEFAULT_DESKTOP_ID = "helix.desktop.main";
-const LOCAL_CALL_SPEC_URL =
-  process.env.LOCAL_CALL_SPEC_URL ??
-  process.env.VITE_LOCAL_CALL_SPEC_URL ??
-  "http://127.0.0.1:11434/api/local-call-spec";
-const LOCAL_CALL_SPEC_TIMEOUT_MS = 2500;
-const LOCAL_TTS_URL =
-  process.env.LOCAL_TTS_URL ??
-  process.env.VITE_LOCAL_TTS_URL ??
-  "http://127.0.0.1:11434/api/tts";
-const LOCAL_STT_URL =
-  process.env.LOCAL_STT_URL ??
-  process.env.VITE_LOCAL_STT_URL ??
-  "http://127.0.0.1:11434/api/stt";
-const LOCAL_TTS_TIMEOUT_MS = 5000;
-const LOCAL_STT_TIMEOUT_MS = 5000;
 const ANCHOR_CONFIG_PATH = path.resolve(process.cwd(), "codex/anchors/anchors.config.json");
 let anchorConfigCache: AnchorConfig | null = null;
 let anchorConfigLoadFailed = false;
@@ -2466,45 +2481,6 @@ const KnowledgeProjectSchema = z.object({
   omittedFiles: z.array(z.string()).optional(),
 });
 
-const PanelTelemetrySchema = z.object({
-  panelId: z.string().min(1),
-  instanceId: z.string().min(1),
-  title: z.string().min(1),
-  kind: z.string().min(1).optional(),
-  metrics: z.record(z.union([z.number(), z.string(), z.boolean()])).optional(),
-  flags: z.record(z.boolean()).optional(),
-  strings: z.record(z.string()).optional(),
-  bands: z
-    .array(
-      z.object({
-        name: z.string().min(1),
-        q: z.number().optional(),
-        coherence: z.number().optional(),
-        occupancy: z.number().optional(),
-        event_rate: z.number().optional(),
-        last_event: z.string().optional(),
-      }),
-    )
-    .max(24)
-    .optional(),
-  tile_sample: z
-    .object({
-      total: z.number().int().nonnegative().optional(),
-      active: z.number().int().nonnegative().optional(),
-      hot: z.array(z.number()).max(256).optional(),
-    })
-    .optional(),
-  sourceIds: z.array(z.string().min(1)).max(16).optional(),
-  notes: z.string().max(512).optional(),
-  lastUpdated: z.string().optional(),
-});
-
-const ConsoleTelemetrySchema = z.object({
-  desktopId: z.string().min(1).max(128),
-  capturedAt: z.string().optional(),
-  panels: z.array(PanelTelemetrySchema).max(32),
-});
-
 const PromptSpecCitationSchema = z.object({
   source: z.enum(["trace", "memory", "knowledge", "profile"]),
   id: z.string(),
@@ -2544,69 +2520,6 @@ const CollapseTraceSchema = z.object({
   note: z.string().optional(),
   strategy: z.string().optional(),
 });
-
-type RawPanelTelemetry = z.infer<typeof PanelTelemetrySchema>;
-
-const toFiniteNumber = (value: unknown): number | undefined =>
-  typeof value === "number" && Number.isFinite(value) ? value : undefined;
-
-const pickTypedEntries = <T extends "string" | "number" | "boolean">(
-  source: Record<string, unknown> | undefined,
-  type: T,
-): Record<string, T extends "string" ? string : T extends "number" ? number : boolean> => {
-  if (!source) {
-    return {} as Record<string, any>;
-  }
-  const next: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(source)) {
-    if (typeof value === type) {
-      next[key] = value;
-    }
-  }
-  return next as Record<string, any>;
-};
-
-function sanitizePanelTelemetry(panel: RawPanelTelemetry, capturedAt: string): PanelTelemetry {
-  const metrics = pickTypedEntries(panel.metrics, "number");
-  const strings = { ...pickTypedEntries(panel.metrics, "string"), ...(panel.strings ?? {}) };
-  const flags = { ...pickTypedEntries(panel.metrics, "boolean"), ...(panel.flags ?? {}) };
-  const bands =
-    panel.bands
-      ?.map((band) => ({
-        name: band.name,
-        q: toFiniteNumber(band.q) ?? 0,
-        coherence: toFiniteNumber(band.coherence) ?? 0,
-        occupancy: toFiniteNumber(band.occupancy) ?? 0,
-        event_rate: toFiniteNumber(band.event_rate),
-        last_event: band.last_event,
-      }))
-      .filter((band) => band.name) ?? [];
-  const tileSample =
-    panel.tile_sample && (panel.tile_sample.total !== undefined || panel.tile_sample.active !== undefined)
-      ? {
-          total: toFiniteNumber(panel.tile_sample.total) ?? 0,
-          active: toFiniteNumber(panel.tile_sample.active) ?? 0,
-          hot: Array.isArray(panel.tile_sample.hot)
-            ? panel.tile_sample.hot.filter((value) => typeof value === "number" && Number.isFinite(value)).slice(0, 256)
-            : undefined,
-        }
-      : undefined;
-
-  return {
-    panelId: panel.panelId,
-    instanceId: panel.instanceId,
-    title: panel.title,
-    kind: panel.kind,
-    metrics: Object.keys(metrics).length ? metrics : undefined,
-    flags: Object.keys(flags).length ? flags : undefined,
-    strings: Object.keys(strings).length ? strings : undefined,
-    bands: bands.length ? bands : undefined,
-    tile_sample: tileSample,
-    sourceIds: panel.sourceIds?.filter(Boolean),
-    notes: panel.notes,
-    lastUpdated: panel.lastUpdated ?? capturedAt,
-  };
-}
 
 function sanitizePromptSpecForServer(ps?: PromptSpec): PromptSpec | undefined {
   if (!ps) return undefined;
@@ -19168,17 +19081,6 @@ const HelixAskTuningOverrides = z
   })
   .partial();
 
-const HelixAskGraphLockRequest = z.object({
-  sessionId: z.string().min(1),
-  treeIds: z.array(z.string().min(1)).optional(),
-  mode: z.enum(["replace", "merge", "clear"]).optional(),
-});
-
-const normalizeGraphLockSessionId = (value: unknown): string => {
-  if (typeof value !== "string") return "";
-  return value.trim();
-};
-
   const LocalAskRequest = z
   .object({
     prompt: z.string().min(1).optional(),
@@ -19268,22 +19170,6 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     path: ["prompt"],
   });
 
-const LUMA_MOOD_VALUES = ["mad", "upset", "shock", "question", "happy", "friend", "love"] as const;
-type LumaMood = (typeof LUMA_MOOD_VALUES)[number];
-const LumaMoodSchema = z.enum(LUMA_MOOD_VALUES);
-
-const MoodHintRequest = z.object({
-  text: z.string().min(1, "text required"),
-  sessionId: z.string().min(1).max(128).optional(),
-  personaId: z.string().min(1).optional(),
-});
-
-const MoodHintPayloadSchema = z.object({
-  mood: LumaMoodSchema.nullable().optional(),
-  confidence: z.number().min(0).max(1).optional(),
-  reason: z.string().min(1).optional(),
-});
-
 const HELIX_CONVERSATION_MODE_VALUES = ["observe", "act", "verify", "clarify"] as const;
 type HelixConversationMode = (typeof HELIX_CONVERSATION_MODE_VALUES)[number];
 type HelixConversationRouteReasonCode =
@@ -19353,39 +19239,6 @@ const HelixConversationTurnRequest = z.object({
   recentTurns: z.array(z.string().min(1).max(480)).max(8).optional(),
 });
 
-const HELIX_MOOD_HINT_MAX_CHARS = clampNumber(
-  readNumber(
-    process.env.HELIX_MOOD_HINT_MAX_CHARS ?? process.env.VITE_HELIX_MOOD_HINT_MAX_CHARS,
-    600,
-  ),
-  120,
-  2400,
-);
-const HELIX_MOOD_HINT_MAX_TOKENS = clampNumber(
-  readNumber(
-    process.env.HELIX_MOOD_HINT_MAX_TOKENS ?? process.env.VITE_HELIX_MOOD_HINT_MAX_TOKENS,
-    48,
-  ),
-  8,
-  256,
-);
-const HELIX_MOOD_HINT_TEMP = clampNumber(
-  readNumber(process.env.HELIX_MOOD_HINT_TEMP ?? process.env.VITE_HELIX_MOOD_HINT_TEMP, 0.1),
-  0,
-  1,
-);
-
-function clamp01(value: number | undefined, fallback: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.min(1, value));
-}
-
-function coerceLumaMood(value: unknown): LumaMood | null {
-  if (typeof value !== "string") return null;
-  const lowered = value.trim().toLowerCase();
-  return LUMA_MOOD_VALUES.includes(lowered as LumaMood) ? (lowered as LumaMood) : null;
-}
-
 function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
@@ -19404,56 +19257,6 @@ function parseCitationRepairPayload(raw: string): HelixAskCitationRepairPayload 
     return null;
   }
   return null;
-}
-
-function buildMoodHintPrompt(text: string): string {
-  const clipped = text.slice(0, HELIX_MOOD_HINT_MAX_CHARS);
-  const lines: string[] = [];
-  lines.push("You are a fast mood classifier for UI theming.");
-  lines.push(
-    `Choose exactly one mood from: ${LUMA_MOOD_VALUES.join(", ")}. Use question for neutral prompts.`,
-  );
-  lines.push(
-    "Return strict JSON only: {\"mood\":\"<mood|null>\",\"confidence\":0..1,\"reason\":\"short\"}.",
-  );
-  lines.push("If unclear, use mood null with low confidence.");
-  lines.push("");
-  lines.push("Text:");
-  lines.push(clipped);
-  return lines.join("\n");
-}
-
-function parseMoodHintResult(raw: string): {
-  mood: LumaMood | null;
-  confidence: number;
-  reason: string | null;
-} {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return { mood: null, confidence: 0, reason: null };
-  }
-
-  const jsonCandidate = extractJsonObject(trimmed) ?? trimmed;
-  try {
-    const parsed = MoodHintPayloadSchema.safeParse(JSON.parse(jsonCandidate));
-    if (parsed.success) {
-      const mood = coerceLumaMood(parsed.data.mood ?? null);
-      const confidence = clamp01(parsed.data.confidence, mood ? 0.6 : 0.2);
-      const reason = parsed.data.reason?.trim() ?? null;
-      return { mood, confidence, reason };
-    }
-  } catch {
-    // Fall through to token parsing.
-  }
-
-  const lowered = trimmed.toLowerCase();
-  const mood =
-    LUMA_MOOD_VALUES.find((entry) => new RegExp(`\\b${entry}\\b`, "i").test(lowered)) ?? null;
-  return {
-    mood,
-    confidence: mood ? 0.35 : 0.1,
-    reason: mood ? "token-match" : null,
-  };
 }
 
 const HELIX_CONVERSATION_CLASSIFIER_MAX_TOKENS = clampNumber(
@@ -26443,493 +26246,6 @@ const buildHelixAskObjectiveAssemblyPrompt = (args: {
     "Current answer draft:",
     args.currentAnswer,
   ].join("\n");
-};
-
-const HELIX_ASK_OBJECTIVE_LOOP_TERMINAL: ReadonlySet<HelixAskObjectiveLoopStatus> = new Set([
-  "complete",
-  "blocked",
-]);
-
-const isHelixAskObjectiveTerminalStatus = (status: HelixAskObjectiveLoopStatus): boolean =>
-  HELIX_ASK_OBJECTIVE_LOOP_TERMINAL.has(status);
-
-const isHelixAskObjectiveCoverageSatisfied = (state: HelixAskObjectiveLoopState): boolean =>
-  state.required_slots.length === 0 ||
-  state.required_slots.every((slot) => state.matched_slots.includes(slot));
-
-const hasHelixAskObjectiveUnknownBlock = (
-  block: HelixAskObjectiveUnknownBlock | undefined,
-): boolean => {
-  if (!block) return false;
-  const combined = [
-    String(block.unknown ?? "").trim(),
-    String(block.why ?? "").trim(),
-    ...(Array.isArray(block.what_i_checked) ? block.what_i_checked : []),
-    String(block.next_retrieval ?? "").trim(),
-  ].join("\n");
-  return Boolean(
-    String(block.unknown ?? "").trim() &&
-      String(block.why ?? "").trim() &&
-      Array.isArray(block.what_i_checked) &&
-      block.what_i_checked.some((entry) => String(entry ?? "").trim().length > 0) &&
-      String(block.next_retrieval ?? "").trim() &&
-      !isHelixAskGenericUnknownScaffold(combined),
-  );
-};
-
-const enforceHelixAskObjectiveUnknownBlocks = (args: {
-  miniAnswers: HelixAskObjectiveMiniAnswer[];
-  maxObjectives: number;
-}): {
-  miniAnswers: HelixAskObjectiveMiniAnswer[];
-  missingObjectiveIds: string[];
-} => {
-  const missingObjectiveIds = args.miniAnswers
-    .filter((entry) => entry.status !== "covered")
-    .filter((entry) => !hasHelixAskObjectiveUnknownBlock(entry.unknown_block))
-    .map((entry) => entry.objective_id)
-    .slice(0, Math.max(0, args.maxObjectives));
-  const missingSet = new Set(missingObjectiveIds);
-  const patched = args.miniAnswers.map((entry) => {
-    if (entry.status === "covered") {
-      if (!entry.unknown_block) return entry;
-      return {
-        ...entry,
-        unknown_block: undefined,
-      };
-    }
-    if (!missingSet.has(entry.objective_id)) return entry;
-    return {
-      ...entry,
-      unknown_block: sanitizeHelixAskObjectiveUnknownBlock({
-        block: entry.unknown_block,
-        objectiveLabel: entry.objective_label,
-        missingSlots: entry.missing_slots,
-        evidenceRefs: entry.evidence_refs,
-        scopedRetrievalMissing: false,
-      }),
-    };
-  });
-  return {
-    miniAnswers: patched,
-    missingObjectiveIds,
-  };
-};
-
-const HELIX_ASK_OBJECTIVE_OES_COVERED_THRESHOLD = 0.75;
-const HELIX_ASK_OBJECTIVE_OES_BLOCKED_THRESHOLD = 0.5;
-
-const clampHelixAskUnitInterval = (value: number): number => {
-  if (!Number.isFinite(value)) return 0;
-  if (value < 0) return 0;
-  if (value > 1) return 1;
-  return value;
-};
-
-const scoreHelixAskObjectiveEvidenceSufficiency = (args: {
-  miniAnswer: HelixAskObjectiveMiniAnswer;
-  state?: HelixAskObjectiveLoopState;
-  threshold?: number;
-}): HelixAskObjectiveEvidenceScore => {
-  const threshold = Number.isFinite(args.threshold ?? NaN)
-    ? Number(args.threshold)
-    : HELIX_ASK_OBJECTIVE_OES_COVERED_THRESHOLD;
-  const state = args.state;
-  const requiredSlots =
-    state?.required_slots.length
-      ? state.required_slots
-      : Array.from(new Set([...args.miniAnswer.matched_slots, ...args.miniAnswer.missing_slots]));
-  const matchedSlots = requiredSlots.filter((slot) =>
-    args.miniAnswer.matched_slots.includes(slot),
-  );
-  const slotRatio =
-    requiredSlots.length > 0
-      ? clampHelixAskUnitInterval(matchedSlots.length / requiredSlots.length)
-      : args.miniAnswer.status === "covered"
-        ? 1
-        : 0;
-  const linkedEvidenceRefCount = Array.from(
-    new Set(
-      (args.miniAnswer.linked_evidence_refs ?? args.miniAnswer.evidence_refs)
-        .map((entry) => String(entry ?? "").trim())
-        .filter(Boolean),
-    ),
-  ).length;
-  const sourceRatio = clampHelixAskUnitInterval(linkedEvidenceRefCount / 2);
-  const retrievalConfidence = clampHelixAskUnitInterval(
-    Number(state?.retrieval_confidence ?? 0),
-  );
-  const zeroConfidenceNoEvidenceLink =
-    retrievalConfidence <= 0 && linkedEvidenceRefCount <= 0;
-  const score = Number(
-    (
-      (zeroConfidenceNoEvidenceLink ? 0 : 0.55 * slotRatio + 0.25 * sourceRatio + 0.2 * retrievalConfidence)
-    ).toFixed(4),
-  );
-  const pass = score >= threshold;
-  return {
-    objective_id: args.miniAnswer.objective_id,
-    score,
-    threshold,
-    pass,
-    slot_ratio: Number(slotRatio.toFixed(4)),
-    evidence_ref_count: linkedEvidenceRefCount,
-    linked_evidence_ref_count: linkedEvidenceRefCount,
-    retrieval_confidence: Number(retrievalConfidence.toFixed(4)),
-    status: args.miniAnswer.status,
-    reason: zeroConfidenceNoEvidenceLink
-      ? "objective_zero_confidence_missing_evidence_linkage"
-      : pass
-        ? "objective_oes_pass"
-        : "objective_oes_below_threshold",
-  };
-};
-
-const enforceHelixAskObjectiveEvidenceSufficiency = (args: {
-  miniAnswers: HelixAskObjectiveMiniAnswer[];
-  states: HelixAskObjectiveLoopState[];
-  coveredThreshold?: number;
-  blockedThreshold?: number;
-}): {
-  miniAnswers: HelixAskObjectiveMiniAnswer[];
-  scores: HelixAskObjectiveEvidenceScore[];
-  terminalizationReasons: Record<string, string>;
-} => {
-  const coveredThreshold = Number.isFinite(args.coveredThreshold ?? NaN)
-    ? Number(args.coveredThreshold)
-    : HELIX_ASK_OBJECTIVE_OES_COVERED_THRESHOLD;
-  const blockedThreshold = Number.isFinite(args.blockedThreshold ?? NaN)
-    ? Number(args.blockedThreshold)
-    : HELIX_ASK_OBJECTIVE_OES_BLOCKED_THRESHOLD;
-  const stateById = new Map(
-    args.states.map((entry) => [entry.objective_id, entry] as const),
-  );
-  const scores: HelixAskObjectiveEvidenceScore[] = [];
-  const terminalizationReasons: Record<string, string> = {};
-  const patched = args.miniAnswers.map((entry) => {
-    const score = scoreHelixAskObjectiveEvidenceSufficiency({
-      miniAnswer: entry,
-      state: stateById.get(entry.objective_id),
-      threshold: coveredThreshold,
-    });
-    scores.push(score);
-    const unknownBlock = entry.unknown_block ?? buildHelixAskObjectiveUnknownBlock({
-      objectiveLabel: entry.objective_label,
-      missingSlots: entry.missing_slots,
-      evidenceRefs: entry.evidence_refs,
-    });
-    if (entry.status === "covered" && score.score < coveredThreshold) {
-      const downgradedStatus: HelixAskObjectiveMiniAnswerStatus =
-        score.score < blockedThreshold ? "blocked" : "partial";
-      terminalizationReasons[entry.objective_id] =
-        downgradedStatus === "blocked"
-          ? "objective_oes_below_block_threshold"
-          : "objective_oes_below_covered_threshold";
-      return {
-        ...entry,
-        status: downgradedStatus,
-        missing_slots:
-          entry.missing_slots.length > 0
-            ? entry.missing_slots
-            : ["evidence"],
-        summary: `${entry.summary} OES=${score.score.toFixed(2)} below covered threshold ${coveredThreshold.toFixed(2)}.`.trim(),
-        unknown_block: unknownBlock,
-      };
-    }
-    if (entry.status === "partial" && score.score < blockedThreshold) {
-      terminalizationReasons[entry.objective_id] = "objective_oes_partial_below_block_threshold";
-      return {
-        ...entry,
-        status: "blocked",
-        summary: `${entry.summary} OES=${score.score.toFixed(2)} below blocked threshold ${blockedThreshold.toFixed(2)}.`.trim(),
-        unknown_block: unknownBlock,
-      };
-    }
-    if (entry.status !== "covered") {
-      terminalizationReasons[entry.objective_id] = "objective_unresolved";
-    } else {
-      terminalizationReasons[entry.objective_id] = "objective_covered";
-    }
-    return entry;
-  });
-  return {
-    miniAnswers: patched,
-    scores,
-    terminalizationReasons,
-  };
-};
-
-const buildHelixAskObjectiveLoopState = (
-  contract: HelixAskTurnContract | null,
-): HelixAskObjectiveLoopState[] => {
-  if (!contract || contract.objectives.length === 0) return [];
-  const contractFallbackRequiredSlots = Array.from(
-    new Set((contract.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean)),
-  );
-  return contract.objectives.map((objective, index) => {
-    const objectiveId = slugifyHelixAskAnswerPlanSectionId(objective.label, `objective_${index + 1}`);
-    const objectiveRequiredSlots = Array.from(
-      new Set((objective.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean)),
-    );
-    return {
-      objective_id: objectiveId,
-      objective_label: objective.label,
-      required_slots:
-        objectiveRequiredSlots.length > 0
-          ? objectiveRequiredSlots
-          : contractFallbackRequiredSlots,
-      matched_slots: [],
-      status: "pending",
-      attempt: 0,
-    };
-  });
-};
-
-const transitionHelixAskObjectiveState = (args: {
-  state: HelixAskObjectiveLoopState;
-  to: HelixAskObjectiveLoopStatus;
-  reason: string;
-  at?: string;
-}): { state: HelixAskObjectiveLoopState; transition?: HelixAskObjectiveTransition } => {
-  const at = args.at ?? new Date().toISOString();
-  const from = args.state.status;
-  const next: HelixAskObjectiveLoopState = { ...args.state };
-  if (args.to === "retrieving") {
-    next.attempt = Math.max(0, (next.attempt ?? 0) + 1);
-    next.started_at = next.started_at ?? at;
-    next.ended_at = undefined;
-    next.blocked_reason = undefined;
-  } else if (args.to === "blocked") {
-    next.ended_at = at;
-    next.blocked_reason = args.reason;
-  } else if (args.to === "complete") {
-    next.ended_at = at;
-    next.blocked_reason = undefined;
-  }
-  next.status = args.to;
-  const shouldRecordTransition = from !== args.to || args.to === "retrieving";
-  if (!shouldRecordTransition) {
-    return { state: next };
-  }
-  return {
-    state: next,
-    transition: {
-      objective_id: next.objective_id,
-      from,
-      to: args.to,
-      reason: args.reason,
-      at,
-    },
-  };
-};
-
-const applyHelixAskObjectiveCoverageSnapshot = (args: {
-  states: HelixAskObjectiveLoopState[];
-  coveredSlots: string[];
-  retrievalConfidence?: number;
-  objectiveIds?: string[];
-  transitionReason?: string;
-  at?: string;
-  transitionLog?: HelixAskObjectiveTransition[];
-}): HelixAskObjectiveLoopState[] => {
-  const covered = new Set(args.coveredSlots.map((slot) => normalizeSlotId(slot)).filter(Boolean));
-  const objectiveScope = Array.isArray(args.objectiveIds) && args.objectiveIds.length > 0
-    ? new Set(args.objectiveIds.map((entry) => String(entry ?? "").trim()).filter(Boolean))
-    : null;
-  const at = args.at ?? new Date().toISOString();
-  const out: HelixAskObjectiveLoopState[] = [];
-  for (const state of args.states) {
-    if (objectiveScope && !objectiveScope.has(state.objective_id)) {
-      out.push(state);
-      continue;
-    }
-    const matched = state.required_slots.filter(
-      (slot) => covered.has(slot) || state.matched_slots.includes(slot),
-    );
-    let next: HelixAskObjectiveLoopState = {
-      ...state,
-      matched_slots: Array.from(new Set(matched)),
-      retrieval_confidence: Number.isFinite(args.retrievalConfidence)
-        ? Number(args.retrievalConfidence)
-        : state.retrieval_confidence,
-    };
-    if (
-      !isHelixAskObjectiveTerminalStatus(next.status) &&
-      isHelixAskObjectiveCoverageSatisfied(next) &&
-      (next.status === "pending" || next.status === "retrieving")
-    ) {
-      const transitioned = transitionHelixAskObjectiveState({
-        state: next,
-        to: "synthesizing",
-        reason: args.transitionReason ?? "objective_coverage_satisfied",
-        at,
-      });
-      next = transitioned.state;
-      if (transitioned.transition && args.transitionLog) {
-        args.transitionLog.push(transitioned.transition);
-      }
-    }
-    out.push(next);
-  }
-  return out;
-};
-
-const summarizeHelixAskObjectiveLoopState = (states: HelixAskObjectiveLoopState[]) => {
-  const total = states.length;
-  const completeCount = states.filter((state) => state.status === "complete").length;
-  const blockedCount = states.filter((state) => state.status === "blocked").length;
-  const terminalCount = states.filter((state) => isHelixAskObjectiveTerminalStatus(state.status)).length;
-  const unresolvedCount = Math.max(0, total - terminalCount);
-  const completionRate = total > 0 ? Number((completeCount / total).toFixed(4)) : 1;
-  return {
-    total,
-    completeCount,
-    blockedCount,
-    terminalCount,
-    unresolvedCount,
-    completionRate,
-  };
-};
-
-const buildHelixAskObjectivePlainReasoningTrace = (args: {
-  miniAnswers: HelixAskObjectiveMiniAnswer[];
-  states: HelixAskObjectiveLoopState[];
-  scores: HelixAskObjectiveEvidenceScore[];
-  transitions: HelixAskObjectiveTransition[];
-  stepTranscripts: HelixAskObjectiveStepTranscript[];
-  retrievalQueries: Array<{ objective_id: string }>;
-  terminalizationReasons: Record<string, string>;
-}): HelixAskObjectivePlainReasoningTrace[] => {
-  if (args.miniAnswers.length === 0) return [];
-  const stateById = new Map(args.states.map((entry) => [entry.objective_id, entry] as const));
-  const scoreById = new Map(args.scores.map((entry) => [entry.objective_id, entry] as const));
-  const criticReasonById = new Map<string, string>();
-  for (const transcript of args.stepTranscripts) {
-    if (transcript.verb !== "MINI_CRITIC") continue;
-    const objectiveId = String(transcript.objective_id ?? "").trim();
-    if (!objectiveId) continue;
-    const reason = String(transcript.decision_reason ?? "").trim();
-    if (!reason) continue;
-    criticReasonById.set(objectiveId, reason);
-  }
-  const transitionTailById = new Map<string, string[]>();
-  for (const transition of args.transitions) {
-    const objectiveId = String(transition.objective_id ?? "").trim();
-    if (!objectiveId) continue;
-    const from = transition.from ?? "null";
-    const to = transition.to ?? "unknown";
-    const reason = transition.reason ?? "unknown";
-    const prior = transitionTailById.get(objectiveId) ?? [];
-    prior.push(`${from} -> ${to} (${reason})`);
-    transitionTailById.set(objectiveId, prior.slice(-4));
-  }
-  const retrievalPassCountById = new Map<string, number>();
-  for (const row of args.retrievalQueries) {
-    const objectiveId = String(row.objective_id ?? "").trim();
-    if (!objectiveId) continue;
-    retrievalPassCountById.set(objectiveId, (retrievalPassCountById.get(objectiveId) ?? 0) + 1);
-  }
-  return args.miniAnswers.map((entry) => {
-    const objectiveId = entry.objective_id;
-    const state = stateById.get(objectiveId);
-    const requiredSlots =
-      state?.required_slots.length
-        ? state.required_slots
-        : Array.from(new Set([...entry.matched_slots, ...entry.missing_slots]));
-    const matchedSlots = Array.from(new Set(entry.matched_slots.filter((slot) => requiredSlots.includes(slot))));
-    const missingSlots = Array.from(new Set(entry.missing_slots.filter((slot) => requiredSlots.includes(slot))));
-    const evidenceRefs = Array.from(
-      new Set(entry.evidence_refs.map((evidenceRef) => String(evidenceRef ?? "").trim()).filter(Boolean)),
-    ).slice(0, 8);
-    const score = scoreById.get(objectiveId);
-    const criticReason = criticReasonById.get(objectiveId) ?? null;
-    const terminalizationReason = args.terminalizationReasons[objectiveId] ?? null;
-    const retrievalPassCount = retrievalPassCountById.get(objectiveId) ?? 0;
-    const plainReasoning = normalizeHelixAskTurnContractText(
-      [
-        `Status ${entry.status}.`,
-        missingSlots.length > 0
-          ? `Missing required slots: ${missingSlots.join(", ")}.`
-          : "All required slots covered.",
-        score
-          ? `Objective evidence score ${score.score.toFixed(2)} vs threshold ${score.threshold.toFixed(2)} (${score.pass ? "pass" : "fail"}).`
-          : "Objective evidence score unavailable.",
-        criticReason ? `Mini-critic reason: ${criticReason}.` : "Mini-critic reason unavailable.",
-        terminalizationReason ? `Terminalization reason: ${terminalizationReason}.` : null,
-        retrievalPassCount > 0
-          ? `Objective-scoped retrieval passes observed: ${retrievalPassCount}.`
-          : "Objective-scoped retrieval pass not observed.",
-        entry.unknown_block?.next_retrieval
-          ? `Next retrieval action: ${entry.unknown_block.next_retrieval}`
-          : null,
-      ]
-        .filter((line): line is string => Boolean(line && line.trim()))
-        .join(" "),
-      520,
-    );
-    return {
-      objective_id: objectiveId,
-      objective_label: entry.objective_label,
-      final_status: entry.status,
-      plain_reasoning: plainReasoning || `Status ${entry.status}.`,
-      transition_tail: transitionTailById.get(objectiveId) ?? [],
-      unknown_block: entry.unknown_block,
-      used_telemetry: {
-        required_slots: requiredSlots,
-        matched_slots: matchedSlots,
-        missing_slots: missingSlots,
-        retrieval_confidence: Number(
-          clampHelixAskUnitInterval(Number(state?.retrieval_confidence ?? 0)).toFixed(4),
-        ),
-        evidence_refs: evidenceRefs,
-        evidence_ref_count: evidenceRefs.length,
-        retrieval_pass_count: retrievalPassCount,
-        scoped_retrieval_observed: retrievalPassCount > 0,
-        objective_oes_score: score ? Number(score.score.toFixed(4)) : null,
-        objective_oes_threshold: score ? Number(score.threshold.toFixed(4)) : null,
-        objective_oes_pass: score ? Boolean(score.pass) : null,
-        mini_critic_reason: criticReason,
-        terminalization_reason: terminalizationReason,
-        blocked_reason: state?.blocked_reason ?? null,
-      },
-    };
-  });
-};
-
-const finalizeHelixAskObjectiveLoopState = (args: {
-  states: HelixAskObjectiveLoopState[];
-  validationPassed: boolean;
-  failReason?: string | null;
-  at?: string;
-  transitionLog?: HelixAskObjectiveTransition[];
-}): HelixAskObjectiveLoopState[] => {
-  const at = args.at ?? new Date().toISOString();
-  return args.states.map((state) => {
-    if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
-    const coverageSatisfied = isHelixAskObjectiveCoverageSatisfied(state);
-    const to =
-      args.validationPassed && coverageSatisfied
-        ? "complete"
-        : ("blocked" as HelixAskObjectiveLoopStatus);
-    const reason =
-      to === "complete"
-        ? "objective_finalize_complete"
-        : args.failReason?.trim()
-          ? args.failReason.trim()
-          : coverageSatisfied
-            ? "quality_gate_fail"
-            : "missing_required_slots";
-    const transitioned = transitionHelixAskObjectiveState({
-      state,
-      to,
-      reason,
-      at,
-    });
-    if (transitioned.transition && args.transitionLog) {
-      args.transitionLog.push(transitioned.transition);
-    }
-    return transitioned.state;
-  });
 };
 
 const buildHelixAskObjectivePlannerPrompt = (args: {
@@ -36182,344 +35498,16 @@ async function ensureDefaultTools(): Promise<void> {
   }
 }
 
-planRouter.post("/console/telemetry", (req, res) => {
-  const parsed = ConsoleTelemetrySchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
-  }
-  const capturedAt = parsed.data.capturedAt ?? new Date().toISOString();
-  const panels: PanelTelemetry[] = parsed.data.panels.map((panel) => sanitizePanelTelemetry(panel, capturedAt));
-  const payload: ConsoleTelemetryBundle = {
-    desktopId: parsed.data.desktopId,
-    capturedAt,
-    panels,
-  };
-  saveConsoleTelemetry(payload);
-  void persistConsoleTelemetrySnapshot(payload).catch((error) => {
-    console.warn("[telemetry] failed to persist snapshot", error);
-  });
-  res.status(204).end();
-});
-
-planRouter.get("/telemetry/badges", (req, res) => {
-  const desktopId =
-    typeof req.query.desktopId === "string" && req.query.desktopId.trim()
-      ? req.query.desktopId.trim()
-      : DEFAULT_DESKTOP_ID;
-  const panelParam = (req.query.panelId ?? req.query.panelIds) as string | string[] | undefined;
-  const panelIds = Array.isArray(panelParam)
-    ? panelParam
-    : typeof panelParam === "string"
-      ? panelParam.split(",").map((id) => id.trim()).filter(Boolean)
-      : undefined;
-  const includeRaw = req.query.includeRaw === "1" || req.query.includeRaw === "true";
-  const { snapshot, rawPanels } = collectBadgeTelemetry({ desktopId, panelIds });
-  if (includeRaw) {
-    return res.json({ ...snapshot, raw: rawPanels });
-  }
-  return res.json(snapshot);
-});
-
-planRouter.get("/telemetry/panels", (req, res) => {
-  const desktopId =
-    typeof req.query.desktopId === "string" && req.query.desktopId.trim()
-      ? req.query.desktopId.trim()
-      : DEFAULT_DESKTOP_ID;
-  const panelParam = (req.query.panelId ?? req.query.panelIds) as string | string[] | undefined;
-  const panelIds = Array.isArray(panelParam)
-    ? panelParam
-    : typeof panelParam === "string"
-      ? panelParam.split(",").map((id) => id.trim()).filter(Boolean)
-      : undefined;
-  const snapshot = collectPanelSnapshots({ desktopId, panelIds });
-  return res.json(snapshot);
-});
-
-// Lightweight pipeline status snapshot for grounding telemetry/status intents
-planRouter.get("/pipeline/status", (_req, res) => {
-  try {
-    const state = getGlobalPipelineState();
-    // Avoid leaking large buffers; send core physics/warp fields
-    const { warp, natario, warpUniforms, natarioConstraint, dutyEffective_FR, thetaScaleExpected, thetaScale } = state as any;
-    res.json({
-      ok: true,
-      natarioConstraint: natarioConstraint ?? warp?.isZeroExpansion ?? natario?.isZeroExpansion,
-      dutyEffective_FR,
-      thetaScaleExpected,
-      thetaScale,
-      warp: warp ?? null,
-      natario: natario ?? null,
-      warpUniforms: warpUniforms ?? null,
-      capturedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ ok: false, error: "pipeline_status_error", message });
-  }
-});
-
-planRouter.get("/pipeline/last-plan-debug", async (req, res) => {
-  const traceIdParam =
-    typeof req.query.traceId === "string" && req.query.traceId.trim().length > 0
-      ? req.query.traceId.trim()
-      : undefined;
-  let record: PlanRecord | null = null;
-  if (traceIdParam) {
-    record = getPlanRecord(traceIdParam) ?? (await rehydratePlanRecord(traceIdParam));
-    if (record) {
-      rememberPlanRecord(record);
-    }
-  }
-  if (!record) {
-    record = findLatestAccessiblePlan(req.auth);
-  }
-  if (!record) {
-    return res.status(404).json({ error: "plan_debug_unavailable" });
-  }
-  if (!personaPolicy.canAccess(req.auth, record.personaId, "plan")) {
-    return res.status(403).json({ error: "forbidden" });
-  }
-  const groundingSources = dedupeGroundingSources(
-    record.groundingReport?.sources ?? record.taskTrace.grounding_report?.sources ?? [],
-  );
-  const patch = pickResonancePatch({ bundle: record.resonance, selection: record.resonanceSelection });
-  const resonanceNodes = patch?.nodes ?? [];
-  const resonancePatches = resonanceNodes
-    .filter((node) => node?.filePath || node?.symbol)
-    .slice(0, 16)
-    .map((node) => ({
-      id: node.id ?? node.symbol ?? patch?.id ?? "",
-      path: node.filePath ?? node.symbol ?? "",
-      kind: node.kind,
-      score: node.score,
-    }));
-  res.json({
-    ok: true,
-    traceId: record.traceId,
-    createdAt: record.createdAt,
-    goal: record.goal,
-    personaId: record.personaId,
-    planDsl: record.planDsl,
-    resonancePatchId: patch?.id ?? null,
-    resonancePatches,
-    groundingSources,
-  });
-});
-
-planRouter.post("/local-call-spec", async (req, res) => {
-  if ((process.env.ENABLE_LOCAL_CALL_SPEC ?? process.env.VITE_ENABLE_LOCAL_CALL_SPEC) !== "1") {
-    return res.status(404).json({ error: "local_call_spec_disabled" });
-  }
-  if (!LOCAL_CALL_SPEC_URL) {
-    return res.status(503).json({ error: "local_call_spec_unconfigured" });
-  }
-  try {
-    const controller = new AbortController();
-    const to = setTimeout(() => controller.abort(), LOCAL_CALL_SPEC_TIMEOUT_MS);
-    const response = await fetch(LOCAL_CALL_SPEC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body ?? {}),
-      signal: controller.signal,
-    });
-    clearTimeout(to);
-    if (!response.ok) {
-      return res.status(502).json({ error: "local_call_spec_upstream", status: response.status });
-    }
-    const payload = await response.json();
-    return res.json(payload);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return res.status(502).json({ error: "local_call_spec_failed", message });
-  }
-});
-
-const proxyBinaryPost = async (
-  targetUrl: string,
-  timeoutMs: number,
-  req: Request,
-  res: Response,
-  disabledError: string,
-) => {
-  if (!targetUrl) {
-    return res.status(503).json({ error: `${disabledError}_unconfigured` });
-  }
-  try {
-    const controller = new AbortController();
-    const to = setTimeout(() => controller.abort(), timeoutMs);
-    const body: BodyInit | undefined = (() => {
-      const payload = req.body;
-      if (payload === undefined) return undefined;
-      if (typeof payload === "string") return payload;
-      if (payload instanceof ArrayBuffer) return payload;
-      if (typeof SharedArrayBuffer !== "undefined" && payload instanceof SharedArrayBuffer) {
-        return new Uint8Array(payload).slice();
-      }
-      if (ArrayBuffer.isView(payload)) return new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength).slice();
-      return JSON.stringify(payload);
-    })();
-    const response = await fetch(targetUrl, {
-      method: "POST",
-      headers: { "content-type": req.headers["content-type"] ?? "application/octet-stream" },
-      body,
-      signal: controller.signal,
-    });
-    clearTimeout(to);
-    if (!response.ok) {
-      return res.status(502).json({ error: `${disabledError}_upstream`, status: response.status });
-    }
-    const contentType = response.headers.get("content-type") || "application/octet-stream";
-    const buf = Buffer.from(await response.arrayBuffer());
-    res.setHeader("content-type", contentType);
-    return res.status(200).send(buf);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return res.status(502).json({ error: `${disabledError}_failed`, message });
-  }
-};
-
-planRouter.post("/tts/local", async (req, res) => {
-  const enabled = (process.env.ENABLE_LOCAL_TTS ?? process.env.VITE_ENABLE_LOCAL_TTS) === "1";
-  if (!enabled) {
-    return res.status(404).json({ error: "local_tts_disabled" });
-  }
-  return proxyBinaryPost(LOCAL_TTS_URL, LOCAL_TTS_TIMEOUT_MS, req, res, "local_tts");
-});
-
-planRouter.post("/stt/local", async (req, res) => {
-  const enabled = (process.env.ENABLE_LOCAL_STT ?? process.env.VITE_ENABLE_LOCAL_STT) === "1";
-  if (!enabled) {
-    return res.status(404).json({ error: "local_stt_disabled" });
-  }
-  return proxyBinaryPost(LOCAL_STT_URL, LOCAL_STT_TIMEOUT_MS, req, res, "local_stt");
-});
-
-planRouter.post("/mood-hint", async (req, res) => {
-  const tenantGuard = guardTenant(req);
-  if (!tenantGuard.ok) {
-    return res.status(tenantGuard.status).json({ error: tenantGuard.error });
-  }
-  const parsed = MoodHintRequest.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
-  }
-
-  let personaId = parsed.data.personaId ?? "default";
-  if (
-    personaPolicy.shouldRestrictRequest(req.auth) &&
-    (!personaId || personaId === "default") &&
-    req.auth?.sub
-  ) {
-    personaId = req.auth.sub;
-  }
-  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
-    return res.status(403).json({ error: "forbidden" });
-  }
-
-  const text = parsed.data.text.trim();
-  if (!text) {
-    return res.status(400).json({ error: "bad_request", details: "text required" });
-  }
-
-  const sessionId = parsed.data.sessionId?.trim() || undefined;
-  const traceId = `mood:${crypto.randomUUID()}`;
-  const startedAt = Date.now();
-  const prompt = buildMoodHintPrompt(text);
-
-  try {
-    const result = await llmLocalHandler(
-      {
-        prompt,
-        max_tokens: HELIX_MOOD_HINT_MAX_TOKENS,
-        temperature: HELIX_MOOD_HINT_TEMP,
-        stop: ["\n\n"],
-        metadata: { kind: "helix.mood_hint" },
-      },
-      {
-        sessionId,
-        traceId,
-        personaId,
-        tenantId: tenantGuard.tenantId,
-      },
-    );
-    const raw = String((result as any)?.text ?? "");
-    const parsedHint = parseMoodHintResult(raw);
-    const rawPreview = raw.trim().slice(0, 320);
-    return res.json({
-      mood: parsedHint.mood,
-      confidence: parsedHint.confidence,
-      reason: parsedHint.reason,
-      source: "local-llm",
-      durationMs: Math.max(0, Date.now() - startedAt),
-      traceId,
-      sessionId: sessionId ?? null,
-      raw: rawPreview || null,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return res.json({
-      mood: null,
-      confidence: 0,
-      reason: message || "mood_hint_failed",
-      source: "error",
-      durationMs: Math.max(0, Date.now() - startedAt),
-      traceId,
-      sessionId: sessionId ?? null,
-      raw: null,
-    });
-  }
-});
-
-planRouter.get("/helix-ask/graph-lock", (req, res) => {
-  if (!HELIX_ASK_SESSION_MEMORY) {
-    return res.status(404).json({ error: "session_memory_disabled", status: 404 });
-  }
-  const sessionId = normalizeGraphLockSessionId(req.query.sessionId);
-  if (!sessionId) {
-    return res.status(400).json({ error: "bad_request", message: "sessionId required" });
-  }
-  const treeIds = getHelixThreadSessionGraphLock(sessionId);
-  return res.json({ sessionId, treeIds, locked: treeIds.length > 0 });
-});
-
-planRouter.post("/helix-ask/graph-lock", (req, res) => {
-  if (!HELIX_ASK_SESSION_MEMORY) {
-    return res.status(404).json({ error: "session_memory_disabled", status: 404 });
-  }
-  const parsed = HelixAskGraphLockRequest.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
-  }
-  const sessionId = parsed.data.sessionId.trim();
-  const mode = parsed.data.mode ?? "replace";
-  if (mode === "clear") {
-    clearHelixThreadSessionGraphLock(sessionId);
-    return res.json({ ok: true, sessionId, treeIds: [], locked: false, mode: "clear" });
-  }
-  const treeIds = parsed.data.treeIds ?? [];
-  if (treeIds.length === 0) {
-    return res.status(400).json({ error: "bad_request", message: "treeIds required" });
-  }
-  const next = setHelixThreadSessionGraphLock({
-    sessionId,
-    treeIds,
-    mode: mode === "merge" ? "merge" : "replace",
-  });
-  return res.json({ ok: true, sessionId, treeIds: next, locked: next.length > 0, mode });
-});
-
-planRouter.delete("/helix-ask/graph-lock", (req, res) => {
-  if (!HELIX_ASK_SESSION_MEMORY) {
-    return res.status(404).json({ error: "session_memory_disabled", status: 404 });
-  }
-  const sessionId =
-    normalizeGraphLockSessionId(req.query.sessionId) ||
-    normalizeGraphLockSessionId((req.body as { sessionId?: string } | undefined)?.sessionId);
-  if (!sessionId) {
-    return res.status(400).json({ error: "bad_request", message: "sessionId required" });
-  }
-  clearHelixThreadSessionGraphLock(sessionId);
-  return res.json({ ok: true, sessionId, treeIds: [], locked: false });
+registerAgiPlanAncillaryRoutes({
+  planRouter,
+  defaultDesktopId: DEFAULT_DESKTOP_ID,
+  sessionMemoryEnabled: HELIX_ASK_SESSION_MEMORY,
+  getPlanRecord,
+  rehydratePlanRecord,
+  rememberPlanRecord,
+  findLatestAccessiblePlan,
+  dedupeGroundingSources,
+  pickResonancePatch,
 });
 
 
@@ -37201,54 +36189,6 @@ type HelixAskControllerStep = {
   retrievalConfidence?: number;
 };
 
-type HelixAskObjectiveLoopStatus =
-  | "pending"
-  | "retrieving"
-  | "synthesizing"
-  | "critiqued"
-  | "repaired"
-  | "complete"
-  | "blocked";
-
-type HelixAskObjectiveStepVerb =
-  | "PLAN"
-  | "RETRIEVE"
-  | "MINI_SYNTH"
-  | "MINI_CRITIC"
-  | "REPAIR"
-  | "ASSEMBLE"
-  | "UNKNOWN_TERMINAL";
-
-type HelixAskObjectiveStepTranscript = {
-  objective_id: string;
-  attempt: number;
-  verb: HelixAskObjectiveStepVerb;
-  phase: "objective_loop" | "assembly" | "turn";
-  started_at: string;
-  ended_at: string;
-  llm_model?: string | null;
-  reasoning_effort?: string | null;
-  schema_name?: string | null;
-  schema_valid?: boolean;
-  prompt_preview?: string | null;
-  output_preview?: string | null;
-  decision: string;
-  decision_reason?: string | null;
-  evidence_delta?: {
-    before_ref_count?: number;
-    after_ref_count?: number;
-    before_coverage_ratio?: number;
-    after_coverage_ratio?: number;
-    before_oes?: number;
-    after_oes?: number;
-  };
-  validator?: {
-    preconditions_ok: boolean;
-    postconditions_ok: boolean;
-    violations: string[];
-  };
-};
-
 const resolveHelixAskConversationTurnId = (args: {
   explicitTurnId?: string | null;
   traceId?: string | null;
@@ -37903,132 +36843,6 @@ const resolveHelixThreadRouteContext = (args: {
     lifecycleEventType,
     turnKind: args.turnKind,
   };
-};
-
-type HelixAskObjectiveLoopState = {
-  objective_id: string;
-  objective_label: string;
-  required_slots: string[];
-  matched_slots: string[];
-  status: HelixAskObjectiveLoopStatus;
-  attempt: number;
-  started_at?: string;
-  ended_at?: string;
-  blocked_reason?: string;
-  retrieval_confidence?: number;
-};
-
-type HelixAskObjectiveTransition = {
-  objective_id: string;
-  from: HelixAskObjectiveLoopStatus | null;
-  to: HelixAskObjectiveLoopStatus;
-  reason: string;
-  at: string;
-};
-
-type HelixAskObjectiveRetrievalPass = {
-  pass_index: number;
-  reason: string;
-  objective_ids: string[];
-  query_count: number;
-  query_preview: string[];
-  selected_files_count?: number;
-  selected_files?: string[];
-  retrieval_confidence_before?: number;
-  retrieval_confidence_after?: number;
-  completed_objective_ids?: string[];
-  blocked_objective_ids?: string[];
-  exhausted?: boolean;
-  at: string;
-};
-
-type HelixAskObjectiveMiniAnswerStatus = "covered" | "partial" | "blocked";
-
-type HelixAskObjectiveUnknownBlock = {
-  unknown: string;
-  why: string;
-  what_i_checked: string[];
-  next_retrieval: string;
-};
-
-type HelixAskObjectiveMiniAnswer = {
-  objective_id: string;
-  objective_label: string;
-  status: HelixAskObjectiveMiniAnswerStatus;
-  matched_slots: string[];
-  missing_slots: string[];
-  evidence_refs: string[];
-  linked_evidence_refs?: string[];
-  summary: string;
-  unknown_block?: HelixAskObjectiveUnknownBlock;
-};
-
-type HelixAskObjectiveEvidenceScore = {
-  objective_id: string;
-  score: number;
-  threshold: number;
-  pass: boolean;
-  slot_ratio: number;
-  evidence_ref_count: number;
-  linked_evidence_ref_count?: number;
-  retrieval_confidence: number;
-  status: HelixAskObjectiveMiniAnswerStatus;
-  reason: string;
-};
-
-type HelixAskObjectiveMiniValidation = {
-  total: number;
-  covered: number;
-  partial: number;
-  blocked: number;
-  unresolved: number;
-};
-
-type HelixAskObjectivePlainReasoningTrace = {
-  objective_id: string;
-  objective_label: string;
-  final_status: HelixAskObjectiveMiniAnswerStatus;
-  plain_reasoning: string;
-  transition_tail: string[];
-  unknown_block?: HelixAskObjectiveUnknownBlock;
-  used_telemetry: {
-    required_slots: string[];
-    matched_slots: string[];
-    missing_slots: string[];
-    retrieval_confidence: number;
-    evidence_refs: string[];
-    evidence_ref_count: number;
-    retrieval_pass_count: number;
-    scoped_retrieval_observed: boolean;
-    objective_oes_score: number | null;
-    objective_oes_threshold: number | null;
-    objective_oes_pass: boolean | null;
-    mini_critic_reason: string | null;
-    terminalization_reason: string | null;
-    blocked_reason: string | null;
-  };
-};
-
-type HelixAskObjectiveTelemetryUsed = {
-  version: "v1";
-  objective_unresolved_count_terminal: number;
-  objective_coverage_unresolved_count: number;
-  objective_coverage_unresolved_objective_ids: string[];
-  objective_unknown_block_count: number;
-  objective_unresolved_without_unknown_block_count: number;
-  objective_missing_scoped_retrieval_count: number;
-  objective_finalize_gate_mode: "strict_covered" | "unknown_terminal" | "blocked";
-  objective_finalize_gate_passed: boolean;
-  mini_modes: {
-    synth: "llm" | "heuristic_fallback" | "none";
-    critic: "llm" | "heuristic_fallback" | "none";
-    assembly: "llm" | "deterministic_fallback" | "none";
-  };
-  oes_thresholds: {
-    covered: number;
-    blocked: number;
-  };
-  signals: string[];
 };
 
 type HelixAskObjectiveMiniSynthStatus = "covered" | "partial" | "blocked";
@@ -44729,7 +43543,9 @@ const executeHelixAsk = async ({
     let helixTurnObjectiveSupport: HelixAskEvidencePackObjectiveSupport[] = [];
     const objectiveLoopEnabled = !forcedAnswer;
     let objectiveLoopState: HelixAskObjectiveLoopState[] = objectiveLoopEnabled
-      ? buildHelixAskObjectiveLoopState(helixTurnContract)
+      ? buildHelixAskObjectiveLoopState(helixTurnContract, {
+          slugifySectionId: slugifyHelixAskAnswerPlanSectionId,
+        })
       : [];
     let objectiveTransitionLog: HelixAskObjectiveTransition[] = [];
     let objectiveRetrievalPasses: HelixAskObjectiveRetrievalPass[] = [];
@@ -44816,43 +43632,18 @@ const executeHelixAsk = async ({
     let routingSalvageReason: string | null = null;
     let routingSalvageRetrievalAddedCount = 0;
     const objectivePromptRewriteMode = resolveHelixAskObjectivePromptRewriteMode();
-    const objectivePromptRewriteStageApplied: Partial<
-      Record<HelixAskObjectivePromptRewriteStage, boolean>
-    > = {};
-    const objectivePromptRewriteStagePromptHashes: Partial<
-      Record<HelixAskObjectivePromptRewriteStage, string>
-    > = {};
-    const objectivePromptRewriteStageTokenEstimates: Partial<
-      Record<HelixAskObjectivePromptRewriteStage, number>
-    > = {};
-    const objectivePromptRewriteStagePromptBudgets: Partial<
-      Record<HelixAskObjectivePromptRewriteStage, number>
-    > = {};
-    const objectivePromptRewriteStageShadowPromptHashes: Partial<
-      Record<HelixAskObjectivePromptRewriteStage, string>
-    > = {};
-    const objectivePromptRewriteStageShadowTokenEstimates: Partial<
-      Record<HelixAskObjectivePromptRewriteStage, number>
-    > = {};
+    const objectivePromptRewriteTelemetry = createObjectivePromptRewriteTelemetry();
     const recordObjectivePromptRewriteStage = (
       stage: HelixAskObjectivePromptRewriteStage,
       rewrite: HelixAskObjectivePromptRewriteResult,
       budget?: number,
     ): void => {
-      objectivePromptRewriteStageApplied[stage] = rewrite.applied;
-      objectivePromptRewriteStagePromptHashes[stage] = rewrite.effectiveHash;
-      objectivePromptRewriteStageTokenEstimates[stage] = rewrite.effectiveTokenEstimate;
-      if (Number.isFinite(budget)) {
-        objectivePromptRewriteStagePromptBudgets[stage] = Number(budget);
-      }
-      if (rewrite.rewrittenHash) {
-        objectivePromptRewriteStageShadowPromptHashes[stage] = rewrite.rewrittenHash;
-      }
-      if (Number.isFinite(rewrite.rewrittenTokenEstimate ?? NaN)) {
-        objectivePromptRewriteStageShadowTokenEstimates[stage] = Number(
-          rewrite.rewrittenTokenEstimate,
-        );
-      }
+      recordObjectivePromptRewriteTelemetryStage(
+        objectivePromptRewriteTelemetry,
+        stage,
+        rewrite,
+        budget,
+      );
     };
     const retrieveConfidenceSafe = (value?: number): number =>
       Number.isFinite(value) ? Number(value) : 0;
@@ -44861,19 +43652,14 @@ const executeHelixAsk = async ({
       return Number((state.matched_slots.length / Math.max(1, state.required_slots.length)).toFixed(4));
     };
     const pushObjectiveStepTranscript = (entry: HelixAskObjectiveStepTranscript): void => {
-      objectiveStepTranscripts.push(entry);
-      if (objectiveStepTranscripts.length > OBJECTIVE_STEP_TRANSCRIPT_MAX) {
-        objectiveStepTranscripts = objectiveStepTranscripts.slice(-OBJECTIVE_STEP_TRANSCRIPT_MAX);
-      }
+      objectiveStepTranscripts = appendObjectiveStepTranscript({
+        transcripts: objectiveStepTranscripts,
+        entry,
+      });
     };
-    const OBJECTIVE_TRANSITION_LOG_MAX = 160;
-    const OBJECTIVE_RETRIEVAL_PASS_LOG_MAX = 64;
     const OBJECTIVE_SCOPED_RETRIEVAL_MAX_OBJECTIVES = 6;
     const OBJECTIVE_SCOPED_RETRIEVAL_MAX_QUERY_HINTS = 6;
     const OBJECTIVE_SCOPED_RETRIEVAL_MAX_ATTEMPTS = 3;
-    const OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX = 24;
-    const HELIX_ASK_OBJECTIVE_LOOP_PATCH_REVISION =
-      "2026-03-23-objective-loop-final-resolution-v3";
     let applyContextAttempt: (
       label: string,
       result: Awaited<ReturnType<typeof buildAskContextFromQueries>>,
@@ -44891,120 +43677,34 @@ const executeHelixAsk = async ({
       reason: string,
       at?: string,
     ): HelixAskObjectiveLoopState => {
-      const transitioned = transitionHelixAskObjectiveState({
+      const transitioned = recordHelixAskObjectiveTransition({
         state,
         to,
         reason,
+        transitionLog: objectiveTransitionLog,
+        transitionLogMax: OBJECTIVE_TRANSITION_LOG_MAX,
         at,
       });
-      if (transitioned.transition) {
-        objectiveTransitionLog.push(transitioned.transition);
-        if (objectiveTransitionLog.length > OBJECTIVE_TRANSITION_LOG_MAX) {
-          objectiveTransitionLog = objectiveTransitionLog.slice(-OBJECTIVE_TRANSITION_LOG_MAX);
-        }
-      }
+      objectiveTransitionLog = transitioned.transitionLog;
       return transitioned.state;
     };
     const syncObjectiveLoopDebug = (): void => {
       if (!debugPayload) return;
-      const objectiveLoopPrimaryActive = computeObjectiveLoopPrimaryActive();
-      const objectiveLoopPrimaryBypassReason = computeObjectiveLoopPrimaryBypassReason();
-      const summary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
-      const stepTranscripts = objectiveStepTranscripts.slice(-64);
-      const expectedLlmSteps = stepTranscripts.filter((entry) =>
-        entry.verb === "PLAN" ||
-        entry.verb === "RETRIEVE" ||
-        entry.verb === "MINI_SYNTH" ||
-        entry.verb === "MINI_CRITIC" ||
-        entry.verb === "REPAIR" ||
-        entry.verb === "ASSEMBLE"
-      );
-      const llmStepCount = expectedLlmSteps.filter((entry) => Boolean(entry.llm_model)).length;
-      const transcriptCompleteCount = stepTranscripts.filter((entry) =>
-        Boolean(entry.objective_id) &&
-        Boolean(entry.verb) &&
-        Boolean(entry.started_at) &&
-        Boolean(entry.ended_at) &&
-        Boolean(entry.decision)
-      ).length;
-      debugPayload.objective_loop_enabled = objectiveLoopEnabled;
-      debugPayload.objective_loop_patch_revision = HELIX_ASK_OBJECTIVE_LOOP_PATCH_REVISION;
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_mode =
-        objectivePromptRewriteMode;
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_stage_applied = {
-        ...objectivePromptRewriteStageApplied,
-      };
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_stage_prompt_hashes = {
-        ...objectivePromptRewriteStagePromptHashes,
-      };
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_stage_token_estimates = {
-        ...objectivePromptRewriteStageTokenEstimates,
-      };
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_stage_budgets = {
-        ...objectivePromptRewriteStagePromptBudgets,
-      };
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_stage_shadow_prompt_hashes = {
-        ...objectivePromptRewriteStageShadowPromptHashes,
-      };
-      (debugPayload as Record<string, unknown>).objective_prompt_rewrite_stage_shadow_token_estimates = {
-        ...objectivePromptRewriteStageShadowTokenEstimates,
-      };
-      debugPayload.objective_loop_primary_active = objectiveLoopPrimaryActive;
-      debugPayload.objective_loop_primary_bypass_reason = objectiveLoopPrimaryBypassReason;
-      debugPayload.objective_loop_primary_rate = objectiveLoopPrimaryActive ? 1 : 0;
-      debugPayload.objective_total_count = summary.total;
-      debugPayload.objective_terminal_count = summary.terminalCount;
-      debugPayload.objective_unresolved_count = summary.unresolvedCount;
-      debugPayload.objective_completion_rate = summary.completionRate;
-      debugPayload.objective_blocked_count = summary.blockedCount;
-      const objectiveAnswerObligationsMissingCount = Array.isArray(
-        (debugPayload as Record<string, unknown>).answer_obligations_missing,
-      )
-        ? ((debugPayload as Record<string, unknown>).answer_obligations_missing as unknown[])
-            .map((entry) => String(entry ?? "").trim())
-            .filter(Boolean).length
-        : 0;
-      const objectiveComposerValidationFailCount = Array.isArray(
-        (debugPayload as Record<string, unknown>).composer_validation_fail_reasons,
-      )
-        ? ((debugPayload as Record<string, unknown>).composer_validation_fail_reasons as unknown[])
-            .map((entry) => String(entry ?? "").trim())
-            .filter(Boolean).length
-        : 0;
-      const strictCoveredPass =
-        summary.unresolvedCount === 0 &&
-        summary.blockedCount === 0;
-      const unknownTerminalPass = Boolean(
-        objectiveMiniValidation &&
-          objectiveMiniValidation.unresolved > 0 &&
-          objectiveMissingScopedRetrievalCount === 0 &&
-          objectiveUnresolvedWithoutUnknownBlockIds.length === 0 &&
-          objectiveUnknownBlockObjectiveIds.length >= objectiveMiniValidation.unresolved,
-      );
-      const objectiveFinalizeGatePassed = strictCoveredPass;
-      const objectiveFinalizeGateMode: "strict_covered" | "unknown_terminal" | "blocked" = strictCoveredPass
-        ? "strict_covered"
-        : unknownTerminalPass
-          ? "unknown_terminal"
-          : "blocked";
-      applyObjectiveGateDebugPayload({
+      applyObjectiveLoopReportTailDebugPayload({
         debugPayload,
-        objectiveFinalizeGatePassed,
-        objectiveFinalizeGateMode,
-        unknownTerminalPass,
-        strictCoveredPass,
-        unresolvedCount: summary.unresolvedCount,
-        blockedCount: summary.blockedCount,
-        objectiveAnswerObligationsMissingCount,
-        objectiveComposerValidationFailCount,
-      });
-      applyObjectiveStateDebugPayload({
-        debugPayload,
+        objectiveLoopEnabled,
         objectiveLoopState,
         objectiveTransitionLog,
-      });
-      applyObjectiveRecoveryDebugPayload({
-        debugPayload,
+        objectiveStepTranscripts,
+        objectivePromptRewriteMode,
+        objectivePromptRewriteTelemetry,
+        objectiveMiniAnswers,
+        objectiveMiniValidation,
+        objectiveUnknownBlockObjectiveIds,
+        objectiveUnresolvedWithoutUnknownBlockIds,
+        objectiveMissingScopedRetrievalCount,
+        objectiveOesScores,
+        objectiveTerminalizationReasons,
         objectiveRetrievalPasses,
         objectiveRetrievalQueriesLog,
         objectiveRetrievalSelectedFilesLog,
@@ -45023,11 +43723,6 @@ const executeHelixAsk = async ({
         objectiveRecoveryNoContextTerminalCount,
         objectiveRecoveryErrorRetryableCount,
         objectiveRecoveryErrorTerminalCount,
-      });
-      applyObjectiveLlmDebugPayload({
-        debugPayload,
-        objectiveMiniAnswers,
-        objectiveMiniValidation,
         objectiveMiniSynthMode,
         objectiveMiniSynthLlmAttempted,
         objectiveMiniSynthLlmInvoked,
@@ -45061,82 +43756,10 @@ const executeHelixAsk = async ({
         objectiveAssemblyRescueRepairSuccess,
         objectiveAssemblyRescueRepairFailReason,
         objectiveAssemblyWeakRejectCount,
-      });
-      const objectiveCoverageUnresolvedObjectiveIds = objectiveMiniAnswers
-        .filter((entry) => entry.status !== "covered")
-        .map((entry) => entry.objective_id)
-        .slice(0, 12);
-      const unresolvedWithGenericUnknown = objectiveMiniAnswers
-        .filter((entry) => entry.status !== "covered")
-        .filter((entry) => hasHelixAskObjectiveUnknownBlock(entry.unknown_block))
-        .filter((entry) => {
-          const block = entry.unknown_block;
-          if (!block) return false;
-          return isHelixAskGenericUnknownScaffold(
-            [block.unknown, block.why, block.what_i_checked.join(" "), block.next_retrieval].join(" "),
-          );
-        }).length;
-      applyObjectiveValidationDebugPayload({
-        debugPayload,
-        objectiveCoverageUnresolvedObjectiveIds,
-        objectiveUnknownBlockObjectiveIds,
-        objectiveUnresolvedWithoutUnknownBlockIds,
-        unresolvedObjectiveCount: objectiveMiniValidation?.unresolved ?? 0,
-        unresolvedWithGenericUnknownCount: unresolvedWithGenericUnknown,
-        objectiveOesScores,
-        objectiveTerminalizationReasons,
-      });
-      const objectiveReasoningTrace = buildHelixAskObjectivePlainReasoningTrace({
-        miniAnswers: objectiveMiniAnswers,
-        states: objectiveLoopState,
-        scores: objectiveOesScores,
-        transitions: objectiveTransitionLog,
-        stepTranscripts,
-        retrievalQueries: objectiveRetrievalQueriesLog,
-        terminalizationReasons: objectiveTerminalizationReasons,
-      });
-      const objectiveTelemetryUsed = {
-        version: "v1",
-        objective_unresolved_count_terminal: summary.unresolvedCount,
-        objective_coverage_unresolved_count: objectiveCoverageUnresolvedObjectiveIds.length,
-        objective_coverage_unresolved_objective_ids: objectiveCoverageUnresolvedObjectiveIds.slice(),
-        objective_unknown_block_count: objectiveUnknownBlockObjectiveIds.length,
-        objective_unresolved_without_unknown_block_count:
-          objectiveUnresolvedWithoutUnknownBlockIds.length,
-        objective_missing_scoped_retrieval_count: objectiveMissingScopedRetrievalCount,
-        objective_finalize_gate_mode: objectiveFinalizeGateMode,
-        objective_finalize_gate_passed: objectiveFinalizeGatePassed,
-        mini_modes: {
-          synth: objectiveMiniSynthMode,
-          critic: objectiveMiniCriticMode,
-          assembly: objectiveAssemblyMode,
-        },
-        oes_thresholds: {
-          covered: HELIX_ASK_OBJECTIVE_OES_COVERED_THRESHOLD,
-          blocked: HELIX_ASK_OBJECTIVE_OES_BLOCKED_THRESHOLD,
-        },
-        signals: [
-          "objective_required_slots",
-          "objective_scoped_retrieval",
-          "objective_mini_synth",
-          "objective_mini_critic",
-          "objective_oes",
-          "objective_unknown_block",
-          "objective_finalize_gate",
-          "objective_assembly_mode",
-        ],
-      };
-      applyObjectiveTraceDebugPayload({
-        debugPayload,
-        objectiveReasoningTrace,
-        objectiveTelemetryUsed,
-        stepTranscripts,
-        llmStepCount,
-        expectedLlmStepCount: expectedLlmSteps.length,
-        transcriptCompleteCount,
         routingSalvageApplied,
         routingSalvageReason,
         routingSalvageRetrievalAddedCount,
+        normalizeText: normalizeHelixAskTurnContractText,
       });
     };
     const pushObjectiveRetrievalProbe = (args: {
@@ -45147,82 +43770,43 @@ const executeHelixAsk = async ({
       after: number;
       passIndex?: number;
     }): void => {
-      const passIndex = Number.isFinite(args.passIndex) && args.passIndex && args.passIndex > 0
-        ? Number(args.passIndex)
-        : objectiveRetrievalPasses.length;
-      objectiveRetrievalQueriesLog.push({
-        objective_id: args.objectiveId,
-        pass_index: passIndex,
-        queries: args.queries.slice(0, 12),
+      const next = appendObjectiveRetrievalProbe({
+        objectiveRetrievalQueriesLog,
+        objectiveRetrievalSelectedFilesLog,
+        objectiveRetrievalConfidenceDeltaLog,
+        objectiveId: args.objectiveId,
+        queries: args.queries,
+        files: args.files,
+        before: args.before,
+        after: args.after,
+        passIndex: args.passIndex,
+        currentPassCount: objectiveRetrievalPasses.length,
       });
-      objectiveRetrievalSelectedFilesLog.push({
-        objective_id: args.objectiveId,
-        pass_index: passIndex,
-        files: args.files.slice(0, 16),
-      });
-      objectiveRetrievalConfidenceDeltaLog.push({
-        objective_id: args.objectiveId,
-        pass_index: passIndex,
-        before: Number(args.before.toFixed(4)),
-        after: Number(args.after.toFixed(4)),
-        delta: Number((args.after - args.before).toFixed(4)),
-      });
-      if (objectiveRetrievalQueriesLog.length > OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX) {
-        objectiveRetrievalQueriesLog = objectiveRetrievalQueriesLog.slice(-OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX);
-      }
-      if (objectiveRetrievalSelectedFilesLog.length > OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX) {
-        objectiveRetrievalSelectedFilesLog = objectiveRetrievalSelectedFilesLog.slice(
-          -OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX,
-        );
-      }
-      if (objectiveRetrievalConfidenceDeltaLog.length > OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX) {
-        objectiveRetrievalConfidenceDeltaLog = objectiveRetrievalConfidenceDeltaLog.slice(
-          -OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX,
-        );
-      }
+      objectiveRetrievalQueriesLog = next.objectiveRetrievalQueriesLog;
+      objectiveRetrievalSelectedFilesLog = next.objectiveRetrievalSelectedFilesLog;
+      objectiveRetrievalConfidenceDeltaLog = next.objectiveRetrievalConfidenceDeltaLog;
     };
     const beginObjectiveRetrievalPass = (
       reason: string,
       queries: string[],
       objectiveIds?: string[],
     ): void => {
-      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
-      const objectiveScope = Array.isArray(objectiveIds) && objectiveIds.length > 0
-        ? new Set(objectiveIds.map((entry) => String(entry ?? "").trim()).filter(Boolean))
-        : null;
-      const at = new Date().toISOString();
-      objectiveLoopState = objectiveLoopState.map((state) => {
-        if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
-        if (objectiveScope && !objectiveScope.has(state.objective_id)) return state;
-        return recordObjectiveTransition(state, "retrieving", reason, at);
-      });
-      const summary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
-      const scopedObjectiveIds = objectiveScope
-        ? objectiveLoopState
-            .filter((entry) => objectiveScope.has(entry.objective_id))
-            .map((entry) => entry.objective_id)
-        : objectiveLoopState.map((entry) => entry.objective_id);
-      objectiveRetrievalPasses.push({
-        pass_index: objectiveRetrievalPasses.length + 1,
+      const next = beginHelixAskObjectiveRetrievalPass({
+        objectiveLoopEnabled,
+        objectiveLoopState,
+        objectiveTransitionLog,
+        objectiveRetrievalPasses,
+        retrievalConfidence,
         reason,
-        objective_ids: scopedObjectiveIds,
-        query_count: queries.length,
-        query_preview: queries.slice(0, 8),
-        retrieval_confidence_before: retrieveConfidenceSafe(retrievalConfidence),
-        retrieval_confidence_after: retrieveConfidenceSafe(retrievalConfidence),
-        completed_objective_ids: objectiveLoopState
-          .filter((entry) => entry.status === "complete")
-          .map((entry) => entry.objective_id),
-        blocked_objective_ids: objectiveLoopState
-          .filter((entry) => entry.status === "blocked")
-          .map((entry) => entry.objective_id),
-        exhausted: summary.unresolvedCount > 0,
-        at,
+        queries,
+        objectiveIds,
+        objectiveTransitionLogMax: OBJECTIVE_TRANSITION_LOG_MAX,
+        objectiveRetrievalPassLogMax: OBJECTIVE_RETRIEVAL_PASS_LOG_MAX,
       });
-      objectiveRetrievalExhausted = summary.unresolvedCount > 0;
-      if (objectiveRetrievalPasses.length > OBJECTIVE_RETRIEVAL_PASS_LOG_MAX) {
-        objectiveRetrievalPasses = objectiveRetrievalPasses.slice(-OBJECTIVE_RETRIEVAL_PASS_LOG_MAX);
-      }
+      objectiveLoopState = next.objectiveLoopState;
+      objectiveTransitionLog = next.objectiveTransitionLog;
+      objectiveRetrievalPasses = next.objectiveRetrievalPasses;
+      objectiveRetrievalExhausted = next.objectiveRetrievalExhausted;
       syncObjectiveLoopDebug();
     };
     const applyObjectiveCoverageSnapshot = (args: {
@@ -45232,67 +43816,37 @@ const executeHelixAsk = async ({
       retrievalConfidence?: number;
       objectiveIds?: string[];
     }): void => {
-      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
-      objectiveLoopState = applyHelixAskObjectiveCoverageSnapshot({
-        states: objectiveLoopState,
+      const next = applyHelixAskObjectiveCoverageSnapshotRuntime({
+        objectiveLoopEnabled,
+        objectiveLoopState,
+        objectiveTransitionLog,
+        objectiveRetrievalPasses,
         coveredSlots: args.coveredSlots,
-        objectiveIds: args.objectiveIds,
+        reason: args.reason,
+        files: args.files,
         retrievalConfidence: args.retrievalConfidence,
-        transitionReason: args.reason,
-        transitionLog: objectiveTransitionLog,
+        objectiveIds: args.objectiveIds,
       });
-      if (objectiveRetrievalPasses.length > 0) {
-        const lastIndex = objectiveRetrievalPasses.length - 1;
-        const last = objectiveRetrievalPasses[lastIndex];
-        objectiveRetrievalPasses[lastIndex] = {
-          ...last,
-          selected_files_count: args.files?.length ?? last.selected_files_count ?? 0,
-          selected_files: (args.files ?? []).slice(0, 16),
-          retrieval_confidence_after: retrieveConfidenceSafe(args.retrievalConfidence),
-          completed_objective_ids: objectiveLoopState
-            .filter((entry) => entry.status === "complete")
-            .map((entry) => entry.objective_id),
-          blocked_objective_ids: objectiveLoopState
-            .filter((entry) => entry.status === "blocked")
-            .map((entry) => entry.objective_id),
-          exhausted:
-            summarizeHelixAskObjectiveLoopState(objectiveLoopState).unresolvedCount > 0,
-        };
-        objectiveRetrievalExhausted = Boolean(objectiveRetrievalPasses[lastIndex].exhausted);
-      }
+      objectiveLoopState = next.objectiveLoopState;
+      objectiveTransitionLog = next.objectiveTransitionLog;
+      objectiveRetrievalPasses = next.objectiveRetrievalPasses;
+      objectiveRetrievalExhausted = next.objectiveRetrievalExhausted;
       syncObjectiveLoopDebug();
     };
     const reconcileObjectiveLoopFromSupport = (
       objectiveSupport: HelixAskEvidencePackObjectiveSupport[],
       reason = "objective_support_reconciled",
     ): void => {
-      if (!objectiveLoopEnabled || objectiveLoopState.length === 0 || objectiveSupport.length === 0) return;
-      const supportByLabel = new Map(
-        objectiveSupport.map((entry) => [entry.objective.trim().toLowerCase(), entry] as const),
-      );
-      objectiveLoopState = objectiveLoopState.map((state) => {
-        if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
-        const support = supportByLabel.get(state.objective_label.trim().toLowerCase());
-        if (!support) return state;
-        const supportMatched = new Set(
-          (support.matched_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean),
-        );
-        let nextMatchedSlots = state.required_slots.filter((slot) => supportMatched.has(slot));
-        if (support.supported && nextMatchedSlots.length === 0 && state.required_slots.length > 0) {
-          nextMatchedSlots = state.required_slots.slice();
-        }
-        const next: HelixAskObjectiveLoopState = {
-          ...state,
-          matched_slots: Array.from(new Set(nextMatchedSlots)),
-        };
-        if (
-          isHelixAskObjectiveCoverageSatisfied(next) &&
-          (next.status === "pending" || next.status === "retrieving")
-        ) {
-          return recordObjectiveTransition(next, "synthesizing", reason);
-        }
-        return next;
+      const next = reconcileHelixAskObjectiveLoopFromSupport({
+        objectiveLoopEnabled,
+        objectiveLoopState,
+        objectiveTransitionLog,
+        objectiveSupport,
+        objectiveTransitionLogMax: OBJECTIVE_TRANSITION_LOG_MAX,
+        reason,
       });
+      objectiveLoopState = next.objectiveLoopState;
+      objectiveTransitionLog = next.objectiveTransitionLog;
       syncObjectiveLoopDebug();
     };
     const setObjectivePhase = (
@@ -45300,24 +43854,31 @@ const executeHelixAsk = async ({
       reason: string,
       filter?: (state: HelixAskObjectiveLoopState) => boolean,
     ): void => {
-      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
-      objectiveLoopState = objectiveLoopState.map((state) => {
-        if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
-        if (filter && !filter(state)) return state;
-        return recordObjectiveTransition(state, nextStatus, reason);
+      const next = setHelixAskObjectiveLoopPhase({
+        objectiveLoopEnabled,
+        objectiveLoopState,
+        objectiveTransitionLog,
+        nextStatus,
+        reason,
+        objectiveTransitionLogMax: OBJECTIVE_TRANSITION_LOG_MAX,
+        filter,
       });
+      objectiveLoopState = next.objectiveLoopState;
+      objectiveTransitionLog = next.objectiveTransitionLog;
       syncObjectiveLoopDebug();
     };
     const finalizeObjectiveLoopState = (validationPassed: boolean, failReason?: string | null): void => {
-      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
-      objectiveLoopState = finalizeHelixAskObjectiveLoopState({
-        states: objectiveLoopState,
+      const next = finalizeHelixAskObjectiveLoopRuntime({
+        objectiveLoopEnabled,
+        objectiveLoopState,
+        objectiveTransitionLog,
         validationPassed,
         failReason,
-        transitionLog: objectiveTransitionLog,
+        objectiveTransitionLogMax: OBJECTIVE_TRANSITION_LOG_MAX,
       });
-      const summary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
-      objectiveRetrievalExhausted = summary.unresolvedCount > 0;
+      objectiveLoopState = next.objectiveLoopState;
+      objectiveTransitionLog = next.objectiveTransitionLog;
+      objectiveRetrievalExhausted = next.objectiveRetrievalExhausted;
       syncObjectiveLoopDebug();
     };
     let objectiveLoopFinalized = false;
@@ -45351,39 +43912,17 @@ const executeHelixAsk = async ({
       objectiveLoopFinalized = true;
     };
     if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
-      const at = new Date().toISOString();
-      objectiveTransitionLog = objectiveLoopState.map((state) => ({
-        objective_id: state.objective_id,
-        from: null,
-        to: state.status,
-        reason: "initialized",
-        at,
-      }));
-      const planPreview = objectiveLoopState
-        .slice(0, 6)
-        .map((state) => state.objective_label)
-        .join(" | ");
-      pushObjectiveStepTranscript({
-        objective_id: objectiveLoopState[0]?.objective_id ?? "turn",
-        attempt: 0,
-        verb: "PLAN",
-        phase: "turn",
-        started_at: at,
-        ended_at: at,
-        llm_model: process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini",
-        reasoning_effort: "high",
-        schema_name: "helix.ask.plan.v2",
-        schema_valid: true,
-        prompt_preview: clipAskText(baseQuestion, 240),
-        output_preview: clipAskText(planPreview || "(no objective labels)", 280),
-        decision: "plan_initialized",
-        decision_reason: objectiveLoopState.length > 0 ? null : "no_objectives",
-        validator: {
-          preconditions_ok: true,
-          postconditions_ok: objectiveLoopState.length > 0,
-          violations: objectiveLoopState.length > 0 ? [] : ["no_objectives"],
-        },
+      const initialized = initializeHelixAskObjectiveLoopRuntime({
+        objectiveLoopEnabled,
+        objectiveLoopState,
+        baseQuestion,
+        llmModel: process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini",
+        clipText: clipAskText,
       });
+      objectiveTransitionLog = initialized.objectiveTransitionLog;
+      if (initialized.planTranscript) {
+        pushObjectiveStepTranscript(initialized.planTranscript);
+      }
       syncObjectiveLoopDebug();
     }
     const isRoadmapTurnContractLocked = (): boolean =>
@@ -45424,48 +43963,16 @@ const executeHelixAsk = async ({
     });
     const syncIntentPolicyDebug = (): void => {
       if (!debugPayload) return;
-      const debugRecord = debugPayload as Record<string, unknown>;
-      debugRecord.policy_prompt_family = helixIntentPolicyEnvelope.prompt_family;
-      debugRecord.policy_prompt_specificity = helixIntentPolicyEnvelope.prompt_specificity;
-      debugRecord.policy_requires_code_floor = helixIntentPolicyEnvelope.requires_code_floor;
-      debugRecord.policy_requires_doc_floor = helixIntentPolicyEnvelope.requires_doc_floor;
-      debugRecord.policy_clarify_allowed_pre_lock =
-        helixIntentPolicyEnvelope.clarify_allowed_pre_lock;
-      debugRecord.policy_lock_required = helixIntentPolicyEnvelope.lock_required_for_family;
-      debugRecord.policy_budget_profile = helixIntentPolicyEnvelope.budget_profile;
-      debugRecord.policy_allow_two_pass = helixIntentPolicyEnvelope.allow_two_pass;
-      debugRecord.policy_allow_retrieval_retry = helixIntentPolicyEnvelope.allow_retrieval_retry;
-      debugRecord.policy_retrieval_scope = HELIX_ASK_RETRIEVAL_SCOPE;
-      debugRecord.policy_question_fingerprint = helixIntentPolicyEnvelope.question_fingerprint;
-      debugRecord.policy_requires_repo_evidence = requiresRepoEvidence;
-      debugRecord.planner_valid = helixTurnContract.planner.valid;
-      debugRecord.planner_mode = helixTurnContract.planner.mode;
-      debugRecord.planner_source = helixTurnContract.planner.source;
-      debugRecord.turn_contract_hash = helixTurnContractHash;
-      debugRecord.turn_contract_goal = helixTurnContract.goal;
-      debugRecord.turn_contract_grounding_mode = helixTurnContract.grounding_mode;
-      debugRecord.turn_contract_output_family = helixTurnContract.output_family;
-      debugRecord.objective_count = helixTurnContract.objectives.length;
-      debugRecord.turn_contract_required_slots = helixTurnContract.required_slots.slice(0, 12);
-      debugRecord.turn_contract_query_hints = helixTurnContract.query_hints.slice(0, 12);
-      debugRecord.turn_contract_risk_flags = helixTurnContract.risk_flags.slice(0, 8);
-      debugRecord.turn_retrieval_plan = {
-        depth_budget: helixTurnRetrievalPlan.depth_budget,
-        diversity_budget: helixTurnRetrievalPlan.diversity_budget,
-        connectivity_budget: helixTurnRetrievalPlan.connectivity_budget,
-        must_include: helixTurnRetrievalPlan.must_include.slice(0, 8),
-        query_count: helixTurnRetrievalPlan.query_count,
-      };
-      if (promptResearchRetrievalContract) {
-        debugRecord.prompt_retrieval_contract = {
-          must_read_paths: promptResearchRetrievalContract.must_read_paths.slice(0, 16),
-          precedence_paths: promptResearchRetrievalContract.precedence_paths.slice(0, 16),
-          expansion_rule: promptResearchRetrievalContract.expansion_rule,
-          missing_required_paths: promptResearchRetrievalContract.missing_required_paths.slice(0, 16),
-          unreadable_required_paths:
-            promptResearchRetrievalContract.unreadable_required_paths.slice(0, 16),
-        };
-      }
+      applyObjectiveTurnContractDebugPayload({
+        debugPayload: debugPayload as Record<string, unknown>,
+        helixIntentPolicyEnvelope,
+        requiresRepoEvidence,
+        helixTurnContract,
+        helixTurnContractHash,
+        helixTurnRetrievalPlan,
+        promptResearchRetrievalContract,
+        retrievalScope: HELIX_ASK_RETRIEVAL_SCOPE,
+      });
     };
     syncIntentPolicyDebug();
     const applyHelixTurnContractState = (nextContract: HelixAskTurnContract): void => {
@@ -45491,56 +43998,16 @@ const executeHelixAsk = async ({
       syncRoadmapTurnContractIntentState();
       syncIntentPolicyDebug();
       if (objectiveLoopEnabled) {
-        const previousByLabel = new Map(
-          objectiveLoopState.map((state) => [state.objective_label.toLowerCase(), state] as const),
-        );
-        const contractFallbackRequiredSlots = Array.from(
-          new Set((helixTurnContract.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean)),
-        );
-        const rebuilt = buildHelixAskObjectiveLoopState(helixTurnContract).map((nextState) => {
-          const hydratedRequiredSlots =
-            nextState.required_slots.length > 0
-              ? nextState.required_slots
-              : contractFallbackRequiredSlots;
-          const prev = previousByLabel.get(nextState.objective_label.toLowerCase());
-          if (!prev) {
-            return hydratedRequiredSlots === nextState.required_slots
-              ? nextState
-              : {
-                  ...nextState,
-                  required_slots: hydratedRequiredSlots,
-                };
-          }
-          const hydratedRequiredSlotSet = new Set(hydratedRequiredSlots);
-          return {
-            ...nextState,
-            required_slots: hydratedRequiredSlots,
-            matched_slots: prev.matched_slots
-              .filter((slot) => hydratedRequiredSlotSet.has(normalizeSlotId(slot)))
-              .slice(0, hydratedRequiredSlots.length || 8),
-            status: prev.status,
-            attempt: prev.attempt,
-            started_at: prev.started_at,
-            ended_at: prev.ended_at,
-            blocked_reason: prev.blocked_reason,
-            retrieval_confidence: prev.retrieval_confidence,
-          };
+        const rebuilt = rebuildHelixAskObjectiveLoopStateFromContract({
+          objectiveLoopEnabled,
+          objectiveLoopState,
+          objectiveTransitionLog,
+          contract: helixTurnContract,
+          slugifySectionId: slugifyHelixAskAnswerPlanSectionId,
+          objectiveTransitionLogMax: OBJECTIVE_TRANSITION_LOG_MAX,
         });
-        objectiveLoopState = rebuilt;
-        const at = new Date().toISOString();
-        for (const state of objectiveLoopState) {
-          if (state.status !== "pending") continue;
-          objectiveTransitionLog.push({
-            objective_id: state.objective_id,
-            from: null,
-            to: "pending",
-            reason: "contract_rebuild",
-            at,
-          });
-        }
-        if (objectiveTransitionLog.length > OBJECTIVE_TRANSITION_LOG_MAX) {
-          objectiveTransitionLog = objectiveTransitionLog.slice(-OBJECTIVE_TRANSITION_LOG_MAX);
-        }
+        objectiveLoopState = rebuilt.objectiveLoopState;
+        objectiveTransitionLog = rebuilt.objectiveTransitionLog;
         syncObjectiveLoopDebug();
       }
     };
@@ -53628,10 +52095,12 @@ const executeHelixAsk = async ({
           answerText = resultForAnswer.text ?? "";
           answerMeta = isShortAnswer(answerText, verbosity);
           if (debugPayload) {
-            (debugPayload as Record<string, unknown>).objective_plan_stream_seed_labels =
-              objectivePlanSeedLabels.slice(0, 4);
-            (debugPayload as Record<string, unknown>).objective_plan_stream_seed =
-              objectiveSeedDraft || normalizeHelixAskTurnContractText(baseQuestion, 180);
+            applyObjectivePlanStreamSeedDebugPayload({
+              debugPayload: debugPayload as Record<string, unknown>,
+              objectivePlanSeedLabels,
+              objectiveSeedDraft,
+              fallbackQuestionSeed: normalizeHelixAskTurnContractText(baseQuestion, 180),
+            });
           }
         } else if (fastQualityMode && !answerHelperBudget.ok) {
           markLlmSkipDebug("fast_quality_answer_budget");
@@ -63248,212 +61717,61 @@ const executeHelixAsk = async ({
         }
         if (debugPayload) {
           const debugRecord = debugPayload as Record<string, unknown>;
-          debugRecord.composer_shadow_enabled = true;
-          debugRecord.composer_profile_id = answerPlanShadow.profile_id;
-          debugRecord.composer_profile_version = answerPlanShadow.profile_version;
-          debugRecord.composer_prompt_family = answerPlanShadow.prompt_family;
-          debugRecord.composer_prompt_specificity = answerPlanShadow.prompt_specificity;
-          debugRecord.composer_pre_validation_fail_reasons =
-            answerPlanValidationShadow.fail_reasons;
-          debugRecord.composer_pre_sections_present =
-            answerPlanValidationShadow.sections_present;
-          debugRecord.composer_pre_required_section_count =
-            answerPlanValidationShadow.required_section_count;
-          debugRecord.composer_pre_required_section_present_count =
-            answerPlanValidationShadow.required_section_present_count;
-          debugRecord.composer_pre_family_format_accuracy =
-            answerPlanValidationShadow.family_format_accuracy;
-          debugRecord.composer_schema_valid = validatedAfterEnforce.schema_valid;
-          debugRecord.composer_validation_fail_reason =
-            validatedAfterEnforce.fail_reasons[0] ?? null;
-          debugRecord.composer_validation_fail_reasons =
-            validatedAfterEnforce.fail_reasons;
-          debugRecord.composer_sections_present = validatedAfterEnforce.sections_present;
-          debugRecord.composer_required_section_count =
-            validatedAfterEnforce.required_section_count;
-          debugRecord.composer_required_section_present_count =
-            validatedAfterEnforce.required_section_present_count;
-          debugRecord.composer_family_format_accuracy =
-            validatedAfterEnforce.family_format_accuracy;
-          debugRecord.composer_anchor_integrity_violations_count =
-            validatedAfterEnforce.anchor_integrity_violations.length;
-          debugRecord.composer_anchor_integrity_violations =
-            validatedAfterEnforce.anchor_integrity_violations;
-          debugRecord.composer_debug_leak_hit_count =
-            validatedAfterEnforce.debug_leak_hits.length;
-          debugRecord.composer_debug_leak_hits =
-            validatedAfterEnforce.debug_leak_hits;
-          debugRecord.composer_placeholder_section_count =
-            validatedAfterEnforce.placeholder_section_count;
-          debugRecord.answer_validation_failures = [
-            ...validatedAfterEnforce.fail_reasons,
-            ...(promptResearchValidationAfter?.fail_reasons ?? []),
-          ];
-          debugRecord.prompt_research_validation_failures =
-            promptResearchValidationAfter?.fail_reasons ?? [];
-          debugRecord.prompt_research_validation_missing_verbatim_constraints =
-            promptResearchValidationAfter?.missing_verbatim_constraints ?? [];
-          debugRecord.prompt_research_validation_missing_required_sections =
-            promptResearchValidationAfter?.missing_required_sections ?? [];
-          debugRecord.prompt_research_validation_missing_support_sections =
-            promptResearchValidationAfter?.missing_support_sections ?? [];
-          debugRecord.prompt_research_validation_missing_provenance_columns =
-            promptResearchValidationAfter?.missing_provenance_columns ?? [];
-          debugRecord.prompt_research_validation_placeholder_hits =
-            promptResearchValidationAfter?.placeholder_hits ?? [];
-          debugRecord.prompt_research_validation_repair_actions =
-            promptResearchRepairActions;
-          debugRecord.answer_sectional_compose_used =
-            promptResearchRepairActions.includes("append_sectional_compose_sections");
-          debugRecord.composer_degraded = validatedAfterEnforce.degraded;
-          debugRecord.composer_degrade_reason = validatedAfterEnforce.degrade_reason;
-          debugRecord.composer_degrade_path_id = answerPlanShadow.degrade_path_id;
-          const composerSoftEnforceEffectiveMode: "observe" | "enforce" =
-            hardComposerGuardTriggered || softSectionGuardTriggered || softSectionGuardEscalatedEnforce
-              ? "enforce"
-              : HELIX_ASK_GATE_MODE;
-          debugRecord.composer_soft_enforce_applied =
-            hardComposerGuardTriggered ||
-            softSectionGuardTriggered ||
-            composerSoftObserveRewriteApplied ||
-            deterministicPreserveBlocked ||
-            softSectionGuardEscalatedEnforce;
-          debugRecord.composer_soft_enforce_gate_mode = HELIX_ASK_GATE_MODE;
-          debugRecord.composer_soft_enforce_effective_mode =
-            composerSoftEnforceEffectiveMode;
-          debugRecord.composer_soft_enforce_enabled = softSectionGuardEligible;
-          debugRecord.composer_soft_enforce_deterministic_preserve_blocked =
-            deterministicPreserveBlocked;
-          debugRecord.composer_soft_enforce_escalated_enforce =
-            softSectionGuardEscalatedEnforce;
-          debugRecord.composer_soft_enforce_soft_section_guard_observed =
-            softSectionGuardObserved;
-          debugRecord.composer_soft_enforce_observe_skip =
-            softSectionGuardObserveSkipped;
-          debugRecord.composer_soft_enforce_observe_reason =
-            composerSoftObserveReason;
-          debugRecord.composer_soft_enforce_observe_rewrite_applied =
-            composerSoftObserveRewriteApplied;
-          debugRecord.composer_soft_enforce_hard_guard_triggered =
-            hardComposerGuardTriggered;
-          debugRecord.composer_soft_enforce_hard_guard_reason =
-            composerSoftHardGuardReason;
-          debugRecord.composer_soft_enforce_soft_section_guard_triggered =
-            softSectionGuardTriggered;
-          debugRecord.composer_soft_enforce_reason =
-            composerSoftEnforceTriggerReason;
-          debugRecord.composer_soft_enforce_trigger_reason =
-            composerSoftEnforceTriggerReason;
-          debugRecord.composer_soft_enforce_action =
-            composerSoftEnforceAction;
-          debugRecord.composer_family_degrade_suppressed =
-            composerFamilyDegradeSuppressed;
-          debugRecord.composer_family_degrade_suppressed_reason =
-            composerFamilyDegradeSuppressedReason;
-          debugRecord.objective_loop_primary_composer_guard =
-            objectiveLoopPrimaryComposerGuard;
-          debugRecord.composer_v2_enabled = composerV2Enabled;
-          debugRecord.composer_v2_applied = composerV2Applied;
-          debugRecord.composer_v2_brief_source = composerV2BriefSource;
-          debugRecord.composer_v2_evidence_digest_source = composerV2EvidenceDigestSource;
-          debugRecord.composer_v2_evidence_digest_claim_count = composerV2EvidenceDigestClaimCount;
-          debugRecord.composer_v2_handoff_source = composerV2HandoffSource;
-          debugRecord.composer_v2_handoff_block_count = composerV2HandoffBlockCount;
-          debugRecord.composer_v2_handoff_chars = composerV2HandoffChars;
-          debugRecord.composer_v2_handoff_truncated = composerV2HandoffTruncated;
-          debugRecord.composer_v2_claim_counts = composerV2ClaimCounts;
-          debugRecord.composer_v2_pre_link_fail_reasons =
-            composerV2PreLinkFailReasons;
-          debugRecord.composer_v2_post_link_fail_reasons =
-            composerV2PostLinkFailReasons;
-          debugRecord.composer_v2_repair_attempted = composerV2RepairAttempted;
-          debugRecord.composer_v2_fallback_reason = composerV2FallbackReason;
-          debugRecord.composer_v2_expand_char_count = composerV2ExpandCharCount;
-          debugRecord.composer_v2_expand_raw_preview = composerV2ExpandRawPreview;
-          debugRecord.composer_v2_repair_char_count = composerV2RepairCharCount;
-          debugRecord.composer_v2_repair_raw_preview = composerV2RepairRawPreview;
-          debugRecord.composer_v2_expand_attempts = composerV2ExpandAttempts;
-          debugRecord.composer_v2_repair_attempts = composerV2RepairAttempts;
-          debugRecord.composer_v2_transient_retries = composerV2ExpandTransientRetries;
-          debugRecord.composer_v2_repair_skipped_due_to_expand_error =
-            composerV2RepairSkippedDueToExpandError;
-          debugRecord.composer_v2_expand_error_code = composerV2ExpandErrorCode;
-          debugRecord.composer_v2_projection_applied = composerV2ProjectionApplied;
-          debugRecord.composer_v2_best_attempt_stage = composerV2BestAttemptStage;
-          debugRecord.composer_v2_projection_guard_triggered =
-            composerV2ProjectionRegressionGuard?.triggered ?? false;
-          debugRecord.composer_v2_projection_guard_hard =
-            composerV2ProjectionRegressionGuard?.hard ?? false;
-          debugRecord.composer_v2_projection_guard_mode =
-            composerV2ProjectionRegressionGuard?.mode ?? "none";
-          debugRecord.composer_v2_projection_guard_retrieval_healthy =
-            composerV2ProjectionRegressionGuard?.retrieval_healthy ?? false;
-          debugRecord.composer_v2_projection_guard_llm_healthy =
-            composerV2ProjectionRegressionGuard?.llm_healthy ?? false;
-          debugRecord.composer_v2_projection_guard_reasons =
-            composerV2ProjectionRegressionGuard?.reasons ?? [];
-          debugRecord.composer_selection_lock_id = answerPlanShadow.selection_lock.lock_id;
-          debugRecord.composer_selection_locked =
-            answerPlanShadow.selection_lock.selector_locked;
-          debugRecord.composer_selection_primary_key =
-            answerPlanShadow.selection_lock.selector_primary_key;
-          debugRecord.composer_selection_family =
-            answerPlanShadow.selection_lock.selector_family;
-          debugRecord.composer_evidence_hash = answerPlanShadow.evidence_pack.evidence_hash;
-          debugRecord.turn_contract_hash = helixTurnContractHash;
-          debugRecord.objective_count = helixTurnContract.objectives.length;
-          debugRecord.answer_obligation_count =
-            helixTurnContract.obligations.length;
-          debugRecord.answer_obligations =
-            helixTurnContract.obligations.map((obligation: HelixAskAnswerObligation) => ({
-              id: obligation.id,
-              label: obligation.label,
-              kind: obligation.kind,
-              required: obligation.required,
-              required_slots: obligation.required_slots,
-            }));
-          debugRecord.slot_missing = answerPlanShadow.evidence_pack.slot_missing;
-          debugRecord.evidence_gap = answerPlanShadow.evidence_pack.evidence_gap;
-          debugRecord.objective_support = answerPlanShadow.evidence_pack.objective_support;
-          debugRecord.answer_obligation_coverage =
-            answerPlanShadow.evidence_pack.obligation_coverage;
-          debugRecord.answer_obligations_missing =
-            answerPlanShadow.evidence_pack.obligation_coverage
-              .filter(
-                (coverage: HelixAskEvidencePackObligationCoverage) =>
-                  coverage.status !== "covered",
-              )
-              .map((coverage: HelixAskEvidencePackObligationCoverage) => coverage.label);
-          debugRecord.answer_obligation_evidence =
-            answerPlanShadow.evidence_pack.obligation_evidence.slice(0, 8);
-          debugRecord.answer_evidence_blocks =
-            answerPlanShadow.evidence_pack.evidence_blocks.slice(0, 6);
-          debugRecord.answer_plan_sections = answerPlanShadow.sections.map((section: HelixAskAnswerPlanSection) => ({
-            id: section.id,
-            title: section.title,
-            kind: section.kind ?? "answer",
-            coverage_status: section.coverage_status ?? null,
-            obligation_ids: section.obligation_ids ?? [],
-          }));
-          debugRecord.anchor_integrity_ok =
-            validatedAfterEnforce.anchor_integrity_violations.length === 0;
-          debugRecord.answer_mode =
-            answerPlanShadow.prompt_family === "roadmap_planning" && evidenceGap
-              ? "partial_roadmap"
-              : openWorldBypassMode === "active"
-                ? "open_world"
-                : intentDomain === "hybrid"
-                  ? "hybrid"
-                  : intentDomain === "repo"
-                    ? "repo_grounded"
-                    : "general";
-          debugRecord.degrade_mode =
-            composerV2FallbackReason ??
-            composerSoftEnforceAction ??
-            answerPlanValidationShadow.degrade_reason ??
-            (answerPlanShadow.prompt_family === "roadmap_planning" && evidenceGap
-              ? "partial_roadmap"
-              : "none");
+          applyObjectiveComposerShadowDebugPayload({
+            debugPayload: debugRecord,
+            answerPlanShadow,
+            answerPlanValidationShadow,
+            validatedAfterEnforce,
+            promptResearchValidationAfter,
+            promptResearchRepairActions,
+            hardComposerGuardTriggered,
+            softSectionGuardTriggered,
+            composerSoftObserveRewriteApplied,
+            deterministicPreserveBlocked,
+            softSectionGuardEscalatedEnforce,
+            gateMode: HELIX_ASK_GATE_MODE,
+            softSectionGuardEligible,
+            softSectionGuardObserved,
+            softSectionGuardObserveSkipped,
+            composerSoftObserveReason,
+            composerSoftHardGuardReason,
+            composerSoftEnforceTriggerReason,
+            composerSoftEnforceAction,
+            composerFamilyDegradeSuppressed,
+            composerFamilyDegradeSuppressedReason,
+            objectiveLoopPrimaryComposerGuard,
+            composerV2Enabled,
+            composerV2Applied,
+            composerV2BriefSource,
+            composerV2EvidenceDigestSource,
+            composerV2EvidenceDigestClaimCount,
+            composerV2HandoffSource,
+            composerV2HandoffBlockCount,
+            composerV2HandoffChars,
+            composerV2HandoffTruncated,
+            composerV2ClaimCounts,
+            composerV2PreLinkFailReasons,
+            composerV2PostLinkFailReasons,
+            composerV2RepairAttempted,
+            composerV2FallbackReason,
+            composerV2ExpandCharCount,
+            composerV2ExpandRawPreview,
+            composerV2RepairCharCount,
+            composerV2RepairRawPreview,
+            composerV2ExpandAttempts,
+            composerV2RepairAttempts,
+            composerV2ExpandTransientRetries,
+            composerV2RepairSkippedDueToExpandError,
+            composerV2ExpandErrorCode,
+            composerV2ProjectionApplied,
+            composerV2BestAttemptStage,
+            composerV2ProjectionRegressionGuard,
+            helixTurnContractHash,
+            helixTurnContract,
+            evidenceGap,
+            openWorldBypassMode,
+            intentDomain,
+          });
         }
       }
       const ideologyDeterministicPostComposerActive = answerPath.includes(

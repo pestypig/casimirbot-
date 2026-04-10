@@ -4,6 +4,13 @@ import type {
   AstronomyReferenceFrameId,
   AstronomyTimeScale,
 } from "@shared/contracts/astronomy-frame.v1";
+import {
+  OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL,
+  type ObservableUniverseAccordionCatalogPresetId,
+  getObservableUniverseAccordionDefaultActiveEtaCatalogEntry,
+  getObservableUniverseAccordionEtaSelectableNearbyCatalog,
+  getObservableUniverseAccordionVisibleNearbyCatalog,
+} from "@shared/observable-universe-accordion-catalog.v1";
 import type { ObservableUniverseSupportedEtaMode } from "@shared/observable-universe-accordion-projections-constants";
 import type { ObservableUniverseAccordionEtaSurfaceResult } from "@shared/observable-universe-accordion-surfaces";
 
@@ -22,22 +29,37 @@ export type ObservableUniverseAccordionProjectRequest = {
   sourceModel: "warp_worldline_route_time";
   etaMode: ObservableUniverseSupportedEtaMode;
   renderEpoch_tcb_jy: number;
-  catalogPreset?: "nearby_local_rest_small";
+  catalogPreset?: ObservableUniverseAccordionCatalogPresetId;
   catalog?: ObservableUniverseAccordionCatalogSeed[];
 };
 
 export const DEFAULT_OBSERVABLE_UNIVERSE_RENDER_EPOCH_TCB_JY = 2016.0;
 
-export const OBSERVABLE_UNIVERSE_ACTIVE_TARGET = {
-  id: "alpha-cen-a",
-  label: "Alpha Centauri A",
-} as const;
+const DEFAULT_ACTIVE_TARGET =
+  getObservableUniverseAccordionDefaultActiveEtaCatalogEntry() ??
+  getObservableUniverseAccordionVisibleNearbyCatalog()[0];
 
-export const OBSERVABLE_UNIVERSE_NEARBY_VISIBLE_TARGETS = [
-  OBSERVABLE_UNIVERSE_ACTIVE_TARGET,
-  { id: "proxima", label: "Proxima Centauri" },
-  { id: "barnard", label: "Barnard's Star" },
-] as const;
+export const OBSERVABLE_UNIVERSE_ACTIVE_TARGET = DEFAULT_ACTIVE_TARGET
+  ? {
+      id: DEFAULT_ACTIVE_TARGET.id,
+      label: DEFAULT_ACTIVE_TARGET.label,
+    }
+  : {
+      id: "alpha-cen-a",
+      label: "Alpha Centauri A",
+    };
+
+export const OBSERVABLE_UNIVERSE_NEARBY_VISIBLE_TARGETS =
+  getObservableUniverseAccordionVisibleNearbyCatalog().map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+  }));
+
+export const OBSERVABLE_UNIVERSE_ETA_SELECTABLE_TARGETS =
+  getObservableUniverseAccordionEtaSelectableNearbyCatalog().map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+  }));
 
 export const buildObservableUniverseAccordionRequest = (
   estimateKind: ObservableUniverseSupportedEtaMode = "proper_time",
@@ -46,7 +68,7 @@ export const buildObservableUniverseAccordionRequest = (
   sourceModel: "warp_worldline_route_time",
   etaMode: estimateKind,
   renderEpoch_tcb_jy: DEFAULT_OBSERVABLE_UNIVERSE_RENDER_EPOCH_TCB_JY,
-  catalogPreset: "nearby_local_rest_small",
+  catalogPreset: OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL,
 });
 
 export async function fetchObservableUniverseAccordionSurface(

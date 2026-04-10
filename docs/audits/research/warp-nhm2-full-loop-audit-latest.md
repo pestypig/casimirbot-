@@ -8,7 +8,7 @@
 | contractVersion | nhm2_full_loop_audit/v1 |
 | auditId | nhm2_full_loop |
 | laneId | nhm2_shift_lapse |
-| generatedAt | 2026-04-10T06:06:58.602Z |
+| generatedAt | 2026-04-10T19:47:59.694Z |
 | selectedProfileId | stage1_centerline_alpha_0p995_v1 |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit |
 | currentClaimTier | diagnostic |
@@ -35,7 +35,7 @@
 | observerMetricPrimaryDriver | wec |
 | observerTilePrimaryDriver | wec |
 | observerPrimaryDriverAgreement | aligned |
-| observerPrimaryDriverNote | metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. NEC/SEC remain secondary search-driven failures on the tile-effective surface. |
+| observerPrimaryDriverNote | metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. |
 | observerMetricFirstInspectionTarget | metric_required.conditions.wec |
 | observerTileFirstInspectionTarget | tile_effective.conditions.wec |
 | observerSharedRootDriverStatus | shared_root_driver_confirmed |
@@ -50,10 +50,10 @@
 | metric.necMinOverAllNull | 0 |
 | metric.decStatus | fail |
 | metric.secStatus | pass |
-| tile.wecMinOverAllTimelike | -0.11480523685564506 |
-| tile.necMinOverAllNull | -0.05740261842782253 |
+| tile.wecMinOverAllTimelike | -59694026752 |
+| tile.necMinOverAllNull | 0 |
 | tile.decStatus | fail |
-| tile.secStatus | fail |
+| tile.secStatus | pass |
 
 ## Closure Checklist
 | section | expected evidence | found artifact/ref | contract parse status | lane/profile match | stale/mismatch status | section state | blocking reasons |

@@ -4968,15 +4968,32 @@ const buildTileObserverAuditTensorInput = (
   const { warpState, nhm2Active } = resolveNhm2ArtifactContext(state);
   const stressStats = (state.gr?.matter?.stressEnergy ??
     null) as StressEnergyStats | null;
-  const tileTensor =
-    extractNhm2SourceClosureTensor(warpState?.tileEffectiveStressEnergy) ??
-    extractNhm2SourceClosureTensor((state as any)?.tileEffectiveStressEnergy);
-  const observerRobust = stressStats?.observerRobust;
-  const globalRegion = stressStats?.tensorSampledSummaries?.regions?.find(
+  const fallbackBrick =
+    nhm2Active && (stressStats == null || stressStats.observerRobust == null)
+      ? buildStressEnergyBrick({
+          metricT00: toFiniteNumber((state as any)?.warp?.metricT00) ?? undefined,
+          metricT00Ref: asText((state as any)?.warp?.metricT00Ref) ?? undefined,
+          metricT00Source:
+            asText((state as any)?.warp?.metricT00Source) ??
+            asText((state as any)?.warp?.stressEnergySource) ??
+            undefined,
+          warpFieldType: "nhm2_shift_lapse",
+        })
+      : null;
+  const effectiveStressStats =
+    stressStats ?? (fallbackBrick?.stats as StressEnergyStats | null) ?? null;
+  const observerRobust = effectiveStressStats?.observerRobust;
+  const globalRegion = effectiveStressStats?.tensorSampledSummaries?.regions?.find(
     (region) => region.regionId === "global",
   );
-  const netFlux = Array.isArray(stressStats?.netFlux)
-    ? toFiniteVec3(stressStats.netFlux, [0, 0, 0])
+  const tileTensor =
+    (nhm2Active
+      ? extractNhm2SourceClosureTensor(globalRegion?.tensor)
+      : null) ??
+    extractNhm2SourceClosureTensor(warpState?.tileEffectiveStressEnergy) ??
+    extractNhm2SourceClosureTensor((state as any)?.tileEffectiveStressEnergy);
+  const netFlux = Array.isArray(effectiveStressStats?.netFlux)
+    ? toFiniteVec3(effectiveStressStats.netFlux, [0, 0, 0])
     : [0, 0, 0];
   const netMagnitude = magnitudeVec3(netFlux);
   const diagonalReady =
@@ -5026,19 +5043,19 @@ const buildTileObserverAuditTensorInput = (
       : diagonal?.conditions,
     fluxDiagnostics: {
       status:
-        observerRobust != null || stressStats != null
+        observerRobust != null || effectiveStressStats != null
           ? "available"
           : diagonalReady
             ? "unavailable"
             : "unavailable",
-      meanMagnitude: toFiniteNumber(stressStats?.avgFluxMagnitude) ?? null,
+      meanMagnitude: toFiniteNumber(effectiveStressStats?.avgFluxMagnitude) ?? null,
       maxMagnitude: null,
       netMagnitude: Number.isFinite(netMagnitude) ? netMagnitude : null,
       netDirection: normalizeVec3OrNull(
         Number.isFinite(netMagnitude) && netMagnitude > 1e-12 ? netFlux : null,
       ),
       note:
-        observerRobust != null || stressStats != null
+        observerRobust != null || effectiveStressStats != null
           ? "Flux diagnostics come from the tile-effective brick S_i channels."
           : diagonalReady
             ? "Tile-effective tensor fell back to diagonal-only observer audit; flux direction diagnostics were unavailable because S_i channels were not emitted."
@@ -5054,21 +5071,21 @@ const buildTileObserverAuditTensorInput = (
       : diagonal?.consistency,
     model: {
       pressureModel:
-        observerRobust != null || stressStats != null
+        observerRobust != null || effectiveStressStats != null
           ? "isotropic_pressure_proxy"
           : diagonalReady
             ? "diagonal_tensor_components"
             : "isotropic_pressure_proxy",
       fluxHandling:
-        observerRobust != null || stressStats != null
+        observerRobust != null || effectiveStressStats != null
           ? "voxel_flux_field"
           : "missing_t0i_flux_channels",
       shearHandling:
-        observerRobust != null || stressStats != null
+        observerRobust != null || effectiveStressStats != null
           ? "not_modeled_in_proxy"
           : "assumed_zero_from_missing_tij",
       limitationNotes:
-        observerRobust != null || stressStats != null
+        observerRobust != null || effectiveStressStats != null
           ? [
               "Tile-effective observer audit uses the brick isotropic-pressure proxy (p = pressureFactor * rho).",
               "Voxel flux S_i is resolved, but anisotropic pressure/shear terms are not promoted as full tensor truth in this artifact.",
@@ -5080,7 +5097,7 @@ const buildTileObserverAuditTensorInput = (
       note:
         typeof warpState?.tileEffectiveStressSource === "string"
           ? `Tile-effective tensor source: ${String(warpState.tileEffectiveStressSource)}`
-          : observerRobust != null || stressStats != null
+          : observerRobust != null || effectiveStressStats != null
             ? "Tile-effective observer audit comes from the GR matter brick surrogate."
             : "Tile-effective observer audit used the emitted diagonal tensor fallback.",
     },

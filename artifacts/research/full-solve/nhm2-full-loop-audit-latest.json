@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-10T06:06:58.602Z",
+  "generatedAt": "2026-04-10T19:47:59.694Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -275,7 +275,7 @@
       "observerMetricPrimaryDriver": "wec",
       "observerTilePrimaryDriver": "wec",
       "observerPrimaryDriverAgreement": "aligned",
-      "observerPrimaryDriverNote": "metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. NEC/SEC remain secondary search-driven failures on the tile-effective surface.",
+      "observerPrimaryDriverNote": "metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density.",
       "observerMetricFirstInspectionTarget": "metric_required.conditions.wec",
       "observerTileFirstInspectionTarget": "tile_effective.conditions.wec",
       "observerSharedRootDriverStatus": "shared_root_driver_confirmed",
@@ -298,14 +298,14 @@
       },
       "tile": {
         "state": "fail",
-        "wecMinOverAllTimelike": -0.11480523685564506,
-        "necMinOverAllNull": -0.05740261842782253,
+        "wecMinOverAllTimelike": -59694026752,
+        "necMinOverAllNull": 0,
         "decStatus": "fail",
-        "secStatus": "fail",
+        "secStatus": "pass",
         "observerWorstCaseLocation": "algebraic_type_i",
         "typeIFraction": 1,
         "missedViolationFraction": 0,
-        "maxRobustMinusEulerian": 0
+        "maxRobustMinusEulerian": 7.995948196094782e-13
       },
       "supportedClaimTiers": [
         "reduced-order",

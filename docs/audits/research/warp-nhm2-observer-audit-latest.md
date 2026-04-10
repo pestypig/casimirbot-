@@ -12,14 +12,14 @@
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-observer-audit |
 | familyId | nhm2_shift_lapse |
 | shiftLapseProfileId | stage1_centerline_alpha_0p995_v1 |
-| reasonCodes | metric_audit_incomplete, tile_audit_incomplete, observer_condition_failed, surrogate_model_limited |
+| reasonCodes | metric_audit_incomplete, observer_condition_failed, surrogate_model_limited |
 | observerBlockingAssessmentStatus | same_surface_violation_confirmed |
 | observerPromotionBlockingSurface | both |
 | observerPromotionBlockingCondition | mixed |
 | observerMetricPrimaryDriver | wec |
 | observerTilePrimaryDriver | wec |
 | observerPrimaryDriverAgreement | aligned |
-| observerPrimaryDriverNote | metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. NEC/SEC remain secondary search-driven failures on the tile-effective surface. |
+| observerPrimaryDriverNote | metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. |
 | observerMetricFirstInspectionTarget | metric_required.conditions.wec |
 | observerTileFirstInspectionTarget | tile_effective.conditions.wec |
 | observerSharedRootDriverStatus | shared_root_driver_confirmed |
@@ -31,7 +31,7 @@
 | observerRemediationSequenceStatus | metric_then_tile_proxy |
 | observerBlockingAssessmentNote | metric_required and tile_effective tensors emit concrete failing mixed WEC and DEC conditions with missedViolationFraction=0 and non-positive maxRobustMinusEulerian. Policy review remains required because surrogate-model limitations are still present. |
 | metricBlockingSummary | WEC=-57110812.99010783; DEC=-114221625.98021565 |
-| tileBlockingSummary | WEC=-0.11480523685564506; NEC=-0.05740261842782253; DEC=-0.22961047371129012; SEC=-0.05740261842782253 |
+| tileBlockingSummary | WEC=-57921138688; DEC=-115842277376 |
 
 ## Metric Required Tensor
 | field | value |
@@ -100,18 +100,18 @@
 |---|---|
 | tensorId | tile_effective |
 | status | fail |
-| completeness | incomplete |
+| completeness | complete |
 | tensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json |
-| sampleCount | 0 |
-| reasonCodes | tile_audit_incomplete, observer_condition_failed, surrogate_model_limited |
+| sampleCount | 2097152 |
+| reasonCodes | observer_condition_failed, surrogate_model_limited |
 | primaryBlockingCondition | wec |
 | primaryBlockingMode | eulerian_native |
-| primaryBlockingValue | -0.11480523685564506 |
+| primaryBlockingValue | -57921138688 |
 | primaryBlockingReference | tile_effective.conditions.wec |
-| primaryBlockingWhy | WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. NEC/SEC remain secondary search-driven failures on the tile-effective surface. |
+| primaryBlockingWhy | WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. |
 | rootCauseClass | negative_energy_density |
 | blockingDependencyStatus | dec_downstream_of_wec |
-| blockingDependencyNote | DEC fails on the same surface and is treated as downstream of the emitted WEC negativity. NEC and SEC remain secondary robust-only co-failures and are not treated as independent primary blockers. |
+| blockingDependencyNote | DEC fails on the same surface and is treated as downstream of the emitted WEC negativity. |
 | firstRemediationTarget | tile_effective.conditions.wec |
 | firstRemediationWhy | Start at the emitted WEC surface because DEC is downstream of the same negative energy density. |
 | upstreamDriverRef | gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy |
@@ -122,39 +122,39 @@
 | firstUpstreamRemediationWhy | Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface. |
 | wecProbeApplied | true |
 | wecProbeScale | 0.5 |
-| wecProbeBaseline | -0.11480523685564506 |
-| wecProbeResult | -0.11480523685564506 |
+| wecProbeBaseline | -57921138688 |
+| wecProbeResult | -57921138688 |
 | wecProbeDelta | 0 |
-| decProbeBaseline | -0.22961047371129012 |
-| decProbeResult | -0.22961047371129012 |
+| decProbeBaseline | -115842277376 |
+| decProbeResult | -115842277376 |
 | decProbeDelta | 0 |
 | wecProbeInterpretation | Metric-side WEC probe does not automatically lift this tile proxy surface because it depends on a separate proxy-derived upstream ref. |
 | rapidityCap | 2.5 |
 | rapidityCapBeta | 0.9866142981514303 |
-| typeI.count | 1 |
+| typeI.count | 2097152 |
 | typeI.fraction | 1 |
-| typeI.tolerance | 0 |
-| conditions.nec.status | fail |
-| conditions.nec.robustMin | -0.05740261842782253 |
+| typeI.tolerance | 1e-9 |
+| conditions.nec.status | pass |
+| conditions.nec.robustMin | 0 |
 | conditions.wec.status | fail |
-| conditions.wec.robustMin | -0.11480523685564506 |
-| conditions.sec.status | fail |
-| conditions.sec.robustMin | -0.05740261842782253 |
+| conditions.wec.robustMin | -57921138688 |
+| conditions.sec.status | pass |
+| conditions.sec.robustMin | 0 |
 | conditions.dec.status | fail |
-| conditions.dec.robustMin | -0.22961047371129012 |
-| fluxDiagnostics.status | unavailable |
-| fluxDiagnostics.meanMagnitude | 0 |
+| conditions.dec.robustMin | -115842277376 |
+| fluxDiagnostics.status | available |
+| fluxDiagnostics.meanMagnitude | 1.533629131803468e-16 |
 | fluxDiagnostics.maxMagnitude | 0 |
-| fluxDiagnostics.netMagnitude | 0 |
+| fluxDiagnostics.netMagnitude | 1.093891435288278e-16 |
 | fluxDiagnostics.netDirection | null |
-| fluxDiagnostics.note | Tile-effective tensor fell back to diagonal-only observer audit; flux direction diagnostics were unavailable because S_i channels were not emitted. |
+| fluxDiagnostics.note | Flux diagnostics come from the tile-effective brick S_i channels. |
 | consistency.robustNotGreaterThanEulerian | true |
-| consistency.maxRobustMinusEulerian | 0 |
-| model.pressureModel | diagonal_tensor_components |
-| model.fluxHandling | missing_t0i_flux_channels |
-| model.shearHandling | assumed_zero_from_missing_tij |
-| model.limitationNotes | Tile-effective tensor fell back to a diagonal-only observer audit because GR brick flux diagnostics were unavailable.; This fallback does not supply flux magnitude search over T0i terms. |
+| consistency.maxRobustMinusEulerian | 8.172629240021934e-13 |
+| model.pressureModel | isotropic_pressure_proxy |
+| model.fluxHandling | voxel_flux_field |
+| model.shearHandling | not_modeled_in_proxy |
+| model.limitationNotes | Tile-effective observer audit uses the brick isotropic-pressure proxy (p = pressureFactor * rho).; Voxel flux S_i is resolved, but anisotropic pressure/shear terms are not promoted as full tensor truth in this artifact. |
 | model.note | Tile-effective tensor source: pipeline |
-| missingInputs | tile_t0i_flux_channels_missing |
+| missingInputs | none |
 
 

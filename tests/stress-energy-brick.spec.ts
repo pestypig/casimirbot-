@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { buildStressEnergyBrick } from "../server/stress-energy-brick";
 import { buildStressEnergyFieldSetFromPipeline } from "../server/gr/evolution/stress-energy";
+import {
+  getGlobalPipelineState,
+  initializePipelineState,
+  setGlobalPipelineState,
+} from "../server/energy-pipeline";
 
 const baseParams = {
   dims: [20, 12, 12] as [number, number, number],
@@ -73,6 +78,62 @@ describe("stress-energy brick builder", () => {
     expect(global?.t00Diagnostics?.skippedCount).toBeNull();
     expect(global?.t00Diagnostics?.nonFiniteCount).toBeNull();
     expect(global?.t00Diagnostics?.evidenceStatus).toBe("inferred");
+  });
+
+  it("applies NHM2 shift-lapse attenuation to the metric-fed tile proxy lane", () => {
+    const previousState = getGlobalPipelineState();
+    try {
+      const baselineState = initializePipelineState();
+      baselineState.warpFieldType = "nhm2_shift_lapse";
+      baselineState.dynamicConfig = {
+        ...(baselineState.dynamicConfig ?? {}),
+        warpFieldType: "nhm2_shift_lapse",
+        alphaCenterline: 1,
+      } as any;
+      setGlobalPipelineState(baselineState);
+      const baseline = buildStressEnergyBrick({
+        ...baseParams,
+        metricT00: -5.826745096267209e7,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        warpFieldType: "nhm2_shift_lapse",
+      });
+
+      const attenuatedState = initializePipelineState();
+      attenuatedState.warpFieldType = "nhm2_shift_lapse";
+      attenuatedState.dynamicConfig = {
+        ...(attenuatedState.dynamicConfig ?? {}),
+        warpFieldType: "nhm2_shift_lapse",
+        alphaCenterline: 0.995,
+      } as any;
+      setGlobalPipelineState(attenuatedState);
+      const attenuated = buildStressEnergyBrick({
+        ...baseParams,
+        metricT00: -5.826745096267209e7,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        warpFieldType: "nhm2_shift_lapse",
+      });
+
+      const expectedRatio = 0.995 ** 4;
+      const baselineGlobalT00 =
+        baseline.stats.tensorSampledSummaries?.regions.find((region) => region.regionId === "global")?.tensor.T00 ??
+        baseline.stats.avgT00;
+      const attenuatedGlobalT00 =
+        attenuated.stats.tensorSampledSummaries?.regions.find((region) => region.regionId === "global")?.tensor.T00 ??
+        attenuated.stats.avgT00;
+
+      expect(Math.abs(attenuated.stats.avgT00)).toBeLessThan(Math.abs(baseline.stats.avgT00));
+      expect(Math.abs(attenuatedGlobalT00)).toBeLessThan(Math.abs(baselineGlobalT00));
+      expect(attenuated.stats.mapping?.rho_avg).toBeCloseTo(
+        (baseline.stats.mapping?.rho_avg ?? 0) * expectedRatio,
+        6,
+      );
+      expect(attenuated.stats.avgT00 / baseline.stats.avgT00).toBeCloseTo(expectedRatio, 5);
+      expect(attenuatedGlobalT00 / baselineGlobalT00).toBeCloseTo(expectedRatio, 5);
+    } finally {
+      setGlobalPipelineState(previousState);
+    }
   });
 
   it("computes observer-robust energy-condition margins", () => {

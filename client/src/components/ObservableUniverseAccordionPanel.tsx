@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   OBSERVABLE_UNIVERSE_SUPPORTED_ETA_MODES,
   type ObservableUniverseSupportedEtaMode,
@@ -7,6 +7,10 @@ import type {
   ObservableUniverseAccordionEtaSurfaceEntry,
   ObservableUniverseAccordionEtaSurfaceResult,
 } from "@shared/observable-universe-accordion-surfaces";
+import {
+  getObservableUniverseAccordionCatalogEntryById,
+  getObservableUniverseAccordionEtaSelectableNearbyCatalog,
+} from "@shared/observable-universe-accordion-catalog.v1";
 import { useObservableUniverseAccordion } from "@/hooks/useObservableUniverseAccordion";
 import {
   OBSERVABLE_UNIVERSE_ACTIVE_TARGET,
@@ -41,8 +45,10 @@ const formatMaybeDateEpoch = (value: number | null | undefined): string =>
 const formatVector = (value: Vec3): string =>
   `${value[0].toFixed(2)}, ${value[1].toFixed(2)}, ${value[2].toFixed(2)}`;
 
-const norm2d = (value: [number, number]): number =>
-  Math.hypot(value[0], value[1]);
+const formatLimitations = (value: string[]): string =>
+  value.length > 0 ? value.join(", ") : "none surfaced";
+
+const norm2d = (value: [number, number]): number => Math.hypot(value[0], value[1]);
 
 const project3dTo2d = (value: Vec3): [number, number] => {
   const yaw = Math.PI / 4;
@@ -59,10 +65,7 @@ const project3dTo2d = (value: Vec3): [number, number] => {
   return [x1, y2];
 };
 
-const pixelPoint = (
-  value: [number, number],
-  scale: number,
-): [number, number] => {
+const pixelPoint = (value: [number, number], scale: number): [number, number] => {
   const center = SVG_SIZE / 2;
   return [center + value[0] * scale, center - value[1] * scale];
 };
@@ -96,10 +99,30 @@ const modeLabel = (value: ObservableUniverseSupportedEtaMode | undefined): strin
 const supportLabelFor = (entry: ObservableUniverseAccordionEtaSurfaceEntry): string =>
   entry.etaSupport === "contract_backed" ? "contract-backed ETA" : "render-only";
 
+const supportBadgeClassName = (entry: ObservableUniverseAccordionEtaSurfaceEntry): string =>
+  entry.etaSupport === "contract_backed"
+    ? "rounded border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-cyan-200"
+    : "rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-200";
+
+const entryDisplayName = (entry: ObservableUniverseAccordionEtaSurfaceEntry): string =>
+  entry.label ?? entry.id;
+
+const DEFAULT_RENDER_ONLY_COPY =
+  "Visible in the nearby catalog, not yet backed by the explicit NHM2 ETA contract.";
+
+const formatContractState = (value: string | null | undefined): string =>
+  value ? value.replace(/_/g, " ") : "deferred";
+
+const ETA_SELECTABLE_NEARBY_CATALOG = getObservableUniverseAccordionEtaSelectableNearbyCatalog();
+
 const AccordionMap = ({
   entries,
+  selectedEntryId,
+  onSelectEntry,
 }: {
   entries: ObservableUniverseAccordionEtaSurfaceEntry[];
+  selectedEntryId: string | null;
+  onSelectEntry?: (entryId: string) => void;
 }) => {
   const geometry = useMemo(() => buildMapGeometry(entries), [entries]);
   const center = SVG_SIZE / 2;
@@ -156,80 +179,103 @@ const AccordionMap = ({
           stroke="rgba(100,116,139,0.28)"
           strokeWidth={1}
         />
-        {geometry.map(({ entry, canonicalPoint, outputPoint }) => (
-          <g key={entry.id}>
-            <line
-              x1={center}
-              y1={center}
-              x2={canonicalPoint[0]}
-              y2={canonicalPoint[1]}
-              stroke="rgba(148,163,184,0.8)"
-              strokeWidth={1.5}
-              strokeDasharray="5 5"
-            />
-            <circle
-              cx={canonicalPoint[0]}
-              cy={canonicalPoint[1]}
-              r={entry.etaSupport === "contract_backed" ? 4 : 5}
-              fill={
-                entry.etaSupport === "contract_backed"
-                  ? "rgba(148,163,184,0.95)"
-                  : "rgba(251,191,36,0.95)"
-              }
-            />
-            {entry.etaSupport === "contract_backed" ? (
-              <>
-                <line
-                  x1={center}
-                  y1={center}
-                  x2={outputPoint[0]}
-                  y2={outputPoint[1]}
-                  stroke="rgba(34,211,238,0.95)"
-                  strokeWidth={2.5}
-                />
+        {geometry.map(({ entry, canonicalPoint, outputPoint }) => {
+          const isSelected = entry.id === selectedEntryId;
+          const markerPoint =
+            entry.etaSupport === "contract_backed" ? outputPoint : canonicalPoint;
+          return (
+            <g
+              key={entry.id}
+              data-testid={`observable-universe-accordion-map-entry-${entry.id}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Inspect ${entryDisplayName(entry)}`}
+              onClick={() => onSelectEntry?.(entry.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectEntry?.(entry.id);
+                }
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              {isSelected ? (
                 <circle
-                  cx={outputPoint[0]}
-                  cy={outputPoint[1]}
-                  r={6}
-                  fill="rgba(34,211,238,1)"
+                  cx={markerPoint[0]}
+                  cy={markerPoint[1]}
+                  r={entry.etaSupport === "contract_backed" ? 12 : 11}
+                  fill="none"
+                  stroke={
+                    entry.etaSupport === "contract_backed"
+                      ? "rgba(34,211,238,0.55)"
+                      : "rgba(251,191,36,0.55)"
+                  }
+                  strokeWidth={2}
                 />
-              </>
-            ) : null}
-            <text
-              x={
-                (entry.etaSupport === "contract_backed" ? outputPoint[0] : canonicalPoint[0]) +
-                10
-              }
-              y={
-                (entry.etaSupport === "contract_backed" ? outputPoint[1] : canonicalPoint[1]) -
-                10
-              }
-              fill="rgba(226,232,240,1)"
-              fontSize="12"
-            >
-              {entry.label ?? entry.id}
-            </text>
-            <text
-              x={canonicalPoint[0] + 8}
-              y={canonicalPoint[1] + 16}
-              fill={
-                entry.etaSupport === "contract_backed"
-                  ? "rgba(148,163,184,0.95)"
-                  : "rgba(251,191,36,0.95)"
-              }
-              fontSize="11"
-            >
-              {entry.etaSupport === "contract_backed" ? "canonical" : "render-only"}
-            </text>
-          </g>
-        ))}
+              ) : null}
+              <line
+                x1={center}
+                y1={center}
+                x2={canonicalPoint[0]}
+                y2={canonicalPoint[1]}
+                stroke="rgba(148,163,184,0.8)"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+              />
+              <circle
+                cx={canonicalPoint[0]}
+                cy={canonicalPoint[1]}
+                r={entry.etaSupport === "contract_backed" ? 4 : 5}
+                fill={
+                  entry.etaSupport === "contract_backed"
+                    ? "rgba(148,163,184,0.95)"
+                    : "rgba(251,191,36,0.95)"
+                }
+              />
+              {entry.etaSupport === "contract_backed" ? (
+                <>
+                  <line
+                    x1={center}
+                    y1={center}
+                    x2={outputPoint[0]}
+                    y2={outputPoint[1]}
+                    stroke="rgba(34,211,238,0.95)"
+                    strokeWidth={isSelected ? 3 : 2.5}
+                  />
+                  <circle
+                    cx={outputPoint[0]}
+                    cy={outputPoint[1]}
+                    r={isSelected ? 7 : 6}
+                    fill="rgba(34,211,238,1)"
+                  />
+                </>
+              ) : null}
+              <text
+                x={(entry.etaSupport === "contract_backed" ? outputPoint[0] : canonicalPoint[0]) + 10}
+                y={(entry.etaSupport === "contract_backed" ? outputPoint[1] : canonicalPoint[1]) - 10}
+                fill="rgba(226,232,240,1)"
+                fontSize="12"
+                fontWeight={isSelected ? 700 : 400}
+              >
+                {entryDisplayName(entry)}
+              </text>
+              <text
+                x={canonicalPoint[0] + 8}
+                y={canonicalPoint[1] + 16}
+                fill={
+                  entry.etaSupport === "contract_backed"
+                    ? "rgba(148,163,184,0.95)"
+                    : "rgba(251,191,36,0.95)"
+                }
+                fontSize="11"
+              >
+                {entry.etaSupport === "contract_backed" ? "canonical" : "render-only"}
+              </text>
+            </g>
+          );
+        })}
         <circle cx={center} cy={center} r={7} fill="rgba(250,204,21,0.95)" />
-        <text
-          x={center + 10}
-          y={center - 12}
-          fill="rgba(250,250,249,1)"
-          fontSize="12"
-        >
+        <text x={center + 10} y={center - 12} fill="rgba(250,250,249,1)" fontSize="12">
           Sol
         </text>
       </svg>
@@ -248,14 +294,69 @@ export function ObservableUniverseAccordionPanel({
   targetLabel = OBSERVABLE_UNIVERSE_ACTIVE_TARGET.label,
 }: ObservableUniverseAccordionPanelProps) {
   const computedEntries = surface?.status === "computed" ? surface.entries : [];
-  const activeEntry =
+  const contractBackedEntries =
     surface?.status === "computed"
-      ? computedEntries.find((entry) => entry.etaSupport === "contract_backed") ?? null
-      : null;
+      ? ETA_SELECTABLE_NEARBY_CATALOG.flatMap((catalogEntry) => {
+          const entry = computedEntries.find(
+            (candidate) =>
+              candidate.id === catalogEntry.id &&
+              candidate.etaSupport === "contract_backed",
+          );
+          return entry ? [entry] : [];
+        })
+      : [];
   const renderOnlyEntries =
     surface?.status === "computed"
       ? computedEntries.filter((entry) => entry.etaSupport === "render_only")
       : [];
+  const [activeEtaTargetId, setActiveEtaTargetId] = useState<string | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (contractBackedEntries.length === 0) {
+      if (activeEtaTargetId !== null) {
+        setActiveEtaTargetId(null);
+      }
+      return;
+    }
+    if (
+      activeEtaTargetId &&
+      contractBackedEntries.some((entry) => entry.id === activeEtaTargetId)
+    ) {
+      return;
+    }
+    setActiveEtaTargetId(contractBackedEntries[0]?.id ?? null);
+  }, [activeEtaTargetId, contractBackedEntries]);
+
+  const activeEntry =
+    contractBackedEntries.find((entry) => entry.id === activeEtaTargetId) ??
+    contractBackedEntries[0] ??
+    null;
+
+  useEffect(() => {
+    const nextSelectedId = activeEntry?.id ?? computedEntries[0]?.id ?? null;
+    if (
+      !selectedEntryId ||
+      !computedEntries.some((entry) => entry.id === selectedEntryId)
+    ) {
+      setSelectedEntryId(nextSelectedId);
+    }
+  }, [activeEntry?.id, computedEntries, selectedEntryId]);
+
+  const selectedEntry =
+    computedEntries.find((entry) => entry.id === selectedEntryId) ??
+    activeEntry ??
+    computedEntries[0] ??
+    null;
+  const selectedCatalogContract = getObservableUniverseAccordionCatalogEntryById(
+    selectedEntry?.id,
+  );
+  const selectedSupportReason =
+    selectedCatalogContract?.supportReason ??
+    selectedEntry?.renderOnlyReason ??
+    DEFAULT_RENDER_ONLY_COPY;
+  const selectedSupportEvidence = selectedCatalogContract?.supportEvidence ?? null;
+  const activeEtaTargetLabel = activeEntry?.label ?? targetLabel;
   const statusLabel =
     surface?.status === "computed"
       ? "contract-backed"
@@ -273,8 +374,8 @@ export function ObservableUniverseAccordionPanel({
             Observable Universe Accordion
           </h3>
           <p className="mt-1 text-xs text-slate-400">
-            Small nearby-star catalog with one explicit NHM2 ETA lane. Sol stays
-            fixed, the sky direction stays canonical, and only contract-backed
+            Small nearby-star catalog with governed NHM2 ETA eligibility. Sol
+            stays fixed, the sky direction stays canonical, and only evidence-backed
             targets receive radius remaps.
           </p>
         </div>
@@ -285,11 +386,40 @@ export function ObservableUniverseAccordionPanel({
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
         <span className="uppercase tracking-[0.18em] text-slate-500">
-          ETA-backed target
+          Active ETA target
         </span>
-        <span className="rounded border border-slate-700 px-2 py-1 text-slate-100">
-          {activeEntry?.label ?? targetLabel}
-        </span>
+        {contractBackedEntries.length > 1 ? (
+          <label className="flex items-center gap-2">
+            <select
+              aria-label="Active ETA target"
+              data-testid="observable-universe-accordion-active-target-selector"
+              value={activeEntry?.id ?? ""}
+              onChange={(event) => {
+                setActiveEtaTargetId(event.target.value);
+                setSelectedEntryId(event.target.value);
+              }}
+              className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100"
+            >
+              {contractBackedEntries.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entryDisplayName(entry)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span
+            data-testid="observable-universe-accordion-active-target"
+            className="rounded border border-slate-700 px-2 py-1 text-slate-100"
+          >
+            {activeEtaTargetLabel}
+          </span>
+        )}
+        {contractBackedEntries.length <= 1 ? (
+          <span className="text-slate-500">
+            read-only: explicit NHM2 contract lane only
+          </span>
+        ) : null}
         <span className="uppercase tracking-[0.18em] text-slate-500">
           Visible nearby catalog
         </span>
@@ -328,6 +458,11 @@ export function ObservableUniverseAccordionPanel({
         </Button>
       </div>
 
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs text-slate-400">
+        Visible stars may be render-only when they are in the nearby catalog but
+        not yet backed by the explicit NHM2 ETA contract.
+      </div>
+
       {isLoading && !surface && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-slate-300">
           Resolving the nearby-star accordion surface...
@@ -342,33 +477,146 @@ export function ObservableUniverseAccordionPanel({
 
       {surface?.status === "computed" && computedEntries.length > 0 ? (
         <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-          <AccordionMap entries={computedEntries} />
+          <AccordionMap
+            entries={computedEntries}
+            selectedEntryId={selectedEntry?.id ?? null}
+            onSelectEntry={setSelectedEntryId}
+          />
 
           <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Active projection
-              </div>
-              {activeEntry ? (
-                <div className="mt-3 space-y-2 text-sm text-slate-200">
-                  <div>
-                    {activeEntry.label ?? activeEntry.id}:{" "}
-                    {activeEntry.estimateYears?.toFixed(3)} yr
+            <div
+              data-testid="observable-universe-accordion-entry-details"
+              className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    Entry details
                   </div>
-                  <div>Mode: {modeLabel(activeEntry.estimateKind ?? undefined)}</div>
-                  <div>Driving profile: {activeEntry.drivingProfileId}</div>
-                  <div>
-                    Supported band membership:{" "}
-                    {activeEntry.withinSupportedBand
-                      ? "within supported band"
-                      : "outside supported band"}
+                  <div className="mt-1 text-sm text-slate-200">
+                    {selectedEntry ? entryDisplayName(selectedEntry) : "No selected entry"}
                   </div>
-                  <div>Frame: {activeEntry.frame_id}</div>
-                  <div>Frame realization: {activeEntry.frame_realization ?? "Gaia_CRF3"}</div>
-                  <div>Render epoch: {formatMaybeDateEpoch(activeEntry.render_epoch_tcb_jy)}</div>
-                  <div>Provenance: {activeEntry.provenance_class}</div>
-                  <div>Source artifact: {activeEntry.sourceArtifactPath}</div>
                 </div>
+                {selectedEntry ? (
+                  <span
+                    data-testid="observable-universe-accordion-entry-details-support-badge"
+                    className={supportBadgeClassName(selectedEntry)}
+                  >
+                    {supportLabelFor(selectedEntry)}
+                  </span>
+                ) : null}
+              </div>
+
+              {selectedEntry ? (
+                <>
+                  {selectedEntry.etaSupport === "render_only" ? (
+                    <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                      {selectedSupportReason}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-100">
+                      Explicit NHM2 ETA contract is active for this entry and is
+                      backed by the shared catalog evidence contract.
+                    </div>
+                  )}
+
+                  <dl className="mt-3 space-y-0">
+                    {renderRow("Support state", supportLabelFor(selectedEntry))}
+                    {renderRow(
+                      "Support contract state",
+                      formatContractState(selectedCatalogContract?.etaContractState),
+                    )}
+                    {renderRow(
+                      "Support policy",
+                      selectedCatalogContract?.supportPolicy ?? "deferred",
+                    )}
+                    {renderRow("Frame", selectedEntry.frame_id)}
+                    {renderRow(
+                      "Frame realization",
+                      selectedEntry.frame_realization ?? "Gaia_CRF3",
+                    )}
+                    {renderRow(
+                      "Source epoch",
+                      formatMaybeDateEpoch(selectedEntry.source_epoch_tcb_jy),
+                    )}
+                    {renderRow(
+                      "Render epoch",
+                      formatMaybeDateEpoch(selectedEntry.render_epoch_tcb_jy),
+                    )}
+                    {renderRow("Provenance", selectedEntry.provenance_class)}
+                    {renderRow("Dynamic state", selectedEntry.dynamic_state)}
+                    {renderRow(
+                      "Canonical position",
+                      formatVector(selectedEntry.canonicalPosition_m),
+                    )}
+                    {renderRow(
+                      "Input direction unit",
+                      formatVector(selectedEntry.inputDirectionUnit),
+                    )}
+                    {renderRow(
+                      "Propagation limitations",
+                      formatLimitations(selectedEntry.propagation_limitations),
+                    )}
+                    {selectedEntry.etaSupport === "contract_backed" ? (
+                      <>
+                        {renderRow("ETA years", selectedEntry.estimateYears.toFixed(3))}
+                        {renderRow("Mode", modeLabel(selectedEntry.estimateKind))}
+                        {renderRow("Driving profile", selectedEntry.drivingProfileId)}
+                        {renderRow(
+                          "Supported band",
+                          selectedEntry.withinSupportedBand
+                            ? "within supported band"
+                            : "outside supported band",
+                        )}
+                        {renderRow(
+                          "Mapped radius (m)",
+                          selectedEntry.mappedRadius_m.toExponential(3),
+                        )}
+                        {renderRow(
+                          "Rendered position",
+                          formatVector(selectedEntry.outputPosition_m),
+                        )}
+                        {renderRow("Source artifact", selectedEntry.sourceArtifactPath)}
+                        {renderRow(
+                          "Evidence target",
+                          selectedSupportEvidence
+                            ? `${selectedSupportEvidence.targetId} (${selectedSupportEvidence.targetFrame})`
+                            : "deferred",
+                        )}
+                        {renderRow(
+                          "Evidence bundle",
+                          selectedSupportEvidence?.evidenceKind ?? "deferred",
+                        )}
+                        {renderRow(
+                          "Policy profiles",
+                          selectedSupportEvidence
+                            ? `${selectedSupportEvidence.defaultOperatingProfileId} | floor ${selectedSupportEvidence.supportedBandFloorProfileId} | ceiling ${selectedSupportEvidence.supportedBandCeilingProfileId}`
+                            : "deferred",
+                        )}
+                        {renderRow(
+                          "Boundary artifact",
+                          selectedSupportEvidence?.sourceBoundaryArtifactPath ?? "deferred",
+                        )}
+                        {renderRow(
+                          "Default comparison artifact",
+                          selectedSupportEvidence
+                            ?.sourceDefaultMissionTimeComparisonArtifactPath ?? "deferred",
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {renderRow(
+                          "Support reason",
+                          selectedSupportReason,
+                        )}
+                        {renderRow(
+                          "Rendered marker",
+                          "canonical-only marker; no ETA remap applied",
+                        )}
+                      </>
+                    )}
+                  </dl>
+                </>
               ) : (
                 <div className="mt-3 text-sm text-amber-100">
                   No contract-backed ETA target is active. The panel stays honest
@@ -383,18 +631,33 @@ export function ObservableUniverseAccordionPanel({
               </div>
               <dl className="mt-3 space-y-0">
                 {renderRow("Radius meaning", surface.radiusMeaning)}
-                {renderRow("Default operating profile", surface.defaultOperatingProfileId ?? "deferred")}
-                {renderRow("Supported band floor", surface.supportedBandFloorProfileId ?? "deferred")}
-                {renderRow("Supported band ceiling", surface.supportedBandCeilingProfileId ?? "deferred")}
-                {renderRow("Evidence floor", surface.evidenceFloorProfileId ?? "deferred")}
-                {renderRow("Evidence floor alpha", formatNumber(surface.evidenceFloorCenterlineAlpha))}
-                {renderRow("Support buffer", formatNumber(surface.supportBufferDeltaCenterlineAlpha))}
+                {renderRow(
+                  "Default operating profile",
+                  surface.defaultOperatingProfileId ?? "deferred",
+                )}
+                {renderRow(
+                  "Supported band floor",
+                  surface.supportedBandFloorProfileId ?? "deferred",
+                )}
+                {renderRow(
+                  "Supported band ceiling",
+                  surface.supportedBandCeilingProfileId ?? "deferred",
+                )}
+                {renderRow(
+                  "Evidence floor",
+                  surface.evidenceFloorProfileId ?? "deferred",
+                )}
+                {renderRow(
+                  "Evidence floor alpha",
+                  formatNumber(surface.evidenceFloorCenterlineAlpha),
+                )}
+                {renderRow(
+                  "Support buffer",
+                  formatNumber(surface.supportBufferDeltaCenterlineAlpha),
+                )}
                 {renderRow("Contract status", surface.supportedBandStatus ?? "deferred")}
                 {renderRow("Hidden anchors", String(surface.hiddenAnchorCount))}
-                {renderRow(
-                  "Render-only nearby stars",
-                  String(renderOnlyEntries.length),
-                )}
+                {renderRow("Render-only nearby stars", String(renderOnlyEntries.length))}
               </dl>
             </div>
 
@@ -402,60 +665,55 @@ export function ObservableUniverseAccordionPanel({
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
                 Visible nearby catalog
               </div>
+              <div className="mt-2 text-xs text-slate-400">
+                Select a nearby star to inspect its frame metadata and support state.
+              </div>
               <div className="mt-3 space-y-3 text-xs text-slate-300">
-                {computedEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-xl border border-slate-800 px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-slate-100">
-                        {entry.label ?? entry.id}
-                      </span>
-                      <span
-                        className={
-                          entry.etaSupport === "contract_backed"
-                            ? "rounded border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-cyan-200"
-                            : "rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-200"
-                        }
-                      >
-                        {supportLabelFor(entry)}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-slate-400">
-                      Frame {entry.frame_id} · provenance {entry.provenance_class}
-                    </div>
-                    {entry.etaSupport === "render_only" ? (
-                      <div className="mt-2 text-amber-100">{entry.renderOnlyReason}</div>
-                    ) : (
-                      <div className="mt-2 text-slate-300">
-                        {entry.estimateYears?.toFixed(3)} yr via {entry.drivingProfileId}
+                {computedEntries.map((entry) => {
+                  const isSelected = entry.id === selectedEntry?.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      data-testid={`observable-universe-accordion-catalog-row-${entry.id}`}
+                      onClick={() => setSelectedEntryId(entry.id)}
+                      className={
+                        isSelected
+                          ? "block w-full rounded-xl border border-cyan-500/40 bg-cyan-500/5 px-3 py-2 text-left"
+                          : "block w-full rounded-xl border border-slate-800 px-3 py-2 text-left"
+                      }
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-semibold text-slate-100">
+                          {entryDisplayName(entry)}
+                        </span>
+                        <span
+                          data-testid={`observable-universe-accordion-support-badge-${entry.id}`}
+                          className={supportBadgeClassName(entry)}
+                        >
+                          {supportLabelFor(entry)}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <div className="mt-2 text-slate-400">
+                        Frame {entry.frame_id} | provenance {entry.provenance_class}
+                      </div>
+                      {entry.etaSupport === "render_only" ? (
+                        <div className="mt-2 text-amber-100">
+                          {getObservableUniverseAccordionCatalogEntryById(entry.id)
+                            ?.supportReason ??
+                            entry.renderOnlyReason ??
+                            DEFAULT_RENDER_ONLY_COPY}
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-slate-300">
+                          {entry.estimateYears.toFixed(3)} yr via {entry.drivingProfileId}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            {activeEntry && (
-              <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                  Entry vectors
-                </div>
-                <div className="mt-3 space-y-2 text-xs text-slate-300">
-                  <div>Input direction unit: {formatVector(activeEntry.inputDirectionUnit)}</div>
-                  <div>Canonical position: {formatVector(activeEntry.canonicalPosition_m)}</div>
-                  <div>Rendered position: {formatVector(activeEntry.outputPosition_m)}</div>
-                  <div>Mapped radius (m): {activeEntry.mappedRadius_m?.toExponential(3)}</div>
-                  <div>
-                    Propagation limitations:{" "}
-                    {activeEntry.propagation_limitations.length > 0
-                      ? activeEntry.propagation_limitations.join(", ")
-                      : "none surfaced"}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       ) : (

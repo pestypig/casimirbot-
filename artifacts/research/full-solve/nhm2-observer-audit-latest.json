@@ -7,7 +7,6 @@
   "completeness": "incomplete",
   "reasonCodes": [
     "metric_audit_incomplete",
-    "tile_audit_incomplete",
     "observer_condition_failed",
     "surrogate_model_limited"
   ],
@@ -18,7 +17,7 @@
   "observerMetricPrimaryDriver": "wec",
   "observerTilePrimaryDriver": "wec",
   "observerPrimaryDriverAgreement": "aligned",
-  "observerPrimaryDriverNote": "metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. NEC/SEC remain secondary search-driven failures on the tile-effective surface.",
+  "observerPrimaryDriverNote": "metric_required first localizes to WEC (eulerian_native) at metric_required.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. tile_effective first localizes to WEC (eulerian_native) at tile_effective.conditions.wec. WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density.",
   "observerMetricFirstInspectionTarget": "metric_required.conditions.wec",
   "observerTileFirstInspectionTarget": "tile_effective.conditions.wec",
   "observerSharedRootDriverStatus": "shared_root_driver_confirmed",
@@ -200,40 +199,39 @@
     "tileEffective": {
       "tensorId": "tile_effective",
       "status": "fail",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "tensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json",
-      "sampleCount": 0,
+      "sampleCount": 2097152,
       "reasonCodes": [
-        "tile_audit_incomplete",
         "observer_condition_failed",
         "surrogate_model_limited"
       ],
       "rapidityCap": 2.5,
       "rapidityCapBeta": 0.9866142981514303,
       "typeI": {
-        "count": 1,
+        "count": 2097152,
         "fraction": 1,
-        "tolerance": 0
+        "tolerance": 1e-9
       },
       "conditions": {
         "nec": {
-          "status": "fail",
-          "eulerianMin": 0,
-          "eulerianMean": 0,
-          "robustMin": -0.05740261842782253,
-          "robustMean": -0.05740261842782253,
-          "eulerianViolationFraction": 0,
-          "robustViolationFraction": 1,
-          "missedViolationFraction": 1,
-          "severityGainMin": -0.05740261842782253,
-          "severityGainMean": -0.05740261842782253,
-          "maxRobustMinusEulerian": -0.05740261842782253,
+          "status": "pass",
+          "eulerianMin": -8.172629240021934e-13,
+          "eulerianMean": -9.975958197963988e-18,
+          "robustMin": 0,
+          "robustMean": 0,
+          "eulerianViolationFraction": 0.014923095703125,
+          "robustViolationFraction": 0,
+          "missedViolationFraction": 0,
+          "severityGainMin": -2.9347948767369236e-13,
+          "severityGainMean": 9.975958197963988e-18,
+          "maxRobustMinusEulerian": 8.172629240021934e-13,
           "worstCase": {
             "index": 0,
-            "value": -0.05740261842782253,
+            "value": 0,
             "direction": [
+              -1,
               0,
-              1,
               0
             ],
             "rapidity": 0,
@@ -242,21 +240,21 @@
         },
         "wec": {
           "status": "fail",
-          "eulerianMin": -0.11480523685564506,
-          "eulerianMean": -0.11480523685564506,
-          "robustMin": -0.11480523685564506,
-          "robustMean": -0.11480523685564506,
-          "eulerianViolationFraction": 1,
-          "robustViolationFraction": 1,
+          "eulerianMin": -57921138688,
+          "eulerianMean": -57110813.13004573,
+          "robustMin": -57921138688,
+          "robustMean": -57110813.13004573,
+          "eulerianViolationFraction": 0.028730392456054688,
+          "robustViolationFraction": 0.028730392456054688,
           "missedViolationFraction": 0,
           "severityGainMin": 0,
           "severityGainMean": 0,
           "maxRobustMinusEulerian": 0,
           "worstCase": {
-            "index": 0,
-            "value": -0.11480523685564506,
+            "index": 1003273,
+            "value": -57921138688,
             "direction": [
-              1,
+              -1,
               0,
               0
             ],
@@ -265,23 +263,23 @@
           }
         },
         "sec": {
-          "status": "fail",
-          "eulerianMin": 0.08610392764173379,
-          "eulerianMean": 0.08610392764173379,
-          "robustMin": -0.05740261842782253,
-          "robustMean": -0.05740261842782253,
+          "status": "pass",
+          "eulerianMin": 0,
+          "eulerianMean": 57110813.13004573,
+          "robustMin": 0,
+          "robustMean": 0,
           "eulerianViolationFraction": 0,
-          "robustViolationFraction": 1,
-          "missedViolationFraction": 1,
-          "severityGainMin": -0.14350654606955632,
-          "severityGainMean": -0.14350654606955632,
-          "maxRobustMinusEulerian": -0.14350654606955632,
+          "robustViolationFraction": 0,
+          "missedViolationFraction": 0,
+          "severityGainMin": -57921138688,
+          "severityGainMean": -57110813.13004573,
+          "maxRobustMinusEulerian": 0,
           "worstCase": {
             "index": 0,
-            "value": -0.05740261842782253,
+            "value": 0,
             "direction": [
+              -1,
               0,
-              1,
               0
             ],
             "rapidity": 0,
@@ -290,21 +288,21 @@
         },
         "dec": {
           "status": "fail",
-          "eulerianMin": -0.11480523685564506,
-          "eulerianMean": -0.11480523685564506,
-          "robustMin": -0.22961047371129012,
-          "robustMean": -0.22961047371129012,
-          "eulerianViolationFraction": 1,
-          "robustViolationFraction": 1,
+          "eulerianMin": -57921138688,
+          "eulerianMean": -57110813.13004573,
+          "robustMin": -115842277376,
+          "robustMean": -114221626.26009145,
+          "eulerianViolationFraction": 0.028730392456054688,
+          "robustViolationFraction": 0.028730392456054688,
           "missedViolationFraction": 0,
-          "severityGainMin": -0.11480523685564506,
-          "severityGainMean": -0.11480523685564506,
-          "maxRobustMinusEulerian": -0.11480523685564506,
+          "severityGainMin": -57921138688,
+          "severityGainMean": -57110813.13004573,
+          "maxRobustMinusEulerian": 0,
           "worstCase": {
-            "index": 0,
-            "value": -0.22961047371129012,
+            "index": 1003273,
+            "value": -115842277376,
             "direction": [
-              1,
+              -1,
               0,
               0
             ],
@@ -314,38 +312,36 @@
         }
       },
       "fluxDiagnostics": {
-        "status": "unavailable",
-        "meanMagnitude": 0,
+        "status": "available",
+        "meanMagnitude": 1.533629131803468e-16,
         "maxMagnitude": 0,
-        "netMagnitude": 0,
+        "netMagnitude": 1.093891435288278e-16,
         "netDirection": null,
-        "note": "Tile-effective tensor fell back to diagonal-only observer audit; flux direction diagnostics were unavailable because S_i channels were not emitted."
+        "note": "Flux diagnostics come from the tile-effective brick S_i channels."
       },
       "consistency": {
         "robustNotGreaterThanEulerian": true,
-        "maxRobustMinusEulerian": 0
+        "maxRobustMinusEulerian": 8.172629240021934e-13
       },
       "model": {
-        "pressureModel": "diagonal_tensor_components",
-        "fluxHandling": "missing_t0i_flux_channels",
-        "shearHandling": "assumed_zero_from_missing_tij",
+        "pressureModel": "isotropic_pressure_proxy",
+        "fluxHandling": "voxel_flux_field",
+        "shearHandling": "not_modeled_in_proxy",
         "limitationNotes": [
-          "Tile-effective tensor fell back to a diagonal-only observer audit because GR brick flux diagnostics were unavailable.",
-          "This fallback does not supply flux magnitude search over T0i terms."
+          "Tile-effective observer audit uses the brick isotropic-pressure proxy (p = pressureFactor * rho).",
+          "Voxel flux S_i is resolved, but anisotropic pressure/shear terms are not promoted as full tensor truth in this artifact."
         ],
         "note": "Tile-effective tensor source: pipeline"
       },
-      "missingInputs": [
-        "tile_t0i_flux_channels_missing"
-      ],
+      "missingInputs": [],
       "primaryBlockingCondition": "wec",
       "primaryBlockingMode": "eulerian_native",
-      "primaryBlockingValue": -0.11480523685564506,
+      "primaryBlockingValue": -57921138688,
       "primaryBlockingReference": "tile_effective.conditions.wec",
-      "primaryBlockingWhy": "WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. NEC/SEC remain secondary search-driven failures on the tile-effective surface.",
+      "primaryBlockingWhy": "WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density.",
       "rootCauseClass": "negative_energy_density",
       "blockingDependencyStatus": "dec_downstream_of_wec",
-      "blockingDependencyNote": "DEC fails on the same surface and is treated as downstream of the emitted WEC negativity. NEC and SEC remain secondary robust-only co-failures and are not treated as independent primary blockers.",
+      "blockingDependencyNote": "DEC fails on the same surface and is treated as downstream of the emitted WEC negativity.",
       "firstRemediationTarget": "tile_effective.conditions.wec",
       "firstRemediationWhy": "Start at the emitted WEC surface because DEC is downstream of the same negative energy density.",
       "upstreamDriverRef": "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy",
@@ -356,11 +352,11 @@
       "firstUpstreamRemediationWhy": "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface.",
       "wecProbeApplied": true,
       "wecProbeScale": 0.5,
-      "wecProbeBaseline": -0.11480523685564506,
-      "wecProbeResult": -0.11480523685564506,
+      "wecProbeBaseline": -57921138688,
+      "wecProbeResult": -57921138688,
       "wecProbeDelta": 0,
-      "decProbeBaseline": -0.22961047371129012,
-      "decProbeResult": -0.22961047371129012,
+      "decProbeBaseline": -115842277376,
+      "decProbeResult": -115842277376,
       "decProbeDelta": 0,
       "wecProbeInterpretation": "Metric-side WEC probe does not automatically lift this tile proxy surface because it depends on a separate proxy-derived upstream ref."
     }

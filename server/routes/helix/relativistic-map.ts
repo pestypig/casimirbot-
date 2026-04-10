@@ -6,11 +6,18 @@ import {
   buildObservableUniverseAccordionEtaProjection,
 } from "@shared/observable-universe-accordion-projections";
 import {
+  OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL,
+  type ObservableUniverseAccordionCatalogPresetId,
+  getObservableUniverseAccordionCatalogEntryById,
+  getObservableUniverseAccordionVisibleNearbyCatalog,
+} from "@shared/observable-universe-accordion-catalog.v1";
+import {
   OBSERVABLE_UNIVERSE_NHM2_ETA_POLICY,
   type ObservableUniverseSupportedEtaMode,
 } from "@shared/observable-universe-accordion-projections-constants";
 import {
   buildObservableUniverseAccordionEtaSurface,
+  type ObservableUniverseAccordionEtaSurfaceResult,
 } from "@shared/observable-universe-accordion-surfaces";
 import { buildRelativisticMapProjection } from "@shared/relativistic-map-projections";
 import type {
@@ -94,7 +101,9 @@ const ProjectSchema = z
     etaMode: z.enum(["proper_time", "coordinate_time"]).optional(),
     renderEpoch_tcb_jy: z.number().finite().optional(),
     includeHiddenAnchorsDebug: z.boolean().optional(),
-    catalogPreset: z.enum(["nearby_local_rest_small"]).optional(),
+    catalogPreset: z
+      .enum([OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL])
+      .optional(),
     catalog: z.array(CatalogEntrySchema).min(1).optional(),
     control: ControlSchema.optional(),
   })
@@ -116,7 +125,8 @@ const ProjectSchema = z
     if (
       value.catalogPreset &&
       !(
-        value.catalogPreset === "nearby_local_rest_small" &&
+        value.catalogPreset ===
+          OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL &&
         value.sourceModel === "warp_worldline_route_time" &&
         value.projectionKind === "sun_centered_accessibility"
       )
@@ -179,12 +189,6 @@ const loadObservableUniverseAccordionEtaProjection = () => {
   });
 };
 
-const OBSERVABLE_UNIVERSE_LOCAL_REST_PRESET = [
-  { id: "alpha-cen-a", label: "Alpha Centauri A" },
-  { id: "proxima", label: "Proxima Centauri" },
-  { id: "barnard", label: "Barnard's Star" },
-] as const;
-
 const LOCAL_REST_PRESET_RADIUS_PC = 6;
 
 const julianYearToIsoString = (julianYear: number): string => {
@@ -203,6 +207,7 @@ const mjdToJulianYear = (mjd: number | undefined): number =>
 const buildNearbyLocalRestSmallCatalog = async (
   renderEpoch_tcb_jy?: number,
 ): Promise<Array<z.infer<typeof CatalogEntrySchema>>> => {
+  const visibleCatalog = getObservableUniverseAccordionVisibleNearbyCatalog();
   const snapshot = await buildLocalRestSnapshot({
     radius_pc: LOCAL_REST_PRESET_RADIUS_PC,
     page: 1,
@@ -214,7 +219,7 @@ const buildNearbyLocalRestSmallCatalog = async (
   });
   const starsById = new Map(snapshot.stars.map((star) => [star.id, star]));
 
-  return OBSERVABLE_UNIVERSE_LOCAL_REST_PRESET.flatMap((target) => {
+  return visibleCatalog.flatMap((target) => {
     const star = starsById.get(target.id);
     if (!star) return [];
     return [
@@ -240,13 +245,16 @@ const buildNearbyLocalRestSmallCatalog = async (
 
 const resolveAccordionCatalogRequest = async (args: {
   catalog?: Array<z.infer<typeof CatalogEntrySchema>>;
-  catalogPreset?: "nearby_local_rest_small";
+  catalogPreset?: ObservableUniverseAccordionCatalogPresetId;
   renderEpoch_tcb_jy?: number;
 }) => {
   if (args.catalog && args.catalog.length > 0) {
     return args.catalog;
   }
-  if (args.catalogPreset === "nearby_local_rest_small") {
+  if (
+    args.catalogPreset ===
+    OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL
+  ) {
     return buildNearbyLocalRestSmallCatalog(args.renderEpoch_tcb_jy);
   }
   return [];
@@ -287,6 +295,48 @@ const buildAstronomyCatalogForAccordionRender = (args: {
   };
 };
 
+const DEFAULT_RENDER_ONLY_REASON =
+  "Visible in the nearby catalog, but outside the explicit NHM2 target contract. The entry remains render-only and does not receive a fabricated ETA.";
+
+const harmonizeProjectionWithAccordionCatalogContract = (
+  projection: ObservableUniverseAccordionEtaSurfaceResult,
+): ObservableUniverseAccordionEtaSurfaceResult => {
+  if (projection.status !== "computed") {
+    return projection;
+  }
+
+  return {
+    ...projection,
+    entries: projection.entries.map((entry) => {
+      const catalogEntry = getObservableUniverseAccordionCatalogEntryById(entry.id);
+      if (entry.etaSupport === "contract_backed" && !(catalogEntry?.etaSelectable ?? false)) {
+        return {
+          ...entry,
+          etaSupport: "render_only" as const,
+          etaSupportReason: "target_outside_explicit_contract" as const,
+          outputPosition_m: entry.canonicalPosition_m,
+          mappedRadius_m: null,
+          estimateKind: null,
+          estimateSeconds: null,
+          estimateYears: null,
+          drivingProfileId: null,
+          drivingCenterlineAlpha: null,
+          withinSupportedBand: null,
+          sourceArtifactPath: null,
+          renderOnlyReason: catalogEntry?.supportReason ?? DEFAULT_RENDER_ONLY_REASON,
+        };
+      }
+      if (entry.etaSupport === "render_only") {
+        return {
+          ...entry,
+          renderOnlyReason: catalogEntry?.supportReason ?? entry.renderOnlyReason,
+        };
+      }
+      return entry;
+    }),
+  };
+};
+
 helixRelativisticMapRouter.post("/project", async (req, res) => {
   setCors(res);
   const parsed = ProjectSchema.safeParse(req.body ?? {});
@@ -309,20 +359,22 @@ helixRelativisticMapRouter.post("/project", async (req, res) => {
         catalog: requestedCatalog,
         renderEpoch_tcb_jy: parsed.data.renderEpoch_tcb_jy,
       });
-      const projection = buildObservableUniverseAccordionEtaSurface({
-        contract: loadObservableUniverseAccordionEtaProjection(),
-        catalog: astronomyCatalog.visibleCatalog,
-        estimateKind:
-          (parsed.data.etaMode as ObservableUniverseSupportedEtaMode | undefined) ??
-          "proper_time",
+      const projection = harmonizeProjectionWithAccordionCatalogContract(
+        buildObservableUniverseAccordionEtaSurface({
+          contract: loadObservableUniverseAccordionEtaProjection(),
+          catalog: astronomyCatalog.visibleCatalog,
+          estimateKind:
+            (parsed.data.etaMode as ObservableUniverseSupportedEtaMode | undefined) ??
+            "proper_time",
         canonicalFrameId: "ICRS",
         canonicalFrameRealization: "Gaia_CRF3",
         renderEpoch_tcb_jy: astronomyCatalog.renderEpoch,
         propagationApplied: astronomyCatalog.propagationApplied,
-        hiddenAnchorCount: astronomyCatalog.frameLayer.hidden_anchor_count,
-        hiddenAnchorsUsed: true,
-        frameLayer: astronomyCatalog.frameLayer,
-      });
+          hiddenAnchorCount: astronomyCatalog.frameLayer.hidden_anchor_count,
+          hiddenAnchorsUsed: true,
+          frameLayer: astronomyCatalog.frameLayer,
+        }),
+      );
       res.setHeader("Cache-Control", "no-store");
       res.json({
         ok: projection.status === "computed",

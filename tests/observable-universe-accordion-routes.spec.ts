@@ -2,6 +2,11 @@ import fs from "node:fs";
 import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL,
+  getObservableUniverseAccordionEtaSelectableNearbyCatalog,
+  getObservableUniverseAccordionVisibleNearbyCatalog,
+} from "../shared/observable-universe-accordion-catalog.v1";
 import { helixRelativisticMapRouter } from "../server/routes/helix/relativistic-map";
 
 const makeApp = () => {
@@ -74,26 +79,28 @@ describe("observable universe accordion ETA route", () => {
 
   it("can resolve the nearby local-rest preset into a mixed accordion catalog", async () => {
     const app = makeApp();
+    const visibleCatalog = getObservableUniverseAccordionVisibleNearbyCatalog();
+    const etaSelectableCatalog = getObservableUniverseAccordionEtaSelectableNearbyCatalog();
     const res = await request(app)
       .post("/api/helix/relativistic-map/project")
       .send({
         projectionKind: "sun_centered_accessibility",
         sourceModel: "warp_worldline_route_time",
-        catalogPreset: "nearby_local_rest_small",
+        catalogPreset:
+          OBSERVABLE_UNIVERSE_ACCORDION_CATALOG_PRESET_NEARBY_LOCAL_REST_SMALL,
       })
       .expect(200);
 
     expect(res.body.ok).toBe(true);
     expect(res.body.projection?.status).toBe("computed");
+    expect(res.body.projection?.entries?.map((entry: any) => entry.id)).toEqual(
+      visibleCatalog.map((entry) => entry.id),
+    );
     expect(
-      res.body.projection?.entries?.some((entry: any) => entry.id === "alpha-cen-a"),
-    ).toBe(true);
-    expect(
-      res.body.projection?.entries?.some((entry: any) => entry.id === "proxima"),
-    ).toBe(true);
-    expect(
-      res.body.projection?.entries?.some((entry: any) => entry.id === "barnard"),
-    ).toBe(true);
+      res.body.projection?.entries
+        ?.filter((entry: any) => entry.etaSupport === "contract_backed")
+        ?.map((entry: any) => entry.id),
+    ).toEqual(etaSelectableCatalog.map((entry) => entry.id));
     expect(
       res.body.projection?.entries?.filter((entry: any) => entry.etaSupport === "render_only")
         ?.length,

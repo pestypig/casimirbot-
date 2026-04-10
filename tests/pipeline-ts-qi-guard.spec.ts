@@ -328,7 +328,7 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect(typeof artifact.tensors.tileEffective.typeI.fraction).toBe("number");
   });
 
-  it("applies the selected NHM2 shift-lapse profile on the metric T00 lane without automatic tile proxy lift", async () => {
+  it("applies the selected NHM2 shift-lapse profile on the metric T00 lane and the production tile proxy lane", async () => {
     process.env.WARP_STRICT_CONGRUENCE = "1";
     const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
 
@@ -374,16 +374,23 @@ describe("pipeline ts/qi autoscale integration", () => {
     );
     expect(
       tunedObserver.tensors.tileEffective.conditions.wec.robustMin,
-    ).toBeCloseTo(
+    ).toBeGreaterThan(
       baselineObserver.tensors.tileEffective.conditions.wec.robustMin,
-      12,
     );
     expect(
       tunedObserver.tensors.tileEffective.conditions.dec.robustMin,
-    ).toBeCloseTo(
+    ).toBeGreaterThan(
       baselineObserver.tensors.tileEffective.conditions.dec.robustMin,
-      12,
     );
+    const expectedTileScale = 0.995 ** 4;
+    expect(
+      tunedObserver.tensors.tileEffective.conditions.wec.robustMin /
+        baselineObserver.tensors.tileEffective.conditions.wec.robustMin,
+    ).toBeCloseTo(expectedTileScale, 6);
+    expect(
+      tunedObserver.tensors.tileEffective.conditions.dec.robustMin /
+        baselineObserver.tensors.tileEffective.conditions.dec.robustMin,
+    ).toBeCloseTo(expectedTileScale, 6);
   });
 
   it("preserves configured QI tau/sampler for guard evaluation after telemetry refresh", async () => {
