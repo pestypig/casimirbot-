@@ -1,8 +1,11 @@
 import {
   STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
 } from "../contract";
+import { getSolarProductRegistryIdentity } from "../solar-product-registry";
+import { getSolarReferencePackIdentity } from "../solar-reference-pack";
 import type {
   FieldStatus,
+  StarSimSolarArtifactMetadata,
   StarSimArtifactIntegrityStatus,
   StarSimArtifactRef,
   StarSimRequest,
@@ -16,7 +19,16 @@ import type {
 
 export { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION };
 export const STAR_SIM_SOURCE_CACHE_SCHEMA_VERSION = "star-sim-source-cache/1" as const;
-export const STAR_SIM_SOURCE_REGISTRY_VERSION = "star-sim-sources/9" as const;
+const buildSourceRegistryVersion = (): string => {
+  const referenceIdentity = getSolarReferencePackIdentity();
+  const productIdentity = getSolarProductRegistryIdentity();
+  const referenceHashFragment = referenceIdentity.content_hash.replace(/^sha256:/, "").slice(0, 12);
+  const productHashFragment = productIdentity.content_hash.replace(/^sha256:/, "").slice(0, 12);
+  return `star-sim-sources/18+${referenceIdentity.version}+${referenceHashFragment}+${productIdentity.version}+${productHashFragment}`;
+};
+
+export const STAR_SIM_SOURCE_REGISTRY_VERSION = buildSourceRegistryVersion();
+export const getStarSimSourceRegistryVersion = (): string => buildSourceRegistryVersion();
 
 type AstrometryRequest = NonNullable<StarSimRequest["astrometry"]>;
 type PhotometryRequest = NonNullable<StarSimRequest["photometry"]>;
@@ -89,10 +101,18 @@ export interface StarSimSourceCacheWriteArgs {
   selection_manifest: StarSimSourceSelectionManifest;
   raw_records: StarSimSourceRecord[];
   cache_identity: StarSimSourceCacheIdentity;
+  extra_artifacts?: StarSimSourceCacheExtraArtifact[];
 }
 
 export interface StarSimSourceCacheWriteResult {
   artifact_refs: StarSimArtifactRef[];
+}
+
+export interface StarSimSourceCacheExtraArtifact {
+  kind: string;
+  file_name: string;
+  content: unknown;
+  metadata?: StarSimSolarArtifactMetadata;
 }
 
 export type SourceSelectionReason =

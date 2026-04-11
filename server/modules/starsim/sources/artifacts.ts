@@ -24,6 +24,7 @@ type SourceCacheFileEntry = {
   path: string;
   hash: string;
   size_bytes: number;
+  metadata?: StarSimArtifactRef["metadata"];
 };
 
 type SourceCacheManifest = {
@@ -119,6 +120,7 @@ const buildFileEntry = async (args: {
   kind: string;
   stagedPath: string;
   finalPath: string;
+  metadata?: StarSimArtifactRef["metadata"];
 }): Promise<SourceCacheFileEntry> => {
   const stat = await fs.stat(args.stagedPath);
   return {
@@ -126,6 +128,7 @@ const buildFileEntry = async (args: {
     path: asRelative(args.finalPath),
     hash: await readFileHash(args.stagedPath),
     size_bytes: stat.size,
+    metadata: args.metadata,
   };
 };
 
@@ -146,6 +149,7 @@ const ensureFinalizedRefs = (args: {
       path: file.path,
       hash: file.hash,
       integrity_status: "verified",
+      metadata: file.metadata,
     });
   }
   return refs;
@@ -319,6 +323,18 @@ export const writeStarSimSourceCache = async (
       const finalPath = path.join(paths.root, fileName);
       await writeJsonAtomic(stagedPath, record.raw_payload);
       fileEntries.push(await buildFileEntry({ kind: `${record.catalog}_raw`, stagedPath, finalPath }));
+    }
+
+    for (const artifact of args.extra_artifacts ?? []) {
+      const stagedPath = path.join(tempRoot, artifact.file_name);
+      const finalPath = path.join(paths.root, artifact.file_name);
+      await writeJsonAtomic(stagedPath, artifact.content);
+      fileEntries.push(await buildFileEntry({
+        kind: artifact.kind,
+        stagedPath,
+        finalPath,
+        metadata: artifact.metadata,
+      }));
     }
 
     const createdAt = new Date().toISOString();

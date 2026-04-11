@@ -1,12 +1,29 @@
 import type {
   CanonicalStar,
   PhysicsFlagValue,
+  StarSimRequest,
+  StarSimSolarBaselinePhase,
+  StarSimSolarBaselineSupport,
   StarSimSupportedDomain,
   StarSimSupportedDomainReason,
 } from "./contract";
+import {
+  getSolarBenchmarkPackById,
+  STAR_SIM_SOLAR_BASELINE_DOMAIN_ID,
+} from "./solar-benchmarks";
+import {
+  collectSolarCycleBlockingReasons,
+  collectSolarClosureBlockingReasons,
+  collectSolarEruptiveBlockingReasons,
+  evaluateSolarCycleObservedDiagnostics,
+  evaluateSolarInteriorClosureDiagnostics,
+  evaluateSolarEruptiveCatalogDiagnostics,
+} from "./solar-diagnostics";
+import { getSolarReferencePackIdentity } from "./solar-reference-anchors";
 
 export const STAR_SIM_SUPPORTED_DOMAIN_ID = "solar_like_main_sequence_live";
 export const STAR_SIM_SUPPORTED_DOMAIN_VERSION = "star-sim-domain/1";
+export const STAR_SIM_SOLAR_BASELINE_DOMAIN_VERSION = "star-sim-solar-domain/5";
 
 type SupportedLiveLane = "structure_mesa" | "oscillation_gyre";
 
@@ -150,5 +167,124 @@ export const evaluateStarSimSupportedDomain = (
     fit_constraints_applied: mergeConstraints(lane, star),
     benchmark_pack_id: DEFAULT_BENCHMARK_PACKS[lane],
     notes,
+  };
+};
+
+const isSolarObservedRequest = (request: StarSimRequest): boolean => {
+  const objectId = request.target?.object_id?.trim().toLowerCase();
+  const name = request.target?.name?.trim().toLowerCase();
+  return objectId === "sun" || objectId === "sol" || name === "sun" || name === "sol" || request.orbital_context?.naif_body_id === 10;
+};
+
+const solarMissingReasonBySection: Record<string, StarSimSupportedDomainReason> = {
+  solar_interior_profile: "solar_interior_profile_missing",
+  solar_layer_boundaries: "solar_layer_boundaries_missing",
+  solar_global_modes: "solar_global_modes_missing",
+  solar_neutrino_constraints: "solar_neutrino_constraints_missing",
+  solar_cycle_indices: "solar_cycle_indices_missing",
+  solar_magnetogram: "solar_magnetogram_missing",
+  solar_flare_catalog: "solar_flare_catalog_missing",
+  solar_cme_catalog: "solar_cme_catalog_missing",
+  solar_irradiance_series: "solar_irradiance_series_missing",
+};
+
+const getPresentSolarSections = (request: StarSimRequest): string[] =>
+  Object.entries(request.solar_baseline ?? {})
+    .filter(([key, value]) => key !== "schema_version" && value !== undefined)
+    .map(([key]) => key)
+    .sort((left, right) => left.localeCompare(right));
+
+export const evaluateSolarObservedBaseline = (
+  request: StarSimRequest,
+  phase: StarSimSolarBaselinePhase,
+): StarSimSolarBaselineSupport => {
+  const benchmarkPack = getSolarBenchmarkPackById(phase);
+  const solarReferencePack = getSolarReferencePackIdentity();
+  const presentSections = getPresentSolarSections(request);
+  const reasons = new Set<StarSimSupportedDomainReason>();
+  const notes: string[] = [
+    "The solar observed baseline is a Sun-only observational scaffold and does not imply full-Sun physics closure.",
+  ];
+
+  if (!benchmarkPack) {
+    throw new Error(`Unknown solar observed benchmark pack: ${phase}`);
+  }
+
+  if (!isSolarObservedRequest(request)) {
+    reasons.add("solar_target_required");
+    notes.push("This baseline domain is reserved for the Sun (object_id/name sun|sol or NAIF body 10).");
+  }
+
+  for (const section of benchmarkPack.required_sections) {
+    if (!presentSections.includes(section)) {
+      reasons.add(solarMissingReasonBySection[section] ?? "insufficient_observables");
+    }
+  }
+
+  const closureDiagnostics =
+    phase === "solar_interior_closure_v1"
+      ? evaluateSolarInteriorClosureDiagnostics(request)
+      : undefined;
+  const cycleDiagnostics =
+    phase === "solar_cycle_observed_v1"
+      ? evaluateSolarCycleObservedDiagnostics(request)
+      : undefined;
+  const eruptiveDiagnostics =
+    phase === "solar_eruptive_catalog_v1"
+      ? evaluateSolarEruptiveCatalogDiagnostics(request)
+      : undefined;
+  if (closureDiagnostics) {
+    for (const reason of collectSolarClosureBlockingReasons(closureDiagnostics)) {
+      reasons.add(reason);
+    }
+    notes.push(
+      `Phase 0 interior closure is anchored to ${solarReferencePack.id}@${solarReferencePack.version} for convection-zone depth, envelope helium, low-degree mode support, and neutrino vector completeness.`,
+    );
+    if (closureDiagnostics.overall_status === "warn") {
+      notes.push("One or more interior closure checks are at warning strength; inspect closure_diagnostics for details.");
+    }
+  }
+  if (cycleDiagnostics) {
+    for (const reason of collectSolarCycleBlockingReasons(cycleDiagnostics)) {
+      reasons.add(reason);
+    }
+    notes.push(
+      `Solar cycle observed readiness is anchored to ${solarReferencePack.id}@${solarReferencePack.version} for cycle scalars, polarity labels, magnetogram linkage, and active-region context.`,
+    );
+    if (cycleDiagnostics.overall_status === "warn") {
+      notes.push("One or more cycle observed checks are advisory-only warnings; inspect cycle_diagnostics for details.");
+    }
+  }
+  if (eruptiveDiagnostics) {
+    for (const reason of collectSolarEruptiveBlockingReasons(eruptiveDiagnostics)) {
+      reasons.add(reason);
+    }
+    notes.push(
+      `Solar eruptive observed readiness is anchored to ${solarReferencePack.id}@${solarReferencePack.version} for flare coverage, CME coverage, irradiance continuity, and source-region linkage context.`,
+    );
+    if (eruptiveDiagnostics.overall_status === "warn") {
+      notes.push("One or more eruptive catalog checks are advisory-only warnings; inspect eruptive_diagnostics for details.");
+    }
+  }
+
+  notes.push(...benchmarkPack.notes);
+
+  return {
+    id: STAR_SIM_SOLAR_BASELINE_DOMAIN_ID,
+    version: STAR_SIM_SOLAR_BASELINE_DOMAIN_VERSION,
+    phase_id: phase,
+    passed: reasons.size === 0,
+    reasons: [...reasons],
+    required_sections: [...benchmarkPack.required_sections],
+    optional_sections: [...benchmarkPack.optional_sections],
+    present_sections: presentSections,
+    benchmark_pack_id: benchmarkPack.id,
+    solar_reference_pack_id: solarReferencePack.id,
+    solar_reference_pack_version: solarReferencePack.version,
+    conceptual_lanes: [...benchmarkPack.conceptual_lanes],
+    notes,
+    ...(closureDiagnostics ? { closure_diagnostics: closureDiagnostics } : {}),
+    ...(cycleDiagnostics ? { cycle_diagnostics: cycleDiagnostics } : {}),
+    ...(eruptiveDiagnostics ? { eruptive_diagnostics: eruptiveDiagnostics } : {}),
   };
 };

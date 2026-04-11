@@ -1,0 +1,96 @@
+{
+  "source_id": "solar-observed-fixture:sun-eruptive-observed",
+  "instrument": "GOES/SWPC+SOHO/LASCO+SDO/EVE",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2025-01-01T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed solar eruptive observed scaffold only.",
+  "section_metadata_overrides": {
+    "solar_flare_catalog": {
+      "instrument": "GOES/SWPC",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "goes_flare_catalog_v1",
+      "source_product_family": "flare_catalog_products",
+      "source_doc_ids": ["goes_xray"]
+    },
+    "solar_cme_catalog": {
+      "instrument": "SOHO/LASCO",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "lasco_cme_catalog_v1",
+      "source_product_family": "cme_catalog_products",
+      "source_doc_ids": ["lasco_docs"]
+    },
+    "solar_irradiance_series": {
+      "instrument": "SDO/EVE+GOES",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "eve_goes_irradiance_context_v1",
+      "source_product_family": "solar_irradiance_products",
+      "source_doc_ids": ["eve_docs", "goes_xray"]
+    }
+  },
+  "payload": {
+    "solar_flare_catalog": {
+      "event_refs": [
+        "fixture:solar/flares/goes-2025-001",
+        "fixture:solar/flares/goes-2025-002"
+      ],
+      "source_region_refs": [
+        "fixture:solar/active-regions/noaa-13000"
+      ],
+      "flare_count": 2,
+      "strongest_goes_class": "M3.4"
+    },
+    "solar_cme_catalog": {
+      "event_refs": [
+        "fixture:solar/cmes/lasco-2025-001"
+      ],
+      "source_region_refs": [
+        "fixture:solar/active-regions/noaa-13000"
+      ],
+      "cme_count": 1
+    },
+    "solar_irradiance_series": {
+      "tsi_ref": "fixture:solar/irradiance/tsi",
+      "euv_ref": "fixture:solar/irradiance/eve-euv",
+      "xray_ref": "fixture:solar/irradiance/goes-xray"
+    }
+  }
+}

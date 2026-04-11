@@ -4,15 +4,24 @@ import type {
   StarSimResolveResponse,
   StarSimSourceCatalog,
   StarSimSourceIdentifiers,
+  StarSimSolarBaselinePhase,
+  StarSimSolarObservedBaseline,
 } from "../contract";
 import { canonicalizeStarSimRequest } from "../canonicalize";
 import { resolveBenchmarkTarget } from "../benchmark-targets";
 import { buildLaneDiagnosticSummary } from "../diagnostics";
-import { evaluateStarSimSupportedDomain } from "../domain";
+import { evaluateSolarProvenanceDiagnostics } from "../solar-diagnostics";
+import { evaluateSolarObservedBaseline, evaluateStarSimSupportedDomain } from "../domain";
+import { getSolarProductRegistryIdentity } from "../solar-product-registry";
+import {
+  buildAndPersistSolarBaselineSummary,
+  decorateResolveResponseWithSolarBaselineSummary,
+} from "../solar-repeatability";
 import { getGaiaDr3AdapterVersion, resolveGaiaDr3Source } from "./gaia-dr3";
 import { getLamostDr10AdapterVersion, resolveLamostDr10Source } from "./lamost-dr10";
 import { getTasocAdapterVersion, resolveTasocSource } from "./tasoc";
 import { getTessMastAdapterVersion, resolveTessMastSource } from "./tess-mast";
+import { resolveSolarObservedSource } from "./adapters/solar-observed";
 import {
   readStarSimSourceCache,
   writeStarSimSourceCache,
@@ -35,10 +44,11 @@ import {
 } from "./selection";
 import { getSdssAstraAdapterVersion, resolveSdssAstraSource } from "./sdss-astra";
 import {
-  STAR_SIM_SOURCE_REGISTRY_VERSION,
+  getStarSimSourceRegistryVersion,
   type StarSimSourceCacheIdentity,
   type StarSimSourceRecord,
 } from "./types";
+import { getSolarReferencePackIdentity } from "../solar-reference-pack";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 const normalizeIdentifier = (value: string | null | undefined): string =>
@@ -75,7 +85,7 @@ const getRecordTrustedIdentityBasis = (args: {
 };
 
 const buildCacheIdentity = (): StarSimSourceCacheIdentity => ({
-  registry_version: STAR_SIM_SOURCE_REGISTRY_VERSION,
+  registry_version: getStarSimSourceRegistryVersion(),
   adapter_versions: {
     gaia_dr3: getGaiaDr3AdapterVersion(),
     sdss_astra: getSdssAstraAdapterVersion(),
@@ -108,6 +118,40 @@ const hasSelection = (fieldIds: string[], selectionManifest: ReturnType<typeof b
   fieldIds.some((fieldId) => Boolean(selectionManifest.fields[fieldId]));
 
 const secondaryCatalogs: Array<StarSimSourceCatalog> = ["sdss_astra", "lamost_dr10", "tasoc", "tess_mast"];
+const solarBaselinePhaseIds: StarSimSolarBaselinePhase[] = [
+  "solar_interior_closure_v1",
+  "solar_cycle_observed_v1",
+  "solar_eruptive_catalog_v1",
+];
+
+const isSolarObservedRequest = (request: StarSimRequest): boolean => {
+  const objectId = request.target?.object_id?.trim().toLowerCase();
+  const name = request.target?.name?.trim().toLowerCase();
+  return objectId === "sun" || objectId === "sol" || name === "sun" || name === "sol" || request.orbital_context?.naif_body_id === 10;
+};
+
+const mergeSolarBaseline = (
+  request: StarSimRequest,
+  patch: StarSimSolarObservedBaseline | null,
+): StarSimRequest => {
+  if (!patch) {
+    return request;
+  }
+  return {
+    ...request,
+    solar_baseline: {
+      schema_version: patch.schema_version,
+      ...(patch as Omit<StarSimSolarObservedBaseline, "schema_version">),
+      ...(request.solar_baseline ?? {}),
+    },
+  };
+};
+
+const getPresentSolarSections = (baseline: StarSimRequest["solar_baseline"]): string[] =>
+  Object.entries(baseline ?? {})
+    .filter(([key, value]) => key !== "schema_version" && value !== undefined)
+    .map(([key]) => key)
+    .sort((left, right) => left.localeCompare(right));
 
 const applyCrossmatchPolicy = (args: {
   request: StarSimRequest;
@@ -262,11 +306,12 @@ const summarizeResolutionState = (args: {
 }) => {
   const reasons = new Set<string>();
   const notes: string[] = [];
-  if (!args.records.some((record) => record.catalog === "gaia_dr3")) {
+  const solarObserved = isSolarObservedRequest(args.request);
+  if (!solarObserved && !args.records.some((record) => record.catalog === "gaia_dr3")) {
     reasons.add("gaia_target_not_found");
     notes.push("Gaia DR3 identity/astrometry could not be resolved for this request.");
   }
-  if (!hasSelection(
+  if (!solarObserved && !hasSelection(
     ["spectroscopy.teff_K", "spectroscopy.logg_cgs", "spectroscopy.metallicity_feh"],
     args.selectionManifest,
   )) {
@@ -308,7 +353,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     cacheIdentity,
   });
   if (cacheRead.status === "hit" && cacheRead.response) {
-    return cacheRead.response;
+    return decorateResolveResponseWithSolarBaselineSummary(cacheRead.response);
   }
 
   const sourceHints = normalizeSourceHints(request.source_hints);
@@ -328,6 +373,15 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
   const notes: string[] = [];
   const reasons: string[] = [];
   let identifiers = request.identifiers ?? {};
+  let requestForResolution = request;
+  let solarObservedArtifact:
+    | {
+        kind: string;
+        file_name: string;
+        content: unknown;
+        metadata: NonNullable<StarSimResolveResponse["source_resolution"]["artifact_refs"]>[number]["metadata"];
+      }
+    | null = null;
 
   if (fetchMode === "disabled") {
     reasons.push("source_fetch_disabled");
@@ -387,15 +441,31 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     }
   }
 
+  if (isSolarObservedRequest(request) && fetchMode !== "disabled" && fetchMode !== "cache_only") {
+    const solarObserved = await resolveSolarObservedSource(request);
+    if (solarObserved.baseline_patch) {
+      requestForResolution = mergeSolarBaseline(requestForResolution, solarObserved.baseline_patch);
+      solarObservedArtifact = {
+        kind: "solar_observed_baseline",
+        file_name: "solar-observed.baseline.json",
+        content: solarObserved.raw_payload ?? solarObserved.baseline_patch,
+        metadata: solarObserved.metadata,
+      };
+      notes.push("Solar observed baseline scaffold populated for the Sun request.");
+    } else if (solarObserved.reason) {
+      reasons.push(solarObserved.reason);
+    }
+  }
+
   const identifiersObserved = identifiers;
-  const crossmatchPolicy = applyCrossmatchPolicy({ request, records });
+  const crossmatchPolicy = applyCrossmatchPolicy({ request: requestForResolution, records });
   const identifiersTrusted = crossmatchPolicy.trustedIdentifiers;
-  const benchmarkMatch = resolveBenchmarkTarget({ request, identifiersResolved: identifiersTrusted });
+  const benchmarkMatch = resolveBenchmarkTarget({ request: requestForResolution, identifiersResolved: identifiersTrusted });
   const benchmarkTarget = benchmarkMatch.benchmark_target;
   const recordsForSelection = crossmatchPolicy.acceptedRecords;
   const preferredCatalogs = benchmarkTarget?.preferred_source_stack ?? sourceHints.preferred_catalogs;
   const selectionManifest = buildSourceSelectionManifest({
-    request,
+    request: requestForResolution,
     records: recordsForSelection,
     preferredCatalogs,
     allowFallbacks: sourceHints.allow_fallbacks,
@@ -410,13 +480,13 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     qualityRejections: crossmatchPolicy.qualityRejections,
   });
   const canonicalRequestDraft = buildResolvedRequestDraft({
-    request,
+    request: requestForResolution,
     records: recordsForSelection,
     identifiersResolved: identifiersTrusted,
     selectionManifest,
   });
   const resolutionState = summarizeResolutionState({
-    request,
+    request: requestForResolution,
     records,
     selectionManifest,
     canonicalRequestDraft,
@@ -437,12 +507,34 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
   const oscillationSupportedDomainPreview = canonicalRequestDraft
     ? evaluateStarSimSupportedDomain(canonicalizeStarSimRequest(canonicalRequestDraft), "oscillation_gyre")
     : null;
+  const solarBaselineSupport =
+    canonicalRequestDraft && isSolarObservedRequest(requestForResolution)
+      ? Object.fromEntries(
+          solarBaselinePhaseIds.map((phaseId) => [phaseId, evaluateSolarObservedBaseline(canonicalRequestDraft, phaseId)]),
+        ) as Partial<Record<StarSimSolarBaselinePhase, ReturnType<typeof evaluateSolarObservedBaseline>>>
+      : undefined;
+  const solarProvenanceDiagnostics =
+    canonicalRequestDraft && isSolarObservedRequest(requestForResolution)
+      ? evaluateSolarProvenanceDiagnostics(canonicalRequestDraft)
+      : undefined;
+  const solarReferencePack = isSolarObservedRequest(requestForResolution) ? getSolarReferencePackIdentity() : null;
+  const solarProductRegistry = isSolarObservedRequest(requestForResolution) ? getSolarProductRegistryIdentity() : null;
   const structureReady = supportedDomainPreview?.passed === true;
   const oscillationReady = structureReady && oscillationSupportedDomainPreview?.passed === true;
   const requestedOscillation = request.requested_lanes?.includes("oscillation_gyre") === true;
+  const requestedStellarHeavyLane =
+    request.requested_lanes?.includes("structure_mesa") === true || requestedOscillation;
+  const solarInteriorReady = solarBaselineSupport?.solar_interior_closure_v1?.passed === true;
+  const solarCycleReady = solarBaselineSupport?.solar_cycle_observed_v1?.passed === true;
+  const solarEruptiveReady = solarBaselineSupport?.solar_eruptive_catalog_v1?.passed === true;
+  const solarBaselineReady = solarInteriorReady || solarCycleReady || solarEruptiveReady;
   const resolutionStatus: StarSimResolveResponse["source_resolution"]["status"] =
     canonicalRequestDraft === null
       ? "unresolved"
+      : isSolarObservedRequest(requestForResolution) && !requestedStellarHeavyLane
+        ? solarBaselineReady
+          ? "resolved"
+          : "partial"
       : requestedOscillation
         ? structureReady && oscillationReady
           ? "resolved"
@@ -476,8 +568,11 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       selection_manifest: selectionManifest,
       candidate_counts: summarizeSourceCandidates(selectionManifest),
       resolved_sections: unique(
-        Object.keys(selectionManifest.fields)
-          .map((fieldPath) => fieldPath.split(".")[0])
+        [
+          ...Object.keys(selectionManifest.fields)
+            .map((fieldPath) => fieldPath.split(".")[0]),
+          ...getPresentSolarSections(canonicalRequestDraft?.solar_baseline),
+        ]
           .sort((left, right) => left.localeCompare(right)),
       ),
       reasons: unique(reasons).sort((left, right) => left.localeCompare(right)),
@@ -500,6 +595,22 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       diagnostic_summary: {
         top_residual_fields: [],
       },
+      solar_baseline_support: solarBaselineSupport,
+      solar_provenance_diagnostics: solarProvenanceDiagnostics,
+      ...(solarReferencePack
+        ? {
+            solar_reference_pack_id: solarReferencePack.id,
+            solar_reference_pack_version: solarReferencePack.version,
+            solar_reference_pack_ref: solarReferencePack.ref,
+          }
+        : {}),
+      ...(solarProductRegistry
+        ? {
+            solar_product_registry_id: solarProductRegistry.id,
+            solar_product_registry_version: solarProductRegistry.version,
+            solar_product_registry_ref: solarProductRegistry.ref,
+          }
+        : {}),
     },
     structure_mesa_ready: structureReady,
     supported_domain_preview: supportedDomainPreview,
@@ -521,7 +632,53 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     quality_warnings: crossmatchPolicy.qualityWarnings,
     crossmatch_identity_basis: crossmatchPolicy.crossmatchIdentityBasis,
     diagnostic_summary: buildLaneDiagnosticSummary({ residuals: {}, observablesUsed: selectionManifest ? Object.keys(selectionManifest.fields) : [] }),
+    solar_baseline_support: solarBaselineSupport,
+    solar_provenance_diagnostics: solarProvenanceDiagnostics,
+    ...(solarReferencePack
+      ? {
+          solar_reference_pack_id: solarReferencePack.id,
+          solar_reference_pack_version: solarReferencePack.version,
+          solar_reference_pack_ref: solarReferencePack.ref,
+        }
+      : {}),
+    ...(solarProductRegistry
+      ? {
+          solar_product_registry_id: solarProductRegistry.id,
+          solar_product_registry_version: solarProductRegistry.version,
+          solar_product_registry_ref: solarProductRegistry.ref,
+        }
+      : {}),
   };
+
+  const solarBaselineSummary = await buildAndPersistSolarBaselineSummary({
+    requestDraft: canonicalRequestDraft,
+    solarBaselineSupport,
+    solarProvenanceDiagnostics,
+  });
+  if (solarBaselineSummary) {
+    response.source_resolution.solar_reference_pack_id = solarBaselineSummary.solar_reference_pack_id;
+    response.source_resolution.solar_reference_pack_version = solarBaselineSummary.solar_reference_pack_version;
+    response.source_resolution.solar_reference_pack_ref = solarBaselineSummary.solar_reference_pack_ref;
+    response.source_resolution.solar_product_registry_id = solarBaselineSummary.solar_product_registry_id;
+    response.source_resolution.solar_product_registry_version = solarBaselineSummary.solar_product_registry_version;
+    response.source_resolution.solar_product_registry_ref = solarBaselineSummary.solar_product_registry_ref;
+    response.source_resolution.solar_consistency_diagnostics = solarBaselineSummary.solar_consistency_diagnostics;
+    response.source_resolution.solar_provenance_diagnostics = solarBaselineSummary.solar_provenance_diagnostics ?? undefined;
+    response.source_resolution.solar_baseline_signature = solarBaselineSummary.solar_baseline_signature;
+    response.source_resolution.previous_solar_baseline_ref = solarBaselineSummary.previous_solar_baseline_ref;
+    response.source_resolution.solar_baseline_repeatability = solarBaselineSummary.solar_baseline_repeatability;
+    response.solar_reference_pack_id = solarBaselineSummary.solar_reference_pack_id;
+    response.solar_reference_pack_version = solarBaselineSummary.solar_reference_pack_version;
+    response.solar_reference_pack_ref = solarBaselineSummary.solar_reference_pack_ref;
+    response.solar_product_registry_id = solarBaselineSummary.solar_product_registry_id;
+    response.solar_product_registry_version = solarBaselineSummary.solar_product_registry_version;
+    response.solar_product_registry_ref = solarBaselineSummary.solar_product_registry_ref;
+    response.solar_consistency_diagnostics = solarBaselineSummary.solar_consistency_diagnostics;
+    response.solar_provenance_diagnostics = solarBaselineSummary.solar_provenance_diagnostics ?? undefined;
+    response.solar_baseline_signature = solarBaselineSummary.solar_baseline_signature;
+    response.previous_solar_baseline_ref = solarBaselineSummary.previous_solar_baseline_ref;
+    response.solar_baseline_repeatability = solarBaselineSummary.solar_baseline_repeatability;
+  }
 
   const requestHash = hashStableJson(request);
   const writeResult = await writeStarSimSourceCache({
@@ -532,6 +689,10 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     selection_manifest: selectionManifest,
     raw_records: records,
     cache_identity: cacheIdentity,
+    extra_artifacts: [
+      ...(solarObservedArtifact ? [solarObservedArtifact] : []),
+      ...(solarBaselineSummary ? [solarBaselineSummary.summary_artifact] : []),
+    ],
   });
   return {
     ...response,

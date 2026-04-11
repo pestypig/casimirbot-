@@ -1,12 +1,16 @@
 # Star-sim benchmark target operations
 
 `star-sim-v1` supports explicit benchmark-target operations for a narrow solar-like set.
+It also reserves a separate observed-baseline benchmark target for the Sun without widening the current stellar live-fit domain.
 
 ## Named benchmark targets
 
 Targets are resolved only when identifiers or names match explicit registry entries in `server/modules/starsim/benchmark-targets.ts`.
 When both match but disagree, the resolver never silently trusts the label alone.
 Benchmark assignment is computed from trusted post-crossmatch identity, not from the full pre-crossmatch merge.
+
+The registry now contains a distinct `sun_observed_baseline` target for the new solar scaffold.
+That target is name/object-id based (`sun` / `sol`) and is intended to anchor observed solar baseline work, not to silently widen the existing solar-like source-resolution lane stack.
 
 Match provenance is explicit:
 

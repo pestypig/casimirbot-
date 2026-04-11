@@ -5,6 +5,7 @@ import {
   NHM2_OBSERVER_PROMOTION_BLOCKING_SURFACE_VALUES,
   NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES,
   NHM2_OBSERVER_SHARED_UPSTREAM_DRIVER_STATUS_VALUES,
+  NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES,
   NHM2_OBSERVER_WEC_PROPAGATION_STATUS_VALUES,
   type Nhm2ObserverBlockingAssessmentStatus,
   type Nhm2ObserverPrimaryDriverAgreement,
@@ -13,6 +14,7 @@ import {
   type Nhm2ObserverRemediationSequenceStatus,
   type Nhm2ObserverSharedRootDriverStatus,
   type Nhm2ObserverSharedUpstreamDriverStatus,
+  type Nhm2ObserverTileDiminishingReturnStatus,
   type Nhm2ObserverWecPropagationStatus,
   NHM2_OBSERVER_SHARED_ROOT_DRIVER_STATUS_VALUES,
 } from "./nhm2-observer-audit.v1";
@@ -233,6 +235,8 @@ export type Nhm2ObserverAuditSection =
     observerWecPropagationStatus: Nhm2ObserverWecPropagationStatus;
     observerWecPropagationNote: string | null;
     observerRemediationSequenceStatus: Nhm2ObserverRemediationSequenceStatus;
+    observerTileDiminishingReturnStatus: Nhm2ObserverTileDiminishingReturnStatus;
+    observerTileDiminishingReturnNote: string | null;
     metric: Nhm2ObserverFamilyAudit;
     tile: Nhm2ObserverFamilyAudit;
   };
@@ -270,6 +274,8 @@ type Nhm2ObserverAuditSectionInput =
       observerWecPropagationStatus?: Nhm2ObserverWecPropagationStatus;
       observerWecPropagationNote?: string | null;
       observerRemediationSequenceStatus?: Nhm2ObserverRemediationSequenceStatus;
+      observerTileDiminishingReturnStatus?: Nhm2ObserverTileDiminishingReturnStatus;
+      observerTileDiminishingReturnNote?: string | null;
     };
 
 export type Nhm2GrStabilitySafetySection =
@@ -507,6 +513,13 @@ const isObserverPrimaryDriverAgreement = (
     value as Nhm2ObserverPrimaryDriverAgreement,
   );
 
+const isObserverTileDiminishingReturnStatus = (
+  value: unknown,
+): value is Nhm2ObserverTileDiminishingReturnStatus =>
+  NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES.includes(
+    value as Nhm2ObserverTileDiminishingReturnStatus,
+  );
+
 const isObserverSharedRootDriverStatus = (
   value: unknown,
 ): value is Nhm2ObserverSharedRootDriverStatus =>
@@ -720,6 +733,10 @@ const cloneSections = (
       sections.observer_audit.observerWecPropagationNote ?? null,
     observerRemediationSequenceStatus:
       sections.observer_audit.observerRemediationSequenceStatus ?? "unknown",
+    observerTileDiminishingReturnStatus:
+      sections.observer_audit.observerTileDiminishingReturnStatus ?? "unknown",
+    observerTileDiminishingReturnNote:
+      sections.observer_audit.observerTileDiminishingReturnNote ?? null,
     metric: cloneObserverFamilyAudit(sections.observer_audit.metric),
     tile: cloneObserverFamilyAudit(sections.observer_audit.tile),
     supportedClaimTiers: computeTierListForSection("observer_audit"),
@@ -989,6 +1006,11 @@ const isObserverAuditSection = (
     isObserverRemediationSequenceStatus(
       record.observerRemediationSequenceStatus,
     ) &&
+    isObserverTileDiminishingReturnStatus(
+      record.observerTileDiminishingReturnStatus,
+    ) &&
+    (record.observerTileDiminishingReturnNote === null ||
+      asText(record.observerTileDiminishingReturnNote) != null) &&
     isObserverFamilyAudit(record.metric) &&
     isObserverFamilyAudit(record.tile)
   );

@@ -521,9 +521,12 @@ import {
   applyOpenWorldFinalContractLock,
 } from "../services/helix-ask/surface/final-contract-locks";
 import {
+  applyFastQualityDecisionSummary,
+  applyForcedShortCircuitAnswerDebugPayload,
+  applyShortCircuitDebugPayload,
+  attachFastPathResponseDebugPayload,
+  attachFinalResponseObservabilityDebugPayload,
   attachTraceSummaryDebugPayload,
-  attachFinalTraceDebugPayload,
-  attachOverflowRetryDebugPayload,
   type HelixAskTraceEvent,
   type HelixAskTraceSummary,
 } from "../services/helix-ask/surface/response-debug-payload";
@@ -50962,17 +50965,13 @@ const executeHelixAsk = async ({
       : "fallback_answer_present";
     const bypassShortCircuit =
       shouldShortCircuitAnswer && forceLlmProbe && !isStage05HardFailForcedRule;
-    if (debugPayload && shouldShortCircuitAnswer) {
-      debugPayload.llm_short_circuit_rule = "fallback_answer_short_circuit_v1";
-      debugPayload.llm_short_circuit_reason = shortCircuitReason;
-      debugPayload.llm_short_circuit_bypassed = bypassShortCircuit;
-      if (isStage05HardFailForcedRule) {
-        (debugPayload as Record<string, unknown>).stage05_hard_fail_invariant_ok =
-          !bypassShortCircuit;
-        (debugPayload as Record<string, unknown>).stage05_hard_fail_short_circuit =
-          !bypassShortCircuit;
-      }
-    }
+    applyShortCircuitDebugPayload({
+      debugPayload,
+      shouldShortCircuitAnswer,
+      shortCircuitReason,
+      bypassShortCircuit,
+      isStage05HardFailForcedRule,
+    });
     const shouldFastPathFinalize = shouldFastPathFinalizeHelixAskForcedAnswer({
       shouldShortCircuitAnswer,
       fallbackAnswer,
@@ -50998,16 +50997,13 @@ const executeHelixAsk = async ({
         result.fail_class = "input_contract";
         result.missing_paths = promptResearchContractMissingRequiredPaths.slice(0, 16);
       }
-      if (debugPayload) {
-        debugPayload.answer_short_sentences = forcedMeta.sentences;
-        debugPayload.answer_short_tokens = forcedMeta.tokens;
-        (debugPayload as Record<string, unknown>).answer_stream_mode = "final_only_forced_short_circuit";
-        if (isResearchContractFailClosedForcedRule) {
-          debugPayload.answer_blocked = true;
-          debugPayload.answer_stop_reason =
-            promptResearchContract?.fail_closed_behavior.stop_reason ?? "Fail-closed";
-        }
-      }
+      applyForcedShortCircuitAnswerDebugPayload({
+        debugPayload,
+        answerShortSentences: forcedMeta.sentences,
+        answerShortTokens: forcedMeta.tokens,
+        blocked: isResearchContractFailClosedForcedRule,
+        stopReason: promptResearchContract?.fail_closed_behavior.stop_reason ?? "Fail-closed",
+      });
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
       if (shouldFastPathFinalize) {
@@ -51090,51 +51086,29 @@ const executeHelixAsk = async ({
             .filter((section): section is HelixAskEnvelopeSection => Boolean(section));
           result.envelope.sections = sanitizedSections.length ? sanitizedSections : undefined;
         }
-        if (debugPayload) {
-          debugPayload.answer_after_fallback = clipAskText(
-            forcedFinalText,
-            HELIX_ASK_ANSWER_PREVIEW_CHARS,
-          );
-          debugPayload.answer_final_text = clipAskText(
-            forcedFinalText,
-            HELIX_ASK_ANSWER_PREVIEW_CHARS,
-          );
-          debugPayload.answer_path = answerPath;
-          debugPayload.answer_extension_available = false;
-          debugPayload.micro_pass = false;
-          debugPayload.micro_pass_enabled = false;
-          if (forcedQuality.reasons.length > 0) {
-            debugPayload.answer_quality_floor_applied = true;
-            debugPayload.answer_quality_floor_reasons = forcedQuality.reasons;
-          }
-        }
-        if (debugPayload && captureLiveHistory) {
-          const traceEvents = liveEventHistory.slice();
-          attachTraceSummaryDebugPayload({
-            debugPayload: debugPayload as Record<string, unknown>,
-            traceEvents,
-            attachReasoningSidebarToDebug: ({ debugRecord, traceEvents: sidebarTraceEvents }) =>
-              attachHelixAskReasoningSidebarToDebug({
-                debugRecord,
-                traceEvents: sidebarTraceEvents,
-                coerceDebugString: coerceHelixAskDebugString,
-                coerceDebugBoolean: coerceHelixAskDebugBoolean,
-                coerceDebugNumber: coerceHelixAskDebugNumber,
-                coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
-                clipText: clipAskText,
-              }),
-          });
-        }
-        if (debugPayload && overflowHistory.length > 0) {
-          const steps = overflowHistory.flatMap((entry) => entry.steps);
-          debugPayload.overflow_retry_applied = true;
-          debugPayload.overflow_retry_steps = Array.from(new Set(steps));
-          debugPayload.overflow_retry_labels = overflowHistory.map((entry) => entry.label);
-          debugPayload.overflow_retry_attempts = overflowHistory.reduce(
-            (sum, entry) => sum + entry.attempts,
-            0,
-          );
-        }
+        attachFastPathResponseDebugPayload({
+          debugPayload,
+          forcedFinalText,
+          answerPath,
+          qualityFloorReasons: forcedQuality.reasons,
+          captureLiveHistory,
+          traceEvents: liveEventHistory.slice(),
+          overflowHistory,
+          fastQualityMode,
+          fastQualityDecisions,
+          attachReasoningSidebarToDebug: ({ debugRecord, traceEvents: sidebarTraceEvents }) =>
+            attachHelixAskReasoningSidebarToDebug({
+              debugRecord,
+              traceEvents: sidebarTraceEvents,
+              coerceDebugString: coerceHelixAskDebugString,
+              coerceDebugBoolean: coerceHelixAskDebugBoolean,
+              coerceDebugNumber: coerceHelixAskDebugNumber,
+              coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+              clipText: clipAskText,
+            }),
+          clipText: clipAskText,
+          answerPreviewChars: HELIX_ASK_ANSWER_PREVIEW_CHARS,
+        });
         result.prompt_ingested = promptIngested;
         if (promptIngested) {
           if (promptIngestSource) {
@@ -51166,13 +51140,11 @@ const executeHelixAsk = async ({
         });
         streamEmitter.finalize(forcedFinalText);
         logDebug("streamEmitter.finalize complete");
-        if (debugPayload && fastQualityMode) {
-          const decisions = fastQualityDecisions.slice();
-          debugPayload.fast_quality_decisions = decisions;
-          debugPayload.fast_quality_deadline_misses = decisions
-            .filter((entry) => entry.decision === "deadline")
-            .map((entry) => `${entry.stage}:${entry.reason}`);
-        }
+        applyFastQualityDecisionSummary({
+          debugPayload,
+          fastQualityMode,
+          fastQualityDecisions,
+        });
         applyArbiterAnswerArtifacts(result);
         const resultProofRecord =
           result.proof && typeof result.proof === "object"
@@ -51366,13 +51338,11 @@ const executeHelixAsk = async ({
           }
         }
         streamEmitter.finalize(fastText);
-        if (debugPayload && fastQualityMode) {
-          const decisions = fastQualityDecisions.slice();
-          debugPayload.fast_quality_decisions = decisions;
-          debugPayload.fast_quality_deadline_misses = decisions
-            .filter((entry) => entry.decision === "deadline")
-            .map((entry) => `${entry.stage}:${entry.reason}`);
-        }
+        applyFastQualityDecisionSummary({
+          debugPayload,
+          fastQualityMode,
+          fastQualityDecisions,
+        });
         applyArbiterAnswerArtifacts(fastResult);
         logEvent(
           "Finalization",
@@ -63038,7 +63008,7 @@ const executeHelixAsk = async ({
         intent: finalIntentMeta,
       },
     );
-    attachFinalTraceDebugPayload({
+    attachFinalResponseObservabilityDebugPayload({
       debugPayload: debugPayload as Record<string, unknown> | null | undefined,
       captureLiveHistory,
       traceEvents: liveEventHistory.slice(),
@@ -63072,32 +63042,12 @@ const executeHelixAsk = async ({
         claim_gate_ok: !claimGateFailed,
         doc_slot_gate_ok: !docSlotCoverageFailed,
       },
-    });
-    attachOverflowRetryDebugPayload({
-      debugPayload: debugPayload as Record<string, unknown> | null | undefined,
       overflowHistory,
+      fastQualityMode,
+      fastQualityDecisions,
+      attachStageTiming: attachHelixAskStageTiming,
     });
-    if (debugPayload && fastQualityMode) {
-      const decisions = fastQualityDecisions.slice();
-      debugPayload.fast_quality_decisions = decisions;
-      debugPayload.fast_quality_deadline_misses = decisions
-        .filter((entry: HelixAskFastQualityDecision) => entry.decision === "deadline")
-        .map((entry: HelixAskFastQualityDecision) => `${entry.stage}:${entry.reason}`);
-    }
     if (debugPayload) {
-      const timeline = Array.isArray((debugPayload as Record<string, unknown>).timeline)
-        ? ((debugPayload as Record<string, unknown>).timeline as Array<Record<string, unknown>>)
-        : [];
-      for (const entry of timeline) {
-        const stageKey = String(entry?.stage ?? entry?.name ?? "").trim();
-        const durationMs = Number(entry?.duration_ms ?? entry?.ms ?? 0);
-        if (!stageKey) continue;
-        attachHelixAskStageTiming(debugPayload as Record<string, unknown>, stageKey, durationMs);
-      }
-      if (!(debugPayload as Record<string, unknown>).helix_ask_fail_reason) {
-        (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
-        (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
-      }
       const debugPayloadRecord = debugPayload as Record<string, unknown>;
       const objectiveFinalizeGateModeFinal =
         typeof debugPayloadRecord.objective_finalize_gate_mode === "string"

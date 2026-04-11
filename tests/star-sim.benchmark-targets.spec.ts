@@ -72,4 +72,16 @@ describe("star-sim benchmark target matching", () => {
     expect(match.benchmark_target_identity_basis).toBe("trusted_identifier");
     expect(match.benchmark_target_quality_ok).toBe(true);
   });
+
+  it("matches the Sun as a separate observed-baseline benchmark target without disturbing existing stellar targets", () => {
+    const match = resolveBenchmarkTarget({
+      request: {
+        target: { object_id: "sun", name: "Sun" },
+      } as any,
+      identifiersResolved: {},
+    });
+    expect(match.benchmark_target?.id).toBe("sun_observed_baseline");
+    expect(match.benchmark_target_match_mode).toBe("matched_by_name");
+    expect(match.benchmark_target_identity_basis).toBe("name_label");
+  });
 });

@@ -123,6 +123,8 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerWecPropagationStatus).toBe("unknown");
     expect(artifact.observerWecPropagationNote).toBeNull();
     expect(artifact.observerRemediationSequenceStatus).toBe("unknown");
+    expect(artifact.observerTileDiminishingReturnStatus).toBe("unknown");
+    expect(artifact.observerTileDiminishingReturnNote).toBeNull();
     expect(artifact.tensors.metricRequired.rootCauseClass).toBe("unknown");
     expect(artifact.tensors.tileEffective.rootCauseClass).toBe("unknown");
     expect(artifact.tensors.metricRequired.firstRemediationTarget).toBeNull();
@@ -235,6 +237,40 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.tensors.tileEffective.wecProbeResult).toBe(-0.2);
     expect(artifact.tensors.tileEffective.wecProbeDelta).toBe(0);
     expect(artifact.observerWecPropagationStatus).toBe("unknown");
+  });
+
+  it("preserves explicit stop-territory reassessment notes when publication supplies them", () => {
+    const artifact = buildNhm2ObserverAuditArtifact({
+      observerTileDiminishingReturnStatus: "likely_stop_territory",
+      observerTileDiminishingReturnNote:
+        "No admissible new aft-local single-contributor mechanism remained.",
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.2),
+          wec: positiveCondition(0.1),
+          sec: positiveCondition(0.05),
+          dec: positiveCondition(0.02),
+        },
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: positiveCondition(-0.05),
+          sec: positiveCondition(0.04),
+          dec: positiveCondition(-0.1),
+        },
+      },
+    });
+
+    expect(artifact.observerTileDiminishingReturnStatus).toBe(
+      "likely_stop_territory",
+    );
+    expect(artifact.observerTileDiminishingReturnNote).toContain(
+      "No admissible new aft-local single-contributor mechanism remained.",
+    );
+    expect(isNhm2ObserverAuditArtifact(artifact)).toBe(true);
   });
 
   it("classifies same-surface observer blockers when robust failing evidence is complete enough", () => {

@@ -144,6 +144,12 @@ export const NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES = [
+  "productive",
+  "likely_stop_territory",
+  "unknown",
+] as const;
+
 export type Nhm2ObserverAuditStatus =
   (typeof NHM2_OBSERVER_AUDIT_STATUS_VALUES)[number];
 export type Nhm2ObserverAuditCompleteness =
@@ -182,6 +188,8 @@ export type Nhm2ObserverWecPropagationStatus =
   (typeof NHM2_OBSERVER_WEC_PROPAGATION_STATUS_VALUES)[number];
 export type Nhm2ObserverRemediationSequenceStatus =
   (typeof NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES)[number];
+export type Nhm2ObserverTileDiminishingReturnStatus =
+  (typeof NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES)[number];
 
 export type Nhm2ObserverAuditDirection = [number, number, number];
 
@@ -296,6 +304,8 @@ export type Nhm2ObserverAuditArtifact = {
   observerWecPropagationStatus: Nhm2ObserverWecPropagationStatus;
   observerWecPropagationNote: string | null;
   observerRemediationSequenceStatus: Nhm2ObserverRemediationSequenceStatus;
+  observerTileDiminishingReturnStatus: Nhm2ObserverTileDiminishingReturnStatus;
+  observerTileDiminishingReturnNote: string | null;
   tensors: {
     metricRequired: Nhm2ObserverAuditTensor;
     tileEffective: Nhm2ObserverAuditTensor;
@@ -377,6 +387,10 @@ export type BuildNhm2ObserverAuditArtifactInput = {
   shiftLapseProfileId?: string | null;
   metricRequired?: BuildNhm2ObserverAuditTensorInput;
   tileEffective?: BuildNhm2ObserverAuditTensorInput;
+  observerTileDiminishingReturnStatus?:
+    | Nhm2ObserverTileDiminishingReturnStatus
+    | null;
+  observerTileDiminishingReturnNote?: string | null;
 };
 
 const asText = (value: unknown): string | null =>
@@ -1045,6 +1059,13 @@ const isRemediationSequenceStatus = (
 ): value is Nhm2ObserverRemediationSequenceStatus =>
   NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES.includes(
     value as Nhm2ObserverRemediationSequenceStatus,
+  );
+
+const isTileDiminishingReturnStatus = (
+  value: unknown,
+): value is Nhm2ObserverTileDiminishingReturnStatus =>
+  NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES.includes(
+    value as Nhm2ObserverTileDiminishingReturnStatus,
   );
 
 const inferUpstreamDriverClass = (args: {
@@ -1790,6 +1811,10 @@ export const buildNhm2ObserverAuditArtifact = (
     observerWecPropagationStatus: observerWecPropagation.status,
     observerWecPropagationNote: observerWecPropagation.note,
     observerRemediationSequenceStatus: observerWecPropagation.sequence,
+    observerTileDiminishingReturnStatus:
+      input.observerTileDiminishingReturnStatus ?? "unknown",
+    observerTileDiminishingReturnNote:
+      input.observerTileDiminishingReturnNote ?? null,
     tensors: {
       metricRequired,
       tileEffective,
@@ -1995,6 +2020,9 @@ export const isNhm2ObserverAuditArtifact = (
     (record.observerWecPropagationNote === null ||
       typeof record.observerWecPropagationNote === "string") &&
     isRemediationSequenceStatus(record.observerRemediationSequenceStatus) &&
+    isTileDiminishingReturnStatus(record.observerTileDiminishingReturnStatus) &&
+    (record.observerTileDiminishingReturnNote === null ||
+      typeof record.observerTileDiminishingReturnNote === "string") &&
     tensors != null &&
     isTensor(tensors.metricRequired) &&
     isTensor(tensors.tileEffective)

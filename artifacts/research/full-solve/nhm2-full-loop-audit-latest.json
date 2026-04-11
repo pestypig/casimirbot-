@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-10T19:47:59.694Z",
+  "generatedAt": "2026-04-11T19:23:51.438Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -285,6 +285,8 @@
       "observerWecPropagationStatus": "tile_proxy_independent",
       "observerWecPropagationNote": "50% metric-side WEC probe relaxes metric_required WEC/DEC but leaves the tile_effective proxy effectively unchanged, so the tile proxy remains a separate remediation lane.",
       "observerRemediationSequenceStatus": "metric_then_tile_proxy",
+      "observerTileDiminishingReturnStatus": "likely_stop_territory",
+      "observerTileDiminishingReturnNote": "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.",
       "metric": {
         "state": "fail",
         "wecMinOverAllTimelike": -57110812.99010783,
@@ -298,14 +300,14 @@
       },
       "tile": {
         "state": "fail",
-        "wecMinOverAllTimelike": -59694026752,
+        "wecMinOverAllTimelike": -42531360768,
         "necMinOverAllNull": 0,
         "decStatus": "fail",
         "secStatus": "pass",
         "observerWorstCaseLocation": "algebraic_type_i",
         "typeIFraction": 1,
         "missedViolationFraction": 0,
-        "maxRobustMinusEulerian": 7.995948196094782e-13
+        "maxRobustMinusEulerian": 1.7643614434043053e-12
       },
       "supportedClaimTiers": [
         "reduced-order",

@@ -5,7 +5,10 @@ import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/contract";
+import {
+  STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+  STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
+} from "../server/modules/starsim/contract";
 
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
 
@@ -48,6 +51,381 @@ afterEach(() => {
 });
 
 describe("star-sim source resolution route", () => {
+  it("accepts additive solar baseline scaffolding without altering the solar-like live resolve path", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          name: "Demo Solar A",
+        },
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+        },
+        solar_baseline: {
+          schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+          solar_cycle_indices: {
+            sunspot_number: 84,
+            metadata: {
+              instrument: "NOAA/SWPC",
+              observed_mode: "observed",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(res.body.source_resolution.status).toBe("resolved");
+    expect(res.body.benchmark_target_id).toBe("demo_solar_a");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_cycle_indices.sunspot_number).toBe(84);
+    expect(res.body.solar_reference_pack_id).toBeUndefined();
+    expect(res.body.solar_reference_pack_ref).toBeUndefined();
+    expect(res.body.solar_product_registry_id).toBeUndefined();
+    expect(res.body.solar_product_registry_ref).toBeUndefined();
+    expect(res.body.solar_provenance_diagnostics).toBeUndefined();
+  });
+
+  it("populates a Sun-only Phase 0 solar interior baseline and reports closure readiness", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.source_resolution.status).toBe("resolved");
+    expect(res.body.benchmark_target_id).toBe("sun_observed_baseline");
+    expect(res.body.benchmark_target_match_mode).toBe("matched_by_name");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_interior_profile.profile_ref).toBe("fixture:solar/interior/profile");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_layer_boundaries.convection_zone_base_rsun).toBe(0.713);
+    expect(res.body.canonical_request_draft.solar_baseline.solar_global_modes.low_degree_mode_count).toBe(48);
+    expect(res.body.canonical_request_draft.solar_baseline.solar_neutrino_constraints.cno_flux).toBe(7.0);
+    expect(res.body.canonical_request_draft.solar_baseline.solar_cycle_indices.sunspot_number).toBe(82);
+    expect(res.body.canonical_request_draft.solar_baseline.solar_magnetogram.synoptic_radial_map_ref).toBe("fixture:solar/magnetograms/synoptic-radial");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_active_regions.region_count).toBe(2);
+    expect(res.body.canonical_request_draft.solar_baseline.solar_flare_catalog.strongest_goes_class).toBe("M3.4");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_cme_catalog.cme_count).toBe(1);
+    expect(res.body.canonical_request_draft.solar_baseline.solar_irradiance_series.euv_ref).toBe("fixture:solar/irradiance/eve-euv");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.passed).toBe(true);
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.benchmark_pack_id).toBe("solar_interior_closure_v1");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.solar_reference_pack_id).toBe("solar_reference_pack");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.overall_status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.reference_pack_id).toBe("solar_reference_pack");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.convection_zone_depth.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.convection_zone_depth.reference_anchor_id).toBe("solar.interior.convection_zone_depth.v1");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.convection_zone_depth.reference_doc_ids).toEqual(["basu_antia_2004"]);
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.envelope_helium_fraction.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.low_degree_mode_support.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.neutrino_constraint_vector.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.passed).toBe(true);
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.overall_status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.cycle_indices.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.cycle_indices.reference_anchor_id).toBe("solar.cycle.cycle_indices.v1");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.magnetogram_context.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.active_region_context.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.passed).toBe(true);
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.overall_status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.flare_catalog.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.flare_catalog.reference_anchor_id).toBe("solar.eruptive.flare_catalog.v1");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.cme_catalog.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.irradiance_continuity.status).toBe("pass");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.source_region_linkage.status).toBe("pass");
+    expect(res.body.solar_reference_pack_id).toBe("solar_reference_pack");
+    expect(res.body.solar_reference_pack_ref).toBe("data/starsim/solar-reference-pack.v1.json");
+    expect(res.body.solar_product_registry_id).toBe("solar_product_registry");
+    expect(res.body.solar_product_registry_ref).toBe("data/starsim/solar-product-registry.v1.json");
+    expect(res.body.source_resolution.solar_reference_pack_id).toBe("solar_reference_pack");
+    expect(res.body.source_resolution.solar_reference_pack_ref).toBe("data/starsim/solar-reference-pack.v1.json");
+    expect(res.body.source_resolution.solar_product_registry_id).toBe("solar_product_registry");
+    expect(res.body.source_resolution.solar_product_registry_ref).toBe("data/starsim/solar-product-registry.v1.json");
+    expect(res.body.solar_consistency_diagnostics.overall_status).toBe("pass");
+    expect(res.body.solar_consistency_diagnostics.reference_pack_id).toBe("solar_reference_pack");
+    expect(res.body.solar_consistency_diagnostics.checks.source_region_overlap.status).toBe("pass");
+    expect(res.body.solar_consistency_diagnostics.checks.source_region_overlap.reference_anchor_id).toBe("solar.consistency.source_region_overlap.v1");
+    expect(res.body.solar_consistency_diagnostics.checks.source_region_overlap.reference_doc_ids).toEqual(["hmi_products", "goes_xray", "lasco_docs"]);
+    expect(res.body.solar_consistency_diagnostics.checks.magnetogram_active_region_linkage.status).toBe("pass");
+    expect(res.body.solar_consistency_diagnostics.checks.irradiance_context_consistency.status).toBe("pass");
+    expect(res.body.solar_consistency_diagnostics.checks.phase_metadata_coherence.status).toBe("pass");
+    expect(res.body.solar_provenance_diagnostics.overall_status).toBe("pass");
+    expect(res.body.solar_provenance_diagnostics.product_registry_id).toBe("solar_product_registry");
+    expect(res.body.solar_provenance_diagnostics.checks.solar_global_modes.source_product_id).toBe("gong_hmi_global_modes_v1");
+    expect(res.body.solar_provenance_diagnostics.checks.solar_magnetogram.source_product_family).toBe("magnetogram_products");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_magnetogram.metadata.source_product_id).toBe("hmi_full_disk_magnetogram_v1");
+    expect(res.body.canonical_request_draft.solar_baseline.solar_flare_catalog.metadata.source_doc_ids).toEqual(["goes_xray"]);
+    expect(res.body.solar_baseline_signature).toMatch(/^sha256:/);
+    expect(res.body.previous_solar_baseline_ref).toBeNull();
+    expect(res.body.solar_baseline_repeatability).toBeUndefined();
+    expect(res.body.source_resolution.artifact_refs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "solar_observed_baseline",
+          metadata: expect.objectContaining({
+            instrument: "SDO/HMI+Borexino+solar-assimilation",
+            coordinate_frame: "Carrington",
+            observed_mode: "assimilated",
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it("surfaces solar consistency failures when eruptive source-region refs diverge from cycle context", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+        solar_baseline: {
+          schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+          solar_cycle_indices: {
+            sunspot_number: 82,
+            f10_7_sfu: 155,
+            cycle_label: "Cycle 25",
+            polarity_label: "north_negative_south_positive",
+            metadata: {
+              instrument: "NOAA/SWPC",
+              coordinate_frame: "Carrington",
+              carrington_rotation: 2290,
+              observed_mode: "observed",
+            },
+          },
+          solar_magnetogram: {
+            active_region_patch_refs: ["user:solar/magnetograms/patch-1"],
+            synoptic_radial_map_ref: "user:solar/magnetograms/synoptic",
+            metadata: {
+              instrument: "SDO/HMI",
+              coordinate_frame: "Carrington",
+              carrington_rotation: 2290,
+              observed_mode: "observed",
+            },
+          },
+          solar_active_regions: {
+            region_refs: ["user:solar/active-regions/noaa-13000"],
+            region_count: 1,
+            metadata: {
+              instrument: "NOAA",
+              coordinate_frame: "Carrington",
+              carrington_rotation: 2290,
+              observed_mode: "observed",
+            },
+          },
+          solar_flare_catalog: {
+            event_refs: ["user:solar/flares/goes-event-1"],
+            source_region_refs: ["user:solar/active-regions/noaa-99999"],
+            flare_count: 1,
+            strongest_goes_class: "M1.2",
+            metadata: {
+              instrument: "GOES/SWPC",
+              coordinate_frame: "Carrington",
+              carrington_rotation: 2290,
+              observed_mode: "observed",
+            },
+          },
+          solar_cme_catalog: {
+            event_refs: ["user:solar/cmes/lasco-event-1"],
+            source_region_refs: ["user:solar/active-regions/noaa-99999"],
+            cme_count: 1,
+            metadata: {
+              instrument: "SOHO/LASCO",
+              coordinate_frame: "Carrington",
+              carrington_rotation: 2290,
+              observed_mode: "observed",
+            },
+          },
+          solar_irradiance_series: {
+            tsi_ref: "user:solar/irradiance/tsi",
+            euv_ref: "user:solar/irradiance/euv",
+            metadata: {
+              instrument: "SDO/EVE",
+              coordinate_frame: "Carrington",
+              carrington_rotation: 2290,
+              observed_mode: "observed",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(res.body.solar_consistency_diagnostics.overall_status).toBe("fail");
+    expect(res.body.solar_consistency_diagnostics.checks.source_region_overlap.status).toBe("fail");
+    expect(res.body.solar_consistency_diagnostics.checks.source_region_overlap.reason_code).toBe("source_region_overlap_mismatch");
+  });
+
+  it("surfaces solar interior closure support failures when a Sun request is only partially populated", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+        solar_baseline: {
+          schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+          solar_interior_profile: {
+            profile_ref: "user:solar/interior/profile",
+          },
+          solar_layer_boundaries: {
+            convection_zone_base_rsun: 0.713,
+          },
+          solar_global_modes: {
+            mode_table_ref: "user:solar/modes",
+            low_degree_mode_count: 48,
+            detail_ref: "user:solar/modes/detail",
+          },
+          solar_neutrino_constraints: {
+            constraints_ref: "user:solar/neutrinos",
+            pp_flux: 5.98,
+            be7_flux: 4.82,
+            pep_flux: 1.44,
+            b8_flux: 5.16,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(res.body.canonical_request_draft.solar_baseline.solar_interior_profile.profile_ref).toBe("user:solar/interior/profile");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.passed).toBe(false);
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.reasons).toContain("solar_neutrino_vector_incomplete");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.neutrino_constraint_vector.status).toBe("fail");
+  });
+
+  it("surfaces solar interior closure warnings without blocking the Sun baseline when values remain near-band", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+        solar_baseline: {
+          schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+          solar_interior_profile: {
+            profile_ref: "user:solar/interior/profile",
+            summary: {
+              convection_zone_base_rsun: 0.713,
+              envelope_helium_fraction: 0.257,
+            },
+          },
+          solar_layer_boundaries: {
+            convection_zone_base_rsun: 0.713,
+          },
+          solar_global_modes: {
+            mode_table_ref: "user:solar/modes",
+            low_degree_mode_count: 30,
+          },
+          solar_neutrino_constraints: {
+            constraints_ref: "user:solar/neutrinos",
+            pp_flux: 5.98,
+            be7_flux: 4.82,
+            pep_flux: 1.44,
+            b8_flux: 5.16,
+            cno_flux: 7.0,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(res.body.source_resolution.status).toBe("resolved");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.passed).toBe(true);
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.overall_status).toBe("warn");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.envelope_helium_fraction.status).toBe("warn");
+    expect(res.body.solar_baseline_support.solar_interior_closure_v1.closure_diagnostics.checks.low_degree_mode_support.status).toBe("warn");
+  });
+
+  it("surfaces solar cycle observed failures when cycle context is incomplete", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+        solar_baseline: {
+          schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+          solar_cycle_indices: {
+            sunspot_number: 82,
+            f10_7_sfu: 155,
+            cycle_label: "Cycle 25",
+          },
+          solar_magnetogram: {
+            line_of_sight_ref: "user:solar/magnetograms/los",
+          },
+          solar_active_regions: {
+            region_count: 0,
+            region_refs: [],
+          },
+        },
+      })
+      .expect(200);
+
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.passed).toBe(false);
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.reasons).toEqual(
+      expect.arrayContaining([
+        "solar_cycle_indices_incomplete",
+        "solar_cycle_magnetogram_incomplete",
+        "solar_active_regions_incomplete",
+      ]),
+    );
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.cycle_indices.status).toBe("fail");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.magnetogram_context.status).toBe("fail");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.active_region_context.status).toBe("fail");
+    expect(res.body.solar_baseline_support.solar_cycle_observed_v1.cycle_diagnostics.checks.irradiance_continuity.status).toBe("warn");
+  });
+
+  it("surfaces solar eruptive observed failures when flare and CME context are incomplete", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+        solar_baseline: {
+          schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+          solar_flare_catalog: {
+            event_refs: ["user:solar/flares/goes-event-1"],
+            flare_count: 1,
+          },
+          solar_cme_catalog: {
+            cme_count: 0,
+            event_refs: [],
+          },
+          solar_irradiance_series: {
+            tsi_ref: "user:solar/irradiance/tsi",
+          },
+        },
+      })
+      .expect(200);
+
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.passed).toBe(false);
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.reasons).toEqual(
+      expect.arrayContaining([
+        "solar_flare_catalog_incomplete",
+        "solar_cme_catalog_incomplete",
+      ]),
+    );
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.flare_catalog.status).toBe("fail");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.cme_catalog.status).toBe("fail");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.irradiance_continuity.status).toBe("warn");
+    expect(res.body.solar_baseline_support.solar_eruptive_catalog_v1.eruptive_diagnostics.checks.source_region_linkage.status).toBe("warn");
+  });
+
   it("merges Gaia DR3 identity/astrometry with SDSS Astra spectroscopy into a structure-ready draft", async () => {
     const app = await buildApp();
     const resolveResponse = await request(app)

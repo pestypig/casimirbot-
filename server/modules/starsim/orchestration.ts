@@ -166,6 +166,7 @@ export const prepareStarSimResolveBeforeRun = async (
     quality_rejections: resolved.quality_rejections,
     quality_warnings: resolved.quality_warnings,
     diagnostic_summary: resolved.diagnostic_summary,
+    solar_baseline_support: resolved.solar_baseline_support,
   };
 
   if (!resolved.canonical_request_draft || !preflight.enqueue_allowed || !resolvedDraftHash) {

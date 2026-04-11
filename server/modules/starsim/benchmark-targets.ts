@@ -12,7 +12,7 @@ export interface StarSimBenchmarkTarget {
   allowed_identifiers: Partial<StarSimSourceIdentifiers>;
   allowed_object_ids?: string[];
   aliases: string[];
-  preferred_source_stack: StarSimSourceCatalog[];
+  preferred_source_stack?: StarSimSourceCatalog[];
   benchmark_family_or_pack_ids: string[];
   observable_envelopes?: Partial<Record<
     "spectroscopy.teff_K" | "asteroseismology.numax_uHz" | "asteroseismology.deltanu_uHz",
@@ -38,7 +38,7 @@ export interface StarSimBenchmarkTargetMatchResult {
   benchmark_target_quality_ok: boolean;
 }
 
-export const STAR_SIM_BENCHMARK_TARGETS_VERSION = "starsim-benchmark-targets/2";
+export const STAR_SIM_BENCHMARK_TARGETS_VERSION = "starsim-benchmark-targets/3";
 const ALLOW_IDENTIFIER_MATCH_ON_NAME_CONFLICT = false;
 
 const BENCHMARK_TARGETS: StarSimBenchmarkTarget[] = [
@@ -73,6 +73,18 @@ const BENCHMARK_TARGETS: StarSimBenchmarkTarget[] = [
     aliases: ["alpha centauri a", "rigil kentaurus"],
     preferred_source_stack: ["gaia_dr3", "sdss_astra", "lamost_dr10", "tasoc", "tess_mast"],
     benchmark_family_or_pack_ids: ["solar_like_structure_fit_pack_v1", "solar_like_seismic_compare_pack_v1"],
+  },
+  {
+    id: "sun_observed_baseline",
+    canonical_name: "Sun",
+    allowed_identifiers: {},
+    allowed_object_ids: ["sun", "sol"],
+    aliases: ["the sun", "solar baseline"],
+    benchmark_family_or_pack_ids: [
+      "solar_interior_closure_v1",
+      "solar_cycle_observed_v1",
+      "solar_eruptive_catalog_v1",
+    ],
   },
 ];
 

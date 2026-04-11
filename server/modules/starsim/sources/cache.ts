@@ -52,6 +52,7 @@ export const buildSourceResolutionCacheKey = (
       structure: request.structure ?? null,
       orbital_context: request.orbital_context ?? null,
       environment: request.environment ?? null,
+      solar_baseline: request.solar_baseline ?? null,
     },
     registry_version: cacheIdentity.registry_version,
     adapter_versions: cacheIdentity.adapter_versions,

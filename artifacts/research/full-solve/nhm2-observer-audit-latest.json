@@ -27,6 +27,8 @@
   "observerWecPropagationStatus": "tile_proxy_independent",
   "observerWecPropagationNote": "50% metric-side WEC probe relaxes metric_required WEC/DEC but leaves the tile_effective proxy effectively unchanged, so the tile proxy remains a separate remediation lane.",
   "observerRemediationSequenceStatus": "metric_then_tile_proxy",
+  "observerTileDiminishingReturnStatus": "likely_stop_territory",
+  "observerTileDiminishingReturnNote": "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.",
   "tensors": {
     "metricRequired": {
       "tensorId": "metric_required",
@@ -216,16 +218,16 @@
       "conditions": {
         "nec": {
           "status": "pass",
-          "eulerianMin": -8.172629240021934e-13,
-          "eulerianMean": -9.975958197963988e-18,
+          "eulerianMin": -1.7643614434043053e-12,
+          "eulerianMean": -1.573006152986005e-17,
           "robustMin": 0,
           "robustMean": 0,
-          "eulerianViolationFraction": 0.014923095703125,
+          "eulerianViolationFraction": 0.01499176025390625,
           "robustViolationFraction": 0,
           "missedViolationFraction": 0,
-          "severityGainMin": -2.9347948767369236e-13,
-          "severityGainMean": 9.975958197963988e-18,
-          "maxRobustMinusEulerian": 8.172629240021934e-13,
+          "severityGainMin": -5.468877304140585e-13,
+          "severityGainMean": 1.573006152986005e-17,
+          "maxRobustMinusEulerian": 1.7643614434043053e-12,
           "worstCase": {
             "index": 0,
             "value": 0,
@@ -240,10 +242,10 @@
         },
         "wec": {
           "status": "fail",
-          "eulerianMin": -57921138688,
-          "eulerianMean": -57110813.13004573,
-          "robustMin": -57921138688,
-          "robustMean": -57110813.13004573,
+          "eulerianMin": -42531360768,
+          "eulerianMean": -57110813.012878254,
+          "robustMin": -42531360768,
+          "robustMean": -57110813.012878254,
           "eulerianViolationFraction": 0.028730392456054688,
           "robustViolationFraction": 0.028730392456054688,
           "missedViolationFraction": 0,
@@ -251,8 +253,8 @@
           "severityGainMean": 0,
           "maxRobustMinusEulerian": 0,
           "worstCase": {
-            "index": 1003273,
-            "value": -57921138688,
+            "index": 1032370,
+            "value": -42531360768,
             "direction": [
               -1,
               0,
@@ -265,14 +267,14 @@
         "sec": {
           "status": "pass",
           "eulerianMin": 0,
-          "eulerianMean": 57110813.13004573,
+          "eulerianMean": 57110813.012878254,
           "robustMin": 0,
           "robustMean": 0,
           "eulerianViolationFraction": 0,
           "robustViolationFraction": 0,
           "missedViolationFraction": 0,
-          "severityGainMin": -57921138688,
-          "severityGainMean": -57110813.13004573,
+          "severityGainMin": -42531360768,
+          "severityGainMean": -57110813.012878254,
           "maxRobustMinusEulerian": 0,
           "worstCase": {
             "index": 0,
@@ -288,19 +290,19 @@
         },
         "dec": {
           "status": "fail",
-          "eulerianMin": -57921138688,
-          "eulerianMean": -57110813.13004573,
-          "robustMin": -115842277376,
-          "robustMean": -114221626.26009145,
+          "eulerianMin": -42531360768,
+          "eulerianMean": -57110813.012878254,
+          "robustMin": -85062721536,
+          "robustMean": -114221626.02575651,
           "eulerianViolationFraction": 0.028730392456054688,
           "robustViolationFraction": 0.028730392456054688,
           "missedViolationFraction": 0,
-          "severityGainMin": -57921138688,
-          "severityGainMean": -57110813.13004573,
+          "severityGainMin": -42531360768,
+          "severityGainMean": -57110813.012878254,
           "maxRobustMinusEulerian": 0,
           "worstCase": {
-            "index": 1003273,
-            "value": -115842277376,
+            "index": 1032370,
+            "value": -85062721536,
             "direction": [
               -1,
               0,
@@ -313,15 +315,15 @@
       },
       "fluxDiagnostics": {
         "status": "available",
-        "meanMagnitude": 1.533629131803468e-16,
+        "meanMagnitude": 2.23850040723635e-16,
         "maxMagnitude": 0,
-        "netMagnitude": 1.093891435288278e-16,
+        "netMagnitude": 1.7248447748291345e-16,
         "netDirection": null,
         "note": "Flux diagnostics come from the tile-effective brick S_i channels."
       },
       "consistency": {
         "robustNotGreaterThanEulerian": true,
-        "maxRobustMinusEulerian": 8.172629240021934e-13
+        "maxRobustMinusEulerian": 1.7643614434043053e-12
       },
       "model": {
         "pressureModel": "isotropic_pressure_proxy",
@@ -336,7 +338,7 @@
       "missingInputs": [],
       "primaryBlockingCondition": "wec",
       "primaryBlockingMode": "eulerian_native",
-      "primaryBlockingValue": -57921138688,
+      "primaryBlockingValue": -42531360768,
       "primaryBlockingReference": "tile_effective.conditions.wec",
       "primaryBlockingWhy": "WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density.",
       "rootCauseClass": "negative_energy_density",
@@ -352,11 +354,11 @@
       "firstUpstreamRemediationWhy": "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface.",
       "wecProbeApplied": true,
       "wecProbeScale": 0.5,
-      "wecProbeBaseline": -57921138688,
-      "wecProbeResult": -57921138688,
+      "wecProbeBaseline": -42531360768,
+      "wecProbeResult": -42531360768,
       "wecProbeDelta": 0,
-      "decProbeBaseline": -115842277376,
-      "decProbeResult": -115842277376,
+      "decProbeBaseline": -85062721536,
+      "decProbeResult": -85062721536,
       "decProbeDelta": 0,
       "wecProbeInterpretation": "Metric-side WEC probe does not automatically lift this tile proxy surface because it depends on a separate proxy-derived upstream ref."
     }

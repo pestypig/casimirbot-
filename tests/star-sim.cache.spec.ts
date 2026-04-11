@@ -210,6 +210,330 @@ describe("star-sim source-resolution cache", () => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     expect(manifest.registry_version).toBe(STAR_SIM_SOURCE_REGISTRY_VERSION);
   });
+
+  it("persists solar observed artifact metadata through the source cache for Sun requests", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+      })
+      .expect(200);
+
+    const solarArtifact = (res.body.source_resolution.artifact_refs as Array<{ kind: string; metadata?: Record<string, unknown> }>).find(
+      (ref) => ref.kind === "solar_observed_baseline",
+    );
+    expect(solarArtifact).toBeTruthy();
+    expect(solarArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        instrument: "SDO/HMI+Borexino+solar-assimilation",
+        coordinate_frame: "Carrington",
+        observed_mode: "assimilated",
+      }),
+    );
+
+    const cached = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+        },
+      })
+      .expect(200);
+
+    const cachedSolarArtifact = (cached.body.source_resolution.artifact_refs as Array<{ kind: string; metadata?: Record<string, unknown> }>).find(
+      (ref) => ref.kind === "solar_observed_baseline",
+    );
+    expect(cached.body.source_resolution.cache_status).toBe("hit");
+    expect(cachedSolarArtifact?.metadata?.instrument).toBe("SDO/HMI+Borexino+solar-assimilation");
+  });
+
+  it("marks repeated equivalent Sun resolves as repeatable with the same solar baseline signature", async () => {
+    const app = await buildApp();
+    const payload = {
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+    };
+
+    const first = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+    const second = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+
+    expect(first.body.solar_baseline_signature).toMatch(/^sha256:/);
+    expect(first.body.solar_reference_pack_id).toBe("solar_reference_pack");
+    expect(second.body.source_resolution.cache_status).toBe("hit");
+    expect(second.body.solar_baseline_signature).toBe(first.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability).toEqual(
+      expect.objectContaining({
+        repeatable: true,
+        same_signature: true,
+      }),
+    );
+
+    const summaryArtifact = (second.body.source_resolution.artifact_refs as Array<{ kind: string; path: string }>).find(
+      (ref) => ref.kind === "solar_baseline_summary",
+    );
+    expect(summaryArtifact).toBeTruthy();
+  });
+
+  it("changes the solar baseline signature when irradiance context changes and reports drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (euvRef: string) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_cycle_indices: {
+          sunspot_number: 82,
+          f10_7_sfu: 155,
+          cycle_label: "Cycle 25",
+          polarity_label: "north_negative_south_positive",
+          metadata: {
+            instrument: "NOAA/SWPC",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_magnetogram: {
+          synoptic_radial_map_ref: "user:solar/magnetograms/synoptic",
+          active_region_patch_refs: ["user:solar/magnetograms/patch-1"],
+          metadata: {
+            instrument: "SDO/HMI",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          metadata: {
+            instrument: "NOAA",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_flare_catalog: {
+          event_refs: ["user:solar/flares/goes-event-1"],
+          source_region_refs: ["user:solar/active-regions/noaa-13000"],
+          flare_count: 1,
+          strongest_goes_class: "M1.2",
+          metadata: {
+            instrument: "GOES/SWPC",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_cme_catalog: {
+          event_refs: ["user:solar/cmes/lasco-event-1"],
+          source_region_refs: ["user:solar/active-regions/noaa-13000"],
+          cme_count: 1,
+          metadata: {
+            instrument: "SOHO/LASCO",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_irradiance_series: {
+          tsi_ref: "user:solar/irradiance/tsi",
+          euv_ref: euvRef,
+          xray_ref: "user:solar/irradiance/xray",
+          metadata: {
+            instrument: "SDO/EVE",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+      },
+    });
+
+    const first = await request(app).post("/api/star-sim/v1/resolve").send(buildPayload("user:solar/irradiance/euv-a")).expect(200);
+    const second = await request(app).post("/api/star-sim/v1/resolve").send(buildPayload("user:solar/irradiance/euv-b")).expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("irradiance_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when only section product provenance changes and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (productId: string, docIds: string[]) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_cycle_indices: {
+          sunspot_number: 82,
+          f10_7_sfu: 155,
+          cycle_label: "Cycle 25",
+          polarity_label: "north_negative_south_positive",
+          metadata: {
+            instrument: "NOAA/SWPC",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_magnetogram: {
+          synoptic_radial_map_ref: "user:solar/magnetograms/synoptic",
+          active_region_patch_refs: ["user:solar/magnetograms/patch-1"],
+          metadata: {
+            instrument: "SDO/HMI",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+            source_product_id: productId,
+            source_product_family: "magnetogram_products",
+            source_doc_ids: docIds,
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          metadata: {
+            instrument: "NOAA",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("hmi_full_disk_magnetogram_v1", ["hmi_products"]))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("noaa_active_region_catalog_v1", ["hmi_products"]))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("product_provenance_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when only the reference-pack content changes and reports reference-basis drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const payload = {
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_cycle_indices: {
+          sunspot_number: 82,
+          f10_7_sfu: 155,
+          cycle_label: "Cycle 25",
+          polarity_label: "north_negative_south_positive",
+          metadata: {
+            instrument: "NOAA/SWPC",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_magnetogram: {
+          synoptic_radial_map_ref: "user:solar/magnetograms/synoptic",
+          active_region_patch_refs: ["user:solar/magnetograms/patch-1"],
+          metadata: {
+            instrument: "SDO/HMI",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          metadata: {
+            instrument: "NOAA",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_flare_catalog: {
+          event_refs: ["user:solar/flares/goes-event-1"],
+          source_region_refs: ["user:solar/active-regions/noaa-13000"],
+          flare_count: 1,
+          strongest_goes_class: "M1.2",
+          metadata: {
+            instrument: "GOES/SWPC",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_cme_catalog: {
+          event_refs: ["user:solar/cmes/lasco-event-1"],
+          source_region_refs: ["user:solar/active-regions/noaa-13000"],
+          cme_count: 1,
+          metadata: {
+            instrument: "SOHO/LASCO",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+        solar_irradiance_series: {
+          tsi_ref: "user:solar/irradiance/tsi",
+          euv_ref: "user:solar/irradiance/euv-a",
+          xray_ref: "user:solar/irradiance/xray",
+          metadata: {
+            instrument: "SDO/EVE+GOES",
+            coordinate_frame: "Carrington",
+            carrington_rotation: 2290,
+            observed_mode: "observed",
+          },
+        },
+      },
+    };
+
+    const first = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+    const packModule = await import("../server/modules/starsim/solar-reference-pack");
+    const updatedPack = packModule.getSolarReferencePack();
+    updatedPack.anchors.interior.convection_zone_depth.expected_summary = {
+      ...(updatedPack.anchors.interior.convection_zone_depth.expected_summary ?? {}),
+      warn_range: {
+        min: 0.701,
+        max: 0.725,
+      },
+    };
+    packModule.__setSolarReferencePackForTest(updatedPack);
+
+    const second = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+
+    expect(second.body.solar_reference_pack_version).toBe(first.body.solar_reference_pack_version);
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("reference_basis_changed");
+  });
 });
 
 describe("star-sim cache-backed heavy lanes", () => {

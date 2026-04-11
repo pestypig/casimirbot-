@@ -1,0 +1,125 @@
+{
+  "source_id": "solar-observed-fixture:sun-interior-closure",
+  "instrument": "SDO/HMI+Borexino+solar-assimilation",
+  "observed_mode": "assimilated",
+  "time_range": {
+    "start_iso": "2010-04-30T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed Phase 0 solar interior closure scaffold only.",
+  "section_metadata_overrides": {
+    "solar_interior_profile": {
+      "instrument": "solar-assimilation+SDO/HMI",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2010-04-30T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "solar_assimilation_interior_profile_v1",
+      "source_product_family": "helioseismic_closure",
+      "source_doc_ids": ["basu_antia_2004", "hmi_products"]
+    },
+    "solar_layer_boundaries": {
+      "instrument": "solar-assimilation+SDO/HMI",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2010-04-30T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "solar_assimilation_layer_boundaries_v1",
+      "source_product_family": "helioseismic_closure",
+      "source_doc_ids": ["basu_antia_2004", "hmi_products"]
+    },
+    "solar_global_modes": {
+      "instrument": "GONG+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2010-04-30T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "gong_hmi_global_modes_v1",
+      "source_product_family": "global_helioseismology_products",
+      "source_doc_ids": ["gong_products", "hmi_products", "basu_antia_2004"]
+    },
+    "solar_neutrino_constraints": {
+      "instrument": "Borexino",
+      "observed_mode": "observed",
+      "cadence": {
+        "value": 1,
+        "unit": "snapshot"
+      },
+      "time_range": {
+        "start_iso": "2010-04-30T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "borexino_neutrino_vector_v1",
+      "source_product_family": "solar_neutrino_constraints",
+      "source_doc_ids": ["borexino_2018"]
+    }
+  },
+  "payload": {
+    "solar_interior_profile": {
+      "profile_ref": "fixture:solar/interior/profile",
+      "profile_kind": "assimilated_summary",
+      "pressure_profile_ref": "fixture:solar/interior/pressure",
+      "density_profile_ref": "fixture:solar/interior/density",
+      "temperature_profile_ref": "fixture:solar/interior/temperature",
+      "sound_speed_profile_ref": "fixture:solar/interior/sound-speed",
+      "rotation_profile_ref": "fixture:solar/interior/rotation",
+      "summary": {
+        "convection_zone_base_rsun": 0.713,
+        "envelope_helium_fraction": 0.248,
+        "tachocline_center_rsun": 0.693,
+        "tachocline_width_rsun": 0.039
+      }
+    },
+    "solar_layer_boundaries": {
+      "core_edge_rsun": 0.25,
+      "convection_zone_base_rsun": 0.713,
+      "tachocline_center_rsun": 0.693,
+      "tachocline_width_rsun": 0.039,
+      "photosphere_tag": "photosphere",
+      "chromosphere_tag": "chromosphere",
+      "transition_region_tag": "transition_region",
+      "corona_tag": "corona"
+    },
+    "solar_global_modes": {
+      "mode_table_ref": "fixture:solar/helioseismology/global-modes",
+      "detail_ref": "fixture:solar/helioseismology/global-mode-detail",
+      "splitting_ref": "fixture:solar/helioseismology/rotational-splittings",
+      "low_degree_mode_count": 48
+    },
+    "solar_neutrino_constraints": {
+      "constraints_ref": "fixture:solar/neutrinos/closure-vector",
+      "pp_flux": 5.98,
+      "be7_flux": 4.82,
+      "pep_flux": 1.44,
+      "b8_flux": 5.16,
+      "cno_flux": 7.0
+    }
+  }
+}

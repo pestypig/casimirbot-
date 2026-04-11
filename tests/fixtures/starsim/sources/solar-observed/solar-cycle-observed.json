@@ -1,0 +1,117 @@
+{
+  "source_id": "solar-observed-fixture:sun-cycle-observed",
+  "instrument": "SDO/HMI+NOAA/SWPC",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2025-01-01T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed solar cycle observed scaffold only.",
+  "section_metadata_overrides": {
+    "solar_cycle_indices": {
+      "instrument": "NOAA/SWPC",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "noaa_swpc_cycle_indices_v1",
+      "source_product_family": "cycle_index_products",
+      "source_doc_ids": ["goes_xray"]
+    },
+    "solar_magnetogram": {
+      "instrument": "SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_full_disk_magnetogram_v1",
+      "source_product_family": "magnetogram_products",
+      "source_doc_ids": ["hmi_products"]
+    },
+    "solar_active_regions": {
+      "instrument": "NOAA",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "noaa_active_region_catalog_v1",
+      "source_product_family": "active_region_products",
+      "source_doc_ids": ["hmi_products"]
+    },
+    "solar_irradiance_series": {
+      "instrument": "TSIS/TIM",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "tsis_tim_tsi_continuity_v1",
+      "source_product_family": "solar_irradiance_products",
+      "source_doc_ids": ["tsis_tim"]
+    }
+  },
+  "payload": {
+    "solar_cycle_indices": {
+      "sunspot_number": 82,
+      "f10_7_sfu": 155,
+      "polar_field_G": -2.6,
+      "axial_dipole_G": -0.9,
+      "butterfly_latitude_distribution_ref": "fixture:solar/cycle/butterfly-latitudes",
+      "cycle_label": "Cycle 25",
+      "polarity_label": "north_negative_south_positive"
+    },
+    "solar_magnetogram": {
+      "line_of_sight_ref": "fixture:solar/magnetograms/los-full-disk",
+      "vector_field_ref": "fixture:solar/magnetograms/vector-full-disk",
+      "synoptic_radial_map_ref": "fixture:solar/magnetograms/synoptic-radial",
+      "active_region_patch_refs": [
+        "fixture:solar/active-regions/harp-13000",
+        "fixture:solar/active-regions/harp-13001"
+      ]
+    },
+    "solar_active_regions": {
+      "region_refs": [
+        "fixture:solar/active-regions/noaa-13000",
+        "fixture:solar/active-regions/noaa-13001"
+      ],
+      "region_count": 2
+    },
+    "solar_irradiance_series": {
+      "tsi_ref": "fixture:solar/irradiance/tsi",
+      "xray_ref": "fixture:solar/irradiance/goes-xray"
+    }
+  }
+}

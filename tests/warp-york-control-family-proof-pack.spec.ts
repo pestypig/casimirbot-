@@ -2186,6 +2186,12 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerSharedUpstreamDriverStatus).toBeTruthy();
     expect((json as any).observerWecPropagationStatus).toBeTruthy();
     expect((json as any).observerRemediationSequenceStatus).toBeTruthy();
+    expect((json as any).observerTileDiminishingReturnStatus).toBe(
+      "likely_stop_territory",
+    );
+    expect((json as any).observerTileDiminishingReturnNote).toContain(
+      "no admissible new aft-local single-contributor mechanism",
+    );
     expect((json as any).tensors.metricRequired.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.tileEffective.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.metricRequired.rootCauseClass).toBeTruthy();
@@ -2220,6 +2226,8 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("observerSharedUpstreamDriverStatus");
     expect(markdown).toContain("observerWecPropagationStatus");
     expect(markdown).toContain("observerRemediationSequenceStatus");
+    expect(markdown).toContain("observerTileDiminishingReturnStatus");
+    expect(markdown).toContain("likely_stop_territory");
     expect(markdown).toContain("primaryBlockingCondition");
     expect(markdown).toContain("rootCauseClass");
     expect(markdown).toContain("upstreamDriverRef");
@@ -2301,6 +2309,12 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).sections.observer_audit.observerPrimaryDriverAgreement).toBe(
       (observerJson as any).observerPrimaryDriverAgreement,
     );
+    expect(
+      (json as any).sections.observer_audit.observerTileDiminishingReturnStatus,
+    ).toBe((observerJson as any).observerTileDiminishingReturnStatus);
+    expect(
+      (json as any).sections.observer_audit.observerTileDiminishingReturnNote,
+    ).toBe((observerJson as any).observerTileDiminishingReturnNote);
     expect((json as any).sections.observer_audit.observerSharedRootDriverStatus).toBe(
       (observerJson as any).observerSharedRootDriverStatus,
     );

@@ -305,7 +305,8 @@ const hasObservablePayload = (request: StarSimRequest): boolean =>
     || request.surface
     || request.structure
     || request.orbital_context
-    || request.environment,
+    || request.environment
+    || request.solar_baseline,
   );
 
 export const mergeResolvedIdentifiers = (

@@ -457,6 +457,7 @@ const resolveShiftLapseTileSectorSigma = (args: {
 
 const resolveShiftLapseTileLocalShellBias = (args: {
   familyContext: StressEnergyFamilyContext;
+  signedLongitudinal: number;
   shellSharpen: number;
   volumeEnvelope: number;
 }): number => {
@@ -465,10 +466,15 @@ const resolveShiftLapseTileLocalShellBias = (args: {
   }
   // After widening support and sector spread, the remaining NHM2 tile blocker is
   // the sharp wall-local residual sitting on comparatively low-volume support.
-  // Reduce only that residual shell bias so the normalized source redistributes
-  // into nearby support instead of keeping the deepest minimum at the same wall voxel.
-  const shellPeakPenalty = clamp01(args.shellSharpen) * (1 - clamp01(args.volumeEnvelope));
-  return 1 - 0.2 * shellPeakPenalty;
+  // Reduce that shell bias most on aft shoulder voxels so the normalized
+  // source redistributes across nearby aft support instead of keeping the
+  // deepest minimum pinned to the aft wall shoulder.
+  const shellSharpen = clamp01(args.shellSharpen);
+  const shellShoulder = clamp01(4 * shellSharpen * (1 - shellSharpen));
+  const volumePenalty = 1 - clamp01(args.volumeEnvelope);
+  const shellPeakPenalty = shellSharpen * volumePenalty;
+  const aftShoulderPenalty = clamp01(-args.signedLongitudinal) * shellShoulder * volumePenalty;
+  return 1 - 0.2 * shellPeakPenalty - 0.08 * aftShoulderPenalty;
 };
 
 const resolveShiftLapseTileAftSupportSigmaMultiplier = (args: {
@@ -484,11 +490,20 @@ const resolveShiftLapseTileAftSupportSigmaMultiplier = (args: {
   // aft shell support on sharp, low-volume wall voxels so the production proxy
   // redistributes the same normalized source across nearby aft support instead
   // of deepening the minimum on the aft wall.
+  const shellSharpen = clamp01(args.shellSharpen);
+  const shellShoulder = clamp01(4 * shellSharpen * (1 - shellSharpen));
+  const volumeEnvelope = clamp01(args.volumeEnvelope);
+  const volumePenalty = 1 - volumeEnvelope;
+  const volumeRelay = clamp01(4 * volumeEnvelope * volumePenalty);
+  const aftBias = clamp01(-args.signedLongitudinal);
+  const shoulderSkew = clamp01(shellShoulder * (1 + 0.35 * (1 - shellSharpen)));
+  const shoulderPlateau = clamp01(shoulderSkew * (1 + 0.25 * volumePenalty));
+  const aftShoulderShelf = clamp01(shoulderPlateau * (1 + 0.35 * aftBias * volumePenalty));
+  const aftShoulderBridge = clamp01(aftShoulderShelf * (1 + 0.35 * volumeRelay));
+  const aftRelayShelf = clamp01(aftShoulderBridge * (1 + 0.5 * aftBias * volumeRelay));
   const aftSpreadDriver =
-    clamp01(-args.signedLongitudinal) *
-    clamp01(args.shellSharpen) *
-    (1 - clamp01(args.volumeEnvelope));
-  return 1 + 2.6 * aftSpreadDriver;
+    aftBias * aftRelayShelf * clamp01(volumePenalty + 0.45 * volumeRelay + 0.2 * aftBias * volumeRelay);
+  return 1 + 9.0 * aftSpreadDriver;
 };
 
 const resolveShiftLapseTileAftAggregationWeight = (args: {
@@ -519,20 +534,22 @@ const resolveShiftLapseTileAftFalloffExponentMultiplier = (args: {
   signedLongitudinal: number;
   shellSharpen: number;
   volumeEnvelope: number;
+  dualLayerEnvelope: number;
 }): number => {
   if (args.familyContext.warpFieldType !== "nhm2_shift_lapse") {
     return 1;
   }
   // The remaining NHM2 worst-case stays aft-facing after widening the aft
-  // support shoulder. Flatten only the aft wall taper on broad shoulder voxels
-  // so the proxy redistributes across nearby aft wall support instead of
-  // keeping the deepest minimum on the same aft shell slice.
+  // support shoulder. Flatten only the aft wall taper on broad shoulder voxels,
+  // and bias that flattening toward the outer dual-layer shoulder so the proxy
+  // redistributes across nearby aft wall support instead of keeping the deepest
+  // minimum on the same aft shell slice.
   const shellSharpen = clamp01(args.shellSharpen);
   const shellShoulder = clamp01(4 * shellSharpen * (1 - shellSharpen));
   const aftTaperDriver =
     clamp01(-args.signedLongitudinal) *
-    shellShoulder *
-    (1 - clamp01(args.volumeEnvelope));
+    clamp01(shellShoulder * (0.7 + 0.3 * clamp01(args.dualLayerEnvelope))) *
+    clamp01((1 - clamp01(args.volumeEnvelope)) + 0.5 * clamp01(4 * clamp01(args.volumeEnvelope) * (1 - clamp01(args.volumeEnvelope))));
   return 1 - 0.46 * aftTaperDriver;
 };
 
@@ -1764,6 +1781,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
             signedLongitudinal: structuralBase.signedLongitudinal,
             shellSharpen: structuralBase.shellSharpen,
             volumeEnvelope: structuralBase.volumeEnvelope,
+            dualLayerEnvelope: structuralBase.dualLayerEnvelope,
           });
         const wallEnvelopeBase = Math.exp(-0.5 * Math.pow(centerDist / tileAftSupportSigma, 2));
         const wallEnvelope = Math.pow(wallEnvelopeBase, tileAftFalloffExponent);
@@ -1815,6 +1833,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
                   : 0.95 + 0.05 * Math.cos(TWO_PI * phaseDelta);
         const tileLocalShellBias = resolveShiftLapseTileLocalShellBias({
           familyContext,
+          signedLongitudinal: structural.signedLongitudinal,
           shellSharpen: structural.shellSharpen,
           volumeEnvelope: structural.volumeEnvelope,
         });
@@ -2414,10 +2433,5 @@ export const serializeStressEnergyBrickBinary = (brick: StressEnergyBrick): Stre
     ],
   };
 };
-
-
-
-
-
 
 

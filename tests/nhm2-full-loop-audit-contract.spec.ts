@@ -250,6 +250,10 @@ describe("nhm2 full-loop audit contract", () => {
       "certificate_missing",
     );
     expect(contract?.sectionOrder).toEqual(NHM2_FULL_LOOP_AUDIT_SECTION_ORDER);
+    expect(contract?.sections.observer_audit.observerTileDiminishingReturnStatus).toBe(
+      "unknown",
+    );
+    expect(contract?.sections.observer_audit.observerTileDiminishingReturnNote).toBeNull();
 
     const roundTrip = JSON.parse(JSON.stringify(contract));
     expect(isNhm2FullLoopAuditContract(roundTrip)).toBe(true);

@@ -1,4 +1,16 @@
 import { z } from "zod";
+import {
+  STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+  solarObservedBaselineSchema,
+  starSimSolarArtifactMetadataSchema,
+  type StarSimSolarArtifactMetadata,
+  type StarSimSolarBaselineSectionId,
+  type StarSimSolarBaselinePhase,
+  type StarSimSolarObservedBaseline,
+  type StarSimSolarObservedLane,
+} from "./solar-contract";
+
+export type { StarSimSolarBaselineSectionId } from "./solar-contract";
 
 export const fieldStatusSchema = z.enum(["observed", "fit", "prior", "default", "inferred", "missing"]);
 export const maturitySchema = z.enum([
@@ -49,12 +61,34 @@ export const starSimSupportedDomainReasonSchema = z.enum([
   "insufficient_observables",
   "seismology_required",
   "unsupported_evolutionary_state",
+  "solar_target_required",
+  "solar_interior_profile_missing",
+  "solar_layer_boundaries_missing",
+  "solar_global_modes_missing",
+  "solar_neutrino_constraints_missing",
+  "solar_convection_zone_depth_invalid",
+  "solar_envelope_helium_invalid",
+  "solar_low_degree_modes_incomplete",
+  "solar_neutrino_vector_incomplete",
+  "solar_cycle_indices_missing",
+  "solar_cycle_indices_incomplete",
+  "solar_magnetogram_missing",
+  "solar_cycle_magnetogram_incomplete",
+  "solar_active_regions_missing",
+  "solar_active_regions_incomplete",
+  "solar_flare_catalog_missing",
+  "solar_flare_catalog_incomplete",
+  "solar_cme_catalog_missing",
+  "solar_cme_catalog_incomplete",
+  "solar_irradiance_series_missing",
+  "solar_irradiance_series_incomplete",
 ]);
 export const starSimArtifactRefSchema = z.object({
   kind: z.string().min(1),
   path: z.string().min(1),
   hash: z.string().min(1).optional(),
   integrity_status: starSimArtifactIntegritySchema.optional(),
+  metadata: starSimSolarArtifactMetadataSchema.optional(),
 });
 
 const sectionMetaShape = {
@@ -244,6 +278,7 @@ export const starSimRequestSchema = z
     structure: structureSchema,
     orbital_context: orbitalContextSchema,
     environment: environmentSchema,
+    solar_baseline: solarObservedBaselineSchema.optional(),
     evidence_refs: z.array(z.string()).optional(),
     requested_lanes: z.array(requestedLaneSchema).optional(),
     strict_lanes: z.boolean().optional(),
@@ -277,6 +312,14 @@ export type PhysicsFlagValue = string | number | boolean | null;
 export type ObsClass = "O0" | "O1" | "O2" | "O3" | "O4" | "O5";
 export type PhysClass = "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
 
+export {
+  STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+  type StarSimSolarObservedBaseline,
+  type StarSimSolarArtifactMetadata,
+  type StarSimSolarObservedLane,
+  type StarSimSolarBaselinePhase,
+};
+
 export interface StarSimBenchmarkMetricCheck {
   metric_id: string;
   actual: number;
@@ -295,6 +338,144 @@ export interface StarSimBenchmarkValidation {
   crossmatch_summary?: StarSimCrossmatchSummary;
   quality_rejections?: StarSimQualityRejection[];
   diagnostic_summary?: StarSimDiagnosticSummary;
+}
+
+export type StarSimSolarClosureCheckStatus = "pass" | "warn" | "fail" | "missing";
+
+export interface StarSimSolarClosureCheck {
+  status: StarSimSolarClosureCheckStatus;
+  reason_code?: StarSimSupportedDomainReason;
+  reference_anchor_id?: string;
+  reference_pack_id?: string;
+  reference_pack_version?: string;
+  reference_doc_ids?: string[];
+  reference_basis?: string;
+  product_family?: string;
+  actual_summary?: Record<string, unknown>;
+  expected_summary?: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface StarSimSolarClosureDiagnostics {
+  benchmark_pack_id: "solar_interior_closure_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    convection_zone_depth: StarSimSolarClosureCheck;
+    envelope_helium_fraction: StarSimSolarClosureCheck;
+    low_degree_mode_support: StarSimSolarClosureCheck;
+    neutrino_constraint_vector: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarCycleDiagnostics {
+  benchmark_pack_id: "solar_cycle_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    cycle_indices: StarSimSolarClosureCheck;
+    magnetogram_context: StarSimSolarClosureCheck;
+    active_region_context: StarSimSolarClosureCheck;
+    irradiance_continuity: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarEruptiveDiagnostics {
+  benchmark_pack_id: "solar_eruptive_catalog_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    flare_catalog: StarSimSolarClosureCheck;
+    cme_catalog: StarSimSolarClosureCheck;
+    irradiance_continuity: StarSimSolarClosureCheck;
+    source_region_linkage: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarConsistencyCheck {
+  status: StarSimSolarClosureCheckStatus;
+  reason_code?: string;
+  reference_anchor_id?: string;
+  reference_pack_id?: string;
+  reference_pack_version?: string;
+  reference_doc_ids?: string[];
+  reference_basis?: string;
+  product_family?: string;
+  actual_summary?: Record<string, unknown>;
+  expected_summary?: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface StarSimSolarConsistencyDiagnostics {
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    source_region_overlap: StarSimSolarConsistencyCheck;
+    magnetogram_active_region_linkage: StarSimSolarConsistencyCheck;
+    irradiance_context_consistency: StarSimSolarConsistencyCheck;
+    phase_metadata_coherence: StarSimSolarConsistencyCheck;
+  };
+}
+
+export interface StarSimSolarProvenanceCheck {
+  status: StarSimSolarClosureCheckStatus;
+  section_id: StarSimSolarBaselineSectionId;
+  reason_code?: string;
+  source_product_id?: string;
+  source_product_family?: string;
+  source_doc_ids?: string[];
+  product_registry_id?: string;
+  product_registry_version?: string;
+  reference_doc_ids?: string[];
+  actual_summary?: Record<string, unknown>;
+  expected_summary?: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface StarSimSolarProvenanceDiagnostics {
+  product_registry_id: string;
+  product_registry_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: Partial<Record<StarSimSolarBaselineSectionId, StarSimSolarProvenanceCheck>>;
+}
+
+export type StarSimSolarBaselineDriftCategory =
+  | "phase_support_changed"
+  | "source_region_linkage_changed"
+  | "phase_metadata_changed"
+  | "artifact_refs_changed"
+  | "irradiance_context_changed"
+  | "product_provenance_changed"
+  | "reference_basis_changed";
+
+export interface StarSimSolarBaselineRepeatability {
+  repeatable: boolean;
+  same_signature: boolean;
+  drift_categories: StarSimSolarBaselineDriftCategory[];
+  notes: string[];
+}
+
+export interface StarSimSolarBaselineSupport {
+  id: "solar_observed_baseline_v1";
+  version: "star-sim-solar-domain/5";
+  phase_id: StarSimSolarBaselinePhase;
+  passed: boolean;
+  reasons: StarSimSupportedDomainReason[];
+  required_sections: string[];
+  optional_sections: string[];
+  present_sections: string[];
+  benchmark_pack_id: string;
+  solar_reference_pack_id: string;
+  solar_reference_pack_version: string;
+  conceptual_lanes: StarSimSolarObservedLane[];
+  notes: string[];
+  closure_diagnostics?: StarSimSolarClosureDiagnostics;
+  cycle_diagnostics?: StarSimSolarCycleDiagnostics;
+  eruptive_diagnostics?: StarSimSolarEruptiveDiagnostics;
 }
 
 export interface StarSimSupportedDomain {
@@ -568,6 +749,18 @@ export interface StarSimSourceResolution {
   quality_rejections?: StarSimQualityRejection[];
   quality_warnings?: StarSimQualityWarning[];
   diagnostic_summary?: StarSimDiagnosticSummary;
+  solar_baseline_support?: Partial<Record<StarSimSolarBaselinePhase, StarSimSolarBaselineSupport>>;
+  solar_reference_pack_id?: string;
+  solar_reference_pack_version?: string;
+  solar_reference_pack_ref?: string;
+  solar_product_registry_id?: string;
+  solar_product_registry_version?: string;
+  solar_product_registry_ref?: string;
+  solar_consistency_diagnostics?: StarSimSolarConsistencyDiagnostics;
+  solar_provenance_diagnostics?: StarSimSolarProvenanceDiagnostics;
+  solar_baseline_signature?: string;
+  previous_solar_baseline_ref?: string;
+  solar_baseline_repeatability?: StarSimSolarBaselineRepeatability;
 }
 
 export interface StarSimResolveResponse {
@@ -596,6 +789,18 @@ export interface StarSimResolveResponse {
   quality_rejections?: StarSimQualityRejection[];
   quality_warnings?: StarSimQualityWarning[];
   diagnostic_summary?: StarSimDiagnosticSummary;
+  solar_baseline_support?: Partial<Record<StarSimSolarBaselinePhase, StarSimSolarBaselineSupport>>;
+  solar_reference_pack_id?: string;
+  solar_reference_pack_version?: string;
+  solar_reference_pack_ref?: string;
+  solar_product_registry_id?: string;
+  solar_product_registry_version?: string;
+  solar_product_registry_ref?: string;
+  solar_consistency_diagnostics?: StarSimSolarConsistencyDiagnostics;
+  solar_provenance_diagnostics?: StarSimSolarProvenanceDiagnostics;
+  solar_baseline_signature?: string;
+  previous_solar_baseline_ref?: string;
+  solar_baseline_repeatability?: StarSimSolarBaselineRepeatability;
 }
 
 export interface StarSimPreflightLane {
@@ -667,6 +872,7 @@ export interface StarSimResolveBeforeRunResponse {
   quality_rejections?: StarSimQualityRejection[];
   quality_warnings?: StarSimQualityWarning[];
   diagnostic_summary?: StarSimDiagnosticSummary;
+  solar_baseline_support?: Partial<Record<StarSimSolarBaselinePhase, StarSimSolarBaselineSupport>>;
 }
 
 export interface CanonicalStarTarget {

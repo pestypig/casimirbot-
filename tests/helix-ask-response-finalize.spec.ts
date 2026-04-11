@@ -59,12 +59,22 @@ describe("helix ask response debug payload helpers", () => {
   it("attaches final trace journal fields and reasoning sidebar", () => {
     const debugPayload: Record<string, unknown> = {};
     const attachReasoningSidebarToDebug = vi.fn();
+    const traceEvents = [
+      {
+        ts: "2026-04-11T00:00:00.000Z",
+        tool: "helix.ask.event",
+        stage: "answer",
+        detail: "finalize",
+        ok: true,
+        durationMs: 45,
+        meta: { fn: "finalizeHelixAskAnswerSurface" },
+      },
+    ];
 
     attachFinalTraceDebugPayload({
       debugPayload,
       captureLiveHistory: true,
-      traceEvents: [{ stage: "answer" }],
-      buildTraceSummary: () => ({ total: 1 }),
+      traceEvents,
       buildEventStableFields: () => ({ stable: true }),
       hashStableJson: () => "hash123",
       attachReasoningSidebarToDebug,
@@ -78,8 +88,10 @@ describe("helix ask response debug payload helpers", () => {
       },
     });
 
-    expect(debugPayload.live_events).toEqual([{ stage: "answer" }]);
-    expect(debugPayload.trace_summary).toEqual({ total: 1 });
+    expect(debugPayload.live_events).toEqual(traceEvents);
+    expect(debugPayload.trace_summary).toEqual([
+      expect.objectContaining({ stage: "answer", durationMs: 45 }),
+    ]);
     expect(debugPayload.event_journal).toEqual({
       version: "quake_frame_loop_v1",
       replay_parity: true,

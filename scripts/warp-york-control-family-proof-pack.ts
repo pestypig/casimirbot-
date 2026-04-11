@@ -113,6 +113,7 @@ import {
   isNhm2ObserverAuditArtifact,
   type Nhm2ObserverAuditArtifact,
   type BuildNhm2ObserverAuditTensorInput,
+  type Nhm2ObserverTileDiminishingReturnStatus,
 } from "../shared/contracts/nhm2-observer-audit.v1";
 import {
   isCertifiedWarpWorldlineContract,
@@ -29302,6 +29303,15 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
   observerAuditArtifact: Nhm2ObserverAuditArtifact;
   selectedFamilyArtifactRootDir: string;
 }): Nhm2ObserverAuditArtifact => {
+  // April 11, 2026 exception-only reassessment: the latest distinct-family
+  // shell-taper attempt stayed far below the hard 2% gate and no further
+  // admissible single-contributor aft-local mechanism cleared entry, so the
+  // residual tile WEC lane remains in likely stop territory under current
+  // policy until a materially different mechanism is demonstrated.
+  const observerTileDiminishingReturnStatus: Nhm2ObserverTileDiminishingReturnStatus =
+    "likely_stop_territory";
+  const observerTileDiminishingReturnNote =
+    "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.";
   const familyId = resolveStrictSignalPublishedFamilyId(args);
   const selectedProfileId = resolveStrictSignalPublishedProfileId(args);
   const tensorSnapshotPaths =
@@ -29338,6 +29348,8 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
   return buildNhm2ObserverAuditArtifact({
     familyId,
     shiftLapseProfileId: selectedProfileId,
+    observerTileDiminishingReturnStatus,
+    observerTileDiminishingReturnNote,
     metricRequired: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.metricRequired,
       normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
@@ -29488,6 +29500,8 @@ const renderNhm2ObserverAuditMarkdown = (
 | observerWecPropagationStatus | ${payload.observerWecPropagationStatus} |
 | observerWecPropagationNote | ${payload.observerWecPropagationNote ?? "null"} |
 | observerRemediationSequenceStatus | ${payload.observerRemediationSequenceStatus} |
+| observerTileDiminishingReturnStatus | ${payload.observerTileDiminishingReturnStatus} |
+| observerTileDiminishingReturnNote | ${payload.observerTileDiminishingReturnNote ?? "null"} |
 | observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
 | metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
 | tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
@@ -34756,6 +34770,8 @@ ${tierRows}
 | observerWecPropagationStatus | ${observerAudit.observerWecPropagationStatus} |
 | observerWecPropagationNote | ${observerAudit.observerWecPropagationNote ?? "null"} |
 | observerRemediationSequenceStatus | ${observerAudit.observerRemediationSequenceStatus} |
+| observerTileDiminishingReturnStatus | ${observerAudit.observerTileDiminishingReturnStatus} |
+| observerTileDiminishingReturnNote | ${observerAudit.observerTileDiminishingReturnNote ?? "null"} |
 | observerBlockingAssessmentNote | ${observerAudit.observerBlockingAssessmentNote ?? "null"} |
 | metric.wecMinOverAllTimelike | ${observerAudit.metric.wecMinOverAllTimelike ?? "null"} |
 | metric.necMinOverAllNull | ${observerAudit.metric.necMinOverAllNull ?? "null"} |
@@ -35951,6 +35967,10 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         observerAuditArtifact?.observerWecPropagationNote ?? null,
       observerRemediationSequenceStatus:
         observerAuditArtifact?.observerRemediationSequenceStatus ?? "unknown",
+      observerTileDiminishingReturnStatus:
+        observerAuditArtifact?.observerTileDiminishingReturnStatus ?? "unknown",
+      observerTileDiminishingReturnNote:
+        observerAuditArtifact?.observerTileDiminishingReturnNote ?? null,
       metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
       tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
     },

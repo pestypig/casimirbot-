@@ -2,10 +2,17 @@ import type {
   CanonicalStar,
   StarSimBenchmarkMetricCheck,
   StarSimBenchmarkValidation,
+  StarSimSolarBaselinePhase,
   StarSimSupportedDomain,
   StarSimSupportedDomainReason,
 } from "./contract";
 import { STAR_SIM_SUPPORTED_DOMAIN_ID } from "./domain";
+import {
+  getSolarBenchmarkPackById,
+  listSolarBenchmarkPacks,
+  STAR_SIM_SOLAR_BENCHMARK_REGISTRY_VERSION,
+  type StarSimSolarBenchmarkPackSpec,
+} from "./solar-benchmarks";
 import type { StarSimRuntimeArtifactPayload } from "./worker/starsim-worker-types";
 
 export const STAR_SIM_BENCHMARK_REGISTRY_VERSION =
@@ -416,3 +423,11 @@ export const getBenchmarkById = (benchmarkCaseId: string): StarSimBenchmarkSpec 
 
 export const getBenchmarkPackById = (benchmarkPackId: string): StarSimBenchmarkPackSpec | null =>
   BENCHMARK_PACKS[benchmarkPackId] ?? null;
+
+export const getSolarObservedBenchmarkPackById = (
+  benchmarkPackId: StarSimSolarBaselinePhase | string,
+): StarSimSolarBenchmarkPackSpec | null => getSolarBenchmarkPackById(benchmarkPackId);
+
+export const listSolarObservedBenchmarkPacks = (): StarSimSolarBenchmarkPackSpec[] => listSolarBenchmarkPacks();
+
+export const getSolarBenchmarkRegistryVersion = (): string => STAR_SIM_SOLAR_BENCHMARK_REGISTRY_VERSION;

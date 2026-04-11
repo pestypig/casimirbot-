@@ -64,3 +64,16 @@ Important limitations:
 - `/api/star-sim/v1/resolve` now exposes `oscillation_gyre_ready` plus an oscillation-domain preview, but it still does not execute the solver lane
 - source enrichment does not raise solver maturity by itself
 - the supported live physics domain is still the existing solar-like main-sequence envelope
+
+Solar note:
+- `server/modules/starsim/sources/adapters/solar-observed.ts` now provides a scaffolded solar observed-source normalizer for future Sun-only baseline work
+- for Sun requests, the resolver now merges fixture/static `solar_observed` inputs for both Phase 0 interior closure and observed cycle context
+- `solar_baseline_support` now includes `closure_diagnostics` for convection-zone depth, envelope helium, low-degree mode support, and neutrino vector completeness
+- `solar_baseline_support` also includes `cycle_diagnostics` for cycle indices, magnetogram linkage, active-region context, and advisory irradiance continuity
+- `solar_baseline_support` also includes `eruptive_diagnostics` for flare coverage, CME coverage, irradiance continuity, and optional source-region linkage
+- Sun resolves now also emit `solar_reference_pack_id`, `solar_reference_pack_version`, `solar_reference_pack_ref`, `solar_product_registry_id`, `solar_product_registry_version`, `solar_product_registry_ref`, `solar_consistency_diagnostics`, `solar_provenance_diagnostics`, `solar_baseline_signature`, `previous_solar_baseline_ref`, and `solar_baseline_repeatability`
+- each solar diagnostic check now carries anchor provenance plus `reference_doc_ids` so operators can distinguish evidence drift from `reference_basis_changed`
+- the active Sun calibration basis now loads from `data/starsim/solar-reference-pack.v1.json`, not embedded TypeScript literals
+- the active Sun evidence/product basis now loads from `data/starsim/solar-product-registry.v1.json`, and populated solar sections carry explicit `source_product_id`, `source_product_family`, and `source_doc_ids`
+- this solar path stays separate from the Gaia/Astra/LAMOST/TASOC/TESS resolver stack used for ordinary stellar requests
+- the new solar schema/domain scaffold is still separate from the current `solar_like_main_sequence_live` source-resolution workflow and does not imply full-Sun solver closure
