@@ -1,0 +1,54 @@
+{
+  "source_id": "solar-observed-fixture:sun-coronal-field-observed",
+  "instrument": "NSO/PFSS+SDO/HMI+SDO/AIA",
+  "observed_mode": "modeled",
+  "time_range": {
+    "start_iso": "2025-02-01T00:00:00.000Z",
+    "end_iso": "2025-02-27T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "carrington_rotation"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed PFSS-style coronal magnetic scaffold only.",
+  "section_metadata_overrides": {
+    "solar_coronal_field": {
+      "instrument": "NSO/PFSS+SDO/HMI+SDO/AIA",
+      "observed_mode": "modeled",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "carrington_rotation"
+      },
+      "time_range": {
+        "start_iso": "2025-02-01T00:00:00.000Z",
+        "end_iso": "2025-02-27T23:59:59.000Z"
+      },
+      "source_product_id": "pfss_coronal_field_context_v1",
+      "source_product_family": "coronal_field_proxy_products",
+      "source_doc_ids": ["nso_pfss", "hmi_products", "aia_corona"]
+    }
+  },
+  "payload": {
+    "solar_coronal_field": {
+      "pfss_solution_ref": "fixture:solar/coronal/pfss-solution-2290",
+      "synoptic_boundary_ref": "fixture:solar/coronal/synoptic-boundary-2290",
+      "coronal_hole_refs": [
+        "fixture:solar/coronal/coronal-hole-north-2290",
+        "fixture:solar/coronal/coronal-hole-south-2290"
+      ],
+      "helmet_streamer_ref": "fixture:solar/coronal/helmet-streamer-2290",
+      "open_field_map_ref": "fixture:solar/coronal/open-field-map-2290",
+      "euv_coronal_context_ref": "fixture:solar/coronal/aia-euv-context-2290",
+      "summary": {
+        "source_surface_rsun": 2.5,
+        "open_flux_weber": 340000000000000,
+        "dominant_topology": "dipolar_open_flux",
+        "coronal_hole_count": 2
+      }
+    }
+  }
+}

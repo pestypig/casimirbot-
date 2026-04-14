@@ -1,0 +1,193 @@
+{
+  "source_id": "solar-observed-fixture:sun-sunspot-region-observed",
+  "instrument": "NOAA+SDO/HMI/HARP",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2025-02-14T00:00:00.000Z",
+    "end_iso": "2025-02-16T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed solar sunspot and bipolar-region scaffold only.",
+  "section_metadata_overrides": {
+    "solar_sunspot_catalog": {
+      "instrument": "NOAA+SDO/HMI/HARP",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-02-14T00:00:00.000Z",
+        "end_iso": "2025-02-16T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_noaa_sunspot_catalog_v1",
+      "source_product_family": "sunspot_catalog_products",
+      "source_doc_ids": ["hmi_products", "sft_review_2023"]
+    },
+    "solar_active_regions": {
+      "instrument": "NOAA+SDO/HMI/HARP",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2025-02-14T00:00:00.000Z",
+        "end_iso": "2025-02-16T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_noaa_bipolar_active_region_context_v1",
+      "source_product_family": "bipolar_active_region_products",
+      "source_doc_ids": ["hmi_products", "sft_review_2023"]
+    }
+  },
+  "payload": {
+    "solar_sunspot_catalog": {
+      "spot_refs": [
+        "fixture:solar/sunspots/spot-13000-a",
+        "fixture:solar/sunspots/spot-13000-b",
+        "fixture:solar/sunspots/spot-13001-a",
+        "fixture:solar/sunspots/spot-13001-b"
+      ],
+      "spot_count": 4,
+      "bipolar_group_refs": [
+        "fixture:solar/bipolar-groups/group-13000",
+        "fixture:solar/bipolar-groups/group-13001"
+      ],
+      "spots": [
+        {
+          "spot_id": "fixture:solar/sunspots/spot-13000-a",
+          "linked_region_id": "fixture:solar/active-regions/noaa-13000",
+          "linked_noaa_region_id": "13000",
+          "linked_harp_id": "HARP-13000",
+          "hemisphere": "north",
+          "heliographic_latitude_deg": 14.1,
+          "carrington_longitude_deg": 205.1,
+          "area_msh": 180,
+          "polarity": "negative",
+          "umbra_area_msh": 62,
+          "penumbra_area_msh": 118,
+          "magnetic_class": "beta-gamma",
+          "bipolar_group_id": "fixture:solar/bipolar-groups/group-13000",
+          "emergence_time_iso": "2025-02-14T08:10:00.000Z"
+        },
+        {
+          "spot_id": "fixture:solar/sunspots/spot-13000-b",
+          "linked_region_id": "fixture:solar/active-regions/noaa-13000",
+          "linked_noaa_region_id": "13000",
+          "linked_harp_id": "HARP-13000",
+          "hemisphere": "north",
+          "heliographic_latitude_deg": 14.4,
+          "carrington_longitude_deg": 206.0,
+          "area_msh": 150,
+          "polarity": "positive",
+          "umbra_area_msh": 51,
+          "penumbra_area_msh": 99,
+          "magnetic_class": "beta-gamma",
+          "bipolar_group_id": "fixture:solar/bipolar-groups/group-13000",
+          "emergence_time_iso": "2025-02-14T08:22:00.000Z"
+        },
+        {
+          "spot_id": "fixture:solar/sunspots/spot-13001-a",
+          "linked_region_id": "fixture:solar/active-regions/noaa-13001",
+          "linked_noaa_region_id": "13001",
+          "linked_harp_id": "HARP-13001",
+          "hemisphere": "south",
+          "heliographic_latitude_deg": -9.8,
+          "carrington_longitude_deg": 218.4,
+          "area_msh": 135,
+          "polarity": "positive",
+          "umbra_area_msh": 44,
+          "penumbra_area_msh": 91,
+          "magnetic_class": "beta",
+          "bipolar_group_id": "fixture:solar/bipolar-groups/group-13001",
+          "emergence_time_iso": "2025-02-16T11:30:00.000Z"
+        },
+        {
+          "spot_id": "fixture:solar/sunspots/spot-13001-b",
+          "linked_region_id": "fixture:solar/active-regions/noaa-13001",
+          "linked_noaa_region_id": "13001",
+          "linked_harp_id": "HARP-13001",
+          "hemisphere": "south",
+          "heliographic_latitude_deg": -10.1,
+          "carrington_longitude_deg": 219.2,
+          "area_msh": 120,
+          "polarity": "negative",
+          "umbra_area_msh": 38,
+          "penumbra_area_msh": 82,
+          "magnetic_class": "beta",
+          "bipolar_group_id": "fixture:solar/bipolar-groups/group-13001",
+          "emergence_time_iso": "2025-02-16T11:44:00.000Z"
+        }
+      ],
+      "summary": {
+        "total_area_msh": 585,
+        "mean_absolute_latitude_deg": 12.1,
+        "bipolar_group_count": 2
+      }
+    },
+    "solar_active_regions": {
+      "region_refs": [
+        "fixture:solar/active-regions/noaa-13000",
+        "fixture:solar/active-regions/noaa-13001"
+      ],
+      "region_count": 2,
+      "regions": [
+        {
+          "region_id": "fixture:solar/active-regions/noaa-13000",
+          "noaa_region_id": "13000",
+          "harp_id": "HARP-13000",
+          "sharp_ref": "fixture:solar/active-regions/sharp-13000",
+          "heliographic_latitude_deg": 14.2,
+          "carrington_longitude_deg": 205.4,
+          "area_msh": 420,
+          "magnetic_class": "beta-gamma",
+          "tilt_deg": 11.5,
+          "leading_polarity": "negative",
+          "hemisphere": "north",
+          "following_polarity": "positive",
+          "bipole_separation_deg": 6.8,
+          "emergence_time_iso": "2025-02-14T08:15:00.000Z",
+          "joy_law_tilt_class": "aligned",
+          "linked_spot_ids": [
+            "fixture:solar/sunspots/spot-13000-a",
+            "fixture:solar/sunspots/spot-13000-b"
+          ],
+          "bipolar_group_id": "fixture:solar/bipolar-groups/group-13000",
+          "polarity_ordering_class": "hale-consistent"
+        },
+        {
+          "region_id": "fixture:solar/active-regions/noaa-13001",
+          "noaa_region_id": "13001",
+          "harp_id": "HARP-13001",
+          "sharp_ref": "fixture:solar/active-regions/sharp-13001",
+          "heliographic_latitude_deg": -9.6,
+          "carrington_longitude_deg": 218.8,
+          "area_msh": 360,
+          "magnetic_class": "beta",
+          "tilt_deg": -8.1,
+          "leading_polarity": "positive",
+          "hemisphere": "south",
+          "following_polarity": "negative",
+          "bipole_separation_deg": 5.7,
+          "emergence_time_iso": "2025-02-16T11:40:00.000Z",
+          "joy_law_tilt_class": "aligned",
+          "linked_spot_ids": [
+            "fixture:solar/sunspots/spot-13001-a",
+            "fixture:solar/sunspots/spot-13001-b"
+          ],
+          "bipolar_group_id": "fixture:solar/bipolar-groups/group-13001",
+          "polarity_ordering_class": "hale-consistent"
+        }
+      ]
+    }
+  }
+}

@@ -83,5 +83,10 @@ describe("star-sim benchmark target matching", () => {
     expect(match.benchmark_target?.id).toBe("sun_observed_baseline");
     expect(match.benchmark_target_match_mode).toBe("matched_by_name");
     expect(match.benchmark_target_identity_basis).toBe("name_label");
+    expect(match.benchmark_target?.benchmark_family_or_pack_ids).toContain("solar_structural_residual_closure_v1");
+    expect(match.benchmark_target?.benchmark_family_or_pack_ids).toContain("solar_spot_region_observed_v1");
+    expect(match.benchmark_target?.benchmark_family_or_pack_ids).toContain("solar_coronal_field_observed_v1");
+    expect(match.benchmark_target?.benchmark_family_or_pack_ids).toContain("solar_topology_linkage_observed_v1");
+    expect(match.benchmark_target?.benchmark_family_or_pack_ids).toContain("solar_cross_layer_consistency_v1");
   });
 });

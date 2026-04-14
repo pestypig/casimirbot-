@@ -1,19 +1,35 @@
 import {
   NHM2_OBSERVER_BLOCKING_ASSESSMENT_STATUS_VALUES,
+  NHM2_OBSERVER_LEAD_READINESS_WORKSTREAM_VALUES,
+  NHM2_OBSERVER_METRIC_COMPLETENESS_STATUS_VALUES,
+  NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES,
+  NHM2_OBSERVER_METRIC_COVERAGE_BLOCKER_STATUS_VALUES,
+  NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES,
+  NHM2_OBSERVER_METRIC_FIRST_MISSING_STAGE_VALUES,
+  NHM2_OBSERVER_NEXT_TECHNICAL_ACTION_VALUES,
   NHM2_OBSERVER_PRIMARY_DRIVER_AGREEMENT_VALUES,
   NHM2_OBSERVER_PROMOTION_BLOCKING_CONDITION_VALUES,
   NHM2_OBSERVER_PROMOTION_BLOCKING_SURFACE_VALUES,
   NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES,
   NHM2_OBSERVER_SHARED_UPSTREAM_DRIVER_STATUS_VALUES,
+  NHM2_OBSERVER_TILE_AUTHORITY_STATUS_VALUES,
   NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES,
   NHM2_OBSERVER_WEC_PROPAGATION_STATUS_VALUES,
   type Nhm2ObserverBlockingAssessmentStatus,
+  type Nhm2ObserverLeadReadinessWorkstream,
+  type Nhm2ObserverMetricCompletenessStatus,
+  type Nhm2ObserverMetricComponentAdmissionStatus,
+  type Nhm2ObserverMetricCoverageBlockerStatus,
+  type Nhm2ObserverMetricEmissionAdmissionStatus,
+  type Nhm2ObserverMetricFirstMissingStage,
+  type Nhm2ObserverNextTechnicalAction,
   type Nhm2ObserverPrimaryDriverAgreement,
   type Nhm2ObserverPromotionBlockingCondition,
   type Nhm2ObserverPromotionBlockingSurface,
   type Nhm2ObserverRemediationSequenceStatus,
   type Nhm2ObserverSharedRootDriverStatus,
   type Nhm2ObserverSharedUpstreamDriverStatus,
+  type Nhm2ObserverTileAuthorityStatus,
   type Nhm2ObserverTileDiminishingReturnStatus,
   type Nhm2ObserverWecPropagationStatus,
   NHM2_OBSERVER_SHARED_ROOT_DRIVER_STATUS_VALUES,
@@ -237,6 +253,22 @@ export type Nhm2ObserverAuditSection =
     observerRemediationSequenceStatus: Nhm2ObserverRemediationSequenceStatus;
     observerTileDiminishingReturnStatus: Nhm2ObserverTileDiminishingReturnStatus;
     observerTileDiminishingReturnNote: string | null;
+    observerMetricCompletenessStatus: Nhm2ObserverMetricCompletenessStatus;
+    observerMetricCompletenessNote: string | null;
+    observerMetricCoverageBlockerStatus: Nhm2ObserverMetricCoverageBlockerStatus;
+    observerMetricCoverageBlockerNote: string | null;
+    observerMetricFirstMissingStage: Nhm2ObserverMetricFirstMissingStage;
+    observerMetricEmissionAdmissionStatus: Nhm2ObserverMetricEmissionAdmissionStatus;
+    observerMetricEmissionAdmissionNote: string | null;
+    observerMetricT0iAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+    observerMetricT0iAdmissionNote: string | null;
+    observerMetricOffDiagonalTijAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+    observerMetricOffDiagonalTijAdmissionNote: string | null;
+    observerTileAuthorityStatus: Nhm2ObserverTileAuthorityStatus;
+    observerTileAuthorityNote: string | null;
+    observerLeadReadinessWorkstream: Nhm2ObserverLeadReadinessWorkstream;
+    observerLeadReadinessReason: string | null;
+    observerNextTechnicalAction: Nhm2ObserverNextTechnicalAction;
     metric: Nhm2ObserverFamilyAudit;
     tile: Nhm2ObserverFamilyAudit;
   };
@@ -256,6 +288,31 @@ type Nhm2ObserverAuditSectionInput =
       | "observerPrimaryDriverNote"
       | "observerMetricFirstInspectionTarget"
       | "observerTileFirstInspectionTarget"
+      | "observerSharedRootDriverStatus"
+      | "observerSharedRootDriverNote"
+      | "observerSharedUpstreamDriverStatus"
+      | "observerSharedUpstreamDriverNote"
+      | "observerWecPropagationStatus"
+      | "observerWecPropagationNote"
+      | "observerRemediationSequenceStatus"
+      | "observerTileDiminishingReturnStatus"
+      | "observerTileDiminishingReturnNote"
+      | "observerMetricCompletenessStatus"
+      | "observerMetricCompletenessNote"
+      | "observerMetricCoverageBlockerStatus"
+      | "observerMetricCoverageBlockerNote"
+      | "observerMetricFirstMissingStage"
+      | "observerMetricEmissionAdmissionStatus"
+      | "observerMetricEmissionAdmissionNote"
+      | "observerMetricT0iAdmissionStatus"
+      | "observerMetricT0iAdmissionNote"
+      | "observerMetricOffDiagonalTijAdmissionStatus"
+      | "observerMetricOffDiagonalTijAdmissionNote"
+      | "observerTileAuthorityStatus"
+      | "observerTileAuthorityNote"
+      | "observerLeadReadinessWorkstream"
+      | "observerLeadReadinessReason"
+      | "observerNextTechnicalAction"
     > & {
       observerBlockingAssessmentStatus?: Nhm2ObserverBlockingAssessmentStatus;
       observerBlockingAssessmentNote?: string | null;
@@ -276,6 +333,28 @@ type Nhm2ObserverAuditSectionInput =
       observerRemediationSequenceStatus?: Nhm2ObserverRemediationSequenceStatus;
       observerTileDiminishingReturnStatus?: Nhm2ObserverTileDiminishingReturnStatus;
       observerTileDiminishingReturnNote?: string | null;
+      observerMetricCompletenessStatus?: Nhm2ObserverMetricCompletenessStatus;
+      observerMetricCompletenessNote?: string | null;
+      observerMetricCoverageBlockerStatus?: Nhm2ObserverMetricCoverageBlockerStatus;
+      observerMetricCoverageBlockerNote?: string | null;
+      observerMetricFirstMissingStage?: Nhm2ObserverMetricFirstMissingStage;
+      observerMetricEmissionAdmissionStatus?:
+        | Nhm2ObserverMetricEmissionAdmissionStatus
+        | null;
+      observerMetricEmissionAdmissionNote?: string | null;
+      observerMetricT0iAdmissionStatus?:
+        | Nhm2ObserverMetricComponentAdmissionStatus
+        | null;
+      observerMetricT0iAdmissionNote?: string | null;
+      observerMetricOffDiagonalTijAdmissionStatus?:
+        | Nhm2ObserverMetricComponentAdmissionStatus
+        | null;
+      observerMetricOffDiagonalTijAdmissionNote?: string | null;
+      observerTileAuthorityStatus?: Nhm2ObserverTileAuthorityStatus;
+      observerTileAuthorityNote?: string | null;
+      observerLeadReadinessWorkstream?: Nhm2ObserverLeadReadinessWorkstream;
+      observerLeadReadinessReason?: string | null;
+      observerNextTechnicalAction?: Nhm2ObserverNextTechnicalAction;
     };
 
 export type Nhm2GrStabilitySafetySection =
@@ -520,6 +599,62 @@ const isObserverTileDiminishingReturnStatus = (
     value as Nhm2ObserverTileDiminishingReturnStatus,
   );
 
+const isObserverMetricCompletenessStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricCompletenessStatus =>
+  NHM2_OBSERVER_METRIC_COMPLETENESS_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricCompletenessStatus,
+  );
+
+const isObserverMetricCoverageBlockerStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricCoverageBlockerStatus =>
+  NHM2_OBSERVER_METRIC_COVERAGE_BLOCKER_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricCoverageBlockerStatus,
+  );
+
+const isObserverMetricFirstMissingStage = (
+  value: unknown,
+): value is Nhm2ObserverMetricFirstMissingStage =>
+  NHM2_OBSERVER_METRIC_FIRST_MISSING_STAGE_VALUES.includes(
+    value as Nhm2ObserverMetricFirstMissingStage,
+  );
+
+const isObserverMetricEmissionAdmissionStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricEmissionAdmissionStatus =>
+  NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricEmissionAdmissionStatus,
+  );
+
+const isObserverMetricComponentAdmissionStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricComponentAdmissionStatus =>
+  NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricComponentAdmissionStatus,
+  );
+
+const isObserverTileAuthorityStatus = (
+  value: unknown,
+): value is Nhm2ObserverTileAuthorityStatus =>
+  NHM2_OBSERVER_TILE_AUTHORITY_STATUS_VALUES.includes(
+    value as Nhm2ObserverTileAuthorityStatus,
+  );
+
+const isObserverLeadReadinessWorkstream = (
+  value: unknown,
+): value is Nhm2ObserverLeadReadinessWorkstream =>
+  NHM2_OBSERVER_LEAD_READINESS_WORKSTREAM_VALUES.includes(
+    value as Nhm2ObserverLeadReadinessWorkstream,
+  );
+
+const isObserverNextTechnicalAction = (
+  value: unknown,
+): value is Nhm2ObserverNextTechnicalAction =>
+  NHM2_OBSERVER_NEXT_TECHNICAL_ACTION_VALUES.includes(
+    value as Nhm2ObserverNextTechnicalAction,
+  );
+
 const isObserverSharedRootDriverStatus = (
   value: unknown,
 ): value is Nhm2ObserverSharedRootDriverStatus =>
@@ -737,6 +872,39 @@ const cloneSections = (
       sections.observer_audit.observerTileDiminishingReturnStatus ?? "unknown",
     observerTileDiminishingReturnNote:
       sections.observer_audit.observerTileDiminishingReturnNote ?? null,
+    observerMetricCompletenessStatus:
+      sections.observer_audit.observerMetricCompletenessStatus ?? "unknown",
+    observerMetricCompletenessNote:
+      sections.observer_audit.observerMetricCompletenessNote ?? null,
+    observerMetricCoverageBlockerStatus:
+      sections.observer_audit.observerMetricCoverageBlockerStatus ?? "unknown",
+    observerMetricCoverageBlockerNote:
+      sections.observer_audit.observerMetricCoverageBlockerNote ?? null,
+    observerMetricFirstMissingStage:
+      sections.observer_audit.observerMetricFirstMissingStage ?? "unknown",
+    observerMetricEmissionAdmissionStatus:
+      sections.observer_audit.observerMetricEmissionAdmissionStatus ?? "unknown",
+    observerMetricEmissionAdmissionNote:
+      sections.observer_audit.observerMetricEmissionAdmissionNote ?? null,
+    observerMetricT0iAdmissionStatus:
+      sections.observer_audit.observerMetricT0iAdmissionStatus ?? "unknown",
+    observerMetricT0iAdmissionNote:
+      sections.observer_audit.observerMetricT0iAdmissionNote ?? null,
+    observerMetricOffDiagonalTijAdmissionStatus:
+      sections.observer_audit.observerMetricOffDiagonalTijAdmissionStatus ??
+      "unknown",
+    observerMetricOffDiagonalTijAdmissionNote:
+      sections.observer_audit.observerMetricOffDiagonalTijAdmissionNote ?? null,
+    observerTileAuthorityStatus:
+      sections.observer_audit.observerTileAuthorityStatus ?? "unknown",
+    observerTileAuthorityNote:
+      sections.observer_audit.observerTileAuthorityNote ?? null,
+    observerLeadReadinessWorkstream:
+      sections.observer_audit.observerLeadReadinessWorkstream ?? "unknown",
+    observerLeadReadinessReason:
+      sections.observer_audit.observerLeadReadinessReason ?? null,
+    observerNextTechnicalAction:
+      sections.observer_audit.observerNextTechnicalAction ?? "unknown",
     metric: cloneObserverFamilyAudit(sections.observer_audit.metric),
     tile: cloneObserverFamilyAudit(sections.observer_audit.tile),
     supportedClaimTiers: computeTierListForSection("observer_audit"),
@@ -1011,6 +1179,41 @@ const isObserverAuditSection = (
     ) &&
     (record.observerTileDiminishingReturnNote === null ||
       asText(record.observerTileDiminishingReturnNote) != null) &&
+    isObserverMetricCompletenessStatus(
+      record.observerMetricCompletenessStatus,
+    ) &&
+    (record.observerMetricCompletenessNote === null ||
+      asText(record.observerMetricCompletenessNote) != null) &&
+    isObserverMetricCoverageBlockerStatus(
+      record.observerMetricCoverageBlockerStatus,
+    ) &&
+    (record.observerMetricCoverageBlockerNote === null ||
+      asText(record.observerMetricCoverageBlockerNote) != null) &&
+    isObserverMetricFirstMissingStage(record.observerMetricFirstMissingStage) &&
+    isObserverMetricEmissionAdmissionStatus(
+      record.observerMetricEmissionAdmissionStatus,
+    ) &&
+    (record.observerMetricEmissionAdmissionNote === null ||
+      asText(record.observerMetricEmissionAdmissionNote) != null) &&
+    isObserverMetricComponentAdmissionStatus(
+      record.observerMetricT0iAdmissionStatus,
+    ) &&
+    (record.observerMetricT0iAdmissionNote === null ||
+      asText(record.observerMetricT0iAdmissionNote) != null) &&
+    isObserverMetricComponentAdmissionStatus(
+      record.observerMetricOffDiagonalTijAdmissionStatus,
+    ) &&
+    (record.observerMetricOffDiagonalTijAdmissionNote === null ||
+      asText(record.observerMetricOffDiagonalTijAdmissionNote) != null) &&
+    isObserverTileAuthorityStatus(record.observerTileAuthorityStatus) &&
+    (record.observerTileAuthorityNote === null ||
+      asText(record.observerTileAuthorityNote) != null) &&
+    isObserverLeadReadinessWorkstream(
+      record.observerLeadReadinessWorkstream,
+    ) &&
+    (record.observerLeadReadinessReason === null ||
+      asText(record.observerLeadReadinessReason) != null) &&
+    isObserverNextTechnicalAction(record.observerNextTechnicalAction) &&
     isObserverFamilyAudit(record.metric) &&
     isObserverFamilyAudit(record.tile)
   );

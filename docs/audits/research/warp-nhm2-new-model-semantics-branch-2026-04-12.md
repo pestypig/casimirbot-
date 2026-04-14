@@ -1,0 +1,116 @@
+# NHM2 New-Model Semantics Branch Charter (2026-04-12)
+
+## Decision
+Decision: `DEFER_NEW_MODEL_BRANCH`
+
+Decision line: Defer opening a separate NHM2 new-model semantics branch until one narrower same-chart hypothesis is promoted from exploratory to admissible with explicit new state, preserved `comoving_cartesian` semantics, and a no-proxy/no-zero-fill tensor closure story for either `T0i` or symmetric off-diagonal `Tij`.
+
+## Why The Current Model Is Exhausted
+- The current-model NHM2 same-chart full-tensor lane is closed as `NO_GO_UNDER_CURRENT_MODEL`.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\natario-warp.ts` emits diagonal-only stress members `T00`, `T11`, `T22`, and `T33` and does not emit same-chart `T0i` or off-diagonal `Tij` families.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\server\energy-pipeline.ts` explicitly treats `T0i` and off-diagonal `Tij` as structurally missing and assumes zero for flux/shear handling on the metric-required observer path.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\nhm2-observer-audit-latest.json` still reports `observerMetricCompletenessStatus = incomplete_missing_inputs`, `observerMetricCoverageBlockerStatus = producer_not_emitted`, `observerMetricEmissionAdmissionStatus = not_admitted`, `observerMetricT0iAdmissionStatus = basis_or_semantics_ambiguous`, and `observerMetricOffDiagonalTijAdmissionStatus = basis_or_semantics_ambiguous`.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\nhm2-full-loop-audit-latest.json` now shows `sections.certificate_policy_result.state = pass`, so certificate/policy is no longer the live blocker.
+
+## What A New Model Would Need To Add
+- Chart and basis contract to preserve: comoving_cartesian, using the same metric-required observer path already used by the current ADM-style observer audit.
+- A producer-state expansion that can represent momentum-density and shear information in the same `comoving_cartesian` chart already used by the metric-required observer lane.
+- Explicit physical meaning, units, and sign conventions for `T0i` and off-diagonal `Tij`.
+- A symmetry rule for spatial shear, at minimum `Tij = Tji` when emitted as a stress tensor family.
+- A proof that the new terms are produced from upstream semantics rather than proxy substitution or zero-fill.
+- A branch-local validation story that can fail independently without mutating the current-model NHM2 lane.
+
+## Candidate New-Model Hypotheses
+### 1. ADM Momentum-Density Extension
+- Hypothesis name: `adm_momentum_density_extension`
+- Physical meaning: define same-chart `T0i` as momentum-density / energy-flux terms from explicit comoving ADM-style shift/lapse derivative state rather than treating flux as absent.
+- New state required: directional shift derivatives, explicit time-derivative or extrinsic-curvature-like terms, and a chart-stable mapping from those quantities into `T0i`.
+- Preserves `comoving_cartesian`: yes.
+- Requires a new stress model term: yes.
+- Requires a new observer semantics: no if emitted as admitted tensor components, yes if only partially emitted and the observer must infer the rest.
+- Why it is narrower than a vague full-tensor request: it targets only the missing flux family and names the missing state category.
+- Current disposition: branch-only exploratory.
+
+### 2. Symmetric Shear Closure Extension
+- Hypothesis name: `symmetric_shear_closure_extension`
+- Physical meaning: define same-chart off-diagonal `Tij` as anisotropic shear stresses on a symmetric spatial stress tensor rather than collapsing the model to diagonal pressures.
+- New state required: a local anisotropy basis, shear closure coefficients, and an explicit symmetric map from producer state into off-diagonal `Tij` with `Tij = Tji`.
+- Preserves `comoving_cartesian`: yes.
+- Requires a new stress model term: yes.
+- Requires a new observer semantics: no if the symmetric tensor is emitted directly, yes if branch logic asks the observer path to reconstruct it.
+- Why it is narrower than a vague full-tensor request: it targets only the missing off-diagonal spatial family and makes symmetry a hard requirement.
+- Current disposition: branch-only exploratory.
+
+### 3. Richer Producer-State Before Tensor Reduction
+- Hypothesis name: `pre_tensor_adm_state_branch`
+- Physical meaning: promote the NHM2 producer from reduced diagonal outputs to a richer same-chart state package from which both `T0i` and `Tij` could later be derived.
+- New state required: explicit ADM-style intermediate state, not just diagonal stress outputs.
+- Preserves `comoving_cartesian`: yes.
+- Requires a new stress model term: likely yes.
+- Requires a new observer semantics: possibly, depending on whether the branch emits full tensor components or a richer precursor state first.
+- Why it is narrower than a vague full-tensor request: it changes the producer-state boundary explicitly instead of vaguely requesting missing tensor families.
+- Current disposition: branch-only exploratory.
+
+## Admissibility Rule For Opening A New Branch
+Open a new model branch only if all of the following are true:
+- One hypothesis is selected as the branch hypothesis of record.
+- The hypothesis preserves the existing `comoving_cartesian` chart contract or explicitly proves why a chart change is required.
+- The hypothesis names the exact new upstream state that will be introduced.
+- The hypothesis defines units, sign conventions, and any symmetry rules before code changes.
+- The hypothesis can close at least one missing family without proxy substitution or zero-fill.
+- The branch can proceed without reopening tile remediation.
+- The branch leaves the current-model NHM2 lane intact as the control baseline.
+
+Under the current evidence, this gate is not yet satisfied.
+
+## Minimum Future Write Surface
+If a new-model branch is eventually opened, the minimum likely write surface is:
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\natario-warp.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\warp-metric-adapter.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\server\energy-pipeline.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\shared\contracts\nhm2-observer-audit.v1.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\shared\contracts\nhm2-full-loop-audit.v1.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\tests\nhm2-observer-audit.spec.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\tests\warp-york-control-family-proof-pack.spec.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\tests\pipeline-ts-qi-guard.spec.ts`
+
+`C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\nhm2-source-closure-latest.json` and the current source-closure contract should remain diagonal-only until a branch proves admitted full-tensor semantics.
+
+## Required Evidence Before Any Code Change
+Before touching `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\natario-warp.ts` or `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\server\energy-pipeline.ts`, the branch must have:
+- one chosen hypothesis of record
+- an explicit same-chart tensor semantics note for the target family or families
+- a written units/sign/symmetry table
+- a statement of which new upstream state fields will be introduced
+- a branch-local admission test that can fail closed
+- a proof that tile proxies are not being used as stand-ins
+
+## Success Gates
+A future new-model branch is successful only if it can show all of the following:
+- same-chart `comoving_cartesian` contract preserved, or a chart change justified explicitly
+- at least one missing family is emitted from upstream semantics rather than inferred downstream
+- `T0i` or off-diagonal `Tij` semantics become `admitted` instead of `basis_or_semantics_ambiguous`
+- observer completeness changes because producer truth changed, not because reporting softened
+- tile pause remains explicit throughout the branch
+- current-model NHM2 outputs remain available as the baseline control
+
+## Stop Conditions
+Stop or refuse to open the branch if any of the following remains true:
+- no hypothesis gets narrower than “emit the missing tensor somehow”
+- proposed work depends on tile re-entry or proxy substitution
+- the hypothesis breaks the `comoving_cartesian` contract without a replacement chart contract
+- the branch cannot name the new state it needs
+- the branch requires zero-filling missing `T0i` or off-diagonal `Tij`
+- the branch tries to use certificate pass as evidence of physics admissibility
+
+## Next Active Workstreams
+- `observer_completeness_and_authority` remains the live reporting-truth lane for the current model.
+- `certificate/policy` is now maintenance, not the lead blocker.
+- NHM2 promotion work should wait on a separate new-model decision instead of further current-model implementation churn.
+
+## Non-Goals
+- Do not reopen tile remediation in this charter.
+- Do not modify current-model NHM2 producer or observer code in this patch.
+- Do not widen claim tier from `diagnostic`.
+- Do not treat certificate pass as a physics pass.
+- Do not change source closure from `review`.

@@ -1,0 +1,78 @@
+{
+  "source_id": "fixture:solar-observed/counterexample-event-topology-mismatch",
+  "instrument": "GOES/SWPC+SOHO/LASCO+SDO/HMI+GONG",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2025-02-14T00:00:00.000Z",
+    "end_iso": "2025-02-16T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "payload": {
+    "solar_event_linkage": {
+      "link_refs": [
+        "fixture:solar/event-linkage/flare-region-link-2025-001",
+        "fixture:solar/event-linkage/cme-region-link-2025-001",
+        "fixture:solar/event-linkage/sunquake-region-link-2025-001"
+      ],
+      "links": [
+        {
+          "linked_region_id": "fixture:solar/active-regions/noaa-99999",
+          "linked_noaa_region_id": "99999",
+          "linked_harp_id": "HARP-99999",
+          "event_type": "flare",
+          "event_ref": "fixture:solar/flares/goes-2025-001",
+          "linkage_basis": "manual_catalog_association",
+          "event_time_iso": "2025-02-15T03:10:00.000Z"
+        },
+        {
+          "linked_region_id": "fixture:solar/active-regions/noaa-99999",
+          "linked_noaa_region_id": "99999",
+          "linked_harp_id": "HARP-99999",
+          "event_type": "cme",
+          "event_ref": "fixture:solar/cmes/lasco-2025-001",
+          "linkage_basis": "catalog",
+          "event_time_iso": "2025-02-15T03:58:00.000Z",
+          "time_offset_minutes": 48
+        },
+        {
+          "linked_region_id": "fixture:solar/active-regions/noaa-99999",
+          "linked_noaa_region_id": "99999",
+          "linked_harp_id": "HARP-99999",
+          "linked_flare_event_ref": "fixture:solar/flares/goes-2025-001",
+          "event_type": "sunquake",
+          "event_ref": "fixture:solar/local-helio/sunquake-event-2025-001",
+          "linkage_basis": "spatiotemporal",
+          "event_time_iso": "2025-02-15T03:16:00.000Z",
+          "time_offset_minutes": 6
+        }
+      ],
+      "summary": {
+        "flare_link_count": 1,
+        "cme_link_count": 1,
+        "sunquake_link_count": 1
+      },
+      "metadata": {
+        "instrument": "GOES/SWPC+SOHO/LASCO+SDO/HMI+GONG",
+        "observed_mode": "observed",
+        "coordinate_frame": "Carrington",
+        "carrington_rotation": 2290,
+        "cadence": {
+          "value": 1,
+          "unit": "day"
+        },
+        "time_range": {
+          "start_iso": "2025-02-14T00:00:00.000Z",
+          "end_iso": "2025-02-16T23:59:59.000Z"
+        },
+        "source_product_id": "solar_cross_phase_event_linkage_context_v1",
+        "source_product_family": "cross_phase_event_linkage",
+        "source_doc_ids": ["goes_xray", "lasco_docs", "hmi_products", "gong_products"]
+      }
+    }
+  }
+}

@@ -125,6 +125,52 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerRemediationSequenceStatus).toBe("unknown");
     expect(artifact.observerTileDiminishingReturnStatus).toBe("unknown");
     expect(artifact.observerTileDiminishingReturnNote).toBeNull();
+    expect(artifact.observerMetricCompletenessStatus).toBe(
+      "incomplete_missing_inputs",
+    );
+    expect(artifact.observerMetricCompletenessNote).toContain(
+      "metric_t0i_missing",
+    );
+    expect(artifact.observerMetricCoverageBlockerStatus).toBe(
+      "producer_not_emitted",
+    );
+    expect(artifact.observerMetricCoverageBlockerNote).toContain(
+      "diagonal-only",
+    );
+    expect(artifact.observerMetricFirstMissingStage).toBe(
+      "metric_tensor_emission",
+    );
+    expect(artifact.observerMetricEmissionAdmissionStatus).toBe(
+      "not_admitted",
+    );
+    expect(artifact.observerMetricEmissionAdmissionNote).toContain(
+      "reduced-order diagonal tensor only",
+    );
+    expect(artifact.observerMetricT0iAdmissionStatus).toBe(
+      "basis_or_semantics_ambiguous",
+    );
+    expect(artifact.observerMetricT0iAdmissionNote).toContain(
+      "not carried as an emitted same-chart quantity",
+    );
+    expect(artifact.observerMetricOffDiagonalTijAdmissionStatus).toBe(
+      "basis_or_semantics_ambiguous",
+    );
+    expect(artifact.observerMetricOffDiagonalTijAdmissionNote).toContain(
+      "reduced-order placeholders",
+    );
+    expect(artifact.observerTileAuthorityStatus).toBe("proxy_limited");
+    expect(artifact.observerTileAuthorityNote).toContain(
+      "fluxHandling=voxel_flux_field",
+    );
+    expect(artifact.observerLeadReadinessWorkstream).toBe(
+      "observer_completeness_and_authority",
+    );
+    expect(artifact.observerLeadReadinessReason).toContain(
+      "same-surface negativity is real",
+    );
+    expect(artifact.observerNextTechnicalAction).toBe(
+      "emit_same_chart_metric_flux_and_shear_terms",
+    );
     expect(artifact.tensors.metricRequired.rootCauseClass).toBe("unknown");
     expect(artifact.tensors.tileEffective.rootCauseClass).toBe("unknown");
     expect(artifact.tensors.metricRequired.firstRemediationTarget).toBeNull();
@@ -244,6 +290,9 @@ describe("nhm2 observer audit artifact", () => {
       observerTileDiminishingReturnStatus: "likely_stop_territory",
       observerTileDiminishingReturnNote:
         "No admissible new aft-local single-contributor mechanism remained.",
+      observerLeadReadinessWorkstream: "certificate_policy_readiness",
+      observerLeadReadinessReason:
+        "Certificate remains unavailable after the observer pause decision.",
       metricRequired: {
         tensorRef: "warp.metricStressEnergy",
         conditions: {
@@ -270,6 +319,15 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.observerTileDiminishingReturnNote).toContain(
       "No admissible new aft-local single-contributor mechanism remained.",
     );
+    expect(artifact.observerLeadReadinessWorkstream).toBe(
+      "certificate_policy_readiness",
+    );
+    expect(artifact.observerLeadReadinessReason).toContain(
+      "Certificate remains unavailable",
+    );
+    expect(artifact.observerMetricCoverageBlockerStatus).toBe("unknown");
+    expect(artifact.observerMetricFirstMissingStage).toBe("unknown");
+    expect(artifact.observerNextTechnicalAction).toBe("unknown");
     expect(isNhm2ObserverAuditArtifact(artifact)).toBe(true);
   });
 

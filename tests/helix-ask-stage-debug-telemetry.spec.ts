@@ -178,4 +178,62 @@ describe("helix ask stage debug telemetry", () => {
     expect(debugPayload.repair_stage05_soft_runtime_fail_open).toBe(true);
     expect(debugPayload.repair_stage05_soft_runtime_fail_reason).toBe("stage05_llm_http_401");
   });
+
+  it("normalizes pipeline stage05 coverage telemetry to code_path when the route narrows coverage", () => {
+    const debugPayload: Record<string, unknown> = {
+      pipeline_stage05_code_path_only: true,
+    };
+
+    applyStage05DebugFields(
+      debugPayload,
+      {
+        used: true,
+        file_count: 2,
+        card_count: 8,
+        kind_counts: { code: 1, doc: 7, config: 0, data: 0, binary: 0 },
+        llm_used: false,
+        fallback_reason: null,
+        extract_ms: 20,
+        total_ms: 30,
+        budget_capped: false,
+        summary_required: true,
+        summary_hard_fail: false,
+        summary_fail_reason: null,
+        slot_plan: { required: ["definition", "mechanism", "code_path"], slots: [] },
+        slot_coverage: {
+          required: ["definition", "mechanism", "code_path"],
+          present: ["code_path"],
+          missing: ["definition", "mechanism"],
+          ratio: 0.3333,
+        },
+        fullfile_mode: false,
+        two_pass_used: false,
+        two_pass_batches: 0,
+        overflow_policy: "single_pass",
+        input_scope: "docs_first",
+        input_path_count: 2,
+        input_wide_added_count: 0,
+        input_connectivity_added_count: 0,
+        input_seed_signal_token_count: 0,
+        input_connected_hint_path_count: 0,
+      } as any,
+      "retrieval",
+    );
+
+    expect(debugPayload.stage05_slot_plan).toMatchObject({
+      required: ["code_path"],
+    });
+    expect(debugPayload.stage05_slot_coverage).toEqual({
+      required: ["code_path"],
+      present: ["code_path"],
+      missing: [],
+      ratio: 1,
+    });
+    expect(debugPayload.retrieval_stage05_slot_coverage).toEqual({
+      required: ["code_path"],
+      present: ["code_path"],
+      missing: [],
+      ratio: 1,
+    });
+  });
 });

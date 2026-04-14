@@ -193,6 +193,43 @@ describe("helix ask answer surface", () => {
     );
   });
 
+  it("restores repo-grounded visible text from debug answer state when the payload collapses to a short artifact block", () => {
+    const args = buildBaseArgs();
+    args.requestData.question = "How does fast quality mode alter answer generation deadlines?";
+    args.payload = {
+      text: "Key files\n- docs/helix-ask-reasoning-latency-2026-02-16.md",
+      answer: "Key files\n- docs/helix-ask-reasoning-latency-2026-02-16.md",
+      envelope: {
+        answer: "",
+        sections: [
+          {
+            title: "Key files",
+            body: "- docs/helix-ask-reasoning-latency-2026-02-16.md",
+          },
+        ],
+      },
+      debug: {
+        intent_domain: "repo",
+        answer_mode: "repo_grounded",
+        answer_runtime_fallback_direct: true,
+        answer_final_text:
+          "How does fast quality mode alter answer generation deadlines is grounded in docs/helix-ask-reasoning-latency-2026-02-16.md. " +
+          "Direct Answer: Fast quality mode shortens helper and finalize budgets so the route prefers deterministic completion sooner.",
+      },
+    } as Record<string, unknown>;
+
+    const result = applyHelixAskSuccessSurface(args);
+
+    expect(String(result.text)).toContain("Fast quality mode shortens helper and finalize budgets");
+    expect(String(result.text)).not.toMatch(/^Key files\b/im);
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_source).toBe(
+      "debug_answer_text",
+    );
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_repo_repair).toBe(
+      true,
+    );
+  });
+
   it("does not invent answer text when no grounded substrate exists", () => {
     const args = buildBaseArgs();
     args.payload = {

@@ -8,6 +8,7 @@ import {
   shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt,
   shouldBypassHelixAskPreIntentClarifyForDefinitionTarget,
   shouldBypassHelixAskPreIntentClarifyForGeneralDefinitionTarget,
+  shouldPreserveHelixAskGeneralCompareRouting,
   shouldUseGeneralAmbiguityAnswerFloor,
 } from "../server/services/helix-ask/policy/pre-intent-clarify";
 
@@ -93,5 +94,28 @@ describe("helix ask pre-intent policy", () => {
     expect(hasHelixAskRepoTechnicalCue("What is a practical debug payload used for?")).toBe(
       false,
     );
+  });
+
+  it("keeps short generic compare prompts out of the repo-routing lane", () => {
+    expect(
+      shouldPreserveHelixAskGeneralCompareRouting({
+        question: "Help me compare precision and recall quickly.",
+        intentDomain: "general",
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveHelixAskGeneralCompareRouting({
+        question: "Compare precision and recall in this repo.",
+        intentDomain: "general",
+        explicitRepoExpectation: true,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+      }),
+    ).toBe(false);
   });
 });

@@ -86,6 +86,32 @@ const normalizeKindCounts = (value: unknown): Record<string, number> => {
   };
 };
 
+const normalizePipelineCodePathOnlySlotPlan = (value: unknown): unknown => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const source = value as Record<string, unknown>;
+  return {
+    ...source,
+    required: ["code_path"],
+  };
+};
+
+const normalizePipelineCodePathOnlySlotCoverage = (value: unknown): unknown => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const source = value as Record<string, unknown>;
+  const present = Array.isArray(source.present)
+    ? source.present
+        .map((slot) => String(slot ?? "").trim())
+        .filter((slot) => slot === "code_path")
+    : [];
+  return {
+    ...source,
+    required: ["code_path"],
+    present,
+    missing: present.includes("code_path") ? [] : ["code_path"],
+    ratio: present.includes("code_path") ? 1 : 0,
+  };
+};
+
 export function applyStage0DebugFields(
   debugPayload: Record<string, unknown> | null | undefined,
   stage0: RepoSearchStage0Telemetry | undefined,
@@ -521,8 +547,17 @@ export function applyStage05DebugFields(
   } else if (debugPayload.stage05_llm_request_body_bytes === undefined) {
     debugPayload.stage05_llm_request_body_bytes = null;
   }
-  debugPayload.stage05_slot_plan = stage05.slot_plan ?? debugPayload.stage05_slot_plan ?? null;
-  debugPayload.stage05_slot_coverage = stage05.slot_coverage ?? debugPayload.stage05_slot_coverage ?? null;
+  const pipelineCodePathOnly = debugPayload.pipeline_stage05_code_path_only === true;
+  const normalizedStage05SlotPlan = pipelineCodePathOnly
+    ? normalizePipelineCodePathOnlySlotPlan(stage05.slot_plan)
+    : stage05.slot_plan;
+  const normalizedStage05SlotCoverage = pipelineCodePathOnly
+    ? normalizePipelineCodePathOnlySlotCoverage(stage05.slot_coverage)
+    : stage05.slot_coverage;
+  debugPayload.stage05_slot_plan =
+    normalizedStage05SlotPlan ?? debugPayload.stage05_slot_plan ?? null;
+  debugPayload.stage05_slot_coverage =
+    normalizedStage05SlotCoverage ?? debugPayload.stage05_slot_coverage ?? null;
   debugPayload.stage05_fullfile_mode =
     Boolean(debugPayload.stage05_fullfile_mode) || stage05.fullfile_mode;
   debugPayload.stage05_two_pass_used =
@@ -608,8 +643,8 @@ export function applyStage05DebugFields(
   writeScoped("llm_provider_request_id", stage05.llm_provider_request_id ?? null);
   writeScoped("llm_prompt_tokens_estimate", stage05.llm_prompt_tokens_estimate ?? null);
   writeScoped("llm_request_body_bytes", stage05.llm_request_body_bytes ?? null);
-  writeScoped("slot_plan", stage05.slot_plan ?? null);
-  writeScoped("slot_coverage", stage05.slot_coverage ?? null);
+  writeScoped("slot_plan", normalizedStage05SlotPlan ?? null);
+  writeScoped("slot_coverage", normalizedStage05SlotCoverage ?? null);
   writeScoped("fullfile_mode", stage05.fullfile_mode);
   writeScoped("two_pass_used", stage05.two_pass_used);
   writeScoped("two_pass_batches", stage05.two_pass_batches);

@@ -150,6 +150,61 @@ export const NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_OBSERVER_METRIC_COMPLETENESS_STATUS_VALUES = [
+  "complete",
+  "incomplete_missing_inputs",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_METRIC_COVERAGE_BLOCKER_STATUS_VALUES = [
+  "consumer_drop",
+  "publication_drop",
+  "producer_not_emitted",
+  "semantics_ambiguous",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_METRIC_FIRST_MISSING_STAGE_VALUES = [
+  "metric_tensor_emission",
+  "observer_input_mapping",
+  "observer_publication_mapping",
+  "semantic_contract",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_TILE_AUTHORITY_STATUS_VALUES = [
+  "full_tensor_authority",
+  "proxy_limited",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_LEAD_READINESS_WORKSTREAM_VALUES = [
+  "observer_completeness_and_authority",
+  "certificate_policy_readiness",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_NEXT_TECHNICAL_ACTION_VALUES = [
+  "emit_same_chart_metric_flux_and_shear_terms",
+  "wire_existing_metric_inputs",
+  "resolve_metric_tensor_semantics",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES = [
+  "admitted",
+  "not_admitted",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES = [
+  "existing_internal_quantity_not_serialized",
+  "derivable_same_chart_from_existing_state",
+  "requires_new_model_term",
+  "basis_or_semantics_ambiguous",
+  "unknown",
+] as const;
+
 export type Nhm2ObserverAuditStatus =
   (typeof NHM2_OBSERVER_AUDIT_STATUS_VALUES)[number];
 export type Nhm2ObserverAuditCompleteness =
@@ -190,6 +245,22 @@ export type Nhm2ObserverRemediationSequenceStatus =
   (typeof NHM2_OBSERVER_REMEDIATION_SEQUENCE_STATUS_VALUES)[number];
 export type Nhm2ObserverTileDiminishingReturnStatus =
   (typeof NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES)[number];
+export type Nhm2ObserverMetricCompletenessStatus =
+  (typeof NHM2_OBSERVER_METRIC_COMPLETENESS_STATUS_VALUES)[number];
+export type Nhm2ObserverMetricCoverageBlockerStatus =
+  (typeof NHM2_OBSERVER_METRIC_COVERAGE_BLOCKER_STATUS_VALUES)[number];
+export type Nhm2ObserverMetricFirstMissingStage =
+  (typeof NHM2_OBSERVER_METRIC_FIRST_MISSING_STAGE_VALUES)[number];
+export type Nhm2ObserverTileAuthorityStatus =
+  (typeof NHM2_OBSERVER_TILE_AUTHORITY_STATUS_VALUES)[number];
+export type Nhm2ObserverLeadReadinessWorkstream =
+  (typeof NHM2_OBSERVER_LEAD_READINESS_WORKSTREAM_VALUES)[number];
+export type Nhm2ObserverNextTechnicalAction =
+  (typeof NHM2_OBSERVER_NEXT_TECHNICAL_ACTION_VALUES)[number];
+export type Nhm2ObserverMetricEmissionAdmissionStatus =
+  (typeof NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES)[number];
+export type Nhm2ObserverMetricComponentAdmissionStatus =
+  (typeof NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES)[number];
 
 export type Nhm2ObserverAuditDirection = [number, number, number];
 
@@ -306,6 +377,22 @@ export type Nhm2ObserverAuditArtifact = {
   observerRemediationSequenceStatus: Nhm2ObserverRemediationSequenceStatus;
   observerTileDiminishingReturnStatus: Nhm2ObserverTileDiminishingReturnStatus;
   observerTileDiminishingReturnNote: string | null;
+  observerMetricCompletenessStatus: Nhm2ObserverMetricCompletenessStatus;
+  observerMetricCompletenessNote: string | null;
+  observerMetricCoverageBlockerStatus: Nhm2ObserverMetricCoverageBlockerStatus;
+  observerMetricCoverageBlockerNote: string | null;
+  observerMetricFirstMissingStage: Nhm2ObserverMetricFirstMissingStage;
+  observerMetricEmissionAdmissionStatus: Nhm2ObserverMetricEmissionAdmissionStatus;
+  observerMetricEmissionAdmissionNote: string | null;
+  observerMetricT0iAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  observerMetricT0iAdmissionNote: string | null;
+  observerMetricOffDiagonalTijAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  observerMetricOffDiagonalTijAdmissionNote: string | null;
+  observerTileAuthorityStatus: Nhm2ObserverTileAuthorityStatus;
+  observerTileAuthorityNote: string | null;
+  observerLeadReadinessWorkstream: Nhm2ObserverLeadReadinessWorkstream;
+  observerLeadReadinessReason: string | null;
+  observerNextTechnicalAction: Nhm2ObserverNextTechnicalAction;
   tensors: {
     metricRequired: Nhm2ObserverAuditTensor;
     tileEffective: Nhm2ObserverAuditTensor;
@@ -391,6 +478,34 @@ export type BuildNhm2ObserverAuditArtifactInput = {
     | Nhm2ObserverTileDiminishingReturnStatus
     | null;
   observerTileDiminishingReturnNote?: string | null;
+  observerMetricCompletenessStatus?:
+    | Nhm2ObserverMetricCompletenessStatus
+    | null;
+  observerMetricCompletenessNote?: string | null;
+  observerMetricCoverageBlockerStatus?:
+    | Nhm2ObserverMetricCoverageBlockerStatus
+    | null;
+  observerMetricCoverageBlockerNote?: string | null;
+  observerMetricFirstMissingStage?: Nhm2ObserverMetricFirstMissingStage | null;
+  observerMetricEmissionAdmissionStatus?:
+    | Nhm2ObserverMetricEmissionAdmissionStatus
+    | null;
+  observerMetricEmissionAdmissionNote?: string | null;
+  observerMetricT0iAdmissionStatus?:
+    | Nhm2ObserverMetricComponentAdmissionStatus
+    | null;
+  observerMetricT0iAdmissionNote?: string | null;
+  observerMetricOffDiagonalTijAdmissionStatus?:
+    | Nhm2ObserverMetricComponentAdmissionStatus
+    | null;
+  observerMetricOffDiagonalTijAdmissionNote?: string | null;
+  observerTileAuthorityStatus?: Nhm2ObserverTileAuthorityStatus | null;
+  observerTileAuthorityNote?: string | null;
+  observerLeadReadinessWorkstream?:
+    | Nhm2ObserverLeadReadinessWorkstream
+    | null;
+  observerLeadReadinessReason?: string | null;
+  observerNextTechnicalAction?: Nhm2ObserverNextTechnicalAction | null;
 };
 
 const asText = (value: unknown): string | null =>
@@ -433,6 +548,278 @@ const approximatelyEqual = (
 const NHM2_OBSERVER_WEC_PROBE_DEFAULT_SCALE = 0.5;
 const NHM2_OBSERVER_WEC_SHARED_PROPAGATION_RATIO = 0.25;
 const NHM2_OBSERVER_WEC_WEAK_PROPAGATION_RATIO = 0.05;
+const NHM2_OBSERVER_METRIC_MISSING_INPUTS = new Set([
+  "metric_t0i_missing",
+  "metric_tij_off_diagonal_missing",
+]);
+
+const deriveMetricCompleteness = (
+  tensor: Nhm2ObserverAuditTensor,
+  input: BuildNhm2ObserverAuditArtifactInput,
+): {
+  status: Nhm2ObserverMetricCompletenessStatus;
+  note: string | null;
+} => {
+  if (
+    NHM2_OBSERVER_METRIC_COMPLETENESS_STATUS_VALUES.includes(
+      input.observerMetricCompletenessStatus as Nhm2ObserverMetricCompletenessStatus,
+    )
+  ) {
+    return {
+      status: input.observerMetricCompletenessStatus as Nhm2ObserverMetricCompletenessStatus,
+      note: asText(input.observerMetricCompletenessNote),
+    };
+  }
+  const missingMetricInputs = tensor.missingInputs.filter((entry) =>
+    NHM2_OBSERVER_METRIC_MISSING_INPUTS.has(entry),
+  );
+  if (missingMetricInputs.length > 0) {
+    return {
+      status: "incomplete_missing_inputs",
+      note:
+        "Metric-required observer audit remains diagonal-only because T0i flux terms and off-diagonal spatial shear terms were not supplied; missing inputs: " +
+        missingMetricInputs.join(", "),
+    };
+  }
+  if (tensor.status !== "unavailable") {
+    return {
+      status: "complete",
+      note: "Metric-required observer audit has no declared missing observer inputs.",
+    };
+  }
+  return {
+    status: "unknown",
+    note: null,
+  };
+};
+
+const deriveMetricCoverageBlocker = (
+  tensor: Nhm2ObserverAuditTensor,
+  input: BuildNhm2ObserverAuditArtifactInput,
+): {
+  status: Nhm2ObserverMetricCoverageBlockerStatus;
+  note: string | null;
+  firstMissingStage: Nhm2ObserverMetricFirstMissingStage;
+  nextTechnicalAction: Nhm2ObserverNextTechnicalAction;
+} => {
+  if (
+    NHM2_OBSERVER_METRIC_COVERAGE_BLOCKER_STATUS_VALUES.includes(
+      input
+        .observerMetricCoverageBlockerStatus as Nhm2ObserverMetricCoverageBlockerStatus,
+    )
+  ) {
+    return {
+      status:
+        input
+          .observerMetricCoverageBlockerStatus as Nhm2ObserverMetricCoverageBlockerStatus,
+      note: asText(input.observerMetricCoverageBlockerNote),
+      firstMissingStage:
+        (NHM2_OBSERVER_METRIC_FIRST_MISSING_STAGE_VALUES.includes(
+          input
+            .observerMetricFirstMissingStage as Nhm2ObserverMetricFirstMissingStage,
+        )
+          ? input.observerMetricFirstMissingStage
+          : "unknown") as Nhm2ObserverMetricFirstMissingStage,
+      nextTechnicalAction:
+        (NHM2_OBSERVER_NEXT_TECHNICAL_ACTION_VALUES.includes(
+          input.observerNextTechnicalAction as Nhm2ObserverNextTechnicalAction,
+        )
+          ? input.observerNextTechnicalAction
+          : "unknown") as Nhm2ObserverNextTechnicalAction,
+    };
+  }
+  const missingMetricInputs = tensor.missingInputs.filter((entry) =>
+    NHM2_OBSERVER_METRIC_MISSING_INPUTS.has(entry),
+  );
+  if (missingMetricInputs.length === 0) {
+    return {
+      status: "unknown",
+      note: null,
+      firstMissingStage: "unknown",
+      nextTechnicalAction: "unknown",
+    };
+  }
+  const fluxHandling = tensor.model.fluxHandling ?? "unknown";
+  const shearHandling = tensor.model.shearHandling ?? "unknown";
+  if (
+    fluxHandling === "assumed_zero_from_missing_t0i" &&
+    shearHandling === "assumed_zero_from_missing_tij"
+  ) {
+    return {
+      status: "producer_not_emitted",
+      note:
+        "Metric-required observer completeness stops at metric tensor emission: the emitted same-chart observer tensor is diagonal-only and does not supply T0i flux terms or off-diagonal Tij shear terms, so completeness cannot close without new tensor emission semantics.",
+      firstMissingStage: "metric_tensor_emission",
+      nextTechnicalAction: "emit_same_chart_metric_flux_and_shear_terms",
+    };
+  }
+  return {
+    status: "semantics_ambiguous",
+    note:
+      "Metric-required observer completeness remains blocked, but the first missing stage could not be localized cleanly from the current artifact surface alone.",
+    firstMissingStage: "semantic_contract",
+    nextTechnicalAction: "resolve_metric_tensor_semantics",
+  };
+};
+
+const deriveMetricEmissionAdmission = (args: {
+  tensor: Nhm2ObserverAuditTensor;
+  input: BuildNhm2ObserverAuditArtifactInput;
+  coverageBlockerStatus: Nhm2ObserverMetricCoverageBlockerStatus;
+}): {
+  status: Nhm2ObserverMetricEmissionAdmissionStatus;
+  note: string | null;
+  t0iStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  t0iNote: string | null;
+  offDiagonalStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  offDiagonalNote: string | null;
+} => {
+  const { tensor, input, coverageBlockerStatus } = args;
+  const explicitAdmissionStatus =
+    input.observerMetricEmissionAdmissionStatus as
+      | Nhm2ObserverMetricEmissionAdmissionStatus
+      | undefined;
+  const explicitT0iStatus =
+    input.observerMetricT0iAdmissionStatus as
+      | Nhm2ObserverMetricComponentAdmissionStatus
+      | undefined;
+  const explicitOffDiagonalStatus =
+    input.observerMetricOffDiagonalTijAdmissionStatus as
+      | Nhm2ObserverMetricComponentAdmissionStatus
+      | undefined;
+  if (
+    NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES.includes(
+      explicitAdmissionStatus as Nhm2ObserverMetricEmissionAdmissionStatus,
+    ) &&
+    NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES.includes(
+      explicitT0iStatus as Nhm2ObserverMetricComponentAdmissionStatus,
+    ) &&
+    NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES.includes(
+      explicitOffDiagonalStatus as Nhm2ObserverMetricComponentAdmissionStatus,
+    )
+  ) {
+    return {
+      status: explicitAdmissionStatus as Nhm2ObserverMetricEmissionAdmissionStatus,
+      note: asText(input.observerMetricEmissionAdmissionNote),
+      t0iStatus: explicitT0iStatus as Nhm2ObserverMetricComponentAdmissionStatus,
+      t0iNote: asText(input.observerMetricT0iAdmissionNote),
+      offDiagonalStatus:
+        explicitOffDiagonalStatus as Nhm2ObserverMetricComponentAdmissionStatus,
+      offDiagonalNote: asText(input.observerMetricOffDiagonalTijAdmissionNote),
+    };
+  }
+
+  const missingMetricInputs = tensor.missingInputs.filter((entry) =>
+    NHM2_OBSERVER_METRIC_MISSING_INPUTS.has(entry),
+  );
+  if (
+    coverageBlockerStatus === "producer_not_emitted" &&
+    missingMetricInputs.includes("metric_t0i_missing") &&
+    missingMetricInputs.includes("metric_tij_off_diagonal_missing")
+  ) {
+    return {
+      status: "not_admitted",
+      note:
+        "Admission failed: the current metric-required branch emits a reduced-order diagonal tensor only. Closing T0i and off-diagonal Tij would require a new same-chart full-tensor emission semantics rather than simple serialization or consumer wiring.",
+      t0iStatus: "basis_or_semantics_ambiguous",
+      t0iNote:
+        "T0i is not carried as an emitted same-chart quantity. The current branch would need a new momentum-density emission semantics, not a serialization of an existing tensor component.",
+      offDiagonalStatus: "basis_or_semantics_ambiguous",
+      offDiagonalNote:
+        "Off-diagonal Tij is not emitted and the current diagonal pressures are reduced-order placeholders. Closing shear terms would require a new same-chart full-tensor stress semantics, not a publication-only fix.",
+    };
+  }
+
+  return {
+    status: "unknown",
+    note: null,
+    t0iStatus: "unknown",
+    t0iNote: null,
+    offDiagonalStatus: "unknown",
+    offDiagonalNote: null,
+  };
+};
+
+const deriveTileAuthority = (
+  tensor: Nhm2ObserverAuditTensor,
+  input: BuildNhm2ObserverAuditArtifactInput,
+): {
+  status: Nhm2ObserverTileAuthorityStatus;
+  note: string | null;
+} => {
+  if (
+    NHM2_OBSERVER_TILE_AUTHORITY_STATUS_VALUES.includes(
+      input.observerTileAuthorityStatus as Nhm2ObserverTileAuthorityStatus,
+    )
+  ) {
+    return {
+      status: input.observerTileAuthorityStatus as Nhm2ObserverTileAuthorityStatus,
+      note: asText(input.observerTileAuthorityNote),
+    };
+  }
+  const fluxHandling = tensor.model.fluxHandling ?? "unknown";
+  const shearHandling = tensor.model.shearHandling ?? "unknown";
+  if (
+    tensor.model.pressureModel === "isotropic_pressure_proxy" ||
+    shearHandling === "not_modeled_in_proxy"
+  ) {
+    return {
+      status: "proxy_limited",
+      note:
+        "Tile-effective observer audit remains proxy-limited: fluxHandling=" +
+        fluxHandling +
+        ", shearHandling=" +
+        shearHandling +
+        ".",
+    };
+  }
+  if (tensor.status !== "unavailable") {
+    return {
+      status: "full_tensor_authority",
+      note: "Tile-effective observer audit does not declare a proxy-only authority limit.",
+    };
+  }
+  return {
+    status: "unknown",
+    note: null,
+  };
+};
+
+const deriveLeadReadiness = (args: {
+  metricCompletenessStatus: Nhm2ObserverMetricCompletenessStatus;
+  tileAuthorityStatus: Nhm2ObserverTileAuthorityStatus;
+  input: BuildNhm2ObserverAuditArtifactInput;
+}): {
+  workstream: Nhm2ObserverLeadReadinessWorkstream;
+  reason: string | null;
+} => {
+  if (
+    NHM2_OBSERVER_LEAD_READINESS_WORKSTREAM_VALUES.includes(
+      args.input.observerLeadReadinessWorkstream as Nhm2ObserverLeadReadinessWorkstream,
+    )
+  ) {
+    return {
+      workstream:
+        args.input
+          .observerLeadReadinessWorkstream as Nhm2ObserverLeadReadinessWorkstream,
+      reason: asText(args.input.observerLeadReadinessReason),
+    };
+  }
+  if (
+    args.metricCompletenessStatus === "incomplete_missing_inputs" ||
+    args.tileAuthorityStatus === "proxy_limited"
+  ) {
+    return {
+      workstream: "observer_completeness_and_authority",
+      reason:
+        "Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited.",
+    };
+  }
+  return {
+    workstream: "unknown",
+    reason: null,
+  };
+};
 
 const buildCondition = (
   input: BuildNhm2ObserverAuditConditionInput,
@@ -1066,6 +1453,62 @@ const isTileDiminishingReturnStatus = (
 ): value is Nhm2ObserverTileDiminishingReturnStatus =>
   NHM2_OBSERVER_TILE_DIMINISHING_RETURN_STATUS_VALUES.includes(
     value as Nhm2ObserverTileDiminishingReturnStatus,
+  );
+
+const isMetricCompletenessStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricCompletenessStatus =>
+  NHM2_OBSERVER_METRIC_COMPLETENESS_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricCompletenessStatus,
+  );
+
+const isMetricCoverageBlockerStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricCoverageBlockerStatus =>
+  NHM2_OBSERVER_METRIC_COVERAGE_BLOCKER_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricCoverageBlockerStatus,
+  );
+
+const isMetricFirstMissingStage = (
+  value: unknown,
+): value is Nhm2ObserverMetricFirstMissingStage =>
+  NHM2_OBSERVER_METRIC_FIRST_MISSING_STAGE_VALUES.includes(
+    value as Nhm2ObserverMetricFirstMissingStage,
+  );
+
+const isMetricEmissionAdmissionStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricEmissionAdmissionStatus =>
+  NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricEmissionAdmissionStatus,
+  );
+
+const isMetricComponentAdmissionStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricComponentAdmissionStatus =>
+  NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricComponentAdmissionStatus,
+  );
+
+const isTileAuthorityStatus = (
+  value: unknown,
+): value is Nhm2ObserverTileAuthorityStatus =>
+  NHM2_OBSERVER_TILE_AUTHORITY_STATUS_VALUES.includes(
+    value as Nhm2ObserverTileAuthorityStatus,
+  );
+
+const isLeadReadinessWorkstream = (
+  value: unknown,
+): value is Nhm2ObserverLeadReadinessWorkstream =>
+  NHM2_OBSERVER_LEAD_READINESS_WORKSTREAM_VALUES.includes(
+    value as Nhm2ObserverLeadReadinessWorkstream,
+  );
+
+const isNextTechnicalAction = (
+  value: unknown,
+): value is Nhm2ObserverNextTechnicalAction =>
+  NHM2_OBSERVER_NEXT_TECHNICAL_ACTION_VALUES.includes(
+    value as Nhm2ObserverNextTechnicalAction,
   );
 
 const inferUpstreamDriverClass = (args: {
@@ -1783,6 +2226,25 @@ export const buildNhm2ObserverAuditArtifact = (
     tile: tileWecProbeLocalization,
     tileUpstream: tileUpstreamLocalization,
   });
+  const observerMetricCompleteness = deriveMetricCompleteness(
+    metricRequired,
+    input,
+  );
+  const observerMetricCoverageBlocker = deriveMetricCoverageBlocker(
+    metricRequired,
+    input,
+  );
+  const observerMetricEmissionAdmission = deriveMetricEmissionAdmission({
+    tensor: metricRequired,
+    input,
+    coverageBlockerStatus: observerMetricCoverageBlocker.status,
+  });
+  const observerTileAuthority = deriveTileAuthority(tileEffective, input);
+  const observerLeadReadiness = deriveLeadReadiness({
+    metricCompletenessStatus: observerMetricCompleteness.status,
+    tileAuthorityStatus: observerTileAuthority.status,
+    input,
+  });
 
   return {
     artifactId: NHM2_OBSERVER_AUDIT_ARTIFACT_ID,
@@ -1815,6 +2277,26 @@ export const buildNhm2ObserverAuditArtifact = (
       input.observerTileDiminishingReturnStatus ?? "unknown",
     observerTileDiminishingReturnNote:
       input.observerTileDiminishingReturnNote ?? null,
+    observerMetricCompletenessStatus: observerMetricCompleteness.status,
+    observerMetricCompletenessNote: observerMetricCompleteness.note,
+    observerMetricCoverageBlockerStatus: observerMetricCoverageBlocker.status,
+    observerMetricCoverageBlockerNote: observerMetricCoverageBlocker.note,
+    observerMetricFirstMissingStage:
+      observerMetricCoverageBlocker.firstMissingStage,
+    observerMetricEmissionAdmissionStatus:
+      observerMetricEmissionAdmission.status,
+    observerMetricEmissionAdmissionNote: observerMetricEmissionAdmission.note,
+    observerMetricT0iAdmissionStatus: observerMetricEmissionAdmission.t0iStatus,
+    observerMetricT0iAdmissionNote: observerMetricEmissionAdmission.t0iNote,
+    observerMetricOffDiagonalTijAdmissionStatus:
+      observerMetricEmissionAdmission.offDiagonalStatus,
+    observerMetricOffDiagonalTijAdmissionNote:
+      observerMetricEmissionAdmission.offDiagonalNote,
+    observerTileAuthorityStatus: observerTileAuthority.status,
+    observerTileAuthorityNote: observerTileAuthority.note,
+    observerLeadReadinessWorkstream: observerLeadReadiness.workstream,
+    observerLeadReadinessReason: observerLeadReadiness.reason,
+    observerNextTechnicalAction: observerMetricCoverageBlocker.nextTechnicalAction,
     tensors: {
       metricRequired,
       tileEffective,
@@ -2023,6 +2505,33 @@ export const isNhm2ObserverAuditArtifact = (
     isTileDiminishingReturnStatus(record.observerTileDiminishingReturnStatus) &&
     (record.observerTileDiminishingReturnNote === null ||
       typeof record.observerTileDiminishingReturnNote === "string") &&
+    isMetricCompletenessStatus(record.observerMetricCompletenessStatus) &&
+    (record.observerMetricCompletenessNote === null ||
+      typeof record.observerMetricCompletenessNote === "string") &&
+    isMetricCoverageBlockerStatus(record.observerMetricCoverageBlockerStatus) &&
+    (record.observerMetricCoverageBlockerNote === null ||
+      typeof record.observerMetricCoverageBlockerNote === "string") &&
+    isMetricFirstMissingStage(record.observerMetricFirstMissingStage) &&
+    isMetricEmissionAdmissionStatus(
+      record.observerMetricEmissionAdmissionStatus,
+    ) &&
+    (record.observerMetricEmissionAdmissionNote === null ||
+      typeof record.observerMetricEmissionAdmissionNote === "string") &&
+    isMetricComponentAdmissionStatus(record.observerMetricT0iAdmissionStatus) &&
+    (record.observerMetricT0iAdmissionNote === null ||
+      typeof record.observerMetricT0iAdmissionNote === "string") &&
+    isMetricComponentAdmissionStatus(
+      record.observerMetricOffDiagonalTijAdmissionStatus,
+    ) &&
+    (record.observerMetricOffDiagonalTijAdmissionNote === null ||
+      typeof record.observerMetricOffDiagonalTijAdmissionNote === "string") &&
+    isTileAuthorityStatus(record.observerTileAuthorityStatus) &&
+    (record.observerTileAuthorityNote === null ||
+      typeof record.observerTileAuthorityNote === "string") &&
+    isLeadReadinessWorkstream(record.observerLeadReadinessWorkstream) &&
+    (record.observerLeadReadinessReason === null ||
+      typeof record.observerLeadReadinessReason === "string") &&
+    isNextTechnicalAction(record.observerNextTechnicalAction) &&
     tensors != null &&
     isTensor(tensors.metricRequired) &&
     isTensor(tensors.tileEffective)

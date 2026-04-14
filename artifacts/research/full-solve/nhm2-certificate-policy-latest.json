@@ -1,0 +1,29 @@
+{
+  "artifactId": "nhm2_certificate_policy",
+  "schemaVersion": "nhm2_certificate_policy/v1",
+  "artifactType": "nhm2_certificate_policy/v1",
+  "laneId": "nhm2_shift_lapse",
+  "generatedAt": "2026-04-12T19:28:02.734Z",
+  "state": "pass",
+  "reasonCodes": [],
+  "sourceTraceId": "adapter:7261196a-cff3-458b-8d5a-bd1fb375101f",
+  "sourceRunId": "38809",
+  "verdict": "PASS",
+  "firstFail": null,
+  "viabilityStatus": "ADMISSIBLE",
+  "hardConstraintPass": true,
+  "firstHardFailureId": null,
+  "certificateStatus": "GREEN",
+  "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+  "certificateIntegrity": "ok",
+  "promotionTier": "certified",
+  "promotionReason": null,
+  "artifactRefs": [
+    {
+      "artifactId": "casimir_repo_convergence_trace",
+      "path": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/training-trace-export.jsonl",
+      "contractVersion": "training_trace/v1",
+      "status": "pass"
+    }
+  ]
+}

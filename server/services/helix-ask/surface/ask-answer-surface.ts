@@ -95,18 +95,42 @@ const coerceTrimmedString = (value: unknown): string =>
 const RELATION_INTENT_ID = "hybrid.warp_ethos_relation";
 const ARTIFACT_SECTION_TITLE_RE = /^(?:Tree Walk|Key files|Proof|Context sources|Additional Repo Context)$/i;
 const WEAK_RELATION_VISIBLE_TEXT_RE = /^(?:\.+\s*[-:]\s*)|(?:^|\n)\s*(?:Tree Walk|Key files)\b/i;
+const WEAK_REPO_VISIBLE_TEXT_RE = /^(?:Key files|Sources)\b/i;
 
 const resolveGroundedAnswerCompletionFloor = (
   payload: Record<string, unknown>,
   question: string,
   preferRelationFallback: boolean,
-): { text: string; source: "envelope_answer" | "envelope_sections" | "memory_citation" } | null => {
+  preferRepoDebugFallback: boolean,
+): {
+  text: string;
+  source: "debug_answer_text" | "envelope_answer" | "envelope_sections" | "memory_citation";
+} | null => {
   if (preferRelationFallback && question) {
     const relationFallback = renderRelationAssemblyConversationalFallback(
       ensureRelationAssemblyPacketFallback(null, question),
     ).trim();
     if (relationFallback) {
       return { text: relationFallback, source: "envelope_answer" };
+    }
+  }
+
+  if (preferRepoDebugFallback) {
+    const debugPayload = coerceObjectRecord(payload.debug);
+    const debugCandidates = [
+      coerceTrimmedString(debugPayload?.answer_final_text),
+      coerceTrimmedString(debugPayload?.answer_after_format),
+      coerceTrimmedString(debugPayload?.answer_after_fallback),
+      coerceTrimmedString(debugPayload?.answer_raw_text),
+    ];
+    for (const candidate of debugCandidates) {
+      if (!candidate) continue;
+      if (candidate.length < 80) continue;
+      if (WEAK_REPO_VISIBLE_TEXT_RE.test(candidate)) continue;
+      return {
+        text: candidate.slice(0, 2400).trim(),
+        source: "debug_answer_text",
+      };
     }
   }
 
@@ -192,8 +216,21 @@ export const applyHelixAskSuccessSurface = (
     (!existingVisibleText ||
       existingVisibleText.length < 160 ||
       WEAK_RELATION_VISIBLE_TEXT_RE.test(existingVisibleText));
+  const repoCompletionEligible =
+    typedPayload.report_mode !== true &&
+    typedPayload.dry_run !== true &&
+    !relationCompletionEligible &&
+    (
+      coerceTrimmedString(debugPayload?.intent_domain) === "repo" ||
+      coerceTrimmedString(debugPayload?.intent_domain) === "hybrid" ||
+      coerceTrimmedString(debugPayload?.answer_mode) === "repo_grounded" ||
+      debugPayload?.answer_runtime_fallback_direct === true
+    ) &&
+    (!existingVisibleText ||
+      existingVisibleText.length < 120 ||
+      WEAK_REPO_VISIBLE_TEXT_RE.test(existingVisibleText));
   if (
-    (!existingVisibleText || relationCompletionEligible) &&
+    (!existingVisibleText || relationCompletionEligible || repoCompletionEligible) &&
     typedPayload.report_mode !== true &&
     typedPayload.dry_run !== true
   ) {
@@ -201,16 +238,20 @@ export const applyHelixAskSuccessSurface = (
       typedPayload,
       sourceQuestion,
       relationCompletionEligible,
+      repoCompletionEligible,
     );
     if (completionFloor) {
       typedPayload.text = completionFloor.text;
       if (!coerceTrimmedString(typedPayload.answer)) {
         typedPayload.answer = completionFloor.text;
-      } else if (relationCompletionEligible) {
+      } else if (relationCompletionEligible || repoCompletionEligible) {
         typedPayload.answer = completionFloor.text;
       }
       const typedEnvelope = coerceObjectRecord(typedPayload.envelope);
-      if (typedEnvelope && (!coerceTrimmedString(typedEnvelope.answer) || relationCompletionEligible)) {
+      if (
+        typedEnvelope &&
+        (!coerceTrimmedString(typedEnvelope.answer) || relationCompletionEligible || repoCompletionEligible)
+      ) {
         typedEnvelope.answer = completionFloor.text;
       }
       const typedDebug = debugPayload;
@@ -219,6 +260,9 @@ export const applyHelixAskSuccessSurface = (
         typedDebug.answer_completion_floor_source = completionFloor.source;
         if (relationCompletionEligible) {
           typedDebug.answer_completion_floor_relation_repair = true;
+        }
+        if (repoCompletionEligible) {
+          typedDebug.answer_completion_floor_repo_repair = true;
         }
       }
     }

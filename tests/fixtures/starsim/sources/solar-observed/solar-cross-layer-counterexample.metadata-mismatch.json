@@ -1,0 +1,125 @@
+{
+  "source_id": "fixture:solar-observed/counterexample-metadata-mismatch",
+  "instrument": "NSO/PFSS+SDO/HMI+SDO/AIA",
+  "observed_mode": "modeled",
+  "coordinate_frame": "Helioprojective",
+  "carrington_rotation": 2292,
+  "time_range": {
+    "start_iso": "2025-02-18T00:00:00.000Z",
+    "end_iso": "2025-02-18T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "payload": {
+    "solar_coronal_field": {
+      "pfss_solution_ref": "fixture:solar/coronal/pfss-solution-2290",
+      "synoptic_boundary_ref": "fixture:solar/coronal/synoptic-boundary-2290",
+      "coronal_hole_refs": [
+        "fixture:solar/coronal/coronal-hole-north-2290",
+        "fixture:solar/coronal/coronal-hole-south-2290"
+      ],
+      "helmet_streamer_ref": "fixture:solar/coronal/helmet-streamer-2290",
+      "open_field_map_ref": "fixture:solar/coronal/open-field-map-2290",
+      "euv_coronal_context_ref": "fixture:solar/coronal/aia-euv-context-2290",
+      "summary": {
+        "source_surface_rsun": 2.5,
+        "open_flux_weber": 340000000000000,
+        "dominant_topology": "dipolar_open_flux",
+        "coronal_hole_count": 2
+      },
+      "metadata": {
+        "instrument": "NSO/PFSS+SDO/HMI+SDO/AIA",
+        "observed_mode": "modeled",
+        "coordinate_frame": "Helioprojective",
+        "carrington_rotation": 2292,
+        "cadence": {
+          "value": 1,
+          "unit": "carrington_rotation"
+        },
+        "time_range": {
+          "start_iso": "2025-02-18T00:00:00.000Z",
+          "end_iso": "2025-02-18T23:59:59.000Z"
+        },
+        "source_product_id": "pfss_coronal_field_context_v1",
+        "source_product_family": "coronal_field_proxy_products",
+        "source_doc_ids": ["nso_pfss", "hmi_products", "aia_corona"]
+      }
+    },
+    "solar_topology_linkage": {
+      "link_refs": [
+        "fixture:solar/topology-linkage/region-13000-open-flux",
+        "fixture:solar/topology-linkage/region-13001-memory-continuity"
+      ],
+      "link_count": 2,
+      "links": [
+        {
+          "link_id": "fixture:solar/topology-linkage/region-13000-open-flux",
+          "linked_spot_ids": [
+            "fixture:solar/sunspots/spot-13000-a",
+            "fixture:solar/sunspots/spot-13000-b"
+          ],
+          "linked_region_id": "fixture:solar/active-regions/noaa-13000",
+          "linked_noaa_region_id": "13000",
+          "linked_harp_id": "HARP-13000",
+          "linked_pfss_solution_ref": "fixture:solar/coronal/pfss-solution-2290",
+          "linked_open_field_map_ref": "fixture:solar/coronal/open-field-map-2290",
+          "linked_coronal_hole_refs": [
+            "fixture:solar/coronal/coronal-hole-north-2290",
+            "fixture:solar/coronal/coronal-hole-south-2290"
+          ],
+          "linked_flare_refs": ["fixture:solar/flares/goes-2025-001"],
+          "linked_cme_refs": ["fixture:solar/cmes/lasco-2025-001"],
+          "linked_polar_field_ref": "fixture:solar/magnetic-memory/polar-field-history",
+          "linked_axial_dipole_ref": "fixture:solar/magnetic-memory/axial-dipole-history",
+          "topology_role": "active_region_open_flux_source",
+          "linkage_basis": "manual_catalog_association",
+          "time_window_start": "2025-02-15T00:10:00.000Z",
+          "time_window_end": "2025-02-15T00:40:00.000Z"
+        },
+        {
+          "link_id": "fixture:solar/topology-linkage/region-13001-memory-continuity",
+          "linked_spot_ids": [
+            "fixture:solar/sunspots/spot-13001-a",
+            "fixture:solar/sunspots/spot-13001-b"
+          ],
+          "linked_region_id": "fixture:solar/active-regions/noaa-13001",
+          "linked_noaa_region_id": "13001",
+          "linked_harp_id": "HARP-13001",
+          "linked_pfss_solution_ref": "fixture:solar/coronal/pfss-solution-2290",
+          "linked_open_field_map_ref": "fixture:solar/coronal/open-field-map-2290",
+          "linked_coronal_hole_refs": ["fixture:solar/coronal/coronal-hole-south-2290"],
+          "linked_polar_field_ref": "fixture:solar/magnetic-memory/polar-field-history",
+          "linked_axial_dipole_ref": "fixture:solar/magnetic-memory/axial-dipole-history",
+          "topology_role": "bipolar_memory_continuity",
+          "linkage_basis": "region_id_match",
+          "time_window_start": "2025-02-16T00:10:00.000Z",
+          "time_window_end": "2025-02-16T00:40:00.000Z"
+        }
+      ],
+      "summary": {
+        "topology_role_count": 2,
+        "open_flux_link_count": 2,
+        "event_link_count": 1
+      },
+      "metadata": {
+        "instrument": "NSO/PFSS+SDO/HMI+NOAA+GOES/LASCO",
+        "observed_mode": "observed",
+        "coordinate_frame": "Carrington",
+        "carrington_rotation": 2290,
+        "time_range": {
+          "start_iso": "2025-02-15T00:00:00.000Z",
+          "end_iso": "2025-02-16T23:59:59.000Z"
+        },
+        "cadence": {
+          "value": 1,
+          "unit": "day"
+        },
+        "source_product_id": "solar_cross_layer_topology_linkage_context_v1",
+        "source_product_family": "topology_linkage_products",
+        "source_doc_ids": ["nso_pfss", "hmi_products", "sft_review_2023", "goes_xray", "lasco_docs"]
+      }
+    }
+  }
+}

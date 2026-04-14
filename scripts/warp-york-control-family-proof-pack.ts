@@ -84,6 +84,14 @@ import {
   type Nhm2FullLoopAuditState,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
 import {
+  NHM2_CERTIFICATE_POLICY_ARTIFACT_ID,
+  NHM2_CERTIFICATE_POLICY_SCHEMA_VERSION,
+  buildNhm2CertificatePolicyArtifact,
+  isNhm2CertificatePolicyArtifact,
+  type Nhm2CertificatePolicyArtifact,
+  type Nhm2CertificatePolicyReasonCode,
+} from "../shared/contracts/nhm2-certificate-policy.v1";
+import {
   buildNhm2StrictSignalReadinessArtifact,
   isNhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessArtifact,
@@ -115,6 +123,12 @@ import {
   type BuildNhm2ObserverAuditTensorInput,
   type Nhm2ObserverTileDiminishingReturnStatus,
 } from "../shared/contracts/nhm2-observer-audit.v1";
+import {
+  buildNhm2SuccessorTileFluxLaneAdmissibilityArtifact,
+  isNhm2SuccessorTileFluxLaneAdmissibilityArtifact,
+  type Nhm2SuccessorTileFluxLaneAdmissibilityArtifact,
+  type Nhm2SuccessorTileFluxLaneAdmissibilitySurface,
+} from "../shared/contracts/nhm2-successor-tile-flux-lane-admissibility.v1";
 import {
   isCertifiedWarpWorldlineContract,
   type WarpWorldlineContractV1,
@@ -666,6 +680,22 @@ const DEFAULT_FULL_LOOP_AUDIT_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-full-loop-audit-latest.md",
 );
+const DEFAULT_CERTIFICATE_POLICY_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-certificate-policy-${DATE_STAMP}.json`,
+);
+const DEFAULT_CERTIFICATE_POLICY_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-certificate-policy-latest.json",
+);
+const DEFAULT_CERTIFICATE_POLICY_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-certificate-policy-${DATE_STAMP}.md`,
+);
+const DEFAULT_CERTIFICATE_POLICY_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-certificate-policy-latest.md",
+);
 const DEFAULT_SOURCE_CLOSURE_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-source-closure-${DATE_STAMP}.json`,
@@ -878,6 +908,8 @@ const SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-source-closure";
 const SELECTED_SHIFT_LAPSE_OBSERVER_AUDIT_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-observer-audit";
+const SELECTED_SHIFT_LAPSE_CERTIFICATE_POLICY_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-certificate-policy";
 const SELECTED_SHIFT_LAPSE_FULL_LOOP_AUDIT_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit";
 const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
@@ -888,9 +920,74 @@ const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
   requireNhm2CongruentFullSolve: true,
   shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
 };
+const SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_ASSESSMENT_ID =
+  "nhm2_successor_tile_flux_lane_admissibility" as const;
+const SUCCESSOR_TILE_FLUX_LANE_ID = "nhm2_successor_tile_flux_lane" as const;
+const SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_PUBLICATION_COMMAND =
+  `node --import tsx -e "import('./scripts/warp-york-control-family-proof-pack.ts').then(async (m) => { await m.publishNhm2SuccessorTileFluxLaneAdmissibility({ selectedProfileId: 'stage1_centerline_alpha_0p9925_v1' }); process.exit(0); }).catch((error) => { console.error(error); process.exit(1); });"`;
+const CURRENT_LANE_BASELINE_CONVERGENCE_ASSESSMENT_ID =
+  "nhm2_current_lane_baseline_convergence" as const;
+const CURRENT_LANE_BASELINE_CONVERGENCE_PUBLICATION_COMMAND =
+  `node --import tsx -e "import('./scripts/warp-york-control-family-proof-pack.ts').then(async (m) => { await m.publishNhm2CurrentLaneBaselineConvergence({ selectedProfileId: 'stage1_centerline_alpha_0p9925_v1' }); process.exit(0); }).catch((error) => { console.error(error); process.exit(1); });"`;
 const DEFAULT_SOURCE_CLOSURE_LATEST_JSON = path.join(
   FULL_SOLVE_DIR,
   "nhm2-source-closure-latest.json",
+);
+const DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-current-lane-baseline-convergence-${DATE_STAMP}.json`,
+);
+const DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-current-lane-baseline-convergence-latest.json",
+);
+const DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-current-lane-baseline-convergence-${DATE_STAMP}.md`,
+);
+const DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-current-lane-baseline-convergence-latest.md",
+);
+const DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_STOP_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-current-lane-baseline-convergence-stop-${DATE_STAMP}.md`,
+);
+const DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_STOP_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-current-lane-baseline-convergence-stop-latest.md",
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-successor-tile-flux-lane-admissibility-${DATE_STAMP}.json`,
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-successor-tile-flux-lane-admissibility-latest.json",
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-successor-tile-flux-lane-admissibility-${DATE_STAMP}.md`,
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-successor-tile-flux-lane-admissibility-latest.md",
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_STOP_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-successor-tile-flux-lane-admissibility-stop-${DATE_STAMP}.md`,
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_STOP_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-successor-tile-flux-lane-admissibility-stop-latest.md",
+);
+const DEFAULT_RECHARTERED_LANE_STATUS_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-rechartered-lane-status-latest.json",
+);
+const DEFAULT_SUCCESSOR_TILE_FLUX_LANE_CHARTER_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-successor-tile-flux-lane-charter-latest.json",
 );
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
@@ -6987,6 +7084,345 @@ const collectFullLoopArtifactRefs = (
   inspections
     .map((entry) => entry.artifactRef ?? null)
     .filter((entry): entry is Nhm2FullLoopAuditArtifactRef => entry != null);
+
+type RepoConvergenceTrainingTraceRecord = {
+  traceId?: unknown;
+  id?: unknown;
+  seq?: unknown;
+  ts?: unknown;
+  pass?: unknown;
+  firstFail?: unknown;
+  source?: unknown;
+  certificate?: unknown;
+};
+
+type RepoConvergenceTrainingTraceSource = {
+  sourcePath: string;
+  record: RepoConvergenceTrainingTraceRecord;
+};
+
+const resolveArtifactsRootDir = (artifactRootDir: string): string =>
+  path.resolve(artifactRootDir, "..", "..");
+
+const buildCertificatePolicyTraceCandidatePaths = (
+  artifactRootDir: string,
+): string[] => {
+  const artifactsRootDir = resolveArtifactsRootDir(artifactRootDir);
+  return [
+    path.join(artifactsRootDir, "training-trace.jsonl"),
+    path.join(artifactsRootDir, "training-trace-export.jsonl"),
+  ];
+};
+
+const isRepoConvergenceTrainingTraceRecord = (
+  value: unknown,
+): value is RepoConvergenceTrainingTraceRecord => {
+  const record = asRecord(value);
+  const source = asRecord(record.source);
+  return (
+    typeof record.pass === "boolean" &&
+    asText(record.traceId) != null &&
+    source.system === "constraint-pack" &&
+    source.component === "adapter" &&
+    source.tool === "repo-convergence"
+  );
+};
+
+const readLatestRepoConvergenceTrainingTraceSource = (
+  artifactRootDir: string,
+): RepoConvergenceTrainingTraceSource | null => {
+  let latest: RepoConvergenceTrainingTraceSource | null = null;
+  for (const candidatePath of buildCertificatePolicyTraceCandidatePaths(artifactRootDir)) {
+    if (!fs.existsSync(candidatePath)) continue;
+    const lines = fs
+      .readFileSync(candidatePath, "utf8")
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(lines[index]);
+      } catch {
+        continue;
+      }
+      if (!isRepoConvergenceTrainingTraceRecord(parsed)) {
+        continue;
+      }
+      const nextCandidate = {
+        sourcePath: candidatePath,
+        record: parsed,
+      };
+      if (latest == null) {
+        latest = nextCandidate;
+        break;
+      }
+      const latestTs = asText(latest.record.ts);
+      const nextTs = asText(parsed.ts);
+      if (nextTs != null && (latestTs == null || nextTs >= latestTs)) {
+        latest = nextCandidate;
+      }
+      break;
+    }
+  }
+  return latest;
+};
+
+const uniqueFullLoopArtifactRefs = (
+  refs: Array<Nhm2FullLoopAuditArtifactRef | null | undefined>,
+): Nhm2FullLoopAuditArtifactRef[] => {
+  const seen = new Set<string>();
+  const unique: Nhm2FullLoopAuditArtifactRef[] = [];
+  for (const ref of refs) {
+    if (ref == null) continue;
+    const key = `${ref.artifactId}|${ref.path}|${ref.contractVersion ?? "null"}|${ref.status ?? "null"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(ref);
+  }
+  return unique;
+};
+
+const buildNhm2CertificatePolicyArtifactFromTraceSource = (args: {
+  artifactRootDir: string;
+  generatedAt: string;
+}): Nhm2CertificatePolicyArtifact => {
+  const traceSource = readLatestRepoConvergenceTrainingTraceSource(args.artifactRootDir);
+  if (traceSource == null) {
+    const artifact = buildNhm2CertificatePolicyArtifact({
+      generatedAt: args.generatedAt,
+      state: "unavailable",
+      reasonCodes: ["certificate_missing"],
+      verdict: "UNKNOWN",
+      viabilityStatus: "UNKNOWN",
+      hardConstraintPass: null,
+      certificateIntegrity: "unavailable",
+      promotionTier: null,
+      promotionReason: "certificate_missing",
+      artifactRefs: [],
+    });
+    if (artifact == null) {
+      throw new Error("nhm2_certificate_policy_contract_invalid");
+    }
+    return artifact;
+  }
+
+  const certificate = asRecord(traceSource.record.certificate);
+  const firstFailRecord = asRecord(traceSource.record.firstFail);
+  const certificateStatus = asText(certificate.status);
+  const certificateHash = asText(certificate.certificateHash);
+  const integrityOk =
+    typeof certificate.integrityOk === "boolean" ? certificate.integrityOk : null;
+  const firstFailId = asText(firstFailRecord.id);
+  const hardConstraintPass =
+    traceSource.record.pass === true
+      ? true
+      : firstFailId != null
+        ? false
+        : null;
+  const hasRequiredSource =
+    certificateStatus != null &&
+    certificateHash != null &&
+    integrityOk != null &&
+    asText(traceSource.record.traceId) != null;
+  const certificateIntegrity =
+    integrityOk === true ? "ok" : integrityOk === false ? "fail" : "unavailable";
+  const reasonCodes: Nhm2CertificatePolicyReasonCode[] = [];
+  let state: Nhm2CertificatePolicyArtifact["state"] = "review";
+  let viabilityStatus: Nhm2CertificatePolicyArtifact["viabilityStatus"] = "UNKNOWN";
+
+  if (!hasRequiredSource) {
+    if (certificateHash == null) {
+      reasonCodes.push("certificate_missing");
+    }
+    if (integrityOk == null) {
+      reasonCodes.push("certificate_integrity_missing");
+    }
+    state = "unavailable";
+    viabilityStatus = "UNKNOWN";
+  } else {
+    const certificateAdmissible =
+      traceSource.record.pass === true &&
+      certificateStatus === "GREEN" &&
+      certificateIntegrity === "ok";
+    viabilityStatus = certificateAdmissible ? "ADMISSIBLE" : "INADMISSIBLE";
+    if (hardConstraintPass === false) {
+      reasonCodes.push("hard_constraint_failed");
+    }
+    if (certificateIntegrity === "fail") {
+      reasonCodes.push("certificate_integrity_failed");
+    } else if (certificateIntegrity === "unavailable") {
+      reasonCodes.push("certificate_integrity_missing");
+    }
+    if (viabilityStatus !== "ADMISSIBLE") {
+      reasonCodes.push("status_non_admissible");
+    }
+    state =
+      reasonCodes.length === 0 && certificateHash != null
+        ? "pass"
+        : certificateIntegrity === "fail" || hardConstraintPass === false
+          ? "fail"
+          : reasonCodes.includes("status_non_admissible")
+            ? "fail"
+            : "review";
+  }
+
+  const sourceRunId =
+    asText(traceSource.record.id) ??
+    (Number.isFinite(traceSource.record.seq)
+      ? String(traceSource.record.seq)
+      : null);
+  const artifact = buildNhm2CertificatePolicyArtifact({
+    generatedAt: args.generatedAt,
+    state,
+    reasonCodes,
+    sourceTraceId: asText(traceSource.record.traceId),
+    sourceRunId,
+    verdict: traceSource.record.pass === true ? "PASS" : "FAIL",
+    firstFail:
+      firstFailId == null
+        ? null
+        : {
+            id: firstFailId,
+            severity: asText(firstFailRecord.severity),
+            status: asText(firstFailRecord.status),
+            note: asText(firstFailRecord.note),
+          },
+    viabilityStatus,
+    hardConstraintPass,
+    firstHardFailureId: firstFailId,
+    certificateStatus,
+    certificateHash,
+    certificateIntegrity,
+    promotionTier: state === "pass" ? "certified" : null,
+    promotionReason: state === "pass" ? null : reasonCodes[0] ?? null,
+    artifactRefs: [
+      {
+        artifactId: "casimir_repo_convergence_trace",
+        path: normalizePath(traceSource.sourcePath),
+        contractVersion: "training_trace/v1",
+        status: traceSource.record.pass === true ? "pass" : "fail",
+      },
+    ],
+  });
+  if (artifact == null) {
+    throw new Error("nhm2_certificate_policy_contract_invalid");
+  }
+  return artifact;
+};
+
+const renderNhm2CertificatePolicyMarkdown = (
+  payload: Nhm2CertificatePolicyArtifact,
+): string => {
+  const reasonCodes =
+    payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
+  const artifactRefRows =
+    payload.artifactRefs.length > 0
+      ? payload.artifactRefs
+          .map(
+            (entry) =>
+              `| ${entry.artifactId} | ${entry.path} | ${entry.contractVersion ?? "null"} | ${entry.status ?? "null"} |`,
+          )
+          .join("\n")
+      : "| none | null | null | null |";
+  return `# NHM2 Certificate Policy (${DATE_STAMP})
+
+"This policy wrapper records adapter-backed Casimir repo-convergence truth for the NHM2 full-loop lane. It does not widen warp physics, observer, transport, gravity, or viability claims."
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| laneId | ${payload.laneId} |
+| generatedAt | ${payload.generatedAt} |
+| publicationCommand | ${SELECTED_SHIFT_LAPSE_CERTIFICATE_POLICY_COMMAND} |
+| state | ${payload.state} |
+| reasonCodes | ${reasonCodes} |
+| sourceTraceId | ${payload.sourceTraceId ?? "null"} |
+| sourceRunId | ${payload.sourceRunId ?? "null"} |
+| verdict | ${payload.verdict} |
+| firstFail.id | ${payload.firstFail?.id ?? "null"} |
+| firstFail.severity | ${payload.firstFail?.severity ?? "null"} |
+| firstFail.status | ${payload.firstFail?.status ?? "null"} |
+| firstFail.note | ${payload.firstFail?.note ?? "null"} |
+| viabilityStatus | ${payload.viabilityStatus} |
+| hardConstraintPass | ${payload.hardConstraintPass == null ? "null" : String(payload.hardConstraintPass)} |
+| firstHardFailureId | ${payload.firstHardFailureId ?? "null"} |
+| certificateStatus | ${payload.certificateStatus ?? "null"} |
+| certificateHash | ${payload.certificateHash ?? "null"} |
+| certificateIntegrity | ${payload.certificateIntegrity} |
+| promotionTier | ${payload.promotionTier ?? "null"} |
+| promotionReason | ${payload.promotionReason ?? "null"} |
+
+## Artifact Refs
+| artifactId | path | contractVersion | status |
+|---|---|---|---|
+${artifactRefRows}
+`;
+};
+
+export const publishNhm2CertificatePolicyResearchSurface = (args: {
+  artifact: Nhm2CertificatePolicyArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2CertificatePolicyArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown: renderNhm2CertificatePolicyMarkdown(args.artifact),
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_CERTIFICATE_POLICY_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_CERTIFICATE_POLICY_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_CERTIFICATE_POLICY_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_CERTIFICATE_POLICY_LATEST_MD),
+    ),
+  });
+};
+
+const publishNhm2ShiftLapseCertificatePolicyImpl = async (options?: {
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): Promise<{
+  certificatePolicyArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2CertificatePolicyArtifact;
+  };
+}> => {
+  const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+  const artifact = buildNhm2CertificatePolicyArtifactFromTraceSource({
+    artifactRootDir,
+    generatedAt: new Date().toISOString(),
+  });
+  return {
+    certificatePolicyArtifact: publishNhm2CertificatePolicyResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    }),
+  };
+};
 
 const hasInspectionMismatch = (
   inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>,
@@ -29312,6 +29748,10 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
     "likely_stop_territory";
   const observerTileDiminishingReturnNote =
     "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.";
+  const observerLeadReadinessWorkstream =
+    "observer_completeness_and_authority" as const;
+  const observerLeadReadinessReason =
+    "Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited. Certificate/policy readiness remains a separate parallel full-loop lane.";
   const familyId = resolveStrictSignalPublishedFamilyId(args);
   const selectedProfileId = resolveStrictSignalPublishedProfileId(args);
   const tensorSnapshotPaths =
@@ -29350,6 +29790,8 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
     shiftLapseProfileId: selectedProfileId,
     observerTileDiminishingReturnStatus,
     observerTileDiminishingReturnNote,
+    observerLeadReadinessWorkstream,
+    observerLeadReadinessReason,
     metricRequired: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.metricRequired,
       normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
@@ -29502,6 +29944,22 @@ const renderNhm2ObserverAuditMarkdown = (
 | observerRemediationSequenceStatus | ${payload.observerRemediationSequenceStatus} |
 | observerTileDiminishingReturnStatus | ${payload.observerTileDiminishingReturnStatus} |
 | observerTileDiminishingReturnNote | ${payload.observerTileDiminishingReturnNote ?? "null"} |
+| observerMetricCompletenessStatus | ${payload.observerMetricCompletenessStatus} |
+| observerMetricCompletenessNote | ${payload.observerMetricCompletenessNote ?? "null"} |
+| observerMetricCoverageBlockerStatus | ${payload.observerMetricCoverageBlockerStatus} |
+| observerMetricCoverageBlockerNote | ${payload.observerMetricCoverageBlockerNote ?? "null"} |
+| observerMetricFirstMissingStage | ${payload.observerMetricFirstMissingStage} |
+| observerMetricEmissionAdmissionStatus | ${payload.observerMetricEmissionAdmissionStatus} |
+| observerMetricEmissionAdmissionNote | ${payload.observerMetricEmissionAdmissionNote ?? "null"} |
+| observerMetricT0iAdmissionStatus | ${payload.observerMetricT0iAdmissionStatus} |
+| observerMetricT0iAdmissionNote | ${payload.observerMetricT0iAdmissionNote ?? "null"} |
+| observerMetricOffDiagonalTijAdmissionStatus | ${payload.observerMetricOffDiagonalTijAdmissionStatus} |
+| observerMetricOffDiagonalTijAdmissionNote | ${payload.observerMetricOffDiagonalTijAdmissionNote ?? "null"} |
+| observerTileAuthorityStatus | ${payload.observerTileAuthorityStatus} |
+| observerTileAuthorityNote | ${payload.observerTileAuthorityNote ?? "null"} |
+| observerLeadReadinessWorkstream | ${payload.observerLeadReadinessWorkstream} |
+| observerLeadReadinessReason | ${payload.observerLeadReadinessReason ?? "null"} |
+| observerNextTechnicalAction | ${payload.observerNextTechnicalAction} |
 | observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
 | metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
 | tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
@@ -34772,6 +35230,22 @@ ${tierRows}
 | observerRemediationSequenceStatus | ${observerAudit.observerRemediationSequenceStatus} |
 | observerTileDiminishingReturnStatus | ${observerAudit.observerTileDiminishingReturnStatus} |
 | observerTileDiminishingReturnNote | ${observerAudit.observerTileDiminishingReturnNote ?? "null"} |
+| observerMetricCompletenessStatus | ${observerAudit.observerMetricCompletenessStatus} |
+| observerMetricCompletenessNote | ${observerAudit.observerMetricCompletenessNote ?? "null"} |
+| observerMetricCoverageBlockerStatus | ${observerAudit.observerMetricCoverageBlockerStatus} |
+| observerMetricCoverageBlockerNote | ${observerAudit.observerMetricCoverageBlockerNote ?? "null"} |
+| observerMetricFirstMissingStage | ${observerAudit.observerMetricFirstMissingStage} |
+| observerMetricEmissionAdmissionStatus | ${observerAudit.observerMetricEmissionAdmissionStatus} |
+| observerMetricEmissionAdmissionNote | ${observerAudit.observerMetricEmissionAdmissionNote ?? "null"} |
+| observerMetricT0iAdmissionStatus | ${observerAudit.observerMetricT0iAdmissionStatus} |
+| observerMetricT0iAdmissionNote | ${observerAudit.observerMetricT0iAdmissionNote ?? "null"} |
+| observerMetricOffDiagonalTijAdmissionStatus | ${observerAudit.observerMetricOffDiagonalTijAdmissionStatus} |
+| observerMetricOffDiagonalTijAdmissionNote | ${observerAudit.observerMetricOffDiagonalTijAdmissionNote ?? "null"} |
+| observerTileAuthorityStatus | ${observerAudit.observerTileAuthorityStatus} |
+| observerTileAuthorityNote | ${observerAudit.observerTileAuthorityNote ?? "null"} |
+| observerLeadReadinessWorkstream | ${observerAudit.observerLeadReadinessWorkstream} |
+| observerLeadReadinessReason | ${observerAudit.observerLeadReadinessReason ?? "null"} |
+| observerNextTechnicalAction | ${observerAudit.observerNextTechnicalAction} |
 | observerBlockingAssessmentNote | ${observerAudit.observerBlockingAssessmentNote ?? "null"} |
 | metric.wecMinOverAllTimelike | ${observerAudit.metric.wecMinOverAllTimelike ?? "null"} |
 | metric.necMinOverAllNull | ${observerAudit.metric.necMinOverAllNull ?? "null"} |
@@ -34867,6 +35341,10 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     artifactRootDir,
     path.basename(DEFAULT_SOURCE_CLOSURE_LATEST_JSON),
   );
+  const rootCertificatePolicyLatestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_CERTIFICATE_POLICY_LATEST_JSON),
+  );
   const selectedEnvelopeLatestJsonPath = path.join(
     selectedFamilyArtifactRootDir,
     "envelope",
@@ -34888,6 +35366,12 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       reuseExistingSelectedArtifacts: true,
     });
   }
+  const certificatePolicyPublication = !fs.existsSync(rootCertificatePolicyLatestJsonPath)
+    ? await publishNhm2ShiftLapseCertificatePolicyImpl({
+        artifactRootDir,
+        auditRootDir,
+      })
+    : null;
 
   const transportInspection =
     inspectPublishedAuditArtifact<Nhm2ShiftLapseTransportResultArtifact>({
@@ -35782,9 +36266,26 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         : uncertaintyReasons.length > 0
           ? "review"
           : "pass";
-
-  const certificatePolicyReasons: Nhm2FullLoopAuditReasonCode[] = ["certificate_missing"];
-  const certificatePolicyState: Nhm2FullLoopAuditState = "unavailable";
+  const certificatePolicyInspection =
+    inspectPublishedAuditArtifact<Nhm2CertificatePolicyArtifact>({
+      expectedPath:
+        certificatePolicyPublication?.certificatePolicyArtifact.latestJsonPath ??
+        rootCertificatePolicyLatestJsonPath,
+      artifactId: NHM2_CERTIFICATE_POLICY_ARTIFACT_ID,
+      expectedArtifactType: NHM2_CERTIFICATE_POLICY_SCHEMA_VERSION,
+      validator: isNhm2CertificatePolicyArtifact,
+    });
+  const certificatePolicyArtifact = certificatePolicyInspection.parsed;
+  const certificatePolicyReasons: Nhm2FullLoopAuditReasonCode[] =
+    certificatePolicyArtifact != null
+      ? [...certificatePolicyArtifact.reasonCodes]
+      : ["certificate_missing"];
+  const certificatePolicyState: Nhm2FullLoopAuditState =
+    certificatePolicyArtifact?.state ?? "unavailable";
+  const certificatePolicyArtifactRefs = uniqueFullLoopArtifactRefs([
+    certificatePolicyInspection.artifactRef,
+    ...(certificatePolicyArtifact?.artifactRefs ?? []),
+  ]);
 
   const toObserverFamilyAudit = (
     tensor:
@@ -35971,6 +36472,40 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         observerAuditArtifact?.observerTileDiminishingReturnStatus ?? "unknown",
       observerTileDiminishingReturnNote:
         observerAuditArtifact?.observerTileDiminishingReturnNote ?? null,
+      observerMetricCompletenessStatus:
+        observerAuditArtifact?.observerMetricCompletenessStatus ?? "unknown",
+      observerMetricCompletenessNote:
+        observerAuditArtifact?.observerMetricCompletenessNote ?? null,
+      observerMetricCoverageBlockerStatus:
+        observerAuditArtifact?.observerMetricCoverageBlockerStatus ?? "unknown",
+      observerMetricCoverageBlockerNote:
+        observerAuditArtifact?.observerMetricCoverageBlockerNote ?? null,
+      observerMetricFirstMissingStage:
+        observerAuditArtifact?.observerMetricFirstMissingStage ?? "unknown",
+      observerMetricEmissionAdmissionStatus:
+        observerAuditArtifact?.observerMetricEmissionAdmissionStatus ??
+        "unknown",
+      observerMetricEmissionAdmissionNote:
+        observerAuditArtifact?.observerMetricEmissionAdmissionNote ?? null,
+      observerMetricT0iAdmissionStatus:
+        observerAuditArtifact?.observerMetricT0iAdmissionStatus ?? "unknown",
+      observerMetricT0iAdmissionNote:
+        observerAuditArtifact?.observerMetricT0iAdmissionNote ?? null,
+      observerMetricOffDiagonalTijAdmissionStatus:
+        observerAuditArtifact?.observerMetricOffDiagonalTijAdmissionStatus ??
+        "unknown",
+      observerMetricOffDiagonalTijAdmissionNote:
+        observerAuditArtifact?.observerMetricOffDiagonalTijAdmissionNote ?? null,
+      observerTileAuthorityStatus:
+        observerAuditArtifact?.observerTileAuthorityStatus ?? "unknown",
+      observerTileAuthorityNote:
+        observerAuditArtifact?.observerTileAuthorityNote ?? null,
+      observerLeadReadinessWorkstream:
+        observerAuditArtifact?.observerLeadReadinessWorkstream ?? "unknown",
+      observerLeadReadinessReason:
+        observerAuditArtifact?.observerLeadReadinessReason ?? null,
+      observerNextTechnicalAction:
+        observerAuditArtifact?.observerNextTechnicalAction ?? "unknown",
       metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
       tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
     },
@@ -36074,15 +36609,19 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       sectionId: "certificate_policy_result",
       state: certificatePolicyState,
       reasons: certificatePolicyReasons,
-      artifactRefs: [],
-      viabilityStatus: "UNKNOWN",
-      hardConstraintPass: null,
-      firstHardFailureId: null,
-      certificateStatus: null,
-      certificateHash: null,
-      certificateIntegrity: "unavailable",
-      promotionTier: null,
-      promotionReason: "certificate_missing",
+      artifactRefs: certificatePolicyArtifactRefs,
+      viabilityStatus: certificatePolicyArtifact?.viabilityStatus ?? "UNKNOWN",
+      hardConstraintPass: certificatePolicyArtifact?.hardConstraintPass ?? null,
+      firstHardFailureId: certificatePolicyArtifact?.firstHardFailureId ?? null,
+      certificateStatus: certificatePolicyArtifact?.certificateStatus ?? null,
+      certificateHash: certificatePolicyArtifact?.certificateHash ?? null,
+      certificateIntegrity:
+        certificatePolicyArtifact?.certificateIntegrity ?? "unavailable",
+      promotionTier: certificatePolicyArtifact?.promotionTier ?? null,
+      promotionReason:
+        certificatePolicyArtifact != null
+          ? certificatePolicyArtifact.promotionReason
+          : "certificate_missing",
     },
   };
 
@@ -36197,8 +36736,8 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     }),
     buildFullLoopSectionChecklist({
       sectionId: "certificate_policy_result",
-      expectedEvidence: ["published certificate-adjacent NHM2 policy artifact"],
-      inspections: [],
+      expectedEvidence: ["published NHM2 certificate-policy wrapper artifact"],
+      inspections: [certificatePolicyInspection],
       sectionState: audit.sections.certificate_policy_result.state,
       blockingReasons: audit.sections.certificate_policy_result.reasons,
     }),
@@ -36246,6 +36785,11 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
   };
 };
 
+export const publishNhm2ShiftLapseCertificatePolicy = async (options?: {
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}) => publishNhm2ShiftLapseCertificatePolicyImpl(options);
+
 export const publishNhm2ShiftLapseFullLoopAudit = async (options?: {
   baseUrl?: string;
   selectedFamilyArtifactRootDir?: string;
@@ -36269,6 +36813,834 @@ export const publishNhm2ShiftLapseFullLoopAudit = async (options?: {
   withProofSurfacePublicationLock({
     operation: "publish-selected-shift-lapse-full-loop-audit",
     fn: async () => publishNhm2ShiftLapseFullLoopAuditImpl(options),
+  });
+
+const appendUniqueArtifactPathRefs = <T extends { label: string; path: string | null }>(
+  refs: T[],
+  additions: T[],
+): T[] => {
+  const seen = new Set(refs.map((entry) => `${entry.label}|${entry.path ?? "null"}`));
+  const merged = [...refs];
+  for (const entry of additions) {
+    const key = `${entry.label}|${entry.path ?? "null"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(entry);
+  }
+  return merged;
+};
+
+const inspectSuccessorLaneAdmissibilityRepoState = (args: {
+  artifactRootDir: string;
+  selectedProfileId: string;
+}): {
+  currentPublishedProfileId: string | null;
+  observerMetricCoverageBlockerStatus: string | null;
+  observerNextTechnicalAction: string | null;
+  currentLaneDisposition: string;
+  metricFluxPresent: boolean;
+  tileEffectiveFluxPresent: boolean;
+  tileEffectiveModelStatus: string;
+  candidateAdmissibleSurfaces: Nhm2SuccessorTileFluxLaneAdmissibilitySurface[];
+  candidateRejectedSurfaces: Nhm2SuccessorTileFluxLaneAdmissibilitySurface[];
+  blockingReasons: string[];
+  requiredNewEvidence: string[];
+  forbiddenShortcuts: string[];
+  artifactRefs: Array<{ label: string; path: string | null }>;
+} => {
+  const observerPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_OBSERVER_AUDIT_LATEST_JSON),
+  );
+  const fullLoopPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_FULL_LOOP_AUDIT_LATEST_JSON),
+  );
+  const sourceClosurePath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_SOURCE_CLOSURE_LATEST_JSON),
+  );
+  const recharterPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_RECHARTERED_LANE_STATUS_LATEST_JSON),
+  );
+  const charterPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_SUCCESSOR_TILE_FLUX_LANE_CHARTER_LATEST_JSON),
+  );
+
+  const observer = readJsonArtifactIfPresent<Record<string, unknown>>(observerPath);
+  const natarioPath = path.join(process.cwd(), "modules", "warp", "natario-warp.ts");
+  const pipelinePath = path.join(process.cwd(), "server", "energy-pipeline.ts");
+  const natarioText = fs.readFileSync(natarioPath, "utf8");
+  const pipelineText = fs.readFileSync(pipelinePath, "utf8");
+  const metricFluxPresent =
+    /calculateMetricStressEnergyFromShiftField[\s\S]*?stress:\s*\{[\s\S]*?T0[123]\s*:/.test(
+      natarioText,
+    );
+  const tileEffectiveFluxPresent =
+    /calculateStressEnergyTensor[\s\S]*?return\s*\{[\s\S]*?T0[123]\s*:/.test(
+      natarioText,
+    );
+  const tileEffectiveModelStatus =
+    natarioText.includes(
+      'tileEffectiveStressSource: pipelineStress ? "pipeline" : "proxy"',
+    ) ||
+    natarioText.includes(
+      'tileEffectiveStressSource: pipeline ? "pipeline" : "proxy"',
+    )
+      ? "pipeline_reduced_order_diagonal_only"
+      : "unknown";
+  const currentPublishedProfileId = asText(observer?.shiftLapseProfileId);
+  const currentObserverBlocker = asText(
+    observer?.observerMetricCoverageBlockerStatus,
+  );
+  const currentObserverAction = asText(observer?.observerNextTechnicalAction);
+  const hasRecharter = fs.existsSync(recharterPath);
+  const hasCharter = fs.existsSync(charterPath);
+
+  const blockingReasons: string[] = [];
+  if (currentPublishedProfileId !== args.selectedProfileId) {
+    blockingReasons.push("current_repo_published_profile_mismatch");
+  }
+  if (currentObserverBlocker !== "not_applicable_rechartered_tile_model") {
+    blockingReasons.push("current_lane_recharter_not_landed");
+  }
+  if (!hasRecharter) {
+    blockingReasons.push("rechartered_lane_status_artifact_missing");
+  }
+  if (!hasCharter) {
+    blockingReasons.push("successor_lane_charter_artifact_missing");
+  }
+  if (!metricFluxPresent) {
+    blockingReasons.push("metric_flux_terms_not_emitted_in_current_repo");
+  }
+  if (!tileEffectiveFluxPresent) {
+    blockingReasons.push("tile_effective_flux_terms_not_present_in_current_repo");
+  }
+  if (pipelineText.includes('"voxel_flux_field"')) {
+    blockingReasons.push("tile_consumer_still_proxy_flux_field");
+  }
+
+  const candidateRejectedSurfaces: Nhm2SuccessorTileFluxLaneAdmissibilitySurface[] =
+    [
+      {
+        surfaceId:
+          "modules/warp/natario-warp.ts:calculateMetricStressEnergyFromShiftField",
+        status: metricFluxPresent
+          ? "candidate_requires_new_model_semantics"
+          : "candidate_not_present",
+        note: metricFluxPresent
+          ? "The current repo would still need a semantics bridge from metric same-chart flux into a successor tile-effective lane."
+          : "The current repo metric branch emits diagonal stress only (T00/T11/T22/T33); there are no emitted metric T01/T02/T03 terms to seed successor-lane admissibility here.",
+      },
+      {
+        surfaceId: "modules/warp/natario-warp.ts:warp.tileEffectiveStressEnergy",
+        status: tileEffectiveFluxPresent
+          ? "candidate_requires_new_model_semantics"
+          : "candidate_not_present",
+        note: tileEffectiveFluxPresent
+          ? "The current repo tile-effective branch would still require new validated semantics before it could support a flux-complete successor lane."
+          : "The current repo tile-effective branch is pipeline-sourced reduced-order diagonal-only and does not emit T01/T02/T03.",
+      },
+      {
+        surfaceId: "server/energy-pipeline.ts:buildTileObserverAuditTensorInput",
+        status: "candidate_requires_new_model_semantics",
+        note: "This is a downstream proxy consumer surface (voxel_flux_field), not an admissible upstream producer/runtime surface for successor-lane tile-effective flux truth.",
+      },
+    ];
+
+  const artifactRefs = appendUniqueArtifactPathRefs([], [
+    {
+      label: "observer_audit_latest",
+      path: fs.existsSync(observerPath) ? normalizePath(observerPath) : null,
+    },
+    {
+      label: "full_loop_audit_latest",
+      path: fs.existsSync(fullLoopPath) ? normalizePath(fullLoopPath) : null,
+    },
+    {
+      label: "source_closure_latest",
+      path: fs.existsSync(sourceClosurePath) ? normalizePath(sourceClosurePath) : null,
+    },
+    {
+      label: "expected_rechartered_lane_status",
+      path: normalizePath(recharterPath),
+    },
+    {
+      label: "expected_successor_lane_charter",
+      path: normalizePath(charterPath),
+    },
+    {
+      label: "natario_warp_source",
+      path: normalizePath(natarioPath),
+    },
+    {
+      label: "energy_pipeline_source",
+      path: normalizePath(pipelinePath),
+    },
+  ]);
+
+  return {
+    currentPublishedProfileId,
+    observerMetricCoverageBlockerStatus: currentObserverBlocker,
+    observerNextTechnicalAction: currentObserverAction,
+    currentLaneDisposition:
+      hasRecharter && hasCharter
+        ? "current_lane_frozen_diagnostic_baseline"
+        : "current_lane_prerequisites_not_landed",
+    metricFluxPresent,
+    tileEffectiveFluxPresent,
+    tileEffectiveModelStatus,
+    candidateAdmissibleSurfaces: [],
+    candidateRejectedSurfaces,
+    blockingReasons,
+    requiredNewEvidence: [
+      "Land current-lane same-chart metric flux/shear recovery in this repo before successor-lane admissibility work.",
+      "Publish nhm2-rechartered-lane-status-latest.json in this repo for the locked 0p9925 lane.",
+      "Publish nhm2-successor-tile-flux-lane-charter-latest.json in this repo before attempting a successor-lane upstream admissibility preflight.",
+      "Produce upstream producer/runtime evidence for tile-effective T01/T02/T03 that does not rely on metric-to-tile relabeling.",
+    ],
+    forbiddenShortcuts: [
+      "consumer-only remap",
+      "metric-to-tile relabeling",
+      "proxy fill",
+      "zero fill",
+      "publication-only upgrade",
+    ],
+    artifactRefs,
+  };
+};
+
+const renderNhm2SuccessorTileFluxLaneAdmissibilityMarkdown = (args: {
+  artifact: Nhm2SuccessorTileFluxLaneAdmissibilityArtifact;
+  decision:
+    | "LAND_SUCCESSOR_LANE_ADMISSIBILITY_PREFLIGHT"
+    | "STOP_ON_SUCCESSOR_LANE_ADMISSIBILITY_BLOCKER";
+}): string => {
+  const admissibleRows =
+    args.artifact.candidateAdmissibleSurfaces.length > 0
+      ? args.artifact.candidateAdmissibleSurfaces
+          .map(
+            (entry) =>
+              `| ${entry.surfaceId} | ${entry.status} | ${entry.note} |`,
+          )
+          .join("\n")
+      : "| none | none | No admissible candidate surface is available in this repo state. |";
+  const rejectedRows =
+    args.artifact.candidateRejectedSurfaces.length > 0
+      ? args.artifact.candidateRejectedSurfaces
+          .map(
+            (entry) =>
+              `| ${entry.surfaceId} | ${entry.status} | ${entry.note} |`,
+          )
+          .join("\n")
+      : "| none | none | none |";
+  const requiredEvidence =
+    args.artifact.requiredNewEvidence.length > 0
+      ? args.artifact.requiredNewEvidence.map((entry) => `- ${entry}`).join("\n")
+      : "- none";
+  const forbiddenShortcuts =
+    args.artifact.forbiddenShortcuts.length > 0
+      ? args.artifact.forbiddenShortcuts.map((entry) => `- ${entry}`).join("\n")
+      : "- none";
+  const blockingReasons =
+    args.artifact.blockingReasons.length > 0
+      ? args.artifact.blockingReasons.map((entry) => `- ${entry}`).join("\n")
+      : "- none";
+  const artifactRefs =
+    args.artifact.artifactRefs.length > 0
+      ? args.artifact.artifactRefs
+          .map((entry) => `| ${entry.label} | ${entry.path ?? "null"} |`)
+          .join("\n")
+      : "| none | null |";
+
+  return `# NHM2 Successor Tile-Flux Lane Admissibility (${DATE_STAMP})
+
+"This memo audits whether the current repo has any truthful upstream path to a future tile-flux-complete successor lane without semantics widening. It does not claim the successor lane exists or passes."
+
+## Gate
+| field | value |
+|---|---|
+| assessmentId | ${args.artifact.assessmentId} |
+| currentLaneId | ${args.artifact.currentLaneId} |
+| successorLaneId | ${args.artifact.successorLaneId} |
+| selectedProfileLocked | ${args.artifact.selectedProfileLocked} |
+| currentLaneDisposition | ${args.artifact.currentLaneDisposition} |
+| publicationCommand | \`${SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_PUBLICATION_COMMAND}\` |
+| decision | ${args.decision} |
+| gateVerdict | ${args.artifact.gateVerdict} |
+
+## Current Repo State
+| field | value |
+|---|---|
+| currentPublishedProfileId | ${args.artifact.currentPublishedProfileId ?? "null"} |
+| metricFluxPresent | ${String(args.artifact.metricFluxPresent)} |
+| tileEffectiveFluxPresent | ${String(args.artifact.tileEffectiveFluxPresent)} |
+| tileEffectiveModelStatus | ${args.artifact.tileEffectiveModelStatus} |
+| admissibilityStatus | ${args.artifact.admissibilityStatus} |
+| nextTechnicalAction | ${args.artifact.nextTechnicalAction} |
+
+## Blocking Reasons
+${blockingReasons}
+
+## Candidate Admissible Surfaces
+| surfaceId | status | note |
+|---|---|---|
+${admissibleRows}
+
+## Candidate Rejected Surfaces
+| surfaceId | status | note |
+|---|---|---|
+${rejectedRows}
+
+## Required New Evidence
+${requiredEvidence}
+
+## Forbidden Shortcuts
+${forbiddenShortcuts}
+
+## Artifact Refs
+| label | path |
+|---|---|
+${artifactRefs}
+`;
+};
+
+export const publishNhm2SuccessorTileFluxLaneAdmissibility = async (options?: {
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  selectedProfileId?: string;
+}): Promise<{
+  status: "published" | "blocked";
+  assessmentArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2SuccessorTileFluxLaneAdmissibilityArtifact;
+  };
+}> =>
+  withProofSurfacePublicationLock({
+    lockPath: path.join(
+      options?.artifactRootDir ?? FULL_SOLVE_DIR,
+      ".nhm2-proof-surface-publication.lock",
+    ),
+    operation: "publish-successor-tile-flux-lane-admissibility",
+    fn: async () => {
+      const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+      const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+      const selectedProfileId =
+        options?.selectedProfileId ?? "stage1_centerline_alpha_0p9925_v1";
+      const inspection = inspectSuccessorLaneAdmissibilityRepoState({
+        artifactRootDir,
+        selectedProfileId,
+      });
+      const blocked = inspection.blockingReasons.length > 0;
+      const artifact = buildNhm2SuccessorTileFluxLaneAdmissibilityArtifact({
+        generatedAt: new Date().toISOString(),
+        assessmentId: SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_ASSESSMENT_ID,
+        currentLaneId: "nhm2_shift_lapse_current_lane",
+        successorLaneId: SUCCESSOR_TILE_FLUX_LANE_ID,
+        selectedProfileLocked: selectedProfileId,
+        currentLaneDisposition: inspection.currentLaneDisposition,
+        currentPublishedProfileId: inspection.currentPublishedProfileId,
+        metricFluxPresent: inspection.metricFluxPresent,
+        tileEffectiveFluxPresent: inspection.tileEffectiveFluxPresent,
+        tileEffectiveModelStatus: inspection.tileEffectiveModelStatus,
+        candidateAdmissibleSurfaces: inspection.candidateAdmissibleSurfaces,
+        candidateRejectedSurfaces: inspection.candidateRejectedSurfaces,
+        requiredNewEvidence: inspection.requiredNewEvidence,
+        forbiddenShortcuts: inspection.forbiddenShortcuts,
+        blockingReasons: inspection.blockingReasons,
+        admissibilityStatus: blocked
+          ? "blocked_by_missing_current_lane_baseline"
+          : "candidate_identified_without_semantics_widening",
+        nextTechnicalAction: blocked
+          ? "land_current_lane_same_chart_and_recharter_prerequisites"
+          : "open_successor_tile_flux_lane_implementation",
+        artifactRefs: inspection.artifactRefs,
+        gateVerdict: blocked
+          ? "successor_lane_admissibility_blocked"
+          : "successor_lane_admissibility_preflight_published",
+      });
+      if (!isNhm2SuccessorTileFluxLaneAdmissibilityArtifact(artifact)) {
+        throw new Error("nhm2_successor_lane_admissibility_invalid");
+      }
+      const decision = blocked
+        ? "STOP_ON_SUCCESSOR_LANE_ADMISSIBILITY_BLOCKER"
+        : "LAND_SUCCESSOR_LANE_ADMISSIBILITY_PREFLIGHT";
+      const outMdPath = blocked
+        ? path.join(
+            auditRootDir,
+            path.basename(
+              DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_STOP_OUT_MD,
+            ),
+          )
+        : path.join(
+            auditRootDir,
+            path.basename(DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_OUT_MD),
+          );
+      const latestMdPath = blocked
+        ? path.join(
+            auditRootDir,
+            path.basename(
+              DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_STOP_LATEST_MD,
+            ),
+          )
+        : path.join(
+            auditRootDir,
+            path.basename(
+              DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_LATEST_MD,
+            ),
+          );
+      const published = writePublishedArtifactSurface({
+        artifact,
+        markdown: renderNhm2SuccessorTileFluxLaneAdmissibilityMarkdown({
+          artifact,
+          decision,
+        }),
+        outJsonPath: path.join(
+          artifactRootDir,
+          path.basename(DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_OUT_JSON),
+        ),
+        latestJsonPath: path.join(
+          artifactRootDir,
+          path.basename(
+            DEFAULT_SUCCESSOR_TILE_FLUX_LANE_ADMISSIBILITY_LATEST_JSON,
+          ),
+        ),
+        outMdPath,
+        latestMdPath,
+      });
+      return {
+        status: blocked ? "blocked" : "published",
+        assessmentArtifact: published,
+      };
+    },
+  });
+
+type Nhm2CurrentLaneBaselineConvergenceAssessment = {
+  schemaVersion: 1;
+  generatedAt: string;
+  assessmentId: typeof CURRENT_LANE_BASELINE_CONVERGENCE_ASSESSMENT_ID;
+  laneId: "nhm2_shift_lapse_current_lane";
+  selectedProfileLocked: string;
+  currentPublishedProfileId: string | null;
+  observerMetricCoverageBlockerStatus: string | null;
+  observerMetricEmissionAdmissionStatus: string | null;
+  observerMetricT0iAdmissionStatus: string | null;
+  observerMetricOffDiagonalTijAdmissionStatus: string | null;
+  observerNextTechnicalAction: string | null;
+  metricFluxHandling: string | null;
+  metricShearHandling: string | null;
+  tileFluxHandling: string | null;
+  tileShearHandling: string | null;
+  metricFluxPresent: boolean;
+  metricOffDiagonalPresent: boolean;
+  metricWec: number | null;
+  metricDec: number | null;
+  tileWec: number | null;
+  tileDec: number | null;
+  currentLaneDisposition: string;
+  overallStateSnapshot: string | null;
+  claimTierSnapshot: string | null;
+  sourceClosureStatus: string | null;
+  blockingReasons: string[];
+  nextTechnicalAction: string;
+  artifactRefs: Array<{ label: string; path: string | null }>;
+  gateVerdict:
+    | "current_lane_baseline_convergence_blocked"
+    | "current_lane_baseline_convergence_published";
+};
+
+const escapeRegexLiteral = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const extractBlockingSummaryPair = (
+  markdown: string | null,
+  label: "metricBlockingSummary" | "tileBlockingSummary",
+): { wec: number | null; dec: number | null } => {
+  if (!markdown) {
+    return { wec: null, dec: null };
+  }
+  const match = markdown.match(
+    new RegExp(
+      `\\|\\s*${escapeRegexLiteral(label)}\\s*\\|\\s*WEC=([^;|]+);\\s*DEC=([^|]+)\\|`,
+    ),
+  );
+  return {
+    wec: toFiniteNumber(match?.[1]?.trim() ?? null),
+    dec: toFiniteNumber(match?.[2]?.trim() ?? null),
+  };
+};
+
+const inspectCurrentLaneBaselineConvergenceRepoState = (args: {
+  artifactRootDir: string;
+  selectedProfileId: string;
+}): Omit<
+  Nhm2CurrentLaneBaselineConvergenceAssessment,
+  "schemaVersion" | "generatedAt" | "assessmentId" | "laneId" | "selectedProfileLocked" | "gateVerdict"
+> => {
+  const observerPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_OBSERVER_AUDIT_LATEST_JSON),
+  );
+  const fullLoopPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_FULL_LOOP_AUDIT_LATEST_JSON),
+  );
+  const sourceClosurePath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_SOURCE_CLOSURE_LATEST_JSON),
+  );
+  const recharterPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_RECHARTERED_LANE_STATUS_LATEST_JSON),
+  );
+  const observerMarkdownPath = path.join(
+    process.cwd(),
+    "docs",
+    "audits",
+    "research",
+    "warp-nhm2-observer-audit-latest.md",
+  );
+  const natarioPath = path.join(process.cwd(), "modules", "warp", "natario-warp.ts");
+  const pipelinePath = path.join(process.cwd(), "server", "energy-pipeline.ts");
+
+  const observer = readJsonArtifactIfPresent<Record<string, unknown>>(observerPath);
+  const fullLoop = readJsonArtifactIfPresent<Record<string, unknown>>(fullLoopPath);
+  const sourceClosure = readJsonArtifactIfPresent<Record<string, unknown>>(sourceClosurePath);
+  const observerMarkdown = fs.existsSync(observerMarkdownPath)
+    ? fs.readFileSync(observerMarkdownPath, "utf8")
+    : null;
+  const metricBlockingSummary = extractBlockingSummaryPair(
+    observerMarkdown,
+    "metricBlockingSummary",
+  );
+  const tileBlockingSummary = extractBlockingSummaryPair(
+    observerMarkdown,
+    "tileBlockingSummary",
+  );
+  const natarioText = fs.readFileSync(natarioPath, "utf8");
+  const pipelineText = fs.readFileSync(pipelinePath, "utf8");
+
+  const metricFluxPresent =
+    /calculateMetricStressEnergyFromShiftField[\s\S]*?T0(?:1|2|3)\s*:/.test(natarioText);
+  const metricOffDiagonalPresent =
+    /calculateMetricStressEnergyFromShiftField[\s\S]*?T(?:12|13|23)\s*:/.test(
+      natarioText,
+    );
+  const metricCoverage = asRecord(observer?.metricTensorCoverage);
+  const tileCoverage = asRecord(observer?.tileTensorCoverage);
+  const metricFluxHandling =
+    asText(metricCoverage?.fluxHandling) ??
+    (pipelineText.includes('"assumed_zero_from_missing_t0i"')
+      ? "assumed_zero_from_missing_t0i"
+      : null);
+  const metricShearHandling =
+    asText(metricCoverage?.shearHandling) ??
+    (pipelineText.includes('"assumed_zero_from_missing_tij"')
+      ? "assumed_zero_from_missing_tij"
+      : null);
+  const tileFluxHandling =
+    asText(tileCoverage?.fluxHandling) ??
+    (pipelineText.includes('"voxel_flux_field"') ? "voxel_flux_field" : null);
+  const tileShearHandling =
+    asText(tileCoverage?.shearHandling) ??
+    (pipelineText.includes('"not_modeled_in_proxy"')
+      ? "not_modeled_in_proxy"
+      : pipelineText.includes('"assumed_zero_from_missing_tij"')
+        ? "assumed_zero_from_missing_tij"
+        : null);
+
+  const currentPublishedProfileId = asText(observer?.shiftLapseProfileId);
+  const observerMetricCoverageBlockerStatus = asText(
+    observer?.observerMetricCoverageBlockerStatus,
+  );
+  const observerMetricEmissionAdmissionStatus = asText(
+    observer?.observerMetricEmissionAdmissionStatus,
+  );
+  const observerMetricT0iAdmissionStatus = asText(
+    observer?.observerMetricT0iAdmissionStatus,
+  );
+  const observerMetricOffDiagonalTijAdmissionStatus = asText(
+    observer?.observerMetricOffDiagonalTijAdmissionStatus,
+  );
+  const observerNextTechnicalAction = asText(observer?.observerNextTechnicalAction);
+  const overallStateSnapshot = asText(fullLoop?.overallState);
+  const claimTierSnapshot = asText(fullLoop?.currentClaimTier);
+  const sourceClosureStatus =
+    asText(sourceClosure?.state) ?? asText(sourceClosure?.status);
+
+  const blockingReasons: string[] = [];
+  if (currentPublishedProfileId !== args.selectedProfileId) {
+    blockingReasons.push("current_repo_published_profile_mismatch");
+  }
+  if (observerMetricCoverageBlockerStatus === "producer_not_emitted") {
+    blockingReasons.push("observer_metric_blocker_still_producer_not_emitted");
+  }
+  if (observerMetricEmissionAdmissionStatus !== "admitted") {
+    blockingReasons.push("observer_metric_emission_not_admitted");
+  }
+  if (
+    observerMetricT0iAdmissionStatus !==
+    "derivable_same_chart_from_existing_state"
+  ) {
+    blockingReasons.push("observer_metric_t0i_not_same_chart_derivable");
+  }
+  if (
+    observerMetricOffDiagonalTijAdmissionStatus !==
+    "derivable_same_chart_from_existing_state"
+  ) {
+    blockingReasons.push(
+      "observer_metric_off_diagonal_tij_not_same_chart_derivable",
+    );
+  }
+  if (!metricFluxPresent) {
+    blockingReasons.push("metric_runtime_flux_terms_not_emitted");
+  }
+  if (!metricOffDiagonalPresent) {
+    blockingReasons.push("metric_runtime_off_diagonal_tij_not_emitted");
+  }
+  if (metricFluxHandling === "assumed_zero_from_missing_t0i") {
+    blockingReasons.push("metric_observer_still_assumes_zero_flux");
+  }
+  if (metricShearHandling === "assumed_zero_from_missing_tij") {
+    blockingReasons.push("metric_observer_still_assumes_zero_shear");
+  }
+  if (!fs.existsSync(recharterPath)) {
+    blockingReasons.push("rechartered_lane_status_artifact_missing");
+  }
+  if (
+    currentPublishedProfileId !== args.selectedProfileId &&
+    !metricFluxPresent &&
+    !metricOffDiagonalPresent &&
+    observerMetricCoverageBlockerStatus === "producer_not_emitted"
+  ) {
+    blockingReasons.push("current_repo_divergence_too_large_for_single_patch");
+  }
+
+  return {
+    currentPublishedProfileId,
+    observerMetricCoverageBlockerStatus,
+    observerMetricEmissionAdmissionStatus,
+    observerMetricT0iAdmissionStatus,
+    observerMetricOffDiagonalTijAdmissionStatus,
+    observerNextTechnicalAction,
+    metricFluxHandling,
+    metricShearHandling,
+    tileFluxHandling,
+    tileShearHandling,
+    metricFluxPresent,
+    metricOffDiagonalPresent,
+    metricWec: metricBlockingSummary.wec,
+    metricDec: metricBlockingSummary.dec,
+    tileWec: tileBlockingSummary.wec,
+    tileDec: tileBlockingSummary.dec,
+    currentLaneDisposition:
+      blockingReasons.length > 0
+        ? "current_lane_prerequisites_not_landed"
+        : "current_lane_baseline_converged",
+    overallStateSnapshot,
+    claimTierSnapshot,
+    sourceClosureStatus,
+    blockingReasons,
+    nextTechnicalAction:
+      blockingReasons.length > 0
+        ? "port_same_chart_metric_tensor_emission_and_recharter_prerequisites"
+        : "publish_rechartered_current_lane_baseline",
+    artifactRefs: appendUniqueArtifactPathRefs([], [
+      {
+        label: "observer_audit_latest",
+        path: fs.existsSync(observerPath) ? normalizePath(observerPath) : null,
+      },
+      {
+        label: "full_loop_audit_latest",
+        path: fs.existsSync(fullLoopPath) ? normalizePath(fullLoopPath) : null,
+      },
+      {
+        label: "source_closure_latest",
+        path: fs.existsSync(sourceClosurePath) ? normalizePath(sourceClosurePath) : null,
+      },
+      {
+        label: "observer_audit_latest_markdown",
+        path: fs.existsSync(observerMarkdownPath)
+          ? normalizePath(observerMarkdownPath)
+          : null,
+      },
+      {
+        label: "expected_rechartered_lane_status",
+        path: normalizePath(recharterPath),
+      },
+      {
+        label: "natario_warp_source",
+        path: normalizePath(natarioPath),
+      },
+      {
+        label: "energy_pipeline_source",
+        path: normalizePath(pipelinePath),
+      },
+    ]),
+  };
+};
+
+const renderNhm2CurrentLaneBaselineConvergenceMarkdown = (args: {
+  artifact: Nhm2CurrentLaneBaselineConvergenceAssessment;
+  decision:
+    | "LAND_CURRENT_LANE_BASELINE_CONVERGENCE"
+    | "STOP_ON_CURRENT_LANE_CONVERGENCE_BLOCKER";
+}): string => {
+  const blockingReasons =
+    args.artifact.blockingReasons.length > 0
+      ? args.artifact.blockingReasons.map((entry) => `- ${entry}`).join("\n")
+      : "- none";
+  const artifactRefs =
+    args.artifact.artifactRefs.length > 0
+      ? args.artifact.artifactRefs
+          .map((entry) => `| ${entry.label} | ${entry.path ?? "null"} |`)
+          .join("\n")
+      : "| none | null |";
+
+  return `# NHM2 Current-Lane Baseline Convergence (${DATE_STAMP})
+
+"This memo audits whether the current repo can truthfully converge to the locked 0p9925 NHM2 current-lane baseline in a bounded patch. It does not claim successor-lane progress."
+
+## Gate
+| field | value |
+|---|---|
+| assessmentId | ${args.artifact.assessmentId} |
+| laneId | ${args.artifact.laneId} |
+| selectedProfileLocked | ${args.artifact.selectedProfileLocked} |
+| publicationCommand | \`${CURRENT_LANE_BASELINE_CONVERGENCE_PUBLICATION_COMMAND}\` |
+| decision | ${args.decision} |
+| gateVerdict | ${args.artifact.gateVerdict} |
+
+## Current Published State
+| field | value |
+|---|---|
+| currentPublishedProfileId | ${args.artifact.currentPublishedProfileId ?? "null"} |
+| observerMetricCoverageBlockerStatus | ${args.artifact.observerMetricCoverageBlockerStatus ?? "null"} |
+| observerMetricEmissionAdmissionStatus | ${args.artifact.observerMetricEmissionAdmissionStatus ?? "null"} |
+| observerMetricT0iAdmissionStatus | ${args.artifact.observerMetricT0iAdmissionStatus ?? "null"} |
+| observerMetricOffDiagonalTijAdmissionStatus | ${args.artifact.observerMetricOffDiagonalTijAdmissionStatus ?? "null"} |
+| observerNextTechnicalAction | ${args.artifact.observerNextTechnicalAction ?? "null"} |
+| currentLaneDisposition | ${args.artifact.currentLaneDisposition} |
+| nextTechnicalAction | ${args.artifact.nextTechnicalAction} |
+| overallStateSnapshot | ${args.artifact.overallStateSnapshot ?? "null"} |
+| claimTierSnapshot | ${args.artifact.claimTierSnapshot ?? "null"} |
+| sourceClosureStatus | ${args.artifact.sourceClosureStatus ?? "null"} |
+
+## Runtime Evidence
+| field | value |
+|---|---|
+| metricFluxPresent | ${String(args.artifact.metricFluxPresent)} |
+| metricOffDiagonalPresent | ${String(args.artifact.metricOffDiagonalPresent)} |
+| metricFluxHandling | ${args.artifact.metricFluxHandling ?? "null"} |
+| metricShearHandling | ${args.artifact.metricShearHandling ?? "null"} |
+| tileFluxHandling | ${args.artifact.tileFluxHandling ?? "null"} |
+| tileShearHandling | ${args.artifact.tileShearHandling ?? "null"} |
+| metricWec | ${args.artifact.metricWec ?? "null"} |
+| metricDec | ${args.artifact.metricDec ?? "null"} |
+| tileWec | ${args.artifact.tileWec ?? "null"} |
+| tileDec | ${args.artifact.tileDec ?? "null"} |
+
+## Blocking Reasons
+${blockingReasons}
+
+## Artifact Refs
+| label | path |
+|---|---|
+${artifactRefs}
+`;
+};
+
+export const publishNhm2CurrentLaneBaselineConvergence = async (options?: {
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  selectedProfileId?: string;
+}): Promise<{
+  status: "published" | "blocked";
+  assessmentArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2CurrentLaneBaselineConvergenceAssessment;
+  };
+}> =>
+  withProofSurfacePublicationLock({
+    lockPath: path.join(
+      options?.artifactRootDir ?? FULL_SOLVE_DIR,
+      ".nhm2-proof-surface-publication.lock",
+    ),
+    operation: "publish-current-lane-baseline-convergence",
+    fn: async () => {
+      const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+      const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+      const selectedProfileId =
+        options?.selectedProfileId ?? "stage1_centerline_alpha_0p9925_v1";
+      const inspection = inspectCurrentLaneBaselineConvergenceRepoState({
+        artifactRootDir,
+        selectedProfileId,
+      });
+      const blocked = inspection.blockingReasons.length > 0;
+      const artifact: Nhm2CurrentLaneBaselineConvergenceAssessment = {
+        schemaVersion: 1,
+        generatedAt: new Date().toISOString(),
+        assessmentId: CURRENT_LANE_BASELINE_CONVERGENCE_ASSESSMENT_ID,
+        laneId: "nhm2_shift_lapse_current_lane",
+        selectedProfileLocked: selectedProfileId,
+        ...inspection,
+        gateVerdict: blocked
+          ? "current_lane_baseline_convergence_blocked"
+          : "current_lane_baseline_convergence_published",
+      };
+      const decision = blocked
+        ? "STOP_ON_CURRENT_LANE_CONVERGENCE_BLOCKER"
+        : "LAND_CURRENT_LANE_BASELINE_CONVERGENCE";
+      const outMdPath = blocked
+        ? path.join(
+            auditRootDir,
+            path.basename(DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_STOP_OUT_MD),
+          )
+        : path.join(
+            auditRootDir,
+            path.basename(DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_OUT_MD),
+          );
+      const latestMdPath = blocked
+        ? path.join(
+            auditRootDir,
+            path.basename(
+              DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_STOP_LATEST_MD,
+            ),
+          )
+        : path.join(
+            auditRootDir,
+            path.basename(DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_LATEST_MD),
+          );
+      const published = writePublishedArtifactSurface({
+        artifact,
+        markdown: renderNhm2CurrentLaneBaselineConvergenceMarkdown({
+          artifact,
+          decision,
+        }),
+        outJsonPath: path.join(
+          artifactRootDir,
+          path.basename(DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_OUT_JSON),
+        ),
+        latestJsonPath: path.join(
+          artifactRootDir,
+          path.basename(DEFAULT_CURRENT_LANE_BASELINE_CONVERGENCE_LATEST_JSON),
+        ),
+        outMdPath,
+        latestMdPath,
+      });
+      return {
+        status: blocked ? "blocked" : "published",
+        assessmentArtifact: published,
+      };
+    },
   });
 
 const computeCanonicalVisualComparisonChecksum = (

@@ -178,6 +178,28 @@ export const shouldBypassHelixAskPreIntentClarifyForCompareTarget = (question: s
   return informativeSegments.length >= 2;
 };
 
+export const shouldPreserveHelixAskGeneralCompareRouting = (args: {
+  question: string;
+  intentDomain?: HelixAskDomain;
+  explicitRepoExpectation?: boolean;
+  hasFilePathHints?: boolean;
+  endpointHintCount?: number;
+  requiresRepoEvidence?: boolean;
+}): boolean => {
+  const trimmed = args.question.trim();
+  if (!trimmed) return false;
+  if (args.intentDomain && args.intentDomain !== "general") return false;
+  if (args.explicitRepoExpectation) return false;
+  if (args.requiresRepoEvidence) return false;
+  if (args.hasFilePathHints) return false;
+  if ((args.endpointHintCount ?? 0) > 0) return false;
+  if (isSecurityRiskPrompt(trimmed)) return false;
+  if (hasHelixAskRepoTechnicalCue(trimmed)) return false;
+  if (!shouldBypassHelixAskPreIntentClarifyForCompareTarget(trimmed)) return false;
+  const tokenCount = filterCriticTokens(tokenizeAskQuery(trimmed)).length;
+  return trimmed.length <= 120 && tokenCount <= 8;
+};
+
 export const shouldUseGeneralAmbiguityAnswerFloor = (args: {
   intentDomain: HelixAskDomain;
   requiresRepoEvidence: boolean;

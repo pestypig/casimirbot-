@@ -1,0 +1,53 @@
+{
+  "source_id": "solar-observed-fixture:sun-cycle-history-observed",
+  "instrument": "NOAA/SWPC+SDO/HMI",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2018-01-01T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "uncertainty_note": "Fixture-backed Hale-aware cycle chronology scaffold only.",
+  "section_metadata_overrides": {
+    "solar_cycle_history": {
+      "instrument": "NOAA/SWPC+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2018-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "hale_cycle_history_context_v1",
+      "source_product_family": "cycle_history_products",
+      "source_doc_ids": ["sft_review_2023", "hmi_products"]
+    }
+  },
+  "payload": {
+    "solar_cycle_history": {
+      "history_start_iso": "2018-01-01T00:00:00.000Z",
+      "history_end_iso": "2025-12-31T23:59:59.000Z",
+      "covered_cycle_labels": [
+        "Cycle 24",
+        "Cycle 25"
+      ],
+      "polarity_reversal_refs": [
+        "fixture:solar/cycle/polarity-reversal-markers"
+      ],
+      "polarity_reversal_dates_iso": [
+        "2019-12-01T00:00:00.000Z",
+        "2024-10-15T00:00:00.000Z"
+      ],
+      "butterfly_history_ref": "fixture:solar/cycle/butterfly-history",
+      "axial_dipole_history_ref": "fixture:solar/cycle/axial-dipole-history",
+      "polar_field_history_ref": "fixture:solar/cycle/polar-field-history"
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "source_id": "solar-observed-fixture:sun-magnetic-memory-observed",
+  "instrument": "NOAA/SWPC+SDO/HMI/HARP",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2018-01-01T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed solar magnetic-memory observed scaffold only.",
+  "section_metadata_overrides": {
+    "solar_magnetic_memory": {
+      "instrument": "NOAA/SWPC+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2018-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_noaa_magnetic_memory_history_v1",
+      "source_product_family": "magnetic_memory_products",
+      "source_doc_ids": ["sft_review_2023", "hmi_products"]
+    },
+    "solar_active_regions": {
+      "instrument": "NOAA+SDO/HMI/HARP",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2024-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_noaa_bipolar_active_region_context_v1",
+      "source_product_family": "bipolar_active_region_products",
+      "source_doc_ids": ["hmi_products", "sft_review_2023"]
+    }
+  },
+  "payload": {
+    "solar_magnetic_memory": {
+      "axial_dipole_history_ref": "fixture:solar/magnetic-memory/axial-dipole-history",
+      "polar_field_history_ref": "fixture:solar/magnetic-memory/polar-field-history",
+      "polarity_reversal_refs": [
+        "fixture:solar/magnetic-memory/reversal-marker-2019",
+        "fixture:solar/magnetic-memory/reversal-marker-2024"
+      ],
+      "bipolar_region_proxy_ref": "fixture:solar/magnetic-memory/bipolar-region-proxy",
+      "summary": {
+        "cycle_labels_covered": ["Cycle 24", "Cycle 25"],
+        "north_polarity_state": "negative",
+        "south_polarity_state": "positive",
+        "latest_axial_dipole_sign": "positive",
+        "reversal_marker_count": 2
+      }
+    },
+    "solar_active_regions": {
+      "region_refs": [
+        "fixture:solar/active-regions/noaa-13000",
+        "fixture:solar/active-regions/noaa-13001"
+      ],
+      "region_count": 2,
+      "regions": [
+        {
+          "region_id": "fixture:solar/active-regions/noaa-13000",
+          "noaa_region_id": "13000",
+          "harp_id": "HARP-13000",
+          "sharp_ref": "fixture:solar/active-regions/sharp-13000",
+          "heliographic_latitude_deg": 14.2,
+          "carrington_longitude_deg": 205.4,
+          "area_msh": 420,
+          "magnetic_class": "beta-gamma",
+          "tilt_deg": 11.5,
+          "leading_polarity": "negative",
+          "hemisphere": "north",
+          "following_polarity": "positive",
+          "bipole_separation_deg": 6.8,
+          "emergence_time_iso": "2025-02-14T08:15:00.000Z",
+          "joy_law_tilt_class": "aligned"
+        },
+        {
+          "region_id": "fixture:solar/active-regions/noaa-13001",
+          "noaa_region_id": "13001",
+          "harp_id": "HARP-13001",
+          "sharp_ref": "fixture:solar/active-regions/sharp-13001",
+          "heliographic_latitude_deg": -9.6,
+          "carrington_longitude_deg": 218.8,
+          "area_msh": 360,
+          "magnetic_class": "beta",
+          "tilt_deg": -8.1,
+          "leading_polarity": "positive",
+          "hemisphere": "south",
+          "following_polarity": "negative",
+          "bipole_separation_deg": 5.7,
+          "emergence_time_iso": "2025-02-16T11:40:00.000Z",
+          "joy_law_tilt_class": "aligned"
+        }
+      ]
+    }
+  }
+}

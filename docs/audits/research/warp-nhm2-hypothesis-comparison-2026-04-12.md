@@ -1,0 +1,99 @@
+# NHM2 Hypothesis Comparison (2026-04-12)
+
+## Decision
+Decision: `KEEP_ALL_HYPOTHESES_IN_DEFERRED_STATE`
+
+Decision line: Keep all current NHM2 new-model hypotheses in deferred state because none is yet specific enough to satisfy the branch gate, even though `adm_momentum_density_extension` is currently the best candidate.
+
+## Comparison Rule
+Rank hypotheses by this rule:
+- preserve the existing `comoving_cartesian` chart/basis contract
+- name the exact new upstream state required
+- minimize observer-side inference by preferring producer-emitted semantics
+- avoid tile proxies and zero-fill
+- be narrower than a generic “add full tensor terms” request
+- be specific enough to justify a branch without requiring a second concept-selection phase
+
+A hypothesis is branch-ready only if it can identify the missing family, the new state, the mapping boundary, and the admission evidence in one coherent package.
+
+## Current Boundary
+- The current-model NHM2 lane remains exhausted under `NO_GO_UNDER_CURRENT_MODEL`.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\natario-warp.ts` emits diagonal-only stress members `T00`, `T11`, `T22`, and `T33`.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\server\energy-pipeline.ts` treats `metric_t0i_missing` and `metric_tij_off_diagonal_missing` as structural missing inputs and uses `assumed_zero_from_missing_t0i` and `assumed_zero_from_missing_tij` on the metric-required observer path.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\warp-metric-adapter.ts` keeps the current chart contract on `comoving_cartesian` with coordinate map `x' = x - x_s(t), t = t` and notes `dt gamma assumed zero`.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\nhm2-full-loop-audit-latest.json` shows `certificate_policy_result.state = pass` while `overallState = fail` and `currentClaimTier = diagnostic`.
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\nhm2-observer-audit-latest.json` still shows `observerMetricCompletenessStatus = incomplete_missing_inputs`, `observerMetricCoverageBlockerStatus = producer_not_emitted`, `observerMetricEmissionAdmissionStatus = not_admitted`, `observerMetricT0iAdmissionStatus = basis_or_semantics_ambiguous`, and `observerMetricOffDiagonalTijAdmissionStatus = basis_or_semantics_ambiguous`.
+- Tile pause remains in force, and source closure remains `review` and non-lead.
+
+## Hypothesis Comparison Table
+| Hypothesis | Target Missing Family | Physical Meaning | Exact New State Required | Preserves `comoving_cartesian` | Requires New Stress Model Term | Requires New Observer Semantics | Narrower Than Vague Full-Tensor Request | Repo-Compatible As Written | Specific Enough For Branch Admission | Key Missing Evidence | Branch Recommendation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `adm_momentum_density_extension` | `T0i` | Same-chart momentum-density / energy-flux terms from ADM-style shift/lapse state | Directional shift derivatives, explicit time-derivative or extrinsic-curvature-like terms, and a stable producer-side map into `T0i` | yes | yes | no if emitted directly | yes | partial | no | exact state variables, units/signs, and proof that the added state is producer-emittable without proxy reconstruction | `defer` |
+| `symmetric_shear_closure_extension` | off-diagonal `Tij` | Same-chart anisotropic shear stresses on a symmetric spatial tensor | Local anisotropy basis, shear closure coefficients, and explicit symmetric map with `Tij = Tji` | yes | yes | no if emitted directly | yes | partial | no | symmetric closure law, state basis, and proof that shear coefficients are not just invented observer-side semantics | `defer` |
+| `pre_tensor_adm_state_branch` | both | Richer same-chart producer state before diagonal tensor reduction | Explicit ADM-style intermediate state package from which both `T0i` and `Tij` could later be derived | yes | likely yes | possibly | yes | no | no | too broad: it still needs a second decision about which tensor family to admit first and how the intermediate state maps into actual tensor components | `defer` |
+
+## Best Current Candidate
+Best current candidate: `adm_momentum_density_extension`
+
+Why it ranks first:
+- It is the narrowest candidate.
+- It targets a single missing family instead of trying to solve both at once.
+- It preserves the current `comoving_cartesian` chart/basis contract.
+- It has the clearest producer-first interpretation.
+
+Why it still does not admit a branch:
+- It does not yet name the exact new state fields that would exist in the producer.
+- It does not yet provide units and sign conventions for emitted `T0i`.
+- It does not yet prove that the same-chart flux terms can be emitted without adding a second observer reconstruction layer.
+- It does not close the off-diagonal `Tij` family, so it is not yet a full branch hypothesis of record.
+
+## Why It Still Does Or Does Not Admit A Branch
+No current hypothesis is branch-ready.
+
+`adm_momentum_density_extension` is the best candidate, but it is still one level too abstract: it names a direction, not a complete branch package.
+
+`symmetric_shear_closure_extension` is more speculative because it depends on a new symmetric shear closure law that is not grounded in current producer state.
+
+`pre_tensor_adm_state_branch` is the broadest option and therefore the weakest branch candidate right now. It postpones the real physics decision instead of narrowing it.
+
+## Evidence Still Missing
+For the best current candidate, the repo still needs:
+- explicit producer-state field names
+- explicit `T0i` units and sign conventions
+- a no-proxy emission story in `comoving_cartesian`
+- a statement of whether the branch can remain useful even if off-diagonal `Tij` stays deferred
+- a branch-local admission test that fails closed before implementation
+
+## Minimum Future Write Surface
+If `adm_momentum_density_extension` were later promoted, the minimum future write surface would be:
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\natario-warp.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\modules\warp\warp-metric-adapter.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\server\energy-pipeline.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\shared\contracts\nhm2-observer-audit.v1.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\shared\contracts\nhm2-full-loop-audit.v1.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\tests\nhm2-observer-audit.spec.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\tests\warp-york-control-family-proof-pack.spec.ts`
+- `C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\tests\pipeline-ts-qi-guard.spec.ts`
+
+Source closure should remain diagonal-only until a promoted branch proves otherwise.
+
+## Stop Conditions
+- Any hypothesis still depends on proxy fill or zero fill.
+- Any hypothesis breaks the `comoving_cartesian` contract without a replacement chart contract.
+- Any hypothesis cannot name exact new producer state.
+- Any hypothesis tries to treat certificate pass as evidence of observer/full-tensor admissibility.
+- Any hypothesis requires tile remediation to make progress.
+- Any hypothesis remains broad enough that a second concept-selection memo would still be needed before branch code work.
+
+## Next Active Workstreams
+- `observer_completeness_and_authority` remains the live truth-reporting lane for current-model NHM2.
+- `certificate/policy` is maintenance, not the blocker.
+- NHM2 new-model work should remain deferred until one hypothesis becomes specific enough to satisfy the branch gate.
+- No current-model full-tensor implementation patch should proceed.
+
+## Non-Goals
+- Do not reopen tile remediation.
+- Do not change current-model NHM2 producer code.
+- Do not change observer or full-loop artifacts in this patch.
+- Do not widen claims beyond `diagnostic`.
+- Do not treat certificate pass as a physics pass.

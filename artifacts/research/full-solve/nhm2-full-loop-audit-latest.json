@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-11T19:23:51.438Z",
+  "generatedAt": "2026-04-12T19:28:02.768Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -287,6 +287,22 @@
       "observerRemediationSequenceStatus": "metric_then_tile_proxy",
       "observerTileDiminishingReturnStatus": "likely_stop_territory",
       "observerTileDiminishingReturnNote": "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.",
+      "observerMetricCompletenessStatus": "incomplete_missing_inputs",
+      "observerMetricCompletenessNote": "Metric-required observer audit remains diagonal-only because T0i flux terms and off-diagonal spatial shear terms were not supplied; missing inputs: metric_t0i_missing, metric_tij_off_diagonal_missing",
+      "observerMetricCoverageBlockerStatus": "producer_not_emitted",
+      "observerMetricCoverageBlockerNote": "Metric-required observer completeness stops at metric tensor emission: the emitted same-chart observer tensor is diagonal-only and does not supply T0i flux terms or off-diagonal Tij shear terms, so completeness cannot close without new tensor emission semantics.",
+      "observerMetricFirstMissingStage": "metric_tensor_emission",
+      "observerMetricEmissionAdmissionStatus": "not_admitted",
+      "observerMetricEmissionAdmissionNote": "Admission failed: the current metric-required branch emits a reduced-order diagonal tensor only. Closing T0i and off-diagonal Tij would require a new same-chart full-tensor emission semantics rather than simple serialization or consumer wiring.",
+      "observerMetricT0iAdmissionStatus": "basis_or_semantics_ambiguous",
+      "observerMetricT0iAdmissionNote": "T0i is not carried as an emitted same-chart quantity. The current branch would need a new momentum-density emission semantics, not a serialization of an existing tensor component.",
+      "observerMetricOffDiagonalTijAdmissionStatus": "basis_or_semantics_ambiguous",
+      "observerMetricOffDiagonalTijAdmissionNote": "Off-diagonal Tij is not emitted and the current diagonal pressures are reduced-order placeholders. Closing shear terms would require a new same-chart full-tensor stress semantics, not a publication-only fix.",
+      "observerTileAuthorityStatus": "proxy_limited",
+      "observerTileAuthorityNote": "Tile-effective observer audit remains proxy-limited: fluxHandling=voxel_flux_field, shearHandling=not_modeled_in_proxy.",
+      "observerLeadReadinessWorkstream": "observer_completeness_and_authority",
+      "observerLeadReadinessReason": "Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited. Certificate/policy readiness remains a separate parallel full-loop lane.",
+      "observerNextTechnicalAction": "emit_same_chart_metric_flux_and_shear_terms",
       "metric": {
         "state": "fail",
         "wecMinOverAllTimelike": -57110812.99010783,
@@ -481,19 +497,30 @@
     },
     "certificate_policy_result": {
       "sectionId": "certificate_policy_result",
-      "state": "unavailable",
-      "reasons": [
-        "certificate_missing"
+      "state": "pass",
+      "reasons": [],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_certificate_policy",
+          "path": "artifacts/research/full-solve/nhm2-certificate-policy-latest.json",
+          "contractVersion": "nhm2_certificate_policy/v1",
+          "status": null
+        },
+        {
+          "artifactId": "casimir_repo_convergence_trace",
+          "path": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/training-trace-export.jsonl",
+          "contractVersion": "training_trace/v1",
+          "status": "pass"
+        }
       ],
-      "artifactRefs": [],
-      "viabilityStatus": "UNKNOWN",
-      "hardConstraintPass": null,
+      "viabilityStatus": "ADMISSIBLE",
+      "hardConstraintPass": true,
       "firstHardFailureId": null,
-      "certificateStatus": null,
-      "certificateHash": null,
-      "certificateIntegrity": "unavailable",
-      "promotionTier": null,
-      "promotionReason": "certificate_missing",
+      "certificateStatus": "GREEN",
+      "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificateIntegrity": "ok",
+      "promotionTier": "certified",
+      "promotionReason": null,
       "supportedClaimTiers": [
         "certified"
       ]
@@ -600,11 +627,11 @@
         "lapse_provenance",
         "strict_signal_readiness",
         "mission_time_outputs",
-        "shift_vs_lapse_decomposition"
+        "shift_vs_lapse_decomposition",
+        "certificate_policy_result"
       ],
       "blockingReasons": [
         "observer_blocking_violation",
-        "certificate_missing",
         "policy_review_required"
       ]
     }
@@ -615,7 +642,6 @@
   "overallState": "fail",
   "blockingReasons": [
     "observer_blocking_violation",
-    "certificate_missing",
     "policy_review_required"
   ]
 }

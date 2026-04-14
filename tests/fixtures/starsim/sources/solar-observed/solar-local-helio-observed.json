@@ -1,0 +1,49 @@
+{
+  "source_id": "solar-observed-fixture:sun-local-helio-observed",
+  "instrument": "SDO/HMI+GONG",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2025-02-14T00:00:00.000Z",
+    "end_iso": "2025-02-15T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 45,
+    "unit": "s"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed local helioseismology scaffold only.",
+  "section_metadata_overrides": {
+    "solar_local_helio": {
+      "instrument": "SDO/HMI+GONG",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 45,
+        "unit": "s"
+      },
+      "time_range": {
+        "start_iso": "2025-02-14T00:00:00.000Z",
+        "end_iso": "2025-02-15T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_gong_local_helio_context_v1",
+      "source_product_family": "local_helioseismology_products",
+      "source_doc_ids": ["hmi_products", "gong_products"]
+    }
+  },
+  "payload": {
+    "solar_local_helio": {
+      "dopplergram_ref": "fixture:solar/local-helio/dopplergram-cube",
+      "travel_time_ref": "fixture:solar/local-helio/travel-time-map",
+      "holography_ref": "fixture:solar/local-helio/holography-egression",
+      "product_refs": [
+        "fixture:solar/local-helio/hmi-dopplergram-context",
+        "fixture:solar/local-helio/gong-local-context"
+      ],
+      "sunquake_event_refs": [
+        "fixture:solar/local-helio/sunquake-event-2025-001"
+      ]
+    }
+  }
+}

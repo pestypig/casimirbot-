@@ -24,7 +24,7 @@ const buildSourceRegistryVersion = (): string => {
   const productIdentity = getSolarProductRegistryIdentity();
   const referenceHashFragment = referenceIdentity.content_hash.replace(/^sha256:/, "").slice(0, 12);
   const productHashFragment = productIdentity.content_hash.replace(/^sha256:/, "").slice(0, 12);
-  return `star-sim-sources/18+${referenceIdentity.version}+${referenceHashFragment}+${productIdentity.version}+${productHashFragment}`;
+  return `star-sim-sources/27+${referenceIdentity.version}+${referenceHashFragment}+${productIdentity.version}+${productHashFragment}`;
 };
 
 export const STAR_SIM_SOURCE_REGISTRY_VERSION = buildSourceRegistryVersion();

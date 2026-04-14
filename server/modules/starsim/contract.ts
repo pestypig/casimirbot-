@@ -66,22 +66,75 @@ export const starSimSupportedDomainReasonSchema = z.enum([
   "solar_layer_boundaries_missing",
   "solar_global_modes_missing",
   "solar_neutrino_constraints_missing",
+  "solar_structural_residuals_missing",
   "solar_convection_zone_depth_invalid",
   "solar_envelope_helium_invalid",
   "solar_low_degree_modes_incomplete",
   "solar_neutrino_vector_incomplete",
+  "solar_hydrostatic_residual_missing",
+  "solar_sound_speed_residual_missing",
+  "solar_rotation_residual_missing",
+  "solar_pressure_scale_height_incomplete",
+  "solar_structural_residual_metadata_incomplete",
   "solar_cycle_indices_missing",
   "solar_cycle_indices_incomplete",
+  "solar_cycle_history_missing",
+  "solar_cycle_chronology_incomplete",
+  "solar_cycle_polarity_reversal_missing",
+  "solar_cycle_butterfly_history_missing",
+  "solar_cycle_axial_dipole_history_missing",
+  "solar_magnetic_memory_missing",
+  "solar_magnetic_memory_axial_dipole_missing",
+  "solar_magnetic_memory_polar_field_missing",
+  "solar_magnetic_memory_reversal_missing",
+  "solar_sunspot_catalog_missing",
+  "solar_sunspot_catalog_incomplete",
+  "solar_spot_geometry_incomplete",
+  "solar_spot_region_linkage_incomplete",
+  "solar_bipolar_grouping_incomplete",
+  "solar_spot_polarity_tilt_incomplete",
+  "solar_event_linkage_missing",
+  "solar_event_linkage_flare_missing",
+  "solar_event_linkage_cme_missing",
+  "solar_event_linkage_region_identifier_inconsistent",
+  "solar_event_linkage_chronology_incomplete",
+  "solar_cross_layer_structural_context_incomplete",
+  "solar_cross_layer_mode_residual_incomplete",
+  "solar_cross_layer_rotation_incomplete",
+  "solar_cross_layer_memory_topology_inconsistent",
+  "solar_cross_layer_event_topology_inconsistent",
+  "solar_cross_layer_metadata_misaligned",
+  "solar_topology_linkage_missing",
+  "solar_topology_linkage_surface_corona_missing",
+  "solar_topology_linkage_open_flux_missing",
+  "solar_topology_linkage_event_context_incomplete",
+  "solar_topology_linkage_role_missing",
+  "solar_topology_linkage_chronology_incomplete",
+  "solar_topology_linkage_identifier_inconsistent",
   "solar_magnetogram_missing",
   "solar_cycle_magnetogram_incomplete",
+  "solar_surface_flows_missing",
+  "solar_surface_flow_rotation_missing",
+  "solar_surface_flow_meridional_missing",
+  "solar_coronal_field_missing",
+  "solar_coronal_field_pfss_missing",
+  "solar_coronal_field_boundary_missing",
+  "solar_coronal_field_topology_incomplete",
+  "solar_coronal_field_source_region_incomplete",
   "solar_active_regions_missing",
   "solar_active_regions_incomplete",
+  "solar_active_region_geometry_incomplete",
+  "solar_active_region_polarity_incomplete",
+  "solar_active_region_hemisphere_incomplete",
   "solar_flare_catalog_missing",
   "solar_flare_catalog_incomplete",
   "solar_cme_catalog_missing",
   "solar_cme_catalog_incomplete",
   "solar_irradiance_series_missing",
   "solar_irradiance_series_incomplete",
+  "solar_local_helio_missing",
+  "solar_local_helio_dopplergram_missing",
+  "solar_local_helio_context_incomplete",
 ]);
 export const starSimArtifactRefSchema = z.object({
   kind: z.string().min(1),
@@ -342,6 +395,12 @@ export interface StarSimBenchmarkValidation {
 
 export type StarSimSolarClosureCheckStatus = "pass" | "warn" | "fail" | "missing";
 
+export interface StarSimSolarConflictingRefPair {
+  left_ref: string;
+  right_ref: string;
+  relation?: string;
+}
+
 export interface StarSimSolarClosureCheck {
   status: StarSimSolarClosureCheckStatus;
   reason_code?: StarSimSupportedDomainReason;
@@ -353,7 +412,25 @@ export interface StarSimSolarClosureCheck {
   product_family?: string;
   actual_summary?: Record<string, unknown>;
   expected_summary?: Record<string, unknown>;
+  conflicting_ref_pairs?: StarSimSolarConflictingRefPair[];
+  conflicting_region_ids?: string[];
+  conflicting_noaa_ids?: string[];
+  conflicting_harp_ids?: string[];
+  missing_required_refs?: string[];
+  non_carrington_sections?: string[];
+  missing_time_range_sections?: string[];
+  out_of_window_event_refs?: string[];
+  topology_link_ids_in_conflict?: string[];
+  event_refs_in_conflict?: string[];
   notes: string[];
+}
+
+export interface StarSimSolarCrossLayerMismatchSummary {
+  failing_check_ids: string[];
+  warning_check_ids: string[];
+  conflicting_section_ids: string[];
+  conflict_token_count: number;
+  mismatch_fingerprint: string;
 }
 
 export interface StarSimSolarClosureDiagnostics {
@@ -369,6 +446,21 @@ export interface StarSimSolarClosureDiagnostics {
   };
 }
 
+export interface StarSimSolarStructuralResidualDiagnostics {
+  benchmark_pack_id: "solar_structural_residual_closure_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    hydrostatic_balance_context: StarSimSolarClosureCheck;
+    sound_speed_residual_context: StarSimSolarClosureCheck;
+    rotation_residual_context: StarSimSolarClosureCheck;
+    pressure_scale_height_continuity_context: StarSimSolarClosureCheck;
+    neutrino_seismic_consistency_context: StarSimSolarClosureCheck;
+    residual_metadata_coherence_context: StarSimSolarClosureCheck;
+  };
+}
+
 export interface StarSimSolarCycleDiagnostics {
   benchmark_pack_id: "solar_cycle_observed_v1";
   reference_pack_id: string;
@@ -376,6 +468,10 @@ export interface StarSimSolarCycleDiagnostics {
   overall_status: "pass" | "warn" | "fail";
   checks: {
     cycle_indices: StarSimSolarClosureCheck;
+    chronology_window: StarSimSolarClosureCheck;
+    polarity_reversal_context: StarSimSolarClosureCheck;
+    butterfly_history: StarSimSolarClosureCheck;
+    axial_dipole_history: StarSimSolarClosureCheck;
     magnetogram_context: StarSimSolarClosureCheck;
     active_region_context: StarSimSolarClosureCheck;
     irradiance_continuity: StarSimSolarClosureCheck;
@@ -392,6 +488,120 @@ export interface StarSimSolarEruptiveDiagnostics {
     cme_catalog: StarSimSolarClosureCheck;
     irradiance_continuity: StarSimSolarClosureCheck;
     source_region_linkage: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarLocalHelioDiagnostics {
+  benchmark_pack_id: "solar_local_helio_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    dopplergram_context: StarSimSolarClosureCheck;
+    travel_time_or_holography_context: StarSimSolarClosureCheck;
+    sunquake_event_context: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarSurfaceFlowDiagnostics {
+  benchmark_pack_id: "solar_surface_flow_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    differential_rotation_context: StarSimSolarClosureCheck;
+    meridional_flow_context: StarSimSolarClosureCheck;
+    active_region_geometry_context: StarSimSolarClosureCheck;
+    surface_transport_proxy_context: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarCoronalFieldDiagnostics {
+  benchmark_pack_id: "solar_coronal_field_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    pfss_context: StarSimSolarClosureCheck;
+    synoptic_boundary_context: StarSimSolarClosureCheck;
+    open_field_topology_context: StarSimSolarClosureCheck;
+    source_region_linkage_context: StarSimSolarClosureCheck;
+    metadata_coherence_context: StarSimSolarClosureCheck;
+    euv_coronal_context: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarMagneticMemoryDiagnostics {
+  benchmark_pack_id: "solar_magnetic_memory_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    axial_dipole_continuity_context: StarSimSolarClosureCheck;
+    polar_field_continuity_context: StarSimSolarClosureCheck;
+    reversal_linkage_context: StarSimSolarClosureCheck;
+    active_region_polarity_ordering_context: StarSimSolarClosureCheck;
+    hemisphere_bipolar_coverage_context: StarSimSolarClosureCheck;
+    bipolar_region_proxy_context: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarEventLinkageDiagnostics {
+  benchmark_pack_id: "solar_event_association_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    flare_region_linkage_context: StarSimSolarClosureCheck;
+    cme_region_linkage_context: StarSimSolarClosureCheck;
+    sunquake_flare_region_linkage_context: StarSimSolarClosureCheck;
+    event_chronology_alignment_context: StarSimSolarClosureCheck;
+    region_identifier_consistency_context: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarTopologyLinkageDiagnostics {
+  benchmark_pack_id: "solar_topology_linkage_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    spot_region_corona_context: StarSimSolarClosureCheck;
+    open_flux_polar_field_continuity_context: StarSimSolarClosureCheck;
+    event_topology_context: StarSimSolarClosureCheck;
+    topology_role_context: StarSimSolarClosureCheck;
+    chronology_alignment_context: StarSimSolarClosureCheck;
+    identifier_consistency_context: StarSimSolarClosureCheck;
+  };
+}
+
+export interface StarSimSolarCrossLayerConsistencyDiagnostics {
+  benchmark_pack_id: "solar_cross_layer_consistency_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    interior_residual_coherence: StarSimSolarClosureCheck;
+    mode_residual_coherence: StarSimSolarClosureCheck;
+    rotation_residual_coherence: StarSimSolarClosureCheck;
+    cycle_memory_topology_coherence: StarSimSolarClosureCheck;
+    event_topology_identifier_coherence: StarSimSolarClosureCheck;
+    chronology_metadata_alignment: StarSimSolarClosureCheck;
+  };
+  cross_layer_mismatch_summary: StarSimSolarCrossLayerMismatchSummary;
+}
+
+export interface StarSimSolarSpotRegionDiagnostics {
+  benchmark_pack_id: "solar_spot_region_observed_v1";
+  reference_pack_id: string;
+  reference_pack_version: string;
+  overall_status: "pass" | "warn" | "fail";
+  checks: {
+    sunspot_catalog_context: StarSimSolarClosureCheck;
+    spot_geometry_context: StarSimSolarClosureCheck;
+    spot_region_linkage_context: StarSimSolarClosureCheck;
+    bipolar_grouping_context: StarSimSolarClosureCheck;
+    polarity_tilt_context: StarSimSolarClosureCheck;
   };
 }
 
@@ -446,6 +656,14 @@ export interface StarSimSolarProvenanceDiagnostics {
 export type StarSimSolarBaselineDriftCategory =
   | "phase_support_changed"
   | "source_region_linkage_changed"
+  | "structural_residual_context_changed"
+  | "surface_flow_context_changed"
+  | "coronal_field_context_changed"
+  | "magnetic_memory_context_changed"
+  | "spot_region_context_changed"
+  | "event_linkage_context_changed"
+  | "topology_linkage_context_changed"
+  | "cross_layer_consistency_changed"
   | "phase_metadata_changed"
   | "artifact_refs_changed"
   | "irradiance_context_changed"
@@ -461,7 +679,7 @@ export interface StarSimSolarBaselineRepeatability {
 
 export interface StarSimSolarBaselineSupport {
   id: "solar_observed_baseline_v1";
-  version: "star-sim-solar-domain/5";
+  version: "star-sim-solar-domain/16";
   phase_id: StarSimSolarBaselinePhase;
   passed: boolean;
   reasons: StarSimSupportedDomainReason[];
@@ -474,8 +692,17 @@ export interface StarSimSolarBaselineSupport {
   conceptual_lanes: StarSimSolarObservedLane[];
   notes: string[];
   closure_diagnostics?: StarSimSolarClosureDiagnostics;
+  structural_residual_diagnostics?: StarSimSolarStructuralResidualDiagnostics;
   cycle_diagnostics?: StarSimSolarCycleDiagnostics;
   eruptive_diagnostics?: StarSimSolarEruptiveDiagnostics;
+  local_helio_diagnostics?: StarSimSolarLocalHelioDiagnostics;
+  surface_flow_diagnostics?: StarSimSolarSurfaceFlowDiagnostics;
+  coronal_field_diagnostics?: StarSimSolarCoronalFieldDiagnostics;
+  magnetic_memory_diagnostics?: StarSimSolarMagneticMemoryDiagnostics;
+  spot_region_diagnostics?: StarSimSolarSpotRegionDiagnostics;
+  event_linkage_diagnostics?: StarSimSolarEventLinkageDiagnostics;
+  topology_linkage_diagnostics?: StarSimSolarTopologyLinkageDiagnostics;
+  cross_layer_consistency_diagnostics?: StarSimSolarCrossLayerConsistencyDiagnostics;
 }
 
 export interface StarSimSupportedDomain {

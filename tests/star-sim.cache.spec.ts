@@ -4,7 +4,10 @@ import os from "node:os";
 import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/contract";
+import {
+  STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+  STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
+} from "../server/modules/starsim/contract";
 import { STAR_SIM_SOURCE_REGISTRY_VERSION } from "../server/modules/starsim/sources/types";
 
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
@@ -26,6 +29,75 @@ const buildApp = async () => {
   app.use(express.json());
   app.use("/api/star-sim", routeModule.starSimRouter);
   return app;
+};
+
+const SOLAR_OBSERVED_FIXTURE_FILES = [
+  "solar-interior-closure.json",
+  "solar-structural-residual-observed.json",
+  "solar-cycle-observed.json",
+  "solar-cycle-history-observed.json",
+  "solar-local-helio-observed.json",
+  "solar-surface-flow-observed.json",
+  "solar-magnetic-memory-observed.json",
+  "solar-sunspot-region-observed.json",
+  "solar-event-linkage-observed.json",
+  "solar-eruptive-observed.json",
+  "solar-coronal-field-observed.json",
+  "solar-topology-linkage-observed.json",
+] as const;
+
+const applySectionMetadataOverrides = (
+  payload: Record<string, unknown>,
+  sectionMetadataOverrides?: Record<string, unknown>,
+): Record<string, unknown> => {
+  if (!sectionMetadataOverrides) {
+    return payload;
+  }
+
+  return Object.entries(sectionMetadataOverrides).reduce<Record<string, unknown>>((nextPayload, [sectionId, metadata]) => {
+    const sectionValue = nextPayload[sectionId];
+    if (!sectionValue || typeof sectionValue !== "object") {
+      return nextPayload;
+    }
+    return {
+      ...nextPayload,
+      [sectionId]: {
+        ...sectionValue,
+        metadata: {
+          ...((sectionValue as { metadata?: Record<string, unknown> }).metadata ?? {}),
+          ...(typeof metadata === "object" && metadata ? (metadata as Record<string, unknown>) : {}),
+        },
+      },
+    };
+  }, payload);
+};
+
+const loadSolarObservedFixtureBaseline = (): Record<string, unknown> => {
+  const fixtureDir = path.join(process.cwd(), "tests/fixtures/starsim/sources/solar-observed");
+  return SOLAR_OBSERVED_FIXTURE_FILES.reduce<Record<string, unknown>>(
+    (baseline, fileName) => {
+      const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, fileName), "utf8")) as {
+        payload?: Record<string, unknown>;
+        section_metadata_overrides?: Record<string, unknown>;
+      };
+      const payload = applySectionMetadataOverrides(fixture.payload ?? {}, fixture.section_metadata_overrides);
+      return {
+        ...baseline,
+        ...payload,
+      };
+    },
+    {
+      schema_version: STAR_SIM_SOLAR_OBSERVED_BASELINE_SCHEMA_VERSION,
+    },
+  );
+};
+
+const loadSolarCrossLayerCounterexamplePayload = (fileName: string): Record<string, unknown> => {
+  const fixturePath = path.join(process.cwd(), "tests/fixtures/starsim/sources/solar-observed", fileName);
+  const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as {
+    payload?: Record<string, unknown>;
+  };
+  return fixture.payload ?? {};
 };
 
 const waitForJob = async (app: express.Express, jobId: string, expected: string) => {
@@ -371,6 +443,85 @@ describe("star-sim source-resolution cache", () => {
     expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
   });
 
+  it("changes the solar baseline signature when only cycle-history refs change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (butterflyRef: string) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_cycle_indices: {
+          sunspot_number: 82,
+          f10_7_sfu: 155,
+          cycle_label: "Cycle 25",
+          polarity_label: "north_negative_south_positive",
+          metadata: {
+            instrument: "NOAA/SWPC",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+          },
+        },
+        solar_cycle_history: {
+          history_start_iso: "2018-01-01T00:00:00.000Z",
+          history_end_iso: "2025-12-31T23:59:59.000Z",
+          covered_cycle_labels: ["Cycle 24", "Cycle 25"],
+          polarity_reversal_refs: ["user:solar/cycle/polarity-reversal"],
+          butterfly_history_ref: butterflyRef,
+          axial_dipole_history_ref: "user:solar/cycle/axial-dipole-history",
+          polar_field_history_ref: "user:solar/cycle/polar-field-history",
+          metadata: {
+            instrument: "NOAA/SWPC+SDO/HMI",
+            coordinate_frame: "Carrington",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            observed_mode: "observed",
+            source_product_id: "hale_cycle_history_context_v1",
+            source_product_family: "cycle_history_products",
+            source_doc_ids: ["sft_review_2023", "hmi_products"],
+          },
+        },
+        solar_magnetogram: {
+          synoptic_radial_map_ref: "user:solar/magnetograms/synoptic",
+          active_region_patch_refs: ["user:solar/magnetograms/patch-1"],
+          metadata: {
+            instrument: "SDO/HMI",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          metadata: {
+            instrument: "NOAA",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/cycle/butterfly-history-a"))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/cycle/butterfly-history-b"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("artifact_refs_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
   it("changes the solar baseline signature when only section product provenance changes and reports evidence drift", async () => {
     process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
     const app = await buildApp();
@@ -432,6 +583,827 @@ describe("star-sim source-resolution cache", () => {
     expect(second.body.previous_solar_baseline_ref).toBeTruthy();
     expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
     expect(second.body.solar_baseline_repeatability.drift_categories).toContain("product_provenance_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when local-helio refs change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (dopplergramRef: string) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_local_helio: {
+          dopplergram_ref: dopplergramRef,
+          travel_time_ref: "user:solar/local-helio/travel-time",
+          holography_ref: "user:solar/local-helio/holography",
+          sunquake_event_refs: ["user:solar/local-helio/sunquake-event-1"],
+          metadata: {
+            instrument: "SDO/HMI+GONG",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 45,
+              unit: "s",
+            },
+            time_range: {
+              start_iso: "2025-02-14T00:00:00.000Z",
+              end_iso: "2025-02-15T23:59:59.000Z",
+            },
+            source_product_id: "hmi_gong_local_helio_context_v1",
+            source_product_family: "local_helioseismology_products",
+            source_doc_ids: ["hmi_products", "gong_products"],
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/local-helio/dopplergram-a"))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/local-helio/dopplergram-b"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("artifact_refs_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when structural-residual refs or summary values change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (maxRotationResidualNhz: number) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_structural_residuals: {
+          hydrostatic_residual_ref: "user:solar/structural-residuals/hydrostatic-balance",
+          sound_speed_residual_ref: "user:solar/structural-residuals/sound-speed",
+          rotation_residual_ref: "user:solar/structural-residuals/rotation",
+          pressure_scale_height_ref: "user:solar/structural-residuals/pressure-scale-height",
+          neutrino_consistency_ref: "user:solar/structural-residuals/neutrino-consistency",
+          summary: {
+            max_sound_speed_fractional_residual: 0.0018,
+            mean_hydrostatic_fractional_residual: 0.0006,
+            max_rotation_residual_nhz: maxRotationResidualNhz,
+            pressure_scale_height_consistent: true,
+            residual_window_label: "cycle24-25-assimilated-closure-window",
+          },
+          metadata: {
+            instrument: "solar-assimilation+SDO/HMI+GONG+Borexino",
+            coordinate_frame: "Carrington",
+            observed_mode: "assimilated",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2010-04-30T00:00:00.000Z",
+              end_iso: "2025-12-31T23:59:59.000Z",
+            },
+            source_product_id: "solar_assimilation_structural_residual_context_v1",
+            source_product_family: "structural_residual_products",
+            source_doc_ids: ["basu_antia_2004", "hmi_products", "gong_products", "borexino_2018"],
+          },
+        },
+      },
+    });
+
+    const first = await request(app).post("/api/star-sim/v1/resolve").send(buildPayload(8.4)).expect(200);
+    const second = await request(app).post("/api/star-sim/v1/resolve").send(buildPayload(12.6)).expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("structural_residual_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when surface-flow geometry changes and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (tiltDeg: number) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_surface_flows: {
+          differential_rotation_ref: "user:solar/surface-flows/differential-rotation",
+          meridional_flow_ref: "user:solar/surface-flows/meridional-flow",
+          supergranular_diffusion_ref: "user:solar/surface-flows/supergranular-diffusion",
+          summary: {
+            equatorial_rotation_deg_per_day: 14.35,
+            rotation_shear_deg_per_day: 2.68,
+            meridional_flow_peak_ms: 12.4,
+          },
+          metadata: {
+            instrument: "SDO/HMI+GONG",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2025-01-01T00:00:00.000Z",
+              end_iso: "2025-12-31T23:59:59.000Z",
+            },
+            source_product_id: "hmi_gong_surface_flow_context_v1",
+            source_product_family: "surface_flow_products",
+            source_doc_ids: ["hmi_products", "gong_products", "sft_review_2023"],
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          regions: [
+            {
+              region_id: "user:solar/active-regions/noaa-13000",
+              noaa_region_id: "13000",
+              harp_id: "HARP-13000",
+              sharp_ref: "user:solar/active-regions/sharp-13000",
+              heliographic_latitude_deg: 14.2,
+              carrington_longitude_deg: 205.4,
+              area_msh: 420,
+              magnetic_class: "beta-gamma",
+              tilt_deg: tiltDeg,
+              leading_polarity: "negative",
+            },
+          ],
+          metadata: {
+            instrument: "NOAA+SDO/HMI/HARP",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2025-01-01T00:00:00.000Z",
+              end_iso: "2025-12-31T23:59:59.000Z",
+            },
+            source_product_id: "hmi_noaa_active_region_geometry_v1",
+            source_product_family: "active_region_geometry_products",
+            source_doc_ids: ["hmi_products", "sft_review_2023"],
+          },
+        },
+      },
+    });
+
+    const first = await request(app).post("/api/star-sim/v1/resolve").send(buildPayload(11.5)).expect(200);
+    const second = await request(app).post("/api/star-sim/v1/resolve").send(buildPayload(18.5)).expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("surface_flow_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when coronal-field refs or topology change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (pfssRef: string, dominantTopology: string) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_coronal_field: {
+          pfss_solution_ref: pfssRef,
+          synoptic_boundary_ref: "user:solar/corona/synoptic-boundary",
+          coronal_hole_refs: ["user:solar/corona/coronal-hole-north"],
+          open_field_map_ref: "user:solar/corona/open-field-map",
+          euv_coronal_context_ref: "user:solar/corona/aia-euv",
+          summary: {
+            source_surface_rsun: 2.5,
+            open_flux_weber: 340000000000000,
+            dominant_topology: dominantTopology,
+            coronal_hole_count: 1,
+          },
+          metadata: {
+            instrument: "NSO/PFSS+SDO/HMI+SDO/AIA",
+            coordinate_frame: "Carrington",
+            observed_mode: "modeled",
+            cadence: {
+              value: 1,
+              unit: "carrington_rotation",
+            },
+            source_product_id: "pfss_coronal_field_context_v1",
+            source_product_family: "coronal_field_proxy_products",
+            source_doc_ids: ["nso_pfss", "hmi_products", "aia_corona"],
+          },
+        },
+        solar_magnetogram: {
+          synoptic_radial_map_ref: "user:solar/magnetograms/synoptic-radial",
+          active_region_patch_refs: ["user:solar/active-regions/patch-13000"],
+          metadata: {
+            instrument: "SDO/HMI",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            source_product_id: "hmi_full_disk_magnetogram_v1",
+            source_product_family: "magnetogram_products",
+            source_doc_ids: ["hmi_products"],
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+        },
+        solar_event_linkage: {
+          link_refs: ["user:solar/event-linkage/link-13000"],
+          summary: {
+            flare_link_count: 1,
+            cme_link_count: 0,
+            sunquake_link_count: 0,
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/corona/pfss-a", "dipolar_open_flux"))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/corona/pfss-b", "quadrupolar_open_flux"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("coronal_field_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when magnetic-memory refs or bipolar semantics change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (axialDipoleRef: string, southHemisphere: "north" | "south") => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_magnetic_memory: {
+          axial_dipole_history_ref: axialDipoleRef,
+          polar_field_history_ref: "user:solar/magnetic-memory/polar-field-history",
+          polarity_reversal_refs: ["user:solar/magnetic-memory/reversal-marker"],
+          bipolar_region_proxy_ref: "user:solar/magnetic-memory/bipolar-proxy",
+          summary: {
+            cycle_labels_covered: ["Cycle 24", "Cycle 25"],
+            north_polarity_state: "negative",
+            south_polarity_state: "positive",
+            latest_axial_dipole_sign: "positive",
+            reversal_marker_count: 1,
+          },
+          metadata: {
+            instrument: "NOAA/SWPC+SDO/HMI",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2024-01-01T00:00:00.000Z",
+              end_iso: "2025-12-31T23:59:59.000Z",
+            },
+            source_product_id: "hmi_noaa_magnetic_memory_history_v1",
+            source_product_family: "magnetic_memory_products",
+            source_doc_ids: ["sft_review_2023", "hmi_products"],
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000", "user:solar/active-regions/noaa-13001"],
+          region_count: 2,
+          regions: [
+            {
+              region_id: "user:solar/active-regions/noaa-13000",
+              heliographic_latitude_deg: 14.2,
+              carrington_longitude_deg: 205.4,
+              area_msh: 420,
+              magnetic_class: "beta-gamma",
+              tilt_deg: 11.5,
+              leading_polarity: "negative",
+              hemisphere: "north",
+              following_polarity: "positive",
+              bipole_separation_deg: 6.8,
+            },
+            {
+              region_id: "user:solar/active-regions/noaa-13001",
+              heliographic_latitude_deg: -9.6,
+              carrington_longitude_deg: 218.8,
+              area_msh: 360,
+              magnetic_class: "beta",
+              tilt_deg: -8.1,
+              leading_polarity: "positive",
+              hemisphere: southHemisphere,
+              following_polarity: "negative",
+              bipole_separation_deg: 5.7,
+            },
+          ],
+          metadata: {
+            instrument: "NOAA+SDO/HMI/HARP",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2025-01-01T00:00:00.000Z",
+              end_iso: "2025-12-31T23:59:59.000Z",
+            },
+            source_product_id: "hmi_noaa_bipolar_active_region_context_v1",
+            source_product_family: "bipolar_active_region_products",
+            source_doc_ids: ["hmi_products", "sft_review_2023"],
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/magnetic-memory/axial-dipole-history-a", "south"))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/magnetic-memory/axial-dipole-history-b", "north"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("magnetic_memory_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when event-linkage refs or linkage basis change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (eventRef: string, linkageBasis: "catalog" | "spatiotemporal") => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_event_linkage: {
+          links: [
+            {
+              linked_region_id: "user:solar/active-regions/noaa-13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              event_type: "flare",
+              event_ref: "user:solar/flares/goes-event-1",
+              linkage_basis: "catalog",
+              event_time_iso: "2025-02-14T11:23:00.000Z",
+            },
+            {
+              linked_region_id: "user:solar/active-regions/noaa-13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              event_type: "cme",
+              event_ref: eventRef,
+              linkage_basis: linkageBasis,
+              event_time_iso: "2025-02-14T12:02:00.000Z",
+            },
+          ],
+          summary: {
+            flare_link_count: 1,
+            cme_link_count: 1,
+            sunquake_link_count: 0,
+          },
+          metadata: {
+            instrument: "GOES/SWPC+SOHO/LASCO+SDO/HMI+GONG",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "min",
+            },
+            time_range: {
+              start_iso: "2025-02-14T00:00:00.000Z",
+              end_iso: "2025-02-15T00:00:00.000Z",
+            },
+            source_product_id: "solar_cross_phase_event_linkage_context_v1",
+            source_product_family: "cross_phase_event_linkage",
+            source_doc_ids: ["goes_xray", "lasco_docs", "hmi_products", "gong_products"],
+          },
+        },
+        solar_flare_catalog: {
+          event_refs: ["user:solar/flares/goes-event-1"],
+          source_region_refs: ["user:solar/active-regions/noaa-13000"],
+          flare_count: 1,
+          strongest_goes_class: "M1.2",
+        },
+        solar_cme_catalog: {
+          event_refs: [eventRef],
+          source_region_refs: ["user:solar/active-regions/noaa-13000"],
+          cme_count: 1,
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          regions: [
+            {
+              region_id: "user:solar/active-regions/noaa-13000",
+              noaa_region_id: "13000",
+              harp_id: "HARP-13000",
+              heliographic_latitude_deg: 14.2,
+              carrington_longitude_deg: 205.4,
+              area_msh: 420,
+              magnetic_class: "beta-gamma",
+              tilt_deg: 11.5,
+              leading_polarity: "negative",
+              hemisphere: "north",
+              following_polarity: "positive",
+              bipole_separation_deg: 6.8,
+              emergence_time_iso: "2025-02-14T08:15:00.000Z",
+            },
+          ],
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/cmes/lasco-event-1", "catalog"))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/cmes/lasco-event-2", "spatiotemporal"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("event_linkage_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when sunspot refs or bipolar grouping change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (spotRef: string, bipolarGroupId: string) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_sunspot_catalog: {
+          spot_refs: [spotRef, "user:solar/sunspots/spot-13000-b"],
+          spot_count: 2,
+          bipolar_group_refs: [bipolarGroupId],
+          spots: [
+            {
+              spot_id: spotRef,
+              linked_region_id: "user:solar/active-regions/noaa-13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              hemisphere: "north",
+              heliographic_latitude_deg: 14.1,
+              carrington_longitude_deg: 205.2,
+              area_msh: 180,
+              polarity: "negative",
+              bipolar_group_id: bipolarGroupId,
+            },
+            {
+              spot_id: "user:solar/sunspots/spot-13000-b",
+              linked_region_id: "user:solar/active-regions/noaa-13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              hemisphere: "north",
+              heliographic_latitude_deg: 14.4,
+              carrington_longitude_deg: 206,
+              area_msh: 150,
+              polarity: "positive",
+              bipolar_group_id: bipolarGroupId,
+            },
+          ],
+          metadata: {
+            instrument: "NOAA+SDO/HMI/HARP",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2025-02-14T00:00:00.000Z",
+              end_iso: "2025-02-16T00:00:00.000Z",
+            },
+            source_product_id: "hmi_noaa_sunspot_catalog_v1",
+            source_product_family: "sunspot_catalog_products",
+            source_doc_ids: ["hmi_products", "sft_review_2023"],
+          },
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/noaa-13000"],
+          region_count: 1,
+          regions: [
+            {
+              region_id: "user:solar/active-regions/noaa-13000",
+              noaa_region_id: "13000",
+              harp_id: "HARP-13000",
+              heliographic_latitude_deg: 14.2,
+              carrington_longitude_deg: 205.4,
+              area_msh: 420,
+              magnetic_class: "beta-gamma",
+              tilt_deg: 11.5,
+              leading_polarity: "negative",
+              hemisphere: "north",
+              following_polarity: "positive",
+              bipole_separation_deg: 6.8,
+              joy_law_tilt_class: "aligned",
+              linked_spot_ids: [spotRef, "user:solar/sunspots/spot-13000-b"],
+              bipolar_group_id: bipolarGroupId,
+              polarity_ordering_class: "hale-consistent",
+            },
+          ],
+          metadata: {
+            instrument: "NOAA+SDO/HMI/HARP",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2025-02-14T00:00:00.000Z",
+              end_iso: "2025-02-16T00:00:00.000Z",
+            },
+            source_product_id: "hmi_noaa_bipolar_active_region_context_v1",
+            source_product_family: "bipolar_active_region_products",
+            source_doc_ids: ["hmi_products", "sft_review_2023"],
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/sunspots/spot-13000-a", "user:solar/bipolar-groups/group-13000-a"))
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("user:solar/sunspots/spot-13000-c", "user:solar/bipolar-groups/group-13000-b"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("spot_region_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when topology-linkage refs or linkage semantics change and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (
+      topologyRef: string,
+      topologyRole: "active_region_open_flux_source" | "bipolar_memory_continuity",
+      linkageBasis: "manual_catalog_association" | "region_id_match",
+    ) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        schema_version: "star-sim-solar-baseline/1",
+        solar_sunspot_catalog: {
+          spot_refs: ["user:solar/sunspots/spot-13000-a", "user:solar/sunspots/spot-13000-b"],
+          spot_count: 2,
+          spots: [
+            {
+              spot_id: "user:solar/sunspots/spot-13000-a",
+              linked_region_id: "user:solar/active-regions/ar13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              hemisphere: "north",
+              heliographic_latitude_deg: 14.1,
+              carrington_longitude_deg: 205.2,
+              area_msh: 180,
+              polarity: "negative",
+            },
+            {
+              spot_id: "user:solar/sunspots/spot-13000-b",
+              linked_region_id: "user:solar/active-regions/ar13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              hemisphere: "north",
+              heliographic_latitude_deg: 14.4,
+              carrington_longitude_deg: 206.0,
+              area_msh: 150,
+              polarity: "positive",
+            },
+          ],
+        },
+        solar_active_regions: {
+          region_refs: ["user:solar/active-regions/ar13000"],
+          region_count: 1,
+          regions: [
+            {
+              region_id: "user:solar/active-regions/ar13000",
+              noaa_region_id: "13000",
+              harp_id: "HARP-13000",
+              heliographic_latitude_deg: 14.2,
+              carrington_longitude_deg: 205.4,
+              area_msh: 420,
+              magnetic_class: "beta-gamma",
+              tilt_deg: 11.5,
+              leading_polarity: "negative",
+              hemisphere: "north",
+              following_polarity: "positive",
+              bipole_separation_deg: 6.8,
+              emergence_time_iso: "2025-02-14T08:15:00.000Z",
+              linked_spot_ids: ["user:solar/sunspots/spot-13000-a", "user:solar/sunspots/spot-13000-b"],
+            },
+          ],
+        },
+        solar_coronal_field: {
+          pfss_solution_ref: "user:solar/coronal/pfss-solution-2290",
+          synoptic_boundary_ref: "user:solar/coronal/synoptic-boundary-2290",
+          coronal_hole_refs: ["user:solar/coronal/coronal-hole-north"],
+          open_field_map_ref: "user:solar/coronal/open-field-map-2290",
+          summary: {
+            source_surface_rsun: 2.5,
+            open_flux_weber: 340000000000000,
+            dominant_topology: "dipolar_open_flux",
+            coronal_hole_count: 1,
+          },
+          metadata: {
+            instrument: "NSO/PFSS+SDO/HMI+SDO/AIA",
+            coordinate_frame: "Carrington",
+            observed_mode: "modeled",
+            cadence: {
+              value: 1,
+              unit: "carrington_rotation",
+            },
+            time_range: {
+              start_iso: "2025-02-14T00:00:00.000Z",
+              end_iso: "2025-02-16T00:00:00.000Z",
+            },
+            source_product_id: "pfss_coronal_field_context_v1",
+            source_product_family: "coronal_field_proxy_products",
+            source_doc_ids: ["nso_pfss", "hmi_products", "aia_corona"],
+          },
+        },
+        solar_magnetic_memory: {
+          axial_dipole_history_ref: "user:solar/magnetic-memory/axial-dipole-history",
+          polar_field_history_ref: "user:solar/magnetic-memory/polar-field-history",
+          polarity_reversal_refs: ["user:solar/magnetic-memory/reversal-marker"],
+          summary: {
+            cycle_labels_covered: ["Cycle 24", "Cycle 25"],
+            north_polarity_state: "negative",
+            south_polarity_state: "positive",
+            latest_axial_dipole_sign: "positive",
+            reversal_marker_count: 1,
+          },
+        },
+        solar_flare_catalog: {
+          event_refs: ["user:solar/flares/goes-event-1"],
+          source_region_refs: ["user:solar/active-regions/ar13000"],
+          flare_count: 1,
+          strongest_goes_class: "M1.2",
+        },
+        solar_cme_catalog: {
+          event_refs: ["user:solar/cmes/lasco-event-1"],
+          source_region_refs: ["user:solar/active-regions/ar13000"],
+          cme_count: 1,
+        },
+        solar_topology_linkage: {
+          link_refs: [topologyRef],
+          link_count: 1,
+          links: [
+            {
+              link_id: topologyRef,
+              linked_spot_ids: ["user:solar/sunspots/spot-13000-a", "user:solar/sunspots/spot-13000-b"],
+              linked_region_id: "user:solar/active-regions/ar13000",
+              linked_noaa_region_id: "13000",
+              linked_harp_id: "HARP-13000",
+              linked_pfss_solution_ref: "user:solar/coronal/pfss-solution-2290",
+              linked_open_field_map_ref: "user:solar/coronal/open-field-map-2290",
+              linked_coronal_hole_refs: ["user:solar/coronal/coronal-hole-north"],
+              linked_flare_refs: ["user:solar/flares/goes-event-1"],
+              linked_cme_refs: ["user:solar/cmes/lasco-event-1"],
+              linked_polar_field_ref: "user:solar/magnetic-memory/polar-field-history",
+              linked_axial_dipole_ref: "user:solar/magnetic-memory/axial-dipole-history",
+              topology_role: topologyRole,
+              linkage_basis: linkageBasis,
+              time_window_start: "2025-02-14T10:30:00.000Z",
+              time_window_end: "2025-02-14T12:30:00.000Z",
+            },
+          ],
+          summary: {
+            topology_role_count: 1,
+            open_flux_link_count: 1,
+            event_link_count: 1,
+          },
+          metadata: {
+            instrument: "NSO/PFSS+SDO/HMI+NOAA+GOES/LASCO",
+            coordinate_frame: "Carrington",
+            observed_mode: "observed",
+            cadence: {
+              value: 1,
+              unit: "day",
+            },
+            time_range: {
+              start_iso: "2025-02-14T00:00:00.000Z",
+              end_iso: "2025-02-16T00:00:00.000Z",
+            },
+            source_product_id: "solar_cross_layer_topology_linkage_context_v1",
+            source_product_family: "topology_linkage_products",
+            source_doc_ids: ["nso_pfss", "hmi_products", "sft_review_2023", "goes_xray", "lasco_docs"],
+          },
+        },
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(
+        buildPayload(
+          "user:solar/topology-linkage/region-13000-open-flux-a",
+          "active_region_open_flux_source",
+          "manual_catalog_association",
+        ),
+      )
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(
+        buildPayload(
+          "user:solar/topology-linkage/region-13000-open-flux-b",
+          "bipolar_memory_continuity",
+          "region_id_match",
+        ),
+      )
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("topology_linkage_context_changed");
+    expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
+  });
+
+  it("changes the solar baseline signature when cross-layer coherence evidence changes and reports evidence drift", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "disabled";
+    const app = await buildApp();
+    const buildPayload = (counterexampleFileName?: string) => ({
+      target: {
+        object_id: "sun",
+        name: "Sun",
+      },
+      solar_baseline: {
+        ...loadSolarObservedFixtureBaseline(),
+        ...(counterexampleFileName ? loadSolarCrossLayerCounterexamplePayload(counterexampleFileName) : {}),
+      },
+    });
+
+    const first = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload())
+      .expect(200);
+    const second = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send(buildPayload("solar-cross-layer-counterexample.event-topology-mismatch.json"))
+      .expect(200);
+
+    expect(first.body.solar_baseline_signature).not.toBe(second.body.solar_baseline_signature);
+    expect(second.body.previous_solar_baseline_ref).toBeTruthy();
+    expect(second.body.solar_baseline_repeatability.same_signature).toBe(false);
+    expect(second.body.solar_baseline_support.solar_cross_layer_consistency_v1.passed).toBe(false);
+    expect(
+      first.body.solar_baseline_support.solar_cross_layer_consistency_v1.cross_layer_consistency_diagnostics.cross_layer_mismatch_summary.mismatch_fingerprint,
+    ).toBe("cross-layer:none");
+    expect(
+      second.body.solar_baseline_support.solar_cross_layer_consistency_v1.cross_layer_consistency_diagnostics.cross_layer_mismatch_summary.mismatch_fingerprint,
+    ).not.toBe("cross-layer:none");
+    expect(second.body.solar_baseline_repeatability.drift_categories).toContain("cross_layer_consistency_changed");
     expect(second.body.solar_baseline_repeatability.drift_categories).not.toContain("reference_basis_changed");
   });
 

@@ -38,7 +38,7 @@ export interface StarSimBenchmarkTargetMatchResult {
   benchmark_target_quality_ok: boolean;
 }
 
-export const STAR_SIM_BENCHMARK_TARGETS_VERSION = "starsim-benchmark-targets/3";
+export const STAR_SIM_BENCHMARK_TARGETS_VERSION = "starsim-benchmark-targets/7";
 const ALLOW_IDENTIFIER_MATCH_ON_NAME_CONFLICT = false;
 
 const BENCHMARK_TARGETS: StarSimBenchmarkTarget[] = [
@@ -82,8 +82,17 @@ const BENCHMARK_TARGETS: StarSimBenchmarkTarget[] = [
     aliases: ["the sun", "solar baseline"],
     benchmark_family_or_pack_ids: [
       "solar_interior_closure_v1",
+      "solar_structural_residual_closure_v1",
       "solar_cycle_observed_v1",
       "solar_eruptive_catalog_v1",
+      "solar_local_helio_observed_v1",
+      "solar_surface_flow_observed_v1",
+      "solar_coronal_field_observed_v1",
+      "solar_magnetic_memory_observed_v1",
+      "solar_spot_region_observed_v1",
+      "solar_event_association_observed_v1",
+      "solar_topology_linkage_observed_v1",
+      "solar_cross_layer_consistency_v1",
     ],
   },
 ];

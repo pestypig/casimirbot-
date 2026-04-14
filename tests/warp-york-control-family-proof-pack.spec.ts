@@ -31,8 +31,14 @@ import {
   isNhm2ObserverAuditArtifact,
 } from "../shared/contracts/nhm2-observer-audit.v1";
 import {
+  isNhm2SuccessorTileFluxLaneAdmissibilityArtifact,
+} from "../shared/contracts/nhm2-successor-tile-flux-lane-admissibility.v1";
+import {
   isNhm2FullLoopAuditContract,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
+import {
+  isNhm2CertificatePolicyArtifact,
+} from "../shared/contracts/nhm2-certificate-policy.v1";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
   buildWarpRodcSnapshot,
@@ -137,11 +143,14 @@ import {
   buildNhm2ShiftLapseTransportResultArtifact,
   computeNhm2EnvelopePerturbationChecksum,
   publishNhm2EnvelopePerturbationResearchSurface,
+  publishNhm2ShiftLapseCertificatePolicy,
   publishNhm2ShiftLapseObserverAudit,
   publishNhm2ShiftLapseSourceClosure,
   publishNhm2SourceClosureResearchSurface,
   publishNhm2ShiftLapseStrictSignalReadiness,
   publishNhm2ShiftLapseFullLoopAudit,
+  publishNhm2SuccessorTileFluxLaneAdmissibility,
+  publishNhm2CurrentLaneBaselineConvergence,
   publishNhm2ShiftVsLapseDecompositionResearchSurface,
   renderNhm2WarpWorldlineProofMarkdown,
   renderNhm2CruiseEnvelopePreflightMarkdown,
@@ -395,6 +404,57 @@ const writeMarkdownFixture = (filePath: string, markdown: string) => {
   fs.writeFileSync(filePath, `${markdown}\n`);
 };
 
+const writeJsonlFixture = (filePath: string, values: unknown[]) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(
+    filePath,
+    `${values.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
+  );
+};
+
+const makeRepoConvergenceTraceFixture = (overrides?: Partial<Record<string, unknown>>) => ({
+  kind: "training-trace",
+  version: 1,
+  id: "fixture-run-1",
+  seq: 1,
+  ts: "2026-04-12T08:28:59.625Z",
+  traceId: "adapter:fixture-trace",
+  source: {
+    system: "constraint-pack",
+    component: "adapter",
+    tool: "repo-convergence",
+    version: "1",
+  },
+  signal: {
+    kind: "repo-certified",
+    ladder: {
+      tier: "certified",
+      policy: "repo-convergence",
+      policyVersion: "1",
+    },
+  },
+  pass: true,
+  deltas: [],
+  metrics: {
+    "build.status": 1,
+    "tests.status": "pass",
+    "schema.contracts": 1,
+    "deps.coherence": 1,
+    "lint.status": "pass",
+    "typecheck.status": "pass",
+  },
+  certificate: {
+    status: "GREEN",
+    certificateHash:
+      "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    certificateId: "constraint-pack:repo-convergence:6e84f965957f",
+    integrityOk: true,
+  },
+  eventRefs: ["fixture-event"],
+  notes: ["telemetry_source=fixture"],
+  ...overrides,
+});
+
 const buildSelectedShiftLapseRuntimeState = async (args: {
   selectedArtifactDir: string;
   selectedProfileId: string;
@@ -440,6 +500,7 @@ const makeNhm2FullLoopAuditPublisherFixture = (args?: {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nhm2-full-loop-audit-"));
   const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
   const auditRootDir = path.join(tempDir, "docs/audits/research");
+  const trainingTraceJsonlPath = path.join(tempDir, "artifacts/training-trace.jsonl");
   const selectedArtifactDir = path.join(
     artifactRootDir,
     "selected-family/nhm2-shift-lapse",
@@ -698,6 +759,7 @@ const makeNhm2FullLoopAuditPublisherFixture = (args?: {
     path.join(selectedAuditDir, "warp-nhm2-shift-lapse-transport-result-latest.md"),
     transportArtifact.measuredResultSummary,
   );
+  writeJsonlFixture(trainingTraceJsonlPath, [makeRepoConvergenceTraceFixture()]);
   publishNhm2ShiftVsLapseDecompositionResearchSurface({
     artifact: decompositionArtifact,
     artifactRootDir: selectedArtifactDir,
@@ -718,7 +780,7 @@ const makeNhm2FullLoopAuditPublisherFixture = (args?: {
     artifactRootDir,
     auditRootDir,
   });
-  return { artifactRootDir, auditRootDir, selectedProfileId };
+  return { artifactRootDir, auditRootDir, selectedProfileId, trainingTraceJsonlPath };
 };
 
 describe("nhm2 publication completion surfaces", () => {
@@ -1036,9 +1098,39 @@ describe("nhm2 publication completion surfaces", () => {
     expect(
       (json as any).sections.uncertainty_perturbation_reproducibility.state,
     ).toBe("review");
-    expect((json as any).sections.certificate_policy_result.state).toBe(
-      "unavailable",
+    expect((json as any).sections.certificate_policy_result.state).toBe("pass");
+    expect((json as any).sections.certificate_policy_result.reasons).toEqual([]);
+    expect((json as any).sections.certificate_policy_result.artifactRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactId: "nhm2_certificate_policy",
+          path: expect.stringContaining("nhm2-certificate-policy-latest.json"),
+        }),
+        expect.objectContaining({
+          artifactId: "casimir_repo_convergence_trace",
+          path: expect.stringContaining("artifacts/training-trace.jsonl"),
+        }),
+      ]),
     );
+    expect((json as any).sections.certificate_policy_result.viabilityStatus).toBe(
+      "ADMISSIBLE",
+    );
+    expect((json as any).sections.certificate_policy_result.hardConstraintPass).toBe(
+      true,
+    );
+    expect((json as any).sections.certificate_policy_result.certificateStatus).toBe(
+      "GREEN",
+    );
+    expect((json as any).sections.certificate_policy_result.certificateHash).toBe(
+      "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    );
+    expect((json as any).sections.certificate_policy_result.certificateIntegrity).toBe(
+      "ok",
+    );
+    expect((json as any).sections.certificate_policy_result.promotionTier).toBe(
+      "certified",
+    );
+    expect((json as any).sections.certificate_policy_result.promotionReason).toBeNull();
     expect((json as any).highestPassingClaimTier).toBe("diagnostic");
     expect((json as any).overallState).toBe("unavailable");
 
@@ -1047,7 +1139,86 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("publish-full-loop-audit");
     expect(markdown).toContain("| strict_signal_readiness |");
     expect(markdown).toContain("| source_closure |");
+    expect(markdown).toContain("published NHM2 certificate-policy wrapper artifact");
     expect(markdown).toContain("do not widen route ETA, transport, gravity, or viability claims");
+  });
+
+  it("publishes an NHM2 certificate-policy wrapper artifact from repo-convergence trace evidence", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const published = await publishNhm2ShiftLapseCertificatePolicy({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+    });
+
+    expect(path.basename(published.certificatePolicyArtifact.latestJsonPath)).toBe(
+      "nhm2-certificate-policy-latest.json",
+    );
+    expect(path.basename(published.certificatePolicyArtifact.latestMdPath)).toBe(
+      "warp-nhm2-certificate-policy-latest.md",
+    );
+    expect(fs.existsSync(published.certificatePolicyArtifact.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.certificatePolicyArtifact.latestMdPath)).toBe(true);
+
+    const json = JSON.parse(
+      fs.readFileSync(published.certificatePolicyArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2CertificatePolicyArtifact(json)).toBe(true);
+    expect((json as any).state).toBe("pass");
+    expect((json as any).reasonCodes).toEqual([]);
+    expect((json as any).sourceTraceId).toBe("adapter:fixture-trace");
+    expect((json as any).sourceRunId).toBe("fixture-run-1");
+    expect((json as any).verdict).toBe("PASS");
+    expect((json as any).viabilityStatus).toBe("ADMISSIBLE");
+    expect((json as any).hardConstraintPass).toBe(true);
+    expect((json as any).certificateStatus).toBe("GREEN");
+    expect((json as any).certificateHash).toBe(
+      "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    );
+    expect((json as any).certificateIntegrity).toBe("ok");
+    expect((json as any).promotionTier).toBe("certified");
+    expect((json as any).promotionReason).toBeNull();
+    expect((json as any).artifactRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactId: "casimir_repo_convergence_trace",
+          path: expect.stringContaining("artifacts/training-trace.jsonl"),
+        }),
+      ]),
+    );
+
+    const markdown = fs.readFileSync(
+      published.certificatePolicyArtifact.latestMdPath,
+      "utf8",
+    );
+    expect(markdown).toContain("NHM2 Certificate Policy");
+    expect(markdown).toContain("adapter:fixture-trace");
+    expect(markdown).toContain(
+      "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    );
+    expect(markdown).toContain("casimir_repo_convergence_trace");
+  });
+
+  it("fails closed to unavailable when repo-convergence trace evidence is absent", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nhm2-certificate-policy-"));
+    const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
+    const auditRootDir = path.join(tempDir, "docs/audits/research");
+    const published = await publishNhm2ShiftLapseCertificatePolicy({
+      artifactRootDir,
+      auditRootDir,
+    });
+
+    const json = JSON.parse(
+      fs.readFileSync(published.certificatePolicyArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2CertificatePolicyArtifact(json)).toBe(true);
+    expect((json as any).state).toBe("unavailable");
+    expect((json as any).reasonCodes).toEqual(["certificate_missing"]);
+    expect((json as any).verdict).toBe("UNKNOWN");
+    expect((json as any).viabilityStatus).toBe("UNKNOWN");
+    expect((json as any).hardConstraintPass).toBeNull();
+    expect((json as any).certificateHash).toBeNull();
+    expect((json as any).certificateIntegrity).toBe("unavailable");
+    expect((json as any).artifactRefs).toEqual([]);
   });
 
   it("publishes a selected-profile NHM2 strict-signal readiness artifact from refreshed pipeline evidence", async () => {
@@ -2192,6 +2363,46 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerTileDiminishingReturnNote).toContain(
       "no admissible new aft-local single-contributor mechanism",
     );
+    expect((json as any).observerMetricCompletenessStatus).toBe(
+      "incomplete_missing_inputs",
+    );
+    expect((json as any).observerMetricCompletenessNote).toContain(
+      "metric_t0i_missing",
+    );
+    expect((json as any).observerMetricCoverageBlockerStatus).toBe(
+      "producer_not_emitted",
+    );
+    expect((json as any).observerMetricCoverageBlockerNote).toContain(
+      "diagonal-only",
+    );
+    expect((json as any).observerMetricFirstMissingStage).toBe(
+      "metric_tensor_emission",
+    );
+    expect((json as any).observerMetricEmissionAdmissionStatus).toBe(
+      "not_admitted",
+    );
+    expect((json as any).observerMetricEmissionAdmissionNote).toContain(
+      "reduced-order diagonal tensor only",
+    );
+    expect((json as any).observerMetricT0iAdmissionStatus).toBe(
+      "basis_or_semantics_ambiguous",
+    );
+    expect((json as any).observerMetricOffDiagonalTijAdmissionStatus).toBe(
+      "basis_or_semantics_ambiguous",
+    );
+    expect((json as any).observerTileAuthorityStatus).toBe("proxy_limited");
+    expect((json as any).observerTileAuthorityNote).toContain(
+      "fluxHandling=voxel_flux_field",
+    );
+    expect((json as any).observerLeadReadinessWorkstream).toBe(
+      "observer_completeness_and_authority",
+    );
+    expect((json as any).observerLeadReadinessReason).toContain(
+      "Certificate/policy readiness remains a separate parallel full-loop lane",
+    );
+    expect((json as any).observerNextTechnicalAction).toBe(
+      "emit_same_chart_metric_flux_and_shear_terms",
+    );
     expect((json as any).tensors.metricRequired.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.tileEffective.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.metricRequired.rootCauseClass).toBeTruthy();
@@ -2227,6 +2438,14 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("observerWecPropagationStatus");
     expect(markdown).toContain("observerRemediationSequenceStatus");
     expect(markdown).toContain("observerTileDiminishingReturnStatus");
+    expect(markdown).toContain("observerMetricCoverageBlockerStatus");
+    expect(markdown).toContain("observerMetricEmissionAdmissionStatus");
+    expect(markdown).toContain("observerMetricT0iAdmissionStatus");
+    expect(markdown).toContain("observerMetricOffDiagonalTijAdmissionStatus");
+    expect(markdown).toContain("observerNextTechnicalAction");
+    expect(markdown).toContain("observerMetricCompletenessStatus");
+    expect(markdown).toContain("observerTileAuthorityStatus");
+    expect(markdown).toContain("observerLeadReadinessWorkstream");
     expect(markdown).toContain("likely_stop_territory");
     expect(markdown).toContain("primaryBlockingCondition");
     expect(markdown).toContain("rootCauseClass");
@@ -2315,6 +2534,45 @@ describe("nhm2 publication completion surfaces", () => {
     expect(
       (json as any).sections.observer_audit.observerTileDiminishingReturnNote,
     ).toBe((observerJson as any).observerTileDiminishingReturnNote);
+    expect(
+      (json as any).sections.observer_audit.observerMetricCompletenessStatus,
+    ).toBe((observerJson as any).observerMetricCompletenessStatus);
+    expect(
+      (json as any).sections.observer_audit.observerMetricCompletenessNote,
+    ).toBe((observerJson as any).observerMetricCompletenessNote);
+    expect(
+      (json as any).sections.observer_audit.observerMetricCoverageBlockerStatus,
+    ).toBe((observerJson as any).observerMetricCoverageBlockerStatus);
+    expect(
+      (json as any).sections.observer_audit.observerMetricCoverageBlockerNote,
+    ).toBe((observerJson as any).observerMetricCoverageBlockerNote);
+    expect(
+      (json as any).sections.observer_audit.observerMetricFirstMissingStage,
+    ).toBe((observerJson as any).observerMetricFirstMissingStage);
+    expect(
+      (json as any).sections.observer_audit.observerMetricEmissionAdmissionStatus,
+    ).toBe((observerJson as any).observerMetricEmissionAdmissionStatus);
+    expect(
+      (json as any).sections.observer_audit.observerMetricT0iAdmissionStatus,
+    ).toBe((observerJson as any).observerMetricT0iAdmissionStatus);
+    expect(
+      (json as any).sections.observer_audit.observerMetricOffDiagonalTijAdmissionStatus,
+    ).toBe((observerJson as any).observerMetricOffDiagonalTijAdmissionStatus);
+    expect(
+      (json as any).sections.observer_audit.observerTileAuthorityStatus,
+    ).toBe((observerJson as any).observerTileAuthorityStatus);
+    expect(
+      (json as any).sections.observer_audit.observerTileAuthorityNote,
+    ).toBe((observerJson as any).observerTileAuthorityNote);
+    expect(
+      (json as any).sections.observer_audit.observerLeadReadinessWorkstream,
+    ).toBe((observerJson as any).observerLeadReadinessWorkstream);
+    expect(
+      (json as any).sections.observer_audit.observerLeadReadinessReason,
+    ).toBe((observerJson as any).observerLeadReadinessReason);
+    expect(
+      (json as any).sections.observer_audit.observerNextTechnicalAction,
+    ).toBe((observerJson as any).observerNextTechnicalAction);
     expect((json as any).sections.observer_audit.observerSharedRootDriverStatus).toBe(
       (observerJson as any).observerSharedRootDriverStatus,
     );
@@ -2504,6 +2762,128 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("selected_decomposition_worldline_path_mismatch");
   });
 });
+
+it("publishes a successor-lane admissibility stop when this repo has not landed the current-lane recharter prerequisites", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nhm2-successor-preflight-"));
+  const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
+  const auditRootDir = path.join(tempDir, "docs/audits/research");
+  fs.mkdirSync(artifactRootDir, { recursive: true });
+  fs.mkdirSync(auditRootDir, { recursive: true });
+  for (const fileName of [
+    "nhm2-observer-audit-latest.json",
+    "nhm2-full-loop-audit-latest.json",
+    "nhm2-source-closure-latest.json",
+  ]) {
+    fs.copyFileSync(
+      path.join(process.cwd(), "artifacts/research/full-solve", fileName),
+      path.join(artifactRootDir, fileName),
+    );
+  }
+
+  const published = await publishNhm2SuccessorTileFluxLaneAdmissibility({
+    artifactRootDir,
+    auditRootDir,
+    selectedProfileId: "stage1_centerline_alpha_0p9925_v1",
+  });
+
+  expect(published.status).toBe("blocked");
+  expect(
+    isNhm2SuccessorTileFluxLaneAdmissibilityArtifact(
+      published.assessmentArtifact.artifact,
+    ),
+  ).toBe(true);
+  expect(published.assessmentArtifact.artifact.currentLaneDisposition).toBe(
+    "current_lane_prerequisites_not_landed",
+  );
+  expect(published.assessmentArtifact.artifact.admissibilityStatus).toBe(
+    "blocked_by_missing_current_lane_baseline",
+  );
+  expect(published.assessmentArtifact.artifact.currentPublishedProfileId).toBe(
+    "stage1_centerline_alpha_0p995_v1",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "current_repo_published_profile_mismatch",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "metric_flux_terms_not_emitted_in_current_repo",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "rechartered_lane_status_artifact_missing",
+  );
+  expect(
+    published.assessmentArtifact.artifact.candidateAdmissibleSurfaces,
+  ).toHaveLength(0);
+
+  const markdown = fs.readFileSync(
+    published.assessmentArtifact.latestMdPath,
+    "utf8",
+  );
+  expect(markdown).toContain("STOP_ON_SUCCESSOR_LANE_ADMISSIBILITY_BLOCKER");
+  expect(markdown).toContain("stage1_centerline_alpha_0p9925_v1");
+  expect(markdown).toContain("stage1_centerline_alpha_0p995_v1");
+  expect(markdown).toContain("metric_flux_terms_not_emitted_in_current_repo");
+}, 600000);
+
+it("publishes a current-lane baseline convergence stop when this repo is still at the 0p995 producer_not_emitted state", async () => {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "nhm2-current-lane-convergence-"),
+  );
+  const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
+  const auditRootDir = path.join(tempDir, "docs/audits/research");
+  fs.mkdirSync(artifactRootDir, { recursive: true });
+  fs.mkdirSync(auditRootDir, { recursive: true });
+  for (const fileName of [
+    "nhm2-observer-audit-latest.json",
+    "nhm2-full-loop-audit-latest.json",
+    "nhm2-source-closure-latest.json",
+  ]) {
+    fs.copyFileSync(
+      path.join(process.cwd(), "artifacts/research/full-solve", fileName),
+      path.join(artifactRootDir, fileName),
+    );
+  }
+
+  const published = await publishNhm2CurrentLaneBaselineConvergence({
+    artifactRootDir,
+    auditRootDir,
+    selectedProfileId: "stage1_centerline_alpha_0p9925_v1",
+  });
+
+  expect(published.status).toBe("blocked");
+  expect(published.assessmentArtifact.artifact.currentLaneDisposition).toBe(
+    "current_lane_prerequisites_not_landed",
+  );
+  expect(published.assessmentArtifact.artifact.currentPublishedProfileId).toBe(
+    "stage1_centerline_alpha_0p995_v1",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "current_repo_published_profile_mismatch",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "metric_runtime_flux_terms_not_emitted",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "metric_observer_still_assumes_zero_flux",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "current_repo_divergence_too_large_for_single_patch",
+  );
+  expect(published.assessmentArtifact.artifact.metricWec).toBe(
+    -57110812.99010783,
+  );
+  expect(published.assessmentArtifact.artifact.metricDec).toBe(
+    -114221625.98021565,
+  );
+
+  const markdown = fs.readFileSync(
+    published.assessmentArtifact.latestMdPath,
+    "utf8",
+  );
+  expect(markdown).toContain("STOP_ON_CURRENT_LANE_CONVERGENCE_BLOCKER");
+  expect(markdown).toContain("stage1_centerline_alpha_0p9925_v1");
+  expect(markdown).toContain("stage1_centerline_alpha_0p995_v1");
+  expect(markdown).toContain("current_repo_divergence_too_large_for_single_patch");
+}, 600000);
 
 const makeWarpWorldlineContract = () => makeWarpWorldlineFixture();
 const makeWarpRouteTimeWorldlineContract = () => makeWarpRouteTimeWorldlineFixture();

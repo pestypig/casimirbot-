@@ -1,0 +1,98 @@
+{
+  "source_id": "solar-observed-fixture:sun-surface-flow-observed",
+  "instrument": "SDO/HMI+GONG+NOAA/HARP",
+  "observed_mode": "observed",
+  "time_range": {
+    "start_iso": "2024-01-01T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "uncertainty_note": "Fixture-backed solar surface-flow observed scaffold only.",
+  "section_metadata_overrides": {
+    "solar_surface_flows": {
+      "instrument": "SDO/HMI+GONG",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2024-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_gong_surface_flow_context_v1",
+      "source_product_family": "surface_flow_products",
+      "source_doc_ids": ["hmi_products", "gong_products", "sft_review_2023"]
+    },
+    "solar_active_regions": {
+      "instrument": "NOAA+SDO/HMI/HARP",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "time_range": {
+        "start_iso": "2024-01-01T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "source_product_id": "hmi_noaa_active_region_geometry_v1",
+      "source_product_family": "active_region_geometry_products",
+      "source_doc_ids": ["hmi_products", "sft_review_2023"]
+    }
+  },
+  "payload": {
+    "solar_surface_flows": {
+      "differential_rotation_ref": "fixture:solar/surface-flows/differential-rotation-profile",
+      "meridional_flow_ref": "fixture:solar/surface-flows/meridional-flow-profile",
+      "supergranular_diffusion_ref": "fixture:solar/surface-flows/supergranular-diffusion",
+      "surface_transport_proxy_ref": "fixture:solar/surface-flows/transport-proxy",
+      "summary": {
+        "equatorial_rotation_deg_per_day": 14.35,
+        "rotation_shear_deg_per_day": 2.68,
+        "meridional_flow_peak_ms": 12.4
+      }
+    },
+    "solar_active_regions": {
+      "region_refs": [
+        "fixture:solar/active-regions/noaa-13000",
+        "fixture:solar/active-regions/noaa-13001"
+      ],
+      "region_count": 2,
+      "regions": [
+        {
+          "region_id": "fixture:solar/active-regions/noaa-13000",
+          "noaa_region_id": "13000",
+          "harp_id": "HARP-13000",
+          "sharp_ref": "fixture:solar/active-regions/sharp-13000",
+          "heliographic_latitude_deg": 14.2,
+          "carrington_longitude_deg": 205.4,
+          "area_msh": 420,
+          "magnetic_class": "beta-gamma",
+          "tilt_deg": 11.5,
+          "leading_polarity": "negative"
+        },
+        {
+          "region_id": "fixture:solar/active-regions/noaa-13001",
+          "noaa_region_id": "13001",
+          "harp_id": "HARP-13001",
+          "sharp_ref": "fixture:solar/active-regions/sharp-13001",
+          "heliographic_latitude_deg": -9.6,
+          "carrington_longitude_deg": 218.8,
+          "area_msh": 360,
+          "magnetic_class": "beta",
+          "tilt_deg": -8.1,
+          "leading_polarity": "positive"
+        }
+      ]
+    }
+  }
+}

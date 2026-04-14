@@ -1,0 +1,51 @@
+{
+  "source_id": "fixture:solar-observed/structural-residuals",
+  "instrument": "solar-assimilation+SDO/HMI+GONG+Borexino",
+  "observed_mode": "assimilated",
+  "coordinate_frame": "Carrington",
+  "carrington_rotation": 2290,
+  "time_range": {
+    "start_iso": "2010-04-30T00:00:00.000Z",
+    "end_iso": "2025-12-31T23:59:59.000Z"
+  },
+  "cadence": {
+    "value": 1,
+    "unit": "day"
+  },
+  "section_metadata_overrides": {
+    "solar_structural_residuals": {
+      "instrument": "solar-assimilation+SDO/HMI+GONG+Borexino",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "carrington_rotation": 2290,
+      "time_range": {
+        "start_iso": "2010-04-30T00:00:00.000Z",
+        "end_iso": "2025-12-31T23:59:59.000Z"
+      },
+      "cadence": {
+        "value": 1,
+        "unit": "day"
+      },
+      "source_product_id": "solar_assimilation_structural_residual_context_v1",
+      "source_product_family": "structural_residual_products",
+      "source_doc_ids": ["basu_antia_2004", "hmi_products", "gong_products", "borexino_2018"]
+    }
+  },
+  "payload": {
+    "solar_structural_residuals": {
+      "hydrostatic_residual_ref": "fixture:solar/structural-residuals/hydrostatic-balance",
+      "sound_speed_residual_ref": "fixture:solar/structural-residuals/sound-speed",
+      "rotation_residual_ref": "fixture:solar/structural-residuals/rotation",
+      "pressure_scale_height_ref": "fixture:solar/structural-residuals/pressure-scale-height",
+      "density_residual_ref": "fixture:solar/structural-residuals/density",
+      "neutrino_consistency_ref": "fixture:solar/structural-residuals/neutrino-consistency",
+      "summary": {
+        "max_sound_speed_fractional_residual": 0.0018,
+        "mean_hydrostatic_fractional_residual": 0.0006,
+        "max_rotation_residual_nhz": 8.4,
+        "pressure_scale_height_consistent": true,
+        "residual_window_label": "cycle24-25-assimilated-closure-window"
+      }
+    }
+  }
+}

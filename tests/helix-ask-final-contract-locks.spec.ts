@@ -5,6 +5,7 @@ import {
   applyFinalAnswerSurfaceReconciliation,
 } from "../server/services/helix-ask/surface/final-answer-surface";
 import {
+  applyFrontierConversationalFollowupLock,
   applyFrontierTerminalHeadingRepair,
   applyIdeologyFinalNarrativeLock,
   applyOpenWorldFinalContractLock,
@@ -36,6 +37,34 @@ describe("helix ask final contract lock helpers", () => {
     expect(result.envelope?.answer).toBe("after");
     expect(answerPath).toEqual(["frontier:terminal_heading_repair"]);
     expect(debugPayload.frontier_terminal_heading_repair_applied).toBe(true);
+    expect(debugPayload.final_mode_gate_consistency_reasons).toEqual(["sources_missing"]);
+  });
+
+  it("applies frontier followup conversational lock for leaked baseline scaffolding", () => {
+    const result = { text: "before", envelope: { answer: "before" } };
+    const answerPath: string[] = [];
+    const debugPayload: Record<string, unknown> = {
+      final_mode_gate_consistency_reasons: [
+        "frontier_required_headings_missing",
+        "sources_missing",
+      ],
+    };
+
+    const updated = applyFrontierConversationalFollowupLock({
+      cleanedText: "Mainstream baseline: no certified evidence currently establishes solar subjective awareness.",
+      shouldRepair: true,
+      repairedText:
+        "Focus on the falsifier step first: identify what observation would separate the frontier lens from the baseline, then test that directly.",
+      result,
+      answerPath,
+      debugPayload,
+      applyText: applyTerminalAnswerText,
+    });
+
+    expect(updated).toMatch(/Focus on the falsifier step first/i);
+    expect(result.envelope?.answer).toBe(updated);
+    expect(answerPath).toEqual(["frontier:followup_conversational_lock"]);
+    expect(debugPayload.frontier_followup_conversational_lock_applied).toBe(true);
     expect(debugPayload.final_mode_gate_consistency_reasons).toEqual(["sources_missing"]);
   });
 

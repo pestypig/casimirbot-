@@ -120,8 +120,17 @@ const hasSelection = (fieldIds: string[], selectionManifest: ReturnType<typeof b
 const secondaryCatalogs: Array<StarSimSourceCatalog> = ["sdss_astra", "lamost_dr10", "tasoc", "tess_mast"];
 const solarBaselinePhaseIds: StarSimSolarBaselinePhase[] = [
   "solar_interior_closure_v1",
+  "solar_structural_residual_closure_v1",
   "solar_cycle_observed_v1",
   "solar_eruptive_catalog_v1",
+  "solar_local_helio_observed_v1",
+  "solar_surface_flow_observed_v1",
+  "solar_coronal_field_observed_v1",
+  "solar_magnetic_memory_observed_v1",
+  "solar_spot_region_observed_v1",
+  "solar_event_association_observed_v1",
+  "solar_topology_linkage_observed_v1",
+  "solar_cross_layer_consistency_v1",
 ];
 
 const isSolarObservedRequest = (request: StarSimRequest): boolean => {
@@ -525,9 +534,30 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
   const requestedStellarHeavyLane =
     request.requested_lanes?.includes("structure_mesa") === true || requestedOscillation;
   const solarInteriorReady = solarBaselineSupport?.solar_interior_closure_v1?.passed === true;
+  const solarStructuralResidualReady = solarBaselineSupport?.solar_structural_residual_closure_v1?.passed === true;
   const solarCycleReady = solarBaselineSupport?.solar_cycle_observed_v1?.passed === true;
   const solarEruptiveReady = solarBaselineSupport?.solar_eruptive_catalog_v1?.passed === true;
-  const solarBaselineReady = solarInteriorReady || solarCycleReady || solarEruptiveReady;
+  const solarLocalHelioReady = solarBaselineSupport?.solar_local_helio_observed_v1?.passed === true;
+  const solarSurfaceFlowReady = solarBaselineSupport?.solar_surface_flow_observed_v1?.passed === true;
+  const solarCoronalFieldReady = solarBaselineSupport?.solar_coronal_field_observed_v1?.passed === true;
+  const solarMagneticMemoryReady = solarBaselineSupport?.solar_magnetic_memory_observed_v1?.passed === true;
+  const solarSpotRegionReady = solarBaselineSupport?.solar_spot_region_observed_v1?.passed === true;
+  const solarEventAssociationReady = solarBaselineSupport?.solar_event_association_observed_v1?.passed === true;
+  const solarTopologyLinkageReady = solarBaselineSupport?.solar_topology_linkage_observed_v1?.passed === true;
+  const solarCrossLayerConsistencyReady = solarBaselineSupport?.solar_cross_layer_consistency_v1?.passed === true;
+  const solarBaselineReady =
+    solarInteriorReady
+    || solarStructuralResidualReady
+    || solarCycleReady
+    || solarEruptiveReady
+    || solarLocalHelioReady
+    || solarSurfaceFlowReady
+    || solarCoronalFieldReady
+    || solarMagneticMemoryReady
+    || solarSpotRegionReady
+    || solarEventAssociationReady
+    || solarTopologyLinkageReady
+    || solarCrossLayerConsistencyReady;
   const resolutionStatus: StarSimResolveResponse["source_resolution"]["status"] =
     canonicalRequestDraft === null
       ? "unresolved"

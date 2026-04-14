@@ -118,6 +118,32 @@ const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
     observerWecPropagationStatus: "unknown",
     observerWecPropagationNote: null,
     observerRemediationSequenceStatus: "unknown",
+    observerMetricCompletenessStatus: "incomplete_missing_inputs",
+    observerMetricCompletenessNote:
+      "Metric-required observer audit remains diagonal-only because T0i flux terms and off-diagonal spatial shear terms were not supplied; missing inputs: metric_t0i_missing, metric_tij_off_diagonal_missing",
+    observerMetricCoverageBlockerStatus: "producer_not_emitted",
+    observerMetricCoverageBlockerNote:
+      "Metric-required observer completeness stops at metric tensor emission: the emitted same-chart observer tensor is diagonal-only and does not supply T0i flux terms or off-diagonal Tij shear terms, so completeness cannot close without new tensor emission semantics.",
+    observerMetricFirstMissingStage: "metric_tensor_emission",
+    observerMetricEmissionAdmissionStatus: "not_admitted",
+    observerMetricEmissionAdmissionNote:
+      "Admission failed: the current metric-required branch emits a reduced-order diagonal tensor only. Closing T0i and off-diagonal Tij would require a new same-chart full-tensor emission semantics rather than simple serialization or consumer wiring.",
+    observerMetricT0iAdmissionStatus: "basis_or_semantics_ambiguous",
+    observerMetricT0iAdmissionNote:
+      "T0i is not carried as an emitted same-chart quantity. The current branch would need a new momentum-density emission semantics, not a serialization of an existing tensor component.",
+    observerMetricOffDiagonalTijAdmissionStatus:
+      "basis_or_semantics_ambiguous",
+    observerMetricOffDiagonalTijAdmissionNote:
+      "Off-diagonal Tij is not emitted and the current diagonal pressures are reduced-order placeholders. Closing shear terms would require a new same-chart full-tensor stress semantics, not a publication-only fix.",
+    observerTileAuthorityStatus: "proxy_limited",
+    observerTileAuthorityNote:
+      "Tile-effective observer audit remains proxy-limited: fluxHandling=voxel_flux_field, shearHandling=not_modeled_in_proxy.",
+    observerLeadReadinessWorkstream: "observer_completeness_and_authority",
+    observerLeadReadinessReason:
+      "Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited.",
+    observerNextTechnicalAction: "emit_same_chart_metric_flux_and_shear_terms",
+    observerTileDiminishingReturnStatus: "unknown",
+    observerTileDiminishingReturnNote: null,
     metric: {
       state: "pass",
       wecMinOverAllTimelike: 0,
@@ -254,6 +280,33 @@ describe("nhm2 full-loop audit contract", () => {
       "unknown",
     );
     expect(contract?.sections.observer_audit.observerTileDiminishingReturnNote).toBeNull();
+    expect(
+      contract?.sections.observer_audit.observerMetricCompletenessStatus,
+    ).toBe("incomplete_missing_inputs");
+    expect(
+      contract?.sections.observer_audit.observerMetricCoverageBlockerStatus,
+    ).toBe("producer_not_emitted");
+    expect(
+      contract?.sections.observer_audit.observerMetricFirstMissingStage,
+    ).toBe("metric_tensor_emission");
+    expect(
+      contract?.sections.observer_audit.observerMetricEmissionAdmissionStatus,
+    ).toBe("not_admitted");
+    expect(
+      contract?.sections.observer_audit.observerMetricT0iAdmissionStatus,
+    ).toBe("basis_or_semantics_ambiguous");
+    expect(
+      contract?.sections.observer_audit.observerMetricOffDiagonalTijAdmissionStatus,
+    ).toBe("basis_or_semantics_ambiguous");
+    expect(contract?.sections.observer_audit.observerTileAuthorityStatus).toBe(
+      "proxy_limited",
+    );
+    expect(
+      contract?.sections.observer_audit.observerLeadReadinessWorkstream,
+    ).toBe("observer_completeness_and_authority");
+    expect(contract?.sections.observer_audit.observerNextTechnicalAction).toBe(
+      "emit_same_chart_metric_flux_and_shear_terms",
+    );
 
     const roundTrip = JSON.parse(JSON.stringify(contract));
     expect(isNhm2FullLoopAuditContract(roundTrip)).toBe(true);
