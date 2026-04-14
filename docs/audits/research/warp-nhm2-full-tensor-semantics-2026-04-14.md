@@ -108,3 +108,4 @@ Which route is chosen is a producer decision, but the emitted semantics must mat
 - no consumer-side inference of `T0i` or off-diagonal `Tij`
 - no proxy substitution from tile-effective lanes
 - no completeness claim until `E`, `J_i`, `S_{ij}` are admitted and emitted as same-chart families
+
