@@ -32,19 +32,59 @@
   "observerMetricCompletenessStatus": "incomplete_missing_inputs",
   "observerMetricCompletenessNote": "Metric-required observer audit remains diagonal-only because T0i flux terms and off-diagonal spatial shear terms were not supplied; missing inputs: metric_t0i_missing, metric_tij_off_diagonal_missing",
   "observerMetricCoverageBlockerStatus": "producer_not_emitted",
-  "observerMetricCoverageBlockerNote": "Metric-required observer completeness stops at metric tensor emission: the emitted same-chart observer tensor is diagonal-only and does not supply T0i flux terms or off-diagonal Tij shear terms, so completeness cannot close without new tensor emission semantics.",
-  "observerMetricFirstMissingStage": "metric_tensor_emission",
+  "observerMetricCoverageBlockerNote": "Metric-required observer completeness remains blocked at producer emission: current runtime emits diagonal-only stress and lacks admitted same-chart routes required for J_i/T0i and off-diagonal S_ij/Tij closure.",
+  "observerMetricFirstMissingStage": "semantic_contract",
   "observerMetricEmissionAdmissionStatus": "not_admitted",
-  "observerMetricEmissionAdmissionNote": "Admission failed: the current metric-required branch emits a reduced-order diagonal tensor only. Closing T0i and off-diagonal Tij would require a new same-chart full-tensor emission semantics rather than simple serialization or consumer wiring.",
-  "observerMetricT0iAdmissionStatus": "basis_or_semantics_ambiguous",
-  "observerMetricT0iAdmissionNote": "T0i is not carried as an emitted same-chart quantity. The current branch would need a new momentum-density emission semantics, not a serialization of an existing tensor component.",
-  "observerMetricOffDiagonalTijAdmissionStatus": "basis_or_semantics_ambiguous",
-  "observerMetricOffDiagonalTijAdmissionNote": "Off-diagonal Tij is not emitted and the current diagonal pressures are reduced-order placeholders. Closing shear terms would require a new same-chart full-tensor stress semantics, not a publication-only fix.",
+  "observerMetricEmissionAdmissionNote": "Admission failed: current evidence localizes both missing families to a model-term/evaluator gap rather than a wiring-only gap.",
+  "observerMetricT0iAdmissionStatus": "requires_new_model_term",
+  "observerMetricT0iAdmissionNote": "Current producer remains diagonal-only and does not expose an admitted momentum-constraint-grade route (D_j K^j_i - D_i K) or full Einstein-tensor route for same-chart J_i/T0i.",
+  "observerMetricOffDiagonalTijAdmissionStatus": "requires_new_model_term",
+  "observerMetricOffDiagonalTijAdmissionNote": "Current producer does not expose an admitted stress/evolution route (time-derivative or K_ij evolution) or full Einstein-tensor route for same-chart off-diagonal S_ij/Tij.",
   "observerTileAuthorityStatus": "proxy_limited",
   "observerTileAuthorityNote": "Tile-effective observer audit remains proxy-limited: fluxHandling=voxel_flux_field, shearHandling=not_modeled_in_proxy.",
   "observerLeadReadinessWorkstream": "observer_completeness_and_authority",
   "observerLeadReadinessReason": "Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited. Certificate/policy readiness remains a separate parallel full-loop lane.",
-  "observerNextTechnicalAction": "emit_same_chart_metric_flux_and_shear_terms",
+  "observerNextTechnicalAction": "resolve_metric_tensor_semantics",
+  "metricProducerAdmissionEvidence": {
+    "semanticsRef": "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
+    "chartRef": "comoving_cartesian",
+    "producerModuleRef": [
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+      "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput"
+    ],
+    "currentEmissionShape": "diagonal_only",
+    "currentOutputFamilies": [
+      "T00",
+      "T11",
+      "T22",
+      "T33"
+    ],
+    "supportFieldEvidence": {
+      "alpha": "present_admitted",
+      "beta_i": "missing",
+      "gamma_ij": "present_admitted",
+      "K_ij": "missing",
+      "D_j_Kj_i_minus_D_i_K_route": "missing",
+      "time_derivative_or_Kij_evolution_route": "missing",
+      "full_einstein_tensor_route": "missing"
+    },
+    "t0iAdmissionBranch": "requires_new_model_term",
+    "offDiagonalTijAdmissionBranch": "requires_new_model_term",
+    "nextInspectionTarget": "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+    "notes": [
+      "metricRequired.tensorRef=warp.metric.T00.nhm2.shift_lapse",
+      "metricRequired.model.fluxHandling=assumed_zero_from_missing_t0i",
+      "metricRequired.model.shearHandling=assumed_zero_from_missing_tij",
+      "support.alpha=present_admitted",
+      "support.beta_i=missing",
+      "support.gamma_ij=present_admitted",
+      "support.K_ij=missing",
+      "support.D_j_Kj_i_minus_D_i_K_route=missing",
+      "support.time_derivative_or_Kij_evolution_route=missing",
+      "support.full_einstein_tensor_route=missing"
+    ]
+  },
   "tensors": {
     "metricRequired": {
       "tensorId": "metric_required",

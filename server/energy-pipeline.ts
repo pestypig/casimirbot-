@@ -86,6 +86,8 @@ import {
   buildNhm2ObserverAuditArtifact,
   type BuildNhm2ObserverAuditTensorInput,
   type Nhm2ObserverAuditArtifact,
+  type Nhm2ObserverMetricComponentAdmissionStatus,
+  type Nhm2ObserverMetricProducerAdmissionEvidence,
 } from "../shared/contracts/nhm2-observer-audit.v1.ts";
 import {
   NHM2_SOURCE_CLOSURE_COMPONENTS,
@@ -4959,6 +4961,300 @@ const buildDiagonalMetricObserverAuditTensorInput = (
   };
 };
 
+const NHM2_FULL_TENSOR_SEMANTICS_REF =
+  "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md";
+const NHM2_T0I_FAMILY_KEYS = ["T01", "T02", "T03"] as const;
+const NHM2_OFF_DIAGONAL_TIJ_FAMILY_KEYS = [
+  "T12",
+  "T13",
+  "T23",
+  "T21",
+  "T31",
+  "T32",
+] as const;
+const NHM2_METRIC_PRODUCER_MODULE_REFS = [
+  "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+  "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+  "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput",
+] as const;
+
+type Nhm2MetricProducerSupportFieldEvidence =
+  Nhm2ObserverMetricProducerAdmissionEvidence["supportFieldEvidence"];
+type Nhm2MetricProducerEvidenceStatus =
+  Nhm2MetricProducerSupportFieldEvidence[keyof Nhm2MetricProducerSupportFieldEvidence];
+
+const isFiniteTriplet = (
+  value: unknown,
+): value is [number, number, number] =>
+  Array.isArray(value) &&
+  value.length >= 3 &&
+  toFiniteNumber(value[0]) != null &&
+  toFiniteNumber(value[1]) != null &&
+  toFiniteNumber(value[2]) != null;
+
+const resolveMetricProducerAdmissionBranch = (args: {
+  familyKind: "t0i" | "off_diagonal_tij";
+  familyPresentInRuntime: boolean;
+  currentEmissionShape: Nhm2ObserverMetricProducerAdmissionEvidence["currentEmissionShape"];
+  supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence;
+}): Nhm2ObserverMetricComponentAdmissionStatus => {
+  if (args.familyPresentInRuntime) {
+    return "existing_internal_quantity_not_serialized";
+  }
+
+  const support = args.supportFieldEvidence;
+  const fullEinsteinReady = support.full_einstein_tensor_route === "present_admitted";
+  if (args.familyKind === "t0i") {
+    const momentumConstraintReady =
+      support.beta_i === "present_admitted" &&
+      support.gamma_ij === "present_admitted" &&
+      support.K_ij === "present_admitted" &&
+      support.D_j_Kj_i_minus_D_i_K_route === "present_admitted";
+    if (fullEinsteinReady || momentumConstraintReady) {
+      return "derivable_same_chart_from_existing_state";
+    }
+  } else {
+    const stressEvolutionReady =
+      support.gamma_ij === "present_admitted" &&
+      support.K_ij === "present_admitted" &&
+      support.time_derivative_or_Kij_evolution_route === "present_admitted";
+    if (fullEinsteinReady || stressEvolutionReady) {
+      return "derivable_same_chart_from_existing_state";
+    }
+  }
+
+  if (args.currentEmissionShape === "diagonal_only") {
+    return "requires_new_model_term";
+  }
+  return "basis_or_semantics_ambiguous";
+};
+
+const buildMetricProducerAdmissionNotes = (args: {
+  t0iBranch: Nhm2ObserverMetricComponentAdmissionStatus;
+  offDiagonalBranch: Nhm2ObserverMetricComponentAdmissionStatus;
+  supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence;
+}): {
+  t0iNote: string | null;
+  offDiagonalNote: string | null;
+  notes: string[];
+} => {
+  const support = args.supportFieldEvidence;
+  const t0iNote =
+    args.t0iBranch === "existing_internal_quantity_not_serialized"
+      ? "Same-chart T0i appears upstream on the producer path but is not currently wired into the observer publication lane."
+      : args.t0iBranch === "derivable_same_chart_from_existing_state"
+        ? "Same-chart T0i is derivable from currently admitted producer state without introducing a new physics term."
+        : args.t0iBranch === "requires_new_model_term"
+          ? "Current producer remains diagonal-only and does not expose an admitted momentum-constraint-grade route (D_j K^j_i - D_i K) or full Einstein-tensor route for same-chart J_i/T0i."
+          : "Current evidence is insufficient to resolve whether same-chart T0i is wiring-limited, derivable, or model-limited.";
+  const offDiagonalNote =
+    args.offDiagonalBranch === "existing_internal_quantity_not_serialized"
+      ? "Same-chart off-diagonal Tij components appear upstream on the producer path but are not currently wired into observer publication."
+      : args.offDiagonalBranch === "derivable_same_chart_from_existing_state"
+        ? "Same-chart off-diagonal Tij is derivable from currently admitted producer state without introducing a new physics term."
+        : args.offDiagonalBranch === "requires_new_model_term"
+          ? "Current producer does not expose an admitted stress/evolution route (time-derivative or K_ij evolution) or full Einstein-tensor route for same-chart off-diagonal S_ij/Tij."
+          : "Current evidence is insufficient to resolve whether off-diagonal Tij is wiring-limited, derivable, or model-limited.";
+  const notes = [
+    `support.alpha=${support.alpha}`,
+    `support.beta_i=${support.beta_i}`,
+    `support.gamma_ij=${support.gamma_ij}`,
+    `support.K_ij=${support.K_ij}`,
+    `support.D_j_Kj_i_minus_D_i_K_route=${support.D_j_Kj_i_minus_D_i_K_route}`,
+    `support.time_derivative_or_Kij_evolution_route=${support.time_derivative_or_Kij_evolution_route}`,
+    `support.full_einstein_tensor_route=${support.full_einstein_tensor_route}`,
+  ];
+  return {
+    t0iNote,
+    offDiagonalNote,
+    notes,
+  };
+};
+
+const deriveNhm2MetricProducerAdmissionEvidence = (
+  state: EnergyPipelineState,
+  metricRequiredTensorInput: BuildNhm2ObserverAuditTensorInput,
+): Nhm2ObserverMetricProducerAdmissionEvidence => {
+  const { warpState, adapter } = resolveNhm2ArtifactContext(state);
+  const metricStressRaw = (warpState?.metricStressEnergy ??
+    null) as Record<string, unknown> | null;
+  const outputFamilies: string[] = [];
+  for (const key of ["T00", "T11", "T22", "T33"]) {
+    if (toFiniteNumber(metricStressRaw?.[key]) != null) {
+      outputFamilies.push(key);
+    }
+  }
+  for (const key of [...NHM2_T0I_FAMILY_KEYS, ...NHM2_OFF_DIAGONAL_TIJ_FAMILY_KEYS]) {
+    if (toFiniteNumber(metricStressRaw?.[key]) != null) {
+      outputFamilies.push(key);
+    }
+  }
+  const hasT0iRuntimeFamily = NHM2_T0I_FAMILY_KEYS.some(
+    (key) => toFiniteNumber(metricStressRaw?.[key]) != null,
+  );
+  const hasOffDiagonalRuntimeFamily = NHM2_OFF_DIAGONAL_TIJ_FAMILY_KEYS.some(
+    (key) => toFiniteNumber(metricStressRaw?.[key]) != null,
+  );
+  const chartRef =
+    typeof adapter?.chart?.label === "string" && adapter.chart.label.length > 0
+      ? adapter.chart.label
+      : "unknown";
+  const hasShiftVectorEvaluator =
+    warpState?.shiftVectorField != null &&
+    typeof (warpState.shiftVectorField as Record<string, unknown>)
+      .evaluateShiftVector === "function";
+  const supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence = {
+    alpha: toFiniteNumber(adapter?.alpha) != null ? "present_admitted" : "missing",
+    beta_i: hasShiftVectorEvaluator ? "present_admitted" : "missing",
+    gamma_ij: isFiniteTriplet(adapter?.gammaDiag) ? "present_admitted" : "missing",
+    K_ij: hasShiftVectorEvaluator ? "present_but_not_admitted" : "missing",
+    D_j_Kj_i_minus_D_i_K_route: "missing",
+    time_derivative_or_Kij_evolution_route: "missing",
+    full_einstein_tensor_route: "missing",
+  };
+  const currentEmissionShape: Nhm2ObserverMetricProducerAdmissionEvidence["currentEmissionShape"] =
+    hasT0iRuntimeFamily || hasOffDiagonalRuntimeFamily ? "full_tensor" : "diagonal_only";
+  const t0iAdmissionBranch = resolveMetricProducerAdmissionBranch({
+    familyKind: "t0i",
+    familyPresentInRuntime: hasT0iRuntimeFamily,
+    currentEmissionShape,
+    supportFieldEvidence,
+  });
+  const offDiagonalTijAdmissionBranch = resolveMetricProducerAdmissionBranch({
+    familyKind: "off_diagonal_tij",
+    familyPresentInRuntime: hasOffDiagonalRuntimeFamily,
+    currentEmissionShape,
+    supportFieldEvidence,
+  });
+  const noteBundle = buildMetricProducerAdmissionNotes({
+    t0iBranch: t0iAdmissionBranch,
+    offDiagonalBranch: offDiagonalTijAdmissionBranch,
+    supportFieldEvidence,
+  });
+  return {
+    semanticsRef: NHM2_FULL_TENSOR_SEMANTICS_REF,
+    chartRef,
+    producerModuleRef: [...NHM2_METRIC_PRODUCER_MODULE_REFS],
+    currentEmissionShape,
+    currentOutputFamilies: outputFamilies.length > 0 ? outputFamilies : ["none_emitted"],
+    supportFieldEvidence,
+    t0iAdmissionBranch,
+    offDiagonalTijAdmissionBranch,
+    nextInspectionTarget:
+      currentEmissionShape === "diagonal_only"
+        ? "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField"
+        : "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput",
+    notes: [
+      `metricRequired.tensorRef=${metricRequiredTensorInput.tensorRef ?? "warp.metricStressEnergy"}`,
+      `metricRequired.model.fluxHandling=${metricRequiredTensorInput.model?.fluxHandling ?? "unknown"}`,
+      `metricRequired.model.shearHandling=${metricRequiredTensorInput.model?.shearHandling ?? "unknown"}`,
+      ...noteBundle.notes,
+    ],
+  };
+};
+
+const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
+  evidence: Nhm2ObserverMetricProducerAdmissionEvidence;
+}): {
+  coverageBlockerStatus: "consumer_drop" | "publication_drop" | "producer_not_emitted" | "semantics_ambiguous";
+  coverageBlockerNote: string;
+  firstMissingStage:
+    | "observer_input_mapping"
+    | "observer_publication_mapping"
+    | "metric_tensor_emission"
+    | "semantic_contract";
+  emissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
+  emissionAdmissionNote: string;
+  t0iAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  t0iAdmissionNote: string | null;
+  offDiagonalAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  offDiagonalAdmissionNote: string | null;
+  nextTechnicalAction:
+    | "wire_existing_metric_inputs"
+    | "emit_same_chart_metric_flux_and_shear_terms"
+    | "resolve_metric_tensor_semantics";
+} => {
+  const t0i = args.evidence.t0iAdmissionBranch;
+  const offDiag = args.evidence.offDiagonalTijAdmissionBranch;
+  const branches = [t0i, offDiag];
+  const hasExistingInternal = branches.includes(
+    "existing_internal_quantity_not_serialized",
+  );
+  const hasDerivable = branches.includes("derivable_same_chart_from_existing_state");
+  const hasRequiresNewModel = branches.includes("requires_new_model_term");
+  const noteBundle = buildMetricProducerAdmissionNotes({
+    t0iBranch: t0i,
+    offDiagonalBranch: offDiag,
+    supportFieldEvidence: args.evidence.supportFieldEvidence,
+  });
+
+  if (hasExistingInternal) {
+    return {
+      coverageBlockerStatus: "consumer_drop",
+      coverageBlockerNote:
+        "Metric-required observer completeness is blocked by mapping/publication wiring: same-chart component families exist on the producer path but are not wired into observer inputs/publication.",
+      firstMissingStage: "observer_input_mapping",
+      emissionAdmissionStatus: "not_admitted",
+      emissionAdmissionNote:
+        "Admission remains not_admitted until existing same-chart producer quantities are wired through observer input/publication mapping.",
+      t0iAdmissionStatus: t0i,
+      t0iAdmissionNote: noteBundle.t0iNote,
+      offDiagonalAdmissionStatus: offDiag,
+      offDiagonalAdmissionNote: noteBundle.offDiagonalNote,
+      nextTechnicalAction: "wire_existing_metric_inputs",
+    };
+  }
+
+  if (hasRequiresNewModel) {
+    return {
+      coverageBlockerStatus: "producer_not_emitted",
+      coverageBlockerNote:
+        "Metric-required observer completeness remains blocked at producer emission: current runtime emits diagonal-only stress and lacks admitted same-chart routes required for J_i/T0i and off-diagonal S_ij/Tij closure.",
+      firstMissingStage: "semantic_contract",
+      emissionAdmissionStatus: "not_admitted",
+      emissionAdmissionNote:
+        "Admission failed: current evidence localizes both missing families to a model-term/evaluator gap rather than a wiring-only gap.",
+      t0iAdmissionStatus: t0i,
+      t0iAdmissionNote: noteBundle.t0iNote,
+      offDiagonalAdmissionStatus: offDiag,
+      offDiagonalAdmissionNote: noteBundle.offDiagonalNote,
+      nextTechnicalAction: "resolve_metric_tensor_semantics",
+    };
+  }
+
+  if (hasDerivable) {
+    return {
+      coverageBlockerStatus: "producer_not_emitted",
+      coverageBlockerNote:
+        "Metric-required observer completeness is blocked at same-chart tensor emission: required support fields are already admitted, but missing families are not yet emitted.",
+      firstMissingStage: "metric_tensor_emission",
+      emissionAdmissionStatus: "not_admitted",
+      emissionAdmissionNote:
+        "Admission remains not_admitted until same-chart flux/shear families are emitted from currently admitted producer state.",
+      t0iAdmissionStatus: t0i,
+      t0iAdmissionNote: noteBundle.t0iNote,
+      offDiagonalAdmissionStatus: offDiag,
+      offDiagonalAdmissionNote: noteBundle.offDiagonalNote,
+      nextTechnicalAction: "emit_same_chart_metric_flux_and_shear_terms",
+    };
+  }
+
+  return {
+    coverageBlockerStatus: "semantics_ambiguous",
+    coverageBlockerNote:
+      "Metric-required observer completeness remains unresolved: producer evidence does not yet localize whether the gap is wiring, emission, or model semantics.",
+    firstMissingStage: "semantic_contract",
+    emissionAdmissionStatus: "unknown",
+    emissionAdmissionNote:
+      "Admission status could not be resolved from the currently published producer evidence.",
+    t0iAdmissionStatus: t0i,
+    t0iAdmissionNote: noteBundle.t0iNote,
+    offDiagonalAdmissionStatus: offDiag,
+    offDiagonalAdmissionNote: noteBundle.offDiagonalNote,
+    nextTechnicalAction: "resolve_metric_tensor_semantics",
+  };
+};
+
 const NHM2_TILE_EFFECTIVE_UPSTREAM_DRIVER_REF =
   "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
 
@@ -5276,10 +5572,34 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
     return;
   }
 
+  const metricRequired = buildDiagonalMetricObserverAuditTensorInput(state);
+  const metricProducerAdmissionEvidence = deriveNhm2MetricProducerAdmissionEvidence(
+    state,
+    metricRequired,
+  );
+  const metricAdmissionSummary = deriveNhm2MetricAdmissionSummaryFromEvidence({
+    evidence: metricProducerAdmissionEvidence,
+  });
   state.nhm2ObserverAudit = buildNhm2ObserverAuditArtifact({
     familyId: "nhm2_shift_lapse",
-    metricRequired: buildDiagonalMetricObserverAuditTensorInput(state),
+    metricRequired,
     tileEffective: buildTileObserverAuditTensorInput(state),
+    observerMetricCoverageBlockerStatus:
+      metricAdmissionSummary.coverageBlockerStatus,
+    observerMetricCoverageBlockerNote: metricAdmissionSummary.coverageBlockerNote,
+    observerMetricFirstMissingStage: metricAdmissionSummary.firstMissingStage,
+    observerMetricEmissionAdmissionStatus:
+      metricAdmissionSummary.emissionAdmissionStatus,
+    observerMetricEmissionAdmissionNote:
+      metricAdmissionSummary.emissionAdmissionNote,
+    observerMetricT0iAdmissionStatus: metricAdmissionSummary.t0iAdmissionStatus,
+    observerMetricT0iAdmissionNote: metricAdmissionSummary.t0iAdmissionNote,
+    observerMetricOffDiagonalTijAdmissionStatus:
+      metricAdmissionSummary.offDiagonalAdmissionStatus,
+    observerMetricOffDiagonalTijAdmissionNote:
+      metricAdmissionSummary.offDiagonalAdmissionNote,
+    observerNextTechnicalAction: metricAdmissionSummary.nextTechnicalAction,
+    metricProducerAdmissionEvidence,
   });
 };
 

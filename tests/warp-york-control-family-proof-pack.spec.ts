@@ -2376,19 +2376,19 @@ describe("nhm2 publication completion surfaces", () => {
       "diagonal-only",
     );
     expect((json as any).observerMetricFirstMissingStage).toBe(
-      "metric_tensor_emission",
+      "semantic_contract",
     );
     expect((json as any).observerMetricEmissionAdmissionStatus).toBe(
       "not_admitted",
     );
     expect((json as any).observerMetricEmissionAdmissionNote).toContain(
-      "reduced-order diagonal tensor only",
+      "model-term/evaluator gap",
     );
     expect((json as any).observerMetricT0iAdmissionStatus).toBe(
-      "basis_or_semantics_ambiguous",
+      "requires_new_model_term",
     );
     expect((json as any).observerMetricOffDiagonalTijAdmissionStatus).toBe(
-      "basis_or_semantics_ambiguous",
+      "requires_new_model_term",
     );
     expect((json as any).observerTileAuthorityStatus).toBe("proxy_limited");
     expect((json as any).observerTileAuthorityNote).toContain(
@@ -2401,8 +2401,38 @@ describe("nhm2 publication completion surfaces", () => {
       "Certificate/policy readiness remains a separate parallel full-loop lane",
     );
     expect((json as any).observerNextTechnicalAction).toBe(
-      "emit_same_chart_metric_flux_and_shear_terms",
+      "resolve_metric_tensor_semantics",
     );
+    expect((json as any).metricProducerAdmissionEvidence).toMatchObject({
+      semanticsRef:
+        "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
+      chartRef: "comoving_cartesian",
+      currentEmissionShape: "diagonal_only",
+      t0iAdmissionBranch: "requires_new_model_term",
+      offDiagonalTijAdmissionBranch: "requires_new_model_term",
+      nextInspectionTarget:
+        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+    });
+    const supportFieldEvidence = (json as any).metricProducerAdmissionEvidence
+      .supportFieldEvidence as Record<string, string>;
+    const allowedSupportStatuses = new Set([
+      "present_admitted",
+      "present_but_not_admitted",
+      "missing",
+      "unknown",
+    ]);
+    for (const key of ["alpha", "beta_i", "gamma_ij", "K_ij"]) {
+      expect(allowedSupportStatuses.has(supportFieldEvidence[key])).toBe(true);
+    }
+    expect(
+      supportFieldEvidence.D_j_Kj_i_minus_D_i_K_route,
+    ).toBe("missing");
+    expect(
+      supportFieldEvidence.time_derivative_or_Kij_evolution_route,
+    ).toBe("missing");
+    expect(
+      supportFieldEvidence.full_einstein_tensor_route,
+    ).toBe("missing");
     expect((json as any).tensors.metricRequired.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.tileEffective.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.metricRequired.rootCauseClass).toBeTruthy();
@@ -2443,6 +2473,11 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("observerMetricT0iAdmissionStatus");
     expect(markdown).toContain("observerMetricOffDiagonalTijAdmissionStatus");
     expect(markdown).toContain("observerNextTechnicalAction");
+    expect(markdown).toContain("Metric Producer Admission Evidence");
+    expect(markdown).toContain("supportFieldEvidence.alpha");
+    expect(markdown).toContain("supportFieldEvidence.D_j_Kj_i_minus_D_i_K_route");
+    expect(markdown).toContain("t0iAdmissionBranch");
+    expect(markdown).toContain("offDiagonalTijAdmissionBranch");
     expect(markdown).toContain("observerMetricCompletenessStatus");
     expect(markdown).toContain("observerTileAuthorityStatus");
     expect(markdown).toContain("observerLeadReadinessWorkstream");

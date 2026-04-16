@@ -205,6 +205,19 @@ export const NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_OBSERVER_METRIC_PRODUCER_EVIDENCE_STATUS_VALUES = [
+  "present_admitted",
+  "present_but_not_admitted",
+  "missing",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_METRIC_PRODUCER_EMISSION_SHAPE_VALUES = [
+  "diagonal_only",
+  "full_tensor",
+  "unknown",
+] as const;
+
 export type Nhm2ObserverAuditStatus =
   (typeof NHM2_OBSERVER_AUDIT_STATUS_VALUES)[number];
 export type Nhm2ObserverAuditCompleteness =
@@ -261,6 +274,10 @@ export type Nhm2ObserverMetricEmissionAdmissionStatus =
   (typeof NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES)[number];
 export type Nhm2ObserverMetricComponentAdmissionStatus =
   (typeof NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES)[number];
+export type Nhm2ObserverMetricProducerEvidenceStatus =
+  (typeof NHM2_OBSERVER_METRIC_PRODUCER_EVIDENCE_STATUS_VALUES)[number];
+export type Nhm2ObserverMetricProducerEmissionShape =
+  (typeof NHM2_OBSERVER_METRIC_PRODUCER_EMISSION_SHAPE_VALUES)[number];
 
 export type Nhm2ObserverAuditDirection = [number, number, number];
 
@@ -350,6 +367,27 @@ export type Nhm2ObserverAuditTensor = {
   wecProbeInterpretation: string | null;
 };
 
+export type Nhm2ObserverMetricProducerAdmissionEvidence = {
+  semanticsRef: string | null;
+  chartRef: string | null;
+  producerModuleRef: string[];
+  currentEmissionShape: Nhm2ObserverMetricProducerEmissionShape;
+  currentOutputFamilies: string[];
+  supportFieldEvidence: {
+    alpha: Nhm2ObserverMetricProducerEvidenceStatus;
+    beta_i: Nhm2ObserverMetricProducerEvidenceStatus;
+    gamma_ij: Nhm2ObserverMetricProducerEvidenceStatus;
+    K_ij: Nhm2ObserverMetricProducerEvidenceStatus;
+    D_j_Kj_i_minus_D_i_K_route: Nhm2ObserverMetricProducerEvidenceStatus;
+    time_derivative_or_Kij_evolution_route: Nhm2ObserverMetricProducerEvidenceStatus;
+    full_einstein_tensor_route: Nhm2ObserverMetricProducerEvidenceStatus;
+  };
+  t0iAdmissionBranch: Nhm2ObserverMetricComponentAdmissionStatus;
+  offDiagonalTijAdmissionBranch: Nhm2ObserverMetricComponentAdmissionStatus;
+  nextInspectionTarget: string | null;
+  notes: string[];
+};
+
 export type Nhm2ObserverAuditArtifact = {
   artifactId: typeof NHM2_OBSERVER_AUDIT_ARTIFACT_ID;
   schemaVersion: typeof NHM2_OBSERVER_AUDIT_SCHEMA_VERSION;
@@ -393,6 +431,7 @@ export type Nhm2ObserverAuditArtifact = {
   observerLeadReadinessWorkstream: Nhm2ObserverLeadReadinessWorkstream;
   observerLeadReadinessReason: string | null;
   observerNextTechnicalAction: Nhm2ObserverNextTechnicalAction;
+  metricProducerAdmissionEvidence?: Nhm2ObserverMetricProducerAdmissionEvidence | null;
   tensors: {
     metricRequired: Nhm2ObserverAuditTensor;
     tileEffective: Nhm2ObserverAuditTensor;
@@ -506,6 +545,22 @@ export type BuildNhm2ObserverAuditArtifactInput = {
     | null;
   observerLeadReadinessReason?: string | null;
   observerNextTechnicalAction?: Nhm2ObserverNextTechnicalAction | null;
+  metricProducerAdmissionEvidence?: {
+    semanticsRef?: string | null;
+    chartRef?: string | null;
+    producerModuleRef?: string[] | null;
+    currentEmissionShape?: Nhm2ObserverMetricProducerEmissionShape | null;
+    currentOutputFamilies?: string[] | null;
+    supportFieldEvidence?: Partial<
+      Nhm2ObserverMetricProducerAdmissionEvidence["supportFieldEvidence"]
+    > | null;
+    t0iAdmissionBranch?: Nhm2ObserverMetricComponentAdmissionStatus | null;
+    offDiagonalTijAdmissionBranch?:
+      | Nhm2ObserverMetricComponentAdmissionStatus
+      | null;
+    nextInspectionTarget?: string | null;
+    notes?: string[] | null;
+  } | null;
 };
 
 const asText = (value: unknown): string | null =>
@@ -537,6 +592,90 @@ const orderReasonCodes = (
       NHM2_OBSERVER_AUDIT_REASON_CODES.indexOf(lhs) -
       NHM2_OBSERVER_AUDIT_REASON_CODES.indexOf(rhs),
   );
+
+const normalizeMetricProducerEvidenceStatus = (
+  value: unknown,
+): Nhm2ObserverMetricProducerEvidenceStatus =>
+  NHM2_OBSERVER_METRIC_PRODUCER_EVIDENCE_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricProducerEvidenceStatus,
+  )
+    ? (value as Nhm2ObserverMetricProducerEvidenceStatus)
+    : "unknown";
+
+const normalizeMetricProducerAdmissionEvidence = (
+  value: BuildNhm2ObserverAuditArtifactInput["metricProducerAdmissionEvidence"],
+): Nhm2ObserverMetricProducerAdmissionEvidence | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const supportFieldEvidenceInput = (
+    value.supportFieldEvidence ?? {}
+  ) as Record<string, unknown>;
+  const emissionShape = NHM2_OBSERVER_METRIC_PRODUCER_EMISSION_SHAPE_VALUES.includes(
+    value.currentEmissionShape as Nhm2ObserverMetricProducerEmissionShape,
+  )
+    ? (value.currentEmissionShape as Nhm2ObserverMetricProducerEmissionShape)
+    : "unknown";
+  const t0iAdmissionBranch =
+    NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES.includes(
+      value.t0iAdmissionBranch as Nhm2ObserverMetricComponentAdmissionStatus,
+    )
+      ? (value.t0iAdmissionBranch as Nhm2ObserverMetricComponentAdmissionStatus)
+      : "unknown";
+  const offDiagonalTijAdmissionBranch =
+    NHM2_OBSERVER_METRIC_COMPONENT_ADMISSION_STATUS_VALUES.includes(
+      value.offDiagonalTijAdmissionBranch as Nhm2ObserverMetricComponentAdmissionStatus,
+    )
+      ? (value.offDiagonalTijAdmissionBranch as Nhm2ObserverMetricComponentAdmissionStatus)
+      : "unknown";
+  const producerModuleRef = Array.isArray(value.producerModuleRef)
+    ? value.producerModuleRef
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const currentOutputFamilies = Array.isArray(value.currentOutputFamilies)
+    ? value.currentOutputFamilies
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const notes = Array.isArray(value.notes)
+    ? value.notes
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  return {
+    semanticsRef: asText(value.semanticsRef),
+    chartRef: asText(value.chartRef),
+    producerModuleRef: unique(producerModuleRef),
+    currentEmissionShape: emissionShape,
+    currentOutputFamilies: unique(currentOutputFamilies),
+    supportFieldEvidence: {
+      alpha: normalizeMetricProducerEvidenceStatus(
+        supportFieldEvidenceInput.alpha,
+      ),
+      beta_i: normalizeMetricProducerEvidenceStatus(
+        supportFieldEvidenceInput.beta_i,
+      ),
+      gamma_ij: normalizeMetricProducerEvidenceStatus(
+        supportFieldEvidenceInput.gamma_ij,
+      ),
+      K_ij: normalizeMetricProducerEvidenceStatus(supportFieldEvidenceInput.K_ij),
+      D_j_Kj_i_minus_D_i_K_route: normalizeMetricProducerEvidenceStatus(
+        supportFieldEvidenceInput.D_j_Kj_i_minus_D_i_K_route,
+      ),
+      time_derivative_or_Kij_evolution_route: normalizeMetricProducerEvidenceStatus(
+        supportFieldEvidenceInput.time_derivative_or_Kij_evolution_route,
+      ),
+      full_einstein_tensor_route: normalizeMetricProducerEvidenceStatus(
+        supportFieldEvidenceInput.full_einstein_tensor_route,
+      ),
+    },
+    t0iAdmissionBranch,
+    offDiagonalTijAdmissionBranch,
+    nextInspectionTarget: asText(value.nextInspectionTarget),
+    notes,
+  };
+};
 
 const approximatelyEqual = (
   lhs: number | null,
@@ -1490,6 +1629,53 @@ const isMetricComponentAdmissionStatus = (
     value as Nhm2ObserverMetricComponentAdmissionStatus,
   );
 
+const isMetricProducerEvidenceStatus = (
+  value: unknown,
+): value is Nhm2ObserverMetricProducerEvidenceStatus =>
+  NHM2_OBSERVER_METRIC_PRODUCER_EVIDENCE_STATUS_VALUES.includes(
+    value as Nhm2ObserverMetricProducerEvidenceStatus,
+  );
+
+const isMetricProducerEmissionShape = (
+  value: unknown,
+): value is Nhm2ObserverMetricProducerEmissionShape =>
+  NHM2_OBSERVER_METRIC_PRODUCER_EMISSION_SHAPE_VALUES.includes(
+    value as Nhm2ObserverMetricProducerEmissionShape,
+  );
+
+const isMetricProducerAdmissionEvidence = (
+  value: unknown,
+): value is Nhm2ObserverMetricProducerAdmissionEvidence => {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  const support = record.supportFieldEvidence as Record<string, unknown> | undefined;
+  return (
+    (record.semanticsRef === null || typeof record.semanticsRef === "string") &&
+    (record.chartRef === null || typeof record.chartRef === "string") &&
+    Array.isArray(record.producerModuleRef) &&
+    record.producerModuleRef.every((entry) => typeof entry === "string") &&
+    isMetricProducerEmissionShape(record.currentEmissionShape) &&
+    Array.isArray(record.currentOutputFamilies) &&
+    record.currentOutputFamilies.every((entry) => typeof entry === "string") &&
+    support != null &&
+    isMetricProducerEvidenceStatus(support.alpha) &&
+    isMetricProducerEvidenceStatus(support.beta_i) &&
+    isMetricProducerEvidenceStatus(support.gamma_ij) &&
+    isMetricProducerEvidenceStatus(support.K_ij) &&
+    isMetricProducerEvidenceStatus(support.D_j_Kj_i_minus_D_i_K_route) &&
+    isMetricProducerEvidenceStatus(
+      support.time_derivative_or_Kij_evolution_route,
+    ) &&
+    isMetricProducerEvidenceStatus(support.full_einstein_tensor_route) &&
+    isMetricComponentAdmissionStatus(record.t0iAdmissionBranch) &&
+    isMetricComponentAdmissionStatus(record.offDiagonalTijAdmissionBranch) &&
+    (record.nextInspectionTarget === null ||
+      typeof record.nextInspectionTarget === "string") &&
+    Array.isArray(record.notes) &&
+    record.notes.every((entry) => typeof entry === "string")
+  );
+};
+
 const isTileAuthorityStatus = (
   value: unknown,
 ): value is Nhm2ObserverTileAuthorityStatus =>
@@ -2245,6 +2431,9 @@ export const buildNhm2ObserverAuditArtifact = (
     tileAuthorityStatus: observerTileAuthority.status,
     input,
   });
+  const metricProducerAdmissionEvidence = normalizeMetricProducerAdmissionEvidence(
+    input.metricProducerAdmissionEvidence,
+  );
 
   return {
     artifactId: NHM2_OBSERVER_AUDIT_ARTIFACT_ID,
@@ -2297,6 +2486,7 @@ export const buildNhm2ObserverAuditArtifact = (
     observerLeadReadinessWorkstream: observerLeadReadiness.workstream,
     observerLeadReadinessReason: observerLeadReadiness.reason,
     observerNextTechnicalAction: observerMetricCoverageBlocker.nextTechnicalAction,
+    metricProducerAdmissionEvidence,
     tensors: {
       metricRequired,
       tileEffective,
@@ -2532,6 +2722,9 @@ export const isNhm2ObserverAuditArtifact = (
     (record.observerLeadReadinessReason === null ||
       typeof record.observerLeadReadinessReason === "string") &&
     isNextTechnicalAction(record.observerNextTechnicalAction) &&
+    (record.metricProducerAdmissionEvidence === undefined ||
+      record.metricProducerAdmissionEvidence === null ||
+      isMetricProducerAdmissionEvidence(record.metricProducerAdmissionEvidence)) &&
     tensors != null &&
     isTensor(tensors.metricRequired) &&
     isTensor(tensors.tileEffective)

@@ -29792,6 +29792,28 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
     observerTileDiminishingReturnNote,
     observerLeadReadinessWorkstream,
     observerLeadReadinessReason,
+    observerMetricCoverageBlockerStatus:
+      args.observerAuditArtifact.observerMetricCoverageBlockerStatus,
+    observerMetricCoverageBlockerNote:
+      args.observerAuditArtifact.observerMetricCoverageBlockerNote,
+    observerMetricFirstMissingStage:
+      args.observerAuditArtifact.observerMetricFirstMissingStage,
+    observerMetricEmissionAdmissionStatus:
+      args.observerAuditArtifact.observerMetricEmissionAdmissionStatus,
+    observerMetricEmissionAdmissionNote:
+      args.observerAuditArtifact.observerMetricEmissionAdmissionNote,
+    observerMetricT0iAdmissionStatus:
+      args.observerAuditArtifact.observerMetricT0iAdmissionStatus,
+    observerMetricT0iAdmissionNote:
+      args.observerAuditArtifact.observerMetricT0iAdmissionNote,
+    observerMetricOffDiagonalTijAdmissionStatus:
+      args.observerAuditArtifact.observerMetricOffDiagonalTijAdmissionStatus,
+    observerMetricOffDiagonalTijAdmissionNote:
+      args.observerAuditArtifact.observerMetricOffDiagonalTijAdmissionNote,
+    observerNextTechnicalAction:
+      args.observerAuditArtifact.observerNextTechnicalAction,
+    metricProducerAdmissionEvidence:
+      args.observerAuditArtifact.metricProducerAdmissionEvidence ?? null,
     metricRequired: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.metricRequired,
       normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
@@ -29910,6 +29932,45 @@ const renderNhm2ObserverAuditMarkdown = (
 | missingInputs | ${missingInputs} |
 `;
   };
+  const renderMetricProducerAdmissionEvidence = (): string => {
+    const evidence = payload.metricProducerAdmissionEvidence;
+    if (evidence == null) {
+      return `## Metric Producer Admission Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const moduleRefs =
+      evidence.producerModuleRef.length > 0
+        ? evidence.producerModuleRef.join("<br>")
+        : "none";
+    const outputFamilies =
+      evidence.currentOutputFamilies.length > 0
+        ? evidence.currentOutputFamilies.join(", ")
+        : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Metric Producer Admission Evidence
+| field | value |
+|---|---|
+| semanticsRef | ${evidence.semanticsRef ?? "null"} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| producerModuleRef | ${moduleRefs} |
+| currentEmissionShape | ${evidence.currentEmissionShape} |
+| currentOutputFamilies | ${outputFamilies} |
+| supportFieldEvidence.alpha | ${evidence.supportFieldEvidence.alpha} |
+| supportFieldEvidence.beta_i | ${evidence.supportFieldEvidence.beta_i} |
+| supportFieldEvidence.gamma_ij | ${evidence.supportFieldEvidence.gamma_ij} |
+| supportFieldEvidence.K_ij | ${evidence.supportFieldEvidence.K_ij} |
+| supportFieldEvidence.D_j_Kj_i_minus_D_i_K_route | ${evidence.supportFieldEvidence.D_j_Kj_i_minus_D_i_K_route} |
+| supportFieldEvidence.time_derivative_or_Kij_evolution_route | ${evidence.supportFieldEvidence.time_derivative_or_Kij_evolution_route} |
+| supportFieldEvidence.full_einstein_tensor_route | ${evidence.supportFieldEvidence.full_einstein_tensor_route} |
+| t0iAdmissionBranch | ${evidence.t0iAdmissionBranch} |
+| offDiagonalTijAdmissionBranch | ${evidence.offDiagonalTijAdmissionBranch} |
+| nextInspectionTarget | ${evidence.nextInspectionTarget ?? "null"} |
+| notes | ${notes} |
+`;
+  };
 
   return `# NHM2 Observer Audit (${DATE_STAMP})
 
@@ -29960,10 +30021,12 @@ const renderNhm2ObserverAuditMarkdown = (
 | observerLeadReadinessWorkstream | ${payload.observerLeadReadinessWorkstream} |
 | observerLeadReadinessReason | ${payload.observerLeadReadinessReason ?? "null"} |
 | observerNextTechnicalAction | ${payload.observerNextTechnicalAction} |
+| metricProducerAdmissionEvidence | ${payload.metricProducerAdmissionEvidence == null ? "null" : "available"} |
 | observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
 | metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
 | tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
 
+${renderMetricProducerAdmissionEvidence()}
 ${renderTensorSection("Metric Required Tensor", payload.tensors.metricRequired)}
 ${renderTensorSection("Tile Effective Tensor", payload.tensors.tileEffective)}
 `;

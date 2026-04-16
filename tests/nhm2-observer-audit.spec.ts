@@ -191,6 +191,76 @@ describe("nhm2 observer audit artifact", () => {
     expect(isNhm2ObserverAuditArtifact(artifact)).toBe(true);
   });
 
+  it("accepts additive metric-producer admission evidence payloads", () => {
+    const artifact = buildNhm2ObserverAuditArtifact({
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: positiveCondition(0.05),
+          sec: positiveCondition(0.04),
+          dec: positiveCondition(0.03),
+        },
+        model: {
+          pressureModel: "diagonal_tensor_components",
+          fluxHandling: "assumed_zero_from_missing_t0i",
+          shearHandling: "assumed_zero_from_missing_tij",
+          limitationNotes: ["diagonal-only"],
+        },
+        missingInputs: ["metric_t0i_missing", "metric_tij_off_diagonal_missing"],
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+        conditions: {
+          nec: positiveCondition(0.1),
+          wec: positiveCondition(0.05),
+          sec: positiveCondition(0.04),
+          dec: positiveCondition(0.03),
+        },
+      },
+      metricProducerAdmissionEvidence: {
+        semanticsRef:
+          "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
+        chartRef: "comoving_cartesian",
+        producerModuleRef: [
+          "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+        ],
+        currentEmissionShape: "diagonal_only",
+        currentOutputFamilies: ["T00", "T11", "T22", "T33"],
+        supportFieldEvidence: {
+          alpha: "present_admitted",
+          beta_i: "present_admitted",
+          gamma_ij: "present_admitted",
+          K_ij: "present_but_not_admitted",
+          D_j_Kj_i_minus_D_i_K_route: "missing",
+          time_derivative_or_Kij_evolution_route: "missing",
+          full_einstein_tensor_route: "missing",
+        },
+        t0iAdmissionBranch: "requires_new_model_term",
+        offDiagonalTijAdmissionBranch: "requires_new_model_term",
+        nextInspectionTarget:
+          "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+        notes: ["producer is diagonal-only on current runtime path"],
+      },
+    });
+
+    expect(artifact.metricProducerAdmissionEvidence).toMatchObject({
+      semanticsRef:
+        "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
+      chartRef: "comoving_cartesian",
+      currentEmissionShape: "diagonal_only",
+      t0iAdmissionBranch: "requires_new_model_term",
+      offDiagonalTijAdmissionBranch: "requires_new_model_term",
+    });
+    expect(
+      artifact.metricProducerAdmissionEvidence?.supportFieldEvidence.K_ij,
+    ).toBe("present_but_not_admitted");
+    expect(isNhm2ObserverAuditArtifact(artifact)).toBe(true);
+    expect(isNhm2ObserverAuditArtifact(JSON.parse(JSON.stringify(artifact)))).toBe(
+      true,
+    );
+  });
+
   it("preserves explicit negative observer results instead of normalizing them away", () => {
     const artifact = buildNhm2ObserverAuditArtifact({
       metricRequired: {
