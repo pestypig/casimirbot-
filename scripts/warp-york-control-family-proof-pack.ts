@@ -29949,6 +29949,15 @@ const renderNhm2ObserverAuditMarkdown = (
       evidence.currentOutputFamilies.length > 0
         ? evidence.currentOutputFamilies.join(", ")
         : "none";
+    const parseEvidenceNote = (prefix: string): string | null => {
+      const note = evidence.notes.find((entry) => entry.startsWith(prefix));
+      if (note == null) return null;
+      const value = note.slice(prefix.length).trim();
+      return value.length > 0 ? value : null;
+    };
+    const modelTermRoute = parseEvidenceNote("modelTermRoute=");
+    const modelTermAdmission = parseEvidenceNote("modelTermAdmission=");
+    const researchBasisRef = parseEvidenceNote("researchBasisRef=");
     const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
     return `## Metric Producer Admission Evidence
 | field | value |
@@ -29967,6 +29976,9 @@ const renderNhm2ObserverAuditMarkdown = (
 | supportFieldEvidence.full_einstein_tensor_route | ${evidence.supportFieldEvidence.full_einstein_tensor_route} |
 | t0iAdmissionBranch | ${evidence.t0iAdmissionBranch} |
 | offDiagonalTijAdmissionBranch | ${evidence.offDiagonalTijAdmissionBranch} |
+| modelTermRoute | ${modelTermRoute ?? "null"} |
+| modelTermAdmission | ${modelTermAdmission ?? "null"} |
+| researchBasisRef | ${researchBasisRef ?? "null"} |
 | nextInspectionTarget | ${evidence.nextInspectionTarget ?? "null"} |
 | notes | ${notes} |
 `;

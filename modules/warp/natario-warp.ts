@@ -47,6 +47,33 @@ const vecNormalize = (v: Vec3): Vec3 => {
   return [v[0] / m, v[1] / m, v[2] / m];
 };
 const INV16PI = 1 / (16 * Math.PI);
+const INV8PI = 1 / (8 * Math.PI);
+const ADM_MODEL_TERM_ROUTE_ID = "adm_quasi_stationary_recovery_v1";
+const ADM_MODEL_TERM_RESEARCH_BASIS_REF =
+  "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md";
+
+type MetricStressTensor = {
+  T00: number;
+  T11: number;
+  T22: number;
+  T33: number;
+  T01?: number;
+  T02?: number;
+  T03?: number;
+  T10?: number;
+  T20?: number;
+  T30?: number;
+  T12?: number;
+  T13?: number;
+  T23?: number;
+  T21?: number;
+  T31?: number;
+  T32?: number;
+  isNullEnergyConditionSatisfied: boolean;
+  modelTermRoute?: string;
+  modelTermAdmission?: "admitted" | "experimental_not_admitted";
+  researchBasisRef?: string;
+};
 
 const clampDenominator = (value: number) => {
   if (value >= 0) return Math.max(value, 1e-12);
@@ -176,67 +203,238 @@ export const calculateMetricStressEnergyTensorAtPointFromShiftField = (
   const [x, y, z] = point;
 
   try {
-    const betaXp = evaluateShiftVector(x + step, y, z);
-    const betaXm = evaluateShiftVector(x - step, y, z);
-    const betaYp = evaluateShiftVector(x, y + step, z);
-    const betaYm = evaluateShiftVector(x, y - step, z);
-    const betaZp = evaluateShiftVector(x, y, z + step);
-    const betaZm = evaluateShiftVector(x, y, z - step);
+    const sampleExtrinsicCurvature = (p: Vec3) => {
+      const [px, py, pz] = p;
+      const betaXp = evaluateShiftVector(px + step, py, pz);
+      const betaXm = evaluateShiftVector(px - step, py, pz);
+      const betaYp = evaluateShiftVector(px, py + step, pz);
+      const betaYm = evaluateShiftVector(px, py - step, pz);
+      const betaZp = evaluateShiftVector(px, py, pz + step);
+      const betaZm = evaluateShiftVector(px, py, pz - step);
 
-    const dBx_dx = (betaXp[0] - betaXm[0]) / denom;
-    const dBy_dx = (betaXp[1] - betaXm[1]) / denom;
-    const dBz_dx = (betaXp[2] - betaXm[2]) / denom;
+      const dBx_dx = (betaXp[0] - betaXm[0]) / denom;
+      const dBy_dx = (betaXp[1] - betaXm[1]) / denom;
+      const dBz_dx = (betaXp[2] - betaXm[2]) / denom;
 
-    const dBx_dy = (betaYp[0] - betaYm[0]) / denom;
-    const dBy_dy = (betaYp[1] - betaYm[1]) / denom;
-    const dBz_dy = (betaYp[2] - betaYm[2]) / denom;
+      const dBx_dy = (betaYp[0] - betaYm[0]) / denom;
+      const dBy_dy = (betaYp[1] - betaYm[1]) / denom;
+      const dBz_dy = (betaYp[2] - betaYm[2]) / denom;
 
-    const dBx_dz = (betaZp[0] - betaZm[0]) / denom;
-    const dBy_dz = (betaZp[1] - betaZm[1]) / denom;
-    const dBz_dz = (betaZp[2] - betaZm[2]) / denom;
+      const dBx_dz = (betaZp[0] - betaZm[0]) / denom;
+      const dBy_dz = (betaZp[1] - betaZm[1]) / denom;
+      const dBz_dz = (betaZp[2] - betaZm[2]) / denom;
 
+      if (
+        !Number.isFinite(dBx_dx) ||
+        !Number.isFinite(dBy_dx) ||
+        !Number.isFinite(dBz_dx) ||
+        !Number.isFinite(dBx_dy) ||
+        !Number.isFinite(dBy_dy) ||
+        !Number.isFinite(dBz_dy) ||
+        !Number.isFinite(dBx_dz) ||
+        !Number.isFinite(dBy_dz) ||
+        !Number.isFinite(dBz_dz)
+      ) {
+        return null;
+      }
+
+      const Kxx = dBx_dx;
+      const Kyy = dBy_dy;
+      const Kzz = dBz_dz;
+      const Kxy = 0.5 * (dBy_dx + dBx_dy);
+      const Kxz = 0.5 * (dBz_dx + dBx_dz);
+      const Kyz = 0.5 * (dBz_dy + dBy_dz);
+      const trace = Kxx + Kyy + Kzz;
+      const kSquared =
+        Kxx * Kxx +
+        Kyy * Kyy +
+        Kzz * Kzz +
+        2 * (Kxy * Kxy + Kxz * Kxz + Kyz * Kyz);
+      if (!Number.isFinite(trace) || !Number.isFinite(kSquared)) {
+        return null;
+      }
+      return {
+        Kxx,
+        Kyy,
+        Kzz,
+        Kxy,
+        Kxz,
+        Kyz,
+        trace,
+        kSquared,
+      };
+    };
+
+    const center = sampleExtrinsicCurvature([x, y, z]);
+    if (center == null) return null;
+
+    const rhoGeom = (center.trace * center.trace - center.kSquared) * INV16PI;
+    if (!Number.isFinite(rhoGeom)) return null;
+    const rhoEuler = rhoGeom * GEOM_TO_SI_STRESS;
+
+    const K = [
+      [center.Kxx, center.Kxy, center.Kxz],
+      [center.Kxy, center.Kyy, center.Kyz],
+      [center.Kxz, center.Kyz, center.Kzz],
+    ];
+
+    // Quasi-stationary reduced-order closure for S_ij from the K_ij evolution skeleton.
+    const KK = [
+      [
+        K[0][0] * K[0][0] + K[0][1] * K[1][0] + K[0][2] * K[2][0],
+        K[0][0] * K[0][1] + K[0][1] * K[1][1] + K[0][2] * K[2][1],
+        K[0][0] * K[0][2] + K[0][1] * K[1][2] + K[0][2] * K[2][2],
+      ],
+      [
+        K[1][0] * K[0][0] + K[1][1] * K[1][0] + K[1][2] * K[2][0],
+        K[1][0] * K[0][1] + K[1][1] * K[1][1] + K[1][2] * K[2][1],
+        K[1][0] * K[0][2] + K[1][1] * K[1][2] + K[1][2] * K[2][2],
+      ],
+      [
+        K[2][0] * K[0][0] + K[2][1] * K[1][0] + K[2][2] * K[2][0],
+        K[2][0] * K[0][1] + K[2][1] * K[1][1] + K[2][2] * K[2][1],
+        K[2][0] * K[0][2] + K[2][1] * K[1][2] + K[2][2] * K[2][2],
+      ],
+    ];
+    const A = [
+      [
+        center.trace * K[0][0] - 2 * KK[0][0],
+        center.trace * K[0][1] - 2 * KK[0][1],
+        center.trace * K[0][2] - 2 * KK[0][2],
+      ],
+      [
+        center.trace * K[1][0] - 2 * KK[1][0],
+        center.trace * K[1][1] - 2 * KK[1][1],
+        center.trace * K[1][2] - 2 * KK[1][2],
+      ],
+      [
+        center.trace * K[2][0] - 2 * KK[2][0],
+        center.trace * K[2][1] - 2 * KK[2][1],
+        center.trace * K[2][2] - 2 * KK[2][2],
+      ],
+    ];
+    const atrace = A[0][0] + A[1][1] + A[2][2];
+    const Sgeom = [
+      [
+        A[0][0] * INV8PI + (rhoGeom - atrace * INV8PI),
+        A[0][1] * INV8PI,
+        A[0][2] * INV8PI,
+      ],
+      [
+        A[1][0] * INV8PI,
+        A[1][1] * INV8PI + (rhoGeom - atrace * INV8PI),
+        A[1][2] * INV8PI,
+      ],
+      [
+        A[2][0] * INV8PI,
+        A[2][1] * INV8PI,
+        A[2][2] * INV8PI + (rhoGeom - atrace * INV8PI),
+      ],
+    ];
     if (
-      !Number.isFinite(dBx_dx) ||
-      !Number.isFinite(dBy_dx) ||
-      !Number.isFinite(dBz_dx) ||
-      !Number.isFinite(dBx_dy) ||
-      !Number.isFinite(dBy_dy) ||
-      !Number.isFinite(dBz_dy) ||
-      !Number.isFinite(dBx_dz) ||
-      !Number.isFinite(dBy_dz) ||
-      !Number.isFinite(dBz_dz)
+      !Number.isFinite(Sgeom[0][0]) ||
+      !Number.isFinite(Sgeom[1][1]) ||
+      !Number.isFinite(Sgeom[2][2]) ||
+      !Number.isFinite(Sgeom[0][1]) ||
+      !Number.isFinite(Sgeom[0][2]) ||
+      !Number.isFinite(Sgeom[1][2])
     ) {
       return null;
     }
 
-    const Kxx = dBx_dx;
-    const Kyy = dBy_dy;
-    const Kzz = dBz_dz;
-    const Kxy = 0.5 * (dBy_dx + dBx_dy);
-    const Kxz = 0.5 * (dBz_dx + dBx_dz);
-    const Kyz = 0.5 * (dBz_dy + dBy_dz);
-    const trace = Kxx + Kyy + Kzz;
-    const kSquared =
-      Kxx * Kxx +
-      Kyy * Kyy +
-      Kzz * Kzz +
-      2 * (Kxy * Kxy + Kxz * Kxz + Kyz * Kyz);
-    const rhoGeom = (trace * trace - kSquared) * INV16PI;
-    if (!Number.isFinite(rhoGeom)) return null;
-    const rhoEuler = rhoGeom * GEOM_TO_SI_STRESS;
+    const xp = sampleExtrinsicCurvature([x + step, y, z]);
+    const xm = sampleExtrinsicCurvature([x - step, y, z]);
+    const yp = sampleExtrinsicCurvature([x, y + step, z]);
+    const ym = sampleExtrinsicCurvature([x, y - step, z]);
+    const zp = sampleExtrinsicCurvature([x, y, z + step]);
+    const zm = sampleExtrinsicCurvature([x, y, z - step]);
+    if (xp == null || xm == null || yp == null || ym == null || zp == null || zm == null) {
+      return null;
+    }
+    const gradTrace = [
+      (xp.trace - xm.trace) / denom,
+      (yp.trace - ym.trace) / denom,
+      (zp.trace - zm.trace) / denom,
+    ];
+    const gradKx = [
+      [(xp.Kxx - xm.Kxx) / denom, (xp.Kxy - xm.Kxy) / denom, (xp.Kxz - xm.Kxz) / denom],
+      [(yp.Kxx - ym.Kxx) / denom, (yp.Kxy - ym.Kxy) / denom, (yp.Kxz - ym.Kxz) / denom],
+      [(zp.Kxx - zm.Kxx) / denom, (zp.Kxy - zm.Kxy) / denom, (zp.Kxz - zm.Kxz) / denom],
+    ];
+    const gradKy = [
+      [(xp.Kxy - xm.Kxy) / denom, (xp.Kyy - xm.Kyy) / denom, (xp.Kyz - xm.Kyz) / denom],
+      [(yp.Kxy - ym.Kxy) / denom, (yp.Kyy - ym.Kyy) / denom, (yp.Kyz - ym.Kyz) / denom],
+      [(zp.Kxy - zm.Kxy) / denom, (zp.Kyy - zm.Kyy) / denom, (zp.Kyz - zm.Kyz) / denom],
+    ];
+    const gradKz = [
+      [(xp.Kxz - xm.Kxz) / denom, (xp.Kyz - xm.Kyz) / denom, (xp.Kzz - xm.Kzz) / denom],
+      [(yp.Kxz - ym.Kxz) / denom, (yp.Kyz - ym.Kyz) / denom, (yp.Kzz - ym.Kzz) / denom],
+      [(zp.Kxz - zm.Kxz) / denom, (zp.Kyz - zm.Kyz) / denom, (zp.Kzz - zm.Kzz) / denom],
+    ];
+
+    const finiteGradients = [
+      ...gradTrace,
+      ...gradKx.flat(),
+      ...gradKy.flat(),
+      ...gradKz.flat(),
+    ].every((value) => Number.isFinite(value));
+    if (!finiteGradients) return null;
+
+    const DjKji = [
+      gradKx[0][0] + gradKy[1][0] + gradKz[2][0],
+      gradKx[0][1] + gradKy[1][1] + gradKz[2][1],
+      gradKx[0][2] + gradKy[1][2] + gradKz[2][2],
+    ];
+    const Jgeom = [
+      (DjKji[0] - gradTrace[0]) * INV8PI,
+      (DjKji[1] - gradTrace[1]) * INV8PI,
+      (DjKji[2] - gradTrace[2]) * INV8PI,
+    ];
+    if (!Number.isFinite(Jgeom[0]) || !Number.isFinite(Jgeom[1]) || !Number.isFinite(Jgeom[2])) {
+      return null;
+    }
+
+    const T01 = Jgeom[0] * GEOM_TO_SI_STRESS;
+    const T02 = Jgeom[1] * GEOM_TO_SI_STRESS;
+    const T03 = Jgeom[2] * GEOM_TO_SI_STRESS;
+
+    // Keep legacy diagonal branch stable for source-closure and baseline parity.
+    // The model-term extension in this patch is limited to flux/shear channel emission.
+    const T11 = -rhoEuler;
+    const T22 = -rhoEuler;
+    const T33 = -rhoEuler;
+    const T12 = Sgeom[0][1] * GEOM_TO_SI_STRESS;
+    const T13 = Sgeom[0][2] * GEOM_TO_SI_STRESS;
+    const T23 = Sgeom[1][2] * GEOM_TO_SI_STRESS;
+
     return {
       stress: {
         T00: rhoEuler,
-        T11: -rhoEuler,
-        T22: -rhoEuler,
-        T33: -rhoEuler,
+        T11,
+        T22,
+        T33,
+        T01,
+        T10: T01,
+        T02,
+        T20: T02,
+        T03,
+        T30: T03,
+        T12,
+        T21: T12,
+        T13,
+        T31: T13,
+        T23,
+        T32: T23,
         isNullEnergyConditionSatisfied: false,
+        modelTermRoute: ADM_MODEL_TERM_ROUTE_ID,
+        modelTermAdmission: "experimental_not_admitted",
+        researchBasisRef: ADM_MODEL_TERM_RESEARCH_BASIS_REF,
       },
       diagnostics: {
         rhoGeom,
         rhoSi: rhoEuler,
-        kTrace: trace,
-        kSquared,
+        kTrace: center.trace,
+        kSquared: center.kSquared,
         step_m: step,
         scale_m: scale,
       },
@@ -483,6 +681,21 @@ const calculateMetricStressEnergyFromShiftField = (
   let sumTrace = 0;
   let sumKsq = 0;
   let count = 0;
+  const tensorSums: Record<string, number> = {
+    T00: 0,
+    T11: 0,
+    T22: 0,
+    T33: 0,
+    T01: 0,
+    T02: 0,
+    T03: 0,
+    T12: 0,
+    T13: 0,
+    T23: 0,
+  };
+  const modelTermRouteCounts = new Map<string, number>();
+  const modelTermAdmissionCounts = new Map<string, number>();
+  const researchBasisRefCounts = new Map<string, number>();
 
   for (const point of points) {
     const sample = calculateMetricStressEnergyTensorAtPointFromShiftField(
@@ -497,6 +710,39 @@ const calculateMetricStressEnergyFromShiftField = (
     sumRho += sample.diagnostics.rhoGeom;
     sumTrace += sample.diagnostics.kTrace;
     sumKsq += sample.diagnostics.kSquared;
+    for (const key of Object.keys(tensorSums)) {
+      const value = (sample.stress as Record<string, unknown>)[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        tensorSums[key] += value;
+      }
+    }
+    if (
+      typeof sample.stress.modelTermRoute === "string" &&
+      sample.stress.modelTermRoute.length > 0
+    ) {
+      modelTermRouteCounts.set(
+        sample.stress.modelTermRoute,
+        (modelTermRouteCounts.get(sample.stress.modelTermRoute) ?? 0) + 1,
+      );
+    }
+    if (
+      typeof sample.stress.modelTermAdmission === "string" &&
+      sample.stress.modelTermAdmission.length > 0
+    ) {
+      modelTermAdmissionCounts.set(
+        sample.stress.modelTermAdmission,
+        (modelTermAdmissionCounts.get(sample.stress.modelTermAdmission) ?? 0) + 1,
+      );
+    }
+    if (
+      typeof sample.stress.researchBasisRef === "string" &&
+      sample.stress.researchBasisRef.length > 0
+    ) {
+      researchBasisRefCounts.set(
+        sample.stress.researchBasisRef,
+        (researchBasisRefCounts.get(sample.stress.researchBasisRef) ?? 0) + 1,
+      );
+    }
     count += 1;
   }
 
@@ -519,19 +765,57 @@ const calculateMetricStressEnergyFromShiftField = (
   const rhoGeomMean = baseRhoGeomMean * shiftLapseAttenuation;
   const kTraceMean = baseKTraceMean * kScale;
   const kSquaredMean = baseKSquaredMean * shiftLapseAttenuation;
-  const rhoEuler = rhoGeomMean * GEOM_TO_SI_STRESS;
+  const resolveDominantLabel = (counts: Map<string, number>): string | undefined => {
+    let top: string | undefined;
+    let topCount = -1;
+    for (const [label, labelCount] of counts.entries()) {
+      if (labelCount > topCount) {
+        top = label;
+        topCount = labelCount;
+      }
+    }
+    return top;
+  };
+  const stress: MetricStressTensor = {
+    T00: tensorSums.T00 / count,
+    T11: tensorSums.T11 / count,
+    T22: tensorSums.T22 / count,
+    T33: tensorSums.T33 / count,
+    T01: tensorSums.T01 / count,
+    T10: tensorSums.T01 / count,
+    T02: tensorSums.T02 / count,
+    T20: tensorSums.T02 / count,
+    T03: tensorSums.T03 / count,
+    T30: tensorSums.T03 / count,
+    T12: tensorSums.T12 / count,
+    T21: tensorSums.T12 / count,
+    T13: tensorSums.T13 / count,
+    T31: tensorSums.T13 / count,
+    T23: tensorSums.T23 / count,
+    T32: tensorSums.T23 / count,
+    isNullEnergyConditionSatisfied: false,
+  };
+  const dominantModelTermRoute = resolveDominantLabel(modelTermRouteCounts);
+  const dominantModelTermAdmission = resolveDominantLabel(modelTermAdmissionCounts);
+  const dominantResearchBasisRef = resolveDominantLabel(researchBasisRefCounts);
+  if (dominantModelTermRoute) {
+    stress.modelTermRoute = dominantModelTermRoute;
+  }
+  if (
+    dominantModelTermAdmission === "admitted" ||
+    dominantModelTermAdmission === "experimental_not_admitted"
+  ) {
+    stress.modelTermAdmission = dominantModelTermAdmission;
+  }
+  if (dominantResearchBasisRef) {
+    stress.researchBasisRef = dominantResearchBasisRef;
+  }
   return {
-    stress: {
-      T00: rhoEuler,
-      T11: -rhoEuler,
-      T22: -rhoEuler,
-      T33: -rhoEuler,
-      isNullEnergyConditionSatisfied: false,
-    },
+    stress,
     diagnostics: {
       sampleCount: count,
       rhoGeomMean,
-      rhoSiMean: rhoEuler,
+      rhoSiMean: stress.T00,
       kTraceMean,
       kSquaredMean,
       step_m: step,
@@ -646,10 +930,10 @@ export interface NatarioWarpResult {
 
 // Momentum flux balance
   momentumFlux: number;                 // kgâ‹…m/sÂ² - booster shell
-  stressEnergyTensor: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
+  stressEnergyTensor: MetricStressTensor;
   stressEnergySource?: StressEnergySource;
-  metricStressEnergy?: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
-  tileEffectiveStressEnergy?: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
+  metricStressEnergy?: MetricStressTensor;
+  tileEffectiveStressEnergy?: MetricStressTensor;
   tileEffectiveStressSource?: StressEnergySource;
   metricT00?: number;
   metricT00Source?: StressEnergySource;

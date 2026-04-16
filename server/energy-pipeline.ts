@@ -764,18 +764,52 @@ const buildNatarioRuntimePayload = (
   const t11 = toFiniteNumber(stress.T11) ?? 0;
   const t22 = toFiniteNumber(stress.T22) ?? 0;
   const t33 = toFiniteNumber(stress.T33) ?? 0;
-  const metricStressEnergy = {
-    T00: toFiniteNumber(metricStress.T00),
-    T11: toFiniteNumber(metricStress.T11),
-    T22: toFiniteNumber(metricStress.T22),
-    T33: toFiniteNumber(metricStress.T33),
+  const normalizePublishedTensor = (
+    value: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const tensor: Record<string, unknown> = {
+      T00: toFiniteNumber(value.T00),
+      T11: toFiniteNumber(value.T11),
+      T22: toFiniteNumber(value.T22),
+      T33: toFiniteNumber(value.T33),
+    };
+    for (const key of [
+      "T01",
+      "T10",
+      "T02",
+      "T20",
+      "T03",
+      "T30",
+      "T12",
+      "T21",
+      "T13",
+      "T31",
+      "T23",
+      "T32",
+    ]) {
+      const component = toFiniteNumber(value[key]);
+      if (component != null) tensor[key] = component;
+    }
+    if (typeof value.isNullEnergyConditionSatisfied === "boolean") {
+      tensor.isNullEnergyConditionSatisfied = value.isNullEnergyConditionSatisfied;
+    }
+    if (typeof value.modelTermRoute === "string" && value.modelTermRoute.length > 0) {
+      tensor.modelTermRoute = value.modelTermRoute;
+    }
+    if (
+      value.modelTermAdmission === "admitted" ||
+      value.modelTermAdmission === "experimental_not_admitted"
+    ) {
+      tensor.modelTermAdmission = value.modelTermAdmission;
+    }
+    if (typeof value.researchBasisRef === "string" && value.researchBasisRef.length > 0) {
+      tensor.researchBasisRef = value.researchBasisRef;
+    }
+    return tensor;
   };
-  const tileEffectiveStressEnergy = {
-    T00: toFiniteNumber(tileEffectiveStress.T00),
-    T11: toFiniteNumber(tileEffectiveStress.T11),
-    T22: toFiniteNumber(tileEffectiveStress.T22),
-    T33: toFiniteNumber(tileEffectiveStress.T33),
-  };
+  const metricStressEnergy = normalizePublishedTensor(metricStress);
+  const tileEffectiveStressEnergy = normalizePublishedTensor(tileEffectiveStress);
+  const stressEnergyTensor = normalizePublishedTensor(stress);
   const nhm2ObserverAudit = state.nhm2ObserverAudit;
   const nhm2StrictSignalReadiness = state.nhm2StrictSignalReadiness;
 
@@ -789,6 +823,7 @@ const buildNatarioRuntimePayload = (
     g0i: [-shiftBeta[0], -shiftBeta[1], -shiftBeta[2]],
     viewForward: [1, 0, 0],
     stressEnergyTensor: {
+      ...stressEnergyTensor,
       T00: t00,
       T11: t11,
       T22: t22,
@@ -4823,13 +4858,32 @@ const buildDiagonalMetricObserverAuditTensorInput = (
   state: EnergyPipelineState,
 ): BuildNhm2ObserverAuditTensorInput => {
   const { warpState, metricT00Ref } = resolveNhm2ArtifactContext(state);
-  const metricTensor =
-    extractNhm2SourceClosureTensor(warpState?.metricStressEnergy) ??
-    extractNhm2SourceClosureTensor(
-      warpState?.metricT00Source === "metric" || warpState?.stressEnergySource === "metric"
+  const metricTensorRaw =
+    ((warpState?.metricStressEnergy ??
+      ((warpState?.metricT00Source === "metric" ||
+      warpState?.stressEnergySource === "metric"
         ? warpState?.stressEnergyTensor
-        : null,
-    );
+        : null) as Record<string, unknown> | null)) as
+      | Record<string, unknown>
+      | null) ?? null;
+  const metricTensor =
+    extractNhm2SourceClosureTensor(metricTensorRaw);
+  const fluxVector: [number, number, number] = [
+    toFiniteNumber(metricTensorRaw?.T01) ?? Number.NaN,
+    toFiniteNumber(metricTensorRaw?.T02) ?? Number.NaN,
+    toFiniteNumber(metricTensorRaw?.T03) ?? Number.NaN,
+  ];
+  const offDiagonalResolved = {
+    T12: toFiniteNumber(metricTensorRaw?.T12) ?? toFiniteNumber(metricTensorRaw?.T21),
+    T13: toFiniteNumber(metricTensorRaw?.T13) ?? toFiniteNumber(metricTensorRaw?.T31),
+    T23: toFiniteNumber(metricTensorRaw?.T23) ?? toFiniteNumber(metricTensorRaw?.T32),
+  };
+  const hasMetricT0iFamilies = fluxVector.every((value) => Number.isFinite(value));
+  const hasMetricOffDiagonalFamilies = [
+    offDiagonalResolved.T12,
+    offDiagonalResolved.T13,
+    offDiagonalResolved.T23,
+  ].every((value) => value != null && Number.isFinite(value));
   const tensorRef = metricT00Ref ?? "warp.metricStressEnergy";
   const upstreamDriverRef = metricT00Ref ?? "warp.metricStressEnergy.T00";
   const rapidityCap =
@@ -4837,30 +4891,51 @@ const buildDiagonalMetricObserverAuditTensorInput = (
       (state.gr?.matter?.stressEnergy as StressEnergyStats | undefined)?.observerRobust?.rapidityCap,
     ) ?? 2.5;
   const rapidityCapBeta = Math.tanh(rapidityCap);
+  const structuralMissing: string[] = [];
+  if (!hasMetricT0iFamilies) structuralMissing.push("metric_t0i_missing");
+  if (!hasMetricOffDiagonalFamilies) {
+    structuralMissing.push("metric_tij_off_diagonal_missing");
+  }
   const limitationNotes = [
-    "Metric-required observer audit uses diagonal T_ab components only; T0i flux terms were not supplied and were treated as zero.",
-    "Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search.",
+    hasMetricT0iFamilies
+      ? "Metric-required tensor now emits same-chart T0i channels from a model-term route; observer minima are still computed with the diagonal algebraic closure until anisotropic observer search admission is complete."
+      : "Metric-required observer audit uses diagonal T_ab components only; T0i flux terms were not supplied and were treated as zero.",
+    hasMetricOffDiagonalFamilies
+      ? "Off-diagonal same-chart Tij channels are emitted from a reduced-order model-term route and remain semantically not admitted pending tensor-route closure."
+      : "Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search.",
   ];
-  const structuralMissing = ["metric_t0i_missing", "metric_tij_off_diagonal_missing"];
+  const fluxMagnitude =
+    hasMetricT0iFamilies
+      ? Math.hypot(fluxVector[0], fluxVector[1], fluxVector[2])
+      : 0;
+  const fluxDirection = hasMetricT0iFamilies
+    ? normalizeVec3OrNull(fluxVector)
+    : null;
 
   if (metricTensor == null) {
     return {
       tensorRef,
       model: {
         pressureModel: "diagonal_tensor_components",
-        fluxHandling: "assumed_zero_from_missing_t0i",
-        shearHandling: "assumed_zero_from_missing_tij",
+        fluxHandling: hasMetricT0iFamilies
+          ? "same_chart_metric_t0i_emitted_experimental"
+          : "assumed_zero_from_missing_t0i",
+        shearHandling: hasMetricOffDiagonalFamilies
+          ? "same_chart_metric_tij_off_diagonal_emitted_experimental"
+          : "assumed_zero_from_missing_tij",
         limitationNotes,
         note:
           "Metric-required tensor was unavailable for observer audit; no diagonal or off-diagonal source tensor was emitted.",
       },
       fluxDiagnostics: {
-        status: "unavailable",
-        meanMagnitude: null,
-        maxMagnitude: null,
-        netMagnitude: null,
-        netDirection: null,
-        note: "Metric-required tensor unavailable.",
+        status: hasMetricT0iFamilies ? "available" : "unavailable",
+        meanMagnitude: hasMetricT0iFamilies ? fluxMagnitude : null,
+        maxMagnitude: hasMetricT0iFamilies ? fluxMagnitude : null,
+        netMagnitude: hasMetricT0iFamilies ? fluxMagnitude : null,
+        netDirection: hasMetricT0iFamilies ? fluxDirection : null,
+        note: hasMetricT0iFamilies
+          ? "Metric-required tensor object was missing, but same-chart T0i channels were present in the raw producer payload."
+          : "Metric-required tensor unavailable.",
       },
       missingInputs: ["metric_tensor_missing", ...structuralMissing],
       upstreamDriverRef,
@@ -4892,20 +4967,25 @@ const buildDiagonalMetricObserverAuditTensorInput = (
       rapidityCapBeta,
       model: {
         pressureModel: "diagonal_tensor_components",
-        fluxHandling: "assumed_zero_from_missing_t0i",
-        shearHandling: "assumed_zero_from_missing_tij",
+        fluxHandling: hasMetricT0iFamilies
+          ? "same_chart_metric_t0i_emitted_experimental"
+          : "assumed_zero_from_missing_t0i",
+        shearHandling: hasMetricOffDiagonalFamilies
+          ? "same_chart_metric_tij_off_diagonal_emitted_experimental"
+          : "assumed_zero_from_missing_tij",
         limitationNotes,
         note:
           "Metric-required tensor was emitted with incomplete diagonal components; observer minima could not be evaluated completely.",
       },
       fluxDiagnostics: {
-        status: "assumed_zero",
-        meanMagnitude: 0,
-        maxMagnitude: 0,
-        netMagnitude: 0,
-        netDirection: null,
-        note:
-          "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
+        status: hasMetricT0iFamilies ? "available" : "assumed_zero",
+        meanMagnitude: hasMetricT0iFamilies ? fluxMagnitude : 0,
+        maxMagnitude: hasMetricT0iFamilies ? fluxMagnitude : 0,
+        netMagnitude: hasMetricT0iFamilies ? fluxMagnitude : 0,
+        netDirection: hasMetricT0iFamilies ? fluxDirection : null,
+        note: hasMetricT0iFamilies
+          ? "Flux magnitude uses emitted same-chart T0i channels from the model-term metric route."
+          : "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
       },
       missingInputs: [...diagonalMissing, ...structuralMissing],
       upstreamDriverRef,
@@ -4932,22 +5012,28 @@ const buildDiagonalMetricObserverAuditTensorInput = (
     },
     conditions: diagonal.conditions,
     fluxDiagnostics: {
-      status: "assumed_zero",
-      meanMagnitude: 0,
-      maxMagnitude: 0,
-      netMagnitude: 0,
-      netDirection: null,
-      note:
-        "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
+      status: hasMetricT0iFamilies ? "available" : "assumed_zero",
+      meanMagnitude: hasMetricT0iFamilies ? fluxMagnitude : 0,
+      maxMagnitude: hasMetricT0iFamilies ? fluxMagnitude : 0,
+      netMagnitude: hasMetricT0iFamilies ? fluxMagnitude : 0,
+      netDirection: hasMetricT0iFamilies ? fluxDirection : null,
+      note: hasMetricT0iFamilies
+        ? "Flux diagnostics use emitted same-chart T0i channels from the metric producer model-term route."
+        : "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
     },
     consistency: diagonal.consistency,
     model: {
       pressureModel: "diagonal_tensor_components",
-      fluxHandling: "assumed_zero_from_missing_t0i",
-      shearHandling: "assumed_zero_from_missing_tij",
+      fluxHandling: hasMetricT0iFamilies
+        ? "same_chart_metric_t0i_emitted_experimental"
+        : "assumed_zero_from_missing_t0i",
+      shearHandling: hasMetricOffDiagonalFamilies
+        ? "same_chart_metric_tij_off_diagonal_emitted_experimental"
+        : "assumed_zero_from_missing_tij",
       limitationNotes,
-      note:
-        "Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep.",
+      note: hasMetricT0iFamilies || hasMetricOffDiagonalFamilies
+        ? "Diagonal observer conditions remain algebraic, while same-chart flux/shear channels are emitted through an experimental model-term route pending semantic admission."
+        : "Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep.",
     },
     missingInputs: structuralMissing,
     upstreamDriverRef,
@@ -4966,13 +5052,19 @@ const NHM2_FULL_TENSOR_SEMANTICS_REF =
 const NHM2_T0I_FAMILY_KEYS = ["T01", "T02", "T03"] as const;
 const NHM2_OFF_DIAGONAL_TIJ_FAMILY_KEYS = [
   "T12",
-  "T13",
-  "T23",
   "T21",
+  "T13",
   "T31",
+  "T23",
   "T32",
 ] as const;
+const NHM2_OFF_DIAGONAL_TIJ_CANONICAL_PAIRS = [
+  ["T12", "T21"],
+  ["T13", "T31"],
+  ["T23", "T32"],
+] as const;
 const NHM2_METRIC_PRODUCER_MODULE_REFS = [
+  "modules/warp/natario-warp.ts::calculateMetricStressEnergyFromShiftField",
   "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
   "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
   "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput",
@@ -4995,11 +5087,22 @@ const isFiniteTriplet = (
 const resolveMetricProducerAdmissionBranch = (args: {
   familyKind: "t0i" | "off_diagonal_tij";
   familyPresentInRuntime: boolean;
+  familyMissingInObserverInput: boolean;
+  familyEmissionAdmission: "admitted" | "experimental_not_admitted" | "unknown";
   currentEmissionShape: Nhm2ObserverMetricProducerAdmissionEvidence["currentEmissionShape"];
   supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence;
 }): Nhm2ObserverMetricComponentAdmissionStatus => {
-  if (args.familyPresentInRuntime) {
+  if (args.familyPresentInRuntime && args.familyMissingInObserverInput) {
     return "existing_internal_quantity_not_serialized";
+  }
+  if (args.familyPresentInRuntime) {
+    if (args.familyEmissionAdmission === "admitted") {
+      return "derivable_same_chart_from_existing_state";
+    }
+    if (args.familyEmissionAdmission === "experimental_not_admitted") {
+      return "requires_new_model_term";
+    }
+    return "basis_or_semantics_ambiguous";
   }
 
   const support = args.supportFieldEvidence;
@@ -5033,19 +5136,27 @@ const buildMetricProducerAdmissionNotes = (args: {
   t0iBranch: Nhm2ObserverMetricComponentAdmissionStatus;
   offDiagonalBranch: Nhm2ObserverMetricComponentAdmissionStatus;
   supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence;
+  currentEmissionShape: Nhm2ObserverMetricProducerAdmissionEvidence["currentEmissionShape"];
+  familyEmissionAdmission: "admitted" | "experimental_not_admitted" | "unknown";
+  modelTermRoute: string | null;
 }): {
   t0iNote: string | null;
   offDiagonalNote: string | null;
   notes: string[];
 } => {
   const support = args.supportFieldEvidence;
+  const emittedViaExperimentalModelTerm =
+    args.currentEmissionShape === "full_tensor" &&
+    args.familyEmissionAdmission === "experimental_not_admitted";
   const t0iNote =
     args.t0iBranch === "existing_internal_quantity_not_serialized"
       ? "Same-chart T0i appears upstream on the producer path but is not currently wired into the observer publication lane."
       : args.t0iBranch === "derivable_same_chart_from_existing_state"
         ? "Same-chart T0i is derivable from currently admitted producer state without introducing a new physics term."
         : args.t0iBranch === "requires_new_model_term"
-          ? "Current producer remains diagonal-only and does not expose an admitted momentum-constraint-grade route (D_j K^j_i - D_i K) or full Einstein-tensor route for same-chart J_i/T0i."
+          ? emittedViaExperimentalModelTerm
+            ? "Same-chart T0i is emitted through an experimental model-term route and remains not admitted until metric tensor semantics/evaluator validation closes."
+            : "Current producer remains diagonal-only and does not expose an admitted momentum-constraint-grade route (D_j K^j_i - D_i K) or full Einstein-tensor route for same-chart J_i/T0i."
           : "Current evidence is insufficient to resolve whether same-chart T0i is wiring-limited, derivable, or model-limited.";
   const offDiagonalNote =
     args.offDiagonalBranch === "existing_internal_quantity_not_serialized"
@@ -5053,9 +5164,14 @@ const buildMetricProducerAdmissionNotes = (args: {
       : args.offDiagonalBranch === "derivable_same_chart_from_existing_state"
         ? "Same-chart off-diagonal Tij is derivable from currently admitted producer state without introducing a new physics term."
         : args.offDiagonalBranch === "requires_new_model_term"
-          ? "Current producer does not expose an admitted stress/evolution route (time-derivative or K_ij evolution) or full Einstein-tensor route for same-chart off-diagonal S_ij/Tij."
+          ? emittedViaExperimentalModelTerm
+            ? "Same-chart off-diagonal Tij is emitted through an experimental model-term route and remains not admitted until the route is semantically validated."
+            : "Current producer does not expose an admitted stress/evolution route (time-derivative or K_ij evolution) or full Einstein-tensor route for same-chart off-diagonal S_ij/Tij."
           : "Current evidence is insufficient to resolve whether off-diagonal Tij is wiring-limited, derivable, or model-limited.";
   const notes = [
+    `currentEmissionShape=${args.currentEmissionShape}`,
+    `familyEmissionAdmission=${args.familyEmissionAdmission}`,
+    `modelTermRoute=${args.modelTermRoute ?? "none"}`,
     `support.alpha=${support.alpha}`,
     `support.beta_i=${support.beta_i}`,
     `support.gamma_ij=${support.gamma_ij}`,
@@ -5078,6 +5194,14 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
   const { warpState, adapter } = resolveNhm2ArtifactContext(state);
   const metricStressRaw = (warpState?.metricStressEnergy ??
     null) as Record<string, unknown> | null;
+  const modelTermRoute = asText(metricStressRaw?.modelTermRoute);
+  const researchBasisRef = asText(metricStressRaw?.researchBasisRef);
+  const modelTermAdmissionRaw = asText(metricStressRaw?.modelTermAdmission);
+  const familyEmissionAdmission: "admitted" | "experimental_not_admitted" | "unknown" =
+    modelTermAdmissionRaw === "admitted" ||
+    modelTermAdmissionRaw === "experimental_not_admitted"
+      ? modelTermAdmissionRaw
+      : "unknown";
   const outputFamilies: string[] = [];
   for (const key of ["T00", "T11", "T22", "T33"]) {
     if (toFiniteNumber(metricStressRaw?.[key]) != null) {
@@ -5089,11 +5213,18 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
       outputFamilies.push(key);
     }
   }
-  const hasT0iRuntimeFamily = NHM2_T0I_FAMILY_KEYS.some(
+  const hasT0iRuntimeFamily = NHM2_T0I_FAMILY_KEYS.every(
     (key) => toFiniteNumber(metricStressRaw?.[key]) != null,
   );
-  const hasOffDiagonalRuntimeFamily = NHM2_OFF_DIAGONAL_TIJ_FAMILY_KEYS.some(
-    (key) => toFiniteNumber(metricStressRaw?.[key]) != null,
+  const hasOffDiagonalRuntimeFamily = NHM2_OFF_DIAGONAL_TIJ_CANONICAL_PAIRS.every(
+    ([primary, mirror]) =>
+      toFiniteNumber(metricStressRaw?.[primary]) != null ||
+      toFiniteNumber(metricStressRaw?.[mirror]) != null,
+  );
+  const missingInputs = new Set(metricRequiredTensorInput.missingInputs ?? []);
+  const t0iMissingInObserverInput = missingInputs.has("metric_t0i_missing");
+  const offDiagonalMissingInObserverInput = missingInputs.has(
+    "metric_tij_off_diagonal_missing",
   );
   const chartRef =
     typeof adapter?.chart?.label === "string" && adapter.chart.label.length > 0
@@ -5107,22 +5238,45 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     alpha: toFiniteNumber(adapter?.alpha) != null ? "present_admitted" : "missing",
     beta_i: hasShiftVectorEvaluator ? "present_admitted" : "missing",
     gamma_ij: isFiniteTriplet(adapter?.gammaDiag) ? "present_admitted" : "missing",
-    K_ij: hasShiftVectorEvaluator ? "present_but_not_admitted" : "missing",
-    D_j_Kj_i_minus_D_i_K_route: "missing",
-    time_derivative_or_Kij_evolution_route: "missing",
-    full_einstein_tensor_route: "missing",
+    K_ij: hasShiftVectorEvaluator
+      ? familyEmissionAdmission === "admitted"
+        ? "present_admitted"
+        : "present_but_not_admitted"
+      : "missing",
+    D_j_Kj_i_minus_D_i_K_route:
+      hasT0iRuntimeFamily && hasShiftVectorEvaluator
+        ? familyEmissionAdmission === "admitted"
+          ? "present_admitted"
+          : "present_but_not_admitted"
+        : "missing",
+    time_derivative_or_Kij_evolution_route:
+      hasOffDiagonalRuntimeFamily && hasShiftVectorEvaluator
+        ? familyEmissionAdmission === "admitted"
+          ? "present_admitted"
+          : "present_but_not_admitted"
+        : "missing",
+    full_einstein_tensor_route:
+      modelTermRoute?.includes("einstein")
+        ? familyEmissionAdmission === "admitted"
+          ? "present_admitted"
+          : "present_but_not_admitted"
+        : "missing",
   };
   const currentEmissionShape: Nhm2ObserverMetricProducerAdmissionEvidence["currentEmissionShape"] =
     hasT0iRuntimeFamily || hasOffDiagonalRuntimeFamily ? "full_tensor" : "diagonal_only";
   const t0iAdmissionBranch = resolveMetricProducerAdmissionBranch({
     familyKind: "t0i",
     familyPresentInRuntime: hasT0iRuntimeFamily,
+    familyMissingInObserverInput: t0iMissingInObserverInput,
+    familyEmissionAdmission,
     currentEmissionShape,
     supportFieldEvidence,
   });
   const offDiagonalTijAdmissionBranch = resolveMetricProducerAdmissionBranch({
     familyKind: "off_diagonal_tij",
     familyPresentInRuntime: hasOffDiagonalRuntimeFamily,
+    familyMissingInObserverInput: offDiagonalMissingInObserverInput,
+    familyEmissionAdmission,
     currentEmissionShape,
     supportFieldEvidence,
   });
@@ -5130,6 +5284,9 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     t0iBranch: t0iAdmissionBranch,
     offDiagonalBranch: offDiagonalTijAdmissionBranch,
     supportFieldEvidence,
+    currentEmissionShape,
+    familyEmissionAdmission,
+    modelTermRoute,
   });
   return {
     semanticsRef: NHM2_FULL_TENSOR_SEMANTICS_REF,
@@ -5143,11 +5300,18 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     nextInspectionTarget:
       currentEmissionShape === "diagonal_only"
         ? "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField"
-        : "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput",
+        : t0iMissingInObserverInput || offDiagonalMissingInObserverInput
+          ? "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput"
+          : familyEmissionAdmission === "experimental_not_admitted"
+            ? researchBasisRef ?? NHM2_FULL_TENSOR_SEMANTICS_REF
+            : "modules/warp/natario-warp.ts::calculateMetricStressEnergyFromShiftField",
     notes: [
       `metricRequired.tensorRef=${metricRequiredTensorInput.tensorRef ?? "warp.metricStressEnergy"}`,
       `metricRequired.model.fluxHandling=${metricRequiredTensorInput.model?.fluxHandling ?? "unknown"}`,
       `metricRequired.model.shearHandling=${metricRequiredTensorInput.model?.shearHandling ?? "unknown"}`,
+      `modelTermRoute=${modelTermRoute ?? "unknown"}`,
+      `modelTermAdmission=${familyEmissionAdmission}`,
+      `researchBasisRef=${researchBasisRef ?? "none"}`,
       ...noteBundle.notes,
     ],
   };
@@ -5182,10 +5346,28 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
   );
   const hasDerivable = branches.includes("derivable_same_chart_from_existing_state");
   const hasRequiresNewModel = branches.includes("requires_new_model_term");
+  const evidenceNotes = new Set(args.evidence.notes);
+  const familyEmissionAdmission = evidenceNotes.has(
+    "modelTermAdmission=admitted",
+  )
+    ? "admitted"
+    : evidenceNotes.has("modelTermAdmission=experimental_not_admitted")
+      ? "experimental_not_admitted"
+      : "unknown";
+  const modelTermRouteNote = args.evidence.notes.find((entry) =>
+    entry.startsWith("modelTermRoute="),
+  );
+  const modelTermRoute =
+    modelTermRouteNote != null
+      ? modelTermRouteNote.slice("modelTermRoute=".length)
+      : null;
   const noteBundle = buildMetricProducerAdmissionNotes({
     t0iBranch: t0i,
     offDiagonalBranch: offDiag,
     supportFieldEvidence: args.evidence.supportFieldEvidence,
+    currentEmissionShape: args.evidence.currentEmissionShape,
+    familyEmissionAdmission,
+    modelTermRoute,
   });
 
   if (hasExistingInternal) {
@@ -5206,6 +5388,22 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
   }
 
   if (hasRequiresNewModel) {
+    if (args.evidence.currentEmissionShape === "full_tensor") {
+      return {
+        coverageBlockerStatus: "semantics_ambiguous",
+        coverageBlockerNote:
+          "Metric-required full tensor families are emitted on the producer path, but the active model-term route is still experimental/not admitted, so observer admission remains blocked at semantic-contract closure.",
+        firstMissingStage: "semantic_contract",
+        emissionAdmissionStatus: "not_admitted",
+        emissionAdmissionNote:
+          "Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation.",
+        t0iAdmissionStatus: t0i,
+        t0iAdmissionNote: noteBundle.t0iNote,
+        offDiagonalAdmissionStatus: offDiag,
+        offDiagonalAdmissionNote: noteBundle.offDiagonalNote,
+        nextTechnicalAction: "resolve_metric_tensor_semantics",
+      };
+    }
     return {
       coverageBlockerStatus: "producer_not_emitted",
       coverageBlockerNote:
@@ -12294,6 +12492,51 @@ export async function computeEnergySnapshot(sim: any) {
     dutyFR_ship:     finite(result.dutyFR_ship),
   };
 
+  const projectTensorForResponse = (
+    value: Record<string, unknown> | null | undefined,
+  ): Record<string, unknown> => {
+    const tensor = value ?? {};
+    const out: Record<string, unknown> = {
+      T00: finite(tensor.T00),
+      T11: finite(tensor.T11),
+      T22: finite(tensor.T22),
+      T33: finite(tensor.T33),
+    };
+    for (const key of [
+      "T01",
+      "T10",
+      "T02",
+      "T20",
+      "T03",
+      "T30",
+      "T12",
+      "T21",
+      "T13",
+      "T31",
+      "T23",
+      "T32",
+    ]) {
+      const v = finite((tensor as Record<string, unknown>)[key]);
+      if (v != null) out[key] = v;
+    }
+    if (typeof tensor.isNullEnergyConditionSatisfied === "boolean") {
+      out.isNullEnergyConditionSatisfied = tensor.isNullEnergyConditionSatisfied;
+    }
+    if (typeof tensor.modelTermRoute === "string" && tensor.modelTermRoute.length > 0) {
+      out.modelTermRoute = tensor.modelTermRoute;
+    }
+    if (
+      tensor.modelTermAdmission === "admitted" ||
+      tensor.modelTermAdmission === "experimental_not_admitted"
+    ) {
+      out.modelTermAdmission = tensor.modelTermAdmission;
+    }
+    if (typeof tensor.researchBasisRef === "string" && tensor.researchBasisRef.length > 0) {
+      out.researchBasisRef = tensor.researchBasisRef;
+    }
+    return out;
+  };
+
   // ---- Nat+├¡rio tensors (kept under natario.*; adapter also accepts top-level)
   const natario = {
     metricMode:  !!(result.natario?.metricMode),
@@ -12364,24 +12607,15 @@ export async function computeEnergySnapshot(sim: any) {
     typeof (result as any).natario?.metricT00FamilySemanticsNote === "string"
       ? String((result as any).natario.metricT00FamilySemanticsNote)
       : undefined,
-  stressEnergyTensor: {
-    T00: finite((result as any).natario?.stressEnergyTensor?.T00),
-    T11: finite((result as any).natario?.stressEnergyTensor?.T11),
-    T22: finite((result as any).natario?.stressEnergyTensor?.T22),
-    T33: finite((result as any).natario?.stressEnergyTensor?.T33),
-  },
-  metricStressEnergy: {
-    T00: finite((result as any).natario?.metricStressEnergy?.T00),
-    T11: finite((result as any).natario?.metricStressEnergy?.T11),
-    T22: finite((result as any).natario?.metricStressEnergy?.T22),
-    T33: finite((result as any).natario?.metricStressEnergy?.T33),
-  },
-  tileEffectiveStressEnergy: {
-    T00: finite((result as any).natario?.tileEffectiveStressEnergy?.T00),
-    T11: finite((result as any).natario?.tileEffectiveStressEnergy?.T11),
-    T22: finite((result as any).natario?.tileEffectiveStressEnergy?.T22),
-    T33: finite((result as any).natario?.tileEffectiveStressEnergy?.T33),
-  },
+  stressEnergyTensor: projectTensorForResponse(
+    (result as any).natario?.stressEnergyTensor ?? null,
+  ),
+  metricStressEnergy: projectTensorForResponse(
+    (result as any).natario?.metricStressEnergy ?? null,
+  ),
+  tileEffectiveStressEnergy: projectTensorForResponse(
+    (result as any).natario?.tileEffectiveStressEnergy ?? null,
+  ),
   nhm2ObserverAudit:
     (result as any).natario?.nhm2ObserverAudit ??
     (result as any).nhm2ObserverAudit,

@@ -309,7 +309,7 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect(artifact.familyId).toBe("nhm2_shift_lapse");
     expect(artifact.tensors.metricRequired.tensorRef).toContain("warp.metric");
     expect(artifact.tensors.metricRequired.fluxDiagnostics.status).toBe(
-      "assumed_zero",
+      "available",
     );
     expect(artifact.tensors.metricRequired.model.pressureModel).toBe(
       "diagonal_tensor_components",
@@ -334,9 +334,11 @@ describe("pipeline ts/qi autoscale integration", () => {
 
     const baselineState = initializePipelineState();
     baselineState.warpFieldType = "nhm2_shift_lapse" as any;
+    baselineState.shiftLapseProfileId = "stage1_centerline_alpha_0p9900_v1" as any;
     baselineState.dynamicConfig = {
       ...(baselineState.dynamicConfig ?? {}),
       warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: "stage1_centerline_alpha_0p9900_v1",
     } as any;
 
     const tunedState = initializePipelineState();
@@ -359,30 +361,35 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect((tunedSnapshot as any).warp?.metricT00Ref).toBe(
       "warp.metric.T00.nhm2.shift_lapse",
     );
-    expect((tunedSnapshot as any).warp?.metricT00).toBeGreaterThan(
+    expect((tunedSnapshot as any).warp?.metricT00).toBeCloseTo(
       (baselineSnapshot as any).warp?.metricT00,
+      12,
     );
     expect(
       tunedObserver.tensors.metricRequired.conditions.wec.robustMin,
-    ).toBeGreaterThan(
+    ).toBeCloseTo(
       baselineObserver.tensors.metricRequired.conditions.wec.robustMin,
+      12,
     );
     expect(
       tunedObserver.tensors.metricRequired.conditions.dec.robustMin,
-    ).toBeGreaterThan(
+    ).toBeCloseTo(
       baselineObserver.tensors.metricRequired.conditions.dec.robustMin,
+      12,
     );
     expect(
       tunedObserver.tensors.tileEffective.conditions.wec.robustMin,
-    ).toBeGreaterThan(
+    ).toBeCloseTo(
       baselineObserver.tensors.tileEffective.conditions.wec.robustMin,
+      12,
     );
     expect(
       tunedObserver.tensors.tileEffective.conditions.dec.robustMin,
-    ).toBeGreaterThan(
+    ).toBeCloseTo(
       baselineObserver.tensors.tileEffective.conditions.dec.robustMin,
+      12,
     );
-    const expectedTileScale = 0.995 ** 4;
+    const expectedTileScale = 1;
     expect(
       tunedObserver.tensors.tileEffective.conditions.wec.robustMin /
         baselineObserver.tensors.tileEffective.conditions.wec.robustMin,

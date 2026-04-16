@@ -4,9 +4,8 @@
   "familyId": "nhm2_shift_lapse",
   "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
   "status": "fail",
-  "completeness": "incomplete",
+  "completeness": "complete",
   "reasonCodes": [
-    "metric_audit_incomplete",
     "observer_condition_failed",
     "surrogate_model_limited"
   ],
@@ -29,17 +28,17 @@
   "observerRemediationSequenceStatus": "metric_then_tile_proxy",
   "observerTileDiminishingReturnStatus": "likely_stop_territory",
   "observerTileDiminishingReturnNote": "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.",
-  "observerMetricCompletenessStatus": "incomplete_missing_inputs",
-  "observerMetricCompletenessNote": "Metric-required observer audit remains diagonal-only because T0i flux terms and off-diagonal spatial shear terms were not supplied; missing inputs: metric_t0i_missing, metric_tij_off_diagonal_missing",
-  "observerMetricCoverageBlockerStatus": "producer_not_emitted",
-  "observerMetricCoverageBlockerNote": "Metric-required observer completeness remains blocked at producer emission: current runtime emits diagonal-only stress and lacks admitted same-chart routes required for J_i/T0i and off-diagonal S_ij/Tij closure.",
+  "observerMetricCompletenessStatus": "complete",
+  "observerMetricCompletenessNote": "Metric-required observer audit has no declared missing observer inputs.",
+  "observerMetricCoverageBlockerStatus": "semantics_ambiguous",
+  "observerMetricCoverageBlockerNote": "Metric-required full tensor families are emitted on the producer path, but the active model-term route is still experimental/not admitted, so observer admission remains blocked at semantic-contract closure.",
   "observerMetricFirstMissingStage": "semantic_contract",
   "observerMetricEmissionAdmissionStatus": "not_admitted",
-  "observerMetricEmissionAdmissionNote": "Admission failed: current evidence localizes both missing families to a model-term/evaluator gap rather than a wiring-only gap.",
+  "observerMetricEmissionAdmissionNote": "Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation.",
   "observerMetricT0iAdmissionStatus": "requires_new_model_term",
-  "observerMetricT0iAdmissionNote": "Current producer remains diagonal-only and does not expose an admitted momentum-constraint-grade route (D_j K^j_i - D_i K) or full Einstein-tensor route for same-chart J_i/T0i.",
+  "observerMetricT0iAdmissionNote": "Same-chart T0i is emitted through an experimental model-term route and remains not admitted until metric tensor semantics/evaluator validation closes.",
   "observerMetricOffDiagonalTijAdmissionStatus": "requires_new_model_term",
-  "observerMetricOffDiagonalTijAdmissionNote": "Current producer does not expose an admitted stress/evolution route (time-derivative or K_ij evolution) or full Einstein-tensor route for same-chart off-diagonal S_ij/Tij.",
+  "observerMetricOffDiagonalTijAdmissionNote": "Same-chart off-diagonal Tij is emitted through an experimental model-term route and remains not admitted until the route is semantically validated.",
   "observerTileAuthorityStatus": "proxy_limited",
   "observerTileAuthorityNote": "Tile-effective observer audit remains proxy-limited: fluxHandling=voxel_flux_field, shearHandling=not_modeled_in_proxy.",
   "observerLeadReadinessWorkstream": "observer_completeness_and_authority",
@@ -49,16 +48,26 @@
     "semanticsRef": "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
     "chartRef": "comoving_cartesian",
     "producerModuleRef": [
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyFromShiftField",
       "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
       "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
       "server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput"
     ],
-    "currentEmissionShape": "diagonal_only",
+    "currentEmissionShape": "full_tensor",
     "currentOutputFamilies": [
       "T00",
       "T11",
       "T22",
-      "T33"
+      "T33",
+      "T01",
+      "T02",
+      "T03",
+      "T12",
+      "T21",
+      "T13",
+      "T31",
+      "T23",
+      "T32"
     ],
     "supportFieldEvidence": {
       "alpha": "present_admitted",
@@ -71,11 +80,17 @@
     },
     "t0iAdmissionBranch": "requires_new_model_term",
     "offDiagonalTijAdmissionBranch": "requires_new_model_term",
-    "nextInspectionTarget": "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+    "nextInspectionTarget": "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
     "notes": [
       "metricRequired.tensorRef=warp.metric.T00.nhm2.shift_lapse",
-      "metricRequired.model.fluxHandling=assumed_zero_from_missing_t0i",
-      "metricRequired.model.shearHandling=assumed_zero_from_missing_tij",
+      "metricRequired.model.fluxHandling=same_chart_metric_t0i_emitted_experimental",
+      "metricRequired.model.shearHandling=same_chart_metric_tij_off_diagonal_emitted_experimental",
+      "modelTermRoute=adm_quasi_stationary_recovery_v1",
+      "modelTermAdmission=experimental_not_admitted",
+      "researchBasisRef=docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+      "currentEmissionShape=full_tensor",
+      "familyEmissionAdmission=experimental_not_admitted",
+      "modelTermRoute=adm_quasi_stationary_recovery_v1",
       "support.alpha=present_admitted",
       "support.beta_i=missing",
       "support.gamma_ij=present_admitted",
@@ -89,11 +104,10 @@
     "metricRequired": {
       "tensorId": "metric_required",
       "status": "fail",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "tensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
       "sampleCount": 1,
       "reasonCodes": [
-        "metric_audit_incomplete",
         "observer_condition_failed",
         "surrogate_model_limited"
       ],
@@ -131,10 +145,10 @@
         },
         "wec": {
           "status": "fail",
-          "eulerianMin": -57110812.99010783,
-          "eulerianMean": -57110812.99010783,
-          "robustMin": -57110812.99010783,
-          "robustMean": -57110812.99010783,
+          "eulerianMin": -58267450.989558905,
+          "eulerianMean": -58267450.989558905,
+          "robustMin": -58267450.989558905,
+          "robustMean": -58267450.989558905,
           "eulerianViolationFraction": 1,
           "robustViolationFraction": 1,
           "missedViolationFraction": 0,
@@ -143,7 +157,7 @@
           "maxRobustMinusEulerian": 0,
           "worstCase": {
             "index": 0,
-            "value": -57110812.99010783,
+            "value": -58267450.989558905,
             "direction": [
               1,
               0,
@@ -155,16 +169,16 @@
         },
         "sec": {
           "status": "pass",
-          "eulerianMin": 57110812.99010782,
-          "eulerianMean": 57110812.99010782,
+          "eulerianMin": 58267450.989558905,
+          "eulerianMean": 58267450.989558905,
           "robustMin": 0,
           "robustMean": 0,
           "eulerianViolationFraction": 0,
           "robustViolationFraction": 0,
           "missedViolationFraction": 0,
-          "severityGainMin": -57110812.99010782,
-          "severityGainMean": -57110812.99010782,
-          "maxRobustMinusEulerian": -57110812.99010782,
+          "severityGainMin": -58267450.989558905,
+          "severityGainMean": -58267450.989558905,
+          "maxRobustMinusEulerian": -58267450.989558905,
           "worstCase": {
             "index": 0,
             "value": 0,
@@ -179,19 +193,19 @@
         },
         "dec": {
           "status": "fail",
-          "eulerianMin": -57110812.99010783,
-          "eulerianMean": -57110812.99010783,
-          "robustMin": -114221625.98021565,
-          "robustMean": -114221625.98021565,
+          "eulerianMin": -58267450.989558905,
+          "eulerianMean": -58267450.989558905,
+          "robustMin": -116534901.97911781,
+          "robustMean": -116534901.97911781,
           "eulerianViolationFraction": 1,
           "robustViolationFraction": 1,
           "missedViolationFraction": 0,
-          "severityGainMin": -57110812.99010783,
-          "severityGainMean": -57110812.99010783,
-          "maxRobustMinusEulerian": -57110812.99010783,
+          "severityGainMin": -58267450.989558905,
+          "severityGainMean": -58267450.989558905,
+          "maxRobustMinusEulerian": -58267450.989558905,
           "worstCase": {
             "index": 0,
-            "value": -114221625.98021565,
+            "value": -116534901.97911781,
             "direction": [
               1,
               0,
@@ -203,12 +217,16 @@
         }
       },
       "fluxDiagnostics": {
-        "status": "assumed_zero",
-        "meanMagnitude": 0,
-        "maxMagnitude": 0,
-        "netMagnitude": 0,
-        "netDirection": null,
-        "note": "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path."
+        "status": "available",
+        "meanMagnitude": 1.3019178058112196e+22,
+        "maxMagnitude": 1.3019178058112196e+22,
+        "netMagnitude": 1.3019178058112196e+22,
+        "netDirection": [
+          0,
+          1,
+          -4.832514873350764e-14
+        ],
+        "note": "Flux diagnostics use emitted same-chart T0i channels from the metric producer model-term route."
       },
       "consistency": {
         "robustNotGreaterThanEulerian": true,
@@ -216,21 +234,18 @@
       },
       "model": {
         "pressureModel": "diagonal_tensor_components",
-        "fluxHandling": "assumed_zero_from_missing_t0i",
-        "shearHandling": "assumed_zero_from_missing_tij",
+        "fluxHandling": "same_chart_metric_t0i_emitted_experimental",
+        "shearHandling": "same_chart_metric_tij_off_diagonal_emitted_experimental",
         "limitationNotes": [
-          "Metric-required observer audit uses diagonal T_ab components only; T0i flux terms were not supplied and were treated as zero.",
-          "Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search."
+          "Metric-required tensor now emits same-chart T0i channels from a model-term route; observer minima are still computed with the diagonal algebraic closure until anisotropic observer search admission is complete.",
+          "Off-diagonal same-chart Tij channels are emitted from a reduced-order model-term route and remain semantically not admitted pending tensor-route closure."
         ],
-        "note": "Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep."
+        "note": "Diagonal observer conditions remain algebraic, while same-chart flux/shear channels are emitted through an experimental model-term route pending semantic admission."
       },
-      "missingInputs": [
-        "metric_t0i_missing",
-        "metric_tij_off_diagonal_missing"
-      ],
+      "missingInputs": [],
       "primaryBlockingCondition": "wec",
       "primaryBlockingMode": "eulerian_native",
-      "primaryBlockingValue": -57110812.99010783,
+      "primaryBlockingValue": -58267450.989558905,
       "primaryBlockingReference": "metric_required.conditions.wec",
       "primaryBlockingWhy": "WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density.",
       "rootCauseClass": "negative_energy_density",
@@ -246,12 +261,12 @@
       "firstUpstreamRemediationWhy": "Inspect the emitted metric T00 density because metric_required WEC reduces directly to rho on this surface.",
       "wecProbeApplied": true,
       "wecProbeScale": 0.5,
-      "wecProbeBaseline": -57110812.99010783,
-      "wecProbeResult": -28555406.495053913,
-      "wecProbeDelta": 28555406.495053913,
-      "decProbeBaseline": -114221625.98021565,
-      "decProbeResult": -57110812.99010783,
-      "decProbeDelta": 57110812.99010783,
+      "wecProbeBaseline": -58267450.989558905,
+      "wecProbeResult": -29133725.494779453,
+      "wecProbeDelta": 29133725.494779453,
+      "decProbeBaseline": -116534901.97911781,
+      "decProbeResult": -58267450.989558905,
+      "decProbeDelta": 58267450.989558905,
       "wecProbeInterpretation": "Metric-side probe directly relaxes emitted WEC and downstream DEC because this surface depends on the same emitted density ref."
     },
     "tileEffective": {
@@ -274,16 +289,16 @@
       "conditions": {
         "nec": {
           "status": "pass",
-          "eulerianMin": -1.7643614434043053e-12,
-          "eulerianMean": -1.573006152986005e-17,
+          "eulerianMin": -1.7643612265638708e-12,
+          "eulerianMean": -1.573005985985835e-17,
           "robustMin": 0,
           "robustMean": 0,
           "eulerianViolationFraction": 0.01499176025390625,
           "robustViolationFraction": 0,
           "missedViolationFraction": 0,
-          "severityGainMin": -5.468877304140585e-13,
-          "severityGainMean": 1.573006152986005e-17,
-          "maxRobustMinusEulerian": 1.7643614434043053e-12,
+          "severityGainMin": -5.46887513573624e-13,
+          "severityGainMean": 1.573005985985835e-17,
+          "maxRobustMinusEulerian": 1.7643612265638708e-12,
           "worstCase": {
             "index": 0,
             "value": 0,
@@ -298,10 +313,10 @@
         },
         "wec": {
           "status": "fail",
-          "eulerianMin": -42531360768,
-          "eulerianMean": -57110813.012878254,
-          "robustMin": -42531360768,
-          "robustMean": -57110813.012878254,
+          "eulerianMin": -43392729088,
+          "eulerianMean": -58267450.99919073,
+          "robustMin": -43392729088,
+          "robustMean": -58267450.99919073,
           "eulerianViolationFraction": 0.028730392456054688,
           "robustViolationFraction": 0.028730392456054688,
           "missedViolationFraction": 0,
@@ -310,7 +325,7 @@
           "maxRobustMinusEulerian": 0,
           "worstCase": {
             "index": 1032370,
-            "value": -42531360768,
+            "value": -43392729088,
             "direction": [
               -1,
               0,
@@ -323,14 +338,14 @@
         "sec": {
           "status": "pass",
           "eulerianMin": 0,
-          "eulerianMean": 57110813.012878254,
+          "eulerianMean": 58267450.99919073,
           "robustMin": 0,
           "robustMean": 0,
           "eulerianViolationFraction": 0,
           "robustViolationFraction": 0,
           "missedViolationFraction": 0,
-          "severityGainMin": -42531360768,
-          "severityGainMean": -57110813.012878254,
+          "severityGainMin": -43392729088,
+          "severityGainMean": -58267450.99919073,
           "maxRobustMinusEulerian": 0,
           "worstCase": {
             "index": 0,
@@ -346,19 +361,19 @@
         },
         "dec": {
           "status": "fail",
-          "eulerianMin": -42531360768,
-          "eulerianMean": -57110813.012878254,
-          "robustMin": -85062721536,
-          "robustMean": -114221626.02575651,
+          "eulerianMin": -43392729088,
+          "eulerianMean": -58267450.99919073,
+          "robustMin": -86785458176,
+          "robustMean": -116534901.99838147,
           "eulerianViolationFraction": 0.028730392456054688,
           "robustViolationFraction": 0.028730392456054688,
           "missedViolationFraction": 0,
-          "severityGainMin": -42531360768,
-          "severityGainMean": -57110813.012878254,
+          "severityGainMin": -43392729088,
+          "severityGainMean": -58267450.99919073,
           "maxRobustMinusEulerian": 0,
           "worstCase": {
             "index": 1032370,
-            "value": -85062721536,
+            "value": -86785458176,
             "direction": [
               -1,
               0,
@@ -371,15 +386,15 @@
       },
       "fluxDiagnostics": {
         "status": "available",
-        "meanMagnitude": 2.23850040723635e-16,
+        "meanMagnitude": 2.238500057168674e-16,
         "maxMagnitude": 0,
-        "netMagnitude": 1.7248447748291345e-16,
+        "netMagnitude": 1.7248445728410155e-16,
         "netDirection": null,
         "note": "Flux diagnostics come from the tile-effective brick S_i channels."
       },
       "consistency": {
         "robustNotGreaterThanEulerian": true,
-        "maxRobustMinusEulerian": 1.7643614434043053e-12
+        "maxRobustMinusEulerian": 1.7643612265638708e-12
       },
       "model": {
         "pressureModel": "isotropic_pressure_proxy",
@@ -394,7 +409,7 @@
       "missingInputs": [],
       "primaryBlockingCondition": "wec",
       "primaryBlockingMode": "eulerian_native",
-      "primaryBlockingValue": -42531360768,
+      "primaryBlockingValue": -43392729088,
       "primaryBlockingReference": "tile_effective.conditions.wec",
       "primaryBlockingWhy": "WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density.",
       "rootCauseClass": "negative_energy_density",
@@ -410,11 +425,11 @@
       "firstUpstreamRemediationWhy": "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface.",
       "wecProbeApplied": true,
       "wecProbeScale": 0.5,
-      "wecProbeBaseline": -42531360768,
-      "wecProbeResult": -42531360768,
+      "wecProbeBaseline": -43392729088,
+      "wecProbeResult": -43392729088,
       "wecProbeDelta": 0,
-      "decProbeBaseline": -85062721536,
-      "decProbeResult": -85062721536,
+      "decProbeBaseline": -86785458176,
+      "decProbeResult": -86785458176,
       "decProbeDelta": 0,
       "wecProbeInterpretation": "Metric-side WEC probe does not automatically lift this tile proxy surface because it depends on a separate proxy-derived upstream ref."
     }

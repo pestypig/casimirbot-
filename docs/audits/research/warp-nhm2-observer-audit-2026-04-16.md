@@ -8,11 +8,11 @@
 | artifactId | nhm2_observer_audit |
 | schemaVersion | nhm2_observer_audit/v1 |
 | status | fail |
-| completeness | incomplete |
+| completeness | complete |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-observer-audit |
 | familyId | nhm2_shift_lapse |
 | shiftLapseProfileId | stage1_centerline_alpha_0p995_v1 |
-| reasonCodes | metric_audit_incomplete, observer_condition_failed, surrogate_model_limited |
+| reasonCodes | observer_condition_failed, surrogate_model_limited |
 | observerBlockingAssessmentStatus | same_surface_violation_confirmed |
 | observerPromotionBlockingSurface | both |
 | observerPromotionBlockingCondition | mixed |
@@ -31,17 +31,17 @@
 | observerRemediationSequenceStatus | metric_then_tile_proxy |
 | observerTileDiminishingReturnStatus | likely_stop_territory |
 | observerTileDiminishingReturnNote | April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule. |
-| observerMetricCompletenessStatus | incomplete_missing_inputs |
-| observerMetricCompletenessNote | Metric-required observer audit remains diagonal-only because T0i flux terms and off-diagonal spatial shear terms were not supplied; missing inputs: metric_t0i_missing, metric_tij_off_diagonal_missing |
-| observerMetricCoverageBlockerStatus | producer_not_emitted |
-| observerMetricCoverageBlockerNote | Metric-required observer completeness remains blocked at producer emission: current runtime emits diagonal-only stress and lacks admitted same-chart routes required for J_i/T0i and off-diagonal S_ij/Tij closure. |
+| observerMetricCompletenessStatus | complete |
+| observerMetricCompletenessNote | Metric-required observer audit has no declared missing observer inputs. |
+| observerMetricCoverageBlockerStatus | semantics_ambiguous |
+| observerMetricCoverageBlockerNote | Metric-required full tensor families are emitted on the producer path, but the active model-term route is still experimental/not admitted, so observer admission remains blocked at semantic-contract closure. |
 | observerMetricFirstMissingStage | semantic_contract |
 | observerMetricEmissionAdmissionStatus | not_admitted |
-| observerMetricEmissionAdmissionNote | Admission failed: current evidence localizes both missing families to a model-term/evaluator gap rather than a wiring-only gap. |
+| observerMetricEmissionAdmissionNote | Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation. |
 | observerMetricT0iAdmissionStatus | requires_new_model_term |
-| observerMetricT0iAdmissionNote | Current producer remains diagonal-only and does not expose an admitted momentum-constraint-grade route (D_j K^j_i - D_i K) or full Einstein-tensor route for same-chart J_i/T0i. |
+| observerMetricT0iAdmissionNote | Same-chart T0i is emitted through an experimental model-term route and remains not admitted until metric tensor semantics/evaluator validation closes. |
 | observerMetricOffDiagonalTijAdmissionStatus | requires_new_model_term |
-| observerMetricOffDiagonalTijAdmissionNote | Current producer does not expose an admitted stress/evolution route (time-derivative or K_ij evolution) or full Einstein-tensor route for same-chart off-diagonal S_ij/Tij. |
+| observerMetricOffDiagonalTijAdmissionNote | Same-chart off-diagonal Tij is emitted through an experimental model-term route and remains not admitted until the route is semantically validated. |
 | observerTileAuthorityStatus | proxy_limited |
 | observerTileAuthorityNote | Tile-effective observer audit remains proxy-limited: fluxHandling=voxel_flux_field, shearHandling=not_modeled_in_proxy. |
 | observerLeadReadinessWorkstream | observer_completeness_and_authority |
@@ -49,17 +49,17 @@
 | observerNextTechnicalAction | resolve_metric_tensor_semantics |
 | metricProducerAdmissionEvidence | available |
 | observerBlockingAssessmentNote | metric_required and tile_effective tensors emit concrete failing mixed WEC and DEC conditions with missedViolationFraction=0 and non-positive maxRobustMinusEulerian. Policy review remains required because surrogate-model limitations are still present. |
-| metricBlockingSummary | WEC=-57110812.99010783; DEC=-114221625.98021565 |
-| tileBlockingSummary | WEC=-42531360768; DEC=-85062721536 |
+| metricBlockingSummary | WEC=-58267450.989558905; DEC=-116534901.97911781 |
+| tileBlockingSummary | WEC=-43392729088; DEC=-86785458176 |
 
 ## Metric Producer Admission Evidence
 | field | value |
 |---|---|
 | semanticsRef | docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md |
 | chartRef | comoving_cartesian |
-| producerModuleRef | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField<br>modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField<br>server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput |
-| currentEmissionShape | diagonal_only |
-| currentOutputFamilies | T00, T11, T22, T33 |
+| producerModuleRef | modules/warp/natario-warp.ts::calculateMetricStressEnergyFromShiftField<br>modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField<br>modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField<br>server/energy-pipeline.ts::buildDiagonalMetricObserverAuditTensorInput |
+| currentEmissionShape | full_tensor |
+| currentOutputFamilies | T00, T11, T22, T33, T01, T02, T03, T12, T21, T13, T31, T23, T32 |
 | supportFieldEvidence.alpha | present_admitted |
 | supportFieldEvidence.beta_i | missing |
 | supportFieldEvidence.gamma_ij | present_admitted |
@@ -69,21 +69,24 @@
 | supportFieldEvidence.full_einstein_tensor_route | missing |
 | t0iAdmissionBranch | requires_new_model_term |
 | offDiagonalTijAdmissionBranch | requires_new_model_term |
-| nextInspectionTarget | modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField |
-| notes | metricRequired.tensorRef=warp.metric.T00.nhm2.shift_lapse<br>metricRequired.model.fluxHandling=assumed_zero_from_missing_t0i<br>metricRequired.model.shearHandling=assumed_zero_from_missing_tij<br>support.alpha=present_admitted<br>support.beta_i=missing<br>support.gamma_ij=present_admitted<br>support.K_ij=missing<br>support.D_j_Kj_i_minus_D_i_K_route=missing<br>support.time_derivative_or_Kij_evolution_route=missing<br>support.full_einstein_tensor_route=missing |
+| modelTermRoute | adm_quasi_stationary_recovery_v1 |
+| modelTermAdmission | experimental_not_admitted |
+| researchBasisRef | docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md |
+| nextInspectionTarget | docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md |
+| notes | metricRequired.tensorRef=warp.metric.T00.nhm2.shift_lapse<br>metricRequired.model.fluxHandling=same_chart_metric_t0i_emitted_experimental<br>metricRequired.model.shearHandling=same_chart_metric_tij_off_diagonal_emitted_experimental<br>modelTermRoute=adm_quasi_stationary_recovery_v1<br>modelTermAdmission=experimental_not_admitted<br>researchBasisRef=docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md<br>currentEmissionShape=full_tensor<br>familyEmissionAdmission=experimental_not_admitted<br>modelTermRoute=adm_quasi_stationary_recovery_v1<br>support.alpha=present_admitted<br>support.beta_i=missing<br>support.gamma_ij=present_admitted<br>support.K_ij=missing<br>support.D_j_Kj_i_minus_D_i_K_route=missing<br>support.time_derivative_or_Kij_evolution_route=missing<br>support.full_einstein_tensor_route=missing |
 
 ## Metric Required Tensor
 | field | value |
 |---|---|
 | tensorId | metric_required |
 | status | fail |
-| completeness | incomplete |
+| completeness | complete |
 | tensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json |
 | sampleCount | 1 |
-| reasonCodes | metric_audit_incomplete, observer_condition_failed, surrogate_model_limited |
+| reasonCodes | observer_condition_failed, surrogate_model_limited |
 | primaryBlockingCondition | wec |
 | primaryBlockingMode | eulerian_native |
-| primaryBlockingValue | -57110812.99010783 |
+| primaryBlockingValue | -58267450.989558905 |
 | primaryBlockingReference | metric_required.conditions.wec |
 | primaryBlockingWhy | WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. |
 | rootCauseClass | negative_energy_density |
@@ -99,12 +102,12 @@
 | firstUpstreamRemediationWhy | Inspect the emitted metric T00 density because metric_required WEC reduces directly to rho on this surface. |
 | wecProbeApplied | true |
 | wecProbeScale | 0.5 |
-| wecProbeBaseline | -57110812.99010783 |
-| wecProbeResult | -28555406.495053913 |
-| wecProbeDelta | 28555406.495053913 |
-| decProbeBaseline | -114221625.98021565 |
-| decProbeResult | -57110812.99010783 |
-| decProbeDelta | 57110812.99010783 |
+| wecProbeBaseline | -58267450.989558905 |
+| wecProbeResult | -29133725.494779453 |
+| wecProbeDelta | 29133725.494779453 |
+| decProbeBaseline | -116534901.97911781 |
+| decProbeResult | -58267450.989558905 |
+| decProbeDelta | 58267450.989558905 |
 | wecProbeInterpretation | Metric-side probe directly relaxes emitted WEC and downstream DEC because this surface depends on the same emitted density ref. |
 | rapidityCap | 2.5 |
 | rapidityCapBeta | 0.9866142981514303 |
@@ -114,25 +117,25 @@
 | conditions.nec.status | pass |
 | conditions.nec.robustMin | 0 |
 | conditions.wec.status | fail |
-| conditions.wec.robustMin | -57110812.99010783 |
+| conditions.wec.robustMin | -58267450.989558905 |
 | conditions.sec.status | pass |
 | conditions.sec.robustMin | 0 |
 | conditions.dec.status | fail |
-| conditions.dec.robustMin | -114221625.98021565 |
-| fluxDiagnostics.status | assumed_zero |
-| fluxDiagnostics.meanMagnitude | 0 |
-| fluxDiagnostics.maxMagnitude | 0 |
-| fluxDiagnostics.netMagnitude | 0 |
-| fluxDiagnostics.netDirection | null |
-| fluxDiagnostics.note | Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path. |
+| conditions.dec.robustMin | -116534901.97911781 |
+| fluxDiagnostics.status | available |
+| fluxDiagnostics.meanMagnitude | 1.3019178058112196e+22 |
+| fluxDiagnostics.maxMagnitude | 1.3019178058112196e+22 |
+| fluxDiagnostics.netMagnitude | 1.3019178058112196e+22 |
+| fluxDiagnostics.netDirection | [0, 1, -4.832514873350764e-14] |
+| fluxDiagnostics.note | Flux diagnostics use emitted same-chart T0i channels from the metric producer model-term route. |
 | consistency.robustNotGreaterThanEulerian | true |
 | consistency.maxRobustMinusEulerian | 0 |
 | model.pressureModel | diagonal_tensor_components |
-| model.fluxHandling | assumed_zero_from_missing_t0i |
-| model.shearHandling | assumed_zero_from_missing_tij |
-| model.limitationNotes | Metric-required observer audit uses diagonal T_ab components only; T0i flux terms were not supplied and were treated as zero.; Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search. |
-| model.note | Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep. |
-| missingInputs | metric_t0i_missing, metric_tij_off_diagonal_missing |
+| model.fluxHandling | same_chart_metric_t0i_emitted_experimental |
+| model.shearHandling | same_chart_metric_tij_off_diagonal_emitted_experimental |
+| model.limitationNotes | Metric-required tensor now emits same-chart T0i channels from a model-term route; observer minima are still computed with the diagonal algebraic closure until anisotropic observer search admission is complete.; Off-diagonal same-chart Tij channels are emitted from a reduced-order model-term route and remain semantically not admitted pending tensor-route closure. |
+| model.note | Diagonal observer conditions remain algebraic, while same-chart flux/shear channels are emitted through an experimental model-term route pending semantic admission. |
+| missingInputs | none |
 
 ## Tile Effective Tensor
 | field | value |
@@ -145,7 +148,7 @@
 | reasonCodes | observer_condition_failed, surrogate_model_limited |
 | primaryBlockingCondition | wec |
 | primaryBlockingMode | eulerian_native |
-| primaryBlockingValue | -42531360768 |
+| primaryBlockingValue | -43392729088 |
 | primaryBlockingReference | tile_effective.conditions.wec |
 | primaryBlockingWhy | WEC is already negative on the Eulerian sample and robust search does not deepen the minimum. DEC co-fails downstream of the same negative energy density. |
 | rootCauseClass | negative_energy_density |
@@ -161,11 +164,11 @@
 | firstUpstreamRemediationWhy | Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface. |
 | wecProbeApplied | true |
 | wecProbeScale | 0.5 |
-| wecProbeBaseline | -42531360768 |
-| wecProbeResult | -42531360768 |
+| wecProbeBaseline | -43392729088 |
+| wecProbeResult | -43392729088 |
 | wecProbeDelta | 0 |
-| decProbeBaseline | -85062721536 |
-| decProbeResult | -85062721536 |
+| decProbeBaseline | -86785458176 |
+| decProbeResult | -86785458176 |
 | decProbeDelta | 0 |
 | wecProbeInterpretation | Metric-side WEC probe does not automatically lift this tile proxy surface because it depends on a separate proxy-derived upstream ref. |
 | rapidityCap | 2.5 |
@@ -176,19 +179,19 @@
 | conditions.nec.status | pass |
 | conditions.nec.robustMin | 0 |
 | conditions.wec.status | fail |
-| conditions.wec.robustMin | -42531360768 |
+| conditions.wec.robustMin | -43392729088 |
 | conditions.sec.status | pass |
 | conditions.sec.robustMin | 0 |
 | conditions.dec.status | fail |
-| conditions.dec.robustMin | -85062721536 |
+| conditions.dec.robustMin | -86785458176 |
 | fluxDiagnostics.status | available |
-| fluxDiagnostics.meanMagnitude | 2.23850040723635e-16 |
+| fluxDiagnostics.meanMagnitude | 2.238500057168674e-16 |
 | fluxDiagnostics.maxMagnitude | 0 |
-| fluxDiagnostics.netMagnitude | 1.7248447748291345e-16 |
+| fluxDiagnostics.netMagnitude | 1.7248445728410155e-16 |
 | fluxDiagnostics.netDirection | null |
 | fluxDiagnostics.note | Flux diagnostics come from the tile-effective brick S_i channels. |
 | consistency.robustNotGreaterThanEulerian | true |
-| consistency.maxRobustMinusEulerian | 1.7643614434043053e-12 |
+| consistency.maxRobustMinusEulerian | 1.7643612265638708e-12 |
 | model.pressureModel | isotropic_pressure_proxy |
 | model.fluxHandling | voxel_flux_field |
 | model.shearHandling | not_modeled_in_proxy |

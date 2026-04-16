@@ -2363,17 +2363,15 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerTileDiminishingReturnNote).toContain(
       "no admissible new aft-local single-contributor mechanism",
     );
-    expect((json as any).observerMetricCompletenessStatus).toBe(
-      "incomplete_missing_inputs",
-    );
+    expect((json as any).observerMetricCompletenessStatus).toBe("complete");
     expect((json as any).observerMetricCompletenessNote).toContain(
-      "metric_t0i_missing",
+      "no declared missing observer inputs",
     );
     expect((json as any).observerMetricCoverageBlockerStatus).toBe(
-      "producer_not_emitted",
+      "semantics_ambiguous",
     );
     expect((json as any).observerMetricCoverageBlockerNote).toContain(
-      "diagonal-only",
+      "full tensor families are emitted",
     );
     expect((json as any).observerMetricFirstMissingStage).toBe(
       "semantic_contract",
@@ -2382,7 +2380,7 @@ describe("nhm2 publication completion surfaces", () => {
       "not_admitted",
     );
     expect((json as any).observerMetricEmissionAdmissionNote).toContain(
-      "model-term/evaluator gap",
+      "emitted same-chart flux/shear families are present",
     );
     expect((json as any).observerMetricT0iAdmissionStatus).toBe(
       "requires_new_model_term",
@@ -2407,11 +2405,11 @@ describe("nhm2 publication completion surfaces", () => {
       semanticsRef:
         "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
       chartRef: "comoving_cartesian",
-      currentEmissionShape: "diagonal_only",
+      currentEmissionShape: "full_tensor",
       t0iAdmissionBranch: "requires_new_model_term",
       offDiagonalTijAdmissionBranch: "requires_new_model_term",
       nextInspectionTarget:
-        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+        "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
     });
     const supportFieldEvidence = (json as any).metricProducerAdmissionEvidence
       .supportFieldEvidence as Record<string, string>;
@@ -2859,7 +2857,7 @@ it("publishes a successor-lane admissibility stop when this repo has not landed 
   expect(markdown).toContain("metric_flux_terms_not_emitted_in_current_repo");
 }, 600000);
 
-it("publishes a current-lane baseline convergence stop when this repo is still at the 0p995 producer_not_emitted state", async () => {
+it("publishes a current-lane baseline convergence stop when this repo is still at the 0p995 not-admitted semantic-contract state", async () => {
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "nhm2-current-lane-convergence-"),
   );
@@ -2895,19 +2893,19 @@ it("publishes a current-lane baseline convergence stop when this repo is still a
     "current_repo_published_profile_mismatch",
   );
   expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
-    "metric_runtime_flux_terms_not_emitted",
-  );
-  expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
     "metric_observer_still_assumes_zero_flux",
   );
   expect(published.assessmentArtifact.artifact.blockingReasons).toContain(
+    "metric_observer_still_assumes_zero_shear",
+  );
+  expect(published.assessmentArtifact.artifact.blockingReasons).not.toContain(
     "current_repo_divergence_too_large_for_single_patch",
   );
   expect(published.assessmentArtifact.artifact.metricWec).toBe(
-    -57110812.99010783,
+    -58267450.989558905,
   );
   expect(published.assessmentArtifact.artifact.metricDec).toBe(
-    -114221625.98021565,
+    -116534901.97911781,
   );
 
   const markdown = fs.readFileSync(
@@ -2917,7 +2915,7 @@ it("publishes a current-lane baseline convergence stop when this repo is still a
   expect(markdown).toContain("STOP_ON_CURRENT_LANE_CONVERGENCE_BLOCKER");
   expect(markdown).toContain("stage1_centerline_alpha_0p9925_v1");
   expect(markdown).toContain("stage1_centerline_alpha_0p995_v1");
-  expect(markdown).toContain("current_repo_divergence_too_large_for_single_patch");
+  expect(markdown).not.toContain("metric_runtime_flux_terms_not_emitted");
 }, 600000);
 
 const makeWarpWorldlineContract = () => makeWarpWorldlineFixture();
