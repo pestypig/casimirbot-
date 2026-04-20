@@ -680,6 +680,22 @@ const DEFAULT_FULL_LOOP_AUDIT_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-full-loop-audit-latest.md",
 );
+const DEFAULT_METRIC_WEC_FEASIBILITY_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-metric-wec-feasibility-${DATE_STAMP}.json`,
+);
+const DEFAULT_METRIC_WEC_FEASIBILITY_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-metric-wec-feasibility-latest.json",
+);
+const DEFAULT_METRIC_WEC_FEASIBILITY_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-metric-wec-feasibility-${DATE_STAMP}.md`,
+);
+const DEFAULT_METRIC_WEC_FEASIBILITY_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-metric-wec-feasibility-latest.md",
+);
 const DEFAULT_CERTIFICATE_POLICY_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-certificate-policy-${DATE_STAMP}.json`,
@@ -912,6 +928,8 @@ const SELECTED_SHIFT_LAPSE_CERTIFICATE_POLICY_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-certificate-policy";
 const SELECTED_SHIFT_LAPSE_FULL_LOOP_AUDIT_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit";
+const SELECTED_SHIFT_LAPSE_METRIC_WEC_FEASIBILITY_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-metric-wec-feasibility";
 const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
   warpFieldType: "nhm2_shift_lapse",
   metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
@@ -3028,6 +3046,95 @@ type Nhm2ShiftLapseBoundarySweepArtifact = {
   boundarySummary: string;
   entries: Nhm2ShiftLapseBoundarySweepEntry[];
   nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2MetricWecFeasibilityStatus =
+  | "local_neighborhood_non_viable"
+  | "candidate_found_needs_followup";
+
+type Nhm2MetricWecFeasibilityDiagnosisClass =
+  | "all_tested_profiles_wec_negative"
+  | "wec_nonnegative_candidate_found"
+  | "insufficient_observer_evidence";
+
+type Nhm2MetricWecFeasibilitySemanticStatus = "pass" | "fail" | "unknown";
+
+type Nhm2MetricWecFeasibilityEntry = {
+  shiftLapseProfileId: string;
+  centerlineAlpha: number | null;
+  observerStatus: string;
+  metricWecStatus: string | null;
+  metricWecEulerianMin: number | null;
+  metricWecRobustMin: number | null;
+  metricDecStatus: string | null;
+  metricDecEulerianMin: number | null;
+  metricDecRobustMin: number | null;
+  tileWecStatus: string | null;
+  tileWecEulerianMin: number | null;
+  tileWecRobustMin: number | null;
+  observerMetricPrimaryDriver: string | null;
+  observerTilePrimaryDriver: string | null;
+  metricPrimaryBlockingMode: string | null;
+  tilePrimaryBlockingMode: string | null;
+  observerMetricEmissionAdmissionStatus: string | null;
+  observerMetricT00AdmissionStatus: string | null;
+  observerMetricT00ComparabilityStatus: string | null;
+  observerMetricT00RouteId: string | null;
+  observerMetricT0iAdmissionStatus: string | null;
+  observerMetricOffDiagonalTijAdmissionStatus: string | null;
+  modelTermRouteId: string | null;
+  modelTermRouteAdmission: string | null;
+  modelTermDecision: string | null;
+  supportFieldRouteAdmissionStatus: string | null;
+  fullEinsteinTensorRouteAdmissionStatus: string | null;
+  independentCrossCheckStatus: string | null;
+  closurePathSelected: string | null;
+  closurePathSupportFieldInterpretation: "blocking" | "non_blocking" | "unknown";
+  closurePathSemanticConsistencyStatus: Nhm2MetricWecFeasibilitySemanticStatus;
+  closurePathSemanticConsistencyNote: string | null;
+  closurePathInvarianceStatus: Nhm2MetricWecFeasibilitySemanticStatus;
+  closurePathInvarianceNote: string | null;
+  recommendedPatchClass: string | null;
+  closurePathBlockerCodes: string[];
+  closurePathNonBlockingCodes: string[];
+  semanticBlockerSupportFieldRouteNotAdmitted: boolean;
+};
+
+type Nhm2MetricWecFeasibilityArtifact = {
+  artifactType: "nhm2_metric_wec_feasibility/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  publicationCommand: string;
+  selectedProfileId: string;
+  chartRef: "comoving_cartesian";
+  semanticsRef: string;
+  researchBasisRef: string;
+  baselineObserverAuditRef: string;
+  baselineFullLoopAuditRef: string;
+  testedProfileIds: string[];
+  testedProfileCount: number;
+  bestMetricWecProfileId: string | null;
+  bestMetricWecEulerianMin: number | null;
+  bestMetricWecGapToZero: number | null;
+  bestMetricWecRobustProfileId: string | null;
+  bestMetricWecRobustMin: number | null;
+  bestMetricWecRobustGapToZero: number | null;
+  bestMetricWecStatus: string | null;
+  allProfilesMetricWecFail: boolean;
+  feasibilityStatus: Nhm2MetricWecFeasibilityStatus;
+  diagnosisClass: Nhm2MetricWecFeasibilityDiagnosisClass;
+  semanticConsistencyStatus: Nhm2MetricWecFeasibilitySemanticStatus;
+  semanticConsistencyNote: string;
+  invarianceStatus: Nhm2MetricWecFeasibilitySemanticStatus;
+  invarianceNote: string;
+  recommendedPatchClass: string;
+  recommendedPatchRationale: string;
+  nextTechnicalAction: string;
+  citationRefs: string[];
+  nonClaims: string[];
+  entries: Nhm2MetricWecFeasibilityEntry[];
   checksum?: string;
 };
 
@@ -6499,6 +6606,16 @@ const parseYorkViews = (value: string | undefined): HullScientificRenderView[] =
     );
   }
   return ensureRequiredYorkViews(deduped);
+};
+
+const parseCommaSeparatedArg = (value: string | undefined): string[] | undefined => {
+  if (typeof value !== "string") return undefined;
+  const parsed = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (parsed.length === 0) return undefined;
+  return Array.from(new Set(parsed));
 };
 
 const toFiniteNumber = (value: unknown): number | null => {
@@ -29749,9 +29866,14 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
   const observerTileDiminishingReturnNote =
     "April 11, 2026 exception-only reassessment found no admissible new aft-local single-contributor mechanism distinct from the retired shell-bias path, the support-width branch, and the failed shell-taper family with a credible >=2% lift path. Residual tile WEC remains the primary blocker and the tile remediation lane stays in likely stop territory under the hard 2% rule.";
   const observerLeadReadinessWorkstream =
-    "observer_completeness_and_authority" as const;
+    args.observerAuditArtifact.observerLeadReadinessWorkstream ===
+      "observer_completeness_and_authority" ||
+    args.observerAuditArtifact.observerLeadReadinessWorkstream === "unknown"
+      ? args.observerAuditArtifact.observerLeadReadinessWorkstream
+      : ("observer_completeness_and_authority" as const);
   const observerLeadReadinessReason =
-    "Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited. Certificate/policy readiness remains a separate parallel full-loop lane.";
+    asText(args.observerAuditArtifact.observerLeadReadinessReason) ??
+    "Observer fail remains mixed: same-surface negativity is real and tile-effective authority remains proxy-limited. Certificate/policy readiness remains a separate parallel full-loop lane.";
   const familyId = resolveStrictSignalPublishedFamilyId(args);
   const selectedProfileId = resolveStrictSignalPublishedProfileId(args);
   const tensorSnapshotPaths =
@@ -29802,6 +29924,14 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
       args.observerAuditArtifact.observerMetricEmissionAdmissionStatus,
     observerMetricEmissionAdmissionNote:
       args.observerAuditArtifact.observerMetricEmissionAdmissionNote,
+    observerMetricT00AdmissionStatus:
+      args.observerAuditArtifact.observerMetricT00AdmissionStatus,
+    observerMetricT00RouteId:
+      args.observerAuditArtifact.observerMetricT00RouteId,
+    observerMetricT00ComparabilityStatus:
+      args.observerAuditArtifact.observerMetricT00ComparabilityStatus,
+    observerMetricT00AdmissionNote:
+      args.observerAuditArtifact.observerMetricT00AdmissionNote,
     observerMetricT0iAdmissionStatus:
       args.observerAuditArtifact.observerMetricT0iAdmissionStatus,
     observerMetricT0iAdmissionNote:
@@ -29810,10 +29940,36 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
       args.observerAuditArtifact.observerMetricOffDiagonalTijAdmissionStatus,
     observerMetricOffDiagonalTijAdmissionNote:
       args.observerAuditArtifact.observerMetricOffDiagonalTijAdmissionNote,
+    observerTileAuthorityStatus:
+      args.observerAuditArtifact.observerTileAuthorityStatus,
+    observerTileAuthorityNote:
+      args.observerAuditArtifact.observerTileAuthorityNote,
     observerNextTechnicalAction:
       args.observerAuditArtifact.observerNextTechnicalAction,
     metricProducerAdmissionEvidence:
       args.observerAuditArtifact.metricProducerAdmissionEvidence ?? null,
+    modelTermSemanticAdmissionEvidence:
+      args.observerAuditArtifact.modelTermSemanticAdmissionEvidence ?? null,
+    observerDecRemediationEvidence:
+      args.observerAuditArtifact.observerDecRemediationEvidence ?? null,
+    observerDecPhysicsControlEvidence:
+      args.observerAuditArtifact.observerDecPhysicsControlEvidence ?? null,
+    t00PolicyAdmissionBridgeEvidence:
+      args.observerAuditArtifact.t00PolicyAdmissionBridgeEvidence ?? null,
+    tileAuthorityEvidence:
+      args.observerAuditArtifact.tileAuthorityEvidence ?? null,
+    tileComparableCrossCheckEvidence:
+      args.observerAuditArtifact.tileComparableCrossCheckEvidence ?? null,
+    tileSurfaceReconstitutionEvidence:
+      args.observerAuditArtifact.tileSurfaceReconstitutionEvidence ?? null,
+    tileObserverConditionComparabilityEvidence:
+      args.observerAuditArtifact.tileObserverConditionComparabilityEvidence ?? null,
+    tileObserverConditionAuthorityMode:
+      args.observerAuditArtifact.tileObserverConditionAuthorityMode ?? null,
+    tileObserverConditionAuthorityNote:
+      args.observerAuditArtifact.tileObserverConditionAuthorityNote ?? null,
+    tileObserverLegacyProxyDiagnostics:
+      args.observerAuditArtifact.tileObserverLegacyProxyDiagnostics ?? null,
     metricRequired: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.metricRequired,
       normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
@@ -29983,6 +30139,731 @@ const renderNhm2ObserverAuditMarkdown = (
 | notes | ${notes} |
 `;
   };
+  const renderModelTermSemanticAdmissionEvidence = (): string => {
+    const evidence = payload.modelTermSemanticAdmissionEvidence;
+    if (evidence == null) {
+      return `## Model-Term Semantic Admission Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const reasonCodes =
+      evidence.reasonCodes.length > 0 ? evidence.reasonCodes.join(", ") : "none";
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const einsteinRouteEvidence = evidence.einsteinTensorRouteEvidence;
+    const residualEvidence = evidence.einsteinResidualAttributionEvidence;
+    const evaluatorClosureEvidence = evidence.einsteinEvaluatorClosureEvidence;
+    const validationSuite = evidence.einsteinRouteValidationSuite;
+    const closurePathDecision = evidence.closurePathDecision;
+    const residualComponents =
+      residualEvidence?.componentResiduals == null
+        ? "null"
+        : [
+            `T01:${residualEvidence.componentResiduals.T01 ?? "null"}`,
+            `T02:${residualEvidence.componentResiduals.T02 ?? "null"}`,
+            `T03:${residualEvidence.componentResiduals.T03 ?? "null"}`,
+            `T12:${residualEvidence.componentResiduals.T12 ?? "null"}`,
+            `T13:${residualEvidence.componentResiduals.T13 ?? "null"}`,
+            `T23:${residualEvidence.componentResiduals.T23 ?? "null"}`,
+          ].join(" | ");
+    const residualSweep =
+      residualEvidence?.conventionSweep != null &&
+      residualEvidence.conventionSweep.length > 0
+        ? residualEvidence.conventionSweep
+            .map(
+              (entry) =>
+                `${entry.candidateId}:${entry.status}:${entry.maxRelativeResidual ?? "null"}`,
+              )
+            .join("<br>")
+        : "none";
+    const evaluatorClosureResolutionCoarse =
+      evaluatorClosureEvidence == null
+        ? "null"
+        : [
+            `step_m:${evaluatorClosureEvidence.resolutionSweep.coarse.step_m ?? "null"}`,
+            `samples:${evaluatorClosureEvidence.resolutionSweep.coarse.comparedSampleCount ?? "null"}`,
+            `t0i:${evaluatorClosureEvidence.resolutionSweep.coarse.t0iMaxRelativeResidual ?? "null"}`,
+            `offdiag:${evaluatorClosureEvidence.resolutionSweep.coarse.offDiagonalMaxRelativeResidual ?? "null"}`,
+          ].join(" | ");
+    const evaluatorClosureResolutionRefined =
+      evaluatorClosureEvidence == null
+        ? "null"
+        : [
+            `step_m:${evaluatorClosureEvidence.resolutionSweep.refined.step_m ?? "null"}`,
+            `samples:${evaluatorClosureEvidence.resolutionSweep.refined.comparedSampleCount ?? "null"}`,
+            `t0i:${evaluatorClosureEvidence.resolutionSweep.refined.t0iMaxRelativeResidual ?? "null"}`,
+            `offdiag:${evaluatorClosureEvidence.resolutionSweep.refined.offDiagonalMaxRelativeResidual ?? "null"}`,
+          ].join(" | ");
+    const evaluatorClosureResolutionSuperRefined =
+      evaluatorClosureEvidence == null
+        ? "null"
+        : [
+            `step_m:${evaluatorClosureEvidence.resolutionSweep.superRefined.step_m ?? "null"}`,
+            `samples:${evaluatorClosureEvidence.resolutionSweep.superRefined.comparedSampleCount ?? "null"}`,
+            `t0i:${evaluatorClosureEvidence.resolutionSweep.superRefined.t0iMaxRelativeResidual ?? "null"}`,
+            `offdiag:${evaluatorClosureEvidence.resolutionSweep.superRefined.offDiagonalMaxRelativeResidual ?? "null"}`,
+          ].join(" | ");
+    const evaluatorClosureConvergenceOrder =
+      evaluatorClosureEvidence == null
+        ? "null"
+        : `t0i:${evaluatorClosureEvidence.observedConvergenceOrder.t0i ?? "null"} | offdiag:${evaluatorClosureEvidence.observedConvergenceOrder.offDiagonal ?? "null"}`;
+    const evaluatorClosureRichardsonResidual =
+      evaluatorClosureEvidence == null
+        ? "null"
+        : `t0i:${evaluatorClosureEvidence.richardsonExtrapolatedResidual.t0i ?? "null"} | offdiag:${evaluatorClosureEvidence.richardsonExtrapolatedResidual.offDiagonal ?? "null"}`;
+    const evaluatorClosureSweep =
+      evaluatorClosureEvidence != null &&
+      evaluatorClosureEvidence.conventionSweep.length > 0
+        ? evaluatorClosureEvidence.conventionSweep
+            .map(
+              (entry) =>
+                `${entry.candidateId}:${entry.status}:${entry.maxRelativeResidual ?? "null"}`,
+            )
+            .join("<br>")
+        : "none";
+    const evaluatorClosureCitationRefs =
+      evaluatorClosureEvidence != null &&
+      evaluatorClosureEvidence.citationRefs.length > 0
+        ? evaluatorClosureEvidence.citationRefs.join("<br>")
+        : "none";
+    const validationSuiteCases =
+      validationSuite != null && validationSuite.cases.length > 0
+        ? validationSuite.cases
+            .map(
+              (entry) =>
+                `${entry.caseId}:${entry.status}:${entry.maxAbsResidual ?? "null"}`,
+            )
+            .join("<br>")
+        : "none";
+    const validationSuiteCitationRefs =
+      validationSuite != null && validationSuite.citationRefs.length > 0
+        ? validationSuite.citationRefs.join("<br>")
+        : "none";
+    const closurePathBlockerCodes =
+      closurePathDecision == null
+        ? "null"
+        : closurePathDecision.blockerCodes.length > 0
+          ? closurePathDecision.blockerCodes.join(", ")
+          : "none";
+    const closurePathNonBlockingCodes =
+      closurePathDecision == null
+        ? "null"
+        : (() => {
+            const codes = closurePathDecision.nonBlockingCodes ?? [];
+            return codes.length > 0 ? codes.join(", ") : "none";
+          })();
+    const closurePathCitationRefs =
+      closurePathDecision == null
+        ? "null"
+        : closurePathDecision.citationRefs.length > 0
+          ? closurePathDecision.citationRefs.join("<br>")
+          : "none";
+    const closurePathNotes =
+      closurePathDecision == null
+        ? "null"
+        : closurePathDecision.notes.length > 0
+          ? closurePathDecision.notes.join("<br>")
+          : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Model-Term Semantic Admission Evidence
+| field | value |
+|---|---|
+| semanticsRef | ${evidence.semanticsRef ?? "null"} |
+| researchBasisRef | ${evidence.researchBasisRef ?? "null"} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| routeAdmissionRaw | ${evidence.routeAdmissionRaw} |
+| routeAdmissionEffective | ${evidence.routeAdmissionEffective} |
+| routeAdmissionPromotionBasis | ${evidence.routeAdmissionPromotionBasis} |
+| routeAdmission | ${evidence.routeAdmission} |
+| decision | ${evidence.decision} |
+| reasonCodes | ${reasonCodes} |
+| checks.routeMetadata | ${evidence.checks.routeMetadata} |
+| checks.chart | ${evidence.checks.chart} |
+| checks.finiteTensorComponents | ${evidence.checks.finiteTensorComponents} |
+| checks.t0iSymmetry | ${evidence.checks.t0iSymmetry} |
+| checks.offDiagonalTijSymmetry | ${evidence.checks.offDiagonalTijSymmetry} |
+| checks.supportFieldRouteAdmission | ${evidence.checks.supportFieldRouteAdmission} |
+| checks.fullEinsteinTensorRouteAdmission | ${evidence.checks.fullEinsteinTensorRouteAdmission} |
+| checks.citationBasis | ${evidence.checks.citationBasis} |
+| checks.finiteDifferenceConvergence | ${evidence.checks.finiteDifferenceConvergence} |
+| checks.independentCrossCheck | ${evidence.checks.independentCrossCheck} |
+| checks.einsteinT00Comparability | ${evidence.checks.einsteinT00Comparability} |
+| checks.dtGammaAssumptionBounded | ${evidence.checks.dtGammaAssumptionBounded} |
+| checks.citationCoverage | ${evidence.checks.citationCoverage} |
+| einsteinTensorRouteEvidence.status | ${einsteinRouteEvidence?.status ?? "null"} |
+| einsteinTensorRouteEvidence.routeId | ${einsteinRouteEvidence?.routeId ?? "null"} |
+| einsteinTensorRouteEvidence.tensorSource | ${einsteinRouteEvidence?.tensorSource ?? "null"} |
+| einsteinTensorRouteEvidence.comparedSampleCount | ${einsteinRouteEvidence?.comparedSampleCount ?? "null"} |
+| einsteinTensorRouteEvidence.maxRelativeResidual | ${einsteinRouteEvidence?.maxRelativeResidual ?? "null"} |
+| einsteinTensorRouteEvidence.t00ComparedSampleCount | ${einsteinRouteEvidence?.t00ComparedSampleCount ?? "null"} |
+| einsteinTensorRouteEvidence.t00MaxRelativeResidual | ${einsteinRouteEvidence?.t00MaxRelativeResidual ?? "null"} |
+| einsteinTensorRouteEvidence.t00RelativeResidualThreshold | ${einsteinRouteEvidence?.t00RelativeResidualThreshold ?? "null"} |
+| einsteinTensorRouteEvidence.note | ${einsteinRouteEvidence?.note ?? "null"} |
+| einsteinResidualAttributionEvidence.status | ${residualEvidence?.status ?? "null"} |
+| einsteinResidualAttributionEvidence.sampleCount | ${residualEvidence?.sampleCount ?? "null"} |
+| einsteinResidualAttributionEvidence.maxRelativeResidual | ${residualEvidence?.maxRelativeResidual ?? "null"} |
+| einsteinResidualAttributionEvidence.componentResiduals | ${residualComponents} |
+| einsteinResidualAttributionEvidence.conventionSweep | ${residualSweep} |
+| einsteinResidualAttributionEvidence.bestCandidateId | ${residualEvidence?.bestCandidateId ?? "null"} |
+| einsteinResidualAttributionEvidence.bestCandidateResidual | ${residualEvidence?.bestCandidateResidual ?? "null"} |
+| einsteinResidualAttributionEvidence.diagnosisClass | ${residualEvidence?.diagnosisClass ?? "null"} |
+| einsteinResidualAttributionEvidence.note | ${residualEvidence?.note ?? "null"} |
+| einsteinEvaluatorClosureEvidence.status | ${evaluatorClosureEvidence?.status ?? "null"} |
+| einsteinEvaluatorClosureEvidence.chartRef | ${evaluatorClosureEvidence?.chartRef ?? "null"} |
+| einsteinEvaluatorClosureEvidence.routeId | ${evaluatorClosureEvidence?.routeId ?? "null"} |
+| einsteinEvaluatorClosureEvidence.unitConvention | ${evaluatorClosureEvidence?.unitConvention ?? "null"} |
+| einsteinEvaluatorClosureEvidence.signConvention | ${evaluatorClosureEvidence?.signConvention ?? "null"} |
+| einsteinEvaluatorClosureEvidence.resolutionSweep.coarse | ${evaluatorClosureResolutionCoarse} |
+| einsteinEvaluatorClosureEvidence.resolutionSweep.refined | ${evaluatorClosureResolutionRefined} |
+| einsteinEvaluatorClosureEvidence.resolutionSweep.superRefined | ${evaluatorClosureResolutionSuperRefined} |
+| einsteinEvaluatorClosureEvidence.observedConvergenceOrder | ${evaluatorClosureConvergenceOrder} |
+| einsteinEvaluatorClosureEvidence.richardsonExtrapolatedResidual | ${evaluatorClosureRichardsonResidual} |
+| einsteinEvaluatorClosureEvidence.conventionSweep | ${evaluatorClosureSweep} |
+| einsteinEvaluatorClosureEvidence.bestCandidateId | ${evaluatorClosureEvidence?.bestCandidateId ?? "null"} |
+| einsteinEvaluatorClosureEvidence.diagnosisClass | ${evaluatorClosureEvidence?.diagnosisClass ?? "null"} |
+| einsteinEvaluatorClosureEvidence.note | ${evaluatorClosureEvidence?.note ?? "null"} |
+| einsteinEvaluatorClosureEvidence.citationRefs | ${evaluatorClosureCitationRefs} |
+| einsteinRouteValidationSuite.status | ${validationSuite?.status ?? "null"} |
+| einsteinRouteValidationSuite.admittedForRoutePass | ${validationSuite?.admittedForRoutePass ?? "null"} |
+| einsteinRouteValidationSuite.residualThreshold | ${validationSuite?.residualThreshold ?? "null"} |
+| einsteinRouteValidationSuite.evaluatedCaseCount | ${validationSuite?.evaluatedCaseCount ?? "null"} |
+| einsteinRouteValidationSuite.passedCaseCount | ${validationSuite?.passedCaseCount ?? "null"} |
+| einsteinRouteValidationSuite.cases | ${validationSuiteCases} |
+| einsteinRouteValidationSuite.note | ${validationSuite?.note ?? "null"} |
+| einsteinRouteValidationSuite.citationRefs | ${validationSuiteCitationRefs} |
+| closurePathDecision.selectedPath | ${closurePathDecision?.selectedPath ?? "null"} |
+| closurePathDecision.admPathStatus | ${closurePathDecision?.admPathStatus ?? "null"} |
+| closurePathDecision.fullEinsteinPathStatus | ${closurePathDecision?.fullEinsteinPathStatus ?? "null"} |
+| closurePathDecision.routeHint | ${closurePathDecision?.routeHint ?? "null"} |
+| closurePathDecision.nextPatchClass | ${closurePathDecision?.nextPatchClass ?? "null"} |
+| closurePathDecision.patchBriefRef | ${closurePathDecision?.patchBriefRef ?? "null"} |
+| closurePathDecision.rationale | ${closurePathDecision?.rationale ?? "null"} |
+| closurePathDecision.blockerCodes | ${closurePathBlockerCodes} |
+| closurePathDecision.nonBlockingCodes | ${closurePathNonBlockingCodes} |
+| closurePathDecision.citationRefs | ${closurePathCitationRefs} |
+| closurePathDecision.notes | ${closurePathNotes} |
+| citationRefs | ${citationRefs} |
+| notes | ${notes} |
+`;
+  };
+  const renderObserverDecRemediationEvidence = (): string => {
+    const evidence = payload.observerDecRemediationEvidence;
+    if (evidence == null) {
+      return `## Observer DEC Remediation Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Observer DEC Remediation Evidence
+| field | value |
+|---|---|
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| rapidityCap | ${evidence.rapidityCap ?? "null"} |
+| rapidityCapBeta | ${evidence.rapidityCapBeta ?? "null"} |
+| metricDecEulerianMin | ${evidence.metricDecEulerianMin ?? "null"} |
+| metricDecRobustMin | ${evidence.metricDecRobustMin ?? "null"} |
+| tileReconstitutedDecEulerianMin | ${evidence.tileReconstitutedDecEulerianMin ?? "null"} |
+| tileReconstitutedDecRobustMin | ${evidence.tileReconstitutedDecRobustMin ?? "null"} |
+| typeIFractionMetric | ${evidence.typeIFractionMetric ?? "null"} |
+| typeIFractionTileReconstituted | ${evidence.typeIFractionTileReconstituted ?? "null"} |
+| dominantViolationClass | ${evidence.dominantViolationClass} |
+| recommendedPatchClass | ${evidence.recommendedPatchClass} |
+| citationRefs | ${citationRefs} |
+      | notes | ${notes} |
+`;
+  };
+  const renderObserverDecPhysicsControlEvidence = (): string => {
+    const evidence = payload.observerDecPhysicsControlEvidence;
+    if (evidence == null) {
+      return `## Observer DEC Physics Control Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const derivationNotes =
+      evidence.derivationNotes.length > 0
+        ? evidence.derivationNotes.join("<br>")
+        : "none";
+    const uncertaintyNotes =
+      evidence.uncertaintyNotes.length > 0
+        ? evidence.uncertaintyNotes.join("<br>")
+        : "none";
+    const sweepCandidates =
+      evidence.sweepCandidates.length > 0
+        ? evidence.sweepCandidates
+            .map(
+              (entry) =>
+                `${entry.candidateId}:${entry.candidateClass}:phase=${entry.sweepPhase}:seed=${entry.refineSeedCandidateId ?? "none"}:pass=${String(entry.passesSelectionGate)}:crossesZeroBothDecMargins=${entry.crossesZeroBothDecMargins == null ? "null" : String(entry.crossesZeroBothDecMargins)}:pressureScale=${entry.pressureScale ?? "null"}:densityLift=${entry.densityLiftFraction ?? "null"}:fluxScale=${entry.fluxScale ?? "null"}:shearScale=${entry.shearScale ?? "null"}:decLift=${entry.metricDecRobustLift ?? "null"}:tileDecLift=${entry.tileReconstitutedDecRobustLift ?? "null"}:decMarginToZero=${entry.metricDecRobustMarginToZero ?? "null"}:tileDecMarginToZero=${entry.tileReconstitutedDecRobustMarginToZero ?? "null"}:wecMargin=${entry.metricWecNonRegressionMargin ?? "null"}:necMargin=${entry.metricNecNonRegressionMargin ?? "null"}:reasons=${entry.gateFailureReasons.join(",") || "none"}`,
+            )
+            .join("<br>")
+        : "none";
+    const sweepPhaseSummary = `coarseCandidates=${evidence.sweepPhaseSummary.coarseCandidateCount ?? "null"} coarsePassing=${evidence.sweepPhaseSummary.coarsePassingCount ?? "null"} refineCandidates=${evidence.sweepPhaseSummary.refineCandidateCount ?? "null"} refinePassing=${evidence.sweepPhaseSummary.refinePassingCount ?? "null"} refineSeeds=${evidence.sweepPhaseSummary.refineSeedCandidateIds.join(",") || "none"} note=${evidence.sweepPhaseSummary.note ?? "none"}`;
+    const topCandidateLeaderboard =
+      evidence.topCandidateLeaderboard.length > 0
+        ? evidence.topCandidateLeaderboard
+            .map(
+              (entry) =>
+                `rank=${entry.rank}:${entry.candidateId}:${entry.candidateClass}:phase=${entry.sweepPhase}:pass=${String(entry.passesSelectionGate)}:crossesZeroBothDecMargins=${entry.crossesZeroBothDecMargins == null ? "null" : String(entry.crossesZeroBothDecMargins)}:objective=${entry.selectionObjectivePrimaryMargin ?? "null"}:metricLift=${entry.metricDecRobustLift ?? "null"}:tileLift=${entry.tileReconstitutedDecRobustLift ?? "null"}:deviation=${entry.controlDeviationMagnitude ?? "null"}`,
+            )
+            .join("<br>")
+        : "none";
+    const selectedSweepCandidate =
+      evidence.selectedCandidateId != null
+        ? evidence.sweepCandidates.find(
+            (entry) => entry.candidateId === evidence.selectedCandidateId,
+          ) ?? null
+        : null;
+    const selectionReasonCodes =
+      evidence.selectionReasonCodes.length > 0
+        ? evidence.selectionReasonCodes.join(", ")
+        : "none";
+    const nonRegressionRequired =
+      evidence.nonRegressionGate.required.length > 0
+        ? evidence.nonRegressionGate.required.join(", ")
+        : "none";
+    const runtimeRollbackReasonCodes =
+      evidence.runtimeApplication.rollbackReasonCodes.length > 0
+        ? evidence.runtimeApplication.rollbackReasonCodes.join(", ")
+        : "none";
+    const runtimeCitationRefs =
+      evidence.runtimeApplication.citationRefs.length > 0
+        ? evidence.runtimeApplication.citationRefs.join("<br>")
+        : "none";
+    const crossZeroCitationRefs =
+      evidence.crossZeroFeasibilityEvidence.citationRefs.length > 0
+        ? evidence.crossZeroFeasibilityEvidence.citationRefs.join("<br>")
+        : "none";
+    const crossZeroNotes =
+      evidence.crossZeroFeasibilityEvidence.notes.length > 0
+        ? evidence.crossZeroFeasibilityEvidence.notes.join("<br>")
+        : "none";
+    const uncertaintyTags =
+      evidence.uncertaintyTags.length > 0
+        ? evidence.uncertaintyTags.join(", ")
+        : "none";
+    const knobs =
+      evidence.controlKnobs.length > 0
+        ? evidence.controlKnobs
+            .map(
+              (entry) =>
+                `${entry.knobId}: baseline=${entry.baselineValue ?? "null"} candidate=${entry.candidateValue ?? "null"} delta=${entry.deltaValue ?? "null"} bound=${entry.boundedDeltaMax ?? "null"} bounded=${String(entry.bounded)}`,
+            )
+            .join("<br>")
+        : "none";
+    const claimCitationMap =
+      evidence.claimCitationMap != null && evidence.claimCitationMap.length > 0
+        ? evidence.claimCitationMap
+            .map(
+              (entry) =>
+                `${entry.claimId}:${entry.claim}:citations=${entry.citationRefs.join(",") || "none"}:note=${entry.note ?? "none"}`,
+            )
+            .join("<br>")
+        : "none";
+    const zeroCrossReasonCodes =
+      evidence.zeroCrossFeasibilityReasonCodes != null &&
+      evidence.zeroCrossFeasibilityReasonCodes.length > 0
+        ? evidence.zeroCrossFeasibilityReasonCodes.join(", ")
+        : "none";
+    const boundedSearchEnvelope =
+      evidence.boundedSearchEnvelope == null
+        ? "none"
+        : `pressureScale=[${evidence.boundedSearchEnvelope.pressureScaleMin ?? "null"},${evidence.boundedSearchEnvelope.pressureScaleMax ?? "null"}] densityLift=[${evidence.boundedSearchEnvelope.densityLiftMin ?? "null"},${evidence.boundedSearchEnvelope.densityLiftMax ?? "null"}] fluxScale=[${evidence.boundedSearchEnvelope.fluxScaleMin ?? "null"},${evidence.boundedSearchEnvelope.fluxScaleMax ?? "null"}] shearScale=[${evidence.boundedSearchEnvelope.shearScaleMin ?? "null"},${evidence.boundedSearchEnvelope.shearScaleMax ?? "null"}] coarseStep={pressureScale:${evidence.boundedSearchEnvelope.coarsePressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.coarseDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.coarseFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.coarseShearScaleStep ?? "null"}} refineStep={pressureScale:${evidence.boundedSearchEnvelope.refinePressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.refineDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.refineFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.refineShearScaleStep ?? "null"}} coarseCandidates=${evidence.boundedSearchEnvelope.coarseCandidateCount ?? "null"} refineCandidates=${evidence.boundedSearchEnvelope.refineCandidateCount ?? "null"} refineSeeds=${evidence.boundedSearchEnvelope.refineSeedCount ?? "null"} observerDomainFixed=${String(evidence.boundedSearchEnvelope.observerDomainFixed)}`;
+    const claimCitationMapCompleteness =
+      evidence.claimCitationMapCompleteness == null
+        ? "none"
+        : `status=${evidence.claimCitationMapCompleteness.status} expected=${evidence.claimCitationMapCompleteness.expectedClaimCount} covered=${evidence.claimCitationMapCompleteness.coveredClaimCount} expectedIds=${evidence.claimCitationMapCompleteness.expectedClaimIds.join(",") || "none"} missingIds=${evidence.claimCitationMapCompleteness.missingClaimIds.join(",") || "none"} note=${evidence.claimCitationMapCompleteness.note ?? "none"}`;
+    const decCoupledControlEvidence =
+      evidence.decCoupledControlEvidence == null
+        ? "none"
+        : `status=${evidence.decCoupledControlEvidence.status} controlFamilies=${evidence.decCoupledControlEvidence.controlFamiliesUsed.join(",") || "none"} bestCandidateId=${evidence.decCoupledControlEvidence.bestCandidateId ?? "null"} comparabilityPass=${String(evidence.decCoupledControlEvidence.comparabilityGate.pass)} independentCrossCheckStatus=${evidence.decCoupledControlEvidence.comparabilityGate.independentCrossCheckStatus} note=${evidence.decCoupledControlEvidence.note ?? "none"}`;
+    const decCoupledResearchClaims =
+      evidence.decCoupledControlEvidence?.researchClaims == null ||
+      evidence.decCoupledControlEvidence.researchClaims.length === 0
+        ? "none"
+        : evidence.decCoupledControlEvidence.researchClaims
+            .map(
+              (entry) =>
+                `${entry.claimId}:${entry.confidenceLabel}:citations=${entry.citationRefs.join(",") || "none"}:note=${entry.note ?? "none"}`,
+            )
+            .join("<br>");
+    return `## Observer DEC Physics Control Evidence
+| field | value |
+|---|---|
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| baseline.metricDecEulerianMin | ${evidence.baseline.metricDecEulerianMin ?? "null"} |
+| baseline.metricDecRobustMin | ${evidence.baseline.metricDecRobustMin ?? "null"} |
+| baseline.metricWecEulerianMin | ${evidence.baseline.metricWecEulerianMin ?? "null"} |
+| baseline.metricWecRobustMin | ${evidence.baseline.metricWecRobustMin ?? "null"} |
+| baseline.metricNecEulerianMin | ${evidence.baseline.metricNecEulerianMin ?? "null"} |
+| baseline.metricNecRobustMin | ${evidence.baseline.metricNecRobustMin ?? "null"} |
+| baseline.tileReconstitutedDecEulerianMin | ${evidence.baseline.tileReconstitutedDecEulerianMin ?? "null"} |
+| baseline.tileReconstitutedDecRobustMin | ${evidence.baseline.tileReconstitutedDecRobustMin ?? "null"} |
+| baseline.tileReconstitutedWecEulerianMin | ${evidence.baseline.tileReconstitutedWecEulerianMin ?? "null"} |
+| baseline.tileReconstitutedWecRobustMin | ${evidence.baseline.tileReconstitutedWecRobustMin ?? "null"} |
+| baseline.tileReconstitutedNecEulerianMin | ${evidence.baseline.tileReconstitutedNecEulerianMin ?? "null"} |
+| baseline.tileReconstitutedNecRobustMin | ${evidence.baseline.tileReconstitutedNecRobustMin ?? "null"} |
+| candidate.candidateId | ${evidence.candidate.candidateId ?? "null"} |
+| candidate.applied | ${String(evidence.candidate.applied)} |
+| candidate.metricDecRobustMin | ${evidence.candidate.metricDecRobustMin ?? "null"} |
+| candidate.tileReconstitutedDecRobustMin | ${evidence.candidate.tileReconstitutedDecRobustMin ?? "null"} |
+| deltas.metricDecRobustLift | ${evidence.deltas.metricDecRobustLift ?? "null"} |
+| deltas.tileReconstitutedDecRobustLift | ${evidence.deltas.tileReconstitutedDecRobustLift ?? "null"} |
+| deltas.metricWecRobustDelta | ${evidence.deltas.metricWecRobustDelta ?? "null"} |
+| deltas.metricNecRobustDelta | ${evidence.deltas.metricNecRobustDelta ?? "null"} |
+| guardChecks.metricWecNonRegression | ${evidence.guardChecks.metricWecNonRegression == null ? "null" : String(evidence.guardChecks.metricWecNonRegression)} |
+| guardChecks.metricNecNonRegression | ${evidence.guardChecks.metricNecNonRegression == null ? "null" : String(evidence.guardChecks.metricNecNonRegression)} |
+| guardChecks.emissionAdmissionStable | ${evidence.guardChecks.emissionAdmissionStable == null ? "null" : String(evidence.guardChecks.emissionAdmissionStable)} |
+| guardChecks.semanticAdmissionStable | ${evidence.guardChecks.semanticAdmissionStable == null ? "null" : String(evidence.guardChecks.semanticAdmissionStable)} |
+| selectionObjective | ${evidence.selectionObjective ?? "null"} |
+| selectedCandidateId | ${evidence.selectedCandidateId ?? "null"} |
+| selectedCandidate.selectionObjectivePrimaryMargin | ${selectedSweepCandidate?.selectionObjectivePrimaryMargin ?? "null"} |
+| selectedCandidate.controlDeviationMagnitude | ${selectedSweepCandidate?.controlDeviationMagnitude ?? "null"} |
+| selectedCandidate.crossesZeroBothDecMargins | ${selectedSweepCandidate?.crossesZeroBothDecMargins == null ? "null" : String(selectedSweepCandidate.crossesZeroBothDecMargins)} |
+| selectionDecision | ${evidence.selectionDecision} |
+| selectionPlateauStatus | ${evidence.selectionPlateauStatus} |
+| crossZeroFeasibilityEvidence.baselinePrimaryMargin | ${evidence.crossZeroFeasibilityEvidence.baselinePrimaryMargin ?? "null"} |
+| crossZeroFeasibilityEvidence.bestCandidatePrimaryMargin | ${evidence.crossZeroFeasibilityEvidence.bestCandidatePrimaryMargin ?? "null"} |
+| crossZeroFeasibilityEvidence.requiredLiftToZero | ${evidence.crossZeroFeasibilityEvidence.requiredLiftToZero ?? "null"} |
+| crossZeroFeasibilityEvidence.achievedLiftFromBaseline | ${evidence.crossZeroFeasibilityEvidence.achievedLiftFromBaseline ?? "null"} |
+| crossZeroFeasibilityEvidence.bestAchievedLift | ${evidence.crossZeroFeasibilityEvidence.bestAchievedLift ?? "null"} |
+| crossZeroFeasibilityEvidence.residualMarginToZero | ${evidence.crossZeroFeasibilityEvidence.residualMarginToZero ?? "null"} |
+| crossZeroFeasibilityEvidence.gapToZero | ${evidence.crossZeroFeasibilityEvidence.gapToZero ?? "null"} |
+| crossZeroFeasibilityEvidence.crossZeroAchieved | ${evidence.crossZeroFeasibilityEvidence.crossZeroAchieved == null ? "null" : String(evidence.crossZeroFeasibilityEvidence.crossZeroAchieved)} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMin | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMin ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMax | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMax ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.densityLiftMin | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.densityLiftMin ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.densityLiftMax | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.densityLiftMax ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.fluxScaleMin | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.fluxScaleMin ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.fluxScaleMax | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.fluxScaleMax ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.shearScaleMin | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.shearScaleMin ?? "null"} |
+| crossZeroFeasibilityEvidence.boundedControlEnvelope.shearScaleMax | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.shearScaleMax ?? "null"} |
+| crossZeroFeasibilityEvidence.evaluationRoute.chartRef | ${evidence.crossZeroFeasibilityEvidence.evaluationRoute.chartRef ?? "null"} |
+| crossZeroFeasibilityEvidence.evaluationRoute.routeId | ${evidence.crossZeroFeasibilityEvidence.evaluationRoute.routeId ?? "null"} |
+| crossZeroFeasibilityEvidence.evaluationRoute.selectedPath | ${evidence.crossZeroFeasibilityEvidence.evaluationRoute.selectedPath ?? "null"} |
+| crossZeroFeasibilityEvidence.evaluationRoute.independentCrossCheckStatus | ${evidence.crossZeroFeasibilityEvidence.evaluationRoute.independentCrossCheckStatus} |
+| crossZeroFeasibilityEvidence.evaluationRoute.runtimeComparabilityPass | ${evidence.crossZeroFeasibilityEvidence.evaluationRoute.runtimeComparabilityPass == null ? "null" : String(evidence.crossZeroFeasibilityEvidence.evaluationRoute.runtimeComparabilityPass)} |
+| crossZeroFeasibilityEvidence.method | ${evidence.crossZeroFeasibilityEvidence.method} |
+| crossZeroFeasibilityEvidence.inferenceLabel | ${evidence.crossZeroFeasibilityEvidence.inferenceLabel} |
+| crossZeroFeasibilityEvidence.citationRefs | ${crossZeroCitationRefs} |
+| crossZeroFeasibilityEvidence.notes | ${crossZeroNotes} |
+| zeroCrossFeasibilityDecision | ${evidence.zeroCrossFeasibilityDecision ?? "null"} |
+| zeroCrossFeasibilityReasonCodes | ${zeroCrossReasonCodes} |
+| boundedSearchEnvelope | ${boundedSearchEnvelope} |
+| selectionReasonCodes | ${selectionReasonCodes} |
+| sweepPhaseSummary | ${sweepPhaseSummary} |
+| topCandidateLeaderboard | ${topCandidateLeaderboard} |
+| nonRegressionGate.required | ${nonRegressionRequired} |
+| nonRegressionGate.pass | ${String(evidence.nonRegressionGate.pass)} |
+| nonRegressionGate.note | ${evidence.nonRegressionGate.note ?? "null"} |
+| runtimeApplication.attempted | ${String(evidence.runtimeApplication.attempted)} |
+| runtimeApplication.enabled | ${String(evidence.runtimeApplication.enabled)} |
+| runtimeApplication.status | ${evidence.runtimeApplication.status} |
+| runtimeApplication.failureMode | ${evidence.runtimeApplication.failureMode} |
+| runtimeApplication.evaluationComparable | ${String(evidence.runtimeApplication.evaluationComparable)} |
+| runtimeApplication.sampleCount | ${evidence.runtimeApplication.sampleCount ?? "null"} |
+| runtimeApplication.comparableSampleCount | ${evidence.runtimeApplication.comparableSampleCount ?? "null"} |
+| runtimeApplication.minimumComparableSampleCount | ${evidence.runtimeApplication.minimumComparableSampleCount ?? "null"} |
+| runtimeApplication.sampleCountSufficient | ${evidence.runtimeApplication.sampleCountSufficient == null ? "null" : String(evidence.runtimeApplication.sampleCountSufficient)} |
+| runtimeApplication.referenceRouteId | ${evidence.runtimeApplication.referenceRouteId ?? "null"} |
+| runtimeApplication.selectedRouteId | ${evidence.runtimeApplication.selectedRouteId ?? "null"} |
+| runtimeApplication.selectedPath | ${evidence.runtimeApplication.selectedPath ?? "null"} |
+| runtimeApplication.candidateId | ${evidence.runtimeApplication.candidateId ?? "null"} |
+| runtimeApplication.comparabilityGate.chartRef | ${evidence.runtimeApplication.comparabilityGate.chartRef ?? "null"} |
+| runtimeApplication.comparabilityGate.chartParity | ${evidence.runtimeApplication.comparabilityGate.chartParity == null ? "null" : String(evidence.runtimeApplication.comparabilityGate.chartParity)} |
+| runtimeApplication.comparabilityGate.selectedPathParity | ${evidence.runtimeApplication.comparabilityGate.selectedPathParity == null ? "null" : String(evidence.runtimeApplication.comparabilityGate.selectedPathParity)} |
+| runtimeApplication.comparabilityGate.independentCrossCheckStatus | ${evidence.runtimeApplication.comparabilityGate.independentCrossCheckStatus} |
+| runtimeApplication.comparabilityGate.pass | ${String(evidence.runtimeApplication.comparabilityGate.pass)} |
+| runtimeApplication.comparabilityGate.note | ${evidence.runtimeApplication.comparabilityGate.note ?? "null"} |
+| runtimeApplication.rollbackReasonCodes | ${runtimeRollbackReasonCodes} |
+| runtimeApplication.guardChecks.metricWecNonRegression | ${evidence.runtimeApplication.guardChecks.metricWecNonRegression == null ? "null" : String(evidence.runtimeApplication.guardChecks.metricWecNonRegression)} |
+| runtimeApplication.guardChecks.metricNecNonRegression | ${evidence.runtimeApplication.guardChecks.metricNecNonRegression == null ? "null" : String(evidence.runtimeApplication.guardChecks.metricNecNonRegression)} |
+| runtimeApplication.guardChecks.emissionAdmissionStable | ${evidence.runtimeApplication.guardChecks.emissionAdmissionStable == null ? "null" : String(evidence.runtimeApplication.guardChecks.emissionAdmissionStable)} |
+| runtimeApplication.guardChecks.semanticAdmissionStable | ${evidence.runtimeApplication.guardChecks.semanticAdmissionStable == null ? "null" : String(evidence.runtimeApplication.guardChecks.semanticAdmissionStable)} |
+| runtimeApplication.guardChecks.metricDecRobustLiftPositive | ${evidence.runtimeApplication.guardChecks.metricDecRobustLiftPositive == null ? "null" : String(evidence.runtimeApplication.guardChecks.metricDecRobustLiftPositive)} |
+| runtimeApplication.guardChecks.tileReconstitutedDecRobustLiftNonNegative | ${evidence.runtimeApplication.guardChecks.tileReconstitutedDecRobustLiftNonNegative == null ? "null" : String(evidence.runtimeApplication.guardChecks.tileReconstitutedDecRobustLiftNonNegative)} |
+| runtimeApplication.observed.metricDecRobustLift | ${evidence.runtimeApplication.observed.metricDecRobustLift ?? "null"} |
+| runtimeApplication.observed.tileReconstitutedDecRobustLift | ${evidence.runtimeApplication.observed.tileReconstitutedDecRobustLift ?? "null"} |
+| runtimeApplication.observed.metricWecRobustDelta | ${evidence.runtimeApplication.observed.metricWecRobustDelta ?? "null"} |
+| runtimeApplication.observed.metricNecRobustDelta | ${evidence.runtimeApplication.observed.metricNecRobustDelta ?? "null"} |
+| runtimeApplication.observed.metricDecRobustMarginToZero | ${evidence.runtimeApplication.observed.metricDecRobustMarginToZero ?? "null"} |
+| runtimeApplication.observed.tileReconstitutedDecRobustMarginToZero | ${evidence.runtimeApplication.observed.tileReconstitutedDecRobustMarginToZero ?? "null"} |
+| runtimeApplication.observed.metricWecNonRegressionMargin | ${evidence.runtimeApplication.observed.metricWecNonRegressionMargin ?? "null"} |
+| runtimeApplication.observed.metricNecNonRegressionMargin | ${evidence.runtimeApplication.observed.metricNecNonRegressionMargin ?? "null"} |
+| runtimeApplication.note | ${evidence.runtimeApplication.note ?? "null"} |
+| runtimeApplication.citationRefs | ${runtimeCitationRefs} |
+| sweepCandidates | ${sweepCandidates} |
+| recommendation | ${evidence.recommendation} |
+| controlKnobs | ${knobs} |
+| claimCitationMap | ${claimCitationMap} |
+| claimCitationMapCompleteness | ${claimCitationMapCompleteness} |
+| decCoupledControlEvidence | ${decCoupledControlEvidence} |
+| decCoupledControlEvidence.researchClaims | ${decCoupledResearchClaims} |
+| uncertaintyTags | ${uncertaintyTags} |
+| citationRefs | ${citationRefs} |
+| derivationNotes | ${derivationNotes} |
+| uncertaintyNotes | ${uncertaintyNotes} |
+`;
+  };
+  const renderT00PolicyAdmissionBridgeEvidence = (): string => {
+    const evidence = payload.t00PolicyAdmissionBridgeEvidence;
+    if (evidence == null) {
+      return `## T00 Policy Admission Bridge Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0 ? evidence.citationRefs.join("<br>") : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## T00 Policy Admission Bridge Evidence
+| field | value |
+|---|---|
+| status | ${evidence.status} |
+| routeId | ${evidence.routeId ?? "null"} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| routeAdmissionRaw | ${evidence.routeAdmissionRaw} |
+| routeAdmissionEffective | ${evidence.routeAdmissionEffective} |
+| routeAdmissionPromotionBasis | ${evidence.routeAdmissionPromotionBasis} |
+| checks.fullEinsteinTensorRouteAdmission | ${evidence.checks.fullEinsteinTensorRouteAdmission} |
+| checks.einsteinT00Comparability | ${evidence.checks.einsteinT00Comparability} |
+| checks.independentCrossCheck | ${evidence.checks.independentCrossCheck} |
+| checks.finiteDifferenceConvergence | ${evidence.checks.finiteDifferenceConvergence} |
+| checks.citationCoverage | ${evidence.checks.citationCoverage} |
+| pass | ${String(evidence.pass)} |
+| rationale | ${evidence.rationale ?? "null"} |
+| citationRefs | ${citationRefs} |
+| notes | ${notes} |
+`;
+  };
+  const renderTileAuthorityEvidence = (): string => {
+    const evidence = payload.tileAuthorityEvidence;
+    if (evidence == null) {
+      return `## Tile Authority Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Tile Authority Evidence
+| field | value |
+|---|---|
+| status | ${evidence.status} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| tileRoute | ${evidence.tileRoute} |
+| checks.routeAdmission | ${evidence.checks.routeAdmission} |
+| checks.fullTensorComponents | ${evidence.checks.fullTensorComponents} |
+| checks.comparability | ${evidence.checks.comparability} |
+| checks.citationCoverage | ${evidence.checks.citationCoverage} |
+| pass | ${String(evidence.pass)} |
+| rationale | ${evidence.rationale ?? "null"} |
+| citationRefs | ${citationRefs} |
+| notes | ${notes} |
+`;
+  };
+  const renderTileComparableCrossCheckEvidence = (): string => {
+    const evidence = payload.tileComparableCrossCheckEvidence;
+    if (evidence == null) {
+      return `## Tile Comparable Cross-Check Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Tile Comparable Cross-Check Evidence
+| field | value |
+|---|---|
+| status | ${evidence.status} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| referenceRouteId | ${evidence.referenceRouteId ?? "null"} |
+| aggregationMethod | ${evidence.aggregationMethod ?? "null"} |
+| metricTensorRef | ${evidence.metricTensorRef ?? "null"} |
+| tileTensorRef | ${evidence.tileTensorRef ?? "null"} |
+| metricWecEulerianMin | ${evidence.metricWecEulerianMin ?? "null"} |
+| metricWecRobustMin | ${evidence.metricWecRobustMin ?? "null"} |
+| tileWecEulerianMin | ${evidence.tileWecEulerianMin ?? "null"} |
+| tileWecRobustMin | ${evidence.tileWecRobustMin ?? "null"} |
+| eulerianMinDelta | ${evidence.eulerianMinDelta ?? "null"} |
+| robustMinDelta | ${evidence.robustMinDelta ?? "null"} |
+| eulerianSignAgreement | ${evidence.eulerianSignAgreement == null ? "null" : String(evidence.eulerianSignAgreement)} |
+| robustSignAgreement | ${evidence.robustSignAgreement == null ? "null" : String(evidence.robustSignAgreement)} |
+| independentCrossCheckStatus | ${evidence.independentCrossCheckStatus} |
+| comparabilityStatus | ${evidence.comparabilityStatus} |
+| localizationResult | ${evidence.localizationResult} |
+| nextPatchClass | ${evidence.nextPatchClass} |
+| rationale | ${evidence.rationale ?? "null"} |
+| citationRefs | ${citationRefs} |
+| notes | ${notes} |
+`;
+  };
+  const renderTileSurfaceReconstitutionEvidence = (): string => {
+    const evidence = payload.tileSurfaceReconstitutionEvidence;
+    if (evidence == null) {
+      return `## Tile Surface Reconstitution Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Tile Surface Reconstitution Evidence
+| field | value |
+|---|---|
+| status | ${evidence.status} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| sourceTensorRef | ${evidence.sourceTensorRef ?? "null"} |
+| reconstitutedTileTensorRef | ${evidence.reconstitutedTileTensorRef ?? "null"} |
+| aggregationMethod | ${evidence.aggregationMethod ?? "null"} |
+| sampleDomainRef | ${evidence.sampleDomainRef ?? "null"} |
+| componentCoverage.t00 | ${evidence.componentCoverage.t00} |
+| componentCoverage.t0i | ${evidence.componentCoverage.t0i} |
+| componentCoverage.offDiagonalTij | ${evidence.componentCoverage.offDiagonalTij} |
+| independentCrossCheckRouteRef | ${evidence.independentCrossCheckRouteRef ?? "null"} |
+| independentCrossCheckStatus | ${evidence.independentCrossCheckStatus} |
+| comparabilityStatus | ${evidence.comparabilityStatus} |
+| localizationResult | ${evidence.localizationResult} |
+| rationale | ${evidence.rationale ?? "null"} |
+| citationRefs | ${citationRefs} |
+| notes | ${notes} |
+`;
+  };
+  const renderTileObserverConditionComparabilityEvidence = (): string => {
+    const evidence = payload.tileObserverConditionComparabilityEvidence;
+    if (evidence == null) {
+      return `## Tile Observer Condition Comparability Evidence
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const citationRefs =
+      evidence.citationRefs.length > 0
+        ? evidence.citationRefs.join("<br>")
+        : "none";
+    const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    return `## Tile Observer Condition Comparability Evidence
+| field | value |
+|---|---|
+| status | ${evidence.status} |
+| chartRef | ${evidence.chartRef ?? "null"} |
+| routeId | ${evidence.routeId ?? "null"} |
+| selectedPath | ${evidence.selectedPath ?? "null"} |
+| sampleDomainRef | ${evidence.sampleDomainRef ?? "null"} |
+| aggregationMethod | ${evidence.aggregationMethod ?? "null"} |
+| classification | ${evidence.classification} |
+| classificationReason | ${evidence.classificationReason ?? "null"} |
+| checks.routeComparability | ${evidence.checks.routeComparability} |
+| checks.independentCrossCheck | ${evidence.checks.independentCrossCheck} |
+| checks.sampleCountParity | ${evidence.checks.sampleCountParity} |
+| checks.rapidityCapParity | ${evidence.checks.rapidityCapParity} |
+| checks.rapidityCapBetaParity | ${evidence.checks.rapidityCapBetaParity} |
+| checks.citationCoverage | ${evidence.checks.citationCoverage} |
+| lanes.metricRequired.tensorRef | ${evidence.lanes.metricRequired.tensorRef ?? "null"} |
+| lanes.metricRequired.sampleCount | ${evidence.lanes.metricRequired.sampleCount ?? "null"} |
+| lanes.metricRequired.rapidityCap | ${evidence.lanes.metricRequired.rapidityCap ?? "null"} |
+| lanes.metricRequired.rapidityCapBeta | ${evidence.lanes.metricRequired.rapidityCapBeta ?? "null"} |
+| lanes.metricRequired.wecEulerianMin | ${evidence.lanes.metricRequired.wecEulerianMin ?? "null"} |
+| lanes.metricRequired.wecRobustMin | ${evidence.lanes.metricRequired.wecRobustMin ?? "null"} |
+| lanes.metricRequired.decEulerianMin | ${evidence.lanes.metricRequired.decEulerianMin ?? "null"} |
+| lanes.metricRequired.decRobustMin | ${evidence.lanes.metricRequired.decRobustMin ?? "null"} |
+| lanes.tileEffectiveProxy.tensorRef | ${evidence.lanes.tileEffectiveProxy.tensorRef ?? "null"} |
+| lanes.tileEffectiveProxy.sampleCount | ${evidence.lanes.tileEffectiveProxy.sampleCount ?? "null"} |
+| lanes.tileEffectiveProxy.rapidityCap | ${evidence.lanes.tileEffectiveProxy.rapidityCap ?? "null"} |
+| lanes.tileEffectiveProxy.rapidityCapBeta | ${evidence.lanes.tileEffectiveProxy.rapidityCapBeta ?? "null"} |
+| lanes.tileEffectiveProxy.wecEulerianMin | ${evidence.lanes.tileEffectiveProxy.wecEulerianMin ?? "null"} |
+| lanes.tileEffectiveProxy.wecRobustMin | ${evidence.lanes.tileEffectiveProxy.wecRobustMin ?? "null"} |
+| lanes.tileEffectiveProxy.decEulerianMin | ${evidence.lanes.tileEffectiveProxy.decEulerianMin ?? "null"} |
+| lanes.tileEffectiveProxy.decRobustMin | ${evidence.lanes.tileEffectiveProxy.decRobustMin ?? "null"} |
+| lanes.tileEffectiveReconstituted.tensorRef | ${evidence.lanes.tileEffectiveReconstituted.tensorRef ?? "null"} |
+| lanes.tileEffectiveReconstituted.sourceRef | ${evidence.lanes.tileEffectiveReconstituted.sourceRef ?? "null"} |
+| lanes.tileEffectiveReconstituted.sampleCount | ${evidence.lanes.tileEffectiveReconstituted.sampleCount ?? "null"} |
+| lanes.tileEffectiveReconstituted.rapidityCap | ${evidence.lanes.tileEffectiveReconstituted.rapidityCap ?? "null"} |
+| lanes.tileEffectiveReconstituted.rapidityCapBeta | ${evidence.lanes.tileEffectiveReconstituted.rapidityCapBeta ?? "null"} |
+| lanes.tileEffectiveReconstituted.wecEulerianMin | ${evidence.lanes.tileEffectiveReconstituted.wecEulerianMin ?? "null"} |
+| lanes.tileEffectiveReconstituted.wecRobustMin | ${evidence.lanes.tileEffectiveReconstituted.wecRobustMin ?? "null"} |
+| lanes.tileEffectiveReconstituted.decEulerianMin | ${evidence.lanes.tileEffectiveReconstituted.decEulerianMin ?? "null"} |
+| lanes.tileEffectiveReconstituted.decRobustMin | ${evidence.lanes.tileEffectiveReconstituted.decRobustMin ?? "null"} |
+| lanes.tileEffectiveReconstituted.note | ${evidence.lanes.tileEffectiveReconstituted.note ?? "null"} |
+| pass | ${String(evidence.pass)} |
+| rationale | ${evidence.rationale ?? "null"} |
+| citationRefs | ${citationRefs} |
+| notes | ${notes} |
+`;
+  };
+  const renderTileObserverConditionAuthority = (): string => {
+    const mode = payload.tileObserverConditionAuthorityMode ?? "unknown";
+    const note = payload.tileObserverConditionAuthorityNote ?? "null";
+    return `## Tile Observer Condition Authority
+| field | value |
+|---|---|
+| tileObserverConditionAuthorityMode | ${mode} |
+| tileObserverConditionAuthorityNote | ${note} |
+`;
+  };
+  const renderTileObserverLegacyProxyDiagnostics = (): string => {
+    const diagnostics = payload.tileObserverLegacyProxyDiagnostics;
+    if (diagnostics == null) {
+      return `## Tile Observer Legacy Proxy Diagnostics
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    return `## Tile Observer Legacy Proxy Diagnostics
+| field | value |
+|---|---|
+| tensorRef | ${diagnostics.tensorRef ?? "null"} |
+| sampleCount | ${diagnostics.sampleCount ?? "null"} |
+| rapidityCap | ${diagnostics.rapidityCap ?? "null"} |
+| rapidityCapBeta | ${diagnostics.rapidityCapBeta ?? "null"} |
+| wecEulerianMin | ${diagnostics.wecEulerianMin ?? "null"} |
+| wecRobustMin | ${diagnostics.wecRobustMin ?? "null"} |
+| decEulerianMin | ${diagnostics.decEulerianMin ?? "null"} |
+| decRobustMin | ${diagnostics.decRobustMin ?? "null"} |
+| note | ${diagnostics.note ?? "null"} |
+`;
+  };
 
   return `# NHM2 Observer Audit (${DATE_STAMP})
 
@@ -30024,6 +30905,10 @@ const renderNhm2ObserverAuditMarkdown = (
 | observerMetricFirstMissingStage | ${payload.observerMetricFirstMissingStage} |
 | observerMetricEmissionAdmissionStatus | ${payload.observerMetricEmissionAdmissionStatus} |
 | observerMetricEmissionAdmissionNote | ${payload.observerMetricEmissionAdmissionNote ?? "null"} |
+| observerMetricT00AdmissionStatus | ${payload.observerMetricT00AdmissionStatus} |
+| observerMetricT00RouteId | ${payload.observerMetricT00RouteId ?? "null"} |
+| observerMetricT00ComparabilityStatus | ${payload.observerMetricT00ComparabilityStatus} |
+| observerMetricT00AdmissionNote | ${payload.observerMetricT00AdmissionNote ?? "null"} |
 | observerMetricT0iAdmissionStatus | ${payload.observerMetricT0iAdmissionStatus} |
 | observerMetricT0iAdmissionNote | ${payload.observerMetricT0iAdmissionNote ?? "null"} |
 | observerMetricOffDiagonalTijAdmissionStatus | ${payload.observerMetricOffDiagonalTijAdmissionStatus} |
@@ -30034,11 +30919,32 @@ const renderNhm2ObserverAuditMarkdown = (
 | observerLeadReadinessReason | ${payload.observerLeadReadinessReason ?? "null"} |
 | observerNextTechnicalAction | ${payload.observerNextTechnicalAction} |
 | metricProducerAdmissionEvidence | ${payload.metricProducerAdmissionEvidence == null ? "null" : "available"} |
+| modelTermSemanticAdmissionEvidence | ${payload.modelTermSemanticAdmissionEvidence == null ? "null" : "available"} |
+| observerDecRemediationEvidence | ${payload.observerDecRemediationEvidence == null ? "null" : "available"} |
+| observerDecPhysicsControlEvidence | ${payload.observerDecPhysicsControlEvidence == null ? "null" : "available"} |
+| t00PolicyAdmissionBridgeEvidence | ${payload.t00PolicyAdmissionBridgeEvidence == null ? "null" : "available"} |
+| tileAuthorityEvidence | ${payload.tileAuthorityEvidence == null ? "null" : "available"} |
+| tileComparableCrossCheckEvidence | ${payload.tileComparableCrossCheckEvidence == null ? "null" : "available"} |
+| tileSurfaceReconstitutionEvidence | ${payload.tileSurfaceReconstitutionEvidence == null ? "null" : "available"} |
+| tileObserverConditionComparabilityEvidence | ${payload.tileObserverConditionComparabilityEvidence == null ? "null" : "available"} |
+| tileObserverConditionAuthorityMode | ${payload.tileObserverConditionAuthorityMode ?? "null"} |
+| tileObserverConditionAuthorityNote | ${payload.tileObserverConditionAuthorityNote ?? "null"} |
+| tileObserverLegacyProxyDiagnostics | ${payload.tileObserverLegacyProxyDiagnostics == null ? "null" : "available"} |
 | observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
 | metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
 | tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
 
 ${renderMetricProducerAdmissionEvidence()}
+${renderModelTermSemanticAdmissionEvidence()}
+${renderObserverDecRemediationEvidence()}
+${renderObserverDecPhysicsControlEvidence()}
+${renderT00PolicyAdmissionBridgeEvidence()}
+${renderTileAuthorityEvidence()}
+${renderTileComparableCrossCheckEvidence()}
+${renderTileSurfaceReconstitutionEvidence()}
+${renderTileObserverConditionComparabilityEvidence()}
+${renderTileObserverConditionAuthority()}
+${renderTileObserverLegacyProxyDiagnostics()}
 ${renderTensorSection("Metric Required Tensor", payload.tensors.metricRequired)}
 ${renderTensorSection("Tile Effective Tensor", payload.tensors.tileEffective)}
 `;
@@ -34196,6 +35102,497 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
   };
 };
 
+const DEFAULT_NHM2_METRIC_WEC_FEASIBILITY_BOUNDARY_PROFILE_COUNT = 12;
+const NHM2_METRIC_WEC_FEASIBILITY_SEMANTICS_REF =
+  "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md";
+const NHM2_METRIC_WEC_FEASIBILITY_RESEARCH_BASIS_REF =
+  "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md";
+const NHM2_METRIC_WEC_FEASIBILITY_CITATION_REFS = [
+  NHM2_METRIC_WEC_FEASIBILITY_SEMANTICS_REF,
+  NHM2_METRIC_WEC_FEASIBILITY_RESEARCH_BASIS_REF,
+  "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+  "https://arxiv.org/abs/gr-qc/0110086",
+  "https://arxiv.org/abs/gr-qc/0703035",
+  "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+  "https://arxiv.org/abs/2404.03095",
+  "https://arxiv.org/abs/2602.18023",
+] as const;
+
+const computeNhm2MetricWecFeasibilityChecksum = (
+  payload: Nhm2MetricWecFeasibilityArtifact,
+): string => {
+  const copy = {
+    ...payload,
+    checksum: undefined,
+  };
+  return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
+};
+
+const resolveNhm2MetricWecFeasibilityProfileIds = (args?: {
+  profileIds?: string[];
+  boundaryProfileCount?: number;
+}): string[] => {
+  if (args?.profileIds != null && args.profileIds.length > 0) {
+    return Array.from(
+      new Set(args.profileIds.map((entry) => entry.trim()).filter((entry) => entry.length > 0)),
+    );
+  }
+  const selectedProfileId = DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID;
+  const selectedAlpha =
+    toFiniteNumber(resolveWarpShiftLapseProfile(selectedProfileId).alphaCenterlineDefault) ?? 0;
+  const boundaryProfileCount = Math.max(
+    1,
+    args?.boundaryProfileCount ?? DEFAULT_NHM2_METRIC_WEC_FEASIBILITY_BOUNDARY_PROFILE_COUNT,
+  );
+  const nearestBoundaryProfiles = [...STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS]
+    .map((profileId) => {
+      const alpha = toFiniteNumber(resolveWarpShiftLapseProfile(profileId).centerlineAlpha);
+      return {
+        profileId,
+        alpha,
+        distance: alpha == null ? Number.POSITIVE_INFINITY : Math.abs(alpha - selectedAlpha),
+      };
+    })
+    .sort((left, right) => {
+      if (left.distance !== right.distance) return left.distance - right.distance;
+      return (right.alpha ?? -Infinity) - (left.alpha ?? -Infinity);
+    })
+    .slice(0, boundaryProfileCount)
+    .map((entry) => entry.profileId);
+  return Array.from(
+    new Set([
+      selectedProfileId,
+      ...STAGE1_CENTERLINE_ALPHA_ROBUSTNESS_SWEEP_PROFILE_IDS,
+      ...nearestBoundaryProfiles,
+    ]),
+  );
+};
+
+const buildNhm2MetricWecFeasibilityEntryFromObserver = (args: {
+  shiftLapseProfileId: string;
+  observerAudit: Nhm2ObserverAuditArtifact | null;
+}): Nhm2MetricWecFeasibilityEntry => {
+  const resolvedProfile = resolveWarpShiftLapseProfile(args.shiftLapseProfileId);
+  const observerAudit = args.observerAudit;
+  const metricTensor = observerAudit?.tensors.metricRequired;
+  const tileTensor = observerAudit?.tensors.tileEffective;
+  const modelTermEvidence = observerAudit?.modelTermSemanticAdmissionEvidence;
+  const closurePathDecision = modelTermEvidence?.closurePathDecision;
+  const closurePathBlockerCodes = closurePathDecision?.blockerCodes ?? [];
+  const closurePathNonBlockingCodes = closurePathDecision?.nonBlockingCodes ?? [];
+  const closurePathSelected = closurePathDecision?.selectedPath ?? null;
+  const supportFieldRouteAdmissionStatus =
+    modelTermEvidence?.checks.supportFieldRouteAdmission ?? null;
+  const fullEinsteinTensorRouteAdmissionStatus =
+    modelTermEvidence?.checks.fullEinsteinTensorRouteAdmission ?? null;
+  const independentCrossCheckStatus = modelTermEvidence?.checks.independentCrossCheck ?? null;
+  const finiteDifferenceConvergenceStatus =
+    modelTermEvidence?.checks.finiteDifferenceConvergence ?? null;
+  const einsteinT00ComparabilityStatus =
+    modelTermEvidence?.checks.einsteinT00Comparability ?? null;
+  const closurePathSupportFieldInterpretation: "blocking" | "non_blocking" | "unknown" =
+    closurePathSelected === "full_einstein_tensor"
+      ? fullEinsteinTensorRouteAdmissionStatus === "pass" ||
+        closurePathNonBlockingCodes.includes("support_field_route_not_admitted")
+        ? "non_blocking"
+        : "unknown"
+      : closurePathSelected === "adm_complete"
+        ? supportFieldRouteAdmissionStatus === "pass"
+          ? "non_blocking"
+          : "blocking"
+        : "unknown";
+  const closurePathSemanticConsistencyStatus: Nhm2MetricWecFeasibilitySemanticStatus =
+    closurePathSelected === "full_einstein_tensor"
+      ? fullEinsteinTensorRouteAdmissionStatus === "pass"
+        ? "pass"
+        : fullEinsteinTensorRouteAdmissionStatus === "fail"
+          ? "fail"
+          : "unknown"
+      : closurePathSelected === "adm_complete"
+        ? supportFieldRouteAdmissionStatus === "pass"
+          ? "pass"
+          : supportFieldRouteAdmissionStatus === "fail"
+            ? "fail"
+            : "unknown"
+        : "unknown";
+  const closurePathSemanticConsistencyNote =
+    closurePathSelected === "full_einstein_tensor"
+      ? fullEinsteinTensorRouteAdmissionStatus === "pass"
+        ? "Selected full_einstein_tensor path is internally consistent with a passing Einstein-route admission; ADM support-field route remains an out-of-path diagnostic on this closure path."
+        : "Selected full_einstein_tensor path is not yet consistent with Einstein-route admission."
+      : closurePathSelected === "adm_complete"
+        ? supportFieldRouteAdmissionStatus === "pass"
+          ? "Selected adm_complete path is internally consistent with admitted support-field route evidence."
+          : "Selected adm_complete path is not yet consistent with support-field route admission."
+        : "Closure path decision remains undecided, so semantic consistency is not yet determined.";
+  const closurePathInvarianceStatus: Nhm2MetricWecFeasibilitySemanticStatus =
+    closurePathSelected === "full_einstein_tensor"
+      ? fullEinsteinTensorRouteAdmissionStatus === "pass" &&
+        independentCrossCheckStatus === "pass" &&
+        finiteDifferenceConvergenceStatus === "pass" &&
+        einsteinT00ComparabilityStatus === "pass"
+        ? "pass"
+        : fullEinsteinTensorRouteAdmissionStatus === "fail" ||
+            independentCrossCheckStatus === "fail" ||
+            finiteDifferenceConvergenceStatus === "fail" ||
+            einsteinT00ComparabilityStatus === "fail"
+          ? "fail"
+          : "unknown"
+      : closurePathSelected === "adm_complete"
+        ? supportFieldRouteAdmissionStatus === "pass"
+          ? "pass"
+          : supportFieldRouteAdmissionStatus === "fail"
+            ? "fail"
+            : "unknown"
+        : "unknown";
+  const closurePathInvarianceNote =
+    closurePathSelected === "full_einstein_tensor"
+      ? `Einstein-path invariance checks: independentCrossCheck=${independentCrossCheckStatus ?? "unknown"}, finiteDifferenceConvergence=${finiteDifferenceConvergenceStatus ?? "unknown"}, einsteinT00Comparability=${einsteinT00ComparabilityStatus ?? "unknown"}.`
+      : closurePathSelected === "adm_complete"
+        ? `ADM-path invariance anchor follows supportFieldRouteAdmission=${supportFieldRouteAdmissionStatus ?? "unknown"}.`
+        : "Closure path decision is undecided, so invariance checks are informational only.";
+  return {
+    shiftLapseProfileId: args.shiftLapseProfileId,
+    centerlineAlpha: toFiniteNumber(resolvedProfile.alphaCenterlineDefault),
+    observerStatus: observerAudit?.status ?? "unavailable",
+    metricWecStatus: metricTensor?.conditions.wec.status ?? null,
+    metricWecEulerianMin: toFiniteNumber(metricTensor?.conditions.wec.eulerianMin),
+    metricWecRobustMin: toFiniteNumber(metricTensor?.conditions.wec.robustMin),
+    metricDecStatus: metricTensor?.conditions.dec.status ?? null,
+    metricDecEulerianMin: toFiniteNumber(metricTensor?.conditions.dec.eulerianMin),
+    metricDecRobustMin: toFiniteNumber(metricTensor?.conditions.dec.robustMin),
+    tileWecStatus: tileTensor?.conditions.wec.status ?? null,
+    tileWecEulerianMin: toFiniteNumber(tileTensor?.conditions.wec.eulerianMin),
+    tileWecRobustMin: toFiniteNumber(tileTensor?.conditions.wec.robustMin),
+    observerMetricPrimaryDriver: observerAudit?.observerMetricPrimaryDriver ?? null,
+    observerTilePrimaryDriver: observerAudit?.observerTilePrimaryDriver ?? null,
+    metricPrimaryBlockingMode: metricTensor?.primaryBlockingMode ?? null,
+    tilePrimaryBlockingMode: tileTensor?.primaryBlockingMode ?? null,
+    observerMetricEmissionAdmissionStatus:
+      observerAudit?.observerMetricEmissionAdmissionStatus ?? null,
+    observerMetricT00AdmissionStatus:
+      observerAudit?.observerMetricT00AdmissionStatus ?? null,
+    observerMetricT00ComparabilityStatus:
+      observerAudit?.observerMetricT00ComparabilityStatus ?? null,
+    observerMetricT00RouteId: observerAudit?.observerMetricT00RouteId ?? null,
+    observerMetricT0iAdmissionStatus: observerAudit?.observerMetricT0iAdmissionStatus ?? null,
+    observerMetricOffDiagonalTijAdmissionStatus:
+      observerAudit?.observerMetricOffDiagonalTijAdmissionStatus ?? null,
+    modelTermRouteId: modelTermEvidence?.routeId ?? null,
+    modelTermRouteAdmission: modelTermEvidence?.routeAdmission ?? null,
+    modelTermDecision: modelTermEvidence?.decision ?? null,
+    supportFieldRouteAdmissionStatus,
+    fullEinsteinTensorRouteAdmissionStatus,
+    independentCrossCheckStatus,
+    closurePathSelected,
+    closurePathSupportFieldInterpretation,
+    closurePathSemanticConsistencyStatus,
+    closurePathSemanticConsistencyNote,
+    closurePathInvarianceStatus,
+    closurePathInvarianceNote,
+    recommendedPatchClass: closurePathDecision?.nextPatchClass ?? null,
+    closurePathBlockerCodes,
+    closurePathNonBlockingCodes,
+    semanticBlockerSupportFieldRouteNotAdmitted:
+      closurePathBlockerCodes.includes("support_field_route_not_admitted") ||
+      closurePathNonBlockingCodes.includes("support_field_route_not_admitted"),
+  };
+};
+
+export const buildNhm2MetricWecFeasibilityArtifact = (args: {
+  entries: Nhm2MetricWecFeasibilityEntry[];
+}): Nhm2MetricWecFeasibilityArtifact => {
+  const entries = [...args.entries];
+  const metricComparableEntries = entries.filter(
+    (entry): entry is Nhm2MetricWecFeasibilityEntry & { metricWecEulerianMin: number } =>
+      entry.metricWecEulerianMin != null,
+  );
+  const metricRobustComparableEntries = entries.filter(
+    (entry): entry is Nhm2MetricWecFeasibilityEntry & { metricWecRobustMin: number } =>
+      entry.metricWecRobustMin != null,
+  );
+  const bestEntry =
+    metricComparableEntries.length > 0
+      ? metricComparableEntries.reduce((best, candidate) =>
+          candidate.metricWecEulerianMin > best.metricWecEulerianMin ? candidate : best,
+        )
+      : null;
+  const bestRobustEntry =
+    metricRobustComparableEntries.length > 0
+      ? metricRobustComparableEntries.reduce((best, candidate) =>
+          candidate.metricWecRobustMin > best.metricWecRobustMin ? candidate : best,
+        )
+      : null;
+  const hasMetricWecPass = metricComparableEntries.some(
+    (entry) =>
+      entry.metricWecStatus === "pass" &&
+      entry.metricWecEulerianMin != null &&
+      entry.metricWecEulerianMin >= 0,
+  );
+  const allProfilesMetricWecFail =
+    metricComparableEntries.length > 0 && metricComparableEntries.every((entry) => entry.metricWecStatus !== "pass");
+  const diagnosisClass: Nhm2MetricWecFeasibilityDiagnosisClass =
+    metricComparableEntries.length === 0
+      ? "insufficient_observer_evidence"
+      : hasMetricWecPass
+        ? "wec_nonnegative_candidate_found"
+        : "all_tested_profiles_wec_negative";
+  const semanticConsistencyStatus: Nhm2MetricWecFeasibilitySemanticStatus =
+    entries.length === 0
+      ? "unknown"
+      : entries.every((entry) => entry.closurePathSemanticConsistencyStatus === "pass")
+        ? "pass"
+        : entries.some((entry) => entry.closurePathSemanticConsistencyStatus === "fail")
+          ? "fail"
+          : "unknown";
+  const invarianceStatus: Nhm2MetricWecFeasibilitySemanticStatus =
+    entries.length === 0
+      ? "unknown"
+      : entries.every((entry) => entry.closurePathInvarianceStatus === "pass")
+        ? "pass"
+        : entries.some((entry) => entry.closurePathInvarianceStatus === "fail")
+          ? "fail"
+          : "unknown";
+  const recommendedPatchClassVotes = Array.from(
+    new Set(entries.map((entry) => entry.recommendedPatchClass).filter((entry): entry is string => entry != null)),
+  );
+  const recommendedPatchClass =
+    recommendedPatchClassVotes.length === 1
+      ? recommendedPatchClassVotes[0]
+      : recommendedPatchClassVotes.length > 1
+        ? "mixed_entry_patch_classes"
+        : "unknown";
+  const semanticConsistencyNote =
+    semanticConsistencyStatus === "pass"
+      ? "Closure-path semantic checks are consistent across all tested profiles."
+      : semanticConsistencyStatus === "fail"
+        ? "At least one tested profile has a closure-path semantic inconsistency; inspect per-profile notes before widening claims."
+        : "Closure-path semantic consistency could not be established for all tested profiles.";
+  const invarianceNote =
+    invarianceStatus === "pass"
+      ? "Closure-path invariance checks (including independent cross-check and convergence gates when applicable) are consistent across tested profiles."
+      : invarianceStatus === "fail"
+        ? "At least one tested profile failed closure-path invariance checks; treat route admission as unresolved for promotion decisions."
+        : "Closure-path invariance checks are incomplete or mixed across tested profiles.";
+  const recommendedPatchRationale =
+    recommendedPatchClass === "mixed_entry_patch_classes"
+      ? "Tested profiles disagree on follow-up patch class; reconcile profile-level closure-path decisions before implementation."
+      : recommendedPatchClass === "unknown"
+        ? "No clear follow-up patch class is available from current profile-level closure-path evidence."
+        : `Profile-level closure-path evidence converges on ${recommendedPatchClass}.`;
+  const feasibilityStatus: Nhm2MetricWecFeasibilityStatus =
+    hasMetricWecPass ? "candidate_found_needs_followup" : "local_neighborhood_non_viable";
+  const nextTechnicalAction =
+    feasibilityStatus === "candidate_found_needs_followup"
+      ? "rerun selected-profile observer/full-loop publication for the candidate profile and keep claim tier diagnostic until all policy gates remain satisfied."
+      : "the tested local centerline-alpha neighborhood keeps metric_required WEC negative; next patch should target a physics-local model-term change, not dial-only retuning.";
+  const artifactBase: Nhm2MetricWecFeasibilityArtifact = {
+    artifactType: "nhm2_metric_wec_feasibility/v1",
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact localizes the NHM2 metric-required WEC blocker across a selected local centerline-alpha neighborhood. It does not widen claim tier, route ETA, viability, gravity, or tile-lane authority.",
+    publicationCommand: SELECTED_SHIFT_LAPSE_METRIC_WEC_FEASIBILITY_COMMAND,
+    selectedProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+    chartRef: "comoving_cartesian",
+    semanticsRef: NHM2_METRIC_WEC_FEASIBILITY_SEMANTICS_REF,
+    researchBasisRef: NHM2_METRIC_WEC_FEASIBILITY_RESEARCH_BASIS_REF,
+    baselineObserverAuditRef: normalizePath(DEFAULT_OBSERVER_AUDIT_LATEST_JSON),
+    baselineFullLoopAuditRef: normalizePath(DEFAULT_FULL_LOOP_AUDIT_LATEST_JSON),
+    testedProfileIds: entries.map((entry) => entry.shiftLapseProfileId),
+    testedProfileCount: entries.length,
+    bestMetricWecProfileId: bestEntry?.shiftLapseProfileId ?? null,
+    bestMetricWecEulerianMin: bestEntry?.metricWecEulerianMin ?? null,
+    bestMetricWecGapToZero:
+      bestEntry?.metricWecEulerianMin == null ? null : 0 - bestEntry.metricWecEulerianMin,
+    bestMetricWecRobustProfileId: bestRobustEntry?.shiftLapseProfileId ?? null,
+    bestMetricWecRobustMin: bestRobustEntry?.metricWecRobustMin ?? null,
+    bestMetricWecRobustGapToZero:
+      bestRobustEntry?.metricWecRobustMin == null ? null : 0 - bestRobustEntry.metricWecRobustMin,
+    bestMetricWecStatus: bestEntry?.metricWecStatus ?? null,
+    allProfilesMetricWecFail,
+    feasibilityStatus,
+    diagnosisClass,
+    semanticConsistencyStatus,
+    semanticConsistencyNote,
+    invarianceStatus,
+    invarianceNote,
+    recommendedPatchClass,
+    recommendedPatchRationale,
+    nextTechnicalAction,
+    citationRefs: [...NHM2_METRIC_WEC_FEASIBILITY_CITATION_REFS],
+    nonClaims: [
+      "does not change observer-condition formulas",
+      "does not change source physics or pressure proxies",
+      "does not widen claim tier",
+      "does not reopen tile-local remediation",
+      "does not change certificate policy",
+    ],
+    entries,
+  };
+  return {
+    ...artifactBase,
+    checksum: computeNhm2MetricWecFeasibilityChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2MetricWecFeasibilityMarkdown = (
+  payload: Nhm2MetricWecFeasibilityArtifact,
+): string => {
+  const citationRefs =
+    payload.citationRefs.length > 0 ? payload.citationRefs.map((entry) => `- ${entry}`).join("\n") : "- none";
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const rows = payload.entries
+    .map(
+      (entry) =>
+        `| ${entry.shiftLapseProfileId} | ${entry.centerlineAlpha ?? "null"} | ${entry.observerStatus} | ${entry.metricWecStatus ?? "null"} | ${entry.metricWecEulerianMin ?? "null"} | ${entry.metricWecRobustMin ?? "null"} | ${entry.metricDecStatus ?? "null"} | ${entry.metricDecEulerianMin ?? "null"} | ${entry.metricDecRobustMin ?? "null"} | ${entry.tileWecStatus ?? "null"} | ${entry.tileWecEulerianMin ?? "null"} | ${entry.tileWecRobustMin ?? "null"} | ${entry.metricPrimaryBlockingMode ?? "null"} | ${entry.tilePrimaryBlockingMode ?? "null"} | ${entry.supportFieldRouteAdmissionStatus ?? "null"} | ${entry.fullEinsteinTensorRouteAdmissionStatus ?? "null"} | ${entry.independentCrossCheckStatus ?? "null"} | ${entry.closurePathSelected ?? "null"} | ${entry.closurePathSupportFieldInterpretation} | ${entry.closurePathSemanticConsistencyStatus} | ${entry.closurePathInvarianceStatus} | ${entry.recommendedPatchClass ?? "null"} | ${entry.semanticBlockerSupportFieldRouteNotAdmitted ? "yes" : "no"} |`,
+    )
+    .join("\n");
+  return `# NHM2 Metric WEC Feasibility (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| publicationCommand | ${payload.publicationCommand} |
+| selectedProfileId | ${payload.selectedProfileId} |
+| chartRef | ${payload.chartRef} |
+| semanticsRef | ${payload.semanticsRef} |
+| researchBasisRef | ${payload.researchBasisRef} |
+| baselineObserverAuditRef | ${payload.baselineObserverAuditRef} |
+| baselineFullLoopAuditRef | ${payload.baselineFullLoopAuditRef} |
+| testedProfileCount | ${payload.testedProfileCount} |
+| bestMetricWecProfileId | ${payload.bestMetricWecProfileId ?? "null"} |
+| bestMetricWecEulerianMin | ${payload.bestMetricWecEulerianMin ?? "null"} |
+| bestMetricWecGapToZero | ${payload.bestMetricWecGapToZero ?? "null"} |
+| bestMetricWecRobustProfileId | ${payload.bestMetricWecRobustProfileId ?? "null"} |
+| bestMetricWecRobustMin | ${payload.bestMetricWecRobustMin ?? "null"} |
+| bestMetricWecRobustGapToZero | ${payload.bestMetricWecRobustGapToZero ?? "null"} |
+| bestMetricWecStatus | ${payload.bestMetricWecStatus ?? "null"} |
+| allProfilesMetricWecFail | ${String(payload.allProfilesMetricWecFail)} |
+| feasibilityStatus | ${payload.feasibilityStatus} |
+| diagnosisClass | ${payload.diagnosisClass} |
+| semanticConsistencyStatus | ${payload.semanticConsistencyStatus} |
+| semanticConsistencyNote | ${payload.semanticConsistencyNote} |
+| invarianceStatus | ${payload.invarianceStatus} |
+| invarianceNote | ${payload.invarianceNote} |
+| recommendedPatchClass | ${payload.recommendedPatchClass} |
+| recommendedPatchRationale | ${payload.recommendedPatchRationale} |
+| nextTechnicalAction | ${payload.nextTechnicalAction} |
+
+## Per-Profile Metric WEC Localization
+| shiftLapseProfileId | centerlineAlpha | observerStatus | metricWecStatus | metricWecEulerianMin | metricWecRobustMin | metricDecStatus | metricDecEulerianMin | metricDecRobustMin | tileWecStatus | tileWecEulerianMin | tileWecRobustMin | metricPrimaryBlockingMode | tilePrimaryBlockingMode | supportFieldRouteAdmission | fullEinsteinTensorRouteAdmission | independentCrossCheck | closurePathSelected | supportFieldInterpretation | closurePathSemanticConsistency | closurePathInvariance | recommendedPatchClass | supportFieldRouteNotAdmitted |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+${rows}
+
+## Citation Basis
+${citationRefs}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const publishNhm2MetricWecFeasibilityResearchSurface = (args: {
+  artifact: Nhm2MetricWecFeasibilityArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2MetricWecFeasibilityArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown: renderNhm2MetricWecFeasibilityMarkdown(args.artifact),
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_METRIC_WEC_FEASIBILITY_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_METRIC_WEC_FEASIBILITY_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_METRIC_WEC_FEASIBILITY_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_METRIC_WEC_FEASIBILITY_LATEST_MD),
+    ),
+  });
+};
+
+export const publishNhm2ShiftLapseMetricWecFeasibility = async (options?: {
+  profileIds?: string[];
+  boundaryProfileCount?: number;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): Promise<{
+  profileIds: string[];
+  entries: Nhm2MetricWecFeasibilityEntry[];
+  feasibilityArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2MetricWecFeasibilityArtifact;
+  };
+}> => {
+  const profileIds = resolveNhm2MetricWecFeasibilityProfileIds({
+    profileIds: options?.profileIds,
+    boundaryProfileCount: options?.boundaryProfileCount,
+  });
+  const pipelineModule = await import("../server/energy-pipeline.ts");
+  const entries: Nhm2MetricWecFeasibilityEntry[] = [];
+  for (const profileId of profileIds) {
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const nextState = {
+      ...baseState,
+      warpFieldType: "nhm2_shift_lapse",
+      dynamicConfig: {
+        ...((baseState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+        warpFieldType: "nhm2_shift_lapse",
+        shiftLapseProfileId: profileId,
+      },
+      warp: {
+        ...((baseState.warp as Record<string, unknown> | undefined) ?? {}),
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricT00Source: "metric",
+      },
+    } as Record<string, unknown>;
+    const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
+    const observerAudit = isNhm2ObserverAuditArtifact(refreshedState.nhm2ObserverAudit)
+      ? refreshedState.nhm2ObserverAudit
+      : null;
+    entries.push(
+      buildNhm2MetricWecFeasibilityEntryFromObserver({
+        shiftLapseProfileId: profileId,
+        observerAudit,
+      }),
+    );
+  }
+  const artifact = buildNhm2MetricWecFeasibilityArtifact({ entries });
+  const feasibilityArtifact = publishNhm2MetricWecFeasibilityResearchSurface({
+    artifact,
+    artifactRootDir: options?.artifactRootDir,
+    auditRootDir: options?.auditRootDir,
+  });
+  return {
+    profileIds,
+    entries,
+    feasibilityArtifact,
+  };
+};
+
 export const computeNhm2EnvelopePerturbationChecksum = (
   payload: Nhm2EnvelopePerturbationArtifact,
 ): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -35312,6 +36709,10 @@ ${tierRows}
 | observerMetricFirstMissingStage | ${observerAudit.observerMetricFirstMissingStage} |
 | observerMetricEmissionAdmissionStatus | ${observerAudit.observerMetricEmissionAdmissionStatus} |
 | observerMetricEmissionAdmissionNote | ${observerAudit.observerMetricEmissionAdmissionNote ?? "null"} |
+| observerMetricT00AdmissionStatus | ${observerAudit.observerMetricT00AdmissionStatus} |
+| observerMetricT00RouteId | ${observerAudit.observerMetricT00RouteId ?? "null"} |
+| observerMetricT00ComparabilityStatus | ${observerAudit.observerMetricT00ComparabilityStatus} |
+| observerMetricT00AdmissionNote | ${observerAudit.observerMetricT00AdmissionNote ?? "null"} |
 | observerMetricT0iAdmissionStatus | ${observerAudit.observerMetricT0iAdmissionStatus} |
 | observerMetricT0iAdmissionNote | ${observerAudit.observerMetricT0iAdmissionNote ?? "null"} |
 | observerMetricOffDiagonalTijAdmissionStatus | ${observerAudit.observerMetricOffDiagonalTijAdmissionStatus} |
@@ -36205,7 +37606,8 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     if (
       observerAuditArtifact.observerBlockingAssessmentStatus ===
         "same_surface_violation_confirmed" ||
-      (observerAuditArtifact.observerBlockingAssessmentStatus === "unknown" &&
+      (observerAuditArtifact.observerBlockingAssessmentStatus !==
+        "observer_contract_incomplete" &&
         observerAuditArtifact.reasonCodes.includes("observer_condition_failed"))
     ) {
       observerAuditReasons.push("observer_blocking_violation");
@@ -36562,6 +37964,14 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         "unknown",
       observerMetricEmissionAdmissionNote:
         observerAuditArtifact?.observerMetricEmissionAdmissionNote ?? null,
+      observerMetricT00AdmissionStatus:
+        observerAuditArtifact?.observerMetricT00AdmissionStatus ?? "unknown",
+      observerMetricT00RouteId:
+        observerAuditArtifact?.observerMetricT00RouteId ?? null,
+      observerMetricT00ComparabilityStatus:
+        observerAuditArtifact?.observerMetricT00ComparabilityStatus ?? "unknown",
+      observerMetricT00AdmissionNote:
+        observerAuditArtifact?.observerMetricT00AdmissionNote ?? null,
       observerMetricT0iAdmissionStatus:
         observerAuditArtifact?.observerMetricT0iAdmissionStatus ?? "unknown",
       observerMetricT0iAdmissionNote:
@@ -37304,6 +38714,9 @@ type Nhm2CurrentLaneBaselineConvergenceAssessment = {
   currentPublishedProfileId: string | null;
   observerMetricCoverageBlockerStatus: string | null;
   observerMetricEmissionAdmissionStatus: string | null;
+  observerMetricT00AdmissionStatus: string | null;
+  observerMetricT00ComparabilityStatus: string | null;
+  observerMetricT00RouteId: string | null;
   observerMetricT0iAdmissionStatus: string | null;
   observerMetricOffDiagonalTijAdmissionStatus: string | null;
   observerNextTechnicalAction: string | null;
@@ -37436,6 +38849,13 @@ const inspectCurrentLaneBaselineConvergenceRepoState = (args: {
   const observerMetricEmissionAdmissionStatus = asText(
     observer?.observerMetricEmissionAdmissionStatus,
   );
+  const observerMetricT00AdmissionStatus = asText(
+    observer?.observerMetricT00AdmissionStatus,
+  );
+  const observerMetricT00ComparabilityStatus = asText(
+    observer?.observerMetricT00ComparabilityStatus,
+  );
+  const observerMetricT00RouteId = asText(observer?.observerMetricT00RouteId);
   const observerMetricT0iAdmissionStatus = asText(
     observer?.observerMetricT0iAdmissionStatus,
   );
@@ -37457,6 +38877,15 @@ const inspectCurrentLaneBaselineConvergenceRepoState = (args: {
   }
   if (observerMetricEmissionAdmissionStatus !== "admitted") {
     blockingReasons.push("observer_metric_emission_not_admitted");
+  }
+  if (
+    observerMetricT00AdmissionStatus !==
+    "derivable_same_chart_from_existing_state"
+  ) {
+    blockingReasons.push("observer_metric_t00_not_same_chart_derivable");
+  }
+  if (observerMetricT00ComparabilityStatus !== "pass") {
+    blockingReasons.push("observer_metric_t00_comparability_not_pass");
   }
   if (
     observerMetricT0iAdmissionStatus !==
@@ -37500,6 +38929,9 @@ const inspectCurrentLaneBaselineConvergenceRepoState = (args: {
     currentPublishedProfileId,
     observerMetricCoverageBlockerStatus,
     observerMetricEmissionAdmissionStatus,
+    observerMetricT00AdmissionStatus,
+    observerMetricT00ComparabilityStatus,
+    observerMetricT00RouteId,
     observerMetricT0iAdmissionStatus,
     observerMetricOffDiagonalTijAdmissionStatus,
     observerNextTechnicalAction,
@@ -37597,6 +39029,9 @@ const renderNhm2CurrentLaneBaselineConvergenceMarkdown = (args: {
 | currentPublishedProfileId | ${args.artifact.currentPublishedProfileId ?? "null"} |
 | observerMetricCoverageBlockerStatus | ${args.artifact.observerMetricCoverageBlockerStatus ?? "null"} |
 | observerMetricEmissionAdmissionStatus | ${args.artifact.observerMetricEmissionAdmissionStatus ?? "null"} |
+| observerMetricT00AdmissionStatus | ${args.artifact.observerMetricT00AdmissionStatus ?? "null"} |
+| observerMetricT00ComparabilityStatus | ${args.artifact.observerMetricT00ComparabilityStatus ?? "null"} |
+| observerMetricT00RouteId | ${args.artifact.observerMetricT00RouteId ?? "null"} |
 | observerMetricT0iAdmissionStatus | ${args.artifact.observerMetricT0iAdmissionStatus ?? "null"} |
 | observerMetricOffDiagonalTijAdmissionStatus | ${args.artifact.observerMetricOffDiagonalTijAdmissionStatus ?? "null"} |
 | observerNextTechnicalAction | ${args.artifact.observerNextTechnicalAction ?? "null"} |
@@ -50478,6 +51913,10 @@ if (isEntryPoint) {
     "--publish-selected-shift-lapse-full-loop-audit",
     argv,
   );
+  const publishSelectedShiftLapseMetricWecFeasibility = hasArg(
+    "--publish-selected-shift-lapse-metric-wec-feasibility",
+    argv,
+  );
   const parsedOptions = {
     baseUrl: readArgValue("--base-url", argv),
     shiftLapseProfileId: readArgValue("--shift-lapse-profile-id", argv),
@@ -50793,6 +52232,13 @@ if (isEntryPoint) {
       readArgValue("--reuse-existing-selected-shift-lapse-artifacts", argv),
       false,
     ),
+    metricWecFeasibilityProfileIds: parseCommaSeparatedArg(
+      readArgValue("--metric-wec-feasibility-profile-ids", argv),
+    ),
+    metricWecFeasibilityBoundaryProfileCount: parsePositiveInt(
+      readArgValue("--metric-wec-feasibility-boundary-profile-count", argv),
+      DEFAULT_NHM2_METRIC_WEC_FEASIBILITY_BOUNDARY_PROFILE_COUNT,
+    ),
     yorkViews: parseYorkViews(readArgValue("--views", argv)),
     frameSize: { width, height },
   };
@@ -50858,6 +52304,11 @@ if (isEntryPoint) {
         reuseExistingSelectedArtifacts:
           parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
       })
+    : publishSelectedShiftLapseMetricWecFeasibility
+    ? publishNhm2ShiftLapseMetricWecFeasibility({
+        profileIds: parsedOptions.metricWecFeasibilityProfileIds,
+        boundaryProfileCount: parsedOptions.metricWecFeasibilityBoundaryProfileCount,
+      })
     : publishBoundedStackLatest
     ? publishNhm2BoundedStackLatest({
         baseUrl: parsedOptions.baseUrl,
@@ -50914,6 +52365,7 @@ if (isEntryPoint) {
         publishSelectedShiftLapseBoundarySweep ||
         publishSelectedShiftLapseEnvelopeSuite ||
         publishSelectedShiftLapseStrictSignalReadiness ||
+        publishSelectedShiftLapseMetricWecFeasibility ||
         publishSelectedShiftLapseFullLoopAudit ||
         publishBoundedStackLatest ||
         publishProofSurfaceManifestLatest ||

@@ -34,7 +34,7 @@
 | observerMetricCompletenessStatus | complete |
 | observerMetricCompletenessNote | Metric-required observer audit has no declared missing observer inputs. |
 | observerMetricCoverageBlockerStatus | semantics_ambiguous |
-| observerMetricCoverageBlockerNote | Metric-required full tensor families are emitted on the producer path, but the active model-term route is still experimental/not admitted, so observer admission remains blocked at semantic-contract closure. |
+| observerMetricCoverageBlockerNote | Metric-required full tensor families are emitted on the producer path, but model-term semantic admission evidence still rejects route closure (decision=do_not_admit; reasons=support_field_route_not_admitted, full_einstein_tensor_route_not_admitted), so observer admission remains blocked at semantic-contract closure. |
 | observerMetricFirstMissingStage | semantic_contract |
 | observerMetricEmissionAdmissionStatus | not_admitted |
 | observerMetricEmissionAdmissionNote | Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation. |
@@ -48,6 +48,7 @@
 | observerLeadReadinessReason | Observer fail remains mixed: same-surface negativity is real, metric-required coverage still misses T0i/off-diagonal inputs, and tile-effective authority remains proxy-limited. Certificate/policy readiness remains a separate parallel full-loop lane. |
 | observerNextTechnicalAction | resolve_metric_tensor_semantics |
 | metricProducerAdmissionEvidence | available |
+| modelTermSemanticAdmissionEvidence | available |
 | observerBlockingAssessmentNote | metric_required and tile_effective tensors emit concrete failing mixed WEC and DEC conditions with missedViolationFraction=0 and non-positive maxRobustMinusEulerian. Policy review remains required because surrogate-model limitations are still present. |
 | metricBlockingSummary | WEC=-58267450.989558905; DEC=-116534901.97911781 |
 | tileBlockingSummary | WEC=-43392729088; DEC=-86785458176 |
@@ -74,6 +75,27 @@
 | researchBasisRef | docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md |
 | nextInspectionTarget | docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md |
 | notes | metricRequired.tensorRef=warp.metric.T00.nhm2.shift_lapse<br>metricRequired.model.fluxHandling=same_chart_metric_t0i_emitted_experimental<br>metricRequired.model.shearHandling=same_chart_metric_tij_off_diagonal_emitted_experimental<br>modelTermRoute=adm_quasi_stationary_recovery_v1<br>modelTermAdmission=experimental_not_admitted<br>researchBasisRef=docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md<br>currentEmissionShape=full_tensor<br>familyEmissionAdmission=experimental_not_admitted<br>modelTermRoute=adm_quasi_stationary_recovery_v1<br>support.alpha=present_admitted<br>support.beta_i=missing<br>support.gamma_ij=present_admitted<br>support.K_ij=missing<br>support.D_j_Kj_i_minus_D_i_K_route=missing<br>support.time_derivative_or_Kij_evolution_route=missing<br>support.full_einstein_tensor_route=missing |
+
+## Model-Term Semantic Admission Evidence
+| field | value |
+|---|---|
+| semanticsRef | docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md |
+| researchBasisRef | docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md |
+| chartRef | comoving_cartesian |
+| routeId | adm_quasi_stationary_recovery_v1 |
+| routeAdmission | experimental_not_admitted |
+| decision | do_not_admit |
+| reasonCodes | support_field_route_not_admitted, full_einstein_tensor_route_not_admitted |
+| checks.routeMetadata | pass |
+| checks.chart | pass |
+| checks.finiteTensorComponents | pass |
+| checks.t0iSymmetry | pass |
+| checks.offDiagonalTijSymmetry | pass |
+| checks.supportFieldRouteAdmission | fail |
+| checks.fullEinsteinTensorRouteAdmission | fail |
+| checks.citationBasis | pass |
+| citationRefs | docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md<br>docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md<br>https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf<br>https://arxiv.org/abs/gr-qc/0703035<br>https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html<br>https://arxiv.org/abs/2404.03095<br>https://arxiv.org/abs/2602.18023 |
+| notes | metricRequired.tensorRef=warp.metric.T00.nhm2.shift_lapse<br>metricRequired.model.fluxHandling=same_chart_metric_t0i_emitted_experimental<br>metricRequired.model.shearHandling=same_chart_metric_tij_off_diagonal_emitted_experimental<br>routeId=adm_quasi_stationary_recovery_v1<br>routeAdmission=experimental_not_admitted<br>chartRef=comoving_cartesian<br>structuralPass=true<br>derivationRoutePass=false |
 
 ## Metric Required Tensor
 | field | value |

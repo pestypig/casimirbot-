@@ -323,7 +323,12 @@ export const applyObjectiveTurnContractDebugPayload = (args: {
     args.helixTurnContract.grounding_mode;
   args.debugPayload.turn_contract_output_family =
     args.helixTurnContract.output_family;
-  args.debugPayload.objective_count = args.helixTurnContract.objectives.length;
+  const plannerObjectiveCount = args.helixTurnContract.objectives.length;
+  args.debugPayload.objective_planner_count = plannerObjectiveCount;
+  const existingObjectiveCount = Number(args.debugPayload.objective_count);
+  if (!Number.isFinite(existingObjectiveCount)) {
+    args.debugPayload.objective_count = plannerObjectiveCount;
+  }
   args.debugPayload.turn_contract_required_slots =
     args.helixTurnContract.required_slots.slice(0, 12);
   args.debugPayload.turn_contract_query_hints =
@@ -379,7 +384,12 @@ export const applyObjectiveAnswerPlanShadowDebugPayload = (args: {
   args.debugPayload.composer_evidence_hash =
     args.answerPlanShadow.evidence_pack.evidence_hash;
   args.debugPayload.turn_contract_hash = args.helixTurnContractHash;
-  args.debugPayload.objective_count = args.helixTurnContract.objectives.length;
+  const plannerObjectiveCount = args.helixTurnContract.objectives.length;
+  args.debugPayload.objective_planner_count = plannerObjectiveCount;
+  const existingObjectiveCount = Number(args.debugPayload.objective_count);
+  if (!Number.isFinite(existingObjectiveCount)) {
+    args.debugPayload.objective_count = plannerObjectiveCount;
+  }
   args.debugPayload.answer_obligation_count =
     args.helixTurnContract.obligations.length;
   args.debugPayload.answer_obligations = args.helixTurnContract.obligations.map(
@@ -803,6 +813,15 @@ export const applyObjectiveLoopReportTailDebugPayload = (args: {
   args.debugPayload.objective_loop_primary_bypass_reason =
     objectiveLoopPrimaryBypassReason;
   args.debugPayload.objective_loop_primary_rate = objectiveLoopPrimaryActive ? 1 : 0;
+  const plannerObjectiveCount =
+    typeof args.debugPayload.objective_count === "number" &&
+    Number.isFinite(args.debugPayload.objective_count)
+      ? Number(args.debugPayload.objective_count)
+      : null;
+  if (plannerObjectiveCount !== null) {
+    args.debugPayload.objective_planner_count = plannerObjectiveCount;
+  }
+  args.debugPayload.objective_count = summary.total;
   args.debugPayload.objective_total_count = summary.total;
   args.debugPayload.objective_terminal_count = summary.terminalCount;
   args.debugPayload.objective_unresolved_count = summary.unresolvedCount;

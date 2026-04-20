@@ -49,11 +49,80 @@ const vecNormalize = (v: Vec3): Vec3 => {
 const INV16PI = 1 / (16 * Math.PI);
 const INV8PI = 1 / (8 * Math.PI);
 const ADM_MODEL_TERM_ROUTE_ID = "adm_quasi_stationary_recovery_v1";
+const EINSTEIN_MODEL_TERM_ROUTE_ID = "einstein_tensor_geometry_fd4_v1";
+const EINSTEIN_INDEPENDENT_CROSS_CHECK_ROUTE_ID =
+  "einstein_tensor_geometry_fd2_independent_v1";
 const ADM_MODEL_TERM_RESEARCH_BASIS_REF =
   "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md";
+const MODEL_TERM_REFINED_STEP_RATIO = 0.5;
+const MODEL_TERM_SUPER_REFINED_STEP_RATIO = 0.25;
+const MODEL_TERM_RELATIVE_DRIFT_THRESHOLD = 0.25;
+const MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD = 0.25;
+const MODEL_TERM_COMPONENT_REL_EPS = 1e-12;
+const MODEL_TERM_CONVERGENCE_SIGNIFICANCE_RELATIVE_TO_T00 = 1e-12;
+const EINSTEIN_ROUTE_COMPONENT_REL_EPS = 1e-12;
+const EINSTEIN_FD4_ROUNDOFF_NOISE_GAIN = 64;
+const MODEL_TERM_T0I_KEYS = ["T01", "T02", "T03"] as const;
+const MODEL_TERM_OFF_DIAGONAL_KEYS = ["T12", "T13", "T23"] as const;
+const MODEL_TERM_EINSTEIN_T00_KEY = "T00" as const;
+const MODEL_TERM_EINSTEIN_COMPARE_KEYS = [
+  ...MODEL_TERM_T0I_KEYS,
+  ...MODEL_TERM_OFF_DIAGONAL_KEYS,
+] as const;
+const EINSTEIN_RESIDUAL_ATTRIBUTION_CANDIDATES = [
+  {
+    candidateId: "raw_geometry_fd4",
+    transform: (value: number) => value,
+    diagnosisHint: "discretization_mismatch",
+    note: "Baseline geometry-first Einstein FD4 residual comparison.",
+  },
+  {
+    candidateId: "sign_flip",
+    transform: (value: number) => -value,
+    diagnosisHint: "convention_mismatch",
+    note: "Checks sign-convention disagreement between emitter and geometry-first route.",
+  },
+  {
+    candidateId: "scale_8pi",
+    transform: (value: number) => value * (8 * Math.PI),
+    diagnosisHint: "unit_factor_mismatch",
+    note: "Checks missing 8pi factor in Einstein-to-stress-energy conversion.",
+  },
+  {
+    candidateId: "scale_inv_8pi",
+    transform: (value: number) => value / (8 * Math.PI),
+    diagnosisHint: "unit_factor_mismatch",
+    note: "Checks extra 8pi factor in Einstein-to-stress-energy conversion.",
+  },
+] as const;
+
+type EinsteinResidualAttributionCandidateId =
+  (typeof EINSTEIN_RESIDUAL_ATTRIBUTION_CANDIDATES)[number]["candidateId"];
+type EinsteinResidualDiagnosisClass =
+  | "convention_mismatch"
+  | "projection_mismatch"
+  | "unit_factor_mismatch"
+  | "discretization_mismatch"
+  | "mixed"
+  | "unknown";
+
+type Tensor4 = [
+  [number, number, number, number],
+  [number, number, number, number],
+  [number, number, number, number],
+  [number, number, number, number],
+];
+
+type ChristoffelTensor = [
+  Tensor4,
+  Tensor4,
+  Tensor4,
+  Tensor4,
+];
 
 type MetricStressTensor = {
   T00: number;
+  T00_modelTermEinstein?: number;
   T11: number;
   T22: number;
   T33: number;
@@ -73,6 +142,812 @@ type MetricStressTensor = {
   modelTermRoute?: string;
   modelTermAdmission?: "admitted" | "experimental_not_admitted";
   researchBasisRef?: string;
+};
+
+const toFiniteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const resolveTensor4MaxAbs = (tensor: Tensor4): number => {
+  let maxAbs = 0;
+  for (let mu = 0; mu < 4; mu += 1) {
+    for (let nu = 0; nu < 4; nu += 1) {
+      maxAbs = Math.max(maxAbs, Math.abs(tensor[mu][nu]));
+    }
+  }
+  return maxAbs;
+};
+
+const suppressRoundoffNoise = (value: number, floor: number): number =>
+  Math.abs(value) <= floor ? 0 : value;
+
+const resolveEinsteinDerivativeNoiseFloor = (
+  metric: Tensor4,
+  derivativeStep_m: number,
+): number => {
+  const metricScale = Math.max(1, resolveTensor4MaxAbs(metric));
+  const step = Math.max(derivativeStep_m, MODEL_TERM_COMPONENT_REL_EPS);
+  return (Number.EPSILON * metricScale * EINSTEIN_FD4_ROUNDOFF_NOISE_GAIN) / step;
+};
+
+const createZeroTensor4 = (): Tensor4 =>
+  [
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+  ] as Tensor4;
+
+const createZeroChristoffelTensor = (): ChristoffelTensor =>
+  [
+    createZeroTensor4(),
+    createZeroTensor4(),
+    createZeroTensor4(),
+    createZeroTensor4(),
+  ] as ChristoffelTensor;
+
+const offsetPoint = (point: Vec3, axis: 0 | 1 | 2, delta: number): Vec3 => {
+  const next: Vec3 = [point[0], point[1], point[2]];
+  next[axis] += delta;
+  return next;
+};
+
+const finiteDifferenceDerivativeFd4 = (
+  minus2: number,
+  minus1: number,
+  plus1: number,
+  plus2: number,
+  step: number,
+) => (minus2 - 8 * minus1 + 8 * plus1 - plus2) / (12 * step);
+
+const finiteDifferenceDerivativeFd2 = (
+  minus1: number,
+  plus1: number,
+  step: number,
+) => (plus1 - minus1) / (2 * step);
+
+const buildComovingMetricFromShiftField = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  point: Vec3,
+): {
+  metric: Tensor4;
+  metricInverse: Tensor4;
+} | null => {
+  let beta: Vec3;
+  try {
+    beta = evaluateShiftVector(point[0], point[1], point[2]);
+  } catch {
+    return null;
+  }
+  if (
+    !Number.isFinite(beta[0]) ||
+    !Number.isFinite(beta[1]) ||
+    !Number.isFinite(beta[2])
+  ) {
+    return null;
+  }
+  const beta2 = beta[0] * beta[0] + beta[1] * beta[1] + beta[2] * beta[2];
+  const metric: Tensor4 = [
+    [-1 + beta2, beta[0], beta[1], beta[2]],
+    [beta[0], 1, 0, 0],
+    [beta[1], 0, 1, 0],
+    [beta[2], 0, 0, 1],
+  ];
+  const metricInverse: Tensor4 = [
+    [-1, beta[0], beta[1], beta[2]],
+    [
+      beta[0],
+      1 - beta[0] * beta[0],
+      -beta[0] * beta[1],
+      -beta[0] * beta[2],
+    ],
+    [
+      beta[1],
+      -beta[1] * beta[0],
+      1 - beta[1] * beta[1],
+      -beta[1] * beta[2],
+    ],
+    [
+      beta[2],
+      -beta[2] * beta[0],
+      -beta[2] * beta[1],
+      1 - beta[2] * beta[2],
+    ],
+  ];
+  return {
+    metric,
+    metricInverse,
+  };
+};
+
+const calculateChristoffelFromShiftField = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  point: Vec3,
+  derivativeStep_m: number,
+): {
+  metric: Tensor4;
+  metricInverse: Tensor4;
+  christoffel: ChristoffelTensor;
+} | null => {
+  const base = buildComovingMetricFromShiftField(evaluateShiftVector, point);
+  if (base == null) return null;
+  const derivativeNoiseFloor = resolveEinsteinDerivativeNoiseFloor(
+    base.metric,
+    derivativeStep_m,
+  );
+  const christoffelNoiseFloor =
+    derivativeNoiseFloor * Math.max(1, resolveTensor4MaxAbs(base.metricInverse));
+  const metricDerivatives: [Tensor4, Tensor4, Tensor4, Tensor4] = [
+    createZeroTensor4(),
+    createZeroTensor4(),
+    createZeroTensor4(),
+    createZeroTensor4(),
+  ];
+  for (const axis of [0, 1, 2] as const) {
+    const minus2 = buildComovingMetricFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, -2 * derivativeStep_m),
+    );
+    const minus1 = buildComovingMetricFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, -derivativeStep_m),
+    );
+    const plus1 = buildComovingMetricFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, derivativeStep_m),
+    );
+    const plus2 = buildComovingMetricFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, 2 * derivativeStep_m),
+    );
+    if (minus2 == null || minus1 == null || plus1 == null || plus2 == null) {
+      return null;
+    }
+    const derivativeTensor = metricDerivatives[axis + 1];
+    for (let mu = 0; mu < 4; mu += 1) {
+      for (let nu = 0; nu < 4; nu += 1) {
+        const derivative = finiteDifferenceDerivativeFd4(
+          minus2.metric[mu][nu],
+          minus1.metric[mu][nu],
+          plus1.metric[mu][nu],
+          plus2.metric[mu][nu],
+          derivativeStep_m,
+        );
+        if (!Number.isFinite(derivative)) return null;
+        derivativeTensor[mu][nu] = suppressRoundoffNoise(
+          derivative,
+          derivativeNoiseFloor,
+        );
+      }
+    }
+  }
+
+  const christoffel = createZeroChristoffelTensor();
+  for (let rho = 0; rho < 4; rho += 1) {
+    for (let mu = 0; mu < 4; mu += 1) {
+      for (let nu = 0; nu < 4; nu += 1) {
+        let sum = 0;
+        for (let lambda = 0; lambda < 4; lambda += 1) {
+          sum +=
+            base.metricInverse[rho][lambda] *
+            (metricDerivatives[mu][lambda][nu] +
+              metricDerivatives[nu][lambda][mu] -
+              metricDerivatives[lambda][mu][nu]);
+        }
+        const value = 0.5 * sum;
+        if (!Number.isFinite(value)) return null;
+        christoffel[rho][mu][nu] = suppressRoundoffNoise(
+          value,
+          christoffelNoiseFloor,
+        );
+      }
+    }
+  }
+
+  return {
+    metric: base.metric,
+    metricInverse: base.metricInverse,
+    christoffel,
+  };
+};
+
+const calculateChristoffelFromShiftFieldFd2 = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  point: Vec3,
+  derivativeStep_m: number,
+): {
+  metric: Tensor4;
+  metricInverse: Tensor4;
+  christoffel: ChristoffelTensor;
+} | null => {
+  const base = buildComovingMetricFromShiftField(evaluateShiftVector, point);
+  if (base == null) return null;
+  const metricDerivatives: ChristoffelTensor = createZeroChristoffelTensor();
+  const derivativeNoiseFloor = resolveEinsteinDerivativeNoiseFloor(
+    base.metric,
+    derivativeStep_m,
+  );
+  const christoffelNoiseFloor = derivativeNoiseFloor;
+
+  for (const axis of [0, 1, 2] as const) {
+    const minus1 = buildComovingMetricFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, -derivativeStep_m),
+    );
+    const plus1 = buildComovingMetricFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, derivativeStep_m),
+    );
+    if (minus1 == null || plus1 == null) {
+      return null;
+    }
+    const derivativeTensor = metricDerivatives[axis + 1];
+    for (let mu = 0; mu < 4; mu += 1) {
+      for (let nu = 0; nu < 4; nu += 1) {
+        const derivative = finiteDifferenceDerivativeFd2(
+          minus1.metric[mu][nu],
+          plus1.metric[mu][nu],
+          derivativeStep_m,
+        );
+        if (!Number.isFinite(derivative)) return null;
+        derivativeTensor[mu][nu] = suppressRoundoffNoise(
+          derivative,
+          derivativeNoiseFloor,
+        );
+      }
+    }
+  }
+
+  const christoffel = createZeroChristoffelTensor();
+  for (let rho = 0; rho < 4; rho += 1) {
+    for (let mu = 0; mu < 4; mu += 1) {
+      for (let nu = 0; nu < 4; nu += 1) {
+        let sum = 0;
+        for (let lambda = 0; lambda < 4; lambda += 1) {
+          sum +=
+            base.metricInverse[rho][lambda] *
+            (metricDerivatives[mu][lambda][nu] +
+              metricDerivatives[nu][lambda][mu] -
+              metricDerivatives[lambda][mu][nu]);
+        }
+        const value = 0.5 * sum;
+        if (!Number.isFinite(value)) return null;
+        christoffel[rho][mu][nu] = suppressRoundoffNoise(
+          value,
+          christoffelNoiseFloor,
+        );
+      }
+    }
+  }
+
+  return {
+    metric: base.metric,
+    metricInverse: base.metricInverse,
+    christoffel,
+  };
+};
+
+type EinsteinTensorCrossCheckSample = Record<
+  (typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number],
+  number
+> & {
+  [MODEL_TERM_EINSTEIN_T00_KEY]?: number;
+};
+
+type EinsteinResidualProfile = {
+  maxRelativeResidual: number;
+  componentResiduals: Record<
+    (typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number],
+    number
+  >;
+};
+
+const calculateEinsteinTensorCrossCheckAtPointFromShiftField = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  point: Vec3,
+  derivativeStep_m: number,
+): EinsteinTensorCrossCheckSample | null => {
+  const center = calculateChristoffelFromShiftField(
+    evaluateShiftVector,
+    point,
+    derivativeStep_m,
+  );
+  if (center == null) return null;
+  const axisShifted: Array<{
+    minus2: ChristoffelTensor;
+    minus1: ChristoffelTensor;
+    plus1: ChristoffelTensor;
+    plus2: ChristoffelTensor;
+  }> = [];
+  for (const axis of [0, 1, 2] as const) {
+    const minus2 = calculateChristoffelFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, -2 * derivativeStep_m),
+      derivativeStep_m,
+    );
+    const minus1 = calculateChristoffelFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, -derivativeStep_m),
+      derivativeStep_m,
+    );
+    const plus1 = calculateChristoffelFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, derivativeStep_m),
+      derivativeStep_m,
+    );
+    const plus2 = calculateChristoffelFromShiftField(
+      evaluateShiftVector,
+      offsetPoint(point, axis, 2 * derivativeStep_m),
+      derivativeStep_m,
+    );
+    if (minus2 == null || minus1 == null || plus1 == null || plus2 == null) {
+      return null;
+    }
+    axisShifted.push({
+      minus2: minus2.christoffel,
+      minus1: minus1.christoffel,
+      plus1: plus1.christoffel,
+      plus2: plus2.christoffel,
+    });
+  }
+
+  const derivativeGammaSpatial = (
+    axis: 0 | 1 | 2,
+    rho: number,
+    mu: number,
+    nu: number,
+  ): number =>
+    finiteDifferenceDerivativeFd4(
+      axisShifted[axis].minus2[rho][mu][nu],
+      axisShifted[axis].minus1[rho][mu][nu],
+      axisShifted[axis].plus1[rho][mu][nu],
+      axisShifted[axis].plus2[rho][mu][nu],
+      derivativeStep_m,
+    );
+
+  const contractionAtShift = (
+    axis: 0 | 1 | 2,
+    shift: "minus2" | "minus1" | "plus1" | "plus2",
+    mu: number,
+  ): number => {
+    const gamma = axisShifted[axis][shift];
+    let sum = 0;
+    for (let lambda = 0; lambda < 4; lambda += 1) {
+      sum += gamma[lambda][mu][lambda];
+    }
+    return sum;
+  };
+
+  const derivativeContractionSpatial = (
+    axis: 0 | 1 | 2,
+    mu: number,
+  ): number =>
+    finiteDifferenceDerivativeFd4(
+      contractionAtShift(axis, "minus2", mu),
+      contractionAtShift(axis, "minus1", mu),
+      contractionAtShift(axis, "plus1", mu),
+      contractionAtShift(axis, "plus2", mu),
+      derivativeStep_m,
+    );
+
+  const gammaTraceByLambda = [0, 0, 0, 0];
+  for (let lambda = 0; lambda < 4; lambda += 1) {
+    let trace = 0;
+    for (let sigma = 0; sigma < 4; sigma += 1) {
+      trace += center.christoffel[sigma][lambda][sigma];
+    }
+    gammaTraceByLambda[lambda] = trace;
+  }
+
+  const ricci = createZeroTensor4();
+  for (let mu = 0; mu < 4; mu += 1) {
+    for (let nu = 0; nu < 4; nu += 1) {
+      let term1 = 0;
+      for (let lambda = 1; lambda < 4; lambda += 1) {
+        term1 += derivativeGammaSpatial(
+          (lambda - 1) as 0 | 1 | 2,
+          lambda,
+          mu,
+          nu,
+        );
+      }
+      let term2 = 0;
+      if (nu > 0) {
+        term2 = derivativeContractionSpatial((nu - 1) as 0 | 1 | 2, mu);
+      }
+      let term3 = 0;
+      for (let lambda = 0; lambda < 4; lambda += 1) {
+        term3 += center.christoffel[lambda][mu][nu] * gammaTraceByLambda[lambda];
+      }
+      let term4 = 0;
+      for (let lambda = 0; lambda < 4; lambda += 1) {
+        for (let sigma = 0; sigma < 4; sigma += 1) {
+          term4 +=
+            center.christoffel[sigma][mu][lambda] *
+            center.christoffel[lambda][nu][sigma];
+        }
+      }
+      const value = term1 - term2 + term3 - term4;
+      if (!Number.isFinite(value)) return null;
+      ricci[mu][nu] = value;
+    }
+  }
+
+  let ricciScalar = 0;
+  for (let mu = 0; mu < 4; mu += 1) {
+    for (let nu = 0; nu < 4; nu += 1) {
+      ricciScalar += center.metricInverse[mu][nu] * ricci[mu][nu];
+    }
+  }
+  if (!Number.isFinite(ricciScalar)) return null;
+
+  const geomToSi = INV8PI * GEOM_TO_SI_STRESS;
+  const symmetricComponent = (mu: number, nu: number): number => {
+    const gCenter = ricci[mu][nu] - 0.5 * center.metric[mu][nu] * ricciScalar;
+    const gMirror = ricci[nu][mu] - 0.5 * center.metric[nu][mu] * ricciScalar;
+    return 0.5 * (gCenter + gMirror) * geomToSi;
+  };
+  const crossCheck: EinsteinTensorCrossCheckSample = {
+    T00: symmetricComponent(0, 0),
+    T01: symmetricComponent(0, 1),
+    T02: symmetricComponent(0, 2),
+    T03: symmetricComponent(0, 3),
+    T12: symmetricComponent(1, 2),
+    T13: symmetricComponent(1, 3),
+    T23: symmetricComponent(2, 3),
+  };
+  for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+    if (!Number.isFinite(crossCheck[key])) return null;
+  }
+  return crossCheck;
+};
+
+const calculateEinsteinTensorCrossCheckAtPointFromShiftFieldFd2 = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  point: Vec3,
+  derivativeStep_m: number,
+): EinsteinTensorCrossCheckSample | null => {
+  const center = calculateChristoffelFromShiftFieldFd2(
+    evaluateShiftVector,
+    point,
+    derivativeStep_m,
+  );
+  if (center == null) return null;
+  const axisShifted: Array<{
+    minus1: ChristoffelTensor;
+    plus1: ChristoffelTensor;
+  }> = [];
+  for (const axis of [0, 1, 2] as const) {
+    const minus1 = calculateChristoffelFromShiftFieldFd2(
+      evaluateShiftVector,
+      offsetPoint(point, axis, -derivativeStep_m),
+      derivativeStep_m,
+    );
+    const plus1 = calculateChristoffelFromShiftFieldFd2(
+      evaluateShiftVector,
+      offsetPoint(point, axis, derivativeStep_m),
+      derivativeStep_m,
+    );
+    if (minus1 == null || plus1 == null) {
+      return null;
+    }
+    axisShifted.push({
+      minus1: minus1.christoffel,
+      plus1: plus1.christoffel,
+    });
+  }
+
+  const derivativeGammaSpatial = (
+    axis: 0 | 1 | 2,
+    rho: number,
+    mu: number,
+    nu: number,
+  ): number =>
+    finiteDifferenceDerivativeFd2(
+      axisShifted[axis].minus1[rho][mu][nu],
+      axisShifted[axis].plus1[rho][mu][nu],
+      derivativeStep_m,
+    );
+
+  const contractionAtShift = (
+    axis: 0 | 1 | 2,
+    shift: "minus1" | "plus1",
+    mu: number,
+  ): number => {
+    const gamma = axisShifted[axis][shift];
+    let sum = 0;
+    for (let lambda = 0; lambda < 4; lambda += 1) {
+      sum += gamma[lambda][mu][lambda];
+    }
+    return sum;
+  };
+
+  const derivativeContractionSpatial = (
+    axis: 0 | 1 | 2,
+    mu: number,
+  ): number =>
+    finiteDifferenceDerivativeFd2(
+      contractionAtShift(axis, "minus1", mu),
+      contractionAtShift(axis, "plus1", mu),
+      derivativeStep_m,
+    );
+
+  const gammaTraceByLambda = [0, 0, 0, 0];
+  for (let lambda = 0; lambda < 4; lambda += 1) {
+    let trace = 0;
+    for (let sigma = 0; sigma < 4; sigma += 1) {
+      trace += center.christoffel[sigma][lambda][sigma];
+    }
+    gammaTraceByLambda[lambda] = trace;
+  }
+
+  const ricci = createZeroTensor4();
+  for (let mu = 0; mu < 4; mu += 1) {
+    for (let nu = 0; nu < 4; nu += 1) {
+      let term1 = 0;
+      for (let lambda = 1; lambda < 4; lambda += 1) {
+        term1 += derivativeGammaSpatial(
+          (lambda - 1) as 0 | 1 | 2,
+          lambda,
+          mu,
+          nu,
+        );
+      }
+      let term2 = 0;
+      if (nu > 0) {
+        term2 = derivativeContractionSpatial((nu - 1) as 0 | 1 | 2, mu);
+      }
+      let term3 = 0;
+      for (let lambda = 0; lambda < 4; lambda += 1) {
+        term3 += center.christoffel[lambda][mu][nu] * gammaTraceByLambda[lambda];
+      }
+      let term4 = 0;
+      for (let lambda = 0; lambda < 4; lambda += 1) {
+        for (let sigma = 0; sigma < 4; sigma += 1) {
+          term4 +=
+            center.christoffel[sigma][mu][lambda] *
+            center.christoffel[lambda][nu][sigma];
+        }
+      }
+      const value = term1 - term2 + term3 - term4;
+      if (!Number.isFinite(value)) return null;
+      ricci[mu][nu] = value;
+    }
+  }
+
+  let ricciScalar = 0;
+  for (let mu = 0; mu < 4; mu += 1) {
+    for (let nu = 0; nu < 4; nu += 1) {
+      ricciScalar += center.metricInverse[mu][nu] * ricci[mu][nu];
+    }
+  }
+  if (!Number.isFinite(ricciScalar)) return null;
+
+  const geomToSi = INV8PI * GEOM_TO_SI_STRESS;
+  const symmetricComponent = (mu: number, nu: number): number => {
+    const gCenter = ricci[mu][nu] - 0.5 * center.metric[mu][nu] * ricciScalar;
+    const gMirror = ricci[nu][mu] - 0.5 * center.metric[nu][mu] * ricciScalar;
+    return 0.5 * (gCenter + gMirror) * geomToSi;
+  };
+  const crossCheck: EinsteinTensorCrossCheckSample = {
+    T00: symmetricComponent(0, 0),
+    T01: symmetricComponent(0, 1),
+    T02: symmetricComponent(0, 2),
+    T03: symmetricComponent(0, 3),
+    T12: symmetricComponent(1, 2),
+    T13: symmetricComponent(1, 3),
+    T23: symmetricComponent(2, 3),
+  };
+  for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+    if (!Number.isFinite(crossCheck[key])) return null;
+  }
+  return crossCheck;
+};
+
+const resolveEinsteinResidualProfileAgainstRoute = (
+  stress: MetricStressTensor,
+  crossCheck: EinsteinTensorCrossCheckSample,
+  transformRouteValue: (value: number) => number = (value) => value,
+): EinsteinResidualProfile | null => {
+  let maxResidual = -Infinity;
+  const componentResiduals = {
+    T01: 0,
+    T02: 0,
+    T03: 0,
+    T12: 0,
+    T13: 0,
+    T23: 0,
+  } as EinsteinResidualProfile["componentResiduals"];
+  for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+    const emitted = toFiniteNumber((stress as Record<string, unknown>)[key]);
+    const routeValue = toFiniteNumber(transformRouteValue(crossCheck[key]));
+    if (emitted == null || routeValue == null) return null;
+    const denom = Math.max(
+      Math.abs(emitted),
+      Math.abs(routeValue),
+      EINSTEIN_ROUTE_COMPONENT_REL_EPS,
+    );
+    const residual = Math.abs(emitted - routeValue) / denom;
+    if (!Number.isFinite(residual)) return null;
+    componentResiduals[key] = residual;
+    maxResidual = Math.max(maxResidual, residual);
+  }
+  if (!Number.isFinite(maxResidual)) return null;
+  return {
+    maxRelativeResidual: maxResidual,
+    componentResiduals,
+  };
+};
+
+const resolveEinsteinT00ResidualAgainstRoute = (
+  stress: MetricStressTensor,
+  crossCheck: EinsteinTensorCrossCheckSample,
+  transformRouteValue: (value: number) => number = (value) => value,
+): number | null => {
+  const emitted =
+    stress.modelTermRoute === EINSTEIN_MODEL_TERM_ROUTE_ID
+      ? toFiniteNumber(stress.T00_modelTermEinstein)
+      : toFiniteNumber(stress.T00_modelTermEinstein) ?? toFiniteNumber(stress.T00);
+  const routeRaw = toFiniteNumber(crossCheck.T00);
+  if (emitted == null || routeRaw == null) return null;
+  const routeValue = toFiniteNumber(transformRouteValue(routeRaw));
+  if (routeValue == null) return null;
+  const denom = Math.max(
+    Math.abs(emitted),
+    Math.abs(routeValue),
+    EINSTEIN_ROUTE_COMPONENT_REL_EPS,
+  );
+  const residual = Math.abs(emitted - routeValue) / denom;
+  return Number.isFinite(residual) ? residual : null;
+};
+
+const extractFluxShearSampleFromStress = (
+  stress: MetricStressTensor,
+): EinsteinTensorCrossCheckSample | null => {
+  const T01 = toFiniteNumber(stress.T01);
+  const T02 = toFiniteNumber(stress.T02);
+  const T03 = toFiniteNumber(stress.T03);
+  const T12 = toFiniteNumber(stress.T12);
+  const T13 = toFiniteNumber(stress.T13);
+  const T23 = toFiniteNumber(stress.T23);
+  if (
+    T01 == null ||
+    T02 == null ||
+    T03 == null ||
+    T12 == null ||
+    T13 == null ||
+    T23 == null
+  ) {
+    return null;
+  }
+  return {
+    T01,
+    T02,
+    T03,
+    T12,
+    T13,
+    T23,
+  };
+};
+
+const resolveMaxRelativeComponentDrift = (
+  coarse: MetricStressTensor,
+  refined: MetricStressTensor,
+  keys: readonly string[],
+  minimumDenominator: number = MODEL_TERM_COMPONENT_REL_EPS,
+): number | null => {
+  let maxDrift = -Infinity;
+  for (const key of keys) {
+    const coarseValue = toFiniteNumber((coarse as Record<string, unknown>)[key]);
+    const refinedValue = toFiniteNumber((refined as Record<string, unknown>)[key]);
+    if (coarseValue == null || refinedValue == null) return null;
+    const denominator = Math.max(
+      Math.abs(coarseValue),
+      Math.abs(refinedValue),
+      minimumDenominator,
+    );
+    const drift = Math.abs(coarseValue - refinedValue) / denominator;
+    if (!Number.isFinite(drift)) return null;
+    maxDrift = Math.max(maxDrift, drift);
+  }
+  return Number.isFinite(maxDrift) ? maxDrift : null;
+};
+
+const resolveMaxPairMagnitude = (
+  lhs: MetricStressTensor,
+  rhs: MetricStressTensor,
+  keys: readonly string[],
+): number | null => {
+  let maxMagnitude = -Infinity;
+  for (const key of keys) {
+    const lhsValue = toFiniteNumber((lhs as Record<string, unknown>)[key]);
+    const rhsValue = toFiniteNumber((rhs as Record<string, unknown>)[key]);
+    if (lhsValue == null || rhsValue == null) return null;
+    maxMagnitude = Math.max(
+      maxMagnitude,
+      Math.abs(lhsValue),
+      Math.abs(rhsValue),
+    );
+  }
+  return Number.isFinite(maxMagnitude) ? maxMagnitude : null;
+};
+
+const resolveConvergenceOrder = (
+  coarseToRefinedDrift: number,
+  refinedToSuperRefinedDrift: number,
+): number | null => {
+  if (
+    !Number.isFinite(coarseToRefinedDrift) ||
+    !Number.isFinite(refinedToSuperRefinedDrift)
+  ) {
+    return null;
+  }
+  const lhs = Math.abs(coarseToRefinedDrift);
+  const rhs = Math.abs(refinedToSuperRefinedDrift);
+  if (lhs <= MODEL_TERM_COMPONENT_REL_EPS || rhs <= MODEL_TERM_COMPONENT_REL_EPS) {
+    return null;
+  }
+  const order = Math.log2(lhs / rhs);
+  return Number.isFinite(order) ? order : null;
+};
+
+const resolveComponentFamilyResidualMax = (
+  componentResiduals: Record<(typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number], number>,
+  keys: readonly (typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number][],
+): number | null => {
+  let maxResidual = -Infinity;
+  for (const key of keys) {
+    const value = componentResiduals[key];
+    if (!Number.isFinite(value)) return null;
+    maxResidual = Math.max(maxResidual, value);
+  }
+  return Number.isFinite(maxResidual) ? maxResidual : null;
+};
+
+const resolveRichardsonExtrapolatedResidual = (args: {
+  coarseResidual: number | null;
+  refinedResidual: number | null;
+  superRefinedResidual: number | null;
+  coarseToRefinedOrder: number | null;
+  refinedToSuperRefinedOrder: number | null;
+}): number | null => {
+  const isFinitePositive = (value: number | null): value is number =>
+    value != null && Number.isFinite(value) && Math.abs(value) > MODEL_TERM_COMPONENT_REL_EPS;
+  const applyRichardson = (
+    coarseValue: number,
+    fineValue: number,
+    orderEstimate: number,
+  ): number | null => {
+    if (!Number.isFinite(orderEstimate)) return null;
+    const denominator = Math.pow(2, orderEstimate) - 1;
+    if (!Number.isFinite(denominator) || Math.abs(denominator) <= 1e-9) {
+      return null;
+    }
+    const extrapolated = fineValue + (fineValue - coarseValue) / denominator;
+    return Number.isFinite(extrapolated) ? Math.abs(extrapolated) : null;
+  };
+  if (
+    isFinitePositive(args.refinedResidual) &&
+    isFinitePositive(args.superRefinedResidual) &&
+    args.refinedToSuperRefinedOrder != null
+  ) {
+    return applyRichardson(
+      args.refinedResidual,
+      args.superRefinedResidual,
+      args.refinedToSuperRefinedOrder,
+    );
+  }
+  if (
+    isFinitePositive(args.coarseResidual) &&
+    isFinitePositive(args.refinedResidual) &&
+    args.coarseToRefinedOrder != null
+  ) {
+    return applyRichardson(
+      args.coarseResidual,
+      args.refinedResidual,
+      args.coarseToRefinedOrder,
+    );
+  }
+  return null;
 };
 
 const clampDenominator = (value: number) => {
@@ -193,7 +1068,11 @@ const calculateAlcubierreStressEnergy = (
 export const calculateMetricStressEnergyTensorAtPointFromShiftField = (
   evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
   point: Vec3,
-  opts?: { derivativeStep_m?: number; scale_m?: number },
+  opts?: {
+    derivativeStep_m?: number;
+    scale_m?: number;
+    modelTermRoutePreference?: "auto" | "adm_only" | "einstein_only";
+  },
 ) => {
   const inferredScale =
     opts?.scale_m ?? (Math.hypot(point[0], point[1], point[2]) || 1);
@@ -394,22 +1273,55 @@ export const calculateMetricStressEnergyTensorAtPointFromShiftField = (
       return null;
     }
 
-    const T01 = Jgeom[0] * GEOM_TO_SI_STRESS;
-    const T02 = Jgeom[1] * GEOM_TO_SI_STRESS;
-    const T03 = Jgeom[2] * GEOM_TO_SI_STRESS;
+    const admT01 = Jgeom[0] * GEOM_TO_SI_STRESS;
+    const admT02 = Jgeom[1] * GEOM_TO_SI_STRESS;
+    const admT03 = Jgeom[2] * GEOM_TO_SI_STRESS;
 
     // Keep legacy diagonal branch stable for source-closure and baseline parity.
     // The model-term extension in this patch is limited to flux/shear channel emission.
     const T11 = -rhoEuler;
     const T22 = -rhoEuler;
     const T33 = -rhoEuler;
-    const T12 = Sgeom[0][1] * GEOM_TO_SI_STRESS;
-    const T13 = Sgeom[0][2] * GEOM_TO_SI_STRESS;
-    const T23 = Sgeom[1][2] * GEOM_TO_SI_STRESS;
+    const admT12 = Sgeom[0][1] * GEOM_TO_SI_STRESS;
+    const admT13 = Sgeom[0][2] * GEOM_TO_SI_STRESS;
+    const admT23 = Sgeom[1][2] * GEOM_TO_SI_STRESS;
+    const einsteinFluxShear =
+      calculateEinsteinTensorCrossCheckAtPointFromShiftField(
+        evaluateShiftVector,
+        [x, y, z],
+        step,
+      );
+    const hasEinsteinFluxShear =
+      einsteinFluxShear != null &&
+      Number.isFinite(einsteinFluxShear.T01) &&
+      Number.isFinite(einsteinFluxShear.T02) &&
+      Number.isFinite(einsteinFluxShear.T03) &&
+      Number.isFinite(einsteinFluxShear.T12) &&
+      Number.isFinite(einsteinFluxShear.T13) &&
+      Number.isFinite(einsteinFluxShear.T23);
+    const modelTermRoutePreference = opts?.modelTermRoutePreference ?? "auto";
+    if (modelTermRoutePreference === "einstein_only" && !hasEinsteinFluxShear) {
+      return null;
+    }
+    const useEinsteinFluxShear =
+      hasEinsteinFluxShear && modelTermRoutePreference !== "adm_only";
+    const einsteinT00 = useEinsteinFluxShear
+      ? toFiniteNumber(einsteinFluxShear.T00)
+      : null;
+    const T01 = useEinsteinFluxShear ? einsteinFluxShear.T01 : admT01;
+    const T02 = useEinsteinFluxShear ? einsteinFluxShear.T02 : admT02;
+    const T03 = useEinsteinFluxShear ? einsteinFluxShear.T03 : admT03;
+    const T12 = useEinsteinFluxShear ? einsteinFluxShear.T12 : admT12;
+    const T13 = useEinsteinFluxShear ? einsteinFluxShear.T13 : admT13;
+    const T23 = useEinsteinFluxShear ? einsteinFluxShear.T23 : admT23;
+    const modelTermRoute = useEinsteinFluxShear
+      ? EINSTEIN_MODEL_TERM_ROUTE_ID
+      : ADM_MODEL_TERM_ROUTE_ID;
 
     return {
       stress: {
         T00: rhoEuler,
+        ...(einsteinT00 != null ? { T00_modelTermEinstein: einsteinT00 } : {}),
         T11,
         T22,
         T33,
@@ -426,7 +1338,7 @@ export const calculateMetricStressEnergyTensorAtPointFromShiftField = (
         T23,
         T32: T23,
         isNullEnergyConditionSatisfied: false,
-        modelTermRoute: ADM_MODEL_TERM_ROUTE_ID,
+        modelTermRoute,
         modelTermAdmission: "experimental_not_admitted",
         researchBasisRef: ADM_MODEL_TERM_RESEARCH_BASIS_REF,
       },
@@ -696,6 +1608,87 @@ const calculateMetricStressEnergyFromShiftField = (
   const modelTermRouteCounts = new Map<string, number>();
   const modelTermAdmissionCounts = new Map<string, number>();
   const researchBasisRefCounts = new Map<string, number>();
+  let finiteDifferenceComparedSampleCount = 0;
+  let finiteDifferenceTripletSampleCount = 0;
+  let finiteDifferenceRouteLocalComparedSampleCount = 0;
+  let finiteDifferenceRouteSuppressedSampleCount = 0;
+  let finiteDifferenceNumericalFloorSuppressedSampleCount = 0;
+  let t0iDriftSum = 0;
+  let t0iDriftMax = -Infinity;
+  let t0iRefinedDriftSum = 0;
+  let t0iRefinedDriftMax = -Infinity;
+  let t0iConvergenceOrderSum = 0;
+  let t0iConvergenceOrderCount = 0;
+  let t0iConvergenceOrderMin = Infinity;
+  let t0iConvergenceOrderMax = -Infinity;
+  let offDiagonalDriftSum = 0;
+  let offDiagonalDriftMax = -Infinity;
+  let offDiagonalRefinedDriftSum = 0;
+  let offDiagonalRefinedDriftMax = -Infinity;
+  let offDiagonalConvergenceOrderSum = 0;
+  let offDiagonalConvergenceOrderCount = 0;
+  let offDiagonalConvergenceOrderMin = Infinity;
+  let offDiagonalConvergenceOrderMax = -Infinity;
+  let einsteinComparedSampleCount = 0;
+  let einsteinRefinedComparedSampleCount = 0;
+  let einsteinSuperRefinedComparedSampleCount = 0;
+  let einsteinMaxRelativeResidual = -Infinity;
+  let einsteinRefinedMaxRelativeResidual = -Infinity;
+  let einsteinSuperRefinedMaxRelativeResidual = -Infinity;
+  let einsteinT00ComparedSampleCount = 0;
+  let einsteinT00MaxRelativeResidual = -Infinity;
+  let einsteinT00Sum = 0;
+  let einsteinT00SampleCount = 0;
+  let independentCrossCheckComparedSampleCount = 0;
+  let independentCrossCheckMaxRelativeResidual = -Infinity;
+  let independentCrossCheckT00ComparedSampleCount = 0;
+  let independentCrossCheckT00MaxRelativeResidual = -Infinity;
+  let independentCrossCheckReferenceRouteSuppressedSampleCount = 0;
+  const independentCrossCheckReferenceRouteCounts = new Map<string, number>();
+  const independentCrossCheckComponentResidualMax = {
+    T01: -Infinity,
+    T02: -Infinity,
+    T03: -Infinity,
+    T12: -Infinity,
+    T13: -Infinity,
+    T23: -Infinity,
+  } as Record<(typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number], number>;
+  const einsteinComponentResidualMax = {
+    T01: -Infinity,
+    T02: -Infinity,
+    T03: -Infinity,
+    T12: -Infinity,
+    T13: -Infinity,
+    T23: -Infinity,
+  } as Record<(typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number], number>;
+  const einsteinRefinedComponentResidualMax = {
+    T01: -Infinity,
+    T02: -Infinity,
+    T03: -Infinity,
+    T12: -Infinity,
+    T13: -Infinity,
+    T23: -Infinity,
+  } as Record<(typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number], number>;
+  const einsteinSuperRefinedComponentResidualMax = {
+    T01: -Infinity,
+    T02: -Infinity,
+    T03: -Infinity,
+    T12: -Infinity,
+    T13: -Infinity,
+    T23: -Infinity,
+  } as Record<(typeof MODEL_TERM_EINSTEIN_COMPARE_KEYS)[number], number>;
+  const residualSweepMaxResidualByCandidate = new Map<
+    EinsteinResidualAttributionCandidateId,
+    number
+  >();
+  const residualSweepSampleCountByCandidate = new Map<
+    EinsteinResidualAttributionCandidateId,
+    number
+  >();
+  for (const candidate of EINSTEIN_RESIDUAL_ATTRIBUTION_CANDIDATES) {
+    residualSweepMaxResidualByCandidate.set(candidate.candidateId, -Infinity);
+    residualSweepSampleCountByCandidate.set(candidate.candidateId, 0);
+  }
 
   for (const point of points) {
     const sample = calculateMetricStressEnergyTensorAtPointFromShiftField(
@@ -742,6 +1735,398 @@ const calculateMetricStressEnergyFromShiftField = (
         sample.stress.researchBasisRef,
         (researchBasisRefCounts.get(sample.stress.researchBasisRef) ?? 0) + 1,
       );
+    }
+    const independentCrossCheckRoutePreference =
+      sample.stress.modelTermRoute === ADM_MODEL_TERM_ROUTE_ID
+        ? "einstein_only"
+        : sample.stress.modelTermRoute === EINSTEIN_MODEL_TERM_ROUTE_ID
+          ? "einstein_only"
+          : "auto";
+    let referenceFluxShearSample: EinsteinTensorCrossCheckSample | null = null;
+    let independentReferenceRouteId: string | null = null;
+    if (sample.stress.modelTermRoute === EINSTEIN_MODEL_TERM_ROUTE_ID) {
+      // Independent same-family comparator for Einstein closure:
+      // keep geometry-first semantics but switch to FD2 derivatives.
+      referenceFluxShearSample =
+        calculateEinsteinTensorCrossCheckAtPointFromShiftFieldFd2(
+          evaluateShiftVector,
+          point,
+          step,
+        );
+      independentReferenceRouteId =
+        referenceFluxShearSample != null
+          ? EINSTEIN_INDEPENDENT_CROSS_CHECK_ROUTE_ID
+          : null;
+    } else {
+      const independentRouteSample =
+        calculateMetricStressEnergyTensorAtPointFromShiftField(
+          evaluateShiftVector,
+          point,
+          {
+            derivativeStep_m: step,
+            scale_m: scale,
+            modelTermRoutePreference: independentCrossCheckRoutePreference,
+          },
+        );
+      if (independentRouteSample != null) {
+        if (
+          typeof independentRouteSample.stress.modelTermRoute === "string" &&
+          independentRouteSample.stress.modelTermRoute.length > 0
+        ) {
+          independentReferenceRouteId = independentRouteSample.stress.modelTermRoute;
+        }
+        referenceFluxShearSample = extractFluxShearSampleFromStress(
+          independentRouteSample.stress,
+        );
+      }
+    }
+    if (independentReferenceRouteId != null) {
+      independentCrossCheckReferenceRouteCounts.set(
+        independentReferenceRouteId,
+        (independentCrossCheckReferenceRouteCounts.get(
+          independentReferenceRouteId,
+        ) ?? 0) + 1,
+      );
+    }
+    if (referenceFluxShearSample != null) {
+      const independentResidualProfile = resolveEinsteinResidualProfileAgainstRoute(
+        sample.stress,
+        referenceFluxShearSample,
+      );
+      if (independentResidualProfile != null) {
+        independentCrossCheckComparedSampleCount += 1;
+        independentCrossCheckMaxRelativeResidual = Math.max(
+          independentCrossCheckMaxRelativeResidual,
+          independentResidualProfile.maxRelativeResidual,
+        );
+        for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+          independentCrossCheckComponentResidualMax[key] = Math.max(
+            independentCrossCheckComponentResidualMax[key],
+            independentResidualProfile.componentResiduals[key],
+          );
+        }
+      }
+      const independentT00Residual = resolveEinsteinT00ResidualAgainstRoute(
+        sample.stress,
+        referenceFluxShearSample,
+      );
+      if (independentT00Residual != null) {
+        independentCrossCheckT00ComparedSampleCount += 1;
+        independentCrossCheckT00MaxRelativeResidual = Math.max(
+          independentCrossCheckT00MaxRelativeResidual,
+          independentT00Residual,
+        );
+      }
+    } else if (independentCrossCheckRoutePreference !== "auto") {
+      independentCrossCheckReferenceRouteSuppressedSampleCount += 1;
+    }
+    const convergenceRoutePreference =
+      sample.stress.modelTermRoute === EINSTEIN_MODEL_TERM_ROUTE_ID
+        ? "einstein_only"
+        : sample.stress.modelTermRoute === ADM_MODEL_TERM_ROUTE_ID
+          ? "adm_only"
+          : "auto";
+    const refinedSample = calculateMetricStressEnergyTensorAtPointFromShiftField(
+      evaluateShiftVector,
+      point,
+      {
+        derivativeStep_m: step * MODEL_TERM_REFINED_STEP_RATIO,
+        scale_m: scale,
+        modelTermRoutePreference: convergenceRoutePreference,
+      },
+    );
+    let superRefinedSample:
+      | ReturnType<typeof calculateMetricStressEnergyTensorAtPointFromShiftField>
+      | null = null;
+    if (refinedSample != null) {
+      const routeLocalPair =
+        sample.stress.modelTermRoute != null &&
+        refinedSample.stress.modelTermRoute != null &&
+        sample.stress.modelTermRoute === refinedSample.stress.modelTermRoute;
+      if (!routeLocalPair && convergenceRoutePreference !== "auto") {
+        finiteDifferenceRouteSuppressedSampleCount += 1;
+      }
+      const coarseRefinedT00Scale =
+        Math.max(
+          Math.abs(sample.stress.T00),
+          Math.abs(refinedSample.stress.T00),
+          MODEL_TERM_COMPONENT_REL_EPS,
+        ) * MODEL_TERM_CONVERGENCE_SIGNIFICANCE_RELATIVE_TO_T00;
+      const coarseRefinedT0iMagnitude = resolveMaxPairMagnitude(
+        sample.stress,
+        refinedSample.stress,
+        MODEL_TERM_T0I_KEYS,
+      );
+      const coarseRefinedOffDiagonalMagnitude = resolveMaxPairMagnitude(
+        sample.stress,
+        refinedSample.stress,
+        MODEL_TERM_OFF_DIAGONAL_KEYS,
+      );
+      const coarseRefinedFamiliesMeaningful =
+        routeLocalPair &&
+        coarseRefinedT0iMagnitude != null &&
+        coarseRefinedOffDiagonalMagnitude != null &&
+        coarseRefinedT0iMagnitude >= coarseRefinedT00Scale &&
+        coarseRefinedOffDiagonalMagnitude >= coarseRefinedT00Scale;
+      if (
+        routeLocalPair &&
+        !coarseRefinedFamiliesMeaningful &&
+        convergenceRoutePreference !== "auto"
+      ) {
+        finiteDifferenceNumericalFloorSuppressedSampleCount += 1;
+      }
+      const t0iDrift = coarseRefinedFamiliesMeaningful
+        ? resolveMaxRelativeComponentDrift(
+            sample.stress,
+            refinedSample.stress,
+            MODEL_TERM_T0I_KEYS,
+            coarseRefinedT00Scale,
+          )
+        : null;
+      const offDiagonalDrift = coarseRefinedFamiliesMeaningful
+        ? resolveMaxRelativeComponentDrift(
+            sample.stress,
+            refinedSample.stress,
+            MODEL_TERM_OFF_DIAGONAL_KEYS,
+            coarseRefinedT00Scale,
+          )
+        : null;
+      if (t0iDrift != null && offDiagonalDrift != null) {
+        finiteDifferenceComparedSampleCount += 1;
+        finiteDifferenceRouteLocalComparedSampleCount += 1;
+        t0iDriftSum += t0iDrift;
+        t0iDriftMax = Math.max(t0iDriftMax, t0iDrift);
+        offDiagonalDriftSum += offDiagonalDrift;
+        offDiagonalDriftMax = Math.max(offDiagonalDriftMax, offDiagonalDrift);
+      }
+      superRefinedSample = calculateMetricStressEnergyTensorAtPointFromShiftField(
+        evaluateShiftVector,
+        point,
+        {
+          derivativeStep_m: step * MODEL_TERM_SUPER_REFINED_STEP_RATIO,
+          scale_m: scale,
+          modelTermRoutePreference: convergenceRoutePreference,
+        },
+      );
+      if (superRefinedSample != null) {
+        const routeLocalTriplet =
+          routeLocalPair &&
+          refinedSample.stress.modelTermRoute != null &&
+          superRefinedSample.stress.modelTermRoute != null &&
+          refinedSample.stress.modelTermRoute ===
+            superRefinedSample.stress.modelTermRoute;
+        if (!routeLocalTriplet && convergenceRoutePreference !== "auto") {
+          finiteDifferenceRouteSuppressedSampleCount += 1;
+        }
+        const refinedSuperRefinedT00Scale =
+          Math.max(
+            Math.abs(refinedSample.stress.T00),
+            Math.abs(superRefinedSample.stress.T00),
+            MODEL_TERM_COMPONENT_REL_EPS,
+          ) * MODEL_TERM_CONVERGENCE_SIGNIFICANCE_RELATIVE_TO_T00;
+        const refinedSuperRefinedT0iMagnitude = resolveMaxPairMagnitude(
+          refinedSample.stress,
+          superRefinedSample.stress,
+          MODEL_TERM_T0I_KEYS,
+        );
+        const refinedSuperRefinedOffDiagonalMagnitude = resolveMaxPairMagnitude(
+          refinedSample.stress,
+          superRefinedSample.stress,
+          MODEL_TERM_OFF_DIAGONAL_KEYS,
+        );
+        const refinedFamiliesMeaningful =
+          routeLocalTriplet &&
+          refinedSuperRefinedT0iMagnitude != null &&
+          refinedSuperRefinedOffDiagonalMagnitude != null &&
+          refinedSuperRefinedT0iMagnitude >= refinedSuperRefinedT00Scale &&
+          refinedSuperRefinedOffDiagonalMagnitude >=
+            refinedSuperRefinedT00Scale;
+        if (
+          routeLocalTriplet &&
+          !refinedFamiliesMeaningful &&
+          convergenceRoutePreference !== "auto"
+        ) {
+          finiteDifferenceNumericalFloorSuppressedSampleCount += 1;
+        }
+        const t0iRefinedDrift = refinedFamiliesMeaningful
+          ? resolveMaxRelativeComponentDrift(
+              refinedSample.stress,
+              superRefinedSample.stress,
+              MODEL_TERM_T0I_KEYS,
+              refinedSuperRefinedT00Scale,
+            )
+          : null;
+        const offDiagonalRefinedDrift = refinedFamiliesMeaningful
+          ? resolveMaxRelativeComponentDrift(
+              refinedSample.stress,
+              superRefinedSample.stress,
+              MODEL_TERM_OFF_DIAGONAL_KEYS,
+              refinedSuperRefinedT00Scale,
+            )
+          : null;
+        if (
+          t0iDrift != null &&
+          offDiagonalDrift != null &&
+          t0iRefinedDrift != null &&
+          offDiagonalRefinedDrift != null
+        ) {
+          finiteDifferenceTripletSampleCount += 1;
+          t0iRefinedDriftSum += t0iRefinedDrift;
+          t0iRefinedDriftMax = Math.max(t0iRefinedDriftMax, t0iRefinedDrift);
+          offDiagonalRefinedDriftSum += offDiagonalRefinedDrift;
+          offDiagonalRefinedDriftMax = Math.max(
+            offDiagonalRefinedDriftMax,
+            offDiagonalRefinedDrift,
+          );
+          const t0iConvergenceOrder = resolveConvergenceOrder(
+            t0iDrift,
+            t0iRefinedDrift,
+          );
+          if (t0iConvergenceOrder != null) {
+            t0iConvergenceOrderSum += t0iConvergenceOrder;
+            t0iConvergenceOrderCount += 1;
+            t0iConvergenceOrderMin = Math.min(
+              t0iConvergenceOrderMin,
+              t0iConvergenceOrder,
+            );
+            t0iConvergenceOrderMax = Math.max(
+              t0iConvergenceOrderMax,
+              t0iConvergenceOrder,
+            );
+          }
+          const offDiagonalConvergenceOrder = resolveConvergenceOrder(
+            offDiagonalDrift,
+            offDiagonalRefinedDrift,
+          );
+          if (offDiagonalConvergenceOrder != null) {
+            offDiagonalConvergenceOrderSum += offDiagonalConvergenceOrder;
+            offDiagonalConvergenceOrderCount += 1;
+            offDiagonalConvergenceOrderMin = Math.min(
+              offDiagonalConvergenceOrderMin,
+              offDiagonalConvergenceOrder,
+            );
+            offDiagonalConvergenceOrderMax = Math.max(
+              offDiagonalConvergenceOrderMax,
+              offDiagonalConvergenceOrder,
+            );
+          }
+        }
+      }
+    } else if (convergenceRoutePreference !== "auto") {
+      finiteDifferenceRouteSuppressedSampleCount += 1;
+    }
+    const einsteinCrossCheck = calculateEinsteinTensorCrossCheckAtPointFromShiftField(
+      evaluateShiftVector,
+      point,
+      step,
+    );
+    if (einsteinCrossCheck != null) {
+      const residualProfile = resolveEinsteinResidualProfileAgainstRoute(
+        sample.stress,
+        einsteinCrossCheck,
+      );
+      if (residualProfile != null) {
+        einsteinComparedSampleCount += 1;
+        einsteinMaxRelativeResidual = Math.max(
+          einsteinMaxRelativeResidual,
+          residualProfile.maxRelativeResidual,
+        );
+        for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+          einsteinComponentResidualMax[key] = Math.max(
+            einsteinComponentResidualMax[key],
+            residualProfile.componentResiduals[key],
+          );
+        }
+      }
+      const einsteinT00Residual = resolveEinsteinT00ResidualAgainstRoute(
+        sample.stress,
+        einsteinCrossCheck,
+      );
+      if (einsteinT00Residual != null) {
+        einsteinT00ComparedSampleCount += 1;
+        einsteinT00MaxRelativeResidual = Math.max(
+          einsteinT00MaxRelativeResidual,
+          einsteinT00Residual,
+        );
+      }
+      const einsteinRouteT00 = toFiniteNumber(einsteinCrossCheck.T00);
+      if (einsteinRouteT00 != null) {
+        einsteinT00SampleCount += 1;
+        einsteinT00Sum += einsteinRouteT00;
+      }
+      for (const candidate of EINSTEIN_RESIDUAL_ATTRIBUTION_CANDIDATES) {
+        const candidateResidualProfile = resolveEinsteinResidualProfileAgainstRoute(
+          sample.stress,
+          einsteinCrossCheck,
+          candidate.transform,
+        );
+        if (candidateResidualProfile == null) continue;
+        const nextCount =
+          (residualSweepSampleCountByCandidate.get(candidate.candidateId) ?? 0) + 1;
+        residualSweepSampleCountByCandidate.set(candidate.candidateId, nextCount);
+        residualSweepMaxResidualByCandidate.set(
+          candidate.candidateId,
+          Math.max(
+            residualSweepMaxResidualByCandidate.get(candidate.candidateId) ??
+              -Infinity,
+            candidateResidualProfile.maxRelativeResidual,
+          ),
+        );
+      }
+    }
+    if (refinedSample != null) {
+      const einsteinRefinedCrossCheck =
+        calculateEinsteinTensorCrossCheckAtPointFromShiftField(
+          evaluateShiftVector,
+          point,
+          step * MODEL_TERM_REFINED_STEP_RATIO,
+        );
+      if (einsteinRefinedCrossCheck != null) {
+        const refinedResidualProfile = resolveEinsteinResidualProfileAgainstRoute(
+          refinedSample.stress,
+          einsteinRefinedCrossCheck,
+        );
+        if (refinedResidualProfile != null) {
+          einsteinRefinedComparedSampleCount += 1;
+          einsteinRefinedMaxRelativeResidual = Math.max(
+            einsteinRefinedMaxRelativeResidual,
+            refinedResidualProfile.maxRelativeResidual,
+          );
+          for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+            einsteinRefinedComponentResidualMax[key] = Math.max(
+              einsteinRefinedComponentResidualMax[key],
+              refinedResidualProfile.componentResiduals[key],
+            );
+          }
+        }
+      }
+    }
+    if (superRefinedSample != null) {
+      const einsteinSuperRefinedCrossCheck =
+        calculateEinsteinTensorCrossCheckAtPointFromShiftField(
+          evaluateShiftVector,
+          point,
+          step * MODEL_TERM_SUPER_REFINED_STEP_RATIO,
+        );
+      if (einsteinSuperRefinedCrossCheck != null) {
+        const superRefinedResidualProfile = resolveEinsteinResidualProfileAgainstRoute(
+          superRefinedSample.stress,
+          einsteinSuperRefinedCrossCheck,
+        );
+        if (superRefinedResidualProfile != null) {
+          einsteinSuperRefinedComparedSampleCount += 1;
+          einsteinSuperRefinedMaxRelativeResidual = Math.max(
+            einsteinSuperRefinedMaxRelativeResidual,
+            superRefinedResidualProfile.maxRelativeResidual,
+          );
+          for (const key of MODEL_TERM_EINSTEIN_COMPARE_KEYS) {
+            einsteinSuperRefinedComponentResidualMax[key] = Math.max(
+              einsteinSuperRefinedComponentResidualMax[key],
+              superRefinedResidualProfile.componentResiduals[key],
+            );
+          }
+        }
+      }
     }
     count += 1;
   }
@@ -795,6 +2180,9 @@ const calculateMetricStressEnergyFromShiftField = (
     T32: tensorSums.T23 / count,
     isNullEnergyConditionSatisfied: false,
   };
+  if (einsteinT00SampleCount > 0) {
+    stress.T00_modelTermEinstein = einsteinT00Sum / einsteinT00SampleCount;
+  }
   const dominantModelTermRoute = resolveDominantLabel(modelTermRouteCounts);
   const dominantModelTermAdmission = resolveDominantLabel(modelTermAdmissionCounts);
   const dominantResearchBasisRef = resolveDominantLabel(researchBasisRefCounts);
@@ -810,6 +2198,386 @@ const calculateMetricStressEnergyFromShiftField = (
   if (dominantResearchBasisRef) {
     stress.researchBasisRef = dominantResearchBasisRef;
   }
+  const finiteDifferenceStatus =
+    finiteDifferenceRouteLocalComparedSampleCount <= 0
+      ? "unknown"
+      : (() => {
+          const coarseVsRefinedMax = Math.max(t0iDriftMax, offDiagonalDriftMax);
+          const refinedVsSuperRefinedMax =
+            finiteDifferenceTripletSampleCount > 0
+              ? Math.max(t0iRefinedDriftMax, offDiagonalRefinedDriftMax)
+              : null;
+          const convergedAtCoarse =
+            Number.isFinite(coarseVsRefinedMax) &&
+            coarseVsRefinedMax <= MODEL_TERM_RELATIVE_DRIFT_THRESHOLD;
+          const convergedAtRefined =
+            refinedVsSuperRefinedMax != null &&
+            Number.isFinite(refinedVsSuperRefinedMax) &&
+            refinedVsSuperRefinedMax <= MODEL_TERM_RELATIVE_DRIFT_THRESHOLD;
+          return convergedAtCoarse || convergedAtRefined ? "pass" : "fail";
+        })();
+  const finiteDifferenceFailureMode =
+    finiteDifferenceStatus === "pass"
+      ? "none"
+      : finiteDifferenceStatus === "fail"
+        ? "threshold_failed"
+        : finiteDifferenceRouteSuppressedSampleCount > 0
+          ? "route_local_pair_unavailable"
+          : finiteDifferenceNumericalFloorSuppressedSampleCount > 0
+            ? "numerical_floor_insufficient_signal"
+            : "missing_evidence";
+  const hasEinsteinTensorRoute =
+    einsteinComparedSampleCount > 0 &&
+    Number.isFinite(einsteinMaxRelativeResidual);
+  const hasEinsteinT00Comparability =
+    einsteinT00ComparedSampleCount > 0 &&
+    Number.isFinite(einsteinT00MaxRelativeResidual);
+  const einsteinT00RelativeResidualMax = hasEinsteinT00Comparability
+    ? einsteinT00MaxRelativeResidual
+    : null;
+  const einsteinT00ResidualPass =
+    einsteinT00RelativeResidualMax != null &&
+    einsteinT00RelativeResidualMax <=
+      MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD;
+  const einsteinTensorRouteStatus = hasEinsteinTensorRoute
+    ? "available"
+    : "missing";
+  const hasIndependentCrossCheckResidual =
+    independentCrossCheckComparedSampleCount > 0 &&
+    Number.isFinite(independentCrossCheckMaxRelativeResidual);
+  const hasIndependentCrossCheckT00Residual =
+    independentCrossCheckT00ComparedSampleCount > 0 &&
+    Number.isFinite(independentCrossCheckT00MaxRelativeResidual);
+  const independentCrossCheckRelativeResidualMax = hasIndependentCrossCheckResidual
+    ? independentCrossCheckMaxRelativeResidual
+    : null;
+  const independentCrossCheckT00RelativeResidualMax =
+    hasIndependentCrossCheckT00Residual
+      ? independentCrossCheckT00MaxRelativeResidual
+      : null;
+  const independentCrossCheckResidualPass =
+    independentCrossCheckRelativeResidualMax != null &&
+    independentCrossCheckRelativeResidualMax <=
+      MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD;
+  const independentCrossCheckT00ResidualPass =
+    independentCrossCheckT00RelativeResidualMax != null &&
+    independentCrossCheckT00RelativeResidualMax <=
+      MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD;
+  const dominantIndependentReferenceRoute = resolveDominantLabel(
+    independentCrossCheckReferenceRouteCounts,
+  );
+  const independentCrossCheckReferenceRoute =
+    dominantIndependentReferenceRoute ??
+    (dominantModelTermRoute === EINSTEIN_MODEL_TERM_ROUTE_ID
+      ? EINSTEIN_INDEPENDENT_CROSS_CHECK_ROUTE_ID
+      : dominantModelTermRoute === ADM_MODEL_TERM_ROUTE_ID
+        ? EINSTEIN_MODEL_TERM_ROUTE_ID
+        : null);
+  const independentCrossCheckRouteIndependent =
+    independentCrossCheckReferenceRoute != null &&
+    dominantModelTermRoute != null &&
+    independentCrossCheckReferenceRoute !== dominantModelTermRoute;
+  const independentCrossCheckT00ReferenceComparable =
+    hasIndependentCrossCheckT00Residual
+      ? independentCrossCheckRouteIndependent
+      : null;
+  const independentCrossCheckSameRoute = !independentCrossCheckRouteIndependent;
+  const independentCrossCheckFailureMode = !hasIndependentCrossCheckResidual
+    ? independentCrossCheckReferenceRouteSuppressedSampleCount > 0
+      ? "reference_route_unavailable"
+      : "missing_evidence"
+    : !independentCrossCheckRouteIndependent
+      ? "same_route_not_independent"
+      : independentCrossCheckResidualPass === false
+        ? "threshold_failed"
+        : independentCrossCheckResidualPass == null
+          ? "threshold_undefined"
+          : "none";
+  const independentCrossCheckStatus = hasIndependentCrossCheckResidual
+    ? "available"
+    : "missing";
+  const einsteinResidualComponentSummary = {
+    T01:
+      hasEinsteinTensorRoute && Number.isFinite(einsteinComponentResidualMax.T01)
+        ? einsteinComponentResidualMax.T01
+        : null,
+    T02:
+      hasEinsteinTensorRoute && Number.isFinite(einsteinComponentResidualMax.T02)
+        ? einsteinComponentResidualMax.T02
+        : null,
+    T03:
+      hasEinsteinTensorRoute && Number.isFinite(einsteinComponentResidualMax.T03)
+        ? einsteinComponentResidualMax.T03
+        : null,
+    T12:
+      hasEinsteinTensorRoute && Number.isFinite(einsteinComponentResidualMax.T12)
+        ? einsteinComponentResidualMax.T12
+        : null,
+    T13:
+      hasEinsteinTensorRoute && Number.isFinite(einsteinComponentResidualMax.T13)
+        ? einsteinComponentResidualMax.T13
+        : null,
+    T23:
+      hasEinsteinTensorRoute && Number.isFinite(einsteinComponentResidualMax.T23)
+        ? einsteinComponentResidualMax.T23
+        : null,
+  };
+  const independentCrossCheckComponentSummary = {
+    T01:
+      hasIndependentCrossCheckResidual &&
+      Number.isFinite(independentCrossCheckComponentResidualMax.T01)
+        ? independentCrossCheckComponentResidualMax.T01
+        : null,
+    T02:
+      hasIndependentCrossCheckResidual &&
+      Number.isFinite(independentCrossCheckComponentResidualMax.T02)
+        ? independentCrossCheckComponentResidualMax.T02
+        : null,
+    T03:
+      hasIndependentCrossCheckResidual &&
+      Number.isFinite(independentCrossCheckComponentResidualMax.T03)
+        ? independentCrossCheckComponentResidualMax.T03
+        : null,
+    T12:
+      hasIndependentCrossCheckResidual &&
+      Number.isFinite(independentCrossCheckComponentResidualMax.T12)
+        ? independentCrossCheckComponentResidualMax.T12
+        : null,
+    T13:
+      hasIndependentCrossCheckResidual &&
+      Number.isFinite(independentCrossCheckComponentResidualMax.T13)
+        ? independentCrossCheckComponentResidualMax.T13
+        : null,
+    T23:
+      hasIndependentCrossCheckResidual &&
+      Number.isFinite(independentCrossCheckComponentResidualMax.T23)
+        ? independentCrossCheckComponentResidualMax.T23
+        : null,
+  };
+  const hasEinsteinRefinedRoute =
+    einsteinRefinedComparedSampleCount > 0 &&
+    Number.isFinite(einsteinRefinedMaxRelativeResidual);
+  const hasEinsteinSuperRefinedRoute =
+    einsteinSuperRefinedComparedSampleCount > 0 &&
+    Number.isFinite(einsteinSuperRefinedMaxRelativeResidual);
+  const einsteinRefinedResidualComponentSummary = {
+    T01:
+      hasEinsteinRefinedRoute &&
+      Number.isFinite(einsteinRefinedComponentResidualMax.T01)
+        ? einsteinRefinedComponentResidualMax.T01
+        : null,
+    T02:
+      hasEinsteinRefinedRoute &&
+      Number.isFinite(einsteinRefinedComponentResidualMax.T02)
+        ? einsteinRefinedComponentResidualMax.T02
+        : null,
+    T03:
+      hasEinsteinRefinedRoute &&
+      Number.isFinite(einsteinRefinedComponentResidualMax.T03)
+        ? einsteinRefinedComponentResidualMax.T03
+        : null,
+    T12:
+      hasEinsteinRefinedRoute &&
+      Number.isFinite(einsteinRefinedComponentResidualMax.T12)
+        ? einsteinRefinedComponentResidualMax.T12
+        : null,
+    T13:
+      hasEinsteinRefinedRoute &&
+      Number.isFinite(einsteinRefinedComponentResidualMax.T13)
+        ? einsteinRefinedComponentResidualMax.T13
+        : null,
+    T23:
+      hasEinsteinRefinedRoute &&
+      Number.isFinite(einsteinRefinedComponentResidualMax.T23)
+        ? einsteinRefinedComponentResidualMax.T23
+        : null,
+  };
+  const einsteinSuperRefinedResidualComponentSummary = {
+    T01:
+      hasEinsteinSuperRefinedRoute &&
+      Number.isFinite(einsteinSuperRefinedComponentResidualMax.T01)
+        ? einsteinSuperRefinedComponentResidualMax.T01
+        : null,
+    T02:
+      hasEinsteinSuperRefinedRoute &&
+      Number.isFinite(einsteinSuperRefinedComponentResidualMax.T02)
+        ? einsteinSuperRefinedComponentResidualMax.T02
+        : null,
+    T03:
+      hasEinsteinSuperRefinedRoute &&
+      Number.isFinite(einsteinSuperRefinedComponentResidualMax.T03)
+        ? einsteinSuperRefinedComponentResidualMax.T03
+        : null,
+    T12:
+      hasEinsteinSuperRefinedRoute &&
+      Number.isFinite(einsteinSuperRefinedComponentResidualMax.T12)
+        ? einsteinSuperRefinedComponentResidualMax.T12
+        : null,
+    T13:
+      hasEinsteinSuperRefinedRoute &&
+      Number.isFinite(einsteinSuperRefinedComponentResidualMax.T13)
+        ? einsteinSuperRefinedComponentResidualMax.T13
+        : null,
+    T23:
+      hasEinsteinSuperRefinedRoute &&
+      Number.isFinite(einsteinSuperRefinedComponentResidualMax.T23)
+        ? einsteinSuperRefinedComponentResidualMax.T23
+        : null,
+  };
+  const coarseT0iResidualMax = resolveComponentFamilyResidualMax(
+    einsteinComponentResidualMax,
+    MODEL_TERM_T0I_KEYS,
+  );
+  const coarseOffDiagonalResidualMax = resolveComponentFamilyResidualMax(
+    einsteinComponentResidualMax,
+    MODEL_TERM_OFF_DIAGONAL_KEYS,
+  );
+  const refinedT0iResidualMax = resolveComponentFamilyResidualMax(
+    einsteinRefinedComponentResidualMax,
+    MODEL_TERM_T0I_KEYS,
+  );
+  const refinedOffDiagonalResidualMax = resolveComponentFamilyResidualMax(
+    einsteinRefinedComponentResidualMax,
+    MODEL_TERM_OFF_DIAGONAL_KEYS,
+  );
+  const superRefinedT0iResidualMax = resolveComponentFamilyResidualMax(
+    einsteinSuperRefinedComponentResidualMax,
+    MODEL_TERM_T0I_KEYS,
+  );
+  const superRefinedOffDiagonalResidualMax = resolveComponentFamilyResidualMax(
+    einsteinSuperRefinedComponentResidualMax,
+    MODEL_TERM_OFF_DIAGONAL_KEYS,
+  );
+  const resolveOptionalConvergenceOrder = (
+    coarseResidual: number | null,
+    refinedResidual: number | null,
+  ): number | null =>
+    coarseResidual != null && refinedResidual != null
+      ? resolveConvergenceOrder(coarseResidual, refinedResidual)
+      : null;
+  const coarseToRefinedT0iOrder = resolveOptionalConvergenceOrder(
+    coarseT0iResidualMax,
+    refinedT0iResidualMax,
+  );
+  const refinedToSuperRefinedT0iOrder = resolveOptionalConvergenceOrder(
+    refinedT0iResidualMax,
+    superRefinedT0iResidualMax,
+  );
+  const coarseToRefinedOffDiagonalOrder = resolveOptionalConvergenceOrder(
+    coarseOffDiagonalResidualMax,
+    refinedOffDiagonalResidualMax,
+  );
+  const refinedToSuperRefinedOffDiagonalOrder = resolveOptionalConvergenceOrder(
+    refinedOffDiagonalResidualMax,
+    superRefinedOffDiagonalResidualMax,
+  );
+  const resolveMeanOrder = (
+    values: Array<number | null>,
+  ): number | null => {
+    const finiteValues = values.filter(
+      (value): value is number => value != null && Number.isFinite(value),
+    );
+    if (finiteValues.length === 0) return null;
+    return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+  };
+  const observedEinsteinConvergenceOrderT0i = resolveMeanOrder([
+    coarseToRefinedT0iOrder,
+    refinedToSuperRefinedT0iOrder,
+  ]);
+  const observedEinsteinConvergenceOrderOffDiagonal = resolveMeanOrder([
+    coarseToRefinedOffDiagonalOrder,
+    refinedToSuperRefinedOffDiagonalOrder,
+  ]);
+  const richardsonExtrapolatedT0iResidual =
+    resolveRichardsonExtrapolatedResidual({
+      coarseResidual: coarseT0iResidualMax,
+      refinedResidual: refinedT0iResidualMax,
+      superRefinedResidual: superRefinedT0iResidualMax,
+      coarseToRefinedOrder: coarseToRefinedT0iOrder,
+      refinedToSuperRefinedOrder: refinedToSuperRefinedT0iOrder,
+    });
+  const richardsonExtrapolatedOffDiagonalResidual =
+    resolveRichardsonExtrapolatedResidual({
+      coarseResidual: coarseOffDiagonalResidualMax,
+      refinedResidual: refinedOffDiagonalResidualMax,
+      superRefinedResidual: superRefinedOffDiagonalResidualMax,
+      coarseToRefinedOrder: coarseToRefinedOffDiagonalOrder,
+      refinedToSuperRefinedOrder: refinedToSuperRefinedOffDiagonalOrder,
+    });
+  const evaluatorUnitConvention =
+    "si_from_geometry_via_inv8pi_and_geom_to_si_stress";
+  const evaluatorSignConvention = "T_munu_equals_plus_G_munu_over_8pi";
+  const residualAttributionConventionSweep =
+    EINSTEIN_RESIDUAL_ATTRIBUTION_CANDIDATES.map((candidate) => {
+      const sampleCountForCandidate =
+        residualSweepSampleCountByCandidate.get(candidate.candidateId) ?? 0;
+      const maxResidualForCandidate =
+        residualSweepMaxResidualByCandidate.get(candidate.candidateId) ?? -Infinity;
+      const hasCandidateResidual =
+        sampleCountForCandidate > 0 && Number.isFinite(maxResidualForCandidate);
+      return {
+        candidateId: candidate.candidateId,
+        status: hasCandidateResidual ? ("available" as const) : ("missing" as const),
+        maxRelativeResidual: hasCandidateResidual ? maxResidualForCandidate : null,
+        note: candidate.note,
+      };
+    });
+  const bestResidualCandidate =
+    residualAttributionConventionSweep.reduce(
+      (best, candidate) => {
+        if (candidate.maxRelativeResidual == null) return best;
+        if (best == null) return candidate;
+        if (best.maxRelativeResidual == null) return candidate;
+        return candidate.maxRelativeResidual < best.maxRelativeResidual
+          ? candidate
+          : best;
+      },
+      null as
+        | {
+            candidateId: EinsteinResidualAttributionCandidateId;
+            status: "available" | "missing";
+            maxRelativeResidual: number | null;
+            note: string;
+          }
+        | null,
+    );
+  const t0iResidualMax = coarseT0iResidualMax ?? -Infinity;
+  const offDiagonalResidualMax = coarseOffDiagonalResidualMax ?? -Infinity;
+  const bestCandidateHint =
+    EINSTEIN_RESIDUAL_ATTRIBUTION_CANDIDATES.find(
+      (candidate) => candidate.candidateId === bestResidualCandidate?.candidateId,
+    )?.diagnosisHint ?? null;
+  const bestCandidateImprovement =
+    hasEinsteinTensorRoute &&
+    bestResidualCandidate?.maxRelativeResidual != null &&
+    Number.isFinite(einsteinMaxRelativeResidual) &&
+    einsteinMaxRelativeResidual > 0
+      ? 1 - bestResidualCandidate.maxRelativeResidual / einsteinMaxRelativeResidual
+      : null;
+  const residualDiagnosisClass: EinsteinResidualDiagnosisClass = !hasEinsteinTensorRoute
+    ? "unknown"
+    : bestCandidateHint === "convention_mismatch" &&
+        bestCandidateImprovement != null &&
+        bestCandidateImprovement >= 0.5
+      ? "convention_mismatch"
+      : bestCandidateHint === "unit_factor_mismatch" &&
+          bestCandidateImprovement != null &&
+          bestCandidateImprovement >= 0.5
+        ? "unit_factor_mismatch"
+        : Number.isFinite(t0iResidualMax) &&
+            Number.isFinite(offDiagonalResidualMax) &&
+            t0iResidualMax >= 0.5 &&
+            offDiagonalResidualMax <= 0.05
+          ? "projection_mismatch"
+          : finiteDifferenceStatus === "fail"
+            ? "discretization_mismatch"
+            : "mixed";
+  const residualAttributionNote = !hasEinsteinTensorRoute
+    ? "No geometry-first Einstein route sample was available for residual attribution diagnostics."
+    : `Residual attribution over ${einsteinComparedSampleCount} samples selected ${bestResidualCandidate?.candidateId ?? "none"} with max residual ${bestResidualCandidate?.maxRelativeResidual?.toExponential(6) ?? "unknown"}; diagnosis=${residualDiagnosisClass}.`;
+  const evaluatorClosureNote = !hasEinsteinTensorRoute
+    ? "No geometry-first Einstein tensor route is available, so evaluator closure diagnostics remain unavailable."
+    : `Evaluator closure diagnostics use h=${step.toExponential(3)}, h/2, h/4 Einstein residual sweeps with observed orders t0i=${observedEinsteinConvergenceOrderT0i?.toFixed(3) ?? "unknown"}, offdiag=${observedEinsteinConvergenceOrderOffDiagonal?.toFixed(3) ?? "unknown"} and Richardson residual estimates t0i=${richardsonExtrapolatedT0iResidual?.toExponential(6) ?? "unknown"}, offdiag=${richardsonExtrapolatedOffDiagonalResidual?.toExponential(6) ?? "unknown"}.`;
   return {
     stress,
     diagnostics: {
@@ -820,6 +2588,244 @@ const calculateMetricStressEnergyFromShiftField = (
       kSquaredMean,
       step_m: step,
       scale_m: scale,
+      modelTermUncertainty: {
+        finiteDifferenceConvergence: {
+          coarseStep_m: step,
+          refinedStep_m: step * MODEL_TERM_REFINED_STEP_RATIO,
+          superRefinedStep_m: step * MODEL_TERM_SUPER_REFINED_STEP_RATIO,
+          comparedSampleCount: finiteDifferenceComparedSampleCount,
+          routeLocalComparedSampleCount: finiteDifferenceRouteLocalComparedSampleCount,
+          routeSuppressedSampleCount: finiteDifferenceRouteSuppressedSampleCount,
+          numericalFloorSuppressedSampleCount:
+            finiteDifferenceNumericalFloorSuppressedSampleCount,
+          tripletComparedSampleCount: finiteDifferenceTripletSampleCount,
+          t0iRelativeDriftMax:
+            finiteDifferenceComparedSampleCount > 0 && Number.isFinite(t0iDriftMax)
+              ? t0iDriftMax
+              : null,
+          t0iRelativeDriftMean:
+            finiteDifferenceComparedSampleCount > 0
+              ? t0iDriftSum / finiteDifferenceComparedSampleCount
+              : null,
+          t0iRelativeDriftRefinedMax:
+            finiteDifferenceTripletSampleCount > 0 &&
+            Number.isFinite(t0iRefinedDriftMax)
+              ? t0iRefinedDriftMax
+              : null,
+          t0iRelativeDriftRefinedMean:
+            finiteDifferenceTripletSampleCount > 0
+              ? t0iRefinedDriftSum / finiteDifferenceTripletSampleCount
+              : null,
+          t0iConvergenceOrderMean:
+            t0iConvergenceOrderCount > 0
+              ? t0iConvergenceOrderSum / t0iConvergenceOrderCount
+              : null,
+          t0iConvergenceOrderMin:
+            t0iConvergenceOrderCount > 0 && Number.isFinite(t0iConvergenceOrderMin)
+              ? t0iConvergenceOrderMin
+              : null,
+          t0iConvergenceOrderMax:
+            t0iConvergenceOrderCount > 0 && Number.isFinite(t0iConvergenceOrderMax)
+              ? t0iConvergenceOrderMax
+              : null,
+          offDiagonalRelativeDriftMax:
+            finiteDifferenceComparedSampleCount > 0 &&
+            Number.isFinite(offDiagonalDriftMax)
+              ? offDiagonalDriftMax
+              : null,
+          offDiagonalRelativeDriftMean:
+            finiteDifferenceComparedSampleCount > 0
+              ? offDiagonalDriftSum / finiteDifferenceComparedSampleCount
+              : null,
+          offDiagonalRelativeDriftRefinedMax:
+            finiteDifferenceTripletSampleCount > 0 &&
+            Number.isFinite(offDiagonalRefinedDriftMax)
+              ? offDiagonalRefinedDriftMax
+              : null,
+          offDiagonalRelativeDriftRefinedMean:
+            finiteDifferenceTripletSampleCount > 0
+              ? offDiagonalRefinedDriftSum / finiteDifferenceTripletSampleCount
+              : null,
+          offDiagonalConvergenceOrderMean:
+            offDiagonalConvergenceOrderCount > 0
+              ? offDiagonalConvergenceOrderSum / offDiagonalConvergenceOrderCount
+              : null,
+          offDiagonalConvergenceOrderMin:
+            offDiagonalConvergenceOrderCount > 0 &&
+            Number.isFinite(offDiagonalConvergenceOrderMin)
+              ? offDiagonalConvergenceOrderMin
+              : null,
+          offDiagonalConvergenceOrderMax:
+            offDiagonalConvergenceOrderCount > 0 &&
+            Number.isFinite(offDiagonalConvergenceOrderMax)
+              ? offDiagonalConvergenceOrderMax
+              : null,
+          significanceFloorRelativeToT00:
+            MODEL_TERM_CONVERGENCE_SIGNIFICANCE_RELATIVE_TO_T00,
+          relativeDriftThreshold: MODEL_TERM_RELATIVE_DRIFT_THRESHOLD,
+          status: finiteDifferenceStatus,
+          failureMode: finiteDifferenceFailureMode,
+          note:
+            finiteDifferenceComparedSampleCount > 0
+              ? finiteDifferenceTripletSampleCount > 0
+                ? "Compared emitted same-chart T0i and off-diagonal Tij at h, h/2, and h/4 finite-difference stencils with Richardson-style step-consistency diagnostics."
+                : "Compared emitted same-chart T0i and off-diagonal Tij between coarse h and refined h/2 finite-difference stencils."
+              : finiteDifferenceFailureMode === "route_local_pair_unavailable"
+                ? "No route-local coarse/refined pair was available for finite-difference convergence diagnostics."
+                : finiteDifferenceFailureMode ===
+                    "numerical_floor_insufficient_signal"
+                  ? "Finite-difference comparisons were suppressed because flux/shear magnitude stayed below the numerical significance floor relative to T00."
+                  : "No coarse/refined finite-difference pair available for emitted same-chart T0i/off-diagonal Tij convergence diagnostics.",
+        },
+        einsteinTensorRoute: {
+          status: einsteinTensorRouteStatus,
+          routeId: hasEinsteinTensorRoute ? EINSTEIN_MODEL_TERM_ROUTE_ID : null,
+          tensorSource: hasEinsteinTensorRoute
+            ? "geometry_first_einstein_tensor"
+            : "not_emitted",
+          comparedSampleCount: hasEinsteinTensorRoute
+            ? einsteinComparedSampleCount
+            : 0,
+          maxRelativeResidual: hasEinsteinTensorRoute
+            ? einsteinMaxRelativeResidual
+            : null,
+          t00ComparedSampleCount: hasEinsteinT00Comparability
+            ? einsteinT00ComparedSampleCount
+            : 0,
+          t00MaxRelativeResidual: hasEinsteinT00Comparability
+            ? einsteinT00RelativeResidualMax
+            : null,
+          t00RelativeResidualThreshold:
+            MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD,
+          note: hasEinsteinTensorRoute
+            ? `Geometry-first Einstein-tensor FD4 cross-check is available over ${einsteinComparedSampleCount} sample points (max relative residual ${einsteinMaxRelativeResidual.toExponential(6)} against emitted T0i/off-diagonal Tij; T00 max residual ${hasEinsteinT00Comparability && einsteinT00RelativeResidualMax != null ? einsteinT00RelativeResidualMax.toExponential(6) : "unknown"}).`
+            : "No geometry-first Einstein tensor route is emitted on this model-term producer path.",
+        },
+        einsteinResidualAttribution: {
+          status: hasEinsteinTensorRoute ? "available" : "missing",
+          sampleCount: hasEinsteinTensorRoute ? einsteinComparedSampleCount : 0,
+          maxRelativeResidual: hasEinsteinTensorRoute
+            ? einsteinMaxRelativeResidual
+            : null,
+          componentResiduals: einsteinResidualComponentSummary,
+          conventionSweep: residualAttributionConventionSweep,
+          bestCandidateId: bestResidualCandidate?.candidateId ?? null,
+          bestCandidateResidual: bestResidualCandidate?.maxRelativeResidual ?? null,
+          diagnosisClass: residualDiagnosisClass,
+          note: residualAttributionNote,
+        },
+        einsteinEvaluatorClosure: {
+          status: hasEinsteinTensorRoute ? "available" : "missing",
+          chartRef: hasEinsteinTensorRoute ? "comoving_cartesian" : null,
+          routeId: hasEinsteinTensorRoute ? EINSTEIN_MODEL_TERM_ROUTE_ID : null,
+          unitConvention: hasEinsteinTensorRoute ? evaluatorUnitConvention : null,
+          signConvention: hasEinsteinTensorRoute ? evaluatorSignConvention : null,
+          resolutionSweep: {
+            coarse: {
+              step_m: step,
+              comparedSampleCount: hasEinsteinTensorRoute
+                ? einsteinComparedSampleCount
+                : 0,
+              t0iMaxRelativeResidual: hasEinsteinTensorRoute
+                ? coarseT0iResidualMax
+                : null,
+              offDiagonalMaxRelativeResidual: hasEinsteinTensorRoute
+                ? coarseOffDiagonalResidualMax
+                : null,
+            },
+            refined: {
+              step_m: step * MODEL_TERM_REFINED_STEP_RATIO,
+              comparedSampleCount: hasEinsteinTensorRoute
+                ? einsteinRefinedComparedSampleCount
+                : 0,
+              t0iMaxRelativeResidual: hasEinsteinTensorRoute
+                ? refinedT0iResidualMax
+                : null,
+              offDiagonalMaxRelativeResidual: hasEinsteinTensorRoute
+                ? refinedOffDiagonalResidualMax
+                : null,
+            },
+            superRefined: {
+              step_m: step * MODEL_TERM_SUPER_REFINED_STEP_RATIO,
+              comparedSampleCount: hasEinsteinTensorRoute
+                ? einsteinSuperRefinedComparedSampleCount
+                : 0,
+              t0iMaxRelativeResidual: hasEinsteinTensorRoute
+                ? superRefinedT0iResidualMax
+                : null,
+              offDiagonalMaxRelativeResidual: hasEinsteinTensorRoute
+                ? superRefinedOffDiagonalResidualMax
+                : null,
+            },
+          },
+          observedConvergenceOrder: {
+            t0i: hasEinsteinTensorRoute ? observedEinsteinConvergenceOrderT0i : null,
+            offDiagonal: hasEinsteinTensorRoute
+              ? observedEinsteinConvergenceOrderOffDiagonal
+              : null,
+          },
+          richardsonExtrapolatedResidual: {
+            t0i: hasEinsteinTensorRoute ? richardsonExtrapolatedT0iResidual : null,
+            offDiagonal: hasEinsteinTensorRoute
+              ? richardsonExtrapolatedOffDiagonalResidual
+              : null,
+          },
+          conventionSweep: residualAttributionConventionSweep,
+          bestCandidateId: bestResidualCandidate?.candidateId ?? null,
+          diagnosisClass: residualDiagnosisClass,
+          note: evaluatorClosureNote,
+          citationRefs: [
+            "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+            "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+            "https://arxiv.org/abs/gr-qc/0703035",
+            "https://arxiv.org/abs/gr-qc/0110086",
+            "https://arxiv.org/abs/gr-qc/0507004",
+            "https://arxiv.org/abs/1306.6052",
+            "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+            "https://arxiv.org/abs/2404.03095",
+            "https://arxiv.org/abs/2404.10855",
+            "https://arxiv.org/abs/2602.18023",
+          ],
+        },
+        independentCrossCheck: {
+          status: independentCrossCheckStatus,
+          reference:
+            independentCrossCheckStatus === "available"
+              ? independentCrossCheckReferenceRoute
+              : independentCrossCheckSameRoute
+                ? dominantModelTermRoute != null
+                  ? `same_route:${dominantModelTermRoute}`
+                  : null
+                : null,
+          comparedSampleCount: hasIndependentCrossCheckResidual
+            ? independentCrossCheckComparedSampleCount
+            : 0,
+          referenceRouteSuppressedSampleCount:
+            independentCrossCheckReferenceRouteSuppressedSampleCount,
+          maxRelativeResidual: independentCrossCheckRelativeResidualMax,
+          relativeResidualThreshold:
+            MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD,
+          t00ComparedSampleCount: hasIndependentCrossCheckT00Residual
+            ? independentCrossCheckT00ComparedSampleCount
+            : 0,
+          t00MaxRelativeResidual: independentCrossCheckT00RelativeResidualMax,
+          t00ReferenceComparable: independentCrossCheckT00ReferenceComparable,
+          routeIndependent: independentCrossCheckRouteIndependent,
+          failureMode: independentCrossCheckFailureMode,
+          componentResiduals: independentCrossCheckComponentSummary,
+          note:
+            independentCrossCheckStatus === "available"
+              ? independentCrossCheckResidualPass
+                ? `Independent cross-check compares emitted ${dominantModelTermRoute ?? "unknown"} flux/shear against ${independentCrossCheckReferenceRoute ?? "unknown"} (max relative residual ${independentCrossCheckMaxRelativeResidual.toExponential(6)} <= threshold ${MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD.toExponential(3)}; T00 max residual ${independentCrossCheckT00RelativeResidualMax != null ? independentCrossCheckT00RelativeResidualMax.toExponential(6) : "unknown"}).`
+                : `Independent cross-check compares emitted ${dominantModelTermRoute ?? "unknown"} flux/shear against ${independentCrossCheckReferenceRoute ?? "unknown"}, but residual ${independentCrossCheckMaxRelativeResidual.toExponential(6)} exceeds threshold ${MODEL_TERM_INDEPENDENT_CROSS_CHECK_RELATIVE_RESIDUAL_THRESHOLD.toExponential(3)}.`
+              : independentCrossCheckFailureMode === "same_route_not_independent"
+                ? "Independent Einstein-tensor cross-check is not admitted because diagnostics currently reuse the same Einstein route used for emitted flux/shear components."
+                : independentCrossCheckFailureMode ===
+                    "reference_route_unavailable"
+                  ? "Independent reference route could not be evaluated at one or more samples, so cross-check evidence remains unavailable."
+              : "Independent route cross-check is missing; finite-difference triplet checks are same-route consistency only.",
+        },
+      },
     },
   };
 };
@@ -946,6 +2952,150 @@ export interface NatarioWarpResult {
     kSquaredMean?: number;
     step_m: number;
     scale_m: number;
+    modelTermUncertainty?: {
+      finiteDifferenceConvergence?: {
+        coarseStep_m: number;
+        refinedStep_m: number;
+        superRefinedStep_m?: number;
+        comparedSampleCount: number;
+        routeLocalComparedSampleCount?: number;
+        routeSuppressedSampleCount?: number;
+        numericalFloorSuppressedSampleCount?: number;
+        tripletComparedSampleCount?: number;
+        t0iRelativeDriftMax: number | null;
+        t0iRelativeDriftMean: number | null;
+        t0iRelativeDriftRefinedMax?: number | null;
+        t0iRelativeDriftRefinedMean?: number | null;
+        t0iConvergenceOrderMean?: number | null;
+        t0iConvergenceOrderMin?: number | null;
+        t0iConvergenceOrderMax?: number | null;
+        offDiagonalRelativeDriftMax: number | null;
+        offDiagonalRelativeDriftMean: number | null;
+        offDiagonalRelativeDriftRefinedMax?: number | null;
+        offDiagonalRelativeDriftRefinedMean?: number | null;
+        offDiagonalConvergenceOrderMean?: number | null;
+        offDiagonalConvergenceOrderMin?: number | null;
+        offDiagonalConvergenceOrderMax?: number | null;
+        significanceFloorRelativeToT00?: number | null;
+        relativeDriftThreshold: number;
+        status: "pass" | "fail" | "unknown";
+        failureMode?: string | null;
+        note?: string;
+      };
+      einsteinTensorRoute?: {
+        status: "available" | "missing";
+        routeId?: string | null;
+        tensorSource?: string | null;
+        comparedSampleCount?: number | null;
+        maxRelativeResidual?: number | null;
+        t00ComparedSampleCount?: number | null;
+        t00MaxRelativeResidual?: number | null;
+        t00RelativeResidualThreshold?: number | null;
+        note?: string;
+      };
+      einsteinResidualAttribution?: {
+        status: "available" | "missing";
+        sampleCount?: number | null;
+        maxRelativeResidual?: number | null;
+        componentResiduals?: {
+          T01?: number | null;
+          T02?: number | null;
+          T03?: number | null;
+          T12?: number | null;
+          T13?: number | null;
+          T23?: number | null;
+        };
+        conventionSweep?: Array<{
+          candidateId: string;
+          status: "available" | "missing";
+          maxRelativeResidual?: number | null;
+          note?: string | null;
+        }>;
+        bestCandidateId?: string | null;
+        bestCandidateResidual?: number | null;
+        diagnosisClass?:
+          | "convention_mismatch"
+          | "projection_mismatch"
+          | "unit_factor_mismatch"
+          | "discretization_mismatch"
+          | "mixed"
+          | "unknown";
+        note?: string | null;
+      };
+      einsteinEvaluatorClosure?: {
+        status: "available" | "missing";
+        chartRef?: string | null;
+        routeId?: string | null;
+        unitConvention?: string | null;
+        signConvention?: string | null;
+        resolutionSweep?: {
+          coarse?: {
+            step_m?: number | null;
+            comparedSampleCount?: number | null;
+            t0iMaxRelativeResidual?: number | null;
+            offDiagonalMaxRelativeResidual?: number | null;
+          };
+          refined?: {
+            step_m?: number | null;
+            comparedSampleCount?: number | null;
+            t0iMaxRelativeResidual?: number | null;
+            offDiagonalMaxRelativeResidual?: number | null;
+          };
+          superRefined?: {
+            step_m?: number | null;
+            comparedSampleCount?: number | null;
+            t0iMaxRelativeResidual?: number | null;
+            offDiagonalMaxRelativeResidual?: number | null;
+          };
+        };
+        observedConvergenceOrder?: {
+          t0i?: number | null;
+          offDiagonal?: number | null;
+        };
+        richardsonExtrapolatedResidual?: {
+          t0i?: number | null;
+          offDiagonal?: number | null;
+        };
+        conventionSweep?: Array<{
+          candidateId: string;
+          status: "available" | "missing";
+          maxRelativeResidual?: number | null;
+          note?: string | null;
+        }>;
+        bestCandidateId?: string | null;
+        diagnosisClass?:
+          | "convention_mismatch"
+          | "projection_mismatch"
+          | "unit_factor_mismatch"
+          | "discretization_mismatch"
+          | "mixed"
+          | "unknown";
+        note?: string | null;
+        citationRefs?: string[];
+      };
+      independentCrossCheck?: {
+        status: "available" | "missing";
+        reference?: string | null;
+        comparedSampleCount?: number | null;
+        referenceRouteSuppressedSampleCount?: number | null;
+        maxRelativeResidual?: number | null;
+        relativeResidualThreshold?: number | null;
+        t00ComparedSampleCount?: number | null;
+        t00MaxRelativeResidual?: number | null;
+        t00ReferenceComparable?: boolean | null;
+        routeIndependent?: boolean | null;
+        failureMode?: string | null;
+        componentResiduals?: {
+          T01?: number | null;
+          T02?: number | null;
+          T03?: number | null;
+          T12?: number | null;
+          T13?: number | null;
+          T23?: number | null;
+        };
+        note?: string;
+      };
+    };
   };
 
   // Validation flags

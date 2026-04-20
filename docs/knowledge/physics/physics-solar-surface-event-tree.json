@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "rootId": "physics-solar-surface-event-tree",
+  "nodes": [
+    {
+      "id": "physics-solar-surface-event-tree",
+      "slug": "physics-solar-surface-event-tree",
+      "title": "Physics Solar Surface Event Tree",
+      "excerpt": "Cross-modal event-bundle lane for radiative, impact, magnetic, energetic, and helioseismic observables in sunquake contexts.",
+      "bodyMD": "This lane models solar surface-linked impact chains by storing line transients together with Doppler impacts, magnetogram transients, continuum changes, and helioseismic diagnostics as co-registered event siblings.",
+      "tags": [
+        "physics",
+        "solar",
+        "sunquake",
+        "surface-event",
+        "diagnostic"
+      ],
+      "children": [
+        "physics-solar-surface-event-sunquake-impact-definition",
+        "physics-solar-surface-event-photospheric-line-transient-definition",
+        "physics-solar-surface-event-helioseismic-contract-definition",
+        "physics-solar-surface-event-origin-hypothesis-definition",
+        "physics-solar-surface-event-acoustic-holography-definition"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-solar-wave-lineage-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Sunquake-aware event bundles for surface-origin inference.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-surface-origin-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-surface-event-sunquake-impact-definition",
+      "slug": "physics-solar-surface-event-sunquake-impact-definition",
+      "title": "Solar Sunquake Impact Definition",
+      "excerpt": "Method-aware impact-source definition separating initial and reconstructed sources.",
+      "bodyMD": "Defines source records and requires method-linked location kind semantics for Doppler/time-distance vs holography reconstructions.",
+      "tags": [
+        "physics",
+        "solar",
+        "sunquake",
+        "definition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-surface-event-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Source-location semantics for sunquake impacts.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-surface-event-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-sunquake-impact-definition.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-surface-event-photospheric-line-transient-definition",
+      "slug": "physics-solar-surface-event-photospheric-line-transient-definition",
+      "title": "Solar Photospheric Line Transient Definition",
+      "excerpt": "Definition for line-transient objects linked to event bundles.",
+      "bodyMD": "Line transient records keep radiative fit descriptors while geometry anisotropy and ribbon-motion context stay in geometry/impact objects.",
+      "tags": [
+        "physics",
+        "solar",
+        "line",
+        "definition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-surface-event-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Photospheric line transient schema branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-surface-event-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-photospheric-line-transient-definition.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-surface-event-helioseismic-contract-definition",
+      "slug": "physics-solar-surface-event-helioseismic-contract-definition",
+      "title": "Solar Helioseismic Observable Contract Definition",
+      "excerpt": "Definition for time-distance and egression-map observables as event siblings.",
+      "bodyMD": "Helioseismic observables are represented as first-class event records with method and source references.",
+      "tags": [
+        "physics",
+        "solar",
+        "helioseismic",
+        "definition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-surface-event-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Helioseismic observable contract branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-surface-event-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-helioseismic-observable-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-surface-event-origin-hypothesis-definition",
+      "slug": "physics-solar-surface-event-origin-hypothesis-definition",
+      "title": "Solar Surface Origin Hypothesis Definition",
+      "excerpt": "Definition for evidence-linked driver hypotheses across radiative and impact/seismic observables.",
+      "bodyMD": "Hypotheses require mixed-modality support and allow timing-based status downgrades without deleting the hypothesis record.",
+      "tags": [
+        "physics",
+        "solar",
+        "origin",
+        "hypothesis",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-surface-event-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Surface-origin inference guardrail branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-surface-event-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-surface-origin-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-surface-event-acoustic-holography-definition",
+      "slug": "physics-solar-surface-event-acoustic-holography-definition",
+      "title": "Solar Acoustic Holography Definition",
+      "excerpt": "Definition for model-based reconstructed sunquake source observables.",
+      "bodyMD": "Acoustic holography sources are stored as reconstructed-source entities with explicit method provenance.",
+      "tags": [
+        "physics",
+        "solar",
+        "holography",
+        "definition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-surface-event-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Holography reconstruction semantics branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-surface-event-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-acoustic-holography-definition.md"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

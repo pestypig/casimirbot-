@@ -8,7 +8,7 @@
 | contractVersion | nhm2_full_loop_audit/v1 |
 | auditId | nhm2_full_loop |
 | laneId | nhm2_shift_lapse |
-| generatedAt | 2026-04-16T19:29:14.002Z |
+| generatedAt | 2026-04-16T20:16:37.618Z |
 | selectedProfileId | stage1_centerline_alpha_0p995_v1 |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit |
 | currentClaimTier | diagnostic |
@@ -50,7 +50,7 @@
 | observerMetricCompletenessStatus | complete |
 | observerMetricCompletenessNote | Metric-required observer audit has no declared missing observer inputs. |
 | observerMetricCoverageBlockerStatus | semantics_ambiguous |
-| observerMetricCoverageBlockerNote | Metric-required full tensor families are emitted on the producer path, but the active model-term route is still experimental/not admitted, so observer admission remains blocked at semantic-contract closure. |
+| observerMetricCoverageBlockerNote | Metric-required full tensor families are emitted on the producer path, but model-term semantic admission evidence still rejects route closure (decision=do_not_admit; reasons=support_field_route_not_admitted, full_einstein_tensor_route_not_admitted), so observer admission remains blocked at semantic-contract closure. |
 | observerMetricFirstMissingStage | semantic_contract |
 | observerMetricEmissionAdmissionStatus | not_admitted |
 | observerMetricEmissionAdmissionNote | Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation. |

@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "schema": "helix-ask-research-registry.v1",
+  "entries": [
+    {
+      "id": "codex.clone.protocol.v2",
+      "title": "Codex Clone Protocol V2 Contract",
+      "url": "external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs",
+      "domain": "codex_clone",
+      "tier": "codex_reference",
+      "claim_types": [
+        "reasoning_procedure",
+        "orchestration_contract",
+        "message_contract"
+      ],
+      "aliases": [
+        "external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs",
+        "external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs",
+        "external/openai-codex/codex-rs/app-server/src/codex_message_processor.rs"
+      ]
+    },
+    {
+      "id": "warp.alcubierre.1994.gr_qc_0009013",
+      "title": "The warp drive: hyper-fast travel within general relativity",
+      "url": "https://arxiv.org/abs/gr-qc/0009013",
+      "domain": "warp_foundation",
+      "tier": "foundational",
+      "claim_types": [
+        "warp_proposal_reference",
+        "warp_metric_foundation"
+      ],
+      "doi": "10.48550/arXiv.gr-qc/0009013",
+      "arxiv_id": "gr-qc/0009013",
+      "aliases": [
+        "https://arxiv.org/pdf/gr-qc/0009013.pdf",
+        "arXiv:gr-qc/0009013"
+      ]
+    },
+    {
+      "id": "warp.pfenning_ford.1997.gr_qc_9702026",
+      "title": "The unphysical nature of \"Warp Drive\"",
+      "url": "https://arxiv.org/abs/gr-qc/9702026",
+      "domain": "warp_constraints",
+      "tier": "verification",
+      "claim_types": [
+        "warp_constraint_reference",
+        "energy_condition_constraint"
+      ],
+      "doi": "10.48550/arXiv.gr-qc/9702026",
+      "arxiv_id": "gr-qc/9702026",
+      "aliases": [
+        "https://arxiv.org/pdf/gr-qc/9702026.pdf",
+        "arXiv:gr-qc/9702026"
+      ]
+    },
+    {
+      "id": "warp.santiago.2021.2105_03079",
+      "title": "Generic warp drives violate the null energy condition",
+      "url": "https://arxiv.org/abs/2105.03079",
+      "domain": "warp_constraints",
+      "tier": "verification",
+      "claim_types": [
+        "warp_constraint_reference",
+        "energy_condition_constraint"
+      ],
+      "doi": "10.48550/arXiv.2105.03079",
+      "arxiv_id": "2105.03079",
+      "aliases": [
+        "https://arxiv.org/pdf/2105.03079.pdf",
+        "arXiv:2105.03079"
+      ]
+    },
+    {
+      "id": "warp.bobrick_martire.2021.2102_06824",
+      "title": "Introducing Physical Warp Drives",
+      "url": "https://arxiv.org/abs/2102.06824",
+      "domain": "warp_proposals",
+      "tier": "foundational",
+      "claim_types": [
+        "warp_proposal_reference",
+        "warp_metric_foundation"
+      ],
+      "doi": "10.48550/arXiv.2102.06824",
+      "arxiv_id": "2102.06824",
+      "aliases": [
+        "https://arxiv.org/pdf/2102.06824.pdf",
+        "arXiv:2102.06824"
+      ]
+    },
+    {
+      "id": "warp.lentz.2020.2006_07125",
+      "title": "Breaking the Warp Barrier: Hyper-Fast Solitons in Einstein-Maxwell-Plasma Theory",
+      "url": "https://arxiv.org/abs/2006.07125",
+      "domain": "warp_proposals",
+      "tier": "foundational",
+      "claim_types": [
+        "warp_proposal_reference",
+        "warp_metric_foundation"
+      ],
+      "doi": "10.48550/arXiv.2006.07125",
+      "arxiv_id": "2006.07125",
+      "aliases": [
+        "https://arxiv.org/pdf/2006.07125.pdf",
+        "arXiv:2006.07125"
+      ]
+    },
+    {
+      "id": "rag.2020.2005_11401",
+      "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      "url": "https://arxiv.org/abs/2005.11401",
+      "domain": "llm_retrieval",
+      "tier": "foundational",
+      "claim_types": [
+        "retrieval_grounding",
+        "factual_backing",
+        "citation_contract"
+      ],
+      "doi": "10.48550/arXiv.2005.11401",
+      "arxiv_id": "2005.11401",
+      "aliases": [
+        "https://arxiv.org/pdf/2005.11401.pdf",
+        "arXiv:2005.11401"
+      ]
+    },
+    {
+      "id": "truthfulqa.2021.2109_07958",
+      "title": "TruthfulQA: Measuring How Models Mimic Human Falsehoods",
+      "url": "https://arxiv.org/abs/2109.07958",
+      "domain": "llm_truthfulness",
+      "tier": "foundational",
+      "claim_types": [
+        "truthfulness_benchmark",
+        "uncertainty_reporting"
+      ],
+      "doi": "10.48550/arXiv.2109.07958",
+      "arxiv_id": "2109.07958",
+      "aliases": [
+        "https://arxiv.org/pdf/2109.07958.pdf",
+        "arXiv:2109.07958"
+      ]
+    },
+    {
+      "id": "semantic_uncertainty.2023.2302_09664",
+      "title": "Semantic Uncertainty: Linguistic Invariances for Uncertainty Estimation in Natural Language Generation",
+      "url": "https://arxiv.org/abs/2302.09664",
+      "domain": "llm_uncertainty",
+      "tier": "verification",
+      "claim_types": [
+        "uncertainty_estimation",
+        "uncertainty_calibration",
+        "semantic_entropy"
+      ],
+      "doi": "10.48550/arXiv.2302.09664",
+      "arxiv_id": "2302.09664",
+      "aliases": [
+        "https://arxiv.org/pdf/2302.09664.pdf",
+        "arXiv:2302.09664"
+      ]
+    },
+    {
+      "id": "selfcheckgpt.2023.2303_08896",
+      "title": "SelfCheckGPT: Zero-Resource Black-Box Hallucination Detection for Generative LLMs",
+      "url": "https://arxiv.org/abs/2303.08896",
+      "domain": "llm_hallucination",
+      "tier": "verification",
+      "claim_types": [
+        "self_consistency_check",
+        "uncertainty_calibration",
+        "hallucination_detection"
+      ],
+      "doi": "10.48550/arXiv.2303.08896",
+      "arxiv_id": "2303.08896",
+      "aliases": [
+        "https://arxiv.org/pdf/2303.08896.pdf",
+        "arXiv:2303.08896"
+      ]
+    },
+    {
+      "id": "cove.2023.2309_11495",
+      "title": "Chain-of-Verification Reduces Hallucination in Large Language Models",
+      "url": "https://arxiv.org/abs/2309.11495",
+      "domain": "llm_verification",
+      "tier": "verification",
+      "claim_types": [
+        "verification_loop",
+        "reasoning_self_check",
+        "uncertainty_calibration"
+      ],
+      "doi": "10.48550/arXiv.2309.11495",
+      "arxiv_id": "2309.11495",
+      "aliases": [
+        "https://arxiv.org/pdf/2309.11495.pdf",
+        "arXiv:2309.11495"
+      ]
+    }
+  ]
+}

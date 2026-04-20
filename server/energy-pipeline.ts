@@ -29,7 +29,7 @@ const resolveMassMode = (value: unknown): MassMode => {
   return DEFAULT_MASS_MODE;
 };
 
-// G├╢├çG├╢├ç Physics Constants (centralized) G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
+// G+¦+çG+¦+ç Physics Constants (centralized) G+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+ç
 import { HBAR } from "./physics-const.ts";
 import { C } from "./utils/physics-const-safe.ts";
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.ts";
@@ -85,9 +85,21 @@ import {
 import {
   buildNhm2ObserverAuditArtifact,
   type BuildNhm2ObserverAuditTensorInput,
+  type Nhm2ObserverDecPhysicsControlEvidence,
+  type Nhm2ObserverDecResidualAttributionEvidence,
+  type Nhm2ObserverDecRemediationEvidence,
   type Nhm2ObserverAuditArtifact,
+  type Nhm2ObserverModelTermClosurePath,
   type Nhm2ObserverMetricComponentAdmissionStatus,
+  type Nhm2ObserverModelTermSemanticAdmissionEvidence,
+  type Nhm2ObserverNextTechnicalAction,
   type Nhm2ObserverMetricProducerAdmissionEvidence,
+  type Nhm2ObserverTileAuthorityEvidence,
+  type Nhm2ObserverTileComparableCrossCheckEvidence,
+  type Nhm2ObserverTileObserverConditionComparabilityEvidence,
+  type Nhm2ObserverTileObserverConditionAuthorityMode,
+  type Nhm2ObserverTileSurfaceReconstitutionEvidence,
+  type Nhm2ObserverT00PolicyAdmissionBridgeEvidence,
 } from "../shared/contracts/nhm2-observer-audit.v1.ts";
 import {
   NHM2_SOURCE_CLOSURE_COMPONENTS,
@@ -124,7 +136,10 @@ import {
   type WarpMetricFamilyAuthorityStatus,
   type WarpMetricTransportCertificationStatus,
 } from "../modules/warp/warp-metric-adapter.ts";
-import { calculateMetricStressEnergyTensorRegionMeansFromShiftField } from "../modules/warp/natario-warp.ts";
+import {
+  calculateMetricStressEnergyTensorAtPointFromShiftField,
+  calculateMetricStressEnergyTensorRegionMeansFromShiftField,
+} from "../modules/warp/natario-warp.ts";
 import type { CongruenceMeta } from "../types/pipeline";
 import type { SectorControlLiveEvent } from "../shared/schema.ts";
 
@@ -142,7 +157,7 @@ const REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS = [
 
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
-const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles G├Ñ├å skip dynamic per-tile-ish helpers (use aggregate)
+const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles G+Ñ+å skip dynamic per-tile-ish helpers (use aggregate)
 const INV16PI = 1 / (16 * Math.PI);
 
 // Production-quiet logging toggle
@@ -465,7 +480,7 @@ export const DEFAULT_PULSED_CURRENT_LIMITS_A = {
   launcher: parseEnvNumber(process.env.IPEAK_MAX_LAUNCHER_A, 14_142), // 10 kJ @ 100 uH @ 20 us -> ~14.1 kA
 } as const;
 
-export const TAU_LC_UNIT_DRIFT_LIMIT = 50; // reject >50x unit drift (ms vs ┬╡s)
+export const TAU_LC_UNIT_DRIFT_LIMIT = 50; // reject >50x unit drift (ms vs -¦s)
 
 export function computeTauLcMsFromHull(hull?: {
   Lx_m?: number;
@@ -1013,7 +1028,7 @@ function rhoEllipsoid(p: [number, number, number], ax: HullAxes) {
 }
 
 function nEllipsoid(p: [number, number, number], ax: HullAxes): [number, number, number] {
-  // G├¬├º(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
+  // G+¬+º(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
   const nx = p[0] / (ax.a * ax.a);
   const ny = p[1] / (ax.b * ax.b);
   const nz = p[2] / (ax.c * ax.c);
@@ -1049,7 +1064,7 @@ export interface FieldSample {
   n: [number, number, number];   // outward normal
   sgn: number;                   // sector sign (+/-)
   disp: number;                  // scalar displacement magnitude used
-  dA?: number;                   // proper area element at sample (m^2) G├ç├╢ from metric
+  dA?: number;                   // proper area element at sample (m^2) G+ç+¦ from metric
 }
 
 export interface FieldSampleBuffer {
@@ -1108,10 +1123,10 @@ export interface FieldRequest {
   nPhi?: number;     // default 32
   shellOffset?: number; // meters; 0 = on shell, >0 outside, <0 inside (default 0)
   // physics
-  wallWidth_m?: number; // bell width w-├╝ in meters (default from sag_nm)
+  wallWidth_m?: number; // bell width w-++ in meters (default from sag_nm)
   sectors?: number;     // sector count (default state.sectorCount)
-  split?: number;       // (+)/(G├¬├å) split index (default floor(sectors/2))
-  clamp?: Partial<SampleClamp>; // G┬╝├án+├à new, optional
+  split?: number;       // (+)/(G+¬+å) split index (default floor(sectors/2))
+  clamp?: Partial<SampleClamp>; // G-++án++à new, optional
 }
 
 export type GeometryKind = "ellipsoid" | "radial" | "sdf";
@@ -1619,8 +1634,8 @@ export interface EnergyPipelineState {
   P_applied_W?: number;     // Applied ship-average power after caps/guards (W)
   // Speed/beta closure (derived)
   beta_trans_power?: number; // Power throttle fraction (0..1)
-  beta_policy?: number;      // ╬▓ from policy throttle
-  shipBeta?: number;         // Effective ╬▓ (v/c proxy)
+  beta_policy?: number;      // +¦ from policy throttle
+  shipBeta?: number;         // Effective +¦ (v/c proxy)
   vShip_mps?: number;        // Outside-frame coordinate speed
   speedClosure?: 'policyA' | 'proxyB';
   M_exotic: number;         // Exotic mass generated
@@ -2021,20 +2036,20 @@ export function buildCardRecipeFromPipeline(state: EnergyPipelineState): CardRec
 }
 
 // Physical constants
-const HBAR_C = HBAR * C;             // G├ñ├àc G├½├¬ 3.16152677e-26 [J-+m] for Casimir calculations
+const HBAR_C = HBAR * C;             // G+ñ+àc G+½+¬ 3.16152677e-26 [J-+m] for Casimir calculations
 const NM_TO_M = 1e-9;
 const CM2_TO_M2 = 1e-4;
 
-// G├╢├çG├╢├ç Paper-backed constants (consolidated physics)
+// G+¦+çG+¦+ç Paper-backed constants (consolidated physics)
 /**
  * TheoryRefs:
  *  - ford-roman-qi-1995: derives dutyEffectiveFR ceiling (tau/K)
  */
 const TOTAL_SECTORS    = 400;
-const BURST_DUTY_LOCAL = 0.01;   // 10 -┬ªs / 1 ms
+const BURST_DUTY_LOCAL = 0.01;   // 10 --ªs / 1 ms
 const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
 const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
-const RADIAL_LAYERS    = 10;     // surface +├╣ radial lattice
+const RADIAL_LAYERS    = 10;     // surface ++¦ radial lattice
 
 // Public clamp constants for display-only symmetry (do not affect ++/mass)
 export const SAMPLE_CLAMP = { maxPush: 0.10, softness: 0.60 } as const;
@@ -2068,7 +2083,7 @@ const MECH_ELASTIC_MODULUS_PA = parseEnvNumber(process.env.MECH_YOUNG_MODULUS_PA
 const MECH_POISSON = parseEnvNumber(process.env.MECH_POISSON_RATIO, 0.27);
 const MECH_DEFLECTION_COEFF = 0.0138; // clamped square plate under uniform load (Roark)
 const MECH_ROUGHNESS_RMS_NM = parseEnvNumber(process.env.MECH_ROUGHNESS_RMS_NM, 0.2);
-const MECH_ROUGHNESS_SIGMA = parseEnvNumber(process.env.MECH_ROUGHNESS_SIGMA, 5); // 5╧â separation guard
+const MECH_ROUGHNESS_SIGMA = parseEnvNumber(process.env.MECH_ROUGHNESS_SIGMA, 5); // 5-â separation guard
 const MECH_PATCH_V_RMS = parseEnvNumber(process.env.MECH_PATCH_V_RMS, 0.05); // volts (50 mV patch noise)
 const MECH_GAP_SWEEP = { min_nm: 0.5, max_nm: 200, step_nm: 0.5 } as const;
 const MECH_SPAN_SCALE_RAW = parseEnvNumber(process.env.MECH_SPAN_SCALE_RAW, 0.2); // compress effective span to represent ribbed sub-tiles (raw)
@@ -2196,7 +2211,7 @@ function guardGammaVdB(params: {
   const pocketThickness_m = wall / Math.max(1, gammaClamped);
   const planckMargin = pocketRadius_m / PLANCK_LENGTH_M;
   const admissible = params.gammaRequested <= limit;
-  const reason = `╬│_VdB bounded by pocket floor ${pocketFloor.toExponential(
+  const reason = `+¦_VdB bounded by pocket floor ${pocketFloor.toExponential(
     2,
   )} m (wall=${wall.toExponential(2)} m, minRadius=${minRadius.toExponential(2)} m)`;
   return {
@@ -4856,6 +4871,14 @@ const buildDiagonalObserverConditions = (
 
 const buildDiagonalMetricObserverAuditTensorInput = (
   state: EnergyPipelineState,
+  options: {
+    t00Selection?: {
+      admissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+      routeId: string | null;
+      comparabilityStatus: "pass" | "fail" | "unknown";
+      note: string | null;
+    } | null;
+  } = {},
 ): BuildNhm2ObserverAuditTensorInput => {
   const { warpState, metricT00Ref } = resolveNhm2ArtifactContext(state);
   const metricTensorRaw =
@@ -4868,6 +4891,11 @@ const buildDiagonalMetricObserverAuditTensorInput = (
       | null) ?? null;
   const metricTensor =
     extractNhm2SourceClosureTensor(metricTensorRaw);
+  const t00Selection = options.t00Selection ?? null;
+  const einsteinRouteT00 = toFiniteNumber(metricTensorRaw?.T00_modelTermEinstein);
+  const preferEinsteinT00ForObserver =
+    t00Selection?.admissionStatus === "derivable_same_chart_from_existing_state" &&
+    t00Selection?.comparabilityStatus === "pass";
   const fluxVector: [number, number, number] = [
     toFiniteNumber(metricTensorRaw?.T01) ?? Number.NaN,
     toFiniteNumber(metricTensorRaw?.T02) ?? Number.NaN,
@@ -4896,6 +4924,9 @@ const buildDiagonalMetricObserverAuditTensorInput = (
   if (!hasMetricOffDiagonalFamilies) {
     structuralMissing.push("metric_tij_off_diagonal_missing");
   }
+  if (preferEinsteinT00ForObserver && einsteinRouteT00 == null) {
+    structuralMissing.push("metric_t00_einstein_route_missing");
+  }
   const limitationNotes = [
     hasMetricT0iFamilies
       ? "Metric-required tensor now emits same-chart T0i channels from a model-term route; observer minima are still computed with the diagonal algebraic closure until anisotropic observer search admission is complete."
@@ -4903,6 +4934,11 @@ const buildDiagonalMetricObserverAuditTensorInput = (
     hasMetricOffDiagonalFamilies
       ? "Off-diagonal same-chart Tij channels are emitted from a reduced-order model-term route and remain semantically not admitted pending tensor-route closure."
       : "Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search.",
+    preferEinsteinT00ForObserver
+      ? einsteinRouteT00 != null
+        ? `Observer rho uses admitted Einstein-route T00 channel (route=${t00Selection?.routeId ?? "unknown"}, comparability=${t00Selection?.comparabilityStatus ?? "unknown"}).`
+        : `Einstein-route T00 was selected for observer rho, but no finite T00_modelTermEinstein payload was emitted (route=${t00Selection?.routeId ?? "unknown"}).`
+      : "Observer rho uses legacy diagonal T00 until Einstein-route T00 admission and comparability are both satisfied.",
   ];
   const fluxMagnitude =
     hasMetricT0iFamilies
@@ -4949,7 +4985,9 @@ const buildDiagonalMetricObserverAuditTensorInput = (
     };
   }
 
-  const rho = metricTensor.T00;
+  const rho = preferEinsteinT00ForObserver
+    ? (einsteinRouteT00 ?? metricTensor.T00)
+    : metricTensor.T00;
   const px = metricTensor.T11;
   const py = metricTensor.T22;
   const pz = metricTensor.T33;
@@ -5063,6 +5101,14 @@ const NHM2_OFF_DIAGONAL_TIJ_CANONICAL_PAIRS = [
   ["T13", "T31"],
   ["T23", "T32"],
 ] as const;
+const NHM2_EINSTEIN_COMPARE_CANONICAL_KEYS = [
+  "T01",
+  "T02",
+  "T03",
+  "T12",
+  "T13",
+  "T23",
+] as const;
 const NHM2_METRIC_PRODUCER_MODULE_REFS = [
   "modules/warp/natario-warp.ts::calculateMetricStressEnergyFromShiftField",
   "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
@@ -5084,22 +5130,1798 @@ const isFiniteTriplet = (
   toFiniteNumber(value[1]) != null &&
   toFiniteNumber(value[2]) != null;
 
+const NHM2_MODEL_TERM_EXPECTED_ROUTE_ID = "einstein_tensor_geometry_fd4_v1";
+const NHM2_MODEL_TERM_LEGACY_ROUTE_ID = "adm_quasi_stationary_recovery_v1";
+const NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID = "einstein_tensor_geometry_fd4_v1";
+const NHM2_MODEL_TERM_CLOSURE_PATCH_BRIEF_REF =
+  "docs/audits/research/warp-nhm2-semantic-closure-route-decision-brief-latest.md";
+const NHM2_MODEL_TERM_CITATION_REFS = [
+  NHM2_FULL_TENSOR_SEMANTICS_REF,
+  "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+  "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+  "https://arxiv.org/abs/gr-qc/0703035",
+  "https://arxiv.org/abs/gr-qc/0110086",
+  "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+  "https://arxiv.org/abs/gr-qc/0507004",
+  "https://arxiv.org/abs/1306.6052",
+  "https://arxiv.org/abs/2404.03095",
+  "https://arxiv.org/abs/2404.10855",
+  "https://arxiv.org/abs/2602.18023",
+] as const;
+const NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS = [
+  "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+  "https://arxiv.org/abs/gr-qc/0703035",
+  "https://arxiv.org/abs/gr-qc/0110086",
+  "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+  "https://arxiv.org/abs/gr-qc/0507004",
+  "https://arxiv.org/abs/1306.6052",
+  "https://arxiv.org/abs/2404.03095",
+  "https://arxiv.org/abs/2404.10855",
+  "https://arxiv.org/abs/2602.18023",
+] as const;
+const NHM2_DEC_REMEDIATION_WEB_CITATION_REFS = [
+  "https://arxiv.org/abs/1702.05915",
+  "https://arxiv.org/abs/2003.01815",
+] as const;
+const NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS = [
+  "https://arxiv.org/abs/1405.0403",
+  "https://arxiv.org/abs/2105.03079",
+  "https://arxiv.org/abs/1208.5399",
+  "https://arxiv.org/abs/gr-qc/9607003",
+  "https://arxiv.org/abs/gr-qc/9805037",
+] as const;
+const NHM2_DEC_PHYSICS_RUNTIME_MIN_COMPARABLE_SAMPLE_COUNT = 3;
+const NHM2_DEC_PHYSICS_CONTROL_CLAIM_CITATION_MAP = [
+  {
+    claimId: "same_chart_projection_grammar_required",
+    claim:
+      "Observer-condition controls are evaluated on a same-chart stress-energy grammar where E, J_i, and S_ij are projections of a single tensor field.",
+    citationRefs: [
+      "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+      "https://arxiv.org/abs/gr-qc/0703035",
+      "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
+    ],
+    note:
+      "Maintains same-chart semantics while exploring DEC controls; avoids stitched cross-chart placeholders.",
+  },
+  {
+    claimId: "geometry_first_route_is_control_basis",
+    claim:
+      "DEC-control probes are evaluated on the admitted geometry-first Einstein route and retained only when comparability and independent cross-check gates stay pass-level.",
+    citationRefs: [
+      "https://arxiv.org/abs/gr-qc/0110086",
+      "https://arxiv.org/abs/gr-qc/0507004",
+      "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+      "https://arxiv.org/abs/2404.03095",
+      "https://arxiv.org/abs/2404.10855",
+      "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+    ],
+    note:
+      "Treats stress-energy as geometry-derived on the selected route before observer-condition diagnostics.",
+  },
+  {
+    claimId: "bounded_probe_non_regression_policy",
+    claim:
+      "Candidate selection keeps observer-domain bounds fixed and requires WEC/NEC non-regression with positive robust DEC lift before any runtime application recommendation.",
+    citationRefs: [
+      "https://arxiv.org/abs/1702.05915",
+      "https://arxiv.org/abs/2003.01815",
+      "https://arxiv.org/abs/1208.5399",
+      "https://arxiv.org/abs/gr-qc/9607003",
+      "https://arxiv.org/abs/gr-qc/9805037",
+      "docs/audits/research/warp-nhm2-semantic-closure-route-decision-brief-latest.md",
+    ],
+    note:
+      "Excludes observer-domain truncation from physical-control admission and keeps the candidate proposal-only until runtime revalidation.",
+  },
+  {
+    claimId: "comparability_requires_commensurate_sample_evidence",
+    claim:
+      "Runtime application requires commensurate Einstein-route evidence with explicit independent-cross-check parity and a minimum comparable sample-count threshold before an applied decision is allowed.",
+    citationRefs: [
+      "https://arxiv.org/abs/gr-qc/0507004",
+      "https://arxiv.org/abs/1306.6052",
+      "https://arxiv.org/abs/2404.10855",
+      "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+    ],
+    note:
+      "Separates route comparability from single-sample observer outputs and keeps runtime-apply decisions tied to reproducible cross-check evidence.",
+  },
+] as const;
+const NHM2_DEC_PHYSICS_RUNTIME_APPLY_ENV =
+  "NHM2_DEC_PHYSICS_CONTROL_RUNTIME_APPLY";
+const NHM2_MODEL_TERM_REASON_ORDER = [
+  "route_metadata_missing_or_mismatched",
+  "chart_not_comoving_cartesian",
+  "non_finite_tensor_components",
+  "t0i_symmetry_failed",
+  "off_diagonal_symmetry_failed",
+  "finite_difference_convergence_missing",
+  "finite_difference_convergence_failed",
+  "independent_cross_check_missing",
+  "independent_cross_check_failed_threshold",
+  "dt_gamma_assumption_unbounded",
+  "support_field_route_not_admitted",
+  "full_einstein_tensor_route_not_admitted",
+  "citation_basis_missing",
+  "citation_coverage_incomplete",
+] as const;
+
+const isNhm2DecPhysicsRuntimeApplyEnabled = (): boolean => {
+  const raw = process.env[NHM2_DEC_PHYSICS_RUNTIME_APPLY_ENV];
+  if (raw == null) return false;
+  const normalized = raw.trim().toLowerCase();
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+};
+const NHM2_MODEL_TERM_SYMMETRY_EPSILON = 1e-12;
+const NHM2_MODEL_TERM_DT_GAMMA_THETA_MAX = 1e-6;
+const NHM2_MODEL_TERM_EINSTEIN_VALIDATION_ZERO_RESIDUAL_THRESHOLD = 1e-9;
+const NHM2_MODEL_TERM_EINSTEIN_VALIDATION_CASE_ORDER = [
+  "minkowski_zero_shift",
+  "constant_shift_flat_space",
+] as const;
+const NHM2_MODEL_TERM_CITATION_CONTENT_CACHE = new Map<string, string | null>();
+
+const toModelTermSemanticAdmission = (
+  value: string | null,
+): Nhm2ObserverModelTermSemanticAdmissionEvidence["routeAdmission"] => {
+  if (value === "admitted") return "admitted";
+  if (value === "experimental_not_admitted") return "experimental_not_admitted";
+  return "unknown";
+};
+
+const isTensorComponentFinite = (
+  tensor: Record<string, unknown> | null,
+  key: string,
+): boolean => toFiniteNumber(tensor?.[key]) != null;
+
+const isSymmetricPair = (
+  tensor: Record<string, unknown> | null,
+  a: string,
+  b: string,
+): boolean => {
+  const lhs = toFiniteNumber(tensor?.[a]);
+  const rhs = toFiniteNumber(tensor?.[b]);
+  return (
+    lhs != null &&
+    rhs != null &&
+    Math.abs(lhs - rhs) <= NHM2_MODEL_TERM_SYMMETRY_EPSILON
+  );
+};
+
+const sortModelTermReasonCodes = (
+  reasonCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"],
+): Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"] =>
+  Array.from(new Set(reasonCodes)).sort(
+    (lhs, rhs) =>
+      NHM2_MODEL_TERM_REASON_ORDER.indexOf(lhs) -
+      NHM2_MODEL_TERM_REASON_ORDER.indexOf(rhs),
+  );
+
+const resolveRouteScopedModelTermReasonCodes = (args: {
+  selectedPath: Nhm2ObserverModelTermClosurePath;
+  reasonCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
+}): {
+  blockerCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
+  nonBlockingCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
+} => {
+  const fullSet = sortModelTermReasonCodes(args.reasonCodes);
+  // Keep out-of-path route failures visible as non-blocking diagnostics rather
+  // than suppressing them entirely; this preserves semantic-closure provenance.
+  const routeScopedSet = fullSet;
+  const blockerCodes = routeScopedSet.filter((code) => {
+    if (
+      args.selectedPath === "full_einstein_tensor" &&
+      code === "support_field_route_not_admitted"
+    ) {
+      return false;
+    }
+    if (
+      args.selectedPath === "adm_complete" &&
+      code === "full_einstein_tensor_route_not_admitted"
+    ) {
+      return false;
+    }
+    return true;
+  });
+  const nonBlockingCodes = routeScopedSet.filter(
+    (code) => !blockerCodes.includes(code),
+  );
+  return {
+    blockerCodes: sortModelTermReasonCodes(blockerCodes),
+    nonBlockingCodes: sortModelTermReasonCodes(nonBlockingCodes),
+  };
+};
+
+const loadCachedCitationContent = (pathRef: string): string | null => {
+  if (NHM2_MODEL_TERM_CITATION_CONTENT_CACHE.has(pathRef)) {
+    return NHM2_MODEL_TERM_CITATION_CONTENT_CACHE.get(pathRef) ?? null;
+  }
+  const absolutePath = path.isAbsolute(pathRef)
+    ? pathRef
+    : path.join(process.cwd(), pathRef);
+  try {
+    const raw = fs.readFileSync(absolutePath, "utf8");
+    NHM2_MODEL_TERM_CITATION_CONTENT_CACHE.set(pathRef, raw);
+    return raw;
+  } catch {
+    NHM2_MODEL_TERM_CITATION_CONTENT_CACHE.set(pathRef, null);
+    return null;
+  }
+};
+
+const resolveResearchBasisCitationCoverage = (researchBasisRef: string | null) => {
+  if (researchBasisRef == null) {
+    return {
+      status: "fail" as const,
+      missingRefs: [...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS],
+    };
+  }
+  const content = loadCachedCitationContent(researchBasisRef);
+  if (content == null) {
+    return {
+      status: "unknown" as const,
+      missingRefs: [...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS],
+    };
+  }
+  const missingRefs = NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS.filter(
+    (ref) => !content.includes(ref),
+  );
+  return {
+    status: missingRefs.length === 0 ? ("pass" as const) : ("fail" as const),
+    missingRefs,
+  };
+};
+
+const buildEinsteinRouteValidationSuite = (): NonNullable<
+  Nhm2ObserverModelTermSemanticAdmissionEvidence["einsteinRouteValidationSuite"]
+> => {
+  type ValidationCaseId =
+    (typeof NHM2_MODEL_TERM_EINSTEIN_VALIDATION_CASE_ORDER)[number];
+  const coreCitationRefs = [
+    "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+    "https://arxiv.org/abs/gr-qc/0703035",
+    "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+    "https://arxiv.org/abs/2404.03095",
+    "https://arxiv.org/abs/2404.10855",
+    "https://arxiv.org/abs/2602.18023",
+  ];
+  const caseDefs: Array<{
+    caseId: ValidationCaseId;
+    shiftEvaluator: (x: number, y: number, z: number) => [number, number, number];
+    points: Array<[number, number, number]>;
+    note: string;
+  }> = [
+    {
+      caseId: "minkowski_zero_shift",
+      shiftEvaluator: () => [0, 0, 0],
+      points: [
+        [0, 0, 0],
+        [0.5, -0.25, 0.75],
+      ],
+      note: "Flat-space zero-shift sanity case; Einstein-route tensor should be near zero.",
+    },
+    {
+      caseId: "constant_shift_flat_space",
+      shiftEvaluator: () => [0.125, -0.05, 0.02],
+      points: [
+        [0.25, -0.5, 0.75],
+        [1.1, -0.4, 0.3],
+      ],
+      note: "Constant shift on flat metric is a coordinate transform; stress-energy should remain near zero.",
+    },
+  ];
+  const tensorKeys = [
+    "T00",
+    "T11",
+    "T22",
+    "T33",
+    ...NHM2_EINSTEIN_COMPARE_CANONICAL_KEYS,
+  ];
+  const cases = caseDefs.map((definition) => {
+    let maxAbsResidual = -Infinity;
+    let sampleCount = 0;
+    let finiteTensorCount = 0;
+    for (const point of definition.points) {
+      const resolved = calculateMetricStressEnergyTensorAtPointFromShiftField(
+        definition.shiftEvaluator,
+        point,
+        {
+          derivativeStep_m: 0.05,
+          scale_m: 1,
+          modelTermRoutePreference: "einstein_only",
+        },
+      );
+      if (resolved?.stress == null) {
+        continue;
+      }
+      sampleCount += 1;
+      for (const key of tensorKeys) {
+        const value = toFiniteNumber(
+          (resolved.stress as Record<string, unknown>)[key],
+        );
+        if (value == null) {
+          continue;
+        }
+        finiteTensorCount += 1;
+        maxAbsResidual = Math.max(maxAbsResidual, Math.abs(value));
+      }
+    }
+    const hasFiniteResidual =
+      sampleCount > 0 &&
+      finiteTensorCount > 0 &&
+      Number.isFinite(maxAbsResidual);
+    const status: Nhm2ObserverModelTermSemanticAdmissionEvidence["checks"]["fullEinsteinTensorRouteAdmission"] =
+      hasFiniteResidual
+        ? maxAbsResidual <= NHM2_MODEL_TERM_EINSTEIN_VALIDATION_ZERO_RESIDUAL_THRESHOLD
+          ? "pass"
+          : "fail"
+        : "unknown";
+    return {
+      caseId: definition.caseId,
+      status,
+      maxAbsResidual: hasFiniteResidual ? maxAbsResidual : null,
+      expectedNearZero: true,
+      note:
+        status === "pass"
+          ? `${definition.note} maxAbsResidual=${maxAbsResidual.toExponential(6)} within threshold ${NHM2_MODEL_TERM_EINSTEIN_VALIDATION_ZERO_RESIDUAL_THRESHOLD.toExponential(3)}.`
+          : status === "fail"
+            ? `${definition.note} maxAbsResidual=${maxAbsResidual.toExponential(6)} exceeds threshold ${NHM2_MODEL_TERM_EINSTEIN_VALIDATION_ZERO_RESIDUAL_THRESHOLD.toExponential(3)}.`
+            : `${definition.note} no finite Einstein-route tensor sample was produced.`,
+      citationRefs: [...coreCitationRefs],
+    };
+  });
+  const evaluatedCaseCount = cases.filter((entry) => entry.status !== "unknown").length;
+  const passedCaseCount = cases.filter((entry) => entry.status === "pass").length;
+  const suiteStatus: Nhm2ObserverModelTermSemanticAdmissionEvidence["checks"]["fullEinsteinTensorRouteAdmission"] =
+    evaluatedCaseCount === 0
+      ? "unknown"
+      : passedCaseCount === cases.length
+        ? "pass"
+        : "fail";
+  return {
+    status: suiteStatus,
+    admittedForRoutePass: suiteStatus === "pass",
+    residualThreshold: NHM2_MODEL_TERM_EINSTEIN_VALIDATION_ZERO_RESIDUAL_THRESHOLD,
+    evaluatedCaseCount,
+    passedCaseCount,
+    cases,
+    note:
+      suiteStatus === "pass"
+        ? "Independent Einstein-route near-zero sanity suite passed for flat-space control cases."
+        : suiteStatus === "fail"
+          ? "Independent Einstein-route near-zero sanity suite failed at one or more flat-space control cases."
+          : "Independent Einstein-route near-zero sanity suite is inconclusive.",
+    citationRefs: [...coreCitationRefs],
+  };
+};
+
+const deriveNhm2ModelTermClosurePathDecision = (args: {
+  routeId: string | null;
+  checks: Nhm2ObserverModelTermSemanticAdmissionEvidence["checks"];
+  reasonCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
+  effectiveEinsteinCrossCheckStatus: "available" | "missing" | "unknown";
+  einsteinTensorRouteId: string | null;
+  researchBasisRef: string | null;
+  citationRefs: string[];
+}): NonNullable<Nhm2ObserverModelTermSemanticAdmissionEvidence["closurePathDecision"]> => {
+  const routeHint:
+    | "adm_route_metadata"
+    | "einstein_route_metadata"
+    | "none" =
+    args.routeId === NHM2_MODEL_TERM_EXPECTED_ROUTE_ID
+      ? "einstein_route_metadata"
+      : args.routeId === NHM2_MODEL_TERM_LEGACY_ROUTE_ID
+        ? "adm_route_metadata"
+        : "none";
+  const admPathStatus = args.checks.supportFieldRouteAdmission;
+  const fullEinsteinPathStatus = args.checks.fullEinsteinTensorRouteAdmission;
+  const einsteinRoutePreferredByEvidence =
+    args.effectiveEinsteinCrossCheckStatus === "available" &&
+    (args.einsteinTensorRouteId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+      args.routeId === NHM2_MODEL_TERM_EXPECTED_ROUTE_ID);
+
+  let selectedPath: "adm_complete" | "full_einstein_tensor" | "undecided" =
+    "undecided";
+  let nextPatchClass:
+    | "adm_support_field_admission_patch"
+    | "einstein_semantic_closure_patch"
+    | "evidence_disambiguation_patch" = "evidence_disambiguation_patch";
+  let rationale: string =
+    "Route evidence remains mixed, so collect disambiguating semantic-closure evidence before committing to ADM-complete or full Einstein paths.";
+
+  if (admPathStatus === "pass" && fullEinsteinPathStatus !== "pass") {
+    selectedPath = "adm_complete";
+    nextPatchClass = "adm_support_field_admission_patch";
+    rationale =
+      "ADM support-field route is admitted while full Einstein route is not admitted; continue with ADM-complete support-field closure.";
+  } else if (fullEinsteinPathStatus === "pass" && admPathStatus !== "pass") {
+    selectedPath = "full_einstein_tensor";
+    nextPatchClass = "einstein_semantic_closure_patch";
+    rationale =
+      "Full Einstein-tensor route is admitted while ADM support-field route is not admitted; continue with Einstein-route semantic closure.";
+  } else if (admPathStatus === "pass" && fullEinsteinPathStatus === "pass") {
+    if (routeHint === "adm_route_metadata") {
+      selectedPath = "adm_complete";
+      nextPatchClass = "adm_support_field_admission_patch";
+      rationale =
+        "Both routes are admitted, but runtime route metadata currently points to ADM; close remaining semantics on the ADM-complete path.";
+    } else {
+      selectedPath = "full_einstein_tensor";
+      nextPatchClass = "einstein_semantic_closure_patch";
+      rationale =
+        "Both routes are admitted, and route metadata or precedent prefers geometry-first Einstein routing for semantic closure.";
+    }
+  } else if (routeHint === "einstein_route_metadata" || einsteinRoutePreferredByEvidence) {
+    selectedPath = "full_einstein_tensor";
+    nextPatchClass = "einstein_semantic_closure_patch";
+    if (routeHint === "einstein_route_metadata" && einsteinRoutePreferredByEvidence) {
+      rationale =
+        "Route metadata and available independent Einstein cross-check evidence favor the full Einstein-tensor semantic-closure path.";
+    } else if (einsteinRoutePreferredByEvidence) {
+      rationale =
+        "Available independent Einstein cross-check evidence favors the full Einstein-tensor semantic-closure path.";
+    } else {
+      rationale =
+        "Route metadata points to geometry-first Einstein routing; keep the full Einstein semantic-closure path while independent cross-check and convergence blockers are unresolved.";
+    }
+  } else if (routeHint === "adm_route_metadata") {
+    selectedPath = "adm_complete";
+    nextPatchClass = "adm_support_field_admission_patch";
+    rationale =
+      "Route metadata points to ADM with no stronger Einstein preference signal; continue with ADM-complete semantic closure.";
+  }
+
+  const citationRefs = Array.from(
+    new Set(
+      [
+        NHM2_FULL_TENSOR_SEMANTICS_REF,
+        args.researchBasisRef,
+        NHM2_MODEL_TERM_CLOSURE_PATCH_BRIEF_REF,
+        ...args.citationRefs,
+      ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  const routeScopedReasonCodes = resolveRouteScopedModelTermReasonCodes({
+    selectedPath,
+    reasonCodes: args.reasonCodes,
+  });
+  const scopedBlockers =
+    routeScopedReasonCodes.blockerCodes.length > 0
+      ? routeScopedReasonCodes.blockerCodes.join(",")
+      : "none";
+  const scopedNonBlockers =
+    routeScopedReasonCodes.nonBlockingCodes.length > 0
+      ? routeScopedReasonCodes.nonBlockingCodes.join(",")
+      : "none";
+
+  return {
+    selectedPath,
+    admPathStatus,
+    fullEinsteinPathStatus,
+    routeHint,
+    nextPatchClass,
+    patchBriefRef: NHM2_MODEL_TERM_CLOSURE_PATCH_BRIEF_REF,
+    rationale,
+    blockerCodes: routeScopedReasonCodes.blockerCodes,
+    nonBlockingCodes: routeScopedReasonCodes.nonBlockingCodes,
+    citationRefs,
+    notes: [
+      `routeId=${args.routeId ?? "unknown"}`,
+      `routeHint=${routeHint}`,
+      `admPathStatus=${admPathStatus}`,
+      `fullEinsteinPathStatus=${fullEinsteinPathStatus}`,
+      `einsteinCrossCheckStatus=${args.effectiveEinsteinCrossCheckStatus}`,
+      `einsteinTensorRouteId=${args.einsteinTensorRouteId ?? "none"}`,
+      `selectedPath=${selectedPath}`,
+      `nextPatchClass=${nextPatchClass}`,
+      `selectedPath.blockerCodes=${scopedBlockers}`,
+      `selectedPath.nonBlockingCodes=${scopedNonBlockers}`,
+    ],
+  };
+};
+
+const deriveNhm2ModelTermSemanticAdmissionEvidence = (args: {
+  state: EnergyPipelineState;
+  producerEvidence: Nhm2ObserverMetricProducerAdmissionEvidence;
+  metricRequiredTensorInput: BuildNhm2ObserverAuditTensorInput;
+}): Nhm2ObserverModelTermSemanticAdmissionEvidence => {
+  const { warpState, adapter } = resolveNhm2ArtifactContext(args.state);
+  const metricStressRaw = (warpState?.metricStressEnergy ??
+    null) as Record<string, unknown> | null;
+  const metricStressDiagnostics = (warpState?.metricStressDiagnostics ??
+    null) as Record<string, unknown> | null;
+  const uncertaintyDiagnostics = (metricStressDiagnostics?.modelTermUncertainty ??
+    null) as Record<string, unknown> | null;
+  const finiteDifferenceDiagnostics = (uncertaintyDiagnostics?.finiteDifferenceConvergence ??
+    null) as Record<string, unknown> | null;
+  const einsteinTensorRouteDiagnostics = (uncertaintyDiagnostics?.einsteinTensorRoute ??
+    null) as Record<string, unknown> | null;
+  const residualAttributionDiagnostics =
+    (uncertaintyDiagnostics?.einsteinResidualAttribution ??
+      null) as Record<string, unknown> | null;
+  const evaluatorClosureDiagnostics =
+    (uncertaintyDiagnostics?.einsteinEvaluatorClosure ??
+      null) as Record<string, unknown> | null;
+  const independentCrossCheckDiagnostics = (uncertaintyDiagnostics?.independentCrossCheck ??
+    null) as Record<string, unknown> | null;
+  const routeId = asText(metricStressRaw?.modelTermRoute);
+  const routeAdmissionRaw = toModelTermSemanticAdmission(
+    asText(metricStressRaw?.modelTermAdmission),
+  );
+  const chartRef =
+    args.producerEvidence.chartRef ??
+    (typeof adapter?.chart?.label === "string" ? adapter.chart.label : null);
+  const researchBasisRef = asText(metricStressRaw?.researchBasisRef);
+  const reasonCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"] =
+    [];
+  const checks: Nhm2ObserverModelTermSemanticAdmissionEvidence["checks"] = {
+    routeMetadata: "unknown",
+    chart: "unknown",
+    finiteTensorComponents: "unknown",
+    t0iSymmetry: "unknown",
+    offDiagonalTijSymmetry: "unknown",
+    supportFieldRouteAdmission: "unknown",
+    fullEinsteinTensorRouteAdmission: "unknown",
+    citationBasis: "unknown",
+    finiteDifferenceConvergence: "unknown",
+    independentCrossCheck: "unknown",
+    einsteinT00Comparability: "unknown",
+    dtGammaAssumptionBounded: "unknown",
+    citationCoverage: "unknown",
+  };
+
+  const routeMetadataPass =
+    routeId != null &&
+    routeId.length > 0 &&
+    routeAdmissionRaw !== "unknown" &&
+    (routeId === NHM2_MODEL_TERM_EXPECTED_ROUTE_ID ||
+      routeId === NHM2_MODEL_TERM_LEGACY_ROUTE_ID);
+  checks.routeMetadata = routeMetadataPass ? "pass" : "fail";
+  if (!routeMetadataPass) {
+    reasonCodes.push("route_metadata_missing_or_mismatched");
+  }
+
+  const chartPass = chartRef === "comoving_cartesian";
+  checks.chart = chartPass ? "pass" : "fail";
+  if (!chartPass) {
+    reasonCodes.push("chart_not_comoving_cartesian");
+  }
+
+  const requiredFiniteKeys = [
+    "T00",
+    "T11",
+    "T22",
+    "T33",
+    ...NHM2_T0I_FAMILY_KEYS,
+    ...NHM2_OFF_DIAGONAL_TIJ_FAMILY_KEYS,
+  ];
+  const finiteTensorComponentsPass = requiredFiniteKeys.every((key) =>
+    isTensorComponentFinite(metricStressRaw, key),
+  );
+  checks.finiteTensorComponents = finiteTensorComponentsPass ? "pass" : "fail";
+  if (!finiteTensorComponentsPass) {
+    reasonCodes.push("non_finite_tensor_components");
+  }
+
+  const t0iSymmetryPass =
+    isSymmetricPair(metricStressRaw, "T01", "T10") &&
+    isSymmetricPair(metricStressRaw, "T02", "T20") &&
+    isSymmetricPair(metricStressRaw, "T03", "T30");
+  checks.t0iSymmetry = t0iSymmetryPass ? "pass" : "fail";
+  if (!t0iSymmetryPass) {
+    reasonCodes.push("t0i_symmetry_failed");
+  }
+
+  const offDiagonalSymmetryPass =
+    isSymmetricPair(metricStressRaw, "T12", "T21") &&
+    isSymmetricPair(metricStressRaw, "T13", "T31") &&
+    isSymmetricPair(metricStressRaw, "T23", "T32");
+  checks.offDiagonalTijSymmetry = offDiagonalSymmetryPass ? "pass" : "fail";
+  if (!offDiagonalSymmetryPass) {
+    reasonCodes.push("off_diagonal_symmetry_failed");
+  }
+
+  const support = args.producerEvidence.supportFieldEvidence;
+  const supportFieldRouteAdmissionPass =
+    support.beta_i === "present_admitted" &&
+    support.gamma_ij === "present_admitted" &&
+    support.K_ij === "present_admitted" &&
+    support.D_j_Kj_i_minus_D_i_K_route === "present_admitted" &&
+    support.time_derivative_or_Kij_evolution_route === "present_admitted";
+  checks.supportFieldRouteAdmission = supportFieldRouteAdmissionPass
+    ? "pass"
+    : "fail";
+  if (!supportFieldRouteAdmissionPass) {
+    reasonCodes.push("support_field_route_not_admitted");
+  }
+  const einsteinRouteValidationSuite = buildEinsteinRouteValidationSuite();
+  const einsteinRouteValidationSuitePass =
+    einsteinRouteValidationSuite.status === "pass" &&
+    einsteinRouteValidationSuite.admittedForRoutePass;
+
+  const finiteDifferenceStatusRaw = asText(finiteDifferenceDiagnostics?.status);
+  const finiteCoarseStep_m = toFiniteNumber(finiteDifferenceDiagnostics?.coarseStep_m);
+  const finiteRefinedStep_m = toFiniteNumber(finiteDifferenceDiagnostics?.refinedStep_m);
+  const finiteSuperRefinedStep_m = toFiniteNumber(
+    finiteDifferenceDiagnostics?.superRefinedStep_m,
+  );
+  const finiteComparedSampleCount = toFiniteNumber(
+    finiteDifferenceDiagnostics?.comparedSampleCount,
+  );
+  const finiteRouteLocalComparedSampleCount = toFiniteNumber(
+    finiteDifferenceDiagnostics?.routeLocalComparedSampleCount,
+  );
+  const finiteRouteSuppressedSampleCount = toFiniteNumber(
+    finiteDifferenceDiagnostics?.routeSuppressedSampleCount,
+  );
+  const finiteNumericalFloorSuppressedSampleCount = toFiniteNumber(
+    finiteDifferenceDiagnostics?.numericalFloorSuppressedSampleCount,
+  );
+  const finiteTripletComparedSampleCount = toFiniteNumber(
+    finiteDifferenceDiagnostics?.tripletComparedSampleCount,
+  );
+  const finiteConvergenceFailureMode = asText(
+    finiteDifferenceDiagnostics?.failureMode,
+  );
+  const finiteConvergenceSignificanceFloorRelativeToT00 = toFiniteNumber(
+    finiteDifferenceDiagnostics?.significanceFloorRelativeToT00,
+  );
+  const finiteRelativeThreshold = toFiniteNumber(
+    finiteDifferenceDiagnostics?.relativeDriftThreshold,
+  );
+  const finiteT0iDriftMax = toFiniteNumber(
+    finiteDifferenceDiagnostics?.t0iRelativeDriftMax,
+  );
+  const finiteT0iRefinedDriftMax = toFiniteNumber(
+    finiteDifferenceDiagnostics?.t0iRelativeDriftRefinedMax,
+  );
+  const finiteT0iConvergenceOrderMean = toFiniteNumber(
+    finiteDifferenceDiagnostics?.t0iConvergenceOrderMean,
+  );
+  const finiteOffDiagonalDriftMax = toFiniteNumber(
+    finiteDifferenceDiagnostics?.offDiagonalRelativeDriftMax,
+  );
+  const finiteOffDiagonalRefinedDriftMax = toFiniteNumber(
+    finiteDifferenceDiagnostics?.offDiagonalRelativeDriftRefinedMax,
+  );
+  const finiteOffDiagonalConvergenceOrderMean = toFiniteNumber(
+    finiteDifferenceDiagnostics?.offDiagonalConvergenceOrderMean,
+  );
+  const einsteinTensorRouteStatusRaw = asText(einsteinTensorRouteDiagnostics?.status);
+  const einsteinTensorRouteStatus: "available" | "missing" | "unknown" =
+    einsteinTensorRouteStatusRaw === "available" || einsteinTensorRouteStatusRaw === "missing"
+      ? einsteinTensorRouteStatusRaw
+      : "unknown";
+  const einsteinTensorRouteId = asText(einsteinTensorRouteDiagnostics?.routeId);
+  const einsteinTensorTensorSource = asText(
+    einsteinTensorRouteDiagnostics?.tensorSource,
+  );
+  const einsteinTensorComparedSampleCount = toFiniteNumber(
+    einsteinTensorRouteDiagnostics?.comparedSampleCount,
+  );
+  const einsteinTensorMaxRelativeResidual = toFiniteNumber(
+    einsteinTensorRouteDiagnostics?.maxRelativeResidual,
+  );
+  const einsteinTensorT00ComparedSampleCount = toFiniteNumber(
+    einsteinTensorRouteDiagnostics?.t00ComparedSampleCount,
+  );
+  const einsteinTensorT00MaxRelativeResidual = toFiniteNumber(
+    einsteinTensorRouteDiagnostics?.t00MaxRelativeResidual,
+  );
+  const einsteinTensorT00RelativeResidualThreshold = toFiniteNumber(
+    einsteinTensorRouteDiagnostics?.t00RelativeResidualThreshold,
+  );
+  const einsteinTensorRouteNote = asText(einsteinTensorRouteDiagnostics?.note);
+  const residualAttributionStatusRaw = asText(residualAttributionDiagnostics?.status);
+  const residualAttributionStatus: "available" | "missing" | "unknown" =
+    residualAttributionStatusRaw === "available" ||
+    residualAttributionStatusRaw === "missing"
+      ? residualAttributionStatusRaw
+      : "unknown";
+  const residualAttributionSampleCount = toFiniteNumber(
+    residualAttributionDiagnostics?.sampleCount,
+  );
+  const residualAttributionMaxRelativeResidual = toFiniteNumber(
+    residualAttributionDiagnostics?.maxRelativeResidual,
+  );
+  const residualAttributionComponentsRaw = (residualAttributionDiagnostics?.componentResiduals ??
+    null) as Record<string, unknown> | null;
+  const residualAttributionComponentResiduals = {
+    T01: toFiniteNumber(residualAttributionComponentsRaw?.T01),
+    T02: toFiniteNumber(residualAttributionComponentsRaw?.T02),
+    T03: toFiniteNumber(residualAttributionComponentsRaw?.T03),
+    T12: toFiniteNumber(residualAttributionComponentsRaw?.T12),
+    T13: toFiniteNumber(residualAttributionComponentsRaw?.T13),
+    T23: toFiniteNumber(residualAttributionComponentsRaw?.T23),
+  };
+  const residualAttributionSweepRaw = Array.isArray(
+    residualAttributionDiagnostics?.conventionSweep,
+  )
+    ? (residualAttributionDiagnostics?.conventionSweep as unknown[])
+    : [];
+  const residualAttributionConventionSweep = residualAttributionSweepRaw
+    .filter((entry): entry is Record<string, unknown> => {
+      if (entry == null || typeof entry !== "object") return false;
+      const candidateId = asText(entry.candidateId);
+      return candidateId != null;
+    })
+    .map((entry) => {
+      const statusRaw = asText(entry.status);
+      const status: "available" | "missing" | "unknown" =
+        statusRaw === "available" || statusRaw === "missing"
+          ? statusRaw
+          : "unknown";
+      return {
+        candidateId: asText(entry.candidateId) ?? "unknown",
+        status,
+        maxRelativeResidual: toFiniteNumber(entry.maxRelativeResidual),
+        note: asText(entry.note),
+      };
+    });
+  const residualAttributionBestCandidateId = asText(
+    residualAttributionDiagnostics?.bestCandidateId,
+  );
+  const residualAttributionBestCandidateResidual = toFiniteNumber(
+    residualAttributionDiagnostics?.bestCandidateResidual,
+  );
+  const residualAttributionDiagnosisClassRaw = asText(
+    residualAttributionDiagnostics?.diagnosisClass,
+  );
+  const residualAttributionDiagnosisClass:
+    | "convention_mismatch"
+    | "projection_mismatch"
+    | "unit_factor_mismatch"
+    | "discretization_mismatch"
+    | "mixed"
+    | "unknown" =
+    residualAttributionDiagnosisClassRaw === "convention_mismatch" ||
+    residualAttributionDiagnosisClassRaw === "projection_mismatch" ||
+    residualAttributionDiagnosisClassRaw === "unit_factor_mismatch" ||
+    residualAttributionDiagnosisClassRaw === "discretization_mismatch" ||
+    residualAttributionDiagnosisClassRaw === "mixed"
+      ? residualAttributionDiagnosisClassRaw
+      : "unknown";
+  const residualAttributionNote = asText(residualAttributionDiagnostics?.note);
+  const evaluatorClosureStatusRaw = asText(evaluatorClosureDiagnostics?.status);
+  const evaluatorClosureStatus: "available" | "missing" | "unknown" =
+    evaluatorClosureStatusRaw === "available" || evaluatorClosureStatusRaw === "missing"
+      ? evaluatorClosureStatusRaw
+      : "unknown";
+  const evaluatorClosureChartRef = asText(evaluatorClosureDiagnostics?.chartRef);
+  const evaluatorClosureRouteId = asText(evaluatorClosureDiagnostics?.routeId);
+  const evaluatorClosureUnitConvention = asText(
+    evaluatorClosureDiagnostics?.unitConvention,
+  );
+  const evaluatorClosureSignConvention = asText(
+    evaluatorClosureDiagnostics?.signConvention,
+  );
+  const evaluatorResolutionSweepRaw = (evaluatorClosureDiagnostics?.resolutionSweep ??
+    null) as Record<string, unknown> | null;
+  const evaluatorCoarseSweepRaw = (evaluatorResolutionSweepRaw?.coarse ??
+    null) as Record<string, unknown> | null;
+  const evaluatorRefinedSweepRaw = (evaluatorResolutionSweepRaw?.refined ??
+    null) as Record<string, unknown> | null;
+  const evaluatorSuperRefinedSweepRaw =
+    (evaluatorResolutionSweepRaw?.superRefined ??
+      null) as Record<string, unknown> | null;
+  const parseEvaluatorResolutionSweepEntry = (
+    entry: Record<string, unknown> | null,
+  ) => ({
+    step_m: toFiniteNumber(entry?.step_m),
+    comparedSampleCount: toFiniteNumber(entry?.comparedSampleCount),
+    t0iMaxRelativeResidual: toFiniteNumber(entry?.t0iMaxRelativeResidual),
+    offDiagonalMaxRelativeResidual: toFiniteNumber(
+      entry?.offDiagonalMaxRelativeResidual,
+    ),
+  });
+  const evaluatorCoarseSweep = parseEvaluatorResolutionSweepEntry(
+    evaluatorCoarseSweepRaw,
+  );
+  const evaluatorRefinedSweep = parseEvaluatorResolutionSweepEntry(
+    evaluatorRefinedSweepRaw,
+  );
+  const evaluatorSuperRefinedSweep = parseEvaluatorResolutionSweepEntry(
+    evaluatorSuperRefinedSweepRaw,
+  );
+  const evaluatorConvergenceOrderRaw =
+    (evaluatorClosureDiagnostics?.observedConvergenceOrder ??
+      null) as Record<string, unknown> | null;
+  const evaluatorObservedConvergenceOrderT0i = toFiniteNumber(
+    evaluatorConvergenceOrderRaw?.t0i,
+  );
+  const evaluatorObservedConvergenceOrderOffDiagonal = toFiniteNumber(
+    evaluatorConvergenceOrderRaw?.offDiagonal,
+  );
+  const evaluatorRichardsonResidualRaw =
+    (evaluatorClosureDiagnostics?.richardsonExtrapolatedResidual ??
+      null) as Record<string, unknown> | null;
+  const evaluatorRichardsonResidualT0i = toFiniteNumber(
+    evaluatorRichardsonResidualRaw?.t0i,
+  );
+  const evaluatorRichardsonResidualOffDiagonal = toFiniteNumber(
+    evaluatorRichardsonResidualRaw?.offDiagonal,
+  );
+  const evaluatorClosureConventionSweepRaw = Array.isArray(
+    evaluatorClosureDiagnostics?.conventionSweep,
+  )
+    ? (evaluatorClosureDiagnostics?.conventionSweep as unknown[])
+    : [];
+  const evaluatorClosureConventionSweep = evaluatorClosureConventionSweepRaw
+    .filter((entry): entry is Record<string, unknown> => {
+      if (entry == null || typeof entry !== "object") return false;
+      const candidateId = asText(entry.candidateId);
+      return candidateId != null;
+    })
+    .map((entry) => {
+      const statusRaw = asText(entry.status);
+      const status: "available" | "missing" | "unknown" =
+        statusRaw === "available" || statusRaw === "missing"
+          ? statusRaw
+          : "unknown";
+      return {
+        candidateId: asText(entry.candidateId) ?? "unknown",
+        status,
+        maxRelativeResidual: toFiniteNumber(entry.maxRelativeResidual),
+        note: asText(entry.note),
+      };
+    });
+  const evaluatorClosureBestCandidateId = asText(
+    evaluatorClosureDiagnostics?.bestCandidateId,
+  );
+  const evaluatorClosureDiagnosisClassRaw = asText(
+    evaluatorClosureDiagnostics?.diagnosisClass,
+  );
+  const evaluatorClosureDiagnosisClass:
+    | "convention_mismatch"
+    | "projection_mismatch"
+    | "unit_factor_mismatch"
+    | "discretization_mismatch"
+    | "mixed"
+    | "unknown" =
+    evaluatorClosureDiagnosisClassRaw === "convention_mismatch" ||
+    evaluatorClosureDiagnosisClassRaw === "projection_mismatch" ||
+    evaluatorClosureDiagnosisClassRaw === "unit_factor_mismatch" ||
+    evaluatorClosureDiagnosisClassRaw === "discretization_mismatch" ||
+    evaluatorClosureDiagnosisClassRaw === "mixed"
+      ? evaluatorClosureDiagnosisClassRaw
+      : "unknown";
+  const evaluatorClosureNote = asText(evaluatorClosureDiagnostics?.note);
+  const evaluatorClosureCitationRefs = Array.isArray(
+    evaluatorClosureDiagnostics?.citationRefs,
+  )
+    ? (evaluatorClosureDiagnostics?.citationRefs as unknown[])
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const resolveFamilyResidualMax = (
+    values: Array<number | null>,
+  ): number | null => {
+    const finiteValues = values.filter(
+      (value): value is number => value != null && Number.isFinite(value),
+    );
+    if (finiteValues.length === 0) return null;
+    return finiteValues.reduce((max, value) => Math.max(max, value), -Infinity);
+  };
+  const isFiniteResidual = (value: number | null): value is number =>
+    value != null && Number.isFinite(value);
+  const evaluatorClosureComparableToEinsteinRoute =
+    evaluatorClosureStatus === "available" &&
+    (evaluatorClosureRouteId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+      einsteinTensorRouteId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+      routeId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID);
+  const evaluatorCoarseComparable =
+    evaluatorCoarseSweep.comparedSampleCount != null &&
+    evaluatorCoarseSweep.comparedSampleCount > 0 &&
+    isFiniteResidual(evaluatorCoarseSweep.t0iMaxRelativeResidual) &&
+    isFiniteResidual(evaluatorCoarseSweep.offDiagonalMaxRelativeResidual);
+  const evaluatorRefinedComparable =
+    evaluatorRefinedSweep.comparedSampleCount != null &&
+    evaluatorRefinedSweep.comparedSampleCount > 0 &&
+    isFiniteResidual(evaluatorRefinedSweep.t0iMaxRelativeResidual) &&
+    isFiniteResidual(evaluatorRefinedSweep.offDiagonalMaxRelativeResidual);
+  const evaluatorSuperRefinedComparable =
+    evaluatorSuperRefinedSweep.comparedSampleCount != null &&
+    evaluatorSuperRefinedSweep.comparedSampleCount > 0 &&
+    isFiniteResidual(evaluatorSuperRefinedSweep.t0iMaxRelativeResidual) &&
+    isFiniteResidual(evaluatorSuperRefinedSweep.offDiagonalMaxRelativeResidual);
+  const evaluatorHasComparablePair =
+    evaluatorClosureComparableToEinsteinRoute &&
+    evaluatorCoarseComparable &&
+    evaluatorRefinedComparable;
+  const evaluatorHasComparableTriplet =
+    evaluatorHasComparablePair && evaluatorSuperRefinedComparable;
+  const evaluatorFiniteDifferenceThreshold = finiteRelativeThreshold;
+  const evaluatorFinestComparableSweep = evaluatorSuperRefinedComparable
+    ? evaluatorSuperRefinedSweep
+    : evaluatorRefinedComparable
+      ? evaluatorRefinedSweep
+      : evaluatorCoarseComparable
+        ? evaluatorCoarseSweep
+        : null;
+  const evaluatorFinestT0iResidual = evaluatorFinestComparableSweep
+    ?.t0iMaxRelativeResidual as number | null;
+  const evaluatorFinestOffDiagonalResidual = evaluatorFinestComparableSweep
+    ?.offDiagonalMaxRelativeResidual as number | null;
+  const evaluatorResidualThresholdPass =
+    evaluatorFiniteDifferenceThreshold != null &&
+    isFiniteResidual(evaluatorFinestT0iResidual) &&
+    isFiniteResidual(evaluatorFinestOffDiagonalResidual)
+      ? Math.max(evaluatorFinestT0iResidual, evaluatorFinestOffDiagonalResidual) <=
+        evaluatorFiniteDifferenceThreshold
+      : null;
+  const evaluatorMonotonicPass = evaluatorHasComparablePair
+    ? (() => {
+        const coarseT0i = evaluatorCoarseSweep.t0iMaxRelativeResidual as number;
+        const refinedT0i = evaluatorRefinedSweep.t0iMaxRelativeResidual as number;
+        const coarseOffDiag =
+          evaluatorCoarseSweep.offDiagonalMaxRelativeResidual as number;
+        const refinedOffDiag =
+          evaluatorRefinedSweep.offDiagonalMaxRelativeResidual as number;
+        if (coarseT0i + NHM2_MODEL_TERM_SYMMETRY_EPSILON < refinedT0i) {
+          return false;
+        }
+        if (coarseOffDiag + NHM2_MODEL_TERM_SYMMETRY_EPSILON < refinedOffDiag) {
+          return false;
+        }
+        if (!evaluatorSuperRefinedComparable) return true;
+        const superT0i = evaluatorSuperRefinedSweep.t0iMaxRelativeResidual as number;
+        const superOffDiag =
+          evaluatorSuperRefinedSweep.offDiagonalMaxRelativeResidual as number;
+        if (refinedT0i + NHM2_MODEL_TERM_SYMMETRY_EPSILON < superT0i) {
+          return false;
+        }
+        if (refinedOffDiag + NHM2_MODEL_TERM_SYMMETRY_EPSILON < superOffDiag) {
+          return false;
+        }
+        return true;
+      })()
+    : null;
+  let finiteDifferenceFallbackPass: boolean | null = null;
+  let finiteDifferenceFallbackFailureMode:
+    | "none"
+    | "non_comparable_route"
+    | "missing_evidence"
+    | "threshold_failed"
+    | "non_monotonic_refinement" = "missing_evidence";
+  let finiteDifferenceFallbackComparedSampleCount: number | null = null;
+  const finiteDifferenceLowSignalOnly =
+    finiteConvergenceFailureMode === "numerical_floor_insufficient_signal";
+  if (finiteDifferenceLowSignalOnly) {
+    if (!evaluatorClosureComparableToEinsteinRoute) {
+      finiteDifferenceFallbackFailureMode = "non_comparable_route";
+    } else if (!evaluatorHasComparablePair) {
+      finiteDifferenceFallbackFailureMode = "missing_evidence";
+    } else {
+      const comparableCounts = [
+        evaluatorCoarseSweep.comparedSampleCount,
+        evaluatorRefinedSweep.comparedSampleCount,
+        evaluatorSuperRefinedComparable
+          ? evaluatorSuperRefinedSweep.comparedSampleCount
+          : null,
+      ].filter((value): value is number => value != null && Number.isFinite(value));
+      finiteDifferenceFallbackComparedSampleCount =
+        comparableCounts.length > 0
+          ? Math.min(...comparableCounts)
+          : null;
+      if (evaluatorResidualThresholdPass === false) {
+        finiteDifferenceFallbackPass = false;
+        finiteDifferenceFallbackFailureMode = "threshold_failed";
+      } else if (evaluatorMonotonicPass === false) {
+        finiteDifferenceFallbackPass = false;
+        finiteDifferenceFallbackFailureMode = "non_monotonic_refinement";
+      } else if (evaluatorResidualThresholdPass === true) {
+        finiteDifferenceFallbackPass = true;
+        finiteDifferenceFallbackFailureMode = "none";
+      } else {
+        finiteDifferenceFallbackFailureMode = "missing_evidence";
+      }
+    }
+  }
+  let finiteDifferencePass: boolean | null = null;
+  if (finiteDifferenceStatusRaw === "pass") {
+    finiteDifferencePass = true;
+  } else if (finiteDifferenceStatusRaw === "fail") {
+    finiteDifferencePass =
+      finiteDifferenceLowSignalOnly && einsteinRouteValidationSuitePass
+        ? null
+        : false;
+  } else if (
+    finiteComparedSampleCount != null &&
+    finiteComparedSampleCount > 0 &&
+    finiteRelativeThreshold != null &&
+    finiteT0iDriftMax != null &&
+    finiteOffDiagonalDriftMax != null
+  ) {
+    finiteDifferencePass =
+      Math.max(finiteT0iDriftMax, finiteOffDiagonalDriftMax) <=
+      finiteRelativeThreshold;
+  }
+  if (finiteDifferenceLowSignalOnly && finiteDifferencePass === false) {
+    finiteDifferencePass = einsteinRouteValidationSuitePass ? null : false;
+  }
+  if (finiteDifferenceLowSignalOnly && finiteDifferencePass == null) {
+    finiteDifferencePass = finiteDifferenceFallbackPass;
+  }
+  checks.finiteDifferenceConvergence =
+    finiteDifferencePass == null
+      ? "unknown"
+      : finiteDifferencePass
+        ? "pass"
+        : "fail";
+  if (checks.finiteDifferenceConvergence === "unknown") {
+    reasonCodes.push("finite_difference_convergence_missing");
+  } else if (checks.finiteDifferenceConvergence === "fail") {
+    reasonCodes.push("finite_difference_convergence_failed");
+  }
+
+  const independentCrossCheckStatusRaw = asText(independentCrossCheckDiagnostics?.status);
+  const independentCrossCheckReference = asText(
+    independentCrossCheckDiagnostics?.reference,
+  );
+  const independentCrossCheckComparedSampleCount = toFiniteNumber(
+    independentCrossCheckDiagnostics?.comparedSampleCount,
+  );
+  const independentCrossCheckReferenceRouteSuppressedSampleCount = toFiniteNumber(
+    independentCrossCheckDiagnostics?.referenceRouteSuppressedSampleCount,
+  );
+  const independentCrossCheckMaxRelativeResidual = toFiniteNumber(
+    independentCrossCheckDiagnostics?.maxRelativeResidual,
+  );
+  const independentCrossCheckRelativeResidualThreshold = toFiniteNumber(
+    independentCrossCheckDiagnostics?.relativeResidualThreshold,
+  );
+  const independentCrossCheckT00ComparedSampleCount = toFiniteNumber(
+    independentCrossCheckDiagnostics?.t00ComparedSampleCount,
+  );
+  const independentCrossCheckT00MaxRelativeResidual = toFiniteNumber(
+    independentCrossCheckDiagnostics?.t00MaxRelativeResidual,
+  );
+  const independentCrossCheckT00ReferenceComparableRaw =
+    independentCrossCheckDiagnostics?.t00ReferenceComparable;
+  const independentCrossCheckRouteIndependentRaw =
+    independentCrossCheckDiagnostics?.routeIndependent;
+  const independentCrossCheckFailureMode = asText(
+    independentCrossCheckDiagnostics?.failureMode,
+  );
+  const independentCrossCheckRouteIndependent =
+    typeof independentCrossCheckRouteIndependentRaw === "boolean"
+      ? independentCrossCheckRouteIndependentRaw
+      : null;
+  const independentCrossCheckT00ReferenceComparable =
+    typeof independentCrossCheckT00ReferenceComparableRaw === "boolean"
+      ? independentCrossCheckT00ReferenceComparableRaw
+      : null;
+  const independentCrossCheckReferenceLower =
+    independentCrossCheckReference?.toLowerCase() ?? null;
+  const independentCrossCheckReferenceLooksEinstein =
+    independentCrossCheckReferenceLower?.includes("einstein") === true;
+  const independentCrossCheckReferenceRouteId =
+    independentCrossCheckReferenceLower?.startsWith("same_route:") === true
+      ? independentCrossCheckReference.slice("same_route:".length)
+      : independentCrossCheckReference;
+  const independentCrossCheckDeclaredSameRoute =
+    independentCrossCheckReferenceLower?.includes("same_route") === true ||
+    (routeId != null && independentCrossCheckReference === routeId);
+  const independentCrossCheckReferenceLooksLegacyAdm =
+    independentCrossCheckReferenceRouteId === NHM2_MODEL_TERM_LEGACY_ROUTE_ID;
+  const independentCrossCheckPrimaryRouteLooksEinstein =
+    routeId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+    einsteinTensorRouteId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID;
+  const independentCrossCheckResidualPass =
+    independentCrossCheckMaxRelativeResidual != null &&
+    independentCrossCheckRelativeResidualThreshold != null
+      ? independentCrossCheckMaxRelativeResidual <=
+        independentCrossCheckRelativeResidualThreshold
+      : null;
+  const independentCrossCheckT00ResidualPass =
+    independentCrossCheckT00MaxRelativeResidual != null &&
+    independentCrossCheckRelativeResidualThreshold != null
+      ? independentCrossCheckT00MaxRelativeResidual <=
+        independentCrossCheckRelativeResidualThreshold
+      : null;
+  const independentCrossCheckEvidencePresent =
+    independentCrossCheckStatusRaw === "available" &&
+    independentCrossCheckComparedSampleCount != null &&
+    independentCrossCheckComparedSampleCount > 0;
+  const independentCrossCheckThresholdFailed =
+    independentCrossCheckEvidencePresent &&
+    independentCrossCheckResidualPass === false;
+  const independentCrossCheckRouteIndependentEffective =
+    independentCrossCheckRouteIndependent ??
+    (independentCrossCheckReference != null &&
+      !independentCrossCheckDeclaredSameRoute &&
+      (routeId == null || independentCrossCheckReference !== routeId));
+  // The ADM fallback route is retained only as a legacy recovery path. Treat
+  // Einstein-vs-legacy-ADM residual mismatches as non-comparable cross-check
+  // evidence instead of threshold failures.
+  const independentCrossCheckReferenceComparable =
+    independentCrossCheckEvidencePresent
+      ? !(
+          independentCrossCheckPrimaryRouteLooksEinstein &&
+          independentCrossCheckReferenceLooksLegacyAdm
+        )
+      : null;
+  const independentCrossCheckEvidenceStatus: "available" | "missing" | "unknown" =
+    independentCrossCheckEvidencePresent
+      ? "available"
+      : independentCrossCheckStatusRaw === "missing"
+        ? "missing"
+        : "unknown";
+  const independentCrossCheckAdmissionStatus: "pass" | "fail" | "unknown" =
+    independentCrossCheckEvidenceStatus === "available"
+      ? independentCrossCheckRouteIndependentEffective === true &&
+        !independentCrossCheckDeclaredSameRoute &&
+        independentCrossCheckReferenceComparable !== false &&
+        independentCrossCheckResidualPass !== false
+        ? "pass"
+        : "fail"
+      : independentCrossCheckEvidenceStatus === "missing"
+        ? "fail"
+        : "unknown";
+  const independentCrossCheckAdmissionFailureMode =
+    independentCrossCheckAdmissionStatus === "pass"
+      ? "none"
+      : independentCrossCheckReferenceComparable === false
+        ? "reference_route_non_comparable"
+        : independentCrossCheckThresholdFailed
+        ? "threshold_failed"
+        : independentCrossCheckRouteIndependentEffective === false ||
+            independentCrossCheckDeclaredSameRoute
+          ? "same_route_not_independent"
+          : independentCrossCheckEvidenceStatus === "available"
+            ? "admission_ambiguous"
+            : "missing_evidence";
+  const declaredIndependentEinsteinCrossCheckStatus:
+    | "available"
+    | "missing"
+    | "unknown" =
+    independentCrossCheckAdmissionStatus === "pass"
+      ? "available"
+      : independentCrossCheckAdmissionStatus === "fail"
+        ? "missing"
+        : "unknown";
+  const effectiveEinsteinRouteEvidenceStatus:
+    | "available"
+    | "missing"
+    | "unknown" =
+    einsteinTensorRouteStatus !== "unknown"
+      ? einsteinTensorRouteStatus
+      : declaredIndependentEinsteinCrossCheckStatus === "available"
+        ? "available"
+        : support.full_einstein_tensor_route === "present_admitted" ||
+            support.full_einstein_tensor_route === "present_but_not_admitted"
+          ? "available"
+          : support.full_einstein_tensor_route === "missing"
+            ? "missing"
+            : "unknown";
+  const inferredIndependentEinsteinCrossCheckStatus:
+    | "available"
+    | "missing"
+    | "unknown" =
+    effectiveEinsteinRouteEvidenceStatus === "available" &&
+    routeId != null &&
+    routeId !== NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID
+      ? "available"
+      : effectiveEinsteinRouteEvidenceStatus === "available" &&
+          routeId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID
+        ? "missing"
+        : "unknown";
+  const effectiveEinsteinCrossCheckStatus =
+    declaredIndependentEinsteinCrossCheckStatus !== "unknown"
+      ? declaredIndependentEinsteinCrossCheckStatus
+      : inferredIndependentEinsteinCrossCheckStatus !== "unknown"
+        ? inferredIndependentEinsteinCrossCheckStatus
+        : effectiveEinsteinRouteEvidenceStatus === "missing"
+          ? "missing"
+          : "unknown";
+  const effectiveResidualAttributionStatus =
+    residualAttributionStatus !== "unknown"
+      ? residualAttributionStatus
+      : effectiveEinsteinRouteEvidenceStatus;
+  const effectiveResidualAttributionSampleCount =
+    residualAttributionSampleCount ??
+    einsteinTensorComparedSampleCount ??
+    (effectiveResidualAttributionStatus === "available" ? 0 : null);
+  const effectiveResidualAttributionMaxRelativeResidual =
+    residualAttributionMaxRelativeResidual ??
+    einsteinTensorMaxRelativeResidual ??
+    null;
+  const effectiveResidualAttributionConventionSweep =
+    residualAttributionConventionSweep.length > 0
+      ? residualAttributionConventionSweep
+      : [
+          {
+            candidateId: "raw_geometry_fd4",
+            status: effectiveResidualAttributionStatus,
+            maxRelativeResidual: effectiveResidualAttributionMaxRelativeResidual,
+            note:
+              effectiveResidualAttributionStatus === "available"
+                ? "Only baseline geometry-first Einstein residual diagnostic is available on this runtime payload."
+                : "No residual-attribution sweep was emitted by the producer diagnostics.",
+          },
+        ];
+  const effectiveResidualAttributionBestCandidateId =
+    residualAttributionBestCandidateId ??
+    (effectiveResidualAttributionConventionSweep.length > 0
+      ? effectiveResidualAttributionConventionSweep.reduce(
+          (best, candidate) => {
+            if (candidate.maxRelativeResidual == null) return best;
+            if (best == null) return candidate;
+            if (best.maxRelativeResidual == null) return candidate;
+            return candidate.maxRelativeResidual < best.maxRelativeResidual
+              ? candidate
+              : best;
+          },
+          null as
+            | {
+                candidateId: string;
+                status: "available" | "missing" | "unknown";
+                maxRelativeResidual: number | null;
+                note: string | null;
+              }
+            | null,
+        )?.candidateId ?? null
+      : null);
+  const effectiveResidualAttributionBestCandidateResidual =
+    residualAttributionBestCandidateResidual ??
+    (effectiveResidualAttributionBestCandidateId == null
+      ? null
+      : effectiveResidualAttributionConventionSweep.find(
+          (candidate) =>
+            candidate.candidateId === effectiveResidualAttributionBestCandidateId,
+        )?.maxRelativeResidual ?? null);
+  const effectiveResidualAttributionDiagnosisClass =
+    residualAttributionDiagnosisClass !== "unknown"
+      ? residualAttributionDiagnosisClass
+      : checks.finiteDifferenceConvergence === "fail"
+        ? "discretization_mismatch"
+        : "unknown";
+  const effectiveResidualAttributionNote =
+    residualAttributionNote ??
+    (effectiveResidualAttributionStatus === "available"
+      ? "Residual-attribution diagnostics defaulted to baseline Einstein-route residual evidence."
+      : "Residual-attribution diagnostics were not emitted by the producer path.");
+  const effectiveEvaluatorClosureStatus =
+    evaluatorClosureStatus !== "unknown"
+      ? evaluatorClosureStatus
+      : effectiveResidualAttributionStatus;
+  const residualT0iFamilyMax = resolveFamilyResidualMax([
+    residualAttributionComponentResiduals.T01,
+    residualAttributionComponentResiduals.T02,
+    residualAttributionComponentResiduals.T03,
+  ]);
+  const residualOffDiagonalFamilyMax = resolveFamilyResidualMax([
+    residualAttributionComponentResiduals.T12,
+    residualAttributionComponentResiduals.T13,
+    residualAttributionComponentResiduals.T23,
+  ]);
+  const effectiveEvaluatorClosureResolutionSweep = {
+    coarse: {
+      step_m: evaluatorCoarseSweep.step_m ?? finiteCoarseStep_m ?? null,
+      comparedSampleCount:
+        evaluatorCoarseSweep.comparedSampleCount ??
+        effectiveResidualAttributionSampleCount ??
+        null,
+      t0iMaxRelativeResidual:
+        evaluatorCoarseSweep.t0iMaxRelativeResidual ?? residualT0iFamilyMax,
+      offDiagonalMaxRelativeResidual:
+        evaluatorCoarseSweep.offDiagonalMaxRelativeResidual ??
+        residualOffDiagonalFamilyMax,
+    },
+    refined: {
+      step_m: evaluatorRefinedSweep.step_m ?? finiteRefinedStep_m ?? null,
+      comparedSampleCount: evaluatorRefinedSweep.comparedSampleCount ?? null,
+      t0iMaxRelativeResidual: evaluatorRefinedSweep.t0iMaxRelativeResidual ?? null,
+      offDiagonalMaxRelativeResidual:
+        evaluatorRefinedSweep.offDiagonalMaxRelativeResidual ?? null,
+    },
+    superRefined: {
+      step_m:
+        evaluatorSuperRefinedSweep.step_m ?? finiteSuperRefinedStep_m ?? null,
+      comparedSampleCount:
+        evaluatorSuperRefinedSweep.comparedSampleCount ?? null,
+      t0iMaxRelativeResidual:
+        evaluatorSuperRefinedSweep.t0iMaxRelativeResidual ?? null,
+      offDiagonalMaxRelativeResidual:
+        evaluatorSuperRefinedSweep.offDiagonalMaxRelativeResidual ?? null,
+    },
+  };
+  const effectiveEvaluatorClosureConvergenceOrder = {
+    t0i:
+      evaluatorObservedConvergenceOrderT0i ?? finiteT0iConvergenceOrderMean ?? null,
+    offDiagonal:
+      evaluatorObservedConvergenceOrderOffDiagonal ??
+      finiteOffDiagonalConvergenceOrderMean ??
+      null,
+  };
+  const effectiveEvaluatorClosureRichardsonResidual = {
+    t0i: evaluatorRichardsonResidualT0i,
+    offDiagonal: evaluatorRichardsonResidualOffDiagonal,
+  };
+  const effectiveEvaluatorClosureConventionSweep =
+    evaluatorClosureConventionSweep.length > 0
+      ? evaluatorClosureConventionSweep
+      : effectiveResidualAttributionConventionSweep;
+  const effectiveEvaluatorClosureBestCandidateId =
+    evaluatorClosureBestCandidateId ??
+    effectiveResidualAttributionBestCandidateId ??
+    (effectiveEvaluatorClosureConventionSweep.length > 0
+      ? effectiveEvaluatorClosureConventionSweep[0]?.candidateId ?? null
+      : null);
+  const effectiveEvaluatorClosureDiagnosisClass =
+    evaluatorClosureDiagnosisClass !== "unknown"
+      ? evaluatorClosureDiagnosisClass
+      : effectiveResidualAttributionDiagnosisClass;
+  const effectiveEvaluatorClosureNote =
+    evaluatorClosureNote ??
+    (effectiveEvaluatorClosureStatus === "available"
+      ? "Evaluator closure diagnostics were synthesized from available Einstein-route residual and finite-difference evidence."
+      : "Evaluator closure diagnostics are unavailable because Einstein-route diagnostics are missing.");
+  const effectiveEvaluatorClosureCitationRefs = Array.from(
+    new Set(
+      [
+        ...evaluatorClosureCitationRefs,
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+      ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  const hasEinsteinRouteEvidenceForAdmission =
+    effectiveEinsteinRouteEvidenceStatus === "available" &&
+    (einsteinTensorRouteId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+      routeId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+      einsteinTensorTensorSource === "geometry_first_einstein_tensor");
+  const einsteinT00ResidualThreshold =
+    einsteinTensorT00RelativeResidualThreshold ??
+    independentCrossCheckRelativeResidualThreshold;
+  const einsteinRouteT00EvidencePresent =
+    einsteinTensorT00ComparedSampleCount != null &&
+    einsteinTensorT00ComparedSampleCount > 0 &&
+    einsteinTensorT00MaxRelativeResidual != null &&
+    einsteinT00ResidualThreshold != null;
+  const einsteinRouteT00ResidualPass =
+    einsteinRouteT00EvidencePresent &&
+    einsteinTensorT00MaxRelativeResidual <= einsteinT00ResidualThreshold;
+  const independentCrossCheckT00EvidencePresent =
+    independentCrossCheckEvidencePresent &&
+    independentCrossCheckT00ComparedSampleCount != null &&
+    independentCrossCheckT00ComparedSampleCount > 0 &&
+    independentCrossCheckT00ResidualPass != null;
+  const independentCrossCheckT00Comparable =
+    independentCrossCheckT00ReferenceComparable ??
+    (independentCrossCheckReferenceComparable !== false &&
+      independentCrossCheckRouteIndependentEffective === true &&
+      !independentCrossCheckDeclaredSameRoute);
+  const independentCrossCheckT00Pass =
+    independentCrossCheckT00EvidencePresent &&
+    independentCrossCheckT00Comparable !== false &&
+    independentCrossCheckT00ResidualPass !== false;
+  checks.einsteinT00Comparability =
+    einsteinRouteT00ResidualPass && independentCrossCheckT00Pass
+      ? "pass"
+      : einsteinRouteT00EvidencePresent || independentCrossCheckT00EvidencePresent
+        ? "fail"
+        : "unknown";
+  checks.independentCrossCheck =
+    independentCrossCheckAdmissionStatus === "pass"
+      ? "pass"
+      : independentCrossCheckAdmissionStatus === "fail"
+        ? "fail"
+        : "unknown";
+  if (checks.independentCrossCheck !== "pass") {
+    reasonCodes.push(
+      independentCrossCheckAdmissionFailureMode === "threshold_failed"
+        ? "independent_cross_check_failed_threshold"
+        : "independent_cross_check_missing",
+    );
+  }
+  const chartRecord = adapter?.chart as Record<string, unknown> | undefined;
+  const dtGammaPolicy = asText(chartRecord?.dtGammaPolicy);
+  const gammaDiag = (adapter?.gammaDiag ?? null) as [number, number, number] | null;
+  const hasStaticEuclideanGamma =
+    gammaDiag != null &&
+    isFiniteTriplet(gammaDiag) &&
+    Math.abs(gammaDiag[0] - 1) <= 1e-12 &&
+    Math.abs(gammaDiag[1] - 1) <= 1e-12 &&
+    Math.abs(gammaDiag[2] - 1) <= 1e-12;
+  const hasExpectedModelTermRoute =
+    routeId === NHM2_MODEL_TERM_EXPECTED_ROUTE_ID;
+  const dtGammaThetaCandidates = [
+    toFiniteNumber((adapter?.betaDiagnostics as Record<string, unknown>)?.thetaMax),
+    toFiniteNumber(
+      (adapter?.betaDiagnostics as Record<string, unknown>)?.divBetaMaxAbs,
+    ),
+    toFiniteNumber((warpState?.hodgeDiagnostics as Record<string, unknown>)?.maxDiv),
+  ].filter((value): value is number => value != null);
+  const dtGammaThetaMax =
+    dtGammaThetaCandidates.length > 0
+      ? dtGammaThetaCandidates.reduce(
+          (maxValue, value) => Math.max(maxValue, Math.abs(value)),
+          0,
+        )
+      : null;
+  let dtGammaPass: boolean | null = null;
+  let dtGammaClosureMode: "computed_policy" | "static_euclidean_gamma" | "theta_bound" | "unknown" =
+    "unknown";
+  if (dtGammaPolicy === "computed") {
+    dtGammaPass = true;
+    dtGammaClosureMode = "computed_policy";
+  } else if (dtGammaPolicy === "assumed_zero") {
+    if (hasStaticEuclideanGamma && hasExpectedModelTermRoute) {
+      dtGammaPass = true;
+      dtGammaClosureMode = "static_euclidean_gamma";
+    } else if (dtGammaThetaMax != null) {
+      dtGammaPass = dtGammaThetaMax <= NHM2_MODEL_TERM_DT_GAMMA_THETA_MAX;
+      dtGammaClosureMode = "theta_bound";
+    }
+  }
+  checks.dtGammaAssumptionBounded =
+    dtGammaPass == null ? "unknown" : dtGammaPass ? "pass" : "fail";
+  if (checks.dtGammaAssumptionBounded !== "pass") {
+    reasonCodes.push("dt_gamma_assumption_unbounded");
+  }
+
+  const citationRefs = Array.from(
+    new Set(
+      [
+        NHM2_FULL_TENSOR_SEMANTICS_REF,
+        researchBasisRef,
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+      ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  const citationBasisPass =
+    researchBasisRef != null &&
+    citationRefs.length >= NHM2_MODEL_TERM_CITATION_REFS.length;
+  checks.citationBasis = citationBasisPass ? "pass" : "fail";
+  if (!citationBasisPass) {
+    reasonCodes.push("citation_basis_missing");
+  }
+  const citationCoverage = resolveResearchBasisCitationCoverage(researchBasisRef);
+  const citationRefsCoveragePass = NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS.every(
+    (ref) => citationRefs.includes(ref),
+  );
+  const citationRefsMissingRefs = NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS.filter(
+    (ref) => !citationRefs.includes(ref),
+  );
+  checks.citationCoverage =
+    citationCoverage.status === "pass" && citationRefsCoveragePass
+      ? "pass"
+      : citationCoverage.status === "fail"
+        ? "fail"
+        : citationRefsCoveragePass
+          ? "unknown"
+        : "unknown";
+  if (checks.citationCoverage !== "pass") {
+    reasonCodes.push("citation_coverage_incomplete");
+  }
+  const fullEinsteinStructuralChecksPass =
+    checks.routeMetadata === "pass" &&
+    checks.chart === "pass" &&
+    checks.finiteTensorComponents === "pass" &&
+    checks.t0iSymmetry === "pass" &&
+    checks.offDiagonalTijSymmetry === "pass" &&
+    checks.finiteDifferenceConvergence === "pass" &&
+    checks.independentCrossCheck === "pass" &&
+    checks.citationBasis === "pass" &&
+    checks.dtGammaAssumptionBounded === "pass" &&
+    checks.citationCoverage === "pass";
+  const fullEinsteinPolicyAdmissionPass = routeAdmissionRaw === "admitted";
+  const fullEinsteinEvidenceAdmissionPass =
+    hasEinsteinRouteEvidenceForAdmission &&
+    einsteinRouteValidationSuitePass &&
+    fullEinsteinStructuralChecksPass;
+  checks.fullEinsteinTensorRouteAdmission = fullEinsteinEvidenceAdmissionPass
+    ? "pass"
+    : "fail";
+  if (!fullEinsteinEvidenceAdmissionPass) {
+    reasonCodes.push("full_einstein_tensor_route_not_admitted");
+  }
+
+  const routeAdmissionEffective: Nhm2ObserverModelTermSemanticAdmissionEvidence["routeAdmission"] =
+    routeAdmissionRaw === "admitted"
+      ? "admitted"
+      : fullEinsteinEvidenceAdmissionPass
+        ? "admitted"
+        : routeAdmissionRaw;
+  const routeAdmissionPromotionBasis: Nhm2ObserverModelTermSemanticAdmissionEvidence["routeAdmissionPromotionBasis"] =
+    routeAdmissionRaw === "admitted"
+      ? "producer_declared_admitted"
+      : fullEinsteinEvidenceAdmissionPass
+        ? "evidence_gate_promoted_full_einstein"
+        : routeAdmissionRaw === "experimental_not_admitted"
+          ? "evidence_gate_not_satisfied"
+          : "unknown";
+
+  const structuralPass =
+    checks.routeMetadata === "pass" &&
+    checks.chart === "pass" &&
+    checks.finiteTensorComponents === "pass" &&
+    checks.t0iSymmetry === "pass" &&
+    checks.offDiagonalTijSymmetry === "pass" &&
+    checks.citationBasis === "pass" &&
+    checks.finiteDifferenceConvergence === "pass" &&
+    checks.independentCrossCheck === "pass" &&
+    checks.dtGammaAssumptionBounded === "pass" &&
+    checks.citationCoverage === "pass";
+  const derivationRoutePass =
+    checks.supportFieldRouteAdmission === "pass" ||
+    checks.fullEinsteinTensorRouteAdmission === "pass";
+  const decision: Nhm2ObserverModelTermSemanticAdmissionEvidence["decision"] =
+    routeAdmissionEffective === "admitted" && structuralPass && derivationRoutePass
+      ? "admit"
+      : routeAdmissionEffective === "unknown" && reasonCodes.length === 0
+        ? "unknown"
+        : "do_not_admit";
+  const closurePathDecision = deriveNhm2ModelTermClosurePathDecision({
+    routeId,
+    checks,
+    reasonCodes,
+    effectiveEinsteinCrossCheckStatus,
+    einsteinTensorRouteId,
+    researchBasisRef,
+    citationRefs,
+  });
+  const routeScopedReasonCodes = resolveRouteScopedModelTermReasonCodes({
+    selectedPath: closurePathDecision.selectedPath,
+    reasonCodes,
+    checks,
+  });
+
+  const chartLabel =
+    chartRef ??
+    (typeof adapter?.chart?.label === "string" && adapter.chart.label.length > 0
+      ? adapter.chart.label
+      : "unknown");
+  const tensorRef = args.metricRequiredTensorInput.tensorRef ?? "warp.metricStressEnergy";
+
+  return {
+    semanticsRef: args.producerEvidence.semanticsRef ?? NHM2_FULL_TENSOR_SEMANTICS_REF,
+    researchBasisRef,
+    chartRef: chartLabel,
+    routeId,
+    routeAdmissionRaw,
+    routeAdmissionEffective,
+    routeAdmissionPromotionBasis,
+    routeAdmission: routeAdmissionEffective,
+    decision,
+    reasonCodes: routeScopedReasonCodes.blockerCodes,
+    checks,
+    einsteinTensorRouteEvidence: {
+      status: effectiveEinsteinRouteEvidenceStatus,
+      routeId:
+        effectiveEinsteinRouteEvidenceStatus === "available"
+          ? einsteinTensorRouteId ??
+            (independentCrossCheckReferenceLooksEinstein
+              ? independentCrossCheckReference
+              : null) ??
+            NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID
+          : einsteinTensorRouteId ?? null,
+      tensorSource: einsteinTensorTensorSource,
+      comparedSampleCount: einsteinTensorComparedSampleCount,
+      maxRelativeResidual: einsteinTensorMaxRelativeResidual,
+      t00ComparedSampleCount: einsteinTensorT00ComparedSampleCount,
+      t00MaxRelativeResidual: einsteinTensorT00MaxRelativeResidual,
+      t00RelativeResidualThreshold: einsteinT00ResidualThreshold,
+      note:
+        einsteinTensorRouteNote ??
+        (effectiveEinsteinRouteEvidenceStatus === "available"
+          ? checks.independentCrossCheck === "pass"
+            ? "Geometry-first Einstein-tensor route is available with an independent cross-check path."
+            : "Geometry-first Einstein-tensor route is available, but independent cross-check evidence is missing or same-route."
+          : "Geometry-first Einstein-tensor route evidence is missing."),
+    },
+    einsteinResidualAttributionEvidence: {
+      status: effectiveResidualAttributionStatus,
+      sampleCount: effectiveResidualAttributionSampleCount,
+      maxRelativeResidual: effectiveResidualAttributionMaxRelativeResidual,
+      componentResiduals: {
+        T01: residualAttributionComponentResiduals.T01,
+        T02: residualAttributionComponentResiduals.T02,
+        T03: residualAttributionComponentResiduals.T03,
+        T12: residualAttributionComponentResiduals.T12,
+        T13: residualAttributionComponentResiduals.T13,
+        T23: residualAttributionComponentResiduals.T23,
+      },
+      conventionSweep: effectiveResidualAttributionConventionSweep,
+      bestCandidateId: effectiveResidualAttributionBestCandidateId,
+      bestCandidateResidual: effectiveResidualAttributionBestCandidateResidual,
+      diagnosisClass: effectiveResidualAttributionDiagnosisClass,
+      note: effectiveResidualAttributionNote,
+    },
+    einsteinEvaluatorClosureEvidence: {
+      status: effectiveEvaluatorClosureStatus,
+      chartRef: evaluatorClosureChartRef ?? chartLabel,
+      routeId:
+        evaluatorClosureRouteId ??
+        einsteinTensorRouteId ??
+        (effectiveEvaluatorClosureStatus === "available"
+          ? NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID
+          : null),
+      unitConvention:
+        evaluatorClosureUnitConvention ??
+        (effectiveEvaluatorClosureStatus === "available"
+          ? "si_from_geometry_via_inv8pi_and_geom_to_si_stress"
+          : null),
+      signConvention:
+        evaluatorClosureSignConvention ??
+        (effectiveEvaluatorClosureStatus === "available"
+          ? "T_munu_equals_plus_G_munu_over_8pi"
+          : null),
+      resolutionSweep: effectiveEvaluatorClosureResolutionSweep,
+      observedConvergenceOrder: effectiveEvaluatorClosureConvergenceOrder,
+      richardsonExtrapolatedResidual: effectiveEvaluatorClosureRichardsonResidual,
+      conventionSweep: effectiveEvaluatorClosureConventionSweep,
+      bestCandidateId: effectiveEvaluatorClosureBestCandidateId,
+      diagnosisClass: effectiveEvaluatorClosureDiagnosisClass,
+      note: effectiveEvaluatorClosureNote,
+      citationRefs: effectiveEvaluatorClosureCitationRefs,
+    },
+    einsteinRouteValidationSuite,
+    closurePathDecision,
+    citationRefs,
+    notes: [
+      `metricRequired.tensorRef=${tensorRef}`,
+      `metricRequired.model.fluxHandling=${args.metricRequiredTensorInput.model?.fluxHandling ?? "unknown"}`,
+      `metricRequired.model.shearHandling=${args.metricRequiredTensorInput.model?.shearHandling ?? "unknown"}`,
+      `routeId=${routeId ?? "unknown"}`,
+      `routeAdmissionRaw=${routeAdmissionRaw}`,
+      `routeAdmissionEffective=${routeAdmissionEffective}`,
+      `routeAdmissionPromotionBasis=${routeAdmissionPromotionBasis}`,
+      `chartRef=${chartLabel}`,
+      `finiteDifferenceStatus=${checks.finiteDifferenceConvergence}`,
+      `finiteDifferenceComparedSampleCount=${finiteComparedSampleCount ?? "unknown"}`,
+      `finiteDifferenceRouteLocalComparedSampleCount=${finiteRouteLocalComparedSampleCount ?? "unknown"}`,
+      `finiteDifferenceRouteSuppressedSampleCount=${finiteRouteSuppressedSampleCount ?? "unknown"}`,
+      `finiteDifferenceNumericalFloorSuppressedSampleCount=${finiteNumericalFloorSuppressedSampleCount ?? "unknown"}`,
+      `finiteDifferenceTripletComparedSampleCount=${finiteTripletComparedSampleCount ?? "unknown"}`,
+      `finiteDifferenceFailureMode=${finiteConvergenceFailureMode ?? "unknown"}`,
+      `finiteDifferenceSignificanceFloorRelativeToT00=${finiteConvergenceSignificanceFloorRelativeToT00 ?? "unknown"}`,
+      `finiteDifferenceThreshold=${finiteRelativeThreshold ?? "unknown"}`,
+      `finiteDifferenceT0iDriftMax=${finiteT0iDriftMax ?? "unknown"}`,
+      `finiteDifferenceT0iDriftRefinedMax=${finiteT0iRefinedDriftMax ?? "unknown"}`,
+      `finiteDifferenceT0iConvergenceOrderMean=${finiteT0iConvergenceOrderMean ?? "unknown"}`,
+      `finiteDifferenceOffDiagonalDriftMax=${finiteOffDiagonalDriftMax ?? "unknown"}`,
+      `finiteDifferenceOffDiagonalDriftRefinedMax=${finiteOffDiagonalRefinedDriftMax ?? "unknown"}`,
+      `finiteDifferenceOffDiagonalConvergenceOrderMean=${finiteOffDiagonalConvergenceOrderMean ?? "unknown"}`,
+      `finiteDifferenceFallbackComparable=${String(evaluatorClosureComparableToEinsteinRoute)}`,
+      `finiteDifferenceFallbackComparedSampleCount=${finiteDifferenceFallbackComparedSampleCount ?? "unknown"}`,
+      `finiteDifferenceFallbackResidualThreshold=${evaluatorFiniteDifferenceThreshold ?? "unknown"}`,
+      `finiteDifferenceFallbackFinestT0iResidual=${evaluatorFinestT0iResidual ?? "unknown"}`,
+      `finiteDifferenceFallbackFinestOffDiagonalResidual=${evaluatorFinestOffDiagonalResidual ?? "unknown"}`,
+      `finiteDifferenceFallbackResidualThresholdPass=${evaluatorResidualThresholdPass == null ? "unknown" : String(evaluatorResidualThresholdPass)}`,
+      `finiteDifferenceFallbackMonotonicPass=${evaluatorMonotonicPass == null ? "unknown" : String(evaluatorMonotonicPass)}`,
+      `finiteDifferenceFallbackHasComparablePair=${String(evaluatorHasComparablePair)}`,
+      `finiteDifferenceFallbackHasComparableTriplet=${String(evaluatorHasComparableTriplet)}`,
+      `finiteDifferenceFallbackFailureMode=${finiteDifferenceFallbackFailureMode}`,
+      `independentCrossCheckStatus=${checks.independentCrossCheck}`,
+      `independentCrossCheckEvidencePresent=${String(independentCrossCheckEvidencePresent)}`,
+      `independentCrossCheckEvidenceStatus=${independentCrossCheckEvidenceStatus}`,
+      `independentCrossCheckAdmissionStatus=${independentCrossCheckAdmissionStatus}`,
+      `independentCrossCheckAdmissionFailureMode=${independentCrossCheckAdmissionFailureMode}`,
+      `independentCrossCheckFailureMode=${independentCrossCheckFailureMode ?? "unknown"}`,
+      `independentCrossCheckFailureModeRaw=${independentCrossCheckFailureMode ?? "unknown"}`,
+      `independentCrossCheckRef=${independentCrossCheckReference ?? "none"}`,
+      `independentCrossCheckReferenceRouteId=${independentCrossCheckReferenceRouteId ?? "none"}`,
+      `independentCrossCheckSameRoute=${String(independentCrossCheckDeclaredSameRoute)}`,
+      `independentCrossCheckComparedSampleCount=${independentCrossCheckComparedSampleCount ?? "unknown"}`,
+      `independentCrossCheckReferenceRouteSuppressedSampleCount=${independentCrossCheckReferenceRouteSuppressedSampleCount ?? "unknown"}`,
+      `independentCrossCheckMaxRelativeResidual=${independentCrossCheckMaxRelativeResidual ?? "unknown"}`,
+      `independentCrossCheckRelativeResidualThreshold=${independentCrossCheckRelativeResidualThreshold ?? "unknown"}`,
+      `independentCrossCheckResidualPass=${independentCrossCheckResidualPass == null ? "unknown" : String(independentCrossCheckResidualPass)}`,
+      `independentCrossCheckThresholdFailed=${String(independentCrossCheckThresholdFailed)}`,
+      `independentCrossCheckRouteIndependent=${independentCrossCheckRouteIndependentEffective == null ? "unknown" : String(independentCrossCheckRouteIndependentEffective)}`,
+      `independentCrossCheckReferenceComparable=${independentCrossCheckReferenceComparable == null ? "unknown" : String(independentCrossCheckReferenceComparable)}`,
+      `independentCrossCheckT00ComparedSampleCount=${independentCrossCheckT00ComparedSampleCount ?? "unknown"}`,
+      `independentCrossCheckT00MaxRelativeResidual=${independentCrossCheckT00MaxRelativeResidual ?? "unknown"}`,
+      `independentCrossCheckT00ResidualPass=${independentCrossCheckT00ResidualPass == null ? "unknown" : String(independentCrossCheckT00ResidualPass)}`,
+      `independentCrossCheckT00ReferenceComparable=${independentCrossCheckT00Comparable == null ? "unknown" : String(independentCrossCheckT00Comparable)}`,
+      `einsteinTensorRouteStatus=${effectiveEinsteinRouteEvidenceStatus}`,
+      `einsteinTensorRouteId=${einsteinTensorRouteId ?? "none"}`,
+      `einsteinTensorTensorSource=${einsteinTensorTensorSource ?? "unknown"}`,
+      `einsteinTensorComparedSampleCount=${einsteinTensorComparedSampleCount ?? "unknown"}`,
+      `einsteinTensorMaxRelativeResidual=${einsteinTensorMaxRelativeResidual ?? "unknown"}`,
+      `einsteinTensorT00ComparedSampleCount=${einsteinTensorT00ComparedSampleCount ?? "unknown"}`,
+      `einsteinTensorT00MaxRelativeResidual=${einsteinTensorT00MaxRelativeResidual ?? "unknown"}`,
+      `einsteinTensorT00RelativeResidualThreshold=${einsteinT00ResidualThreshold ?? "unknown"}`,
+      `einsteinT00ComparabilityStatus=${checks.einsteinT00Comparability}`,
+      `fullEinsteinRouteAdmissionStatus=${checks.fullEinsteinTensorRouteAdmission}`,
+      `fullEinsteinEvidenceAdmissionPass=${String(fullEinsteinEvidenceAdmissionPass)}`,
+      `fullEinsteinPolicyAdmissionPass=${String(fullEinsteinPolicyAdmissionPass)}`,
+      `einsteinResidualAttributionStatus=${effectiveResidualAttributionStatus}`,
+      `einsteinResidualAttributionSampleCount=${effectiveResidualAttributionSampleCount ?? "unknown"}`,
+      `einsteinResidualAttributionMaxRelativeResidual=${effectiveResidualAttributionMaxRelativeResidual ?? "unknown"}`,
+      `einsteinResidualAttributionDiagnosisClass=${effectiveResidualAttributionDiagnosisClass}`,
+      `einsteinResidualAttributionBestCandidateId=${effectiveResidualAttributionBestCandidateId ?? "none"}`,
+      `einsteinResidualAttributionBestCandidateResidual=${effectiveResidualAttributionBestCandidateResidual ?? "unknown"}`,
+      `einsteinResidualAttributionComponents=${NHM2_EINSTEIN_COMPARE_CANONICAL_KEYS.map((key) => `${key}:${residualAttributionComponentResiduals[key] ?? "unknown"}`).join("|")}`,
+      `einsteinEvaluatorClosureStatus=${effectiveEvaluatorClosureStatus}`,
+      `einsteinEvaluatorClosureChartRef=${evaluatorClosureChartRef ?? chartLabel}`,
+      `einsteinEvaluatorClosureRouteId=${evaluatorClosureRouteId ?? einsteinTensorRouteId ?? "none"}`,
+      `einsteinEvaluatorClosureUnitConvention=${evaluatorClosureUnitConvention ?? "unknown"}`,
+      `einsteinEvaluatorClosureSignConvention=${evaluatorClosureSignConvention ?? "unknown"}`,
+      `einsteinEvaluatorClosureCoarseStep=${effectiveEvaluatorClosureResolutionSweep.coarse.step_m ?? "unknown"}`,
+      `einsteinEvaluatorClosureRefinedStep=${effectiveEvaluatorClosureResolutionSweep.refined.step_m ?? "unknown"}`,
+      `einsteinEvaluatorClosureSuperRefinedStep=${effectiveEvaluatorClosureResolutionSweep.superRefined.step_m ?? "unknown"}`,
+      `einsteinEvaluatorClosureCoarseSampleCount=${effectiveEvaluatorClosureResolutionSweep.coarse.comparedSampleCount ?? "unknown"}`,
+      `einsteinEvaluatorClosureRefinedSampleCount=${effectiveEvaluatorClosureResolutionSweep.refined.comparedSampleCount ?? "unknown"}`,
+      `einsteinEvaluatorClosureSuperRefinedSampleCount=${effectiveEvaluatorClosureResolutionSweep.superRefined.comparedSampleCount ?? "unknown"}`,
+      `einsteinEvaluatorClosureCoarseT0iResidual=${effectiveEvaluatorClosureResolutionSweep.coarse.t0iMaxRelativeResidual ?? "unknown"}`,
+      `einsteinEvaluatorClosureCoarseOffDiagonalResidual=${effectiveEvaluatorClosureResolutionSweep.coarse.offDiagonalMaxRelativeResidual ?? "unknown"}`,
+      `einsteinEvaluatorClosureRefinedT0iResidual=${effectiveEvaluatorClosureResolutionSweep.refined.t0iMaxRelativeResidual ?? "unknown"}`,
+      `einsteinEvaluatorClosureRefinedOffDiagonalResidual=${effectiveEvaluatorClosureResolutionSweep.refined.offDiagonalMaxRelativeResidual ?? "unknown"}`,
+      `einsteinEvaluatorClosureSuperRefinedT0iResidual=${effectiveEvaluatorClosureResolutionSweep.superRefined.t0iMaxRelativeResidual ?? "unknown"}`,
+      `einsteinEvaluatorClosureSuperRefinedOffDiagonalResidual=${effectiveEvaluatorClosureResolutionSweep.superRefined.offDiagonalMaxRelativeResidual ?? "unknown"}`,
+      `einsteinEvaluatorClosureObservedOrderT0i=${effectiveEvaluatorClosureConvergenceOrder.t0i ?? "unknown"}`,
+      `einsteinEvaluatorClosureObservedOrderOffDiagonal=${effectiveEvaluatorClosureConvergenceOrder.offDiagonal ?? "unknown"}`,
+      `einsteinEvaluatorClosureRichardsonT0i=${effectiveEvaluatorClosureRichardsonResidual.t0i ?? "unknown"}`,
+      `einsteinEvaluatorClosureRichardsonOffDiagonal=${effectiveEvaluatorClosureRichardsonResidual.offDiagonal ?? "unknown"}`,
+      `einsteinEvaluatorClosureDiagnosisClass=${effectiveEvaluatorClosureDiagnosisClass}`,
+      `einsteinEvaluatorClosureBestCandidateId=${effectiveEvaluatorClosureBestCandidateId ?? "none"}`,
+      `einsteinEvaluatorClosureCitationRefs=${effectiveEvaluatorClosureCitationRefs.length > 0 ? effectiveEvaluatorClosureCitationRefs.join(",") : "none"}`,
+      `dtGammaPolicy=${dtGammaPolicy ?? "unknown"}`,
+      `dtGammaClosureMode=${dtGammaClosureMode}`,
+      `dtGammaStaticEuclideanGamma=${String(hasStaticEuclideanGamma)}`,
+      `dtGammaExpectedRoute=${String(hasExpectedModelTermRoute)}`,
+      `dtGammaThetaMax=${dtGammaThetaMax ?? "unknown"}`,
+      `dtGammaThetaThreshold=${NHM2_MODEL_TERM_DT_GAMMA_THETA_MAX}`,
+      `citationCoverageStatus=${checks.citationCoverage}`,
+      `citationCoverageMissingRefs=${Array.from(new Set([...citationCoverage.missingRefs, ...citationRefsMissingRefs])).length > 0 ? Array.from(new Set([...citationCoverage.missingRefs, ...citationRefsMissingRefs])).join(",") : "none"}`,
+      `einsteinValidationSuite.status=${einsteinRouteValidationSuite.status}`,
+      `einsteinValidationSuite.admittedForRoutePass=${String(einsteinRouteValidationSuite.admittedForRoutePass)}`,
+      `einsteinValidationSuite.evaluatedCaseCount=${einsteinRouteValidationSuite.evaluatedCaseCount}`,
+      `einsteinValidationSuite.passedCaseCount=${einsteinRouteValidationSuite.passedCaseCount}`,
+      `einsteinValidationSuite.residualThreshold=${einsteinRouteValidationSuite.residualThreshold ?? "unknown"}`,
+      `einsteinValidationSuite.caseResults=${einsteinRouteValidationSuite.cases
+        .map(
+          (entry) =>
+            `${entry.caseId}:${entry.status}:${entry.maxAbsResidual ?? "unknown"}`,
+        )
+        .join("|")}`,
+      `structuralPass=${String(structuralPass)}`,
+      `derivationRoutePass=${String(derivationRoutePass)}`,
+      `closurePath.selected=${closurePathDecision.selectedPath}`,
+      `closurePath.nextPatchClass=${closurePathDecision.nextPatchClass}`,
+      `closurePath.rationale=${closurePathDecision.rationale ?? "none"}`,
+      `closurePath.patchBriefRef=${closurePathDecision.patchBriefRef ?? "none"}`,
+      `reasonCodes.blocking=${routeScopedReasonCodes.blockerCodes.length > 0 ? routeScopedReasonCodes.blockerCodes.join(",") : "none"}`,
+      `reasonCodes.nonBlocking=${routeScopedReasonCodes.nonBlockingCodes.length > 0 ? routeScopedReasonCodes.nonBlockingCodes.join(",") : "none"}`,
+    ],
+  };
+};
+
 const resolveMetricProducerAdmissionBranch = (args: {
   familyKind: "t0i" | "off_diagonal_tij";
   familyPresentInRuntime: boolean;
   familyMissingInObserverInput: boolean;
   familyEmissionAdmission: "admitted" | "experimental_not_admitted" | "unknown";
+  familyEmissionAdmissionEffective:
+    | "admitted"
+    | "experimental_not_admitted"
+    | "unknown";
   currentEmissionShape: Nhm2ObserverMetricProducerAdmissionEvidence["currentEmissionShape"];
+  modelTermSemanticDecision: Nhm2ObserverModelTermSemanticAdmissionEvidence["decision"];
   supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence;
 }): Nhm2ObserverMetricComponentAdmissionStatus => {
   if (args.familyPresentInRuntime && args.familyMissingInObserverInput) {
     return "existing_internal_quantity_not_serialized";
   }
   if (args.familyPresentInRuntime) {
-    if (args.familyEmissionAdmission === "admitted") {
+    if (
+      args.familyEmissionAdmissionEffective === "admitted" &&
+      args.modelTermSemanticDecision !== "do_not_admit"
+    ) {
       return "derivable_same_chart_from_existing_state";
     }
-    if (args.familyEmissionAdmission === "experimental_not_admitted") {
+    if (args.familyEmissionAdmissionEffective === "experimental_not_admitted") {
+      return "requires_new_model_term";
+    }
+    if (args.modelTermSemanticDecision === "do_not_admit") {
       return "requires_new_model_term";
     }
     return "basis_or_semantics_ambiguous";
@@ -5190,10 +7012,24 @@ const buildMetricProducerAdmissionNotes = (args: {
 const deriveNhm2MetricProducerAdmissionEvidence = (
   state: EnergyPipelineState,
   metricRequiredTensorInput: BuildNhm2ObserverAuditTensorInput,
+  modelTermSemanticEvidence:
+    | Pick<
+        Nhm2ObserverModelTermSemanticAdmissionEvidence,
+        "decision" | "routeAdmissionEffective"
+      >
+    | null = null,
 ): Nhm2ObserverMetricProducerAdmissionEvidence => {
   const { warpState, adapter } = resolveNhm2ArtifactContext(state);
   const metricStressRaw = (warpState?.metricStressEnergy ??
     null) as Record<string, unknown> | null;
+  const metricStressDiagnostics = (warpState?.metricStressDiagnostics ??
+    null) as Record<string, unknown> | null;
+  const modelTermUncertaintyDiagnostics = (metricStressDiagnostics?.modelTermUncertainty ??
+    null) as Record<string, unknown> | null;
+  const einsteinTensorRouteDiagnostics = (modelTermUncertaintyDiagnostics?.einsteinTensorRoute ??
+    null) as Record<string, unknown> | null;
+  const einsteinTensorRouteStatus = asText(einsteinTensorRouteDiagnostics?.status);
+  const einsteinTensorRouteId = asText(einsteinTensorRouteDiagnostics?.routeId);
   const modelTermRoute = asText(metricStressRaw?.modelTermRoute);
   const researchBasisRef = asText(metricStressRaw?.researchBasisRef);
   const modelTermAdmissionRaw = asText(metricStressRaw?.modelTermAdmission);
@@ -5202,6 +7038,13 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     modelTermAdmissionRaw === "experimental_not_admitted"
       ? modelTermAdmissionRaw
       : "unknown";
+  const familyEmissionAdmissionEffective:
+    | "admitted"
+    | "experimental_not_admitted"
+    | "unknown" =
+    modelTermSemanticEvidence?.routeAdmissionEffective ?? familyEmissionAdmission;
+  const modelTermSemanticDecision =
+    modelTermSemanticEvidence?.decision ?? "unknown";
   const outputFamilies: string[] = [];
   for (const key of ["T00", "T11", "T22", "T33"]) {
     if (toFiniteNumber(metricStressRaw?.[key]) != null) {
@@ -5234,29 +7077,44 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     warpState?.shiftVectorField != null &&
     typeof (warpState.shiftVectorField as Record<string, unknown>)
       .evaluateShiftVector === "function";
+  const hasExpectedRouteMetadata =
+    modelTermRoute === NHM2_MODEL_TERM_EXPECTED_ROUTE_ID ||
+    modelTermRoute === NHM2_MODEL_TERM_LEGACY_ROUTE_ID;
+  const hasModelTermFluxOrShearFamily =
+    hasT0iRuntimeFamily || hasOffDiagonalRuntimeFamily;
+  const inferredShiftVectorSupport =
+    hasExpectedRouteMetadata && hasModelTermFluxOrShearFamily;
+  const hasShiftVectorSupport =
+    hasShiftVectorEvaluator || inferredShiftVectorSupport;
   const supportFieldEvidence: Nhm2MetricProducerSupportFieldEvidence = {
     alpha: toFiniteNumber(adapter?.alpha) != null ? "present_admitted" : "missing",
-    beta_i: hasShiftVectorEvaluator ? "present_admitted" : "missing",
+    beta_i: hasShiftVectorEvaluator
+      ? "present_admitted"
+      : inferredShiftVectorSupport
+        ? familyEmissionAdmission === "admitted"
+          ? "present_admitted"
+          : "present_but_not_admitted"
+        : "missing",
     gamma_ij: isFiniteTriplet(adapter?.gammaDiag) ? "present_admitted" : "missing",
-    K_ij: hasShiftVectorEvaluator
+    K_ij: hasShiftVectorSupport
       ? familyEmissionAdmission === "admitted"
         ? "present_admitted"
         : "present_but_not_admitted"
       : "missing",
     D_j_Kj_i_minus_D_i_K_route:
-      hasT0iRuntimeFamily && hasShiftVectorEvaluator
+      hasT0iRuntimeFamily && hasShiftVectorSupport
         ? familyEmissionAdmission === "admitted"
           ? "present_admitted"
           : "present_but_not_admitted"
         : "missing",
     time_derivative_or_Kij_evolution_route:
-      hasOffDiagonalRuntimeFamily && hasShiftVectorEvaluator
+      hasOffDiagonalRuntimeFamily && hasShiftVectorSupport
         ? familyEmissionAdmission === "admitted"
           ? "present_admitted"
           : "present_but_not_admitted"
         : "missing",
     full_einstein_tensor_route:
-      modelTermRoute?.includes("einstein")
+      einsteinTensorRouteStatus === "available"
         ? familyEmissionAdmission === "admitted"
           ? "present_admitted"
           : "present_but_not_admitted"
@@ -5269,7 +7127,9 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     familyPresentInRuntime: hasT0iRuntimeFamily,
     familyMissingInObserverInput: t0iMissingInObserverInput,
     familyEmissionAdmission,
+    familyEmissionAdmissionEffective,
     currentEmissionShape,
+    modelTermSemanticDecision,
     supportFieldEvidence,
   });
   const offDiagonalTijAdmissionBranch = resolveMetricProducerAdmissionBranch({
@@ -5277,7 +7137,9 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
     familyPresentInRuntime: hasOffDiagonalRuntimeFamily,
     familyMissingInObserverInput: offDiagonalMissingInObserverInput,
     familyEmissionAdmission,
+    familyEmissionAdmissionEffective,
     currentEmissionShape,
+    modelTermSemanticDecision,
     supportFieldEvidence,
   });
   const noteBundle = buildMetricProducerAdmissionNotes({
@@ -5311,14 +7173,114 @@ const deriveNhm2MetricProducerAdmissionEvidence = (
       `metricRequired.model.shearHandling=${metricRequiredTensorInput.model?.shearHandling ?? "unknown"}`,
       `modelTermRoute=${modelTermRoute ?? "unknown"}`,
       `modelTermAdmission=${familyEmissionAdmission}`,
+      `modelTermAdmissionEffective=${familyEmissionAdmissionEffective}`,
+      `hasShiftVectorEvaluator=${String(hasShiftVectorEvaluator)}`,
+      `hasExpectedRouteMetadata=${String(hasExpectedRouteMetadata)}`,
+      `inferredShiftVectorSupport=${String(inferredShiftVectorSupport)}`,
+      `einsteinTensorRouteStatus=${einsteinTensorRouteStatus ?? "unknown"}`,
+      `einsteinTensorRouteId=${einsteinTensorRouteId ?? "none"}`,
       `researchBasisRef=${researchBasisRef ?? "none"}`,
       ...noteBundle.notes,
     ],
   };
 };
 
+const deriveNhm2T00PolicyAdmissionBridgeEvidence = (
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence,
+): Nhm2ObserverT00PolicyAdmissionBridgeEvidence => {
+  const checks = modelTermSemanticEvidence.checks;
+  const selectedPath = modelTermSemanticEvidence.closurePathDecision?.selectedPath ?? null;
+  const routeId =
+    modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    modelTermSemanticEvidence.routeId ??
+    null;
+  const requiredChecks = [
+    checks.fullEinsteinTensorRouteAdmission,
+    checks.einsteinT00Comparability,
+    checks.independentCrossCheck,
+    checks.finiteDifferenceConvergence,
+    checks.citationCoverage,
+  ];
+  const hasUnknownCheck = requiredChecks.some((status) => status === "unknown");
+  const fullEinsteinPathSelected = selectedPath === "full_einstein_tensor";
+  const routeAdmissionEffectiveAdmitted =
+    modelTermSemanticEvidence.routeAdmissionEffective === "admitted";
+  const pass =
+    checks.fullEinsteinTensorRouteAdmission === "pass" &&
+    checks.einsteinT00Comparability === "pass" &&
+    checks.independentCrossCheck === "pass" &&
+    checks.finiteDifferenceConvergence === "pass" &&
+    checks.citationCoverage === "pass" &&
+    fullEinsteinPathSelected &&
+    routeAdmissionEffectiveAdmitted;
+  const fail = !pass && !hasUnknownCheck;
+  const status: Nhm2ObserverT00PolicyAdmissionBridgeEvidence["status"] = pass
+    ? "pass"
+    : fail
+      ? "fail"
+      : "unknown";
+  const missingOrFailingChecks = [
+    `fullEinsteinTensorRouteAdmission=${checks.fullEinsteinTensorRouteAdmission}`,
+    `einsteinT00Comparability=${checks.einsteinT00Comparability}`,
+    `independentCrossCheck=${checks.independentCrossCheck}`,
+    `finiteDifferenceConvergence=${checks.finiteDifferenceConvergence}`,
+    `citationCoverage=${checks.citationCoverage}`,
+    `selectedPath=${selectedPath ?? "none"}`,
+    `routeAdmissionEffective=${modelTermSemanticEvidence.routeAdmissionEffective}`,
+  ].join("; ");
+  const rationale =
+    status === "pass"
+      ? "Observer-local T00 policy bridge passes on the selected full_einstein_tensor path with admitted Einstein-route closure, T00 comparability, finite-difference convergence, independent cross-check, and citation coverage."
+      : status === "fail"
+        ? `Observer-local T00 policy bridge is not yet satisfied (${missingOrFailingChecks}).`
+        : `Observer-local T00 policy bridge remains unresolved due unknown checks (${missingOrFailingChecks}).`;
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...modelTermSemanticEvidence.citationRefs,
+        ...(modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  return {
+    status,
+    routeId,
+    chartRef: modelTermSemanticEvidence.chartRef ?? null,
+    selectedPath,
+    routeAdmissionRaw: modelTermSemanticEvidence.routeAdmissionRaw,
+    routeAdmissionEffective: modelTermSemanticEvidence.routeAdmissionEffective,
+    routeAdmissionPromotionBasis:
+      modelTermSemanticEvidence.routeAdmissionPromotionBasis,
+    checks: {
+      fullEinsteinTensorRouteAdmission: checks.fullEinsteinTensorRouteAdmission,
+      einsteinT00Comparability: checks.einsteinT00Comparability,
+      independentCrossCheck: checks.independentCrossCheck,
+      finiteDifferenceConvergence: checks.finiteDifferenceConvergence,
+      citationCoverage: checks.citationCoverage,
+    },
+    pass,
+    rationale,
+    citationRefs,
+    notes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `routeAdmissionRaw=${modelTermSemanticEvidence.routeAdmissionRaw}`,
+      `routeAdmissionEffective=${modelTermSemanticEvidence.routeAdmissionEffective}`,
+      `routeAdmissionPromotionBasis=${modelTermSemanticEvidence.routeAdmissionPromotionBasis}`,
+      `fullEinsteinTensorRouteAdmission=${checks.fullEinsteinTensorRouteAdmission}`,
+      `einsteinT00Comparability=${checks.einsteinT00Comparability}`,
+      `independentCrossCheck=${checks.independentCrossCheck}`,
+      `finiteDifferenceConvergence=${checks.finiteDifferenceConvergence}`,
+      `citationCoverage=${checks.citationCoverage}`,
+      `bridgeStatus=${status}`,
+      `bridgePass=${String(pass)}`,
+    ],
+  };
+};
+
 const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
   evidence: Nhm2ObserverMetricProducerAdmissionEvidence;
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
 }): {
   coverageBlockerStatus: "consumer_drop" | "publication_drop" | "producer_not_emitted" | "semantics_ambiguous";
   coverageBlockerNote: string;
@@ -5329,6 +7291,11 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
     | "semantic_contract";
   emissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
   emissionAdmissionNote: string;
+  t00AdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  t00RouteId: string | null;
+  t00ComparabilityStatus: "pass" | "fail" | "unknown";
+  t00AdmissionNote: string | null;
+  t00PolicyAdmissionBridgeEvidence: Nhm2ObserverT00PolicyAdmissionBridgeEvidence;
   t0iAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
   t0iAdmissionNote: string | null;
   offDiagonalAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
@@ -5338,6 +7305,82 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
     | "emit_same_chart_metric_flux_and_shear_terms"
     | "resolve_metric_tensor_semantics";
 } => {
+  const t00PolicyAdmissionBridgeEvidence =
+    deriveNhm2T00PolicyAdmissionBridgeEvidence(args.modelTermSemanticEvidence);
+  const deriveT00AdmissionSummary = (): {
+    status: Nhm2ObserverMetricComponentAdmissionStatus;
+    routeId: string | null;
+    comparabilityStatus: "pass" | "fail" | "unknown";
+    note: string | null;
+  } => {
+    const comparabilityStatus =
+      args.modelTermSemanticEvidence.checks.einsteinT00Comparability;
+    const routeId =
+      args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+      args.modelTermSemanticEvidence.routeId ??
+      null;
+    const fullEinsteinAdmitted =
+      args.modelTermSemanticEvidence.checks.fullEinsteinTensorRouteAdmission ===
+      "pass";
+    const routeDeclaredAdmitted =
+      args.modelTermSemanticEvidence.routeAdmissionRaw === "admitted";
+    if (t00PolicyAdmissionBridgeEvidence.status === "pass") {
+      return {
+        status: "derivable_same_chart_from_existing_state",
+        routeId,
+        comparabilityStatus,
+        note:
+          "Metric-required observer rho/T00 is admitted via the Einstein-route policy bridge: full_einstein_tensor closure, comparable T00 residuals, independent cross-check, finite-difference convergence, and citation coverage all pass.",
+      };
+    }
+    if (
+      fullEinsteinAdmitted &&
+      comparabilityStatus === "pass" &&
+      routeDeclaredAdmitted
+    ) {
+      return {
+        status: "derivable_same_chart_from_existing_state",
+        routeId,
+        comparabilityStatus,
+        note:
+          "Metric-required observer rho/T00 is admitted on the Einstein route with comparable independent cross-check residual evidence.",
+      };
+    }
+    if (
+      fullEinsteinAdmitted &&
+      comparabilityStatus === "pass" &&
+      !routeDeclaredAdmitted
+    ) {
+      return {
+        status: "requires_new_model_term",
+        routeId,
+        comparabilityStatus,
+        note:
+          `Einstein-route T00 comparability is satisfied, but the observer-local policy bridge is ${t00PolicyAdmissionBridgeEvidence.status}; keep observer rho on legacy diagonal T00 until bridge evidence is admitted.`,
+      };
+    }
+    if (
+      comparabilityStatus === "fail" ||
+      args.modelTermSemanticEvidence.checks.fullEinsteinTensorRouteAdmission ===
+        "fail"
+    ) {
+      return {
+        status: "requires_new_model_term",
+        routeId,
+        comparabilityStatus,
+        note:
+          "Einstein-route T00 either lacks admitted route closure or fails comparable residual checks; keep observer rho on legacy diagonal T00.",
+      };
+    }
+    return {
+      status: "basis_or_semantics_ambiguous",
+      routeId,
+      comparabilityStatus,
+      note:
+        "Einstein-route T00 admission/comparability remains unresolved; retain conservative legacy diagonal T00 for observer rho.",
+    };
+  };
+  const t00Summary = deriveT00AdmissionSummary();
   const t0i = args.evidence.t0iAdmissionBranch;
   const offDiag = args.evidence.offDiagonalTijAdmissionBranch;
   const branches = [t0i, offDiag];
@@ -5345,15 +7388,10 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
     "existing_internal_quantity_not_serialized",
   );
   const hasDerivable = branches.includes("derivable_same_chart_from_existing_state");
-  const hasRequiresNewModel = branches.includes("requires_new_model_term");
-  const evidenceNotes = new Set(args.evidence.notes);
-  const familyEmissionAdmission = evidenceNotes.has(
-    "modelTermAdmission=admitted",
-  )
-    ? "admitted"
-    : evidenceNotes.has("modelTermAdmission=experimental_not_admitted")
-      ? "experimental_not_admitted"
-      : "unknown";
+  const hasRequiresNewModel =
+    branches.includes("requires_new_model_term") ||
+    args.modelTermSemanticEvidence.decision === "do_not_admit";
+  const familyEmissionAdmission = args.modelTermSemanticEvidence.routeAdmission;
   const modelTermRouteNote = args.evidence.notes.find((entry) =>
     entry.startsWith("modelTermRoute="),
   );
@@ -5379,6 +7417,11 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
       emissionAdmissionStatus: "not_admitted",
       emissionAdmissionNote:
         "Admission remains not_admitted until existing same-chart producer quantities are wired through observer input/publication mapping.",
+      t00AdmissionStatus: t00Summary.status,
+      t00RouteId: t00Summary.routeId,
+      t00ComparabilityStatus: t00Summary.comparabilityStatus,
+      t00AdmissionNote: t00Summary.note,
+      t00PolicyAdmissionBridgeEvidence,
       t0iAdmissionStatus: t0i,
       t0iAdmissionNote: noteBundle.t0iNote,
       offDiagonalAdmissionStatus: offDiag,
@@ -5389,14 +7432,43 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
 
   if (hasRequiresNewModel) {
     if (args.evidence.currentEmissionShape === "full_tensor") {
+      const closurePath = args.modelTermSemanticEvidence.closurePathDecision;
+      const selectedPathReasonCodes =
+        closurePath != null
+          ? closurePath.blockerCodes
+          : args.modelTermSemanticEvidence.reasonCodes;
+      const semanticReasonCodes =
+        selectedPathReasonCodes.length > 0
+          ? selectedPathReasonCodes.join(", ")
+          : "none";
+      const nonBlockingReasonCodesList = closurePath?.nonBlockingCodes ?? [];
+      const nonBlockingReasonCodes =
+        nonBlockingReasonCodesList.length > 0
+          ? nonBlockingReasonCodesList.join(", ")
+          : "none";
+      const closurePathSummary =
+        closurePath == null
+          ? "closure_path=unresolved"
+          : `closure_path=${closurePath.selectedPath}; next_patch=${closurePath.nextPatchClass}; route_hint=${closurePath.routeHint}; selected_path_non_blocking_reasons=${nonBlockingReasonCodes}`;
+      const semanticAdmissionSummary =
+        args.modelTermSemanticEvidence.decision === "do_not_admit"
+          ? `model-term semantic admission still rejects selected-route closure (decision=${args.modelTermSemanticEvidence.decision})`
+          : selectedPathReasonCodes.length > 0
+            ? `model-term semantic admission status is ${args.modelTermSemanticEvidence.decision}, but selected-route semantic blockers remain`
+            : `model-term semantic admission admits selected-route closure, while observer publication remains conservative until component admission summaries are promoted`;
       return {
         coverageBlockerStatus: "semantics_ambiguous",
         coverageBlockerNote:
-          "Metric-required full tensor families are emitted on the producer path, but the active model-term route is still experimental/not admitted, so observer admission remains blocked at semantic-contract closure.",
+          `Metric-required full tensor families are emitted on the producer path, but ${semanticAdmissionSummary} (selected_path_blockers=${semanticReasonCodes}; ${closurePathSummary}), so observer admission remains blocked at semantic-contract closure.`,
         firstMissingStage: "semantic_contract",
         emissionAdmissionStatus: "not_admitted",
         emissionAdmissionNote:
-          "Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation.",
+          "Admission failed: emitted same-chart flux/shear families are present but remain tied to a non-admitted model-term route pending semantic validation and closure-path execution.",
+        t00AdmissionStatus: t00Summary.status,
+        t00RouteId: t00Summary.routeId,
+        t00ComparabilityStatus: t00Summary.comparabilityStatus,
+        t00AdmissionNote: t00Summary.note,
+        t00PolicyAdmissionBridgeEvidence,
         t0iAdmissionStatus: t0i,
         t0iAdmissionNote: noteBundle.t0iNote,
         offDiagonalAdmissionStatus: offDiag,
@@ -5412,6 +7484,11 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
       emissionAdmissionStatus: "not_admitted",
       emissionAdmissionNote:
         "Admission failed: current evidence localizes both missing families to a model-term/evaluator gap rather than a wiring-only gap.",
+      t00AdmissionStatus: t00Summary.status,
+      t00RouteId: t00Summary.routeId,
+      t00ComparabilityStatus: t00Summary.comparabilityStatus,
+      t00AdmissionNote: t00Summary.note,
+      t00PolicyAdmissionBridgeEvidence,
       t0iAdmissionStatus: t0i,
       t0iAdmissionNote: noteBundle.t0iNote,
       offDiagonalAdmissionStatus: offDiag,
@@ -5421,6 +7498,27 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
   }
 
   if (hasDerivable) {
+    if (args.evidence.currentEmissionShape === "full_tensor") {
+      return {
+        coverageBlockerStatus: "unknown",
+        coverageBlockerNote:
+          "Metric-required same-chart full tensor families are emitted and selected-route semantic blockers are cleared for the active Einstein-path closure.",
+        firstMissingStage: "unknown",
+        emissionAdmissionStatus: "admitted",
+        emissionAdmissionNote:
+          "Admission is accepted on the selected same-chart full-tensor route; ADM support-field-route gaps remain tracked as non-blocking diagnostics for this closure path.",
+        t00AdmissionStatus: t00Summary.status,
+        t00RouteId: t00Summary.routeId,
+        t00ComparabilityStatus: t00Summary.comparabilityStatus,
+        t00AdmissionNote: t00Summary.note,
+        t00PolicyAdmissionBridgeEvidence,
+        t0iAdmissionStatus: t0i,
+        t0iAdmissionNote: noteBundle.t0iNote,
+        offDiagonalAdmissionStatus: offDiag,
+        offDiagonalAdmissionNote: noteBundle.offDiagonalNote,
+        nextTechnicalAction: "unknown",
+      };
+    }
     return {
       coverageBlockerStatus: "producer_not_emitted",
       coverageBlockerNote:
@@ -5429,6 +7527,11 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
       emissionAdmissionStatus: "not_admitted",
       emissionAdmissionNote:
         "Admission remains not_admitted until same-chart flux/shear families are emitted from currently admitted producer state.",
+      t00AdmissionStatus: t00Summary.status,
+      t00RouteId: t00Summary.routeId,
+      t00ComparabilityStatus: t00Summary.comparabilityStatus,
+      t00AdmissionNote: t00Summary.note,
+      t00PolicyAdmissionBridgeEvidence,
       t0iAdmissionStatus: t0i,
       t0iAdmissionNote: noteBundle.t0iNote,
       offDiagonalAdmissionStatus: offDiag,
@@ -5445,6 +7548,11 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
     emissionAdmissionStatus: "unknown",
     emissionAdmissionNote:
       "Admission status could not be resolved from the currently published producer evidence.",
+    t00AdmissionStatus: t00Summary.status,
+    t00RouteId: t00Summary.routeId,
+    t00ComparabilityStatus: t00Summary.comparabilityStatus,
+    t00AdmissionNote: t00Summary.note,
+    t00PolicyAdmissionBridgeEvidence,
     t0iAdmissionStatus: t0i,
     t0iAdmissionNote: noteBundle.t0iNote,
     offDiagonalAdmissionStatus: offDiag,
@@ -5453,11 +7561,3003 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
   };
 };
 
+const getNhm2ModelTermNoteValue = (
+  notes: string[] | undefined,
+  key: string,
+): string | null => {
+  if (!Array.isArray(notes) || notes.length === 0) return null;
+  const prefix = `${key}=`;
+  const matched = notes.find((entry) => entry.startsWith(prefix));
+  return matched != null ? matched.slice(prefix.length) : null;
+};
+
+const classifyNhm2WecSign = (
+  value: number | null,
+): "negative" | "non_negative" | "unknown" => {
+  if (value == null) return "unknown";
+  return value < 0 ? "negative" : "non_negative";
+};
+
+const toTileReconstitutionComponentCoverage = (
+  metricEmissionAdmissionStatus: "admitted" | "not_admitted" | "unknown",
+  componentStatus: Nhm2ObserverMetricComponentAdmissionStatus,
+): Nhm2ObserverTileSurfaceReconstitutionEvidence["componentCoverage"]["t0i"] => {
+  if (
+    componentStatus === "derivable_same_chart_from_existing_state" ||
+    componentStatus === "existing_internal_quantity_not_serialized"
+  ) {
+    return metricEmissionAdmissionStatus === "admitted"
+      ? "present_admitted"
+      : "present_but_not_admitted";
+  }
+  if (
+    componentStatus === "requires_new_model_term" ||
+    componentStatus === "basis_or_semantics_ambiguous"
+  ) {
+    return "missing";
+  }
+  return "unknown";
+};
+
+const deriveNhm2TileComparableCrossCheckEvidence = (args: {
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+}): Nhm2ObserverTileComparableCrossCheckEvidence => {
+  const modelChecks = args.modelTermSemanticEvidence.checks;
+  const selectedPath =
+    args.modelTermSemanticEvidence.closurePathDecision?.selectedPath ?? null;
+  const routeId =
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    args.modelTermSemanticEvidence.routeId ??
+    null;
+  const routeAdmissionEffectiveAdmitted =
+    args.modelTermSemanticEvidence.routeAdmissionEffective === "admitted";
+  const routeAdmissionComparable =
+    selectedPath === "full_einstein_tensor" &&
+    routeAdmissionEffectiveAdmitted &&
+    modelChecks.fullEinsteinTensorRouteAdmission === "pass" &&
+    modelChecks.einsteinT00Comparability === "pass";
+  const metricWecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.eulerianMin,
+  );
+  const metricWecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.robustMin,
+  );
+  const metricDecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.eulerianMin,
+  );
+  const metricDecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.robustMin,
+  );
+  const tileWecEulerianMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.wec?.eulerianMin,
+  );
+  const tileWecRobustMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.wec?.robustMin,
+  );
+  const tileDecEulerianMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.dec?.eulerianMin,
+  );
+  const tileDecRobustMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.dec?.robustMin,
+  );
+  const hasComparableWecMinima =
+    metricWecEulerianMin != null &&
+    metricWecRobustMin != null &&
+    tileWecEulerianMin != null &&
+    tileWecRobustMin != null;
+  const hasComparableDecMinima =
+    metricDecEulerianMin != null &&
+    metricDecRobustMin != null &&
+    tileDecEulerianMin != null &&
+    tileDecRobustMin != null;
+  const hasComparableMinima = hasComparableWecMinima || hasComparableDecMinima;
+  const tileModel = args.tileTensorInput.model ?? {};
+  const tileProxyDeclared =
+    tileModel.pressureModel === "isotropic_pressure_proxy" ||
+    tileModel.shearHandling === "not_modeled_in_proxy" ||
+    tileModel.shearHandling === "assumed_zero_from_missing_tij";
+  const independentCrossCheckStatus = modelChecks.independentCrossCheck;
+  const comparabilityStatus: Nhm2ObserverTileComparableCrossCheckEvidence["comparabilityStatus"] =
+    routeAdmissionComparable &&
+    independentCrossCheckStatus === "pass" &&
+    hasComparableMinima
+      ? "pass"
+      : independentCrossCheckStatus === "fail" || !routeAdmissionComparable
+        ? "fail"
+        : "unknown";
+  const eulerianSignAgreement =
+    metricWecEulerianMin != null && tileWecEulerianMin != null
+      ? classifyNhm2WecSign(metricWecEulerianMin) ===
+        classifyNhm2WecSign(tileWecEulerianMin)
+      : null;
+  const robustSignAgreement =
+    metricWecRobustMin != null && tileWecRobustMin != null
+      ? classifyNhm2WecSign(metricWecRobustMin) ===
+        classifyNhm2WecSign(tileWecRobustMin)
+      : null;
+  const decEulerianSignAgreement =
+    metricDecEulerianMin != null && tileDecEulerianMin != null
+      ? classifyNhm2WecSign(metricDecEulerianMin) ===
+        classifyNhm2WecSign(tileDecEulerianMin)
+      : null;
+  const decRobustSignAgreement =
+    metricDecRobustMin != null && tileDecRobustMin != null
+      ? classifyNhm2WecSign(metricDecRobustMin) ===
+        classifyNhm2WecSign(tileDecRobustMin)
+      : null;
+  const eulerianMinDelta =
+    metricWecEulerianMin != null && tileWecEulerianMin != null
+      ? tileWecEulerianMin - metricWecEulerianMin
+      : null;
+  const robustMinDelta =
+    metricWecRobustMin != null && tileWecRobustMin != null
+      ? tileWecRobustMin - metricWecRobustMin
+      : null;
+  const metricRobustSign = classifyNhm2WecSign(metricWecRobustMin);
+  const tileRobustSign = classifyNhm2WecSign(tileWecRobustMin);
+  const metricDecRobustSign = classifyNhm2WecSign(metricDecRobustMin);
+  const tileDecRobustSign = classifyNhm2WecSign(tileDecRobustMin);
+  const decFailureSignal =
+    (metricDecEulerianMin != null && metricDecEulerianMin < 0) ||
+    (metricDecRobustMin != null && metricDecRobustMin < 0) ||
+    (tileDecEulerianMin != null && tileDecEulerianMin < 0) ||
+    (tileDecRobustMin != null && tileDecRobustMin < 0);
+  const observerConditionFocus: "wec" | "dec" =
+    hasComparableDecMinima && (!hasComparableWecMinima || decFailureSignal)
+      ? "dec"
+      : "wec";
+  const focusedEulerianSignAgreement =
+    observerConditionFocus === "dec"
+      ? decEulerianSignAgreement
+      : eulerianSignAgreement;
+  const focusedRobustSignAgreement =
+    observerConditionFocus === "dec" ? decRobustSignAgreement : robustSignAgreement;
+  const metricFocusedRobustSign =
+    observerConditionFocus === "dec" ? metricDecRobustSign : metricRobustSign;
+  const tileFocusedRobustSign =
+    observerConditionFocus === "dec" ? tileDecRobustSign : tileRobustSign;
+  const localizationResult: Nhm2ObserverTileComparableCrossCheckEvidence["localizationResult"] =
+    comparabilityStatus === "pass"
+      ? focusedRobustSignAgreement === true || focusedEulerianSignAgreement === true
+        ? "same_sign_confirmed"
+        : focusedRobustSignAgreement === false ||
+            focusedEulerianSignAgreement === false
+          ? "proxy_artifact_suspected"
+          : "inconclusive"
+      : tileProxyDeclared &&
+          metricFocusedRobustSign === "non_negative" &&
+          tileFocusedRobustSign === "negative"
+        ? "proxy_artifact_suspected"
+        : "inconclusive";
+  const nextPatchClass: Nhm2ObserverTileComparableCrossCheckEvidence["nextPatchClass"] =
+    localizationResult === "same_sign_confirmed"
+      ? "tile_physics_remediation_patch"
+      : localizationResult === "proxy_artifact_suspected"
+        ? "tile_surface_reconstitution_patch"
+        : "tile_cross_check_instrumentation_patch";
+  const status: Nhm2ObserverTileComparableCrossCheckEvidence["status"] =
+    comparabilityStatus === "pass"
+      ? "pass"
+      : comparabilityStatus === "fail"
+        ? "fail"
+        : "unknown";
+  const referenceRouteId =
+    getNhm2ModelTermNoteValue(
+      args.modelTermSemanticEvidence.notes,
+      "independentCrossCheckReferenceRouteId",
+    ) ??
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    routeId;
+  const rationale =
+    localizationResult === "same_sign_confirmed"
+      ? `Comparable Einstein-path cross-check indicates metric and tile ${observerConditionFocus.toUpperCase()} minima have consistent sign; treat residual tile failure as same-surface physics on a commensurate route.`
+      : localizationResult === "proxy_artifact_suspected"
+        ? `Comparable Einstein-path cross-check keeps metric-side ${observerConditionFocus.toUpperCase()} minima non-negative while tile-side proxy minima remain negative; localize blocker as likely proxy artifact pending tile-surface reconstitution.`
+        : "Comparable Einstein-path tile localization remains inconclusive; gather additional commensurate cross-check evidence before retuning physics.";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ...args.modelTermSemanticEvidence.citationRefs,
+        ...(args.modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  return {
+    status,
+    chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
+    routeId,
+    selectedPath,
+    referenceRouteId,
+    aggregationMethod:
+      "same_profile_global_minimum_compare(condition_focus.{wec,dec}.eulerianMin, condition_focus.{wec,dec}.robustMin)",
+    metricTensorRef: asText(args.metricTensorInput.tensorRef),
+    tileTensorRef: asText(args.tileTensorInput.tensorRef),
+    metricWecEulerianMin,
+    metricWecRobustMin,
+    tileWecEulerianMin,
+    tileWecRobustMin,
+    eulerianMinDelta,
+    robustMinDelta,
+    eulerianSignAgreement,
+    robustSignAgreement,
+    independentCrossCheckStatus,
+    comparabilityStatus,
+    localizationResult,
+    nextPatchClass,
+    rationale,
+    citationRefs,
+    notes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `referenceRouteId=${referenceRouteId ?? "none"}`,
+      `routeAdmissionComparable=${String(routeAdmissionComparable)}`,
+      `independentCrossCheckStatus=${independentCrossCheckStatus}`,
+      `comparabilityStatus=${comparabilityStatus}`,
+      `tileProxyDeclared=${String(tileProxyDeclared)}`,
+      `metricWecEulerianMin=${metricWecEulerianMin ?? "null"}`,
+      `metricWecRobustMin=${metricWecRobustMin ?? "null"}`,
+      `tileWecEulerianMin=${tileWecEulerianMin ?? "null"}`,
+      `tileWecRobustMin=${tileWecRobustMin ?? "null"}`,
+      `metricDecEulerianMin=${metricDecEulerianMin ?? "null"}`,
+      `metricDecRobustMin=${metricDecRobustMin ?? "null"}`,
+      `tileDecEulerianMin=${tileDecEulerianMin ?? "null"}`,
+      `tileDecRobustMin=${tileDecRobustMin ?? "null"}`,
+      `observerConditionFocus=${observerConditionFocus}`,
+      `eulerianSignAgreement=${eulerianSignAgreement == null ? "unknown" : String(eulerianSignAgreement)}`,
+      `robustSignAgreement=${robustSignAgreement == null ? "unknown" : String(robustSignAgreement)}`,
+      `decEulerianSignAgreement=${decEulerianSignAgreement == null ? "unknown" : String(decEulerianSignAgreement)}`,
+      `decRobustSignAgreement=${decRobustSignAgreement == null ? "unknown" : String(decRobustSignAgreement)}`,
+      `localizationResult=${localizationResult}`,
+      `nextPatchClass=${nextPatchClass}`,
+    ],
+  };
+};
+
+const deriveNhm2TileSurfaceReconstitutionEvidence = (args: {
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  metricEmissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
+  metricT0iAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  metricOffDiagonalAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileComparableCrossCheckEvidence: Nhm2ObserverTileComparableCrossCheckEvidence;
+}): Nhm2ObserverTileSurfaceReconstitutionEvidence => {
+  const modelChecks = args.modelTermSemanticEvidence.checks;
+  const selectedPath =
+    args.modelTermSemanticEvidence.closurePathDecision?.selectedPath ?? null;
+  const routeId =
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    args.modelTermSemanticEvidence.routeId ??
+    null;
+  const routeAdmissionEffectiveAdmitted =
+    args.modelTermSemanticEvidence.routeAdmissionEffective === "admitted";
+  const fullEinsteinPathSelected = selectedPath === "full_einstein_tensor";
+  const routeComparable =
+    fullEinsteinPathSelected &&
+    routeAdmissionEffectiveAdmitted &&
+    modelChecks.fullEinsteinTensorRouteAdmission === "pass";
+  const t00Coverage: Nhm2ObserverTileSurfaceReconstitutionEvidence["componentCoverage"]["t00"] =
+    routeComparable &&
+    modelChecks.einsteinT00Comparability === "pass" &&
+    asText(args.metricTensorInput.tensorRef) != null
+      ? "present_admitted"
+      : routeAdmissionEffectiveAdmitted
+        ? "present_but_not_admitted"
+        : "missing";
+  const t0iCoverage = toTileReconstitutionComponentCoverage(
+    args.metricEmissionAdmissionStatus,
+    args.metricT0iAdmissionStatus,
+  );
+  const offDiagonalCoverage = toTileReconstitutionComponentCoverage(
+    args.metricEmissionAdmissionStatus,
+    args.metricOffDiagonalAdmissionStatus,
+  );
+  const allComponentCoverageAdmitted =
+    t00Coverage === "present_admitted" &&
+    t0iCoverage === "present_admitted" &&
+    offDiagonalCoverage === "present_admitted";
+  const independentCrossCheckRouteRef =
+    getNhm2ModelTermNoteValue(
+      args.modelTermSemanticEvidence.notes,
+      "independentCrossCheckReferenceRouteId",
+    ) ?? args.tileComparableCrossCheckEvidence.referenceRouteId;
+  const comparabilityStatus = args.tileComparableCrossCheckEvidence.comparabilityStatus;
+  const localizationResult = args.tileComparableCrossCheckEvidence.localizationResult;
+  const comparabilityPass = comparabilityStatus === "pass";
+  const localizationActionable =
+    localizationResult === "proxy_artifact_suspected" ||
+    localizationResult === "same_sign_confirmed";
+  const pass =
+    routeComparable &&
+    allComponentCoverageAdmitted &&
+    comparabilityPass &&
+    localizationActionable;
+  const fail =
+    !pass &&
+    (!routeComparable ||
+      comparabilityStatus === "fail" ||
+      t00Coverage === "missing" ||
+      t0iCoverage === "missing" ||
+      offDiagonalCoverage === "missing");
+  const status: Nhm2ObserverTileSurfaceReconstitutionEvidence["status"] = pass
+    ? "pass"
+    : fail
+      ? "fail"
+      : "unknown";
+  const rationale =
+    status === "pass"
+      ? localizationResult === "proxy_artifact_suspected"
+        ? "Tile surface reconstitution evidence is admitted: same-chart Einstein-route components are present/admitted and commensurate cross-check localization points to tile-proxy artifact rather than metric-route incompleteness."
+        : "Tile surface reconstitution evidence is admitted on a commensurate Einstein route with same-sign localization; remaining blocker is tile-physics remediation rather than route incomparability."
+      : status === "fail"
+        ? "Tile surface reconstitution evidence is not admitted yet because route comparability or component coverage is still failing on at least one required surface."
+        : "Tile surface reconstitution evidence remains unresolved pending route/component comparability disambiguation.";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ...args.modelTermSemanticEvidence.citationRefs,
+        ...(args.modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+        ...args.tileComparableCrossCheckEvidence.citationRefs,
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  return {
+    status,
+    chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
+    routeId,
+    selectedPath,
+    sourceTensorRef: asText(args.metricTensorInput.tensorRef),
+    reconstitutedTileTensorRef: asText(args.tileTensorInput.tensorRef),
+    aggregationMethod:
+      "same_profile_global_minimum_compare(wec.eulerianMin, wec.robustMin)+component_coverage_gate",
+    sampleDomainRef: "nhm2_shift_lapse/global_region",
+    componentCoverage: {
+      t00: t00Coverage,
+      t0i: t0iCoverage,
+      offDiagonalTij: offDiagonalCoverage,
+    },
+    independentCrossCheckRouteRef,
+    independentCrossCheckStatus:
+      args.tileComparableCrossCheckEvidence.independentCrossCheckStatus,
+    comparabilityStatus,
+    localizationResult,
+    rationale,
+    citationRefs,
+    notes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `routeComparable=${String(routeComparable)}`,
+      `componentCoverage.t00=${t00Coverage}`,
+      `componentCoverage.t0i=${t0iCoverage}`,
+      `componentCoverage.offDiagonalTij=${offDiagonalCoverage}`,
+      `independentCrossCheckRouteRef=${independentCrossCheckRouteRef ?? "none"}`,
+      `comparabilityStatus=${comparabilityStatus}`,
+      `localizationResult=${localizationResult}`,
+      `reconstitutionStatus=${status}`,
+    ],
+  };
+};
+
+const deriveModelTermParityStatus = (
+  lhs: number | null,
+  rhs: number | null,
+  epsilon = 1e-12,
+): "pass" | "fail" | "unknown" => {
+  if (lhs == null || rhs == null) {
+    return "unknown";
+  }
+  return Math.abs(lhs - rhs) <= epsilon ? "pass" : "fail";
+};
+
+const deriveNhm2TileObserverConditionComparabilityEvidence = (args: {
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileComparableCrossCheckEvidence: Nhm2ObserverTileComparableCrossCheckEvidence;
+  tileSurfaceReconstitutionEvidence: Nhm2ObserverTileSurfaceReconstitutionEvidence;
+}): Nhm2ObserverTileObserverConditionComparabilityEvidence => {
+  const selectedPath =
+    args.modelTermSemanticEvidence.closurePathDecision?.selectedPath ?? null;
+  const routeId =
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    args.modelTermSemanticEvidence.routeId ??
+    null;
+  const metricWecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.eulerianMin,
+  );
+  const metricWecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.robustMin,
+  );
+  const metricDecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.eulerianMin,
+  );
+  const metricDecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.robustMin,
+  );
+  const proxyWecEulerianMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.wec?.eulerianMin,
+  );
+  const proxyWecRobustMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.wec?.robustMin,
+  );
+  const proxyDecEulerianMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.dec?.eulerianMin,
+  );
+  const proxyDecRobustMin = toFiniteNumber(
+    args.tileTensorInput.conditions?.dec?.robustMin,
+  );
+  const routeComparability = args.tileSurfaceReconstitutionEvidence.comparabilityStatus;
+  const routeComparable = routeComparability === "pass";
+  const reconstitutedLane = {
+    tensorRef:
+      asText(args.tileSurfaceReconstitutionEvidence.reconstitutedTileTensorRef) ??
+      asText(args.metricTensorInput.tensorRef),
+    sourceRef:
+      asText(args.tileSurfaceReconstitutionEvidence.sourceTensorRef) ??
+      asText(args.metricTensorInput.tensorRef),
+    sampleCount: routeComparable
+      ? toFiniteNumber(args.metricTensorInput.sampleCount)
+      : null,
+    rapidityCap: routeComparable
+      ? toFiniteNumber(args.metricTensorInput.rapidityCap)
+      : null,
+    rapidityCapBeta: routeComparable
+      ? toFiniteNumber(args.metricTensorInput.rapidityCapBeta)
+      : null,
+    wecEulerianMin: routeComparable ? metricWecEulerianMin : null,
+    wecRobustMin: routeComparable ? metricWecRobustMin : null,
+    decEulerianMin: routeComparable ? metricDecEulerianMin : null,
+    decRobustMin: routeComparable ? metricDecRobustMin : null,
+    note: routeComparable
+      ? "Reconstituted lane is replayed from the admitted same-chart Einstein-route metric tensor for commensurate observer-condition comparison."
+      : "Reconstituted lane remains non-admitted; commensurate replay values are withheld.",
+  };
+  const sampleCountParity = deriveModelTermParityStatus(
+    toFiniteNumber(args.metricTensorInput.sampleCount),
+    reconstitutedLane.sampleCount,
+    0,
+  );
+  const rapidityCapParity = deriveModelTermParityStatus(
+    toFiniteNumber(args.metricTensorInput.rapidityCap),
+    reconstitutedLane.rapidityCap,
+    1e-12,
+  );
+  const rapidityCapBetaParity = deriveModelTermParityStatus(
+    toFiniteNumber(args.metricTensorInput.rapidityCapBeta),
+    reconstitutedLane.rapidityCapBeta,
+    1e-12,
+  );
+  const independentCrossCheck =
+    args.tileSurfaceReconstitutionEvidence.independentCrossCheckStatus === "unknown"
+      ? args.tileComparableCrossCheckEvidence.independentCrossCheckStatus
+      : args.tileSurfaceReconstitutionEvidence.independentCrossCheckStatus;
+  const citationCoverage = args.modelTermSemanticEvidence.checks.citationCoverage;
+  const allChecksPass =
+    routeComparability === "pass" &&
+    independentCrossCheck === "pass" &&
+    sampleCountParity === "pass" &&
+    rapidityCapParity === "pass" &&
+    rapidityCapBetaParity === "pass" &&
+    citationCoverage === "pass";
+  const hasNegative = (...values: Array<number | null>): boolean =>
+    values.some((value) => value != null && value < 0);
+  const proxyHasNegative = hasNegative(
+    proxyWecEulerianMin,
+    proxyWecRobustMin,
+    proxyDecEulerianMin,
+    proxyDecRobustMin,
+  );
+  const reconstitutedHasNegative = hasNegative(
+    reconstitutedLane.wecEulerianMin,
+    reconstitutedLane.wecRobustMin,
+    reconstitutedLane.decEulerianMin,
+    reconstitutedLane.decRobustMin,
+  );
+  const metricHasNegative = hasNegative(
+    metricWecEulerianMin,
+    metricWecRobustMin,
+    metricDecEulerianMin,
+    metricDecRobustMin,
+  );
+  const localizationResult =
+    args.tileSurfaceReconstitutionEvidence.localizationResult === "inconclusive"
+      ? args.tileComparableCrossCheckEvidence.localizationResult
+      : args.tileSurfaceReconstitutionEvidence.localizationResult;
+  const classification: Nhm2ObserverTileObserverConditionComparabilityEvidence["classification"] =
+    allChecksPass && reconstitutedHasNegative && metricHasNegative
+      ? "same_surface_failure_confirmed"
+      : allChecksPass && !reconstitutedHasNegative && proxyHasNegative
+        ? "proxy_artifact_confirmed"
+        : allChecksPass && localizationResult === "same_sign_confirmed"
+        ? "same_surface_failure_confirmed"
+        : allChecksPass && localizationResult === "proxy_artifact_suspected"
+          ? "proxy_artifact_confirmed"
+          : "inconclusive";
+  const classificationReason =
+    classification === "proxy_artifact_confirmed"
+      ? "Commensurate same-chart replay passes route/parity checks and localizes to proxy_artifact_suspected on the published tile lane."
+      : classification === "same_surface_failure_confirmed"
+        ? "Commensurate same-chart replay passes route/parity checks and localizes to same_sign_confirmed, indicating same-surface observer-condition failure."
+        : "inconclusive";
+  const unresolvedReason =
+    "Commensurate observer-condition classification remains unresolved because one or more comparability checks are not pass-level or sign evidence is mixed.";
+  const classificationReasonText =
+    classificationReason === "inconclusive" ? unresolvedReason : classificationReason;
+  const checks: Nhm2ObserverTileObserverConditionComparabilityEvidence["checks"] = {
+    routeComparability,
+    independentCrossCheck,
+    sampleCountParity,
+    rapidityCapParity,
+    rapidityCapBetaParity,
+    citationCoverage,
+  };
+  const pass = allChecksPass && classification !== "inconclusive";
+  const fail = !pass && Object.values(checks).some((status) => status === "fail");
+  const status: Nhm2ObserverTileObserverConditionComparabilityEvidence["status"] = pass
+    ? "pass"
+    : fail
+      ? "fail"
+      : "unknown";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ...args.modelTermSemanticEvidence.citationRefs,
+        ...(args.modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+        ...args.tileComparableCrossCheckEvidence.citationRefs,
+        ...args.tileSurfaceReconstitutionEvidence.citationRefs,
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  return {
+    status,
+    chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
+    routeId,
+    selectedPath,
+    sampleDomainRef:
+      args.tileSurfaceReconstitutionEvidence.sampleDomainRef ??
+      "nhm2_shift_lapse/global_region",
+    aggregationMethod:
+      "same_chart_commensurate_replay(metric_required_vs_tile_effective_proxy_vs_tile_effective_reconstituted)",
+    classification,
+    classificationReason: classificationReasonText,
+    checks,
+    lanes: {
+      metricRequired: {
+        tensorRef: asText(args.metricTensorInput.tensorRef),
+        sampleCount: toFiniteNumber(args.metricTensorInput.sampleCount),
+        rapidityCap: toFiniteNumber(args.metricTensorInput.rapidityCap),
+        rapidityCapBeta: toFiniteNumber(args.metricTensorInput.rapidityCapBeta),
+        wecEulerianMin: metricWecEulerianMin,
+        wecRobustMin: metricWecRobustMin,
+        decEulerianMin: metricDecEulerianMin,
+        decRobustMin: metricDecRobustMin,
+      },
+      tileEffectiveProxy: {
+        tensorRef: asText(args.tileTensorInput.tensorRef),
+        sampleCount: toFiniteNumber(args.tileTensorInput.sampleCount),
+        rapidityCap: toFiniteNumber(args.tileTensorInput.rapidityCap),
+        rapidityCapBeta: toFiniteNumber(args.tileTensorInput.rapidityCapBeta),
+        wecEulerianMin: proxyWecEulerianMin,
+        wecRobustMin: proxyWecRobustMin,
+        decEulerianMin: proxyDecEulerianMin,
+        decRobustMin: proxyDecRobustMin,
+      },
+      tileEffectiveReconstituted: reconstitutedLane,
+    },
+    pass,
+    rationale:
+      classification === "proxy_artifact_confirmed"
+        ? "Observer-condition comparability is now commensurate on the admitted Einstein route and confirms a proxy-lane artifact."
+        : classification === "same_surface_failure_confirmed"
+          ? "Observer-condition comparability is commensurate and confirms same-surface failure on the reconstituted lane."
+          : "Observer-condition comparability remains unresolved pending pass-level commensurate checks and non-mixed sign evidence.",
+    citationRefs,
+    notes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `classification=${classification}`,
+      `checks.routeComparability=${checks.routeComparability}`,
+      `checks.independentCrossCheck=${checks.independentCrossCheck}`,
+      `checks.sampleCountParity=${checks.sampleCountParity}`,
+      `checks.rapidityCapParity=${checks.rapidityCapParity}`,
+      `checks.rapidityCapBetaParity=${checks.rapidityCapBetaParity}`,
+      `checks.citationCoverage=${checks.citationCoverage}`,
+      `proxyHasNegative=${String(proxyHasNegative)}`,
+      `reconstitutedHasNegative=${String(reconstitutedHasNegative)}`,
+      `metricHasNegative=${String(metricHasNegative)}`,
+      `localizationResult=${localizationResult}`,
+      `status=${status}`,
+    ],
+  };
+};
+
+const deriveNhm2ObserverDecRemediationEvidence = (args: {
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileComparableCrossCheckEvidence: Nhm2ObserverTileComparableCrossCheckEvidence;
+  tileObserverConditionComparabilityEvidence: Nhm2ObserverTileObserverConditionComparabilityEvidence;
+  tileObserverConditionAuthorityMode: Nhm2ObserverTileObserverConditionAuthorityMode;
+}): Nhm2ObserverDecRemediationEvidence => {
+  const selectedPath =
+    args.modelTermSemanticEvidence.closurePathDecision?.selectedPath ?? null;
+  const routeId =
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    args.modelTermSemanticEvidence.routeId ??
+    null;
+  const metricDecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.eulerianMin,
+  );
+  const metricDecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.robustMin,
+  );
+  const metricWecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.eulerianMin,
+  );
+  const metricWecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.robustMin,
+  );
+  const reconstitutedLane =
+    args.tileObserverConditionComparabilityEvidence.lanes.tileEffectiveReconstituted;
+  const tileReconstitutedDecEulerianMin =
+    toFiniteNumber(reconstitutedLane.decEulerianMin) ?? metricDecEulerianMin;
+  const tileReconstitutedDecRobustMin =
+    toFiniteNumber(reconstitutedLane.decRobustMin) ?? metricDecRobustMin;
+  const metricTypeIFraction = toFiniteNumber(args.metricTensorInput.typeI?.fraction);
+  const tileTypeIFraction = toFiniteNumber(args.tileTensorInput.typeI?.fraction);
+  const metricFluxMeanMagnitude = toFiniteNumber(
+    args.metricTensorInput.fluxDiagnostics?.meanMagnitude,
+  );
+  const tileFluxMeanMagnitude = toFiniteNumber(
+    args.tileTensorInput.fluxDiagnostics?.meanMagnitude,
+  );
+  const observerConditionFocusNote =
+    args.tileComparableCrossCheckEvidence.notes.find((entry) =>
+      entry.startsWith("observerConditionFocus="),
+    ) ?? null;
+  const observerConditionFocus =
+    observerConditionFocusNote != null
+      ? observerConditionFocusNote.slice("observerConditionFocus=".length)
+      : "unknown";
+  const allComparabilityChecksPass =
+    args.tileObserverConditionComparabilityEvidence.status === "pass" &&
+    args.tileObserverConditionComparabilityEvidence.classification ===
+      "same_surface_failure_confirmed" &&
+    args.tileObserverConditionAuthorityMode ===
+      "commensurate_reconstituted_authoritative";
+  const metricDecFail =
+    (metricDecEulerianMin != null && metricDecEulerianMin < 0) ||
+    (metricDecRobustMin != null && metricDecRobustMin < 0);
+  const tileDecFail =
+    (tileReconstitutedDecEulerianMin != null &&
+      tileReconstitutedDecEulerianMin < 0) ||
+    (tileReconstitutedDecRobustMin != null && tileReconstitutedDecRobustMin < 0);
+  const hasDecFailure = metricDecFail || tileDecFail;
+  const metricDecDeficit = Math.max(0, -(metricDecRobustMin ?? 0));
+  const tileDecDeficit = Math.max(0, -(tileReconstitutedDecRobustMin ?? 0));
+  const maxDecDeficit = Math.max(metricDecDeficit, tileDecDeficit);
+  const maxFluxMeanMagnitude = Math.max(
+    Math.abs(metricFluxMeanMagnitude ?? 0),
+    Math.abs(tileFluxMeanMagnitude ?? 0),
+  );
+  const fluxActivityThreshold = 1e-12;
+  const fluxActive = maxFluxMeanMagnitude > fluxActivityThreshold;
+  const fluxVsDecRatio =
+    maxDecDeficit > 0 ? maxFluxMeanMagnitude / maxDecDeficit : null;
+  const decOnlyViolation =
+    (metricWecEulerianMin ?? 0) >= 0 &&
+    (metricWecRobustMin ?? 0) >= 0 &&
+    hasDecFailure;
+  const dominantViolationClass: Nhm2ObserverDecRemediationEvidence["dominantViolationClass"] =
+    !allComparabilityChecksPass || !hasDecFailure
+      ? "unknown"
+      : !fluxActive && decOnlyViolation
+        ? "stress_dominance"
+        : fluxActive && fluxVsDecRatio != null && fluxVsDecRatio >= 1
+          ? "flux_dominance"
+          : fluxActive && fluxVsDecRatio != null
+            ? "stress_dominance"
+            : "mixed";
+  const recommendedPatchClass: Nhm2ObserverDecRemediationEvidence["recommendedPatchClass"] =
+    !allComparabilityChecksPass
+      ? "no_admissible_candidate_yet"
+      : selectedPath !== "full_einstein_tensor" ||
+          args.modelTermSemanticEvidence.checks.fullEinsteinTensorRouteAdmission !==
+            "pass"
+        ? "model_term_extension_patch"
+        : dominantViolationClass === "unknown"
+          ? "no_admissible_candidate_yet"
+          : "physics_control_patch";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+        ...args.modelTermSemanticEvidence.citationRefs,
+        ...(args.modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+        ...args.tileComparableCrossCheckEvidence.citationRefs,
+        ...args.tileObserverConditionComparabilityEvidence.citationRefs,
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  return {
+    chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
+    routeId,
+    selectedPath,
+    rapidityCap: toFiniteNumber(args.metricTensorInput.rapidityCap),
+    rapidityCapBeta: toFiniteNumber(args.metricTensorInput.rapidityCapBeta),
+    metricDecEulerianMin,
+    metricDecRobustMin,
+    tileReconstitutedDecEulerianMin,
+    tileReconstitutedDecRobustMin,
+    typeIFractionMetric: metricTypeIFraction,
+    typeIFractionTileReconstituted: tileTypeIFraction,
+    dominantViolationClass,
+    recommendedPatchClass,
+    citationRefs,
+    notes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `observerConditionFocus=${observerConditionFocus}`,
+      `comparabilityClassification=${args.tileObserverConditionComparabilityEvidence.classification}`,
+      `authorityMode=${args.tileObserverConditionAuthorityMode}`,
+      `allComparabilityChecksPass=${String(allComparabilityChecksPass)}`,
+      `metricDecEulerianMin=${metricDecEulerianMin ?? "null"}`,
+      `metricDecRobustMin=${metricDecRobustMin ?? "null"}`,
+      `tileReconstitutedDecEulerianMin=${tileReconstitutedDecEulerianMin ?? "null"}`,
+      `tileReconstitutedDecRobustMin=${tileReconstitutedDecRobustMin ?? "null"}`,
+      `metricWecEulerianMin=${metricWecEulerianMin ?? "null"}`,
+      `metricWecRobustMin=${metricWecRobustMin ?? "null"}`,
+      `metricFluxMeanMagnitude=${metricFluxMeanMagnitude ?? "null"}`,
+      `tileFluxMeanMagnitude=${tileFluxMeanMagnitude ?? "null"}`,
+      `maxFluxMeanMagnitude=${maxFluxMeanMagnitude}`,
+      `maxDecDeficit=${maxDecDeficit}`,
+      `fluxVsDecRatio=${fluxVsDecRatio ?? "null"}`,
+      `decOnlyViolation=${String(decOnlyViolation)}`,
+      `dominantViolationClass=${dominantViolationClass}`,
+      `recommendedPatchClass=${recommendedPatchClass}`,
+    ],
+  };
+};
+
+const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  decRemediationEvidence: Nhm2ObserverDecRemediationEvidence;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileObserverConditionComparabilityEvidence: Nhm2ObserverTileObserverConditionComparabilityEvidence;
+  emissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
+}): Nhm2ObserverDecPhysicsControlEvidence => {
+  const selectedPath =
+    args.modelTermSemanticEvidence.closurePathDecision?.selectedPath ??
+    args.decRemediationEvidence.selectedPath ??
+    null;
+  const routeId =
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    args.decRemediationEvidence.routeId ??
+    args.modelTermSemanticEvidence.routeId ??
+    null;
+  const baselineMetricDecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.eulerianMin,
+  );
+  const baselineMetricDecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.dec?.robustMin,
+  );
+  const baselineMetricWecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.eulerianMin,
+  );
+  const baselineMetricWecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.wec?.robustMin,
+  );
+  const baselineMetricNecEulerianMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.nec?.eulerianMin,
+  );
+  const baselineMetricNecRobustMin = toFiniteNumber(
+    args.metricTensorInput.conditions?.nec?.robustMin,
+  );
+  const reconstitutedLane =
+    args.tileObserverConditionComparabilityEvidence.lanes.tileEffectiveReconstituted;
+  const baselineTileDecEulerianMin =
+    toFiniteNumber(reconstitutedLane.decEulerianMin) ??
+    args.decRemediationEvidence.tileReconstitutedDecEulerianMin ??
+    baselineMetricDecEulerianMin;
+  const baselineTileDecRobustMin =
+    toFiniteNumber(reconstitutedLane.decRobustMin) ??
+    args.decRemediationEvidence.tileReconstitutedDecRobustMin ??
+    baselineMetricDecRobustMin;
+  const baselineTileWecEulerianMin =
+    toFiniteNumber(reconstitutedLane.wecEulerianMin) ??
+    baselineMetricWecEulerianMin;
+  const baselineTileWecRobustMin =
+    toFiniteNumber(reconstitutedLane.wecRobustMin) ?? baselineMetricWecRobustMin;
+  const baselineTileNecEulerianMin =
+    toFiniteNumber(reconstitutedLane.decEulerianMin) != null
+      ? toFiniteNumber(args.tileTensorInput.conditions?.nec?.eulerianMin)
+      : baselineMetricNecEulerianMin;
+  const baselineTileNecRobustMin =
+    toFiniteNumber(reconstitutedLane.decRobustMin) != null
+      ? toFiniteNumber(args.tileTensorInput.conditions?.nec?.robustMin)
+      : baselineMetricNecRobustMin;
+  const emissionAdmissionStable = args.emissionAdmissionStatus === "admitted";
+  const semanticAdmissionStable =
+    args.modelTermSemanticEvidence.decision === "admit" &&
+    args.modelTermSemanticEvidence.routeAdmission === "admitted" &&
+    args.modelTermSemanticEvidence.checks.fullEinsteinTensorRouteAdmission ===
+      "pass";
+  const sameChartTensorPhysicsControlBaseline = 1;
+  const sameChartTensorPhysicsControlBoundedDeltaMax = 0.15;
+  const sameChartTensorPhysicsControlMin = Math.max(
+    sameChartTensorPhysicsControlBaseline -
+      sameChartTensorPhysicsControlBoundedDeltaMax,
+    0,
+  );
+  const sameChartTensorPhysicsControlProbeScale = sameChartTensorPhysicsControlMin;
+  const sameChartTensorDensityLiftBaseline = 0;
+  const sameChartTensorDensityLiftBoundedDeltaMax = 0.15;
+  const sameChartTensorDensityLiftMax =
+    sameChartTensorDensityLiftBaseline +
+    sameChartTensorDensityLiftBoundedDeltaMax;
+  const sameChartTensorDensityLiftProbeFraction = sameChartTensorDensityLiftMax;
+  const sameChartTensorFluxScaleBaseline = 1;
+  const sameChartTensorFluxScaleBoundedDeltaMax = 0.15;
+  const sameChartTensorFluxScaleMin = Math.max(
+    sameChartTensorFluxScaleBaseline - sameChartTensorFluxScaleBoundedDeltaMax,
+    0,
+  );
+  const sameChartTensorFluxScaleProbe = sameChartTensorFluxScaleMin;
+  const sameChartTensorShearScaleBaseline = 1;
+  const sameChartTensorShearScaleBoundedDeltaMax = 0.15;
+  const sameChartTensorShearScaleMin = Math.max(
+    sameChartTensorShearScaleBaseline - sameChartTensorShearScaleBoundedDeltaMax,
+    0,
+  );
+  const sameChartTensorShearScaleProbe = sameChartTensorShearScaleMin;
+  const baselineMetricRho = baselineMetricWecEulerianMin;
+  const baselineMetricMinPressure =
+    baselineMetricRho != null && baselineMetricNecRobustMin != null
+      ? baselineMetricNecRobustMin - baselineMetricRho
+      : null;
+  const baselineMetricMaxAbsPressure =
+    baselineMetricRho != null && baselineMetricDecRobustMin != null
+      ? Math.max(0, baselineMetricRho - baselineMetricDecRobustMin)
+      : null;
+  const baselineTileRho = baselineTileWecEulerianMin ?? baselineMetricRho;
+  const baselineTileMaxAbsPressure =
+    baselineTileRho != null && baselineTileDecRobustMin != null
+      ? Math.max(0, baselineTileRho - baselineTileDecRobustMin)
+      : null;
+  const metricFluxMeanMagnitude = Math.abs(
+    toFiniteNumber(args.metricTensorInput.fluxDiagnostics?.meanMagnitude) ?? 0,
+  );
+  const metricPressureScaleNorm = Math.max(
+    Math.abs(baselineMetricRho ?? 0),
+    Math.abs(baselineMetricMaxAbsPressure ?? 0),
+    1e-9,
+  );
+  const normalizedFluxInfluence = Math.min(
+    Math.max(metricFluxMeanMagnitude / metricPressureScaleNorm, 0),
+    1,
+  );
+  const evaluateSameChartControlCandidate = (args: {
+    pressureScale: number;
+    densityLiftFraction: number;
+    fluxScale: number;
+    shearScale: number;
+  }) => {
+    if (
+      baselineMetricRho == null ||
+      baselineMetricMaxAbsPressure == null ||
+      baselineMetricMinPressure == null
+    ) {
+      return {
+        metricDecRobustMin: baselineMetricDecRobustMin,
+        tileReconstitutedDecRobustMin: baselineTileDecRobustMin,
+        metricWecRobustMin: baselineMetricWecRobustMin,
+        metricNecRobustMin: baselineMetricNecRobustMin,
+      };
+    }
+    const boundedPressureScale = Math.min(
+      Math.max(args.pressureScale, sameChartTensorPhysicsControlMin),
+      sameChartTensorPhysicsControlBaseline,
+    );
+    const boundedDensityLiftFraction = Math.min(
+      Math.max(args.densityLiftFraction, sameChartTensorDensityLiftBaseline),
+      sameChartTensorDensityLiftMax,
+    );
+    const boundedFluxScale = Math.min(
+      Math.max(args.fluxScale, sameChartTensorFluxScaleMin),
+      sameChartTensorFluxScaleBaseline,
+    );
+    const boundedShearScale = Math.min(
+      Math.max(args.shearScale, sameChartTensorShearScaleMin),
+      sameChartTensorShearScaleBaseline,
+    );
+    const fluxReliefRatio =
+      (1 - boundedFluxScale) * normalizedFluxInfluence * 0.35;
+    const shearReliefRatio =
+      (1 - boundedShearScale) * (1 - normalizedFluxInfluence * 0.5) * 0.35;
+    const anisotropyReliefRatio = Math.min(
+      Math.max(fluxReliefRatio + shearReliefRatio, 0),
+      0.7,
+    );
+    const metricRho =
+      baselineMetricRho +
+      baselineMetricMaxAbsPressure * boundedDensityLiftFraction;
+    const metricMaxAbsPressure = Math.max(
+      0,
+      baselineMetricMaxAbsPressure *
+        Math.max(0, boundedPressureScale - anisotropyReliefRatio),
+    );
+    const metricMinPressure =
+      baselineMetricMinPressure * boundedPressureScale +
+      baselineMetricMaxAbsPressure * anisotropyReliefRatio * 0.25;
+    const metricDecRobustMin = Math.min(
+      metricRho,
+      metricRho - metricMaxAbsPressure,
+    );
+    const metricNecRobustMin = metricRho + metricMinPressure;
+    const metricWecRobustMin = Math.min(metricRho, metricNecRobustMin);
+    const tileReconstitutedDecRobustMin =
+      baselineTileRho != null && baselineTileMaxAbsPressure != null
+        ? Math.min(
+            baselineTileRho +
+              baselineTileMaxAbsPressure * boundedDensityLiftFraction,
+            baselineTileRho +
+              baselineTileMaxAbsPressure * boundedDensityLiftFraction -
+              baselineTileMaxAbsPressure *
+                Math.max(0, boundedPressureScale - anisotropyReliefRatio),
+          )
+        : baselineTileDecRobustMin;
+    return {
+      metricDecRobustMin,
+      tileReconstitutedDecRobustMin,
+      metricWecRobustMin,
+      metricNecRobustMin,
+    };
+  };
+  const sameChartPressureScaleProbe = evaluateSameChartControlCandidate({
+    pressureScale: sameChartTensorPhysicsControlProbeScale,
+    densityLiftFraction: sameChartTensorDensityLiftBaseline,
+    fluxScale: sameChartTensorFluxScaleBaseline,
+    shearScale: sameChartTensorShearScaleBaseline,
+  });
+  const sameChartCoupledDensityPressureProbe = evaluateSameChartControlCandidate({
+    pressureScale: sameChartTensorPhysicsControlProbeScale,
+    densityLiftFraction: sameChartTensorDensityLiftProbeFraction,
+    fluxScale: sameChartTensorFluxScaleProbe,
+    shearScale: sameChartTensorShearScaleProbe,
+  });
+  const baselineRapidityCap = toFiniteNumber(args.metricTensorInput.rapidityCap);
+  const baselineRapidityCapBeta = toFiniteNumber(
+    args.metricTensorInput.rapidityCapBeta,
+  );
+  const selectionObjective =
+    "prioritize cross-zero DEC margins on metric/tile lanes under coupled same-chart E/J/S controls; otherwise maximize min(metricDecRobustMarginToZero,tileReconstitutedDecRobustMarginToZero), tie-break by metricDecRobustLift desc, then controlDeviationMagnitude asc";
+  type DecSweepCandidate =
+    Nhm2ObserverDecPhysicsControlEvidence["sweepCandidates"][number];
+  const makeControlToken = (value: number): string =>
+    `${value}`.replace(".", "p");
+  const makeControlConfigKey = (
+    pressureScale: number,
+    densityLiftFraction: number,
+    fluxScale: number,
+    shearScale: number,
+  ): string =>
+    `${pressureScale.toFixed(6)}|${densityLiftFraction.toFixed(6)}|${fluxScale.toFixed(6)}|${shearScale.toFixed(6)}`;
+  const clamp = (value: number, minValue: number, maxValue: number): number =>
+    Math.min(Math.max(value, minValue), maxValue);
+  const minPositiveStep = (values: number[]): number | null => {
+    const sorted = Array.from(
+      new Set(
+        values
+          .filter((entry) => Number.isFinite(entry))
+          .map((entry) => Number(entry).toFixed(12)),
+      ),
+    )
+      .map((entry) => Number(entry))
+      .sort((lhs, rhs) => lhs - rhs);
+    if (sorted.length === 1) {
+      return sorted[0] > 0 ? Number(sorted[0].toFixed(6)) : null;
+    }
+    let minStep = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < sorted.length; i += 1) {
+      const delta = sorted[i] - sorted[i - 1];
+      if (delta > 0 && delta < minStep) {
+        minStep = delta;
+      }
+    }
+    return Number.isFinite(minStep) ? Number(minStep.toFixed(6)) : null;
+  };
+  const buildSweepCandidate = (candidate: {
+    candidateId: string;
+    candidateClass: DecSweepCandidate["candidateClass"];
+    sweepPhase: DecSweepCandidate["sweepPhase"];
+    refineSeedCandidateId: string | null;
+    applied: boolean;
+    rapidityCap: number | null;
+    rapidityCapBeta: number | null;
+    metricDecRobustMin: number | null;
+    tileReconstitutedDecRobustMin: number | null;
+    metricWecRobustMin: number | null;
+    metricNecRobustMin: number | null;
+    pressureScale: number | null;
+    densityLiftFraction: number | null;
+    fluxScale: number | null;
+    shearScale: number | null;
+    note: string;
+  }): DecSweepCandidate => {
+    const metricDecRobustLift =
+      candidate.metricDecRobustMin != null && baselineMetricDecRobustMin != null
+        ? candidate.metricDecRobustMin - baselineMetricDecRobustMin
+        : null;
+    const tileReconstitutedDecRobustLift =
+      candidate.tileReconstitutedDecRobustMin != null &&
+      baselineTileDecRobustMin != null
+        ? candidate.tileReconstitutedDecRobustMin - baselineTileDecRobustMin
+        : null;
+    const metricWecRobustDelta =
+      candidate.metricWecRobustMin != null && baselineMetricWecRobustMin != null
+        ? candidate.metricWecRobustMin - baselineMetricWecRobustMin
+        : null;
+    const metricNecRobustDelta =
+      candidate.metricNecRobustMin != null && baselineMetricNecRobustMin != null
+        ? candidate.metricNecRobustMin - baselineMetricNecRobustMin
+        : null;
+    const metricDecRobustMarginToZero = candidate.metricDecRobustMin;
+    const tileReconstitutedDecRobustMarginToZero =
+      candidate.tileReconstitutedDecRobustMin;
+    const metricWecNonRegressionMargin = metricWecRobustDelta;
+    const metricNecNonRegressionMargin = metricNecRobustDelta;
+    const selectionObjectivePrimaryMargin =
+      metricDecRobustMarginToZero != null &&
+      tileReconstitutedDecRobustMarginToZero != null
+        ? Math.min(
+            metricDecRobustMarginToZero,
+            tileReconstitutedDecRobustMarginToZero,
+          )
+        : null;
+    const controlDeviationMagnitude =
+      candidate.pressureScale != null &&
+      candidate.densityLiftFraction != null &&
+      candidate.fluxScale != null &&
+      candidate.shearScale != null
+        ? Math.abs(candidate.pressureScale - sameChartTensorPhysicsControlBaseline) +
+          Math.abs(
+            candidate.densityLiftFraction - sameChartTensorDensityLiftBaseline,
+          ) +
+          Math.abs(candidate.fluxScale - sameChartTensorFluxScaleBaseline) +
+          Math.abs(candidate.shearScale - sameChartTensorShearScaleBaseline)
+        : null;
+    const crossesZeroBothDecMargins =
+      metricDecRobustMarginToZero != null &&
+      tileReconstitutedDecRobustMarginToZero != null
+        ? metricDecRobustMarginToZero >= 0 &&
+          tileReconstitutedDecRobustMarginToZero >= 0
+        : null;
+    const metricWecNonRegression =
+      metricWecRobustDelta != null ? metricWecRobustDelta >= 0 : null;
+    const metricNecNonRegression =
+      metricNecRobustDelta != null ? metricNecRobustDelta >= 0 : null;
+    const gateFailureReasons: Nhm2ObserverDecPhysicsControlEvidence["selectionReasonCodes"] =
+      [];
+    if (!(metricDecRobustLift != null && metricDecRobustLift > 0)) {
+      gateFailureReasons.push("no_candidate_improves_dec");
+    }
+    if (
+      !(
+        tileReconstitutedDecRobustLift != null &&
+        tileReconstitutedDecRobustLift >= 0
+      )
+    ) {
+      gateFailureReasons.push("no_candidate_improves_dec");
+    }
+    if (metricWecNonRegression !== true) {
+      gateFailureReasons.push("candidate_violates_wec_non_regression");
+    }
+    if (metricNecNonRegression !== true) {
+      gateFailureReasons.push("candidate_violates_nec_non_regression");
+    }
+    if (!emissionAdmissionStable) {
+      gateFailureReasons.push("candidate_breaks_emission_admission_stability");
+    }
+    if (!semanticAdmissionStable) {
+      gateFailureReasons.push("candidate_breaks_semantic_admission_stability");
+    }
+    if (candidate.candidateClass === "observer_domain_truncation") {
+      gateFailureReasons.push("candidate_is_observer_domain_truncation");
+    }
+    const dedupedReasons = Array.from(new Set(gateFailureReasons));
+    return {
+      candidateId: candidate.candidateId,
+      candidateClass: candidate.candidateClass,
+      sweepPhase: candidate.sweepPhase,
+      refineSeedCandidateId: candidate.refineSeedCandidateId,
+      applied: candidate.applied,
+      rapidityCap: candidate.rapidityCap,
+      rapidityCapBeta: candidate.rapidityCapBeta,
+      pressureScale: candidate.pressureScale,
+      densityLiftFraction: candidate.densityLiftFraction,
+      fluxScale: candidate.fluxScale,
+      shearScale: candidate.shearScale,
+      metricDecRobustMin: candidate.metricDecRobustMin,
+      tileReconstitutedDecRobustMin: candidate.tileReconstitutedDecRobustMin,
+      metricWecRobustMin: candidate.metricWecRobustMin,
+      metricNecRobustMin: candidate.metricNecRobustMin,
+      metricDecRobustLift,
+      tileReconstitutedDecRobustLift,
+      metricWecRobustDelta,
+      metricNecRobustDelta,
+      metricDecRobustMarginToZero,
+      tileReconstitutedDecRobustMarginToZero,
+      crossesZeroBothDecMargins,
+      metricWecNonRegressionMargin,
+      metricNecNonRegressionMargin,
+      selectionObjectivePrimaryMargin,
+      controlDeviationMagnitude,
+      guardChecks: {
+        metricWecNonRegression,
+        metricNecNonRegression,
+        emissionAdmissionStable,
+        semanticAdmissionStable,
+      },
+      passesSelectionGate: dedupedReasons.length === 0,
+      gateFailureReasons: dedupedReasons,
+      note: candidate.note,
+    };
+  };
+  const compareCandidatesForSelection = (
+    lhs: DecSweepCandidate,
+    rhs: DecSweepCandidate,
+  ): number => {
+    const lhsCrossesZero = lhs.crossesZeroBothDecMargins === true ? 1 : 0;
+    const rhsCrossesZero = rhs.crossesZeroBothDecMargins === true ? 1 : 0;
+    if (rhsCrossesZero !== lhsCrossesZero) return rhsCrossesZero - lhsCrossesZero;
+    const lhsPrimary = lhs.selectionObjectivePrimaryMargin ?? Number.NEGATIVE_INFINITY;
+    const rhsPrimary = rhs.selectionObjectivePrimaryMargin ?? Number.NEGATIVE_INFINITY;
+    if (rhsPrimary !== lhsPrimary) return rhsPrimary - lhsPrimary;
+    const lhsLift = lhs.metricDecRobustLift ?? Number.NEGATIVE_INFINITY;
+    const rhsLift = rhs.metricDecRobustLift ?? Number.NEGATIVE_INFINITY;
+    if (rhsLift !== lhsLift) return rhsLift - lhsLift;
+    const lhsDeviation = lhs.controlDeviationMagnitude ?? Number.POSITIVE_INFINITY;
+    const rhsDeviation = rhs.controlDeviationMagnitude ?? Number.POSITIVE_INFINITY;
+    if (lhsDeviation !== rhsDeviation) return lhsDeviation - rhsDeviation;
+    return lhs.candidateId.localeCompare(rhs.candidateId);
+  };
+  const compareCandidatesForLeaderboard = (
+    lhs: DecSweepCandidate,
+    rhs: DecSweepCandidate,
+  ): number => {
+    const lhsPasses = lhs.passesSelectionGate ? 1 : 0;
+    const rhsPasses = rhs.passesSelectionGate ? 1 : 0;
+    if (rhsPasses !== lhsPasses) return rhsPasses - lhsPasses;
+    return compareCandidatesForSelection(lhs, rhs);
+  };
+  const baselineSweepCandidates: Nhm2ObserverDecPhysicsControlEvidence["sweepCandidates"] =
+    [
+      buildSweepCandidate({
+        candidateId: "baseline_hold_no_applied_control_patch_v1",
+        candidateClass: "baseline_hold",
+        sweepPhase: "baseline",
+        refineSeedCandidateId: null,
+        applied: false,
+        rapidityCap: baselineRapidityCap,
+        rapidityCapBeta: baselineRapidityCapBeta,
+        metricDecRobustMin: baselineMetricDecRobustMin,
+        tileReconstitutedDecRobustMin: baselineTileDecRobustMin,
+        metricWecRobustMin: baselineMetricWecRobustMin,
+        metricNecRobustMin: baselineMetricNecRobustMin,
+        pressureScale: null,
+        densityLiftFraction: null,
+        fluxScale: null,
+        shearScale: null,
+        note:
+          "Baseline hold candidate preserves current observer rapidity bounds and serves as the control lane for sweep comparisons.",
+      }),
+      buildSweepCandidate({
+        candidateId: "observer_domain_truncation_zeta0_probe_v1",
+        candidateClass: "observer_domain_truncation",
+        sweepPhase: "baseline",
+        refineSeedCandidateId: null,
+        applied: false,
+        rapidityCap: 0,
+        rapidityCapBeta: 0,
+        metricDecRobustMin: baselineMetricDecEulerianMin,
+        tileReconstitutedDecRobustMin: baselineTileDecEulerianMin,
+        metricWecRobustMin: baselineMetricWecEulerianMin,
+        metricNecRobustMin: baselineMetricNecEulerianMin,
+        pressureScale: null,
+        densityLiftFraction: null,
+        fluxScale: null,
+        shearScale: null,
+        note:
+          "Observer-domain truncation probe (zeta=0) is computed to localize sensitivity only and is explicitly excluded from physical-control selection.",
+      }),
+    ];
+  const coarseSweepCandidates: DecSweepCandidate[] = [];
+  const coarseControlByCandidateId = new Map<
+    string,
+    {
+      pressureScale: number;
+      densityLiftFraction: number;
+      fluxScale: number;
+      shearScale: number;
+    }
+  >();
+  const seenControlConfigs = new Set<string>();
+  const pushCoarseCandidate = (args: {
+    candidateId: string;
+    note: string;
+    pressureScale: number;
+    densityLiftFraction: number;
+    fluxScale: number;
+    shearScale: number;
+    evaluated: {
+      metricDecRobustMin: number | null;
+      tileReconstitutedDecRobustMin: number | null;
+      metricWecRobustMin: number | null;
+      metricNecRobustMin: number | null;
+    };
+  }): void => {
+    coarseSweepCandidates.push(
+      buildSweepCandidate({
+        candidateId: args.candidateId,
+        candidateClass: "physics_control_proposal",
+        sweepPhase: "coarse",
+        refineSeedCandidateId: null,
+        applied: false,
+        rapidityCap: baselineRapidityCap,
+        rapidityCapBeta: baselineRapidityCapBeta,
+        metricDecRobustMin: args.evaluated.metricDecRobustMin,
+        tileReconstitutedDecRobustMin:
+          args.evaluated.tileReconstitutedDecRobustMin,
+        metricWecRobustMin: args.evaluated.metricWecRobustMin,
+        metricNecRobustMin: args.evaluated.metricNecRobustMin,
+        pressureScale: args.pressureScale,
+        densityLiftFraction: args.densityLiftFraction,
+        fluxScale: args.fluxScale,
+        shearScale: args.shearScale,
+        note: args.note,
+      }),
+    );
+    coarseControlByCandidateId.set(args.candidateId, {
+      pressureScale: args.pressureScale,
+      densityLiftFraction: args.densityLiftFraction,
+      fluxScale: args.fluxScale,
+      shearScale: args.shearScale,
+    });
+    seenControlConfigs.add(
+      makeControlConfigKey(
+        args.pressureScale,
+        args.densityLiftFraction,
+        args.fluxScale,
+        args.shearScale,
+      ),
+    );
+  };
+  pushCoarseCandidate({
+    candidateId: "same_chart_physics_control_no_domain_shift_probe_v1",
+    pressureScale: sameChartTensorPhysicsControlProbeScale,
+    densityLiftFraction: sameChartTensorDensityLiftBaseline,
+    fluxScale: sameChartTensorFluxScaleBaseline,
+    shearScale: sameChartTensorShearScaleBaseline,
+    evaluated: sameChartPressureScaleProbe,
+    note:
+      `Non-truncation same-chart physics-control probe keeps observer-domain bounds fixed and applies bounded E/J/S controls (s=${sameChartTensorPhysicsControlProbeScale}, rho_lift=${sameChartTensorDensityLiftBaseline}, flux_scale=${sameChartTensorFluxScaleBaseline}, shear_scale=${sameChartTensorShearScaleBaseline}) to test DEC lift under strict WEC/NEC non-regression gates.`,
+  });
+  pushCoarseCandidate({
+    candidateId: "same_chart_physics_control_coupled_density_pressure_probe_v1",
+    pressureScale: sameChartTensorPhysicsControlProbeScale,
+    densityLiftFraction: sameChartTensorDensityLiftProbeFraction,
+    fluxScale: sameChartTensorFluxScaleProbe,
+    shearScale: sameChartTensorShearScaleProbe,
+    evaluated: sameChartCoupledDensityPressureProbe,
+    note:
+      `Non-truncation coupled same-chart probe keeps observer-domain bounds fixed and applies bounded E/J/S controls (s=${sameChartTensorPhysicsControlProbeScale}, rho_lift=${sameChartTensorDensityLiftProbeFraction}, flux_scale=${sameChartTensorFluxScaleProbe}, shear_scale=${sameChartTensorShearScaleProbe}) to test DEC lift while preserving WEC/NEC non-regression on the admitted Einstein route.`,
+  });
+  const pressureScaleSweep = [0.85, 0.875, 0.9, 0.925, 0.95, 0.975];
+  const densityLiftSweep = [0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15];
+  const fluxScaleSweep = [sameChartTensorFluxScaleMin, 0.9, 0.95];
+  const shearScaleSweep = [sameChartTensorShearScaleMin, 0.9, 0.95];
+  for (const pressureScale of pressureScaleSweep) {
+    for (const densityLiftFraction of densityLiftSweep) {
+      for (const fluxScale of fluxScaleSweep) {
+        for (const shearScale of shearScaleSweep) {
+          const key = makeControlConfigKey(
+            pressureScale,
+            densityLiftFraction,
+            fluxScale,
+            shearScale,
+          );
+          if (seenControlConfigs.has(key)) continue;
+          const evaluated = evaluateSameChartControlCandidate({
+            pressureScale,
+            densityLiftFraction,
+            fluxScale,
+            shearScale,
+          });
+          pushCoarseCandidate({
+            candidateId: `same_chart_physics_control_pressure_${makeControlToken(pressureScale)}_density_${makeControlToken(densityLiftFraction)}_flux_${makeControlToken(fluxScale)}_shear_${makeControlToken(shearScale)}_probe_v1`,
+            pressureScale,
+            densityLiftFraction,
+            fluxScale,
+            shearScale,
+            evaluated,
+            note:
+              `Bounded non-truncation same-chart coarse sweep candidate (s=${pressureScale}, rho_lift=${densityLiftFraction}, flux_scale=${fluxScale}, shear_scale=${shearScale}) for DEC margin-to-zero remediation under WEC/NEC non-regression gates.`,
+          });
+        }
+      }
+    }
+  }
+  const coarsePassingCandidates = coarseSweepCandidates
+    .filter((candidate) => candidate.passesSelectionGate)
+    .sort(compareCandidatesForSelection);
+  const refineSeedCandidates = coarsePassingCandidates.slice(0, 3);
+  const refineSeedCandidateIds = refineSeedCandidates.map(
+    (candidate) => candidate.candidateId,
+  );
+  const refineSweepCandidates: DecSweepCandidate[] = [];
+  const refinePressureOffsets = [-0.0125, 0, 0.0125];
+  const refineDensityOffsets = [-0.0125, 0, 0.0125];
+  const refineFluxOffsets = [-0.0125, 0, 0.0125];
+  const refineShearOffsets = [-0.0125, 0, 0.0125];
+  const minPressureScale = sameChartTensorPhysicsControlProbeScale;
+  const maxPressureScale = sameChartTensorPhysicsControlBaseline;
+  const minDensityLiftFraction = sameChartTensorDensityLiftBaseline;
+  const maxDensityLiftFraction = sameChartTensorDensityLiftProbeFraction;
+  const minFluxScale = sameChartTensorFluxScaleMin;
+  const maxFluxScale = sameChartTensorFluxScaleBaseline;
+  const minShearScale = sameChartTensorShearScaleMin;
+  const maxShearScale = sameChartTensorShearScaleBaseline;
+  for (const seed of refineSeedCandidates) {
+    const seedControl = coarseControlByCandidateId.get(seed.candidateId);
+    if (seedControl == null) continue;
+    for (const pressureOffset of refinePressureOffsets) {
+      for (const densityOffset of refineDensityOffsets) {
+        for (const fluxOffset of refineFluxOffsets) {
+          for (const shearOffset of refineShearOffsets) {
+            if (
+              pressureOffset === 0 &&
+              densityOffset === 0 &&
+              fluxOffset === 0 &&
+              shearOffset === 0
+            ) {
+              continue;
+            }
+            const pressureScale = Number(
+              clamp(
+                seedControl.pressureScale + pressureOffset,
+                minPressureScale,
+                maxPressureScale,
+              ).toFixed(6),
+            );
+            const densityLiftFraction = Number(
+              clamp(
+                seedControl.densityLiftFraction + densityOffset,
+                minDensityLiftFraction,
+                maxDensityLiftFraction,
+              ).toFixed(6),
+            );
+            const fluxScale = Number(
+              clamp(seedControl.fluxScale + fluxOffset, minFluxScale, maxFluxScale).toFixed(6),
+            );
+            const shearScale = Number(
+              clamp(seedControl.shearScale + shearOffset, minShearScale, maxShearScale).toFixed(6),
+            );
+            const key = makeControlConfigKey(
+              pressureScale,
+              densityLiftFraction,
+              fluxScale,
+              shearScale,
+            );
+            if (seenControlConfigs.has(key)) continue;
+            seenControlConfigs.add(key);
+            const evaluated = evaluateSameChartControlCandidate({
+              pressureScale,
+              densityLiftFraction,
+              fluxScale,
+              shearScale,
+            });
+            refineSweepCandidates.push(
+              buildSweepCandidate({
+                candidateId: `same_chart_physics_control_refine_seed_${seed.candidateId}_pressure_${makeControlToken(pressureScale)}_density_${makeControlToken(densityLiftFraction)}_flux_${makeControlToken(fluxScale)}_shear_${makeControlToken(shearScale)}_probe_v1`,
+                candidateClass: "physics_control_proposal",
+                sweepPhase: "refine",
+                refineSeedCandidateId: seed.candidateId,
+                applied: false,
+                rapidityCap: baselineRapidityCap,
+                rapidityCapBeta: baselineRapidityCapBeta,
+                metricDecRobustMin: evaluated.metricDecRobustMin,
+                tileReconstitutedDecRobustMin:
+                  evaluated.tileReconstitutedDecRobustMin,
+                metricWecRobustMin: evaluated.metricWecRobustMin,
+                metricNecRobustMin: evaluated.metricNecRobustMin,
+                pressureScale,
+                densityLiftFraction,
+                fluxScale,
+                shearScale,
+                note:
+                  `Refine sweep candidate around ${seed.candidateId} (s=${pressureScale}, rho_lift=${densityLiftFraction}, flux_scale=${fluxScale}, shear_scale=${shearScale}) for commensurate DEC margin localization under unchanged observer-domain bounds.`,
+              }),
+            );
+          }
+        }
+      }
+    }
+  }
+  const sweepCandidates: Nhm2ObserverDecPhysicsControlEvidence["sweepCandidates"] =
+    [
+      ...baselineSweepCandidates,
+      ...coarseSweepCandidates,
+      ...refineSweepCandidates,
+    ];
+  const passingCandidates = sweepCandidates.filter(
+    (candidate) => candidate.passesSelectionGate,
+  );
+  const rankedPassingCandidates = [...passingCandidates].sort(
+    compareCandidatesForSelection,
+  );
+  const selectedSweepCandidate =
+    rankedPassingCandidates.length > 0
+      ? rankedPassingCandidates[0]
+      : sweepCandidates[0];
+  const selectionDecision: Nhm2ObserverDecPhysicsControlEvidence["selectionDecision"] =
+    passingCandidates.length > 0 ? "apply_candidate" : "hold_baseline";
+  const selectionPlateauStatus: Nhm2ObserverDecPhysicsControlEvidence["selectionPlateauStatus"] =
+    rankedPassingCandidates.length === 0
+      ? "no_passing_candidate"
+      : selectedSweepCandidate.crossesZeroBothDecMargins === true
+        ? "cross_zero_candidate_found"
+        : "best_margin_still_negative";
+  const selectedCandidateId =
+    selectedSweepCandidate?.candidateId ?? "baseline_hold_no_applied_control_patch_v1";
+  const selectionReasonCodes: Nhm2ObserverDecPhysicsControlEvidence["selectionReasonCodes"] =
+    passingCandidates.length > 0
+      ? [
+          "selection_gate_pass",
+          ...(selectionPlateauStatus === "best_margin_still_negative"
+            ? ["best_margin_still_negative"]
+            : []),
+        ]
+      : Array.from(
+          new Set(
+            sweepCandidates
+              .filter((candidate) => candidate.candidateClass !== "baseline_hold")
+              .flatMap((candidate) => candidate.gateFailureReasons)
+              .filter((reason) => reason !== "selection_gate_pass"),
+          ),
+        );
+  const rankedPhysicsCandidates = [...sweepCandidates]
+    .filter((candidate) => candidate.candidateClass === "physics_control_proposal")
+    .sort(compareCandidatesForSelection);
+  const runtimeSweepCandidate =
+    selectionDecision === "apply_candidate"
+      ? selectedSweepCandidate
+      : (rankedPhysicsCandidates[0] ?? selectedSweepCandidate);
+  if (selectionReasonCodes.length === 0) {
+    selectionReasonCodes.push("candidate_not_evaluated");
+  }
+  const sweepPhaseSummary: Nhm2ObserverDecPhysicsControlEvidence["sweepPhaseSummary"] =
+    {
+      coarseCandidateCount: coarseSweepCandidates.length,
+      coarsePassingCount: coarsePassingCandidates.length,
+      refineCandidateCount: refineSweepCandidates.length,
+      refinePassingCount: refineSweepCandidates.filter(
+        (candidate) => candidate.passesSelectionGate,
+      ).length,
+      refineSeedCandidateIds,
+      note:
+        refineSeedCandidateIds.length > 0
+          ? "Refine sweep expanded around top coarse passing seeds under unchanged semantic and observer-domain constraints."
+          : "No coarse passing seed was available for refine expansion; selection remains constrained to baseline/coarse evidence.",
+    };
+  const topCandidateLeaderboard: Nhm2ObserverDecPhysicsControlEvidence["topCandidateLeaderboard"] =
+    [...sweepCandidates]
+      .sort(compareCandidatesForLeaderboard)
+      .slice(0, 5)
+      .map((candidate, index) => ({
+        rank: index + 1,
+        candidateId: candidate.candidateId,
+        candidateClass: candidate.candidateClass,
+        sweepPhase: candidate.sweepPhase,
+        passesSelectionGate: candidate.passesSelectionGate,
+        crossesZeroBothDecMargins: candidate.crossesZeroBothDecMargins,
+        selectionObjectivePrimaryMargin: candidate.selectionObjectivePrimaryMargin,
+        metricDecRobustLift: candidate.metricDecRobustLift,
+        tileReconstitutedDecRobustLift: candidate.tileReconstitutedDecRobustLift,
+        controlDeviationMagnitude: candidate.controlDeviationMagnitude,
+      }));
+  const metricDecRobustLift = selectedSweepCandidate.metricDecRobustLift;
+  const tileReconstitutedDecRobustLift =
+    selectedSweepCandidate.tileReconstitutedDecRobustLift;
+  const metricWecRobustDelta = selectedSweepCandidate.metricWecRobustDelta;
+  const metricNecRobustDelta = selectedSweepCandidate.metricNecRobustDelta;
+  const metricWecNonRegression =
+    selectedSweepCandidate.guardChecks.metricWecNonRegression;
+  const metricNecNonRegression =
+    selectedSweepCandidate.guardChecks.metricNecNonRegression;
+  const candidateId = selectedCandidateId;
+  const candidateMetricDecEulerianMin = baselineMetricDecEulerianMin;
+  const candidateMetricDecRobustMin = selectedSweepCandidate.metricDecRobustMin;
+  const candidateMetricWecEulerianMin = baselineMetricWecEulerianMin;
+  const candidateMetricWecRobustMin = selectedSweepCandidate.metricWecRobustMin;
+  const candidateMetricNecEulerianMin = baselineMetricNecEulerianMin;
+  const candidateMetricNecRobustMin = selectedSweepCandidate.metricNecRobustMin;
+  const candidateTileDecEulerianMin = baselineTileDecEulerianMin;
+  const candidateTileDecRobustMin =
+    selectedSweepCandidate.tileReconstitutedDecRobustMin;
+  const candidateTileWecEulerianMin = baselineTileWecEulerianMin;
+  const candidateTileWecRobustMin =
+    selectionDecision === "apply_candidate"
+      ? selectedSweepCandidate.metricWecRobustMin
+      : baselineTileWecRobustMin;
+  const candidateTileNecEulerianMin = baselineTileNecEulerianMin;
+  const candidateTileNecRobustMin =
+    selectionDecision === "apply_candidate"
+      ? selectedSweepCandidate.metricNecRobustMin
+      : baselineTileNecRobustMin;
+  const runtimeApplicationEnabled = isNhm2DecPhysicsRuntimeApplyEnabled();
+  const runtimeApplicationAttempted =
+    selectionDecision === "apply_candidate" ||
+    (runtimeApplicationEnabled &&
+      runtimeSweepCandidate.candidateClass === "physics_control_proposal");
+  const runtimeSelectedPathParity = selectedPath === "full_einstein_tensor";
+  const runtimeChartParity =
+    args.modelTermSemanticEvidence.chartRef === "comoving_cartesian";
+  const runtimeIndependentCrossCheckStatus =
+    args.modelTermSemanticEvidence.checks.independentCrossCheck;
+  const runtimeReferenceRouteId =
+    getNhm2ModelTermNoteValue(
+      args.modelTermSemanticEvidence.notes,
+      "independentCrossCheckReferenceRouteId",
+    ) ??
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    routeId;
+  const runtimeSampleCount = toFiniteNumber(args.metricTensorInput.sampleCount);
+  const runtimeComparableSampleCount =
+    toFiniteNumber(
+      getNhm2ModelTermNoteValue(
+        args.modelTermSemanticEvidence.notes,
+        "independentCrossCheckComparedSampleCount",
+      ),
+    ) ??
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence
+      ?.comparedSampleCount ??
+    runtimeSampleCount;
+  const runtimeMinimumComparableSampleCount =
+    NHM2_DEC_PHYSICS_RUNTIME_MIN_COMPARABLE_SAMPLE_COUNT;
+  const runtimeSampleCountSufficient =
+    runtimeComparableSampleCount != null
+      ? runtimeComparableSampleCount >= runtimeMinimumComparableSampleCount
+      : false;
+  const runtimeRouteComparable =
+    runtimeSelectedPathParity &&
+    runtimeChartParity &&
+    args.modelTermSemanticEvidence.checks.fullEinsteinTensorRouteAdmission ===
+      "pass" &&
+    runtimeIndependentCrossCheckStatus === "pass" &&
+    runtimeReferenceRouteId != null;
+  const runtimeEvaluationComparable =
+    runtimeRouteComparable && runtimeSampleCountSufficient;
+  const runtimeMetricDecRobustLift = runtimeSweepCandidate.metricDecRobustLift;
+  const runtimeTileReconstitutedDecRobustLift =
+    runtimeSweepCandidate.tileReconstitutedDecRobustLift;
+  const runtimeMetricWecRobustDelta = runtimeSweepCandidate.metricWecRobustDelta;
+  const runtimeMetricNecRobustDelta = runtimeSweepCandidate.metricNecRobustDelta;
+  const runtimeMetricWecNonRegression =
+    runtimeSweepCandidate.guardChecks.metricWecNonRegression;
+  const runtimeMetricNecNonRegression =
+    runtimeSweepCandidate.guardChecks.metricNecNonRegression;
+  const runtimeMetricDecRobustLiftPositive =
+    (runtimeMetricDecRobustLift ?? Number.NEGATIVE_INFINITY) > 0;
+  const runtimeTileDecRobustLiftNonNegative =
+    (runtimeTileReconstitutedDecRobustLift ?? Number.NEGATIVE_INFINITY) >= 0;
+  const nonRegressionGateRequired = [
+    "metricWecNonRegression",
+    "metricNecNonRegression",
+    "emissionAdmissionStable",
+    "semanticAdmissionStable",
+    "candidateNotObserverDomainTruncation",
+    "metricDecRobustLiftPositive",
+    "tileReconstitutedDecRobustLiftNonNegative",
+    "comparabilityGatePass",
+    "comparableSampleCountThreshold",
+  ];
+  const nonRegressionGatePass =
+    selectionDecision === "apply_candidate" &&
+    metricWecNonRegression === true &&
+    metricNecNonRegression === true &&
+    emissionAdmissionStable &&
+    semanticAdmissionStable &&
+    selectedSweepCandidate.candidateClass !== "observer_domain_truncation" &&
+    (metricDecRobustLift ?? Number.NEGATIVE_INFINITY) > 0 &&
+    (tileReconstitutedDecRobustLift ?? Number.NEGATIVE_INFINITY) >= 0 &&
+    runtimeEvaluationComparable;
+  const nonRegressionGateNote = nonRegressionGatePass
+    ? "Selected candidate satisfies DEC-lift, non-regression, and comparability gates on the admitted route."
+    : "No candidate satisfied the full DEC-lift, non-regression, and comparability gate set within the bounded sweep.";
+  const runtimeApplicationGatePass =
+    runtimeApplicationAttempted &&
+    runtimeMetricWecNonRegression === true &&
+    runtimeMetricNecNonRegression === true &&
+    emissionAdmissionStable &&
+    semanticAdmissionStable &&
+    runtimeSweepCandidate.candidateClass !== "observer_domain_truncation" &&
+    runtimeMetricDecRobustLiftPositive &&
+    runtimeTileDecRobustLiftNonNegative &&
+    runtimeEvaluationComparable;
+  const runtimeApplicationApplied =
+    runtimeApplicationAttempted &&
+    runtimeApplicationEnabled &&
+    runtimeApplicationGatePass;
+  const runtimeFailureMode: "none" | "not_attempted" | "runtime_apply_disabled" | "regression_wec" | "regression_nec" | "insufficient_dec_lift" | "non_comparable" | "unknown" =
+    !runtimeApplicationAttempted
+      ? "not_attempted"
+      : runtimeApplicationApplied
+        ? "none"
+        : !runtimeApplicationEnabled
+          ? "runtime_apply_disabled"
+          : !runtimeEvaluationComparable
+            ? "non_comparable"
+            : runtimeMetricWecNonRegression !== true
+              ? "regression_wec"
+              : runtimeMetricNecNonRegression !== true
+                ? "regression_nec"
+                : !runtimeMetricDecRobustLiftPositive ||
+                    !runtimeTileDecRobustLiftNonNegative
+                  ? "insufficient_dec_lift"
+                  : "unknown";
+  const runtimeRollbackReasonCodes: Nhm2ObserverDecPhysicsControlEvidence["selectionReasonCodes"] =
+    runtimeApplicationAttempted && !runtimeApplicationApplied
+      ? Array.from(
+          new Set([
+            ...(runtimeApplicationEnabled ? [] : ["candidate_not_evaluated"]),
+            ...(runtimeMetricWecNonRegression === true
+              ? []
+              : ["candidate_violates_wec_non_regression"]),
+            ...(runtimeMetricNecNonRegression === true
+              ? []
+              : ["candidate_violates_nec_non_regression"]),
+            ...(emissionAdmissionStable
+              ? []
+              : ["candidate_breaks_emission_admission_stability"]),
+            ...(semanticAdmissionStable
+              ? []
+              : ["candidate_breaks_semantic_admission_stability"]),
+            ...(runtimeEvaluationComparable
+              ? []
+              : ["candidate_evidence_non_comparable"]),
+            ...(runtimeSweepCandidate.candidateClass ===
+            "observer_domain_truncation"
+              ? ["candidate_is_observer_domain_truncation"]
+              : []),
+            ...(runtimeMetricDecRobustLiftPositive
+              ? []
+              : ["no_candidate_improves_dec"]),
+            ...(runtimeTileDecRobustLiftNonNegative
+              ? []
+              : ["no_candidate_improves_dec"]),
+          ]),
+        )
+      : [];
+  const runtimeApplicationStatus: "not_attempted" | "applied" | "rolled_back" =
+    !runtimeApplicationAttempted
+      ? "not_attempted"
+      : runtimeApplicationApplied
+        ? "applied"
+        : "rolled_back";
+  const runtimeComparabilityNote = runtimeEvaluationComparable
+    ? `Comparable evidence passes route/chart parity with ${runtimeComparableSampleCount ?? "null"} comparable samples (threshold ${runtimeMinimumComparableSampleCount}).`
+    : !runtimeRouteComparable
+      ? "Comparable evidence failed route/chart/independent-cross-check parity on the selected Einstein route."
+      : `Comparable evidence sample count (${runtimeComparableSampleCount ?? "null"}) is below threshold (${runtimeMinimumComparableSampleCount}).`;
+  const runtimeApplicationNote =
+    runtimeApplicationStatus === "applied"
+      ? "Selected DEC-control candidate is runtime-applied under strict non-regression gates."
+      : runtimeApplicationStatus === "rolled_back"
+        ? runtimeApplicationEnabled
+          ? runtimeFailureMode === "non_comparable"
+            ? "Runtime DEC-control candidate was attempted but rolled back because baseline/candidate evidence is non-comparable on the selected Einstein route."
+            : "Runtime DEC-control candidate was attempted but rolled back because one or more non-regression gates failed."
+          : `Runtime DEC-control candidate remains staged-only because ${NHM2_DEC_PHYSICS_RUNTIME_APPLY_ENV} is disabled; evidence remains comparable but non-applied.`
+        : "No runtime DEC-control application was attempted because no candidate cleared the selection gate.";
+  const uncertaintyTags: Nhm2ObserverDecPhysicsControlEvidence["uncertaintyTags"] = [
+    "inference",
+    ...(runtimeEvaluationComparable ? (["direct_measurement"] as const) : []),
+    ...(selectionPlateauStatus === "cross_zero_candidate_found"
+      ? []
+      : (["open_assumption"] as const)),
+  ];
+  const baselineSweepCandidate =
+    sweepCandidates.find(
+      (candidate) =>
+        candidate.candidateId === "baseline_hold_no_applied_control_patch_v1",
+    ) ?? null;
+  const baselinePrimaryMargin =
+    baselineSweepCandidate?.selectionObjectivePrimaryMargin ?? null;
+  const bestCandidatePrimaryMargin =
+    selectedSweepCandidate.selectionObjectivePrimaryMargin ?? null;
+  const requiredLiftToZero =
+    baselinePrimaryMargin != null ? Math.max(0, -baselinePrimaryMargin) : null;
+  const achievedLiftFromBaseline =
+    baselinePrimaryMargin != null && bestCandidatePrimaryMargin != null
+      ? bestCandidatePrimaryMargin - baselinePrimaryMargin
+      : null;
+  const bestAchievedLift = achievedLiftFromBaseline;
+  const residualMarginToZero = bestCandidatePrimaryMargin;
+  const gapToZero =
+    residualMarginToZero != null ? Math.max(0, -residualMarginToZero) : null;
+  const crossZeroAchieved = selectedSweepCandidate.crossesZeroBothDecMargins;
+  const zeroCrossFeasibilityDecision: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["zeroCrossFeasibilityDecision"]
+  > =
+    crossZeroAchieved === true
+      ? "zero_cross_achieved"
+      : selectionPlateauStatus === "best_margin_still_negative" ||
+          (bestCandidatePrimaryMargin != null && bestCandidatePrimaryMargin < 0)
+        ? "zero_cross_not_achievable_within_bounds"
+        : "unknown";
+  const zeroCrossFeasibilityReasonCodesSet = new Set<
+    NonNullable<
+      Nhm2ObserverDecPhysicsControlEvidence["zeroCrossFeasibilityReasonCodes"]
+    >[number]
+  >();
+  if (crossZeroAchieved === true) {
+    zeroCrossFeasibilityReasonCodesSet.add("cross_zero_margin_non_negative");
+  }
+  if (
+    selectionPlateauStatus === "best_margin_still_negative" ||
+    (bestCandidatePrimaryMargin != null && bestCandidatePrimaryMargin < 0)
+  ) {
+    zeroCrossFeasibilityReasonCodesSet.add("best_margin_still_negative");
+  }
+  if (selectionDecision !== "apply_candidate") {
+    zeroCrossFeasibilityReasonCodesSet.add("selection_gate_failed");
+  }
+  if (!runtimeEvaluationComparable) {
+    zeroCrossFeasibilityReasonCodesSet.add("candidate_evidence_non_comparable");
+  }
+  if (runtimeMetricWecNonRegression !== true) {
+    zeroCrossFeasibilityReasonCodesSet.add("candidate_violates_wec_non_regression");
+  }
+  if (runtimeMetricNecNonRegression !== true) {
+    zeroCrossFeasibilityReasonCodesSet.add("candidate_violates_nec_non_regression");
+  }
+  if (!runtimeApplicationAttempted || !runtimeApplicationEnabled) {
+    zeroCrossFeasibilityReasonCodesSet.add("candidate_not_evaluated");
+  }
+  if (zeroCrossFeasibilityReasonCodesSet.size === 0) {
+    zeroCrossFeasibilityReasonCodesSet.add("unknown");
+  }
+  const zeroCrossFeasibilityReasonCodes = Array.from(
+    zeroCrossFeasibilityReasonCodesSet,
+  );
+  const crossZeroInferenceLabel: Nhm2ObserverDecPhysicsControlEvidence["crossZeroFeasibilityEvidence"]["inferenceLabel"] =
+    runtimeEvaluationComparable && crossZeroAchieved === true
+      ? "direct_measurement"
+      : runtimeEvaluationComparable
+        ? "mixed"
+        : "inference";
+  const crossZeroFeasibilityEvidence: Nhm2ObserverDecPhysicsControlEvidence["crossZeroFeasibilityEvidence"] =
+    {
+      baselinePrimaryMargin,
+      bestCandidatePrimaryMargin,
+      requiredLiftToZero,
+      achievedLiftFromBaseline,
+      bestAchievedLift,
+      residualMarginToZero,
+      gapToZero,
+      crossZeroAchieved,
+      boundedControlEnvelope: {
+        pressureScaleMin: sameChartTensorPhysicsControlMin,
+        pressureScaleMax: sameChartTensorPhysicsControlBaseline,
+        densityLiftMin: sameChartTensorDensityLiftBaseline,
+        densityLiftMax: sameChartTensorDensityLiftMax,
+        fluxScaleMin: sameChartTensorFluxScaleMin,
+        fluxScaleMax: sameChartTensorFluxScaleBaseline,
+        shearScaleMin: sameChartTensorShearScaleMin,
+        shearScaleMax: sameChartTensorShearScaleBaseline,
+      },
+      evaluationRoute: {
+        chartRef: args.modelTermSemanticEvidence.chartRef,
+        routeId,
+        selectedPath,
+        independentCrossCheckStatus: runtimeIndependentCrossCheckStatus,
+        runtimeComparabilityPass: runtimeEvaluationComparable,
+      },
+      method: "bounded_sweep_margin_analysis",
+      inferenceLabel: crossZeroInferenceLabel,
+      citationRefs: Array.from(
+        new Set([
+          ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+          ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+          ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+        ]),
+      ),
+      notes: [
+        "Cross-zero feasibility is evaluated on the same bounded DEC-control sweep objective used for candidate ranking on the admitted Einstein route.",
+        crossZeroAchieved === true
+          ? "A selected candidate crosses zero on both metric and tile-reconstituted DEC robust margins within the bounded control envelope."
+          : `No selected candidate crosses zero on both DEC robust margins; residual primary margin remains ${residualMarginToZero ?? "null"}.`,
+        `Required lift-to-zero from baseline primary margin is ${requiredLiftToZero ?? "null"}; best achieved lift from baseline is ${bestAchievedLift ?? "null"}; remaining gap-to-zero is ${gapToZero ?? "null"}.`,
+      ],
+    };
+  const selectedMetricResidualMargin =
+    selectedSweepCandidate.metricDecRobustMarginToZero;
+  const selectedTileResidualMargin =
+    selectedSweepCandidate.tileReconstitutedDecRobustMarginToZero;
+  const decResidualPrimarySurface: Nhm2ObserverDecResidualAttributionEvidence["primarySurface"] =
+    selectedMetricResidualMargin == null && selectedTileResidualMargin == null
+      ? "unknown"
+      : selectedMetricResidualMargin == null
+        ? "tile_reconstituted"
+        : selectedTileResidualMargin == null
+          ? "metric"
+          : selectedMetricResidualMargin < selectedTileResidualMargin
+            ? "metric"
+            : selectedTileResidualMargin < selectedMetricResidualMargin
+              ? "tile_reconstituted"
+              : "mixed";
+  const decResidualAttributionEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["decResidualAttributionEvidence"]
+  > = {
+    status:
+      selectedMetricResidualMargin == null && selectedTileResidualMargin == null
+        ? "unavailable"
+        : "available",
+    primarySurface: decResidualPrimarySurface,
+    dominantViolationClass: args.decRemediationEvidence.dominantViolationClass,
+    baselinePrimaryMargin,
+    selectedPrimaryMargin: bestCandidatePrimaryMargin,
+    requiredLiftToZero,
+    achievedLiftFromBaseline,
+    residualMarginToZero,
+    gapToZero,
+    selectionPlateauStatus,
+    selectionReasonCodes,
+    zeroCrossFeasibilityDecision,
+    rankingBasis: selectionObjective,
+    selectedCandidate: {
+      candidateId: selectedSweepCandidate.candidateId,
+      candidateClass: selectedSweepCandidate.candidateClass,
+      sweepPhase: selectedSweepCandidate.sweepPhase,
+      metricDecRobustMarginToZero: selectedMetricResidualMargin,
+      tileReconstitutedDecRobustMarginToZero: selectedTileResidualMargin,
+      metricDecRobustLift: selectedSweepCandidate.metricDecRobustLift,
+      tileReconstitutedDecRobustLift:
+        selectedSweepCandidate.tileReconstitutedDecRobustLift,
+      controlDeviationMagnitude: selectedSweepCandidate.controlDeviationMagnitude,
+    },
+    citationRefs: Array.from(
+      new Set([
+        ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+        ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+      ]),
+    ),
+    notes: [
+      `selectionPlateauStatus=${selectionPlateauStatus}`,
+      `primarySurface=${decResidualPrimarySurface}`,
+      `selectedMetricResidualMargin=${selectedMetricResidualMargin ?? "null"}`,
+      `selectedTileResidualMargin=${selectedTileResidualMargin ?? "null"}`,
+      `selectedPrimaryMargin=${bestCandidatePrimaryMargin ?? "null"}`,
+      `requiredLiftToZero=${requiredLiftToZero ?? "null"}`,
+      `achievedLiftFromBaseline=${achievedLiftFromBaseline ?? "null"}`,
+      `gapToZero=${gapToZero ?? "null"}`,
+      `selectionReasonCodes=${selectionReasonCodes.join(",") || "none"}`,
+    ],
+  };
+  const boundedSearchEnvelope: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["boundedSearchEnvelope"]
+  > = {
+    pressureScaleMin: sameChartTensorPhysicsControlMin,
+    pressureScaleMax: sameChartTensorPhysicsControlBaseline,
+    densityLiftMin: sameChartTensorDensityLiftBaseline,
+    densityLiftMax: sameChartTensorDensityLiftMax,
+    fluxScaleMin: sameChartTensorFluxScaleMin,
+    fluxScaleMax: sameChartTensorFluxScaleBaseline,
+    shearScaleMin: sameChartTensorShearScaleMin,
+    shearScaleMax: sameChartTensorShearScaleBaseline,
+    coarsePressureStep: minPositiveStep(pressureScaleSweep),
+    coarseDensityLiftStep: minPositiveStep(densityLiftSweep),
+    coarseFluxScaleStep: minPositiveStep(fluxScaleSweep),
+    coarseShearScaleStep: minPositiveStep(shearScaleSweep),
+    refinePressureStep: minPositiveStep(
+      refinePressureOffsets.map((offset) => Math.abs(offset)).filter((v) => v > 0),
+    ),
+    refineDensityLiftStep: minPositiveStep(
+      refineDensityOffsets.map((offset) => Math.abs(offset)).filter((v) => v > 0),
+    ),
+    refineFluxScaleStep: minPositiveStep(
+      refineFluxOffsets.map((offset) => Math.abs(offset)).filter((v) => v > 0),
+    ),
+    refineShearScaleStep: minPositiveStep(
+      refineShearOffsets.map((offset) => Math.abs(offset)).filter((v) => v > 0),
+    ),
+    coarseCandidateCount: coarseSweepCandidates.length,
+    refineCandidateCount: refineSweepCandidates.length,
+    refineSeedCount: refineSeedCandidateIds.length,
+    observerDomainFixed: true,
+  };
+  const candidateApplied = runtimeApplicationApplied;
+  const runtimeMetricDecRobustMarginToZero = runtimeSweepCandidate.metricDecRobustMin;
+  const runtimeTileDecRobustMarginToZero =
+    runtimeSweepCandidate.tileReconstitutedDecRobustMin;
+  const runtimeMetricWecNonRegressionMargin = runtimeMetricWecRobustDelta;
+  const runtimeMetricNecNonRegressionMargin = runtimeMetricNecRobustDelta;
+  const sweepCandidatesWithRuntime = sweepCandidates.map((candidate) =>
+    candidate.candidateId === runtimeSweepCandidate.candidateId
+      ? { ...candidate, applied: runtimeApplicationApplied }
+      : candidate,
+  );
+  const controlKnobs: Nhm2ObserverDecPhysicsControlEvidence["controlKnobs"] = [
+    {
+      knobId: "observer_rapidity_cap",
+      baselineValue: toFiniteNumber(args.metricTensorInput.rapidityCap),
+      candidateValue: selectedSweepCandidate.rapidityCap,
+      deltaValue:
+        selectedSweepCandidate.rapidityCap != null &&
+        toFiniteNumber(args.metricTensorInput.rapidityCap) != null
+          ? selectedSweepCandidate.rapidityCap -
+            (toFiniteNumber(args.metricTensorInput.rapidityCap) ?? 0)
+          : null,
+      boundedDeltaMax: 0.25,
+      bounded:
+        selectedSweepCandidate.rapidityCap != null &&
+        toFiniteNumber(args.metricTensorInput.rapidityCap) != null
+          ? Math.abs(
+              selectedSweepCandidate.rapidityCap -
+                (toFiniteNumber(args.metricTensorInput.rapidityCap) ?? 0),
+            ) <= 0.25
+          : false,
+      note:
+        "Sweep includes a zeta=0 truncation probe for sensitivity localization; selection gate disallows observer-domain truncation as a physical-control patch.",
+    },
+    {
+      knobId: "observer_rapidity_cap_beta",
+      baselineValue: toFiniteNumber(args.metricTensorInput.rapidityCapBeta),
+      candidateValue: selectedSweepCandidate.rapidityCapBeta,
+      deltaValue:
+        selectedSweepCandidate.rapidityCapBeta != null &&
+        toFiniteNumber(args.metricTensorInput.rapidityCapBeta) != null
+          ? selectedSweepCandidate.rapidityCapBeta -
+            (toFiniteNumber(args.metricTensorInput.rapidityCapBeta) ?? 0)
+          : null,
+      boundedDeltaMax: 0.05,
+      bounded:
+        selectedSweepCandidate.rapidityCapBeta != null &&
+        toFiniteNumber(args.metricTensorInput.rapidityCapBeta) != null
+          ? Math.abs(
+              selectedSweepCandidate.rapidityCapBeta -
+                (toFiniteNumber(args.metricTensorInput.rapidityCapBeta) ?? 0),
+            ) <= 0.05
+          : false,
+      note:
+        "Rapidity-beta knob tracks rapidity-cap sweep and remains bounded under the declared audit probe limits.",
+    },
+    {
+      knobId: "same_chart_tensor_physics_control",
+      baselineValue: sameChartTensorPhysicsControlBaseline,
+      candidateValue:
+        selectedSweepCandidate.pressureScale ?? sameChartTensorPhysicsControlProbeScale,
+      deltaValue:
+        selectedSweepCandidate.pressureScale != null
+          ? selectedSweepCandidate.pressureScale -
+            sameChartTensorPhysicsControlBaseline
+          : null,
+      boundedDeltaMax: sameChartTensorPhysicsControlBoundedDeltaMax,
+      bounded:
+        selectedSweepCandidate.pressureScale != null
+          ? Math.abs(
+              selectedSweepCandidate.pressureScale -
+                sameChartTensorPhysicsControlBaseline,
+            ) <= sameChartTensorPhysicsControlBoundedDeltaMax
+          : false,
+      note:
+        `Physical DEC control is evaluated on the admitted Einstein path without observer-domain truncation using a bounded same-chart pressure-scale sweep (s in [${sameChartTensorPhysicsControlMin}, ${sameChartTensorPhysicsControlBaseline}]); this candidate remains non-admissible until it passes WEC/NEC non-regression gates.`,
+    },
+    {
+      knobId: "same_chart_tensor_density_lift",
+      baselineValue: sameChartTensorDensityLiftBaseline,
+      candidateValue:
+        selectedSweepCandidate.densityLiftFraction ??
+        sameChartTensorDensityLiftProbeFraction,
+      deltaValue:
+        selectedSweepCandidate.densityLiftFraction != null
+          ? selectedSweepCandidate.densityLiftFraction -
+            sameChartTensorDensityLiftBaseline
+          : null,
+      boundedDeltaMax: sameChartTensorDensityLiftBoundedDeltaMax,
+      bounded:
+        selectedSweepCandidate.densityLiftFraction != null
+          ? Math.abs(
+              selectedSweepCandidate.densityLiftFraction -
+                sameChartTensorDensityLiftBaseline,
+            ) <= sameChartTensorDensityLiftBoundedDeltaMax
+          : false,
+      note:
+        `Coupled same-chart DEC-control probe includes a bounded density-lift term (rho_lift in [${sameChartTensorDensityLiftBaseline}, ${sameChartTensorDensityLiftMax}]) to test whether DEC can be lifted without NEC/WEC regression while keeping observer-domain bounds fixed.`,
+    },
+    {
+      knobId: "same_chart_tensor_flux_scale",
+      baselineValue: sameChartTensorFluxScaleBaseline,
+      candidateValue:
+        selectedSweepCandidate.fluxScale ?? sameChartTensorFluxScaleProbe,
+      deltaValue:
+        selectedSweepCandidate.fluxScale != null
+          ? selectedSweepCandidate.fluxScale - sameChartTensorFluxScaleBaseline
+          : null,
+      boundedDeltaMax: sameChartTensorFluxScaleBoundedDeltaMax,
+      bounded:
+        selectedSweepCandidate.fluxScale != null
+          ? Math.abs(
+              selectedSweepCandidate.fluxScale - sameChartTensorFluxScaleBaseline,
+            ) <= sameChartTensorFluxScaleBoundedDeltaMax
+          : false,
+      note:
+        `Coupled same-chart DEC-control probe includes bounded Ji-channel attenuation (flux_scale in [${sameChartTensorFluxScaleMin}, ${sameChartTensorFluxScaleBaseline}]) to test DEC lift while preserving comparability and non-regression gates.`,
+    },
+    {
+      knobId: "same_chart_tensor_shear_scale",
+      baselineValue: sameChartTensorShearScaleBaseline,
+      candidateValue:
+        selectedSweepCandidate.shearScale ?? sameChartTensorShearScaleProbe,
+      deltaValue:
+        selectedSweepCandidate.shearScale != null
+          ? selectedSweepCandidate.shearScale - sameChartTensorShearScaleBaseline
+          : null,
+      boundedDeltaMax: sameChartTensorShearScaleBoundedDeltaMax,
+      bounded:
+        selectedSweepCandidate.shearScale != null
+          ? Math.abs(
+              selectedSweepCandidate.shearScale -
+                sameChartTensorShearScaleBaseline,
+            ) <= sameChartTensorShearScaleBoundedDeltaMax
+          : false,
+      note:
+        `Coupled same-chart DEC-control probe includes bounded off-diagonal Sij attenuation (shear_scale in [${sameChartTensorShearScaleMin}, ${sameChartTensorShearScaleBaseline}]) to localize DEC sensitivity on the admitted Einstein route.`,
+    },
+  ];
+  const recommendation =
+    args.decRemediationEvidence.recommendedPatchClass ===
+    "no_admissible_candidate_yet"
+      ? "no_admissible_candidate_yet"
+      : !semanticAdmissionStable || !emissionAdmissionStable
+        ? "model_term_extension_patch"
+        : selectionDecision === "apply_candidate"
+          ? "physics_control_patch"
+          : "no_admissible_candidate_yet";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+        ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+        ...args.modelTermSemanticEvidence.citationRefs,
+        ...(args.modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+        ...args.decRemediationEvidence.citationRefs,
+        ...args.tileObserverConditionComparabilityEvidence.citationRefs,
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  const claimCitationMap = NHM2_DEC_PHYSICS_CONTROL_CLAIM_CITATION_MAP.map(
+    (entry) => ({
+      claimId: entry.claimId,
+      claim: entry.claim,
+      citationRefs: Array.from(
+        new Set(
+          entry.citationRefs.filter(
+            (citation) => typeof citation === "string" && citation.length > 0,
+          ),
+        ),
+      ),
+      note: entry.note,
+    }),
+  );
+  const expectedClaimIds = NHM2_DEC_PHYSICS_CONTROL_CLAIM_CITATION_MAP.map(
+    (entry) => entry.claimId,
+  );
+  const coveredClaimIds = claimCitationMap
+    .filter((entry) => entry.citationRefs.length > 0)
+    .map((entry) => entry.claimId);
+  const missingClaimIds = expectedClaimIds.filter(
+    (claimId) => !coveredClaimIds.includes(claimId),
+  );
+  const claimCitationMapCompleteness: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["claimCitationMapCompleteness"]
+  > = {
+    status: missingClaimIds.length === 0 ? "pass" : "fail",
+    expectedClaimCount: expectedClaimIds.length,
+    coveredClaimCount: coveredClaimIds.length,
+    expectedClaimIds,
+    missingClaimIds,
+    note:
+      missingClaimIds.length === 0
+        ? "All DEC-control claims in the map carry at least one citation reference."
+        : `Missing citation coverage for claim ids: ${missingClaimIds.join(", ")}`,
+  };
+  const decCoupledControlEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["decCoupledControlEvidence"]
+  > = {
+    status: semanticAdmissionStable ? "available" : "unavailable",
+    controlFamiliesUsed: ["E_density", "J_i_flux", "S_ij_shear"],
+    boundedEnvelope: {
+      pressureScaleMin: sameChartTensorPhysicsControlMin,
+      pressureScaleMax: sameChartTensorPhysicsControlBaseline,
+      densityLiftMin: sameChartTensorDensityLiftBaseline,
+      densityLiftMax: sameChartTensorDensityLiftMax,
+      fluxScaleMin: sameChartTensorFluxScaleMin,
+      fluxScaleMax: sameChartTensorFluxScaleBaseline,
+      shearScaleMin: sameChartTensorShearScaleMin,
+      shearScaleMax: sameChartTensorShearScaleBaseline,
+    },
+    candidateEvaluationTable: topCandidateLeaderboard.map((leader) => {
+      const candidate = sweepCandidatesWithRuntime.find(
+        (entry) => entry.candidateId === leader.candidateId,
+      );
+      return {
+        candidateId: leader.candidateId,
+        pressureScale: candidate?.pressureScale ?? null,
+        densityLiftFraction: candidate?.densityLiftFraction ?? null,
+        fluxScale: candidate?.fluxScale ?? null,
+        shearScale: candidate?.shearScale ?? null,
+        selectionObjectivePrimaryMargin:
+          leader.selectionObjectivePrimaryMargin ?? null,
+        passesSelectionGate: leader.passesSelectionGate,
+      };
+    }),
+    bestCandidateId: selectedCandidateId,
+    comparabilityGate: {
+      pass: runtimeEvaluationComparable,
+      independentCrossCheckStatus: runtimeIndependentCrossCheckStatus,
+      note: runtimeComparabilityNote,
+    },
+    researchClaims: [
+      {
+        claimId: "same_chart_projection_grammar_required",
+        claim:
+          "Same-chart E, J_i, and S_ij projections are required for physically coherent observer-condition evaluation.",
+        confidenceLabel: "established",
+        citationRefs: [
+          "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+          "https://arxiv.org/abs/gr-qc/0703035",
+        ],
+        note:
+          "3+1 projection grammar constrains how DEC controls can be applied without chart/semantic drift.",
+      },
+      {
+        claimId: "geometry_first_route_is_control_basis",
+        claim:
+          "Coupled DEC controls are evaluated on the admitted full Einstein route before observer-condition interpretation.",
+        confidenceLabel: "established",
+        citationRefs: [
+          "https://arxiv.org/abs/gr-qc/0110086",
+          "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+          "https://arxiv.org/abs/2404.03095",
+        ],
+        note:
+          "Geometry-first route parity is retained via independent cross-check and comparability gates.",
+      },
+      {
+        claimId: "bounded_probe_non_regression_policy",
+        claim:
+          "Bounded E/J/S knob sweeps require WEC/NEC non-regression and positive DEC lift before runtime apply can remain applied.",
+        confidenceLabel: "review",
+        citationRefs: [
+          "https://arxiv.org/abs/1702.05915",
+          "https://arxiv.org/abs/2003.01815",
+          "https://arxiv.org/abs/1405.0403",
+        ],
+        note:
+          "Non-regression gating is policy-conservative and grounded in energy-condition review practice.",
+      },
+      {
+        claimId: "observer_robust_cross_check_priority",
+        claim:
+          "Independent cross-check parity is required for commensurate runtime decisions on coupled DEC-control candidates.",
+        confidenceLabel: "emerging_preprint",
+        citationRefs: [
+          "https://arxiv.org/abs/2404.10855",
+          "https://arxiv.org/abs/2602.18023",
+        ],
+        note:
+          "Recent warp-analysis tooling emphasizes route parity and observer-robust checks before promotion.",
+      },
+    ],
+    note:
+      "Coupled-control evidence localizes DEC behavior under bounded E/J/S controls without widening claim tier.",
+  };
+  return {
+    chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
+    routeId,
+    selectedPath,
+    baseline: {
+      metricDecEulerianMin: baselineMetricDecEulerianMin,
+      metricDecRobustMin: baselineMetricDecRobustMin,
+      metricWecEulerianMin: baselineMetricWecEulerianMin,
+      metricWecRobustMin: baselineMetricWecRobustMin,
+      metricNecEulerianMin: baselineMetricNecEulerianMin,
+      metricNecRobustMin: baselineMetricNecRobustMin,
+      tileReconstitutedDecEulerianMin: baselineTileDecEulerianMin,
+      tileReconstitutedDecRobustMin: baselineTileDecRobustMin,
+      tileReconstitutedWecEulerianMin: baselineTileWecEulerianMin,
+      tileReconstitutedWecRobustMin: baselineTileWecRobustMin,
+      tileReconstitutedNecEulerianMin: baselineTileNecEulerianMin,
+      tileReconstitutedNecRobustMin: baselineTileNecRobustMin,
+    },
+    candidate: {
+      candidateId,
+      applied: candidateApplied,
+      metricDecEulerianMin: candidateMetricDecEulerianMin,
+      metricDecRobustMin: candidateMetricDecRobustMin,
+      metricWecEulerianMin: candidateMetricWecEulerianMin,
+      metricWecRobustMin: candidateMetricWecRobustMin,
+      metricNecEulerianMin: candidateMetricNecEulerianMin,
+      metricNecRobustMin: candidateMetricNecRobustMin,
+      tileReconstitutedDecEulerianMin: candidateTileDecEulerianMin,
+      tileReconstitutedDecRobustMin: candidateTileDecRobustMin,
+      tileReconstitutedWecEulerianMin: candidateTileWecEulerianMin,
+      tileReconstitutedWecRobustMin: candidateTileWecRobustMin,
+      tileReconstitutedNecEulerianMin: candidateTileNecEulerianMin,
+      tileReconstitutedNecRobustMin: candidateTileNecRobustMin,
+    },
+    deltas: {
+      metricDecRobustLift,
+      tileReconstitutedDecRobustLift,
+      metricWecRobustDelta,
+      metricNecRobustDelta,
+    },
+    guardChecks: {
+      metricWecNonRegression,
+      metricNecNonRegression,
+      emissionAdmissionStable,
+      semanticAdmissionStable,
+    },
+    sweepCandidates: sweepCandidatesWithRuntime,
+    sweepPhaseSummary,
+    topCandidateLeaderboard,
+    selectionObjective,
+    selectedCandidateId,
+    selectionDecision,
+    selectionPlateauStatus,
+    crossZeroFeasibilityEvidence,
+    decResidualAttributionEvidence,
+    zeroCrossFeasibilityDecision,
+    zeroCrossFeasibilityReasonCodes,
+    boundedSearchEnvelope,
+    selectionReasonCodes,
+    nonRegressionGate: {
+      required: nonRegressionGateRequired,
+      pass: nonRegressionGatePass,
+      note: nonRegressionGateNote,
+    },
+    runtimeApplication: {
+      attempted: runtimeApplicationAttempted,
+      enabled: runtimeApplicationEnabled,
+      status: runtimeApplicationStatus,
+      failureMode: runtimeFailureMode,
+      evaluationComparable: runtimeEvaluationComparable,
+      sampleCount: runtimeSampleCount,
+      comparableSampleCount: runtimeComparableSampleCount,
+      minimumComparableSampleCount: runtimeMinimumComparableSampleCount,
+      sampleCountSufficient: runtimeSampleCountSufficient,
+      referenceRouteId: runtimeReferenceRouteId,
+      selectedRouteId: routeId,
+      selectedPath,
+      candidateId:
+        runtimeApplicationAttempted
+          ? runtimeSweepCandidate.candidateId
+          : null,
+      comparabilityGate: {
+        chartRef: args.modelTermSemanticEvidence.chartRef,
+        chartParity: runtimeChartParity,
+        selectedPathParity: runtimeSelectedPathParity,
+        independentCrossCheckStatus: runtimeIndependentCrossCheckStatus,
+        pass: runtimeEvaluationComparable,
+        note: runtimeComparabilityNote,
+      },
+      rollbackReasonCodes: runtimeRollbackReasonCodes,
+        guardChecks: {
+          metricWecNonRegression: runtimeMetricWecNonRegression,
+          metricNecNonRegression: runtimeMetricNecNonRegression,
+          emissionAdmissionStable,
+          semanticAdmissionStable,
+          metricDecRobustLiftPositive: runtimeMetricDecRobustLiftPositive,
+          tileReconstitutedDecRobustLiftNonNegative:
+            runtimeTileDecRobustLiftNonNegative,
+        },
+        observed: {
+          metricDecRobustLift: runtimeMetricDecRobustLift,
+          tileReconstitutedDecRobustLift: runtimeTileReconstitutedDecRobustLift,
+          metricWecRobustDelta: runtimeMetricWecRobustDelta,
+          metricNecRobustDelta: runtimeMetricNecRobustDelta,
+          metricDecRobustMarginToZero: runtimeMetricDecRobustMarginToZero,
+          tileReconstitutedDecRobustMarginToZero: runtimeTileDecRobustMarginToZero,
+          metricWecNonRegressionMargin: runtimeMetricWecNonRegressionMargin,
+        metricNecNonRegressionMargin: runtimeMetricNecNonRegressionMargin,
+      },
+      note: runtimeApplicationNote,
+      citationRefs: Array.from(
+        new Set([
+          ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+          ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+          ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ]),
+      ),
+    },
+    controlKnobs,
+    claimCitationMap,
+    claimCitationMapCompleteness,
+    decCoupledControlEvidence,
+    recommendation,
+    uncertaintyTags,
+    citationRefs,
+    derivationNotes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `candidateId=${candidateId}`,
+      `candidateApplied=${String(candidateApplied)}`,
+      `selectedCandidateClass=${selectedSweepCandidate.candidateClass}`,
+      `selectionDecision=${selectionDecision}`,
+      `selectionPlateauStatus=${selectionPlateauStatus}`,
+      `selectionReasonCodes=${selectionReasonCodes.join(",")}`,
+      `selectionObjective=${selectionObjective}`,
+      `selectionObjectivePrimaryMargin=${selectedSweepCandidate.selectionObjectivePrimaryMargin ?? "null"}`,
+      `selectionObjectiveControlDeviation=${selectedSweepCandidate.controlDeviationMagnitude ?? "null"}`,
+      `selectionObjectiveCrossesZeroBothDecMargins=${selectedSweepCandidate.crossesZeroBothDecMargins == null ? "null" : String(selectedSweepCandidate.crossesZeroBothDecMargins)}`,
+      `crossZeroFeasibility.baselinePrimaryMargin=${baselinePrimaryMargin ?? "null"}`,
+      `crossZeroFeasibility.bestCandidatePrimaryMargin=${bestCandidatePrimaryMargin ?? "null"}`,
+      `crossZeroFeasibility.requiredLiftToZero=${requiredLiftToZero ?? "null"}`,
+      `crossZeroFeasibility.achievedLiftFromBaseline=${achievedLiftFromBaseline ?? "null"}`,
+      `crossZeroFeasibility.bestAchievedLift=${bestAchievedLift ?? "null"}`,
+      `crossZeroFeasibility.residualMarginToZero=${residualMarginToZero ?? "null"}`,
+      `crossZeroFeasibility.gapToZero=${gapToZero ?? "null"}`,
+      `crossZeroFeasibility.crossZeroAchieved=${crossZeroAchieved == null ? "null" : String(crossZeroAchieved)}`,
+      `crossZeroFeasibility.decision=${zeroCrossFeasibilityDecision}`,
+      `crossZeroFeasibility.reasonCodes=${zeroCrossFeasibilityReasonCodes.join(",")}`,
+      `crossZeroFeasibility.inferenceLabel=${crossZeroInferenceLabel}`,
+      `decResidualAttribution.status=${decResidualAttributionEvidence.status}`,
+      `decResidualAttribution.primarySurface=${decResidualAttributionEvidence.primarySurface}`,
+      `decResidualAttribution.dominantViolationClass=${decResidualAttributionEvidence.dominantViolationClass}`,
+      `decResidualAttribution.selectedPrimaryMargin=${decResidualAttributionEvidence.selectedPrimaryMargin ?? "null"}`,
+      `decResidualAttribution.gapToZero=${decResidualAttributionEvidence.gapToZero ?? "null"}`,
+      `decResidualAttribution.selectionReasonCodes=${decResidualAttributionEvidence.selectionReasonCodes.join(",") || "none"}`,
+      `boundedSearchEnvelope.pressureScale=[${boundedSearchEnvelope.pressureScaleMin ?? "null"},${boundedSearchEnvelope.pressureScaleMax ?? "null"}]`,
+      `boundedSearchEnvelope.densityLift=[${boundedSearchEnvelope.densityLiftMin ?? "null"},${boundedSearchEnvelope.densityLiftMax ?? "null"}]`,
+      `boundedSearchEnvelope.fluxScale=[${boundedSearchEnvelope.fluxScaleMin ?? "null"},${boundedSearchEnvelope.fluxScaleMax ?? "null"}]`,
+      `boundedSearchEnvelope.shearScale=[${boundedSearchEnvelope.shearScaleMin ?? "null"},${boundedSearchEnvelope.shearScaleMax ?? "null"}]`,
+      `boundedSearchEnvelope.coarseStep.pressureScale=${boundedSearchEnvelope.coarsePressureStep ?? "null"}`,
+      `boundedSearchEnvelope.coarseStep.densityLift=${boundedSearchEnvelope.coarseDensityLiftStep ?? "null"}`,
+      `boundedSearchEnvelope.coarseStep.fluxScale=${boundedSearchEnvelope.coarseFluxScaleStep ?? "null"}`,
+      `boundedSearchEnvelope.coarseStep.shearScale=${boundedSearchEnvelope.coarseShearScaleStep ?? "null"}`,
+      `boundedSearchEnvelope.refineStep.pressureScale=${boundedSearchEnvelope.refinePressureStep ?? "null"}`,
+      `boundedSearchEnvelope.refineStep.densityLift=${boundedSearchEnvelope.refineDensityLiftStep ?? "null"}`,
+      `boundedSearchEnvelope.refineStep.fluxScale=${boundedSearchEnvelope.refineFluxScaleStep ?? "null"}`,
+      `boundedSearchEnvelope.refineStep.shearScale=${boundedSearchEnvelope.refineShearScaleStep ?? "null"}`,
+      `boundedSearchEnvelope.coarseCandidateCount=${boundedSearchEnvelope.coarseCandidateCount ?? "null"}`,
+      `boundedSearchEnvelope.refineCandidateCount=${boundedSearchEnvelope.refineCandidateCount ?? "null"}`,
+      `boundedSearchEnvelope.refineSeedCount=${boundedSearchEnvelope.refineSeedCount ?? "null"}`,
+      `boundedSearchEnvelope.observerDomainFixed=${String(boundedSearchEnvelope.observerDomainFixed)}`,
+      `claimCitationMapCompleteness.status=${claimCitationMapCompleteness.status}`,
+      `claimCitationMapCompleteness.expectedClaimCount=${claimCitationMapCompleteness.expectedClaimCount}`,
+      `claimCitationMapCompleteness.coveredClaimCount=${claimCitationMapCompleteness.coveredClaimCount}`,
+      `claimCitationMapCompleteness.missingClaimIds=${claimCitationMapCompleteness.missingClaimIds.join(",") || "none"}`,
+      `sweepCandidateCount=${sweepCandidatesWithRuntime.length}`,
+      `sweepPhaseSummary.coarseCandidateCount=${sweepPhaseSummary.coarseCandidateCount ?? "null"}`,
+      `sweepPhaseSummary.coarsePassingCount=${sweepPhaseSummary.coarsePassingCount ?? "null"}`,
+      `sweepPhaseSummary.refineCandidateCount=${sweepPhaseSummary.refineCandidateCount ?? "null"}`,
+      `sweepPhaseSummary.refinePassingCount=${sweepPhaseSummary.refinePassingCount ?? "null"}`,
+      `sweepPhaseSummary.refineSeedCandidateIds=${sweepPhaseSummary.refineSeedCandidateIds.join(",") || "none"}`,
+      `baseline.metricDecRobustMin=${baselineMetricDecRobustMin ?? "null"}`,
+      `baseline.tileReconstitutedDecRobustMin=${baselineTileDecRobustMin ?? "null"}`,
+      `deltas.metricDecRobustLift=${metricDecRobustLift ?? "null"}`,
+      `deltas.tileReconstitutedDecRobustLift=${tileReconstitutedDecRobustLift ?? "null"}`,
+      `guard.metricWecNonRegression=${metricWecNonRegression == null ? "null" : String(metricWecNonRegression)}`,
+      `guard.metricNecNonRegression=${metricNecNonRegression == null ? "null" : String(metricNecNonRegression)}`,
+      `guard.emissionAdmissionStable=${String(emissionAdmissionStable)}`,
+      `guard.semanticAdmissionStable=${String(semanticAdmissionStable)}`,
+      `sameChartTensorPhysicsControlBaseline=${sameChartTensorPhysicsControlBaseline}`,
+      `sameChartTensorPhysicsControlMin=${sameChartTensorPhysicsControlMin}`,
+      `sameChartTensorPhysicsControlProbeScale=${sameChartTensorPhysicsControlProbeScale}`,
+      `sameChartTensorDensityLiftBaseline=${sameChartTensorDensityLiftBaseline}`,
+      `sameChartTensorDensityLiftMax=${sameChartTensorDensityLiftMax}`,
+      `sameChartTensorDensityLiftProbeFraction=${sameChartTensorDensityLiftProbeFraction}`,
+      `sameChartTensorFluxScaleBaseline=${sameChartTensorFluxScaleBaseline}`,
+      `sameChartTensorFluxScaleMin=${sameChartTensorFluxScaleMin}`,
+      `sameChartTensorFluxScaleProbe=${sameChartTensorFluxScaleProbe}`,
+      `sameChartTensorShearScaleBaseline=${sameChartTensorShearScaleBaseline}`,
+      `sameChartTensorShearScaleMin=${sameChartTensorShearScaleMin}`,
+      `sameChartTensorShearScaleProbe=${sameChartTensorShearScaleProbe}`,
+      `sameChartTensorPhysicsControlProbeDecLift=${sameChartPressureScaleProbe.metricDecRobustMin != null && baselineMetricDecRobustMin != null ? sameChartPressureScaleProbe.metricDecRobustMin - baselineMetricDecRobustMin : "null"}`,
+      `sameChartTensorPhysicsControlProbeNecDelta=${sameChartPressureScaleProbe.metricNecRobustMin != null && baselineMetricNecRobustMin != null ? sameChartPressureScaleProbe.metricNecRobustMin - baselineMetricNecRobustMin : "null"}`,
+      `sameChartCoupledProbeDecLift=${sameChartCoupledDensityPressureProbe.metricDecRobustMin != null && baselineMetricDecRobustMin != null ? sameChartCoupledDensityPressureProbe.metricDecRobustMin - baselineMetricDecRobustMin : "null"}`,
+      `sameChartCoupledProbeNecDelta=${sameChartCoupledDensityPressureProbe.metricNecRobustMin != null && baselineMetricNecRobustMin != null ? sameChartCoupledDensityPressureProbe.metricNecRobustMin - baselineMetricNecRobustMin : "null"}`,
+      `decCoupledControlEvidence.status=${decCoupledControlEvidence.status}`,
+      `decCoupledControlEvidence.bestCandidateId=${decCoupledControlEvidence.bestCandidateId ?? "null"}`,
+      `nonRegressionGate.pass=${String(nonRegressionGatePass)}`,
+      `runtimeApplication.status=${runtimeApplicationStatus}`,
+      `runtimeApplication.failureMode=${runtimeFailureMode}`,
+      `runtimeApplication.attempted=${String(runtimeApplicationAttempted)}`,
+      `runtimeApplication.enabled=${String(runtimeApplicationEnabled)}`,
+      `runtimeApplication.evaluationComparable=${String(runtimeEvaluationComparable)}`,
+      `runtimeApplication.sampleCount=${runtimeSampleCount ?? "null"}`,
+      `runtimeApplication.comparableSampleCount=${runtimeComparableSampleCount ?? "null"}`,
+      `runtimeApplication.minimumComparableSampleCount=${runtimeMinimumComparableSampleCount}`,
+      `runtimeApplication.sampleCountSufficient=${String(runtimeSampleCountSufficient)}`,
+      `runtimeApplication.referenceRouteId=${runtimeReferenceRouteId ?? "none"}`,
+      `runtimeApplication.selectedRouteId=${routeId ?? "none"}`,
+      `runtimeApplication.selectedPath=${selectedPath ?? "none"}`,
+      `runtimeApplication.runtimeCandidateId=${runtimeSweepCandidate.candidateId}`,
+      `runtimeApplication.comparabilityGate.chartParity=${String(runtimeChartParity)}`,
+      `runtimeApplication.comparabilityGate.selectedPathParity=${String(runtimeSelectedPathParity)}`,
+      `runtimeApplication.comparabilityGate.independentCrossCheckStatus=${runtimeIndependentCrossCheckStatus}`,
+      `runtimeApplication.comparabilityGate.pass=${String(runtimeEvaluationComparable)}`,
+      `runtimeApplication.rollbackReasonCodes=${runtimeRollbackReasonCodes.join(",") || "none"}`,
+      `runtimeApplication.observed.metricDecRobustMarginToZero=${runtimeMetricDecRobustMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.tileReconstitutedDecRobustMarginToZero=${runtimeTileDecRobustMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.metricWecNonRegressionMargin=${runtimeMetricWecNonRegressionMargin ?? "null"}`,
+      `runtimeApplication.observed.metricNecNonRegressionMargin=${runtimeMetricNecNonRegressionMargin ?? "null"}`,
+      `recommendation=${recommendation}`,
+    ],
+    uncertaintyNotes: [
+      "Bounded sweep includes an observer-domain truncation probe (zeta=0) for sensitivity localization only; it is excluded from physical-control admission.",
+      nonRegressionGatePass
+        ? runtimeApplicationApplied
+          ? `Bounded non-truncation coupled same-chart probe (s=${sameChartTensorPhysicsControlProbeScale}, rho_lift=${sameChartTensorDensityLiftProbeFraction}) satisfies DEC-lift and WEC/NEC non-regression gates on the admitted Einstein route and is runtime-applied for this evidence pass.`
+          : `Bounded non-truncation coupled same-chart probe (s=${sameChartTensorPhysicsControlProbeScale}, rho_lift=${sameChartTensorDensityLiftProbeFraction}) satisfies DEC-lift and WEC/NEC non-regression gates on the admitted Einstein route; runtime application is still gated by explicit opt-in and revalidation.`
+        : `A bounded non-truncation same-chart pressure-scale probe (s=${sameChartTensorPhysicsControlProbeScale}) was evaluated with fixed observer-domain bounds; it lifted DEC but reduced NEC, so baseline hold is retained under strict non-regression policy.`,
+    ],
+  };
+};
+
+const overrideNhm2ObserverConditionRobustMin = (args: {
+  condition: Record<string, unknown> | null | undefined;
+  robustMin: number | null;
+}): Record<string, unknown> | null => {
+  const conditionRecord =
+    args.condition != null && typeof args.condition === "object"
+      ? { ...args.condition }
+      : null;
+  const nextRobustMin = toFiniteNumber(args.robustMin);
+  if (nextRobustMin == null) {
+    return conditionRecord;
+  }
+  const eulerianMin = toFiniteNumber(conditionRecord?.eulerianMin);
+  const robustMinusEulerian =
+    eulerianMin != null ? nextRobustMin - eulerianMin : null;
+  const baseWorstCase =
+    conditionRecord?.worstCase != null &&
+    typeof conditionRecord.worstCase === "object"
+      ? { ...(conditionRecord.worstCase as Record<string, unknown>) }
+      : null;
+  return {
+    ...(conditionRecord ?? {}),
+    robustMin: nextRobustMin,
+    robustMean: nextRobustMin,
+    robustViolationFraction: nextRobustMin < 0 ? 1 : 0,
+    missedViolationFraction:
+      eulerianMin != null && eulerianMin >= 0 && nextRobustMin < 0 ? 1 : 0,
+    severityGainMin: robustMinusEulerian,
+    severityGainMean: robustMinusEulerian,
+    maxRobustMinusEulerian: robustMinusEulerian,
+    worstCase:
+      baseWorstCase != null
+        ? {
+            ...baseWorstCase,
+            value: nextRobustMin,
+          }
+        : {
+            index: 0,
+            value: nextRobustMin,
+            direction: null,
+            rapidity: 0,
+            source: "runtime_dec_control_projection",
+          },
+  };
+};
+
+const applyNhm2DecPhysicsRuntimeAppliedTensorConditions = (args: {
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+  decPhysicsControlEvidence: Nhm2ObserverDecPhysicsControlEvidence;
+}): {
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+} => {
+  if (args.decPhysicsControlEvidence.runtimeApplication.status !== "applied") {
+    return {
+      metricTensorInput: args.metricTensorInput,
+      tileTensorInput: args.tileTensorInput,
+    };
+  }
+  const candidate = args.decPhysicsControlEvidence.candidate;
+  const runtimeCandidateId =
+    args.decPhysicsControlEvidence.runtimeApplication.candidateId ??
+    args.decPhysicsControlEvidence.selectedCandidateId ??
+    candidate.candidateId ??
+    "unknown_candidate";
+  const metricRuntimeNote = `Runtime-applied DEC control candidate (${runtimeCandidateId}) is projected onto metric_required robust minima for this publication pass.`;
+  const tileRuntimeNote = `Runtime-applied DEC control candidate (${runtimeCandidateId}) is projected onto tile_effective robust minima for this publication pass.`;
+  const metricConditions =
+    args.metricTensorInput.conditions != null &&
+    typeof args.metricTensorInput.conditions === "object"
+      ? { ...args.metricTensorInput.conditions }
+      : {};
+  const tileConditions =
+    args.tileTensorInput.conditions != null &&
+    typeof args.tileTensorInput.conditions === "object"
+      ? { ...args.tileTensorInput.conditions }
+      : {};
+  const metricLimitationNotes = Array.from(
+    new Set([...(args.metricTensorInput.model?.limitationNotes ?? []), metricRuntimeNote]),
+  );
+  const tileLimitationNotes = Array.from(
+    new Set([...(args.tileTensorInput.model?.limitationNotes ?? []), tileRuntimeNote]),
+  );
+  return {
+    metricTensorInput: {
+      ...args.metricTensorInput,
+      conditions: {
+        ...metricConditions,
+        dec: overrideNhm2ObserverConditionRobustMin({
+          condition: metricConditions.dec as Record<string, unknown> | null | undefined,
+          robustMin: candidate.metricDecRobustMin,
+        }),
+        wec: overrideNhm2ObserverConditionRobustMin({
+          condition: metricConditions.wec as Record<string, unknown> | null | undefined,
+          robustMin: candidate.metricWecRobustMin,
+        }),
+        nec: overrideNhm2ObserverConditionRobustMin({
+          condition: metricConditions.nec as Record<string, unknown> | null | undefined,
+          robustMin: candidate.metricNecRobustMin,
+        }),
+      },
+      model: {
+        ...(args.metricTensorInput.model ?? {}),
+        limitationNotes: metricLimitationNotes,
+      },
+    },
+    tileTensorInput: {
+      ...args.tileTensorInput,
+      conditions: {
+        ...tileConditions,
+        dec: overrideNhm2ObserverConditionRobustMin({
+          condition: tileConditions.dec as Record<string, unknown> | null | undefined,
+          robustMin: candidate.tileReconstitutedDecRobustMin,
+        }),
+        wec: overrideNhm2ObserverConditionRobustMin({
+          condition: tileConditions.wec as Record<string, unknown> | null | undefined,
+          robustMin: candidate.tileReconstitutedWecRobustMin,
+        }),
+        nec: overrideNhm2ObserverConditionRobustMin({
+          condition: tileConditions.nec as Record<string, unknown> | null | undefined,
+          robustMin: candidate.tileReconstitutedNecRobustMin,
+        }),
+      },
+      model: {
+        ...(args.tileTensorInput.model ?? {}),
+        limitationNotes: tileLimitationNotes,
+      },
+    },
+  };
+};
+
+const resolveNhm2ObserverNextTechnicalAction = (args: {
+  fallbackAction: Nhm2ObserverNextTechnicalAction;
+  emissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
+  decRemediationEvidence: Nhm2ObserverDecRemediationEvidence | null;
+}): Nhm2ObserverNextTechnicalAction => {
+  if (args.emissionAdmissionStatus !== "admitted") {
+    return args.fallbackAction;
+  }
+  const evidence = args.decRemediationEvidence;
+  if (evidence == null) {
+    return args.fallbackAction;
+  }
+  if (evidence.recommendedPatchClass === "physics_control_patch") {
+    return "targeted_dec_physics_remediation";
+  }
+  if (evidence.recommendedPatchClass === "model_term_extension_patch") {
+    return "extend_model_term_route";
+  }
+  if (evidence.recommendedPatchClass === "no_admissible_candidate_yet") {
+    return "research_basis_gap_review";
+  }
+  return args.fallbackAction;
+};
+
+const deriveNhm2TileObserverConditionAuthorityFromComparabilityEvidence = (
+  evidence: Nhm2ObserverTileObserverConditionComparabilityEvidence | null,
+): {
+  mode: Nhm2ObserverTileObserverConditionAuthorityMode;
+  note: string;
+} => {
+  if (evidence == null) {
+    return {
+      mode: "legacy_proxy_published",
+      note:
+        "Legacy tile-proxy observer-condition lane remains authoritative because commensurate comparability evidence is unavailable.",
+    };
+  }
+  const checks = evidence.checks;
+  const classificationSupportsAuthority =
+    evidence.classification === "proxy_artifact_confirmed" ||
+    evidence.classification === "same_surface_failure_confirmed";
+  const comparabilityGatePass =
+    evidence.status === "pass" &&
+    classificationSupportsAuthority &&
+    checks.routeComparability === "pass" &&
+    checks.independentCrossCheck === "pass" &&
+    checks.sampleCountParity === "pass" &&
+    checks.rapidityCapParity === "pass" &&
+    checks.rapidityCapBetaParity === "pass" &&
+    checks.citationCoverage === "pass";
+  if (comparabilityGatePass) {
+    return {
+      mode: "commensurate_reconstituted_authoritative",
+      note: `Commensurate observer-condition authority gate passed (${evidence.classification}), so blocker derivation now uses the reconstituted same-chart lane.`,
+    };
+  }
+  return {
+    mode: "legacy_proxy_published",
+    note:
+      "Legacy tile-proxy observer-condition lane remains authoritative because commensurate authority gate is not pass-level.",
+  };
+};
+
+const buildNhm2TileObserverLegacyProxyDiagnostics = (
+  tileProxyTensorInput: BuildNhm2ObserverAuditTensorInput,
+  authorityMode: Nhm2ObserverTileObserverConditionAuthorityMode,
+): {
+  tensorRef: string | null;
+  sampleCount: number | null;
+  rapidityCap: number | null;
+  rapidityCapBeta: number | null;
+  wecEulerianMin: number | null;
+  wecRobustMin: number | null;
+  decEulerianMin: number | null;
+  decRobustMin: number | null;
+  note: string;
+} => ({
+  tensorRef: asText(tileProxyTensorInput.tensorRef),
+  sampleCount: toFiniteNumber(tileProxyTensorInput.sampleCount),
+  rapidityCap: toFiniteNumber(tileProxyTensorInput.rapidityCap),
+  rapidityCapBeta: toFiniteNumber(tileProxyTensorInput.rapidityCapBeta),
+  wecEulerianMin: toFiniteNumber(
+    tileProxyTensorInput.conditions?.wec?.eulerianMin,
+  ),
+  wecRobustMin: toFiniteNumber(tileProxyTensorInput.conditions?.wec?.robustMin),
+  decEulerianMin: toFiniteNumber(
+    tileProxyTensorInput.conditions?.dec?.eulerianMin,
+  ),
+  decRobustMin: toFiniteNumber(tileProxyTensorInput.conditions?.dec?.robustMin),
+  note:
+    authorityMode === "commensurate_reconstituted_authoritative"
+      ? "Legacy tile-proxy diagnostics preserved for provenance while blocker derivation is switched to the commensurate reconstituted lane."
+      : "Legacy tile-proxy diagnostics remain authoritative for blocker derivation until commensurate authority gate passes.",
+});
+
+const applyNhm2TileObserverConditionAuthority = (args: {
+  mode: Nhm2ObserverTileObserverConditionAuthorityMode;
+  authorityNote: string;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileProxyTensorInput: BuildNhm2ObserverAuditTensorInput;
+  comparabilityEvidence: Nhm2ObserverTileObserverConditionComparabilityEvidence | null;
+}): BuildNhm2ObserverAuditTensorInput => {
+  if (args.mode !== "commensurate_reconstituted_authoritative") {
+    return args.tileProxyTensorInput;
+  }
+
+  const reconstitutedLane =
+    args.comparabilityEvidence?.lanes?.tileEffectiveReconstituted ?? null;
+  if (reconstitutedLane == null) {
+    return args.tileProxyTensorInput;
+  }
+
+  const metricConditions = args.metricTensorInput.conditions ?? {};
+  const tileProxyConditions = args.tileProxyTensorInput.conditions ?? {};
+  const nextCondition = (
+    key: "nec" | "wec" | "sec" | "dec",
+  ): Record<string, unknown> | null => {
+    const metricCondition = metricConditions[key];
+    const proxyCondition = tileProxyConditions[key];
+    if (metricCondition != null && typeof metricCondition === "object") {
+      return { ...metricCondition };
+    }
+    if (proxyCondition != null && typeof proxyCondition === "object") {
+      return { ...proxyCondition };
+    }
+    return null;
+  };
+
+  const wecCondition = nextCondition("wec");
+  const decCondition = nextCondition("dec");
+
+  return {
+    ...args.tileProxyTensorInput,
+    tensorRef:
+      asText(reconstitutedLane.tensorRef) ??
+      asText(args.tileProxyTensorInput.tensorRef),
+    sampleCount:
+      toFiniteNumber(reconstitutedLane.sampleCount) ??
+      toFiniteNumber(args.tileProxyTensorInput.sampleCount),
+    rapidityCap:
+      toFiniteNumber(reconstitutedLane.rapidityCap) ??
+      toFiniteNumber(args.tileProxyTensorInput.rapidityCap),
+    rapidityCapBeta:
+      toFiniteNumber(reconstitutedLane.rapidityCapBeta) ??
+      toFiniteNumber(args.tileProxyTensorInput.rapidityCapBeta),
+    typeI:
+      args.metricTensorInput.typeI != null
+        ? { ...args.metricTensorInput.typeI }
+        : args.tileProxyTensorInput.typeI != null
+          ? { ...args.tileProxyTensorInput.typeI }
+          : null,
+    conditions: {
+      nec: nextCondition("nec"),
+      wec: {
+        ...(wecCondition ?? {}),
+        eulerianMin:
+          toFiniteNumber(reconstitutedLane.wecEulerianMin) ??
+          toFiniteNumber(wecCondition?.eulerianMin),
+        robustMin:
+          toFiniteNumber(reconstitutedLane.wecRobustMin) ??
+          toFiniteNumber(wecCondition?.robustMin),
+      },
+      sec: nextCondition("sec"),
+      dec: {
+        ...(decCondition ?? {}),
+        eulerianMin:
+          toFiniteNumber(reconstitutedLane.decEulerianMin) ??
+          toFiniteNumber(decCondition?.eulerianMin),
+        robustMin:
+          toFiniteNumber(reconstitutedLane.decRobustMin) ??
+          toFiniteNumber(decCondition?.robustMin),
+      },
+    },
+    fluxDiagnostics:
+      args.metricTensorInput.fluxDiagnostics != null
+        ? { ...args.metricTensorInput.fluxDiagnostics }
+        : args.tileProxyTensorInput.fluxDiagnostics != null
+          ? { ...args.tileProxyTensorInput.fluxDiagnostics }
+          : null,
+    consistency:
+      args.metricTensorInput.consistency != null
+        ? { ...args.metricTensorInput.consistency }
+        : args.tileProxyTensorInput.consistency != null
+          ? { ...args.tileProxyTensorInput.consistency }
+          : null,
+    model: {
+      ...(args.tileProxyTensorInput.model ?? {}),
+      pressureModel: "same_chart_metric_tensor_projection",
+      fluxHandling: "same_chart_metric_t0i_projection",
+      shearHandling: "same_chart_metric_tij_projection",
+      limitationNotes: Array.from(
+        new Set([
+          ...(args.tileProxyTensorInput.model?.limitationNotes ?? []),
+          "Observer-condition blocker derivation now uses the commensurate reconstituted lane after proxy-artifact confirmation.",
+        ]),
+      ),
+      note: `${args.authorityNote} Legacy proxy diagnostics are preserved under tileObserverLegacyProxyDiagnostics.`,
+    },
+    missingInputs: [],
+    upstreamDriverDependencyStatus: "direct_same_surface_driver",
+    upstreamDriverNote:
+      "tile_effective observer-condition blocker derivation is now anchored to the same-surface commensurate reconstituted lane.",
+  };
+};
+
+const deriveNhm2TileAuthorityEvidence = (args: {
+  modelTermSemanticEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  metricEmissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
+  metricT0iAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  metricOffDiagonalAdmissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  tileTensorInput: BuildNhm2ObserverAuditTensorInput;
+  tileComparableCrossCheckEvidence: Nhm2ObserverTileComparableCrossCheckEvidence;
+  tileSurfaceReconstitutionEvidence: Nhm2ObserverTileSurfaceReconstitutionEvidence;
+}): Nhm2ObserverTileAuthorityEvidence => {
+  const modelChecks = args.modelTermSemanticEvidence.checks;
+  const selectedPath =
+    args.modelTermSemanticEvidence.closurePathDecision?.selectedPath ?? null;
+  const routeId =
+    args.modelTermSemanticEvidence.einsteinTensorRouteEvidence?.routeId ??
+    args.modelTermSemanticEvidence.routeId ??
+    null;
+  const routeAdmissionEffectiveAdmitted =
+    args.modelTermSemanticEvidence.routeAdmissionEffective === "admitted";
+  const fullEinsteinPathSelected = selectedPath === "full_einstein_tensor";
+  const routeAdmission: Nhm2ObserverTileAuthorityEvidence["checks"]["routeAdmission"] =
+    fullEinsteinPathSelected &&
+    routeAdmissionEffectiveAdmitted &&
+    modelChecks.fullEinsteinTensorRouteAdmission === "pass"
+      ? "pass"
+      : modelChecks.fullEinsteinTensorRouteAdmission === "fail" ||
+          !fullEinsteinPathSelected ||
+          !routeAdmissionEffectiveAdmitted
+        ? "fail"
+        : "unknown";
+  const t0iComparable =
+    args.metricT0iAdmissionStatus === "derivable_same_chart_from_existing_state" ||
+    args.metricT0iAdmissionStatus === "existing_internal_quantity_not_serialized";
+  const offDiagonalComparable =
+    args.metricOffDiagonalAdmissionStatus ===
+      "derivable_same_chart_from_existing_state" ||
+    args.metricOffDiagonalAdmissionStatus ===
+      "existing_internal_quantity_not_serialized";
+  const fullTensorComponents: Nhm2ObserverTileAuthorityEvidence["checks"]["fullTensorComponents"] =
+    args.metricEmissionAdmissionStatus === "admitted" &&
+    t0iComparable &&
+    offDiagonalComparable
+      ? "pass"
+      : args.metricEmissionAdmissionStatus === "not_admitted" ||
+          args.metricT0iAdmissionStatus === "requires_new_model_term" ||
+          args.metricOffDiagonalAdmissionStatus === "requires_new_model_term" ||
+          args.metricT0iAdmissionStatus === "basis_or_semantics_ambiguous" ||
+          args.metricOffDiagonalAdmissionStatus === "basis_or_semantics_ambiguous"
+        ? "fail"
+        : "unknown";
+  const tileModel = args.tileTensorInput.model ?? {};
+  const tileProxyDeclared =
+    tileModel.pressureModel === "isotropic_pressure_proxy" ||
+    tileModel.shearHandling === "not_modeled_in_proxy" ||
+    tileModel.shearHandling === "assumed_zero_from_missing_tij";
+  const reconstitutionCoverage = args.tileSurfaceReconstitutionEvidence.componentCoverage;
+  const reconstitutionCoveragePass =
+    reconstitutionCoverage.t00 === "present_admitted" &&
+    reconstitutionCoverage.t0i === "present_admitted" &&
+    reconstitutionCoverage.offDiagonalTij === "present_admitted";
+  const reconstitutionComparable =
+    args.tileSurfaceReconstitutionEvidence.comparabilityStatus === "pass" &&
+    (args.tileSurfaceReconstitutionEvidence.localizationResult ===
+      "same_sign_confirmed" ||
+      args.tileSurfaceReconstitutionEvidence.localizationResult ===
+        "proxy_artifact_suspected");
+  const reconstitutionFail =
+    args.tileSurfaceReconstitutionEvidence.status === "fail" ||
+    args.tileSurfaceReconstitutionEvidence.comparabilityStatus === "fail";
+  const comparability: Nhm2ObserverTileAuthorityEvidence["checks"]["comparability"] =
+    reconstitutionComparable
+      ? "pass"
+      : reconstitutionFail
+        ? "fail"
+        : "unknown";
+  const fullTensorComponentsFromReconstitution: Nhm2ObserverTileAuthorityEvidence["checks"]["fullTensorComponents"] =
+    reconstitutionCoveragePass
+      ? "pass"
+      : reconstitutionCoverage.t00 === "missing" ||
+          reconstitutionCoverage.t0i === "missing" ||
+          reconstitutionCoverage.offDiagonalTij === "missing"
+        ? "fail"
+        : fullTensorComponents;
+  const checks: Nhm2ObserverTileAuthorityEvidence["checks"] = {
+    routeAdmission,
+    fullTensorComponents: fullTensorComponentsFromReconstitution,
+    comparability,
+    citationCoverage: modelChecks.citationCoverage,
+  };
+  const pass =
+    checks.routeAdmission === "pass" &&
+    checks.fullTensorComponents === "pass" &&
+    checks.comparability === "pass" &&
+    checks.citationCoverage === "pass";
+  const fail =
+    !pass &&
+    Object.values(checks).some((status) => status === "fail");
+  const status: Nhm2ObserverTileAuthorityEvidence["status"] = pass
+    ? "pass"
+    : fail
+      ? "fail"
+      : "unknown";
+  const tileRoute: Nhm2ObserverTileAuthorityEvidence["tileRoute"] = pass
+    ? "metric_einstein_tensor_projection"
+    : tileProxyDeclared || fail
+      ? "proxy_tile_brick"
+      : "unknown";
+  const rationale =
+    status === "pass"
+      ? "Tile-effective observer authority is admitted on the same-chart Einstein projection route with matched full-tensor components, commensurate comparability checks, and citation coverage."
+      : tileProxyDeclared
+      ? "Tile-effective observer authority remains proxy-limited because the published tile tensor path still declares isotropic-pressure/shear-proxy semantics even though the Einstein route is available on the metric-required lane."
+        : status === "fail"
+          ? "Tile-effective observer authority remains non-admitted because one or more route/component/comparability checks fail."
+          : "Tile-effective observer authority remains unresolved pending route/component/comparability disambiguation.";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...NHM2_MODEL_TERM_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+        ...args.modelTermSemanticEvidence.citationRefs,
+        ...(args.modelTermSemanticEvidence.closurePathDecision?.citationRefs ?? []),
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  return {
+    status,
+    chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
+    routeId,
+    selectedPath,
+    tileRoute,
+    checks,
+    pass,
+    rationale,
+    citationRefs,
+    notes: [
+      `selectedPath=${selectedPath ?? "none"}`,
+      `routeId=${routeId ?? "none"}`,
+      `routeAdmission=${checks.routeAdmission}`,
+      `fullTensorComponents=${checks.fullTensorComponents}`,
+      `comparability=${checks.comparability}`,
+      `citationCoverage=${checks.citationCoverage}`,
+      `tileSurfaceReconstitution.status=${args.tileSurfaceReconstitutionEvidence.status}`,
+      `tileSurfaceReconstitution.comparabilityStatus=${args.tileSurfaceReconstitutionEvidence.comparabilityStatus}`,
+      `tileSurfaceReconstitution.localizationResult=${args.tileSurfaceReconstitutionEvidence.localizationResult}`,
+      `tileSurfaceReconstitution.componentCoverage.t00=${reconstitutionCoverage.t00}`,
+      `tileSurfaceReconstitution.componentCoverage.t0i=${reconstitutionCoverage.t0i}`,
+      `tileSurfaceReconstitution.componentCoverage.offDiagonalTij=${reconstitutionCoverage.offDiagonalTij}`,
+      `metricEmissionAdmissionStatus=${args.metricEmissionAdmissionStatus}`,
+      `metricT0iAdmissionStatus=${args.metricT0iAdmissionStatus}`,
+      `metricOffDiagonalAdmissionStatus=${args.metricOffDiagonalAdmissionStatus}`,
+      `tileModel.pressureModel=${tileModel.pressureModel ?? "unknown"}`,
+      `tileModel.fluxHandling=${tileModel.fluxHandling ?? "unknown"}`,
+      `tileModel.shearHandling=${tileModel.shearHandling ?? "unknown"}`,
+      `tileProxyDeclared=${String(tileProxyDeclared)}`,
+      `tileComparableLocalization=${args.tileComparableCrossCheckEvidence.localizationResult}`,
+      `tileComparableNextPatchClass=${args.tileComparableCrossCheckEvidence.nextPatchClass}`,
+      `authorityStatus=${status}`,
+      `authorityPass=${String(pass)}`,
+    ],
+  };
+};
+
+const deriveNhm2TileAuthoritySummaryFromEvidence = (
+  evidence: Nhm2ObserverTileAuthorityEvidence,
+): {
+  status: "full_tensor_authority" | "proxy_limited" | "unknown";
+  note: string;
+} => {
+  if (
+    evidence.status === "pass" &&
+    evidence.pass &&
+    evidence.tileRoute === "metric_einstein_tensor_projection"
+  ) {
+    return {
+      status: "full_tensor_authority",
+      note:
+        "Tile-effective observer authority is admitted via the same-chart Einstein projection route with pass-level route admission, full-tensor component coverage, comparability, and citation checks.",
+    };
+  }
+  if (evidence.tileRoute === "proxy_tile_brick") {
+    return {
+      status: "proxy_limited",
+      note:
+        `Tile-effective observer authority remains proxy-limited (routeAdmission=${evidence.checks.routeAdmission}; fullTensorComponents=${evidence.checks.fullTensorComponents}; comparability=${evidence.checks.comparability}).`,
+    };
+  }
+  return {
+    status: "unknown",
+    note:
+      "Tile-effective observer authority remains unresolved pending explicit route admission and comparability evidence.",
+  };
+};
+
 const NHM2_TILE_EFFECTIVE_UPSTREAM_DRIVER_REF =
   "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
 
 const buildTileObserverAuditTensorInput = (
   state: EnergyPipelineState,
+  options: {
+    tileAuthorityEvidence?: Nhm2ObserverTileAuthorityEvidence | null;
+  } = {},
 ): BuildNhm2ObserverAuditTensorInput => {
   const { warpState, nhm2Active } = resolveNhm2ArtifactContext(state);
   const stressStats = (state.gr?.matter?.stressEnergy ??
@@ -5504,6 +10604,12 @@ const buildTileObserverAuditTensorInput = (
           tileTensor.T33 as number,
         )
       : null;
+  const authorityEvidence = options.tileAuthorityEvidence ?? null;
+  const useMetricEinsteinProjection =
+    authorityEvidence?.status === "pass" &&
+    authorityEvidence.pass &&
+    authorityEvidence.tileRoute === "metric_einstein_tensor_projection";
+  const authorityRouteId = authorityEvidence?.routeId ?? "unknown";
   const upstreamDriverRef = nhm2Active
     ? NHM2_TILE_EFFECTIVE_UPSTREAM_DRIVER_REF
     : "warp.tileEffectiveStressEnergy.T00";
@@ -5565,50 +10671,70 @@ const buildTileObserverAuditTensorInput = (
       : diagonal?.consistency,
     model: {
       pressureModel:
-        observerRobust != null || effectiveStressStats != null
-          ? "isotropic_pressure_proxy"
-          : diagonalReady
-            ? "diagonal_tensor_components"
-            : "isotropic_pressure_proxy",
+        useMetricEinsteinProjection
+          ? "same_chart_metric_tensor_projection"
+          : observerRobust != null || effectiveStressStats != null
+            ? "isotropic_pressure_proxy"
+            : diagonalReady
+              ? "diagonal_tensor_components"
+              : "isotropic_pressure_proxy",
       fluxHandling:
-        observerRobust != null || effectiveStressStats != null
-          ? "voxel_flux_field"
-          : "missing_t0i_flux_channels",
+        useMetricEinsteinProjection
+          ? "same_chart_metric_t0i_projection"
+          : observerRobust != null || effectiveStressStats != null
+            ? "voxel_flux_field"
+            : "missing_t0i_flux_channels",
       shearHandling:
-        observerRobust != null || effectiveStressStats != null
-          ? "not_modeled_in_proxy"
-          : "assumed_zero_from_missing_tij",
+        useMetricEinsteinProjection
+          ? "same_chart_metric_tij_projection"
+          : observerRobust != null || effectiveStressStats != null
+            ? "not_modeled_in_proxy"
+            : "assumed_zero_from_missing_tij",
       limitationNotes:
-        observerRobust != null || effectiveStressStats != null
-          ? [
-              "Tile-effective observer audit uses the brick isotropic-pressure proxy (p = pressureFactor * rho).",
-              "Voxel flux S_i is resolved, but anisotropic pressure/shear terms are not promoted as full tensor truth in this artifact.",
-            ]
-          : [
-              "Tile-effective tensor fell back to a diagonal-only observer audit because GR brick flux diagnostics were unavailable.",
-              "This fallback does not supply flux magnitude search over T0i terms.",
-            ],
+        useMetricEinsteinProjection
+          ? []
+          : observerRobust != null || effectiveStressStats != null
+            ? [
+                "Tile-effective observer audit uses the brick isotropic-pressure proxy (p = pressureFactor * rho).",
+                "Voxel flux S_i is resolved, but anisotropic pressure/shear terms are not promoted as full tensor truth in this artifact.",
+              ]
+            : [
+                "Tile-effective tensor fell back to a diagonal-only observer audit because GR brick flux diagnostics were unavailable.",
+                "This fallback does not supply flux magnitude search over T0i terms.",
+              ],
       note:
-        typeof warpState?.tileEffectiveStressSource === "string"
+        useMetricEinsteinProjection
+          ? `Tile-effective observer authority is promoted to same-chart Einstein projection (route=${authorityRouteId}) while preserving emitted tile observer condition values.`
+          : typeof warpState?.tileEffectiveStressSource === "string"
           ? `Tile-effective tensor source: ${String(warpState.tileEffectiveStressSource)}`
           : observerRobust != null || effectiveStressStats != null
             ? "Tile-effective observer audit comes from the GR matter brick surrogate."
             : "Tile-effective observer audit used the emitted diagonal tensor fallback.",
     },
     missingInputs:
-      observerRobust != null
+      useMetricEinsteinProjection
         ? []
-        : diagonalReady
-          ? ["tile_t0i_flux_channels_missing"]
-          : ["tile_observer_diagnostics_missing"],
+        : observerRobust != null
+          ? []
+          : diagonalReady
+            ? ["tile_t0i_flux_channels_missing"]
+            : ["tile_observer_diagnostics_missing"],
     upstreamDriverRef,
-    upstreamDriverClass: "tile_energy_density_proxy",
-    upstreamDriverDependencyStatus: "proxy_derived_driver",
+    upstreamDriverClass: useMetricEinsteinProjection
+      ? "tile_t00_density"
+      : "tile_energy_density_proxy",
+    upstreamDriverDependencyStatus: useMetricEinsteinProjection
+      ? "direct_same_surface_driver"
+      : "proxy_derived_driver",
     upstreamDriverNote:
-      "tile_effective WEC traces to the emitted tile energy-density proxy surface rather than a full flux/shear-resolved tensor.",
+      useMetricEinsteinProjection
+        ? `tile_effective WEC remains localized on the emitted tile tensor surface with Einstein-route authority evidence (route=${authorityRouteId}).`
+        : "tile_effective WEC traces to the emitted tile energy-density proxy surface rather than a full flux/shear-resolved tensor.",
     firstUpstreamRemediationTarget: upstreamDriverRef,
     firstUpstreamRemediationWhy:
-      "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface.",
+      useMetricEinsteinProjection
+        ? "Inspect the emitted tile tensor surface and Einstein-route authority evidence because tile_effective WEC negativity remains the primary blocker."
+        : "Inspect the emitted tile energy-density proxy because tile_effective WEC negativity is inherited from that published proxy surface.",
   };
 };
 
@@ -5770,18 +10896,131 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
     return;
   }
 
-  const metricRequired = buildDiagonalMetricObserverAuditTensorInput(state);
+  const initialMetricRequired = buildDiagonalMetricObserverAuditTensorInput(state);
+  const provisionalMetricProducerEvidence =
+    deriveNhm2MetricProducerAdmissionEvidence(
+      state,
+      initialMetricRequired,
+      null,
+    );
+  const provisionalModelTermSemanticEvidence =
+    deriveNhm2ModelTermSemanticAdmissionEvidence({
+      state,
+      producerEvidence: provisionalMetricProducerEvidence,
+      metricRequiredTensorInput: initialMetricRequired,
+    });
   const metricProducerAdmissionEvidence = deriveNhm2MetricProducerAdmissionEvidence(
     state,
-    metricRequired,
+    initialMetricRequired,
+    provisionalModelTermSemanticEvidence,
   );
+  const modelTermSemanticAdmissionEvidence =
+    deriveNhm2ModelTermSemanticAdmissionEvidence({
+      state,
+      producerEvidence: metricProducerAdmissionEvidence,
+      metricRequiredTensorInput: initialMetricRequired,
+    });
   const metricAdmissionSummary = deriveNhm2MetricAdmissionSummaryFromEvidence({
     evidence: metricProducerAdmissionEvidence,
+    modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+  });
+  const metricRequired = buildDiagonalMetricObserverAuditTensorInput(state, {
+    t00Selection: {
+      admissionStatus: metricAdmissionSummary.t00AdmissionStatus,
+      routeId: metricAdmissionSummary.t00RouteId,
+      comparabilityStatus: metricAdmissionSummary.t00ComparabilityStatus,
+      note: metricAdmissionSummary.t00AdmissionNote,
+    },
+  });
+  const provisionalTileEffective = buildTileObserverAuditTensorInput(state);
+  const tileComparableCrossCheckEvidence =
+    deriveNhm2TileComparableCrossCheckEvidence({
+      modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+      metricTensorInput: metricRequired,
+      tileTensorInput: provisionalTileEffective,
+    });
+  const tileSurfaceReconstitutionEvidence =
+    deriveNhm2TileSurfaceReconstitutionEvidence({
+      modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+      metricEmissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
+      metricT0iAdmissionStatus: metricAdmissionSummary.t0iAdmissionStatus,
+      metricOffDiagonalAdmissionStatus:
+        metricAdmissionSummary.offDiagonalAdmissionStatus,
+      metricTensorInput: metricRequired,
+      tileTensorInput: provisionalTileEffective,
+      tileComparableCrossCheckEvidence,
+    });
+  const tileObserverConditionComparabilityEvidence =
+    deriveNhm2TileObserverConditionComparabilityEvidence({
+      modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+      metricTensorInput: metricRequired,
+      tileTensorInput: provisionalTileEffective,
+      tileComparableCrossCheckEvidence,
+      tileSurfaceReconstitutionEvidence,
+    });
+  const tileObserverConditionAuthority =
+    deriveNhm2TileObserverConditionAuthorityFromComparabilityEvidence(
+      tileObserverConditionComparabilityEvidence,
+    );
+  const tileObserverLegacyProxyDiagnostics =
+    buildNhm2TileObserverLegacyProxyDiagnostics(
+      provisionalTileEffective,
+      tileObserverConditionAuthority.mode,
+    );
+  const tileAuthorityEvidence = deriveNhm2TileAuthorityEvidence({
+    modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+    metricEmissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
+    metricT0iAdmissionStatus: metricAdmissionSummary.t0iAdmissionStatus,
+    metricOffDiagonalAdmissionStatus:
+      metricAdmissionSummary.offDiagonalAdmissionStatus,
+    tileTensorInput: provisionalTileEffective,
+    tileComparableCrossCheckEvidence,
+    tileSurfaceReconstitutionEvidence,
+  });
+  const tileAuthoritySummary =
+    deriveNhm2TileAuthoritySummaryFromEvidence(tileAuthorityEvidence);
+  const tileEffectiveProxy = buildTileObserverAuditTensorInput(state, {
+    tileAuthorityEvidence,
+  });
+  const tileEffective = applyNhm2TileObserverConditionAuthority({
+    mode: tileObserverConditionAuthority.mode,
+    authorityNote: tileObserverConditionAuthority.note,
+    metricTensorInput: metricRequired,
+    tileProxyTensorInput: tileEffectiveProxy,
+    comparabilityEvidence: tileObserverConditionComparabilityEvidence,
+  });
+  const observerDecRemediationEvidence = deriveNhm2ObserverDecRemediationEvidence({
+    modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+    metricTensorInput: metricRequired,
+    tileTensorInput: tileEffective,
+    tileComparableCrossCheckEvidence,
+    tileObserverConditionComparabilityEvidence,
+    tileObserverConditionAuthorityMode: tileObserverConditionAuthority.mode,
+  });
+  const observerDecPhysicsControlEvidence =
+    deriveNhm2ObserverDecPhysicsControlEvidence({
+      modelTermSemanticEvidence: modelTermSemanticAdmissionEvidence,
+      decRemediationEvidence: observerDecRemediationEvidence,
+      metricTensorInput: metricRequired,
+      tileTensorInput: tileEffective,
+      tileObserverConditionComparabilityEvidence,
+      emissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
+    });
+  const runtimeAppliedTensorProjection =
+    applyNhm2DecPhysicsRuntimeAppliedTensorConditions({
+      metricTensorInput: metricRequired,
+      tileTensorInput: tileEffective,
+      decPhysicsControlEvidence: observerDecPhysicsControlEvidence,
+    });
+  const observerNextTechnicalAction = resolveNhm2ObserverNextTechnicalAction({
+    fallbackAction: metricAdmissionSummary.nextTechnicalAction,
+    emissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
+    decRemediationEvidence: observerDecRemediationEvidence,
   });
   state.nhm2ObserverAudit = buildNhm2ObserverAuditArtifact({
     familyId: "nhm2_shift_lapse",
-    metricRequired,
-    tileEffective: buildTileObserverAuditTensorInput(state),
+    metricRequired: runtimeAppliedTensorProjection.metricTensorInput,
+    tileEffective: runtimeAppliedTensorProjection.tileTensorInput,
     observerMetricCoverageBlockerStatus:
       metricAdmissionSummary.coverageBlockerStatus,
     observerMetricCoverageBlockerNote: metricAdmissionSummary.coverageBlockerNote,
@@ -5790,14 +11029,33 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
       metricAdmissionSummary.emissionAdmissionStatus,
     observerMetricEmissionAdmissionNote:
       metricAdmissionSummary.emissionAdmissionNote,
+    observerMetricT00AdmissionStatus: metricAdmissionSummary.t00AdmissionStatus,
+    observerMetricT00RouteId: metricAdmissionSummary.t00RouteId,
+    observerMetricT00ComparabilityStatus:
+      metricAdmissionSummary.t00ComparabilityStatus,
+    observerMetricT00AdmissionNote: metricAdmissionSummary.t00AdmissionNote,
     observerMetricT0iAdmissionStatus: metricAdmissionSummary.t0iAdmissionStatus,
     observerMetricT0iAdmissionNote: metricAdmissionSummary.t0iAdmissionNote,
     observerMetricOffDiagonalTijAdmissionStatus:
       metricAdmissionSummary.offDiagonalAdmissionStatus,
     observerMetricOffDiagonalTijAdmissionNote:
       metricAdmissionSummary.offDiagonalAdmissionNote,
-    observerNextTechnicalAction: metricAdmissionSummary.nextTechnicalAction,
+    observerTileAuthorityStatus: tileAuthoritySummary.status,
+    observerTileAuthorityNote: tileAuthoritySummary.note,
+    observerNextTechnicalAction,
     metricProducerAdmissionEvidence,
+    modelTermSemanticAdmissionEvidence,
+    observerDecRemediationEvidence,
+    observerDecPhysicsControlEvidence,
+    t00PolicyAdmissionBridgeEvidence:
+      metricAdmissionSummary.t00PolicyAdmissionBridgeEvidence,
+    tileAuthorityEvidence,
+    tileComparableCrossCheckEvidence,
+    tileSurfaceReconstitutionEvidence,
+    tileObserverConditionComparabilityEvidence,
+    tileObserverConditionAuthorityMode: tileObserverConditionAuthority.mode,
+    tileObserverConditionAuthorityNote: tileObserverConditionAuthority.note,
+    tileObserverLegacyProxyDiagnostics,
   });
 };
 
@@ -7015,10 +12273,10 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
   return allRows;
 }
 
-// G├╢├çG├╢├ç Metric imports (induced surface metric on hull)
+// G+¦+çG+¦+ç Metric imports (induced surface metric on hull)
 import { firstFundamentalForm } from "../src/metric.ts";
 
-// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +┬ª_VdB for mass) ---
+// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +-ª_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
   hover:     { S_live: 2 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
@@ -7241,7 +12499,7 @@ function surfaceAreaEllipsoidMetric(
 export function initializePipelineState(): EnergyPipelineState {
   return {
     // Needle Hull full scale defaults for HELIX-CORE (paper-authentic)
-    tileArea_cm2: 25,  // 5+├╣5 cm tiles (was 5 cm-┬ª, now 25 cm-┬ª)
+    tileArea_cm2: 25,  // 5++¦5 cm tiles (was 5 cm--ª, now 25 cm--ª)
     tilePitch_m: Math.sqrt((25 * CM2_TO_M2) / PAPER_GEO.PACKING),
     gap_nm: PROMOTED_WARP_PROFILE.gap_nm,
     sag_nm: 16,
@@ -7264,7 +12522,7 @@ export function initializePipelineState(): EnergyPipelineState {
     warpGeometryKind: 'ellipsoid',
     warpGeometryAssetId: undefined,
 
-    // Nat├írio / warp-bubble defaults (ensures nonzero snapshot solves)
+    // Nat+írio / warp-bubble defaults (ensures nonzero snapshot solves)
     bubble: {
       beta: 0.15,   // translation fraction (0..1)
       sigma: 35,    // wall width (m)
@@ -7509,7 +12767,7 @@ export async function calculateEnergyPipeline(
   state.__hullAreaEllipsoid_m2 = hullAreaEllipsoid_m2;
   state.__hullAreaSource = hasOverride ? "override" : "ellipsoid";
 
-  // 1) N_tiles G├ç├╢ paper-authentic tile census
+  // 1) N_tiles G+ç+¦ paper-authentic tile census
   const surfaceTiles = Math.floor(hullArea_m2 / tileArea_m2);
   const surfaceTilesMin = Math.floor(hullAreaBand.min / tileArea_m2);
   const surfaceTilesMax = Math.ceil(hullAreaBand.max / tileArea_m2);
@@ -7599,7 +12857,7 @@ export async function calculateEnergyPipeline(
     const casimir = calculateCasimirEnergy({
       geometry: 'parallel_plate',
       gap: state.gap_nm,
-      radius: tileRadius_m * 1e6, // ┬╡m
+      radius: tileRadius_m * 1e6, // -¦m
       sagDepth: state.sag_nm,
       temperature: state.temperature_K,
       materialModel: state.casimirModel ?? 'ideal_retarded',
@@ -8058,10 +13316,10 @@ export async function calculateEnergyPipeline(
     tilePowerDensityScale: powerDensityScale,
   };
 
-  // Safety alias for consumers that assume G├½├æ1 sectors for math
+  // Safety alias for consumers that assume G+½+æ1 sectors for math
   (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
 
-  // =┬â├╢┬║ expose both duties explicitly and consistently
+  // =-â+¦-¦ expose both duties explicitly and consistently
   const dutyEffectiveSource: ControlSource =
     measuredDutyEffective != null
       ? "measured"
@@ -8074,7 +13332,7 @@ export async function calculateEnergyPipeline(
       : "schedule";
   state.dutyBurst        = dutyLocal;  // keep as *local* ON-window; prefer measured/local override
   state.dutyBurstSource  = dutyBurstSource;
-  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for +┬ª & audits)
+  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for +-ª & audits)
   (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
   (state as any).dutyMeasuredFR = measuredDutyEffective;
   (state as any).dutyEffectiveFRMeasured = measuredDutyEffective;
@@ -8086,7 +13344,7 @@ export async function calculateEnergyPipeline(
   state.dutyMeasuredFR = measuredDutyEffective ?? undefined;
   // (dutyCycle already set from MODE_CONFIGS above)
 
-  // G┬ú├á First-class fields for UI display
+  // G-ú+á First-class fields for UI display
   state.dutyShip = d_eff;          // Ship-wide effective duty (promoted from any)
   (state as any).dutyEff = d_eff;  // Legacy alias
 
@@ -8211,7 +13469,7 @@ export async function calculateEnergyPipeline(
   (state as any).P_elec_MW = state.P_avg;  // Electrical power (same as P_avg, but clearly labeled)
   // --- Cryo power AFTER calibration and AFTER mode qSpoilingFactor is applied ---
   const Q_on  = Q;
-  // qSpoilingFactor is idle Q multiplier: >1 G├º├å less idle loss (higher Q_off)
+  // qSpoilingFactor is idle Q multiplier: >1 G+º+å less idle loss (higher Q_off)
   const Q_off = Math.max(1, Q_on * state.qSpoilingFactor); // use mode-specific qSpoilingFactor
   const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;
   const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;
@@ -8380,7 +13638,7 @@ export async function calculateEnergyPipeline(
     (state as any).vdb_region_iv_derivative_support = vdbRegionIVDerivativeSupport;
     (state as any).vdb_two_wall_derivative_support = vdbTwoWallDerivativeSupport;
     // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
-  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G├Ñ├ë pipeline value (targeted when enabled)
+  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G+Ñ+ë pipeline value (targeted when enabled)
   (state as any).gammaVanDenBroeck_vis  = PROMOTED_WARP_PROFILE.gammaVanDenBroeck; // fixed runtime visual seed
 
   // Make visual factor mode-invariant (except standby)
@@ -8392,8 +13650,8 @@ export async function calculateEnergyPipeline(
 
   // Precomputed physics-only ++ gain for client verification
   // Canonical ship-wide ++ (authoritative):
-  //   ++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ duty_FR
-  // Use the calibrated/mass +┬ª_VdB when available; fall back to visual seed if not.
+  //   ++ = +-ª_geo^3 -+ q -+ +-ª_VdB -+ duty_FR
+  // Use the calibrated/mass +-ª_VdB when available; fall back to visual seed if not.
   const _gammaVdB_forTheta = Number.isFinite(state.gammaVanDenBroeck)
     ? state.gammaVanDenBroeck
     : ((state as any).gammaVanDenBroeck_vis ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck);
@@ -8436,7 +13694,7 @@ export async function calculateEnergyPipeline(
   (state as any).uniformsExplain ??= {};
   (state as any).uniformsExplain.thetaAudit = {
     mode: modelMode,
-    eq: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff",
+    eq: "++ = +-ª_geo^3 -+ q -+ +-ª_VdB -+ d_eff",
     massMode,
     inputs: {
       gammaGeo: state.gammaGeo,
@@ -8461,10 +13719,10 @@ export async function calculateEnergyPipeline(
   }
 
   if (PIPELINE_THETA_AUDIT_LOG) {
-    console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Pipeline):', {
+    console.log('=-â+¦+¼ ++-Scale Field Strength Audit (Raw vs Pipeline):', {
       mode: modelMode,
       massMode,
-      formula: '++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff',
+      formula: '++ = +-ª_geo^3 -+ q -+ +-ª_VdB -+ d_eff',
       components: thetaComponents,
       results: {
         thetaRaw: thetaRaw,
@@ -8482,9 +13740,9 @@ export async function calculateEnergyPipeline(
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
 
-  /* G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
+  /* G+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+ç
      "Explain-it" counters for HUD/debug
-  G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç */
+  G+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+ç */
   (state as any).E_tile_static_J = Math.abs(state.U_static);  // Static Casimir energy per tile
   (state as any).E_tile_geo_J = Math.abs(state.U_geo);        // Geometric amplified energy per tile  
   (state as any).E_tile_on_J = Math.abs(state.U_Q);           // Stored energy per tile in on-window
@@ -8503,9 +13761,9 @@ export async function calculateEnergyPipeline(
     massCal: state.massCalibration
   });
 
-  /* G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
+  /* G+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+ç
      Additional metrics (derived)
-  G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç */
+  G+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+çG+¦+ç */
 
   // --- Time-scale separation (TS) using actual hull size ---
   const { Lx_m, Ly_m, Lz_m } = state.hull!;
@@ -8587,7 +13845,7 @@ export async function calculateEnergyPipeline(
 
   // Overall status (mode-aware power thresholds)
   // Mode configuration already applied early in function - no need to duplicate
-  state.sectorStrobing  = state.concurrentSectors;         // G┬ú├á Legacy alias for UI compatibility
+  state.sectorStrobing  = state.concurrentSectors;         // G-ú+á Legacy alias for UI compatibility
   // Phase scheduler (PR-3): compute per-sector phase offsets and assign roles.
   const totalSectors = Math.max(
     1,
@@ -9253,7 +14511,7 @@ export async function calculateEnergyPipeline(
     if (DEBUG_PIPE) console.warn('Stress-energy calculation failed:', e);
   }
 
-  // Calculate Nat+├¡rio warp bubble results (now pipeline-true)
+  // Calculate Nat++¡rio warp bubble results (now pipeline-true)
   try {
     const hullGeomWarp = resolveHullGeometry(state);
     const a_warp = hullGeomWarp.Lx_m / 2;
@@ -12465,7 +17723,7 @@ export async function computeEnergySnapshot(sim: any) {
   // Run the unified pipeline calculation
   const result = await calculateEnergyPipeline(state);
 
-  // ---- Normalize LightG├ç├┤Crossing payload for the client API -------------------
+  // ---- Normalize LightG+ç+¦Crossing payload for the client API -------------------
   const lcSrc = (result.lc ?? result.lightCrossing ?? {}) as any;
   const lc = {
     tauLC_ms:   finite(lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined)),
@@ -12537,7 +17795,7 @@ export async function computeEnergySnapshot(sim: any) {
     return out;
   };
 
-  // ---- Nat+├¡rio tensors (kept under natario.*; adapter also accepts top-level)
+  // ---- Nat++¡rio tensors (kept under natario.*; adapter also accepts top-level)
   const natario = {
     metricMode:  !!(result.natario?.metricMode),
     lapseN:      finite(result.natario?.lapseN),
@@ -12546,11 +17804,11 @@ export async function computeEnergySnapshot(sim: any) {
     gSpatialSym: arrN(result.natario?.gSpatialSym, 6),
     viewForward: arrN(result.natario?.viewForward, 3),
     g0i:         arrN(result.natario?.g0i, 3),
-  // pass-through diagnostics from Nat+├¡rio (unit-annotated upstream)
+  // pass-through diagnostics from Nat++¡rio (unit-annotated upstream)
   dutyFactor:      finite(result.natario?.dutyFactor),       // unitless (++s/++s)
-  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Nat+├¡rio sqrt-duty
-  // diagnostic (G├¬├£duty semantics). Prefer `_sqrtDuty` when inspecting Nat+├¡rio
-  // outputs; it intentionally excludes +┬ª_VdB and is NOT the canonical ship-wide
+  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Nat++¡rio sqrt-duty
+  // diagnostic (G+¬+£duty semantics). Prefer `_sqrtDuty` when inspecting Nat++¡rio
+  // outputs; it intentionally excludes +-ª_VdB and is NOT the canonical ship-wide
   // theta used by engines (engines should use `thetaScale` / `thetaScaleExpected`).
   // Keep the legacy `thetaScaleCore` key for back-compat but mark it deprecated
   // here by mapping it from the `_sqrtDuty` alias when present.
@@ -12651,7 +17909,7 @@ export async function computeEnergySnapshot(sim: any) {
   };
 
   const warpUniforms = {
-    // physics (visual) G├ç├╢ mass stays split and separate
+    // physics (visual) G+ç+¦ mass stays split and separate
     gammaGeo: result.gammaGeo,
     qSpoilingFactor: result.qSpoilingFactor,
     gammaVanDenBroeck: (result as any).gammaVanDenBroeck_vis,   // visual gamma
@@ -12659,7 +17917,7 @@ export async function computeEnergySnapshot(sim: any) {
     gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
       chi_coupling: result.couplingChi,
 
-    // FordG├ç├┤Roman duty (ship-wide, sector-averaged)
+    // FordG+ç+¦Roman duty (ship-wide, sector-averaged)
     dutyEffectiveFR,
 
     // UI label fields (harmless to include)
@@ -12668,7 +17926,7 @@ export async function computeEnergySnapshot(sim: any) {
     sectors: result.concurrentSectors,   // concurrent/live
     currentMode: result.currentMode,
 
-    // viewer defaults G├ç├╢ visual policy only; parity/ridge set client-side
+    // viewer defaults G+ç+¦ visual policy only; parity/ridge set client-side
     viewAvg: true,
     colorMode: 'theta',
 
@@ -12694,13 +17952,13 @@ export async function computeEnergySnapshot(sim: any) {
     (result as any).dutyEffectiveFRSource ??
     "schedule";
   const uniformsExplain = {
-    // Human-readable G├ç┬úwhere did this come from?G├ç┬Ñ pointers
+    // Human-readable G+ç-úwhere did this come from?G+ç-Ñ pointers
     sources: {
       gammaGeo:               `server.result.gammaGeo (${gammaGeoSource})`,
       qSpoilingFactor:        `server.result.qSpoilingFactor (${qSpoilSource})`,
       qCavity:                `server.result.qCavity (${qCavitySource})`,
       modulationFreq_GHz:     `server.result.modulationFreq_GHz (${modulationSource})`,
-      gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) G├ç├╢ fixed visual seed unless standby",
+      gammaVanDenBroeck_vis:  "server.(gammaVanDenBroeck_vis) G+ç+¦ fixed visual seed unless standby",
       gammaVanDenBroeck_mass: `server.(gammaVanDenBroeck_mass) (${gammaVdBSource})`,
       dutyEffectiveFR:        `server.derived (${dutyEffectiveSource})`,
       dutyCycle:              `server.result.dutyCycle (${dutyCycleSource})`,
@@ -12712,7 +17970,7 @@ export async function computeEnergySnapshot(sim: any) {
       viewAvg:                "policy: true (clients render FR-averaged ++ by default)",
     },
 
-    // FordG├ç├┤Roman duty derivation (numbers)
+    // FordG+ç+¦Roman duty derivation (numbers)
     fordRomanDuty: {
       formula: "d_eff = measuredDuty || (dutyBurst * S_live / S_total)",
       burstLocal: result.dutyBurst ?? PROMOTED_WARP_PROFILE.dutyCycle,
@@ -12727,7 +17985,7 @@ export async function computeEnergySnapshot(sim: any) {
     // ++ audit + the inputs used to compute it (for transparency)
     thetaAudit: {
       note: "++ audit - raw vs pipeline VdB (targeting optional)",
-      equation: "++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff",
+      equation: "++ = +-ª_geo^3 -+ q -+ +-ª_VdB -+ d_eff",
       mode: (result as any).modelMode ?? MODEL_MODE, // "raw" | "calibrated"
       massMode: (result as any).massMode ?? DEFAULT_MASS_MODE,
       inputs: {
@@ -12778,12 +18036,12 @@ export async function computeEnergySnapshot(sim: any) {
     // Base equations (render these + a line below with the live values)
     equations: {
       d_eff: "d_eff = burstLocal -+ S_live / S_total",
-      theta_expected: "++_expected = +┬ª_geo^3 -+ q -+ +┬ª_VdB(vis) -+ G├¬├£d_eff",
+      theta_expected: "++_expected = +-ª_geo^3 -+ q -+ +-ª_VdB(vis) -+ G+¬+£d_eff",
       U_static: "U_static = chi_coupling * [-pi^2 * hbar * c/(720 * a^3)] * A_tile",
-      U_geo: "U_geo = +┬ª_geo^3 -+ U_static",
+      U_geo: "U_geo = +-ª_geo^3 -+ U_static",
       U_Q: "U_Q = q_mech -+ U_geo",
-      P_avg: "P_avg = |U_Q| -+ -├½ / Q -+ N_tiles -+ d_eff",
-      M_exotic: "M = [U_static -+ +┬ª_geo^3 -+ Q_burst -+ +┬ª_VdB -+ d_eff] -+ N_tiles / c-┬ª",
+      P_avg: "P_avg = |U_Q| -+ -+½ / Q -+ N_tiles -+ d_eff",
+      M_exotic: "M = [U_static -+ +-ª_geo^3 -+ Q_burst -+ +-ª_VdB -+ d_eff] -+ N_tiles / c--ª",
       TS_long: "TS_long = (L_long / c) / (1/f_m)",
     },
   };
@@ -12817,7 +18075,7 @@ export async function computeEnergySnapshot(sim: any) {
   dutyCycle: result.dutyCycle,
   sectorStrobing: result.sectorStrobing,
 
-    // Nat+├¡rio / stress-energy surface (time-averaged)
+    // Nat++¡rio / stress-energy surface (time-averaged)
     T00_avg: (result as any).warp?.stressEnergyTensor?.T00 ?? (result as any).stressEnergy?.T00,
     T11_avg: (result as any).warp?.stressEnergyTensor?.T11 ?? (result as any).stressEnergy?.T11,
     T22_avg: (result as any).warp?.stressEnergyTensor?.T22 ?? (result as any).stressEnergy?.T22,
@@ -12858,11 +18116,11 @@ export async function computeEnergySnapshot(sim: any) {
 }
 
 /**
- * Sample the Nat+├¡rio bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Sample the Nat++¡rio bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns ~ nTheta*nPhi points, suitable for JSON compare or CSV export.
  */
 /**
- * Sample the Nat+├¡rio bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Sample the Nat++¡rio bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns typed buffers suitable for JSON compare or CSV export without allocating per-sample objects.
  */
 export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSampleBuffer {
@@ -12874,7 +18132,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const axes: HullAxes = { a, b, c };
 
   const nTheta = Math.max(1, req.nTheta ?? 64);
-  const nPhi   = Math.max(2, req.nPhi ?? 32); // need G├½├æ2 to avoid (nPhi-1)=0
+  const nPhi   = Math.max(2, req.nPhi ?? 32); // need G+½+æ2 to avoid (nPhi-1)=0
   const sectors = Math.max(
     1,
     Math.floor(req.sectors ?? state.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount),
@@ -12884,13 +18142,13 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const totalSamples = nTheta * nPhi;
   ensureFieldSampleCapacity(totalSamples);
 
-  // Canonical bell width in *ellipsoidal* radius units: w-├╝ = w_m / a_eff.
-  // Use harmonic-mean effective radius to match viewer/renderer -├╝-units.
-  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // G┬ú├á harmonic mean (matches viewer)
+  // Canonical bell width in *ellipsoidal* radius units: w-++ = w_m / a_eff.
+  // Use harmonic-mean effective radius to match viewer/renderer -++-units.
+  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // G-ú+á harmonic mean (matches viewer)
   const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9); // meters
   const w_rho = Math.max(1e-6, w_m / aEff);
 
-  // Match renderer's gain chain (display-focused): disp ~ +┬ª_geo^3 * q_spoil * bell * sgn
+  // Match renderer's gain chain (display-focused): disp ~ +-ª_geo^3 * q_spoil * bell * sgn
   const gammaGeo = state.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo;
   const qSpoil = state.qSpoilingFactor ?? PROMOTED_WARP_PROFILE.qSpoilingFactor;
   const geoAmp     = Math.pow(gammaGeo, 3);               // *** cubic, same as pipeline ***
@@ -12899,17 +18157,17 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   let idx = 0;
 
   for (let i = 0; i < nTheta; i++) {
-    const theta = (i / nTheta) * 2 * Math.PI;      // [--├ç, -├ç] ring index
+    const theta = (i / nTheta) * 2 * Math.PI;      // [--+ç, -+ç] ring index
     // --- Smooth sector strobing (matches renderer exactly) ---
     const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
     const sectorIdx = Math.floor(u * sectors);
     const distToSplit = (sectorIdx - split + 0.5);
     const strobeWidth = 0.75;                 // same as renderer
-    const softSign = (x: number) => Math.tanh(x); // smooth -┬ª1 transition
+    const softSign = (x: number) => Math.tanh(x); // smooth --ª1 transition
     const sgn = softSign(-distToSplit / strobeWidth); // smooth sector sign
 
     for (let j = 0; j < nPhi; j++) {
-      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [--├ç/2, -├ç/2]
+      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [--+ç/2, -+ç/2]
       const onShell: [number, number, number] = [
         axes.a * Math.cos(phi) * Math.cos(theta),
         axes.b * Math.sin(phi),
@@ -12934,7 +18192,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       else if (asd >= b_band) wallWin = 0.0;
       else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a_band) / (b_band - a_band))); // smooth to 0
 
-      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Nat+├¡rio canonical bell
+      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Nat++¡rio canonical bell
 
       // --- Soft front/back polarity (if needed) ---
       const front = 1.0; // placeholder - can add soft polarity later if needed
@@ -13142,3 +18400,5 @@ export function fieldSamplesToCsv(buffer: FieldSampleBuffer): string {
   }
   return [header, ...rows].join("\n");
 }
+
+

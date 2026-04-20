@@ -3098,3 +3098,71 @@ export const constraintPackEvaluationSchema = z.object({
 export type ConstraintPackEvaluation = z.infer<
   typeof constraintPackEvaluationSchema
 >;
+
+export {
+  evaluateSolarFlareObservableGuardrails,
+  normalizeValidMask,
+  originHypothesisSchema,
+  sharedObservableAxisSchema,
+  sharedObservableContractSchema,
+  sharedObservableErrorSchema,
+  sharedObservableProvenanceRefSchema,
+  sharedObservableResponseRefSchema,
+  solarFlareSpectralObservableSchema,
+  validMaskFraction,
+} from "./solar-flare-observable";
+
+export type {
+  OriginHypothesis,
+  SharedObservableAxis,
+  SharedObservableContract,
+  SharedObservableError,
+  SharedObservableProvenanceRef,
+  SharedObservableResponseRef,
+  SolarFlareForwardModelComparison,
+  SolarFlareSpectralObservable,
+} from "./solar-flare-observable";
+
+export {
+  crossObservableCoherenceSchema,
+  heliosphericWaveObservableSchema,
+  ingestSolarWaveObservable,
+  solarEventLineageSchema,
+  solarLineFitSeriesSchema,
+  solarSpectralCubeSchema,
+  solarWaveObservableSchema,
+  wavePsdObservableSchema,
+  spectralOriginHypothesisSchema,
+} from "./solar-wave-lineage";
+
+export type {
+  CrossObservableCoherence,
+  HeliosphericWaveObservable,
+  SolarEventLineage,
+  SolarLineFitSeries,
+  SolarSpectralCube,
+  SolarWaveObservable,
+  SpectralOriginHypothesis,
+  WavePsdObservable,
+} from "./solar-wave-lineage";
+
+export {
+  SOLAR_SURFACE_EVENT_MATH_CLAIMS,
+  downgradeHypothesisStatusForLagMismatch,
+  helioseismicWavefrontObservableSchema,
+  photosphericLineTransientSchema,
+  solarEventObservableSchema,
+  solarSurfaceEventBundleSchema,
+  sunquakeImpactSourceSchema,
+  surfaceEventOriginHypothesisSchema,
+} from "./solar-surface-event-contract";
+
+export type {
+  HelioseismicWavefrontObservable,
+  PhotosphericLineTransient,
+  SolarEventObservable,
+  SolarSurfaceEventBundle,
+  SolarSurfaceEventMathClaimId,
+  SunquakeImpactSource,
+  SurfaceEventOriginHypothesis,
+} from "./solar-surface-event-contract";

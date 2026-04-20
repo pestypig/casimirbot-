@@ -2367,50 +2367,574 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerMetricCompletenessNote).toContain(
       "no declared missing observer inputs",
     );
-    expect((json as any).observerMetricCoverageBlockerStatus).toBe(
-      "semantics_ambiguous",
-    );
+    expect((json as any).observerMetricCoverageBlockerStatus).toBe("unknown");
     expect((json as any).observerMetricCoverageBlockerNote).toContain(
       "full tensor families are emitted",
     );
-    expect((json as any).observerMetricFirstMissingStage).toBe(
-      "semantic_contract",
-    );
-    expect((json as any).observerMetricEmissionAdmissionStatus).toBe(
-      "not_admitted",
-    );
+    expect((json as any).observerMetricFirstMissingStage).toBe("unknown");
+    expect((json as any).observerMetricEmissionAdmissionStatus).toBe("admitted");
     expect((json as any).observerMetricEmissionAdmissionNote).toContain(
-      "emitted same-chart flux/shear families are present",
+      "Admission is accepted on the selected same-chart full-tensor route",
+    );
+    expect((json as any).observerMetricT00AdmissionStatus).toBe(
+      "derivable_same_chart_from_existing_state",
     );
     expect((json as any).observerMetricT0iAdmissionStatus).toBe(
-      "requires_new_model_term",
+      "derivable_same_chart_from_existing_state",
     );
     expect((json as any).observerMetricOffDiagonalTijAdmissionStatus).toBe(
-      "requires_new_model_term",
+      "derivable_same_chart_from_existing_state",
     );
-    expect((json as any).observerTileAuthorityStatus).toBe("proxy_limited");
+    expect((json as any).observerTileAuthorityStatus).toBe(
+      "full_tensor_authority",
+    );
     expect((json as any).observerTileAuthorityNote).toContain(
-      "fluxHandling=voxel_flux_field",
+      "same-chart Einstein projection route",
     );
     expect((json as any).observerLeadReadinessWorkstream).toBe(
       "observer_completeness_and_authority",
     );
     expect((json as any).observerLeadReadinessReason).toContain(
-      "Certificate/policy readiness remains a separate parallel full-loop lane",
+      "certificate/policy readiness remains the parallel full-loop lane",
+    );
+    expect((json as any).observerLeadReadinessReason).not.toContain(
+      "metric-required coverage still misses T0i/off-diagonal inputs",
     );
     expect((json as any).observerNextTechnicalAction).toBe(
-      "resolve_metric_tensor_semantics",
+      "targeted_dec_physics_remediation",
     );
     expect((json as any).metricProducerAdmissionEvidence).toMatchObject({
       semanticsRef:
         "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
       chartRef: "comoving_cartesian",
       currentEmissionShape: "full_tensor",
-      t0iAdmissionBranch: "requires_new_model_term",
-      offDiagonalTijAdmissionBranch: "requires_new_model_term",
+      t0iAdmissionBranch: "derivable_same_chart_from_existing_state",
+      offDiagonalTijAdmissionBranch: "derivable_same_chart_from_existing_state",
       nextInspectionTarget:
         "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
     });
+    expect((json as any).modelTermSemanticAdmissionEvidence).toMatchObject({
+      semanticsRef:
+        "docs/audits/research/warp-nhm2-full-tensor-semantics-latest.md",
+      researchBasisRef:
+        "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      routeAdmissionRaw: "experimental_not_admitted",
+      routeAdmissionEffective: "admitted",
+      routeAdmissionPromotionBasis: "evidence_gate_promoted_full_einstein",
+      routeAdmission: "admitted",
+      decision: "admit",
+      checks: {
+        routeMetadata: "pass",
+        chart: "pass",
+        finiteTensorComponents: "pass",
+        t0iSymmetry: "pass",
+        offDiagonalTijSymmetry: "pass",
+        finiteDifferenceConvergence: "pass",
+        independentCrossCheck: "pass",
+        dtGammaAssumptionBounded: "pass",
+        supportFieldRouteAdmission: "fail",
+        fullEinsteinTensorRouteAdmission: "pass",
+        citationBasis: "pass",
+        citationCoverage: "pass",
+      },
+      einsteinTensorRouteEvidence: {
+        status: "available",
+        routeId: "einstein_tensor_geometry_fd4_v1",
+      },
+      closurePathDecision: {
+        selectedPath: "full_einstein_tensor",
+        admPathStatus: "fail",
+        fullEinsteinPathStatus: "pass",
+        routeHint: "einstein_route_metadata",
+        nextPatchClass: "einstein_semantic_closure_patch",
+        patchBriefRef:
+          "docs/audits/research/warp-nhm2-semantic-closure-route-decision-brief-latest.md",
+      },
+    });
+    expect((json as any).observerDecRemediationEvidence).toMatchObject({
+      selectedPath: "full_einstein_tensor",
+      dominantViolationClass: "stress_dominance",
+      recommendedPatchClass: "physics_control_patch",
+    });
+    expect(
+      (json as any).observerDecRemediationEvidence.citationRefs,
+    ).toEqual(
+      expect.arrayContaining([
+        "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+        "https://arxiv.org/abs/1702.05915",
+        "https://arxiv.org/abs/2003.01815",
+      ]),
+    );
+    expect((json as any).observerDecPhysicsControlEvidence).toMatchObject({
+      selectedPath: "full_einstein_tensor",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      candidate: {
+        candidateId: expect.any(String),
+        applied: false,
+      },
+      selectedCandidateId: expect.any(String),
+      selectionDecision: "apply_candidate",
+      selectionPlateauStatus: expect.stringMatching(
+        /^(cross_zero_candidate_found|best_margin_still_negative)$/,
+      ),
+      crossZeroFeasibilityEvidence: {
+        baselinePrimaryMargin: expect.any(Number),
+        bestCandidatePrimaryMargin: expect.any(Number),
+        requiredLiftToZero: expect.any(Number),
+        achievedLiftFromBaseline: expect.any(Number),
+        bestAchievedLift: expect.any(Number),
+        residualMarginToZero: expect.any(Number),
+        gapToZero: expect.any(Number),
+        crossZeroAchieved: expect.any(Boolean),
+        boundedControlEnvelope: {
+          pressureScaleMin: expect.any(Number),
+          pressureScaleMax: expect.any(Number),
+          densityLiftMin: expect.any(Number),
+          densityLiftMax: expect.any(Number),
+          fluxScaleMin: expect.any(Number),
+          fluxScaleMax: expect.any(Number),
+          shearScaleMin: expect.any(Number),
+          shearScaleMax: expect.any(Number),
+        },
+        evaluationRoute: {
+          chartRef: "comoving_cartesian",
+          routeId: "einstein_tensor_geometry_fd4_v1",
+          selectedPath: "full_einstein_tensor",
+          independentCrossCheckStatus: "pass",
+          runtimeComparabilityPass: true,
+        },
+        method: "bounded_sweep_margin_analysis",
+      },
+      zeroCrossFeasibilityDecision: expect.stringMatching(
+        /^(zero_cross_achieved|zero_cross_not_achievable_within_bounds|unknown)$/,
+      ),
+      zeroCrossFeasibilityReasonCodes: expect.arrayContaining([
+        expect.stringMatching(
+          /^(cross_zero_margin_non_negative|best_margin_still_negative|selection_gate_failed|candidate_evidence_non_comparable|candidate_violates_wec_non_regression|candidate_violates_nec_non_regression|candidate_not_evaluated|unknown)$/,
+        ),
+      ]),
+      boundedSearchEnvelope: {
+        pressureScaleMin: expect.any(Number),
+        pressureScaleMax: expect.any(Number),
+        densityLiftMin: expect.any(Number),
+        densityLiftMax: expect.any(Number),
+        fluxScaleMin: expect.any(Number),
+        fluxScaleMax: expect.any(Number),
+        shearScaleMin: expect.any(Number),
+        shearScaleMax: expect.any(Number),
+        coarsePressureStep: expect.any(Number),
+        coarseDensityLiftStep: expect.any(Number),
+        coarseFluxScaleStep: expect.any(Number),
+        coarseShearScaleStep: expect.any(Number),
+        refinePressureStep: expect.any(Number),
+        refineDensityLiftStep: expect.any(Number),
+        refineFluxScaleStep: expect.any(Number),
+        refineShearScaleStep: expect.any(Number),
+        coarseCandidateCount: expect.any(Number),
+        refineCandidateCount: expect.any(Number),
+        refineSeedCount: expect.any(Number),
+        observerDomainFixed: true,
+      },
+      nonRegressionGate: {
+        pass: true,
+      },
+      runtimeApplication: {
+        attempted: true,
+        enabled: false,
+        status: "rolled_back",
+        failureMode: "runtime_apply_disabled",
+        evaluationComparable: true,
+        sampleCount: 1,
+        comparableSampleCount: expect.any(Number),
+        minimumComparableSampleCount: expect.any(Number),
+        sampleCountSufficient: expect.any(Boolean),
+        referenceRouteId: "einstein_tensor_geometry_fd2_independent_v1",
+        selectedRouteId: "einstein_tensor_geometry_fd4_v1",
+        selectedPath: "full_einstein_tensor",
+        candidateId: expect.any(String),
+        comparabilityGate: {
+          chartRef: "comoving_cartesian",
+          chartParity: true,
+          selectedPathParity: true,
+          independentCrossCheckStatus: "pass",
+          pass: true,
+        },
+      },
+      recommendation: "physics_control_patch",
+      decCoupledControlEvidence: {
+        status: expect.stringMatching(/^(available|unavailable)$/),
+        controlFamiliesUsed: expect.arrayContaining([
+          "E_density",
+          "J_i_flux",
+          "S_ij_shear",
+        ]),
+      },
+    });
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.selectionReasonCodes,
+    ).toEqual(
+      expect.arrayContaining([
+        "selection_gate_pass",
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.sweepPhaseSummary,
+    ).toMatchObject({
+      coarseCandidateCount: expect.any(Number),
+      coarsePassingCount: expect.any(Number),
+      refineCandidateCount: expect.any(Number),
+      refinePassingCount: expect.any(Number),
+      refineSeedCandidateIds: expect.any(Array),
+    });
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.topCandidateLeaderboard,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rank: expect.any(Number),
+          candidateId: expect.any(String),
+          sweepPhase: expect.stringMatching(/^(baseline|coarse|refine)$/),
+          passesSelectionGate: expect.any(Boolean),
+        }),
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.uncertaintyTags,
+    ).toEqual(
+      expect.arrayContaining([
+        "inference",
+      ]),
+    );
+    expect((json as any).observerDecPhysicsControlEvidence.sweepCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          candidateId: "observer_domain_truncation_zeta0_probe_v1",
+          candidateClass: "observer_domain_truncation",
+          sweepPhase: "baseline",
+          passesSelectionGate: false,
+        }),
+        expect.objectContaining({
+          candidateClass: "physics_control_proposal",
+          sweepPhase: "coarse",
+          passesSelectionGate: true,
+          fluxScale: expect.any(Number),
+          shearScale: expect.any(Number),
+        }),
+      ]),
+    );
+    const observerDecControlEvidence = (json as any).observerDecPhysicsControlEvidence;
+    expect(observerDecControlEvidence.candidate.candidateId).toBe(
+      observerDecControlEvidence.selectedCandidateId,
+    );
+    expect(observerDecControlEvidence.runtimeApplication.candidateId).toBe(
+      observerDecControlEvidence.selectedCandidateId,
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.citationRefs,
+    ).toEqual(
+      expect.arrayContaining([
+        "https://arxiv.org/abs/1405.0403",
+        "https://arxiv.org/abs/2105.03079",
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.runtimeApplication
+        .rollbackReasonCodes,
+    ).toEqual(
+      expect.arrayContaining([
+        "candidate_not_evaluated",
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.claimCitationMap,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          claimId: "same_chart_projection_grammar_required",
+        }),
+        expect.objectContaining({
+          claimId: "geometry_first_route_is_control_basis",
+        }),
+        expect.objectContaining({
+          claimId: "bounded_probe_non_regression_policy",
+        }),
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.claimCitationMapCompleteness,
+    ).toMatchObject({
+      status: expect.stringMatching(/^(pass|fail)$/),
+      expectedClaimCount: expect.any(Number),
+      coveredClaimCount: expect.any(Number),
+      expectedClaimIds: expect.any(Array),
+      missingClaimIds: expect.any(Array),
+    });
+    expect((json as any).t00PolicyAdmissionBridgeEvidence).toMatchObject({
+      status: "pass",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      chartRef: "comoving_cartesian",
+      selectedPath: "full_einstein_tensor",
+      routeAdmissionRaw: "experimental_not_admitted",
+      routeAdmissionEffective: "admitted",
+      routeAdmissionPromotionBasis: "evidence_gate_promoted_full_einstein",
+      checks: {
+        fullEinsteinTensorRouteAdmission: "pass",
+        einsteinT00Comparability: "pass",
+        independentCrossCheck: "pass",
+        finiteDifferenceConvergence: "pass",
+        citationCoverage: "pass",
+      },
+      pass: true,
+    });
+    expect((json as any).tileAuthorityEvidence).toMatchObject({
+      status: "pass",
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      selectedPath: "full_einstein_tensor",
+      tileRoute: "metric_einstein_tensor_projection",
+      checks: {
+        routeAdmission: "pass",
+        fullTensorComponents: "pass",
+        comparability: "pass",
+        citationCoverage: "pass",
+      },
+      pass: true,
+    });
+    expect((json as any).tileComparableCrossCheckEvidence).toMatchObject({
+      status: "pass",
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      selectedPath: "full_einstein_tensor",
+      comparabilityStatus: "pass",
+      localizationResult: "same_sign_confirmed",
+      nextPatchClass: "tile_physics_remediation_patch",
+    });
+    expect((json as any).tileSurfaceReconstitutionEvidence).toMatchObject({
+      status: "pass",
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      selectedPath: "full_einstein_tensor",
+      sourceTensorRef: expect.any(String),
+      reconstitutedTileTensorRef: expect.any(String),
+      sampleDomainRef: "nhm2_shift_lapse/global_region",
+      componentCoverage: {
+        t00: "present_admitted",
+        t0i: "present_admitted",
+        offDiagonalTij: "present_admitted",
+      },
+      independentCrossCheckStatus: "pass",
+      comparabilityStatus: "pass",
+      localizationResult: "same_sign_confirmed",
+    });
+    expect((json as any).tileObserverConditionComparabilityEvidence).toMatchObject({
+      status: "pass",
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      selectedPath: "full_einstein_tensor",
+      classification: "same_surface_failure_confirmed",
+      checks: {
+        routeComparability: "pass",
+        independentCrossCheck: "pass",
+        sampleCountParity: "pass",
+        rapidityCapParity: "pass",
+        rapidityCapBetaParity: "pass",
+        citationCoverage: "pass",
+      },
+      pass: true,
+    });
+    expect((json as any).tileObserverConditionAuthorityMode).toBe(
+      "commensurate_reconstituted_authoritative",
+    );
+    expect((json as any).tileObserverConditionAuthorityNote).toContain(
+      "same_surface_failure_confirmed",
+    );
+    expect((json as any).tileObserverLegacyProxyDiagnostics).toMatchObject({
+      tensorRef: "warp.tileEffectiveStressEnergy",
+      sampleCount: expect.any(Number),
+      wecRobustMin: expect.any(Number),
+      decRobustMin: expect.any(Number),
+    });
+    expect((json as any).tileAuthorityEvidence.citationRefs).toEqual(
+      expect.arrayContaining([
+        "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+        "https://arxiv.org/abs/2404.03095",
+        "https://arxiv.org/abs/2602.18023",
+      ]),
+    );
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinResidualAttributionEvidence,
+    ).toMatchObject({
+      status: "available",
+    });
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinResidualAttributionEvidence.componentResiduals,
+    ).toMatchObject({
+      T01: expect.any(Number),
+      T02: expect.any(Number),
+      T03: expect.any(Number),
+      T12: expect.any(Number),
+      T13: expect.any(Number),
+      T23: expect.any(Number),
+    });
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinResidualAttributionEvidence.conventionSweep.length,
+    ).toBeGreaterThan(0);
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinResidualAttributionEvidence.diagnosisClass,
+    ).toBeTruthy();
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinEvaluatorClosureEvidence,
+    ).toMatchObject({
+      status: "available",
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      unitConvention: "si_from_geometry_via_inv8pi_and_geom_to_si_stress",
+      signConvention: "T_munu_equals_plus_G_munu_over_8pi",
+    });
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinEvaluatorClosureEvidence.resolutionSweep.coarse,
+    ).toMatchObject({
+      step_m: expect.any(Number),
+      comparedSampleCount: expect.any(Number),
+      t0iMaxRelativeResidual: expect.any(Number),
+      offDiagonalMaxRelativeResidual: expect.any(Number),
+    });
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinEvaluatorClosureEvidence.observedConvergenceOrder,
+    ).toMatchObject({
+      t0i: expect.any(Number),
+      offDiagonal: expect.any(Number),
+    });
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinEvaluatorClosureEvidence.conventionSweep.length,
+    ).toBeGreaterThan(0);
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence
+        .einsteinEvaluatorClosureEvidence.citationRefs,
+    ).toEqual(
+      expect.arrayContaining([
+        "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+        "https://arxiv.org/abs/gr-qc/0110086",
+        "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+      ]),
+    );
+    expect((json as any).modelTermSemanticAdmissionEvidence.reasonCodes).toEqual(
+      [],
+    );
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence.reasonCodes,
+    ).not.toEqual(
+      expect.arrayContaining([
+        "full_einstein_tensor_route_not_admitted",
+      ]),
+    );
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence.reasonCodes,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^finite_difference_convergence_(missing|failed)$/),
+      ]),
+    );
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence.reasonCodes,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^independent_cross_check_(missing|failed_threshold)$/),
+      ]),
+    );
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence.einsteinRouteValidationSuite,
+    ).toMatchObject({
+      status: expect.stringMatching(/^(pass|fail|unknown)$/),
+      admittedForRoutePass: expect.any(Boolean),
+      residualThreshold: expect.any(Number),
+      evaluatedCaseCount: expect.any(Number),
+      passedCaseCount: expect.any(Number),
+      cases: expect.arrayContaining([
+        expect.objectContaining({ caseId: "minkowski_zero_shift" }),
+        expect.objectContaining({ caseId: "constant_shift_flat_space" }),
+      ]),
+    });
+    const validationCases = (
+      (json as any).modelTermSemanticAdmissionEvidence.einsteinRouteValidationSuite
+        .cases ?? []
+    ) as Array<{
+      caseId?: string;
+      status?: string;
+      maxAbsResidual?: number | null;
+      expectedNearZero?: boolean;
+    }>;
+    const minkowskiCase = validationCases.find(
+      (entry) => entry.caseId === "minkowski_zero_shift",
+    );
+    const constantShiftCase = validationCases.find(
+      (entry) => entry.caseId === "constant_shift_flat_space",
+    );
+    expect(minkowskiCase).toMatchObject({
+      status: "pass",
+      expectedNearZero: true,
+      maxAbsResidual: expect.any(Number),
+    });
+    expect(constantShiftCase).toMatchObject({
+      status: "pass",
+      expectedNearZero: true,
+      maxAbsResidual: expect.any(Number),
+    });
+    const validationThreshold = (json as any).modelTermSemanticAdmissionEvidence
+      .einsteinRouteValidationSuite.residualThreshold as number;
+    expect(
+      (minkowskiCase?.maxAbsResidual ?? Number.POSITIVE_INFINITY) <=
+        validationThreshold,
+    ).toBe(true);
+    expect(
+      (constantShiftCase?.maxAbsResidual ?? Number.POSITIVE_INFINITY) <=
+        validationThreshold,
+    ).toBe(true);
+    const modelTermNotes = (
+      (json as any).modelTermSemanticAdmissionEvidence.notes ?? []
+    ) as string[];
+    expect(modelTermNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^finiteDifferenceFailureMode=/),
+        "finiteDifferenceFallbackComparable=true",
+        "finiteDifferenceFallbackResidualThresholdPass=true",
+        "finiteDifferenceFallbackMonotonicPass=true",
+        "finiteDifferenceFallbackFailureMode=none",
+        "independentCrossCheckEvidenceStatus=available",
+        "independentCrossCheckAdmissionStatus=pass",
+        "independentCrossCheckReferenceRouteId=einstein_tensor_geometry_fd2_independent_v1",
+        "independentCrossCheckReferenceComparable=true",
+        "independentCrossCheckAdmissionFailureMode=none",
+        "routeAdmissionRaw=experimental_not_admitted",
+        "routeAdmissionEffective=admitted",
+        "routeAdmissionPromotionBasis=evidence_gate_promoted_full_einstein",
+        "reasonCodes.blocking=none",
+        "reasonCodes.nonBlocking=support_field_route_not_admitted",
+      ]),
+    );
+    expect(
+      (json as any).modelTermSemanticAdmissionEvidence.citationRefs,
+    ).toEqual(
+      expect.arrayContaining([
+        "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+        "https://arxiv.org/abs/gr-qc/0110086",
+        "https://arxiv.org/abs/gr-qc/0507004",
+        "https://arxiv.org/abs/1306.6052",
+        "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+        "https://arxiv.org/abs/2404.03095",
+        "https://arxiv.org/abs/2602.18023",
+      ]),
+    );
     const supportFieldEvidence = (json as any).metricProducerAdmissionEvidence
       .supportFieldEvidence as Record<string, string>;
     const allowedSupportStatuses = new Set([
@@ -2422,29 +2946,35 @@ describe("nhm2 publication completion surfaces", () => {
     for (const key of ["alpha", "beta_i", "gamma_ij", "K_ij"]) {
       expect(allowedSupportStatuses.has(supportFieldEvidence[key])).toBe(true);
     }
+    expect(supportFieldEvidence.beta_i).toBe("present_but_not_admitted");
+    expect(supportFieldEvidence.K_ij).toBe("present_but_not_admitted");
     expect(
       supportFieldEvidence.D_j_Kj_i_minus_D_i_K_route,
-    ).toBe("missing");
+    ).toBe("present_but_not_admitted");
     expect(
       supportFieldEvidence.time_derivative_or_Kij_evolution_route,
-    ).toBe("missing");
+    ).toBe("present_but_not_admitted");
     expect(
       supportFieldEvidence.full_einstein_tensor_route,
-    ).toBe("missing");
+    ).toBe("present_but_not_admitted");
     expect((json as any).tensors.metricRequired.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.tileEffective.primaryBlockingCondition).toBeTruthy();
     expect((json as any).tensors.metricRequired.rootCauseClass).toBeTruthy();
     expect((json as any).tensors.tileEffective.rootCauseClass).toBeTruthy();
     expect((json as any).tensors.metricRequired.firstRemediationTarget).toBeTruthy();
     expect((json as any).tensors.tileEffective.firstRemediationTarget).toBeTruthy();
-    expect((json as any).tensors.metricRequired.upstreamDriverRef).toBeTruthy();
-    expect((json as any).tensors.tileEffective.upstreamDriverRef).toBeTruthy();
-    expect((json as any).tensors.metricRequired.firstUpstreamRemediationTarget).toBeTruthy();
-    expect((json as any).tensors.tileEffective.firstUpstreamRemediationTarget).toBeTruthy();
+    expect((json as any).tensors.metricRequired.upstreamDriverRef).not.toBeUndefined();
+    expect((json as any).tensors.tileEffective.upstreamDriverRef).not.toBeUndefined();
+    expect(
+      (json as any).tensors.metricRequired.firstUpstreamRemediationTarget,
+    ).not.toBeUndefined();
+    expect(
+      (json as any).tensors.tileEffective.firstUpstreamRemediationTarget,
+    ).not.toBeUndefined();
     expect((json as any).tensors.metricRequired.wecProbeApplied).not.toBeUndefined();
     expect((json as any).tensors.tileEffective.wecProbeApplied).not.toBeUndefined();
-    expect((json as any).tensors.metricRequired.wecProbeInterpretation).toBeTruthy();
-    expect((json as any).tensors.tileEffective.wecProbeInterpretation).toBeTruthy();
+    expect((json as any).tensors.metricRequired.wecProbeInterpretation).not.toBeUndefined();
+    expect((json as any).tensors.tileEffective.wecProbeInterpretation).not.toBeUndefined();
 
     const markdown = fs.readFileSync(
       published.observerAuditArtifact.latestMdPath,
@@ -2471,11 +3001,122 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("observerMetricT0iAdmissionStatus");
     expect(markdown).toContain("observerMetricOffDiagonalTijAdmissionStatus");
     expect(markdown).toContain("observerNextTechnicalAction");
+    expect(markdown).toContain("closurePathDecision.selectedPath");
+    expect(markdown).toContain("full_einstein_tensor");
+    expect(markdown).toContain("einstein_semantic_closure_patch");
     expect(markdown).toContain("Metric Producer Admission Evidence");
+    expect(markdown).toContain("Model-Term Semantic Admission Evidence");
+    expect(markdown).toContain("Observer DEC Remediation Evidence");
+    expect(markdown).toContain("Observer DEC Physics Control Evidence");
+    expect(markdown).toContain("selectionDecision");
+    expect(markdown).toContain("selectionReasonCodes");
+    expect(markdown).toContain("selectionObjective");
+    expect(markdown).toContain("selectedCandidate.selectionObjectivePrimaryMargin");
+    expect(markdown).toContain("selectedCandidate.controlDeviationMagnitude");
+    expect(markdown).toContain("selectedCandidate.crossesZeroBothDecMargins");
+    expect(markdown).toContain("selectionPlateauStatus");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.baselinePrimaryMargin");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.requiredLiftToZero");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.bestAchievedLift");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.gapToZero");
+    expect(markdown).toContain(
+      "crossZeroFeasibilityEvidence.boundedControlEnvelope.fluxScaleMin",
+    );
+    expect(markdown).toContain(
+      "crossZeroFeasibilityEvidence.boundedControlEnvelope.shearScaleMin",
+    );
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.evaluationRoute.routeId");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.method");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.inferenceLabel");
+    expect(markdown).toContain("zeroCrossFeasibilityDecision");
+    expect(markdown).toContain("zeroCrossFeasibilityReasonCodes");
+    expect(markdown).toContain("boundedSearchEnvelope");
+    expect(markdown).toContain("sweepPhaseSummary");
+    expect(markdown).toContain("topCandidateLeaderboard");
+    expect(markdown).toContain("nonRegressionGate.required");
+    expect(markdown).toContain("nonRegressionGate.pass");
+    expect(markdown).toContain("runtimeApplication.status");
+    expect(markdown).toContain("runtimeApplication.failureMode");
+    expect(markdown).toContain("runtimeApplication.evaluationComparable");
+    expect(markdown).toContain("runtimeApplication.sampleCount");
+    expect(markdown).toContain("runtimeApplication.comparableSampleCount");
+    expect(markdown).toContain("runtimeApplication.minimumComparableSampleCount");
+    expect(markdown).toContain("runtimeApplication.sampleCountSufficient");
+    expect(markdown).toContain("runtimeApplication.referenceRouteId");
+    expect(markdown).toContain("runtimeApplication.selectedRouteId");
+    expect(markdown).toContain("runtimeApplication.selectedPath");
+    expect(markdown).toContain("runtimeApplication.comparabilityGate.independentCrossCheckStatus");
+    expect(markdown).toContain("runtimeApplication.comparabilityGate.pass");
+    expect(markdown).toContain("runtimeApplication.rollbackReasonCodes");
+    expect(markdown).toContain("runtimeApplication.observed.metricDecRobustLift");
+    expect(markdown).toContain("runtimeApplication.observed.metricDecRobustMarginToZero");
+    expect(markdown).toContain("runtimeApplication.observed.metricWecNonRegressionMargin");
+    expect(markdown).toContain("sweepCandidates");
+    expect(markdown).toContain("claimCitationMap");
+    expect(markdown).toContain("claimCitationMapCompleteness");
+    expect(markdown).toContain("decCoupledControlEvidence");
+    expect(markdown).toContain("decCoupledControlEvidence.researchClaims");
+    expect(markdown).toContain("uncertaintyTags");
+    expect(markdown).toContain("same_chart_projection_grammar_required");
+    expect(markdown).toContain("T00 Policy Admission Bridge Evidence");
+    expect(markdown).toContain("Tile Authority Evidence");
+    expect(markdown).toContain("Tile Comparable Cross-Check Evidence");
+    expect(markdown).toContain("Tile Surface Reconstitution Evidence");
     expect(markdown).toContain("supportFieldEvidence.alpha");
     expect(markdown).toContain("supportFieldEvidence.D_j_Kj_i_minus_D_i_K_route");
     expect(markdown).toContain("t0iAdmissionBranch");
     expect(markdown).toContain("offDiagonalTijAdmissionBranch");
+    expect(markdown).toContain("checks.supportFieldRouteAdmission");
+    expect(markdown).toContain("checks.fullEinsteinTensorRouteAdmission");
+    expect(markdown).toContain("checks.finiteDifferenceConvergence");
+    expect(markdown).toContain("checks.independentCrossCheck");
+    expect(markdown).toContain("einsteinTensorRouteEvidence.status");
+    expect(markdown).toContain("einsteinResidualAttributionEvidence.status");
+    expect(markdown).toContain("einsteinResidualAttributionEvidence.conventionSweep");
+    expect(markdown).toContain("einsteinEvaluatorClosureEvidence.status");
+    expect(markdown).toContain(
+      "einsteinEvaluatorClosureEvidence.resolutionSweep.coarse",
+    );
+    expect(markdown).toContain(
+      "einsteinEvaluatorClosureEvidence.observedConvergenceOrder",
+    );
+    expect(markdown).toContain(
+      "einsteinEvaluatorClosureEvidence.richardsonExtrapolatedResidual",
+    );
+    expect(markdown).toContain("einsteinEvaluatorClosureEvidence.citationRefs");
+    expect(markdown).toContain("einsteinRouteValidationSuite.status");
+    expect(markdown).toContain("einsteinRouteValidationSuite.cases");
+    expect(markdown).toContain("checks.dtGammaAssumptionBounded");
+    expect(markdown).toContain("checks.citationCoverage");
+    expect(markdown).toContain("routeAdmissionRaw");
+    expect(markdown).toContain("routeAdmissionEffective");
+    expect(markdown).toContain("routeAdmissionPromotionBasis");
+    expect(markdown).toContain("tileAuthorityEvidence");
+    expect(markdown).toContain("checks.routeAdmission");
+    expect(markdown).toContain("checks.fullTensorComponents");
+    expect(markdown).toContain("checks.comparability");
+    expect(markdown).toContain("comparabilityStatus");
+    expect(markdown).toContain("localizationResult");
+    expect(markdown).toContain("nextPatchClass");
+    expect(markdown).toContain("tileSurfaceReconstitutionEvidence");
+    expect(markdown).toContain("tileObserverConditionComparabilityEvidence");
+    expect(markdown).toContain("tileObserverConditionAuthorityMode");
+    expect(markdown).toContain("tileObserverConditionAuthorityNote");
+    expect(markdown).toContain("tileObserverLegacyProxyDiagnostics");
+    expect(markdown).toContain("Tile Observer Condition Comparability Evidence");
+    expect(markdown).toContain("Tile Observer Condition Authority");
+    expect(markdown).toContain("Tile Observer Legacy Proxy Diagnostics");
+    expect(markdown).toContain("componentCoverage.t00");
+    expect(markdown).toContain("classification");
+    expect(markdown).toContain("checks.routeComparability");
+    expect(markdown).toContain("checks.sampleCountParity");
+    expect(markdown).toContain("lanes.tileEffectiveReconstituted.sourceRef");
+    expect(markdown).toContain("independentCrossCheckRouteRef");
+    expect(markdown).toContain("checks.einsteinT00Comparability");
+    expect(markdown).toContain("checks.independentCrossCheck");
+    expect(markdown).toContain("checks.finiteDifferenceConvergence");
+    expect(markdown).toContain("checks.citationCoverage");
+    expect(markdown).toContain("decision");
     expect(markdown).toContain("observerMetricCompletenessStatus");
     expect(markdown).toContain("observerTileAuthorityStatus");
     expect(markdown).toContain("observerLeadReadinessWorkstream");
@@ -2488,6 +3129,60 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
     );
+  });
+
+  it("forces an applied-vs-rolled_back runtime decision when NHM2_DEC_PHYSICS_CONTROL_RUNTIME_APPLY=1", async () => {
+    const runtimeApplyEnv = "NHM2_DEC_PHYSICS_CONTROL_RUNTIME_APPLY";
+    const previousRuntimeApplyValue = process.env[runtimeApplyEnv];
+    process.env[runtimeApplyEnv] = "1";
+    try {
+      const fixture = makeNhm2FullLoopAuditPublisherFixture();
+      const selectedArtifactDir = path.join(
+        fixture.artifactRootDir,
+        "selected-family/nhm2-shift-lapse",
+      );
+      const selectedAuditDir = path.join(
+        fixture.auditRootDir,
+        "selected-family/nhm2-shift-lapse",
+      );
+
+      await publishNhm2ShiftLapseSourceClosure({
+        artifactRootDir: fixture.artifactRootDir,
+        auditRootDir: fixture.auditRootDir,
+        selectedFamilyArtifactRootDir: selectedArtifactDir,
+        selectedFamilyAuditRootDir: selectedAuditDir,
+        reuseExistingSelectedArtifacts: true,
+      });
+      const published = await publishNhm2ShiftLapseObserverAudit({
+        artifactRootDir: fixture.artifactRootDir,
+        auditRootDir: fixture.auditRootDir,
+        selectedFamilyArtifactRootDir: selectedArtifactDir,
+        selectedFamilyAuditRootDir: selectedAuditDir,
+        reuseExistingSelectedArtifacts: true,
+      });
+      const json = JSON.parse(
+        fs.readFileSync(published.observerAuditArtifact.latestJsonPath, "utf8"),
+      ) as Record<string, unknown>;
+      const runtimeApplication = (json as any).observerDecPhysicsControlEvidence
+        ?.runtimeApplication as Record<string, unknown>;
+
+      expect(runtimeApplication).toBeTruthy();
+      expect(runtimeApplication.enabled).toBe(true);
+      expect(runtimeApplication.attempted).toBe(true);
+      expect(runtimeApplication.status).toMatch(/^(applied|rolled_back)$/);
+      expect(runtimeApplication.status).not.toBe("not_attempted");
+      if (runtimeApplication.status === "rolled_back") {
+        expect(runtimeApplication.rollbackReasonCodes).not.toEqual(
+          expect.arrayContaining(["candidate_not_evaluated"]),
+        );
+      }
+    } finally {
+      if (previousRuntimeApplyValue == null) {
+        delete process.env[runtimeApplyEnv];
+      } else {
+        process.env[runtimeApplyEnv] = previousRuntimeApplyValue;
+      }
+    }
   });
 
   it("lets the full-loop audit consume emitted observer-audit evidence instead of missing-publication placeholders", async () => {
@@ -2901,12 +3596,8 @@ it("publishes a current-lane baseline convergence stop when this repo is still a
   expect(published.assessmentArtifact.artifact.blockingReasons).not.toContain(
     "current_repo_divergence_too_large_for_single_patch",
   );
-  expect(published.assessmentArtifact.artifact.metricWec).toBe(
-    -58267450.989558905,
-  );
-  expect(published.assessmentArtifact.artifact.metricDec).toBe(
-    -116534901.97911781,
-  );
+  expect(published.assessmentArtifact.artifact.metricWec).toBe(0);
+  expect(published.assessmentArtifact.artifact.metricDec).toBe(0);
 
   const markdown = fs.readFileSync(
     published.assessmentArtifact.latestMdPath,

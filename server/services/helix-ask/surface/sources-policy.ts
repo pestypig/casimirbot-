@@ -47,6 +47,10 @@ const cleanDanglingFileExtensionFragments = (value: string): string => {
 const OPEN_WORLD_SOURCES_MARKER_RE =
   /^\s*sources?\s*:\s*open-world\s+best-effort(?:\s*\(no\s+repo\s+citations\s+required\))?\.?\s*$/i;
 const CITATION_TOKEN_RE = /\b(?:gate|certificate):[a-z0-9._-]+/gi;
+const URL_CITATION_RE = /https?:\/\/[^\s,]+/gi;
+const DOI_CITATION_RE = /\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/gi;
+const ARXIV_CITATION_RE =
+  /\b(?:arXiv:)?(?:\d{4}\.\d{4,5}|[a-z-]+\/\d{7})(?:v\d+)?\b/gi;
 
 export const OPEN_WORLD_SOURCES_MARKER_TEXT =
   "Sources: open-world best-effort (no repo citations required).";
@@ -57,6 +61,42 @@ export const extractCitationTokensFromText = (value: string): string[] => {
   if (!value) return [];
   const tokens = value.match(CITATION_TOKEN_RE) ?? [];
   return Array.from(new Set(tokens.map((token) => token.trim()).filter(Boolean)));
+};
+
+const extractUrlCitationsFromText = (value: string): string[] => {
+  if (!value) return [];
+  const urls = value.match(URL_CITATION_RE) ?? [];
+  return Array.from(
+    new Set(
+      urls
+        .map((url) => url.trim().replace(/[)\].,;!?]+$/g, ""))
+        .filter((url) => /^https?:\/\/\S+/i.test(url)),
+    ),
+  );
+};
+
+const extractDoiCitationsFromText = (value: string): string[] => {
+  if (!value) return [];
+  const dois = value.match(DOI_CITATION_RE) ?? [];
+  return Array.from(
+    new Set(
+      dois
+        .map((doi) => doi.trim().replace(/[)\].,;!?]+$/g, ""))
+        .filter((doi) => /^10\.\d{4,9}\//i.test(doi)),
+    ),
+  );
+};
+
+const extractArxivCitationsFromText = (value: string): string[] => {
+  if (!value) return [];
+  const arxivIds = value.match(ARXIV_CITATION_RE) ?? [];
+  return Array.from(
+    new Set(
+      arxivIds
+        .map((entry) => entry.trim().replace(/[)\].,;!?]+$/g, ""))
+        .filter(Boolean),
+    ),
+  );
 };
 
 export const scrubUnsupportedPaths = (
@@ -150,12 +190,31 @@ export const sanitizeSourcesLine = (
     }
     const rawPaths = normalizeCitations(extractFilePathsFromText(line));
     const rawTokens = extractCitationTokensFromText(line);
+    const rawUrls = normalizeCitations(extractUrlCitationsFromText(match[1] ?? line));
+    const rawDois = normalizeCitations(extractDoiCitationsFromText(match[1] ?? line));
+    const rawArxiv = normalizeCitations(extractArxivCitationsFromText(match[1] ?? line));
     const filteredPaths = rawPaths.filter((entry) => {
       const normalized = (normalizeEvidenceRef(entry) ?? entry).toLowerCase();
       return allowedPathSet.has(normalized) || allowedPathSet.has(entry.toLowerCase());
     });
     const filteredTokens = rawTokens.filter((token) => allowedTokenSet.has(token.toLowerCase()));
-    const combined = normalizeCitations([...filteredPaths, ...filteredTokens]);
+    const filteredUrls = rawUrls.filter(
+      (url) => allowedTokenSet.has(url.toLowerCase()) || allowedPathSet.has(url.toLowerCase()),
+    );
+    const filteredDois = rawDois.filter(
+      (doi) => allowedTokenSet.has(doi.toLowerCase()) || allowedPathSet.has(doi.toLowerCase()),
+    );
+    const filteredArxiv = rawArxiv.filter(
+      (entry) =>
+        allowedTokenSet.has(entry.toLowerCase()) || allowedPathSet.has(entry.toLowerCase()),
+    );
+    const combined = normalizeCitations([
+      ...filteredPaths,
+      ...filteredTokens,
+      ...filteredUrls,
+      ...filteredDois,
+      ...filteredArxiv,
+    ]);
     if (combined.length === 0) continue;
     sourcePool.push(...combined);
   }

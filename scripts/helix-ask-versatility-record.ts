@@ -21,6 +21,7 @@ type AskDebug = Record<string, unknown> & {
   intent_domain?: string;
   intent_strategy?: string;
   report_mode?: boolean;
+  report_mode_reason?: string;
   relation_packet_built?: boolean;
   relation_dual_domain_ok?: boolean;
   relation_packet_bridge_count?: number;
@@ -29,6 +30,13 @@ type AskDebug = Record<string, unknown> & {
   deterministic_fallback_used_relation?: boolean;
   contract_parse_fail_rate_relation?: number;
   citation_repair?: boolean;
+  fallback_reason?: string;
+  stage05_fallback_reason?: string | null;
+  answer_fallback_reason?: string;
+  answer_runtime_fallback_reason?: string;
+  answer_short_fallback_reason?: string;
+  agent_stop_reason?: string;
+  controller_stop_reason?: string;
   answer_contract_primary_applied?: boolean;
   answer_contract_applied?: boolean;
   answer_token_budget?: number;
@@ -44,6 +52,22 @@ type AskDebug = Record<string, unknown> & {
   objective_finalize_gate_passed?: boolean;
   objective_finalize_gate_mode?: "strict_covered" | "unknown_terminal" | "blocked";
   objective_finalize_gate_unknown_terminal_eligible?: boolean;
+  uncertainty_research_contract_required?: boolean;
+  uncertainty_research_contract_pass?: boolean;
+  uncertainty_research_contract_missing_reasons?: string[];
+  uncertainty_research_contract_claim_tier?: string;
+  uncertainty_research_contract_tier_coverage_pass?: boolean;
+  uncertainty_research_contract_uncertainty_estimation_count?: number;
+  uncertainty_research_contract_required_uncertainty_estimation?: boolean;
+  uncertainty_research_contract_constraint_reference_count?: number;
+  uncertainty_research_contract_proposal_reference_count?: number;
+  semantic_repo_tech_contract_required?: boolean;
+  semantic_repo_tech_contract_pass?: boolean;
+  semantic_repo_tech_missing_reasons?: string[];
+  claim_evidence_binding_pass?: boolean;
+  claim_evidence_binding_missing?: string[];
+  experimental_math_risk?: boolean;
+  final_mode_gate_consistency_reasons?: string[];
 };
 
 type AskPayload = {
@@ -191,6 +215,13 @@ const DEBUG_SCAFFOLD_LEAK_RE =
   /\b(?:traceid=ask:|timeline:timeline:|what_is_[a-z0-9_]+\b|how_they_connect\b|constraints_and_falsifiability\b|convergence snapshot\b|capsule guards\b|context sources\b|tree walk:\b|retry:\s*not applied\b)\b/i;
 const CODE_FRAGMENT_SPILL_RE =
   /(?:export\s+default\s+function\s+[A-Za-z0-9_]+\s*\(|useState<[^>]+>\(|use[A-Z][A-Za-z0-9_]*\(\)\s*;\s*const)/i;
+const ADAPTER_CONSTRAINT_POLICY_RE = /\bADAPTER_CONSTRAINT_POLICY\b/i;
+const TOOL_USE_BUDGET_POLICY_RE = /\btool[-_\s]?use[-_\s]?budget\b/i;
+const DIRECT_ANSWER_SECTION_RE = /(^|\n)\s*(direct answer|definition|answer)\s*:/i;
+const WHERE_IN_REPO_SECTION_RE = /(^|\n)\s*(where in repo|how repo solves it|repo-grounded findings)\s*:/i;
+const CONFIDENCE_UNCERTAINTY_SECTION_RE =
+  /(^|\n)\s*(confidence(?:\s*\/\s*uncertainty)?|uncertainty(?:\s*\/\s*open gaps)?|open gaps|evidence gaps)\s*:/i;
+const SOURCES_SECTION_RE = /(^|\n)\s*sources?:\s+\S+/i;
 const TRACE_EXPORT_PATH = process.env.HELIX_ASK_TRACE_EXPORT_PATH?.trim() || null;
 const AB_OUTPUT_PATHS = (process.env.HELIX_ASK_AB_OUTPUT_PATHS ?? "")
   .split(",")
@@ -813,6 +844,21 @@ const askWithRetry = async (
 const toNum = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
+const hasRepoOrHybridDomain = (value: unknown): boolean => {
+  const domain = String(value ?? "").trim().toLowerCase();
+  return domain === "repo" || domain === "hybrid";
+};
+
+const isRepoOrHybridScope = (args: {
+  family: PromptFamily;
+  expectedIntentDomain?: unknown;
+  observedIntentDomain?: unknown;
+}): boolean =>
+  args.family === "relation" ||
+  args.family === "repo_technical" ||
+  hasRepoOrHybridDomain(args.expectedIntentDomain) ||
+  hasRepoOrHybridDomain(args.observedIntentDomain);
+
 const collectObjectiveLoopStates = (debug: AskDebug | null): Array<{
   objective_id: string;
   status: string;
@@ -849,6 +895,20 @@ const collectObjectiveRetrievalIds = (debug: AskDebug | null): Set<string> => {
     if (objectiveId) ids.add(objectiveId);
   }
   return ids;
+};
+
+const hasDeterministicStopReason = (debug: AskDebug | null): boolean => {
+  if (!debug) return false;
+  const fields = [
+    debug.agent_stop_reason,
+    debug.controller_stop_reason,
+    debug.fallback_reason,
+    debug.stage05_fallback_reason,
+    debug.answer_runtime_fallback_reason,
+    debug.answer_fallback_reason,
+    debug.answer_short_fallback_reason,
+  ];
+  return fields.some((value) => typeof value === "string" && value.trim().length > 0);
 };
 
 const collectTimings = (debug: AskDebug | null): { retrieval?: number; synthesis?: number } => {
@@ -897,6 +957,7 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   const text = String(response.payload.text ?? "");
   const debug = response.payload.debug ?? null;
   const reportMode = typeof debug?.report_mode === "boolean" ? debug.report_mode : response.payload.report_mode;
+  const objectiveStates = collectObjectiveLoopStates(debug);
   if (response.status !== 200) failures.push(`request_failed:${response.status || "network"}`);
   if (response.status === 200 && isCircuitOpenPayload(response.payload)) {
     failures.push("request_failed:circuit_open_payload");
@@ -909,6 +970,58 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   }
   if (typeof entry.expected_report_mode === "boolean" && reportMode !== entry.expected_report_mode) {
     failures.push(`report_mode_mismatch:${String(reportMode)}`);
+  }
+  const reasoningDebugMissingFields: string[] = [];
+  if (!hasDeterministicStopReason(debug)) {
+    failures.push("reasoning_debug_incomplete:deterministic_stop_reason");
+  }
+  if (typeof debug?.intent_id !== "string" || !debug.intent_id.trim()) {
+    reasoningDebugMissingFields.push("intent_id");
+  }
+  if (typeof debug?.intent_domain !== "string" || !debug.intent_domain.trim()) {
+    reasoningDebugMissingFields.push("intent_domain");
+  }
+  if (typeof debug?.intent_strategy !== "string" || !debug.intent_strategy.trim()) {
+    reasoningDebugMissingFields.push("intent_strategy");
+  }
+  if (typeof reportMode !== "boolean") {
+    reasoningDebugMissingFields.push("report_mode");
+  }
+  const answerPath = Array.isArray(debug?.answer_path)
+    ? debug.answer_path
+      .map((step) => String(step ?? "").trim())
+      .filter(Boolean)
+    : [];
+  if (answerPath.length === 0) {
+    reasoningDebugMissingFields.push("answer_path");
+  }
+  const objectiveLoopExpected =
+    objectiveStates.length > 0 || toNum(debug?.objective_count, 0) > 0;
+  if (objectiveLoopExpected) {
+    if (objectiveStates.length === 0) {
+      reasoningDebugMissingFields.push("objective_loop_state");
+    }
+    if (!Array.isArray(debug?.objective_retrieval_queries)) {
+      reasoningDebugMissingFields.push("objective_retrieval_queries");
+    }
+    if (!Array.isArray(debug?.objective_mini_answers)) {
+      reasoningDebugMissingFields.push("objective_mini_answers");
+    }
+    if (typeof debug?.objective_mini_critic_mode !== "string" || !debug.objective_mini_critic_mode.trim()) {
+      reasoningDebugMissingFields.push("objective_mini_critic_mode");
+    }
+    if (typeof debug?.objective_assembly_mode !== "string" || !debug.objective_assembly_mode.trim()) {
+      reasoningDebugMissingFields.push("objective_assembly_mode");
+    }
+    if (typeof debug?.objective_finalize_gate_passed !== "boolean") {
+      reasoningDebugMissingFields.push("objective_finalize_gate_passed");
+    }
+    if (typeof debug?.objective_finalize_gate_mode !== "string" || !debug.objective_finalize_gate_mode.trim()) {
+      reasoningDebugMissingFields.push("objective_finalize_gate_mode");
+    }
+  }
+  if (reasoningDebugMissingFields.length > 0) {
+    failures.push(`reasoning_debug_incomplete:${Array.from(new Set(reasoningDebugMissingFields)).join(",")}`);
   }
   if (entry.family === "relation") {
     if (debug?.relation_packet_built !== true) failures.push(`relation_packet_built:${String(debug?.relation_packet_built)}`);
@@ -924,9 +1037,107 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   if (/cannot access ['\"]?intentProfile['\"]? before initialization/i.test(text)) {
     failures.push("runtime_tdz_intentProfile");
   }
+  const debugReasonSignals = [
+    ...answerPath,
+    ...(Array.isArray(debug?.final_mode_gate_consistency_reasons)
+      ? debug.final_mode_gate_consistency_reasons.map((entry) => String(entry ?? "").trim())
+      : []),
+    ...(Array.isArray(debug?.uncertainty_research_contract_missing_reasons)
+      ? debug.uncertainty_research_contract_missing_reasons
+          .map((entry) => String(entry ?? "").trim())
+          .filter(Boolean)
+      : []),
+  ];
+  const adapterConstraintPolicySignal =
+    ADAPTER_CONSTRAINT_POLICY_RE.test(text) ||
+    debugReasonSignals.some((entry) => ADAPTER_CONSTRAINT_POLICY_RE.test(entry));
+  if (adapterConstraintPolicySignal) {
+    failures.push("adapter_constraint_policy_fail");
+  }
+  const toolUseBudgetSignal =
+    TOOL_USE_BUDGET_POLICY_RE.test(text) ||
+    debugReasonSignals.some((entry) => TOOL_USE_BUDGET_POLICY_RE.test(entry));
+  if (toolUseBudgetSignal || adapterConstraintPolicySignal) {
+    failures.push("tool_use_budget_pack_fail");
+  }
   if (REPORT_SECTION_RE.test(text)) failures.push("report_scaffold_shape");
   if (DEBUG_SCAFFOLD_LEAK_RE.test(text)) failures.push("debug_scaffold_leak");
   if (CODE_FRAGMENT_SPILL_RE.test(text)) failures.push("code_fragment_spill");
+  const requiresRepoHybridContract = isRepoOrHybridScope({
+    family: entry.family,
+    expectedIntentDomain: entry.expected_intent_domain,
+    observedIntentDomain: debug?.intent_domain,
+  });
+  if (requiresRepoHybridContract) {
+    const uncertaintyMissingReasons = Array.isArray(debug?.uncertainty_research_contract_missing_reasons)
+      ? debug.uncertainty_research_contract_missing_reasons
+          .map((entry) => String(entry ?? "").trim())
+          .filter(Boolean)
+      : [];
+    const semanticMissingReasons = Array.isArray(debug?.semantic_repo_tech_missing_reasons)
+      ? debug.semantic_repo_tech_missing_reasons
+          .map((entry) => String(entry ?? "").trim())
+          .filter(Boolean)
+      : [];
+    const claimEvidenceMissingReasons = Array.isArray(debug?.claim_evidence_binding_missing)
+      ? debug.claim_evidence_binding_missing
+          .map((entry) => String(entry ?? "").trim())
+          .filter(Boolean)
+      : [];
+    const finalContractMissing: string[] = [];
+    if (!DIRECT_ANSWER_SECTION_RE.test(text)) finalContractMissing.push("direct_answer");
+    if (!WHERE_IN_REPO_SECTION_RE.test(text)) finalContractMissing.push("where_in_repo");
+    if (!CONFIDENCE_UNCERTAINTY_SECTION_RE.test(text)) finalContractMissing.push("confidence_uncertainty");
+    if (!SOURCES_SECTION_RE.test(text)) finalContractMissing.push("sources");
+    if (finalContractMissing.length > 0) {
+      failures.push(`final_answer_contract_incomplete:${finalContractMissing.join(",")}`);
+    }
+    if (
+      debug?.uncertainty_research_contract_required === true &&
+      debug?.uncertainty_research_contract_pass !== true
+    ) {
+      failures.push(
+        `uncertainty_research_contract_missing:${uncertaintyMissingReasons.slice(0, 6).join(",") || "unknown"}`,
+      );
+    }
+    if (
+      debug?.uncertainty_research_contract_required === true &&
+      debug?.uncertainty_research_contract_tier_coverage_pass === false
+    ) {
+      failures.push("uncertainty_research_tier_coverage_missing");
+    }
+    if (
+      (debug?.uncertainty_research_contract_required_uncertainty_estimation === true &&
+        toNum(debug?.uncertainty_research_contract_uncertainty_estimation_count, 0) <= 0) ||
+      uncertaintyMissingReasons.some((reason) =>
+        reason.includes("uncertainty_research_contract_missing:uncertainty_estimation_reference"),
+      )
+    ) {
+      failures.push("uncertainty_estimation_reference_missing");
+    }
+    if (
+      debug?.experimental_math_risk === true &&
+      debug?.uncertainty_research_contract_pass !== true
+    ) {
+      failures.push("experimental_math_without_research_pair");
+    }
+    if (
+      debug?.semantic_repo_tech_contract_required === true &&
+      debug?.semantic_repo_tech_contract_pass !== true
+    ) {
+      failures.push(
+        `semantic_repo_tech_incomplete:${semanticMissingReasons.slice(0, 6).join(",") || "unknown"}`,
+      );
+    }
+    if (
+      debug?.claim_evidence_binding_pass === false ||
+      claimEvidenceMissingReasons.length > 0
+    ) {
+      failures.push(
+        `claim_evidence_binding_missing:${claimEvidenceMissingReasons.slice(0, 6).join(",") || "unknown"}`,
+      );
+    }
+  }
   if (text.trim().length < (entry.min_text_chars ?? MIN_TEXT_CHARS)) failures.push(`text_too_short:${text.trim().length}`);
   const memoryCitationEntries = Array.isArray(response.payload.memory_citation?.entries)
     ? response.payload.memory_citation?.entries.length
@@ -941,7 +1152,6 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
     memoryCitationEntries > 0 ||
     memoryCitationRolloutIds > 0;
   if (!hasCitation) failures.push("citation_missing");
-  const objectiveStates = collectObjectiveLoopStates(debug);
   if (objectiveStates.length > 0) {
     const objectiveFinalizeMode = String(debug?.objective_finalize_gate_mode ?? "").trim().toLowerCase();
     const objectiveUnknownTerminalAccepted =
@@ -1061,6 +1271,55 @@ export const buildProbabilityScorecard = (rows: RawRun[]) => {
         "runtime_tdz_intentProfile",
       ]),
   ).length;
+  const reasoningDebugCompletePass = rows.filter((row) => !hasFailurePrefix(row, "reasoning_debug_incomplete")).length;
+  const repoHybridRows = rows.filter((row) => isRepoOrHybridScope({
+    family: row.family,
+    expectedIntentDomain: row.expected_intent_domain,
+    observedIntentDomain: row.debug?.intent_domain,
+  }));
+  const finalAnswerContractPass = repoHybridRows.filter(
+    (row) => !hasFailurePrefix(row, "final_answer_contract_incomplete"),
+  ).length;
+  const uncertaintyResearchRows = repoHybridRows.filter(
+    (row) => row.debug?.uncertainty_research_contract_required === true,
+  );
+  const uncertaintyResearchContractPass = uncertaintyResearchRows.filter(
+    (row) => !hasFailurePrefix(row, "uncertainty_research_contract_missing"),
+  ).length;
+  const semanticRepoTechRows = repoHybridRows.filter(
+    (row) => row.debug?.semantic_repo_tech_contract_required === true,
+  );
+  const semanticRepoTechContractPass = semanticRepoTechRows.filter(
+    (row) => !hasFailurePrefix(row, "semantic_repo_tech_incomplete"),
+  ).length;
+  const claimEvidenceBindingRows = repoHybridRows.filter(
+    (row) =>
+      row.debug?.semantic_repo_tech_contract_required === true ||
+      row.debug?.uncertainty_research_contract_required === true,
+  );
+  const claimEvidenceBindingPass = claimEvidenceBindingRows.filter(
+    (row) => !hasFailurePrefix(row, "claim_evidence_binding_missing"),
+  ).length;
+  const researchTierCoveragePass = uncertaintyResearchRows.filter(
+    (row) => !row.failures.includes("uncertainty_research_tier_coverage_missing"),
+  ).length;
+  const uncertaintyEstimatorRows = uncertaintyResearchRows.filter(
+    (row) => row.debug?.uncertainty_research_contract_required_uncertainty_estimation === true,
+  );
+  const uncertaintyEstimatorPresentPass = uncertaintyEstimatorRows.filter(
+    (row) => !row.failures.includes("uncertainty_estimation_reference_missing"),
+  ).length;
+  const experimentalMathRows = repoHybridRows.filter(
+    (row) => row.debug?.experimental_math_risk === true,
+  );
+  const experimentalMathGuardPass = experimentalMathRows.filter(
+    (row) => !row.failures.includes("experimental_math_without_research_pair"),
+  ).length;
+  const toolUseBudgetPackPass = rows.filter(
+    (row) =>
+      !row.failures.includes("tool_use_budget_pack_fail") &&
+      !row.failures.includes("adapter_constraint_policy_fail"),
+  ).length;
   const objectiveRows = rows.filter((row) => collectObjectiveLoopStates(row.debug).length > 0);
   const objectiveCompleteBeforeFinalizePass = objectiveRows.filter((row) => {
     const states = collectObjectiveLoopStates(row.debug);
@@ -1098,6 +1357,36 @@ export const buildProbabilityScorecard = (rows: RawRun[]) => {
       frontier_scaffold_complete: toWilson95(frontierScaffoldPass, rows.length),
       no_debug_leak: toWilson95(noDebugLeakPass, rows.length),
       no_runtime_fallback: toWilson95(noRuntimeFallbackPass, rows.length),
+      reasoning_debug_complete: toWilson95(reasoningDebugCompletePass, rows.length),
+      final_answer_contract_pass: toWilson95(finalAnswerContractPass, repoHybridRows.length),
+      uncertainty_research_contract_pass: toWilson95(
+        uncertaintyResearchContractPass,
+        uncertaintyResearchRows.length,
+      ),
+      semantic_repo_tech_contract_pass: toWilson95(
+        semanticRepoTechContractPass,
+        semanticRepoTechRows.length,
+      ),
+      claim_evidence_binding_pass: toWilson95(
+        claimEvidenceBindingPass,
+        claimEvidenceBindingRows.length,
+      ),
+      research_tier_coverage_pass: toWilson95(
+        researchTierCoveragePass,
+        uncertaintyResearchRows.length,
+      ),
+      uncertainty_estimator_present: toWilson95(
+        uncertaintyEstimatorPresentPass,
+        uncertaintyEstimatorRows.length,
+      ),
+      experimental_math_guard_pass: toWilson95(
+        experimentalMathGuardPass,
+        experimentalMathRows.length,
+      ),
+      tool_use_budget_pack_pass: toWilson95(
+        toolUseBudgetPackPass,
+        rows.length,
+      ),
       objective_complete_before_finalize: toWilson95(
         objectiveCompleteBeforeFinalizePass,
         objectiveRows.length,
@@ -1327,6 +1616,11 @@ const main = async () => {
   );
   const reportExpectedRows = rawRuns.filter((row) => typeof row.expected_report_mode === "boolean");
   const relationRows = rawRuns.filter((row) => row.family === "relation");
+  const repoHybridRows = rawRuns.filter((row) => isRepoOrHybridScope({
+    family: row.family,
+    expectedIntentDomain: row.expected_intent_domain,
+    observedIntentDomain: row.debug?.intent_domain,
+  }));
 
   const citationRate = rawRuns.filter((row) => !row.failures.some((f) => f.startsWith("citation_missing"))).length / Math.max(1, rawRuns.length);
   const minTextPassRate = rawRuns.filter((row) => !row.failures.some((f) => f.startsWith("text_too_short"))).length / Math.max(1, rawRuns.length);
@@ -1336,6 +1630,54 @@ const main = async () => {
   const runtimeTdzIntentProfileRate = rawRuns.filter((row) => row.failures.includes("runtime_tdz_intentProfile")).length / Math.max(1, rawRuns.length);
   const debugScaffoldLeakRate = rawRuns.filter((row) => row.failures.includes("debug_scaffold_leak")).length / Math.max(1, rawRuns.length);
   const codeFragmentSpillRate = rawRuns.filter((row) => row.failures.includes("code_fragment_spill")).length / Math.max(1, rawRuns.length);
+  const reasoningDebugCompleteRate =
+    rawRuns.filter((row) => !row.failures.some((f) => f.startsWith("reasoning_debug_incomplete"))).length /
+    Math.max(1, rawRuns.length);
+  const finalAnswerContractPassRate =
+    repoHybridRows.filter((row) => !row.failures.some((f) => f.startsWith("final_answer_contract_incomplete"))).length /
+    Math.max(1, repoHybridRows.length);
+  const uncertaintyResearchRequiredRows = repoHybridRows.filter(
+    (row) => row.debug?.uncertainty_research_contract_required === true,
+  );
+  const uncertaintyResearchContractPassRate =
+    repoHybridRows.filter((row) => !row.failures.some((f) => f.startsWith("uncertainty_research_contract_missing"))).length /
+    Math.max(1, repoHybridRows.length);
+  const semanticRepoTechRows = repoHybridRows.filter(
+    (row) => row.debug?.semantic_repo_tech_contract_required === true,
+  );
+  const semanticRepoTechContractPassRate =
+    semanticRepoTechRows.filter((row) => !row.failures.some((f) => f.startsWith("semantic_repo_tech_incomplete"))).length /
+    Math.max(1, semanticRepoTechRows.length);
+  const claimEvidenceBindingRows = repoHybridRows.filter(
+    (row) =>
+      row.debug?.semantic_repo_tech_contract_required === true ||
+      row.debug?.uncertainty_research_contract_required === true,
+  );
+  const claimEvidenceBindingPassRate =
+    claimEvidenceBindingRows.filter((row) => !row.failures.some((f) => f.startsWith("claim_evidence_binding_missing"))).length /
+    Math.max(1, claimEvidenceBindingRows.length);
+  const researchTierCoveragePassRate =
+    uncertaintyResearchRequiredRows.filter(
+      (row) => !row.failures.includes("uncertainty_research_tier_coverage_missing"),
+    ).length /
+    Math.max(1, uncertaintyResearchRequiredRows.length);
+  const uncertaintyEstimatorRows = uncertaintyResearchRequiredRows.filter(
+    (row) => row.debug?.uncertainty_research_contract_required_uncertainty_estimation === true,
+  );
+  const uncertaintyEstimatorPresentRate =
+    uncertaintyEstimatorRows.filter(
+      (row) => !row.failures.includes("uncertainty_estimation_reference_missing"),
+    ).length /
+    Math.max(1, uncertaintyEstimatorRows.length);
+  const experimentalMathGuardPassRate =
+    repoHybridRows.filter((row) => !row.failures.includes("experimental_math_without_research_pair")).length /
+    Math.max(1, repoHybridRows.length);
+  const toolUseBudgetPackPassRate =
+    rawRuns.filter(
+      (row) =>
+        !row.failures.includes("tool_use_budget_pack_fail") &&
+        !row.failures.includes("adapter_constraint_policy_fail"),
+    ).length / Math.max(1, rawRuns.length);
 
   const relationFallbackRate = relationRows.filter((row) => row.debug?.deterministic_fallback_used_relation === true).length / Math.max(1, relationRows.length);
   const parseFailRelationRate = relationRows.filter((row) => toNum(row.debug?.contract_parse_fail_rate_relation, 0) > 0).length / Math.max(1, relationRows.length);
@@ -1355,6 +1697,33 @@ const main = async () => {
   );
   const minRouteCorrectByFamily =
     routeSnapshots.length > 0 ? Math.min(...routeSnapshots.map((entry) => entry.p)) : 1;
+  const reasoningDebugCompleteGatePass =
+    probabilityScorecard.metrics.reasoning_debug_complete.total <= 0 ||
+    probabilityScorecard.metrics.reasoning_debug_complete.p >= 0.98;
+  const finalAnswerContractGatePass =
+    probabilityScorecard.metrics.final_answer_contract_pass.total <= 0 ||
+    probabilityScorecard.metrics.final_answer_contract_pass.p >= 0.95;
+  const uncertaintyResearchContractGatePass =
+    probabilityScorecard.metrics.uncertainty_research_contract_pass.total <= 0 ||
+    probabilityScorecard.metrics.uncertainty_research_contract_pass.p >= 0.95;
+  const semanticRepoTechContractGatePass =
+    probabilityScorecard.metrics.semantic_repo_tech_contract_pass.total <= 0 ||
+    probabilityScorecard.metrics.semantic_repo_tech_contract_pass.p >= 0.95;
+  const claimEvidenceBindingGatePass =
+    probabilityScorecard.metrics.claim_evidence_binding_pass.total <= 0 ||
+    probabilityScorecard.metrics.claim_evidence_binding_pass.p >= 0.95;
+  const researchTierCoverageGatePass =
+    probabilityScorecard.metrics.research_tier_coverage_pass.total <= 0 ||
+    probabilityScorecard.metrics.research_tier_coverage_pass.p >= 0.95;
+  const uncertaintyEstimatorGatePass =
+    probabilityScorecard.metrics.uncertainty_estimator_present.total <= 0 ||
+    probabilityScorecard.metrics.uncertainty_estimator_present.p >= 0.95;
+  const experimentalMathGuardGatePass =
+    probabilityScorecard.metrics.experimental_math_guard_pass.total <= 0 ||
+    probabilityScorecard.metrics.experimental_math_guard_pass.p >= 0.95;
+  const toolUseBudgetPackGatePass =
+    probabilityScorecard.metrics.tool_use_budget_pack_pass.total <= 0 ||
+    probabilityScorecard.metrics.tool_use_budget_pack_pass.p >= 0.99;
   const readinessVerdict =
     !runComplete || !provenanceGatePass
       ? "NOT_READY"
@@ -1362,6 +1731,15 @@ const main = async () => {
           probabilityScorecard.metrics.no_debug_leak.p >= 0.99 &&
           probabilityScorecard.metrics.no_runtime_fallback.p >= 0.99 &&
           probabilityScorecard.metrics.frontier_scaffold_complete.p >= 0.95 &&
+          reasoningDebugCompleteGatePass &&
+          finalAnswerContractGatePass &&
+          uncertaintyResearchContractGatePass &&
+          semanticRepoTechContractGatePass &&
+          claimEvidenceBindingGatePass &&
+          researchTierCoverageGatePass &&
+          uncertaintyEstimatorGatePass &&
+          experimentalMathGuardGatePass &&
+          toolUseBudgetPackGatePass &&
           probabilityScorecard.metrics.objective_complete_before_finalize.p >= 0.99 &&
           probabilityScorecard.metrics.objective_scoped_retrieval_success.p >= 0.95 &&
           probabilityScorecard.metrics.objective_assembly_success.p >= 0.95 &&
@@ -1514,6 +1892,13 @@ const main = async () => {
       runtime_tdz_intentProfile: runtimeTdzIntentProfileRate,
       debug_scaffold_leak_rate: debugScaffoldLeakRate,
       code_fragment_spill_rate: codeFragmentSpillRate,
+      reasoning_debug_complete_rate: reasoningDebugCompleteRate,
+      final_answer_contract_pass_rate: finalAnswerContractPassRate,
+      uncertainty_research_contract_pass_rate: uncertaintyResearchContractPassRate,
+      research_tier_coverage_pass_rate: researchTierCoveragePassRate,
+      uncertainty_estimator_present_rate: uncertaintyEstimatorPresentRate,
+      experimental_math_guard_pass_rate: experimentalMathGuardPassRate,
+      tool_use_budget_pack_pass_rate: toolUseBudgetPackPassRate,
       latency_ms: {
         total: { p50: percentile(totalLatencies, 50), p95: percentile(totalLatencies, 95) },
         retrieval: { p50: percentile(retrievalLatencies, 50), p95: percentile(retrievalLatencies, 95), samples: retrievalLatencies.length },
@@ -1533,6 +1918,18 @@ const main = async () => {
       no_debug_leak: probabilityScorecard.metrics.no_debug_leak.p,
       no_runtime_fallback: probabilityScorecard.metrics.no_runtime_fallback.p,
       frontier_scaffold_complete: probabilityScorecard.metrics.frontier_scaffold_complete.p,
+      reasoning_debug_complete: probabilityScorecard.metrics.reasoning_debug_complete.p,
+      final_answer_contract_pass: probabilityScorecard.metrics.final_answer_contract_pass.p,
+      uncertainty_research_contract_pass:
+        probabilityScorecard.metrics.uncertainty_research_contract_pass.p,
+      research_tier_coverage_pass:
+        probabilityScorecard.metrics.research_tier_coverage_pass.p,
+      uncertainty_estimator_present:
+        probabilityScorecard.metrics.uncertainty_estimator_present.p,
+      experimental_math_guard_pass:
+        probabilityScorecard.metrics.experimental_math_guard_pass.p,
+      tool_use_budget_pack_pass:
+        probabilityScorecard.metrics.tool_use_budget_pack_pass.p,
       objective_complete_before_finalize:
         probabilityScorecard.metrics.objective_complete_before_finalize.p,
       objective_scoped_retrieval_success:
@@ -1615,6 +2012,13 @@ const main = async () => {
           probabilityScorecard.metrics.no_debug_leak.p < 0.99 ||
           probabilityScorecard.metrics.no_runtime_fallback.p < 0.99 ||
           probabilityScorecard.metrics.frontier_scaffold_complete.p < 0.95 ||
+          !reasoningDebugCompleteGatePass ||
+          !finalAnswerContractGatePass ||
+          !uncertaintyResearchContractGatePass ||
+          !researchTierCoverageGatePass ||
+          !uncertaintyEstimatorGatePass ||
+          !experimentalMathGuardGatePass ||
+          !toolUseBudgetPackGatePass ||
           probabilityScorecard.metrics.objective_complete_before_finalize.p < 0.99 ||
           probabilityScorecard.metrics.objective_scoped_retrieval_success.p < 0.95 ||
           probabilityScorecard.metrics.objective_assembly_success.p < 0.95 ||
@@ -1693,6 +2097,15 @@ const main = async () => {
       `no_debug_leak=${probabilityScorecard.metrics.no_debug_leak.p.toFixed(3)}`,
       `no_runtime_fallback=${probabilityScorecard.metrics.no_runtime_fallback.p.toFixed(3)}`,
       `frontier_scaffold_complete=${probabilityScorecard.metrics.frontier_scaffold_complete.p.toFixed(3)}`,
+      `reasoning_debug_complete=${probabilityScorecard.metrics.reasoning_debug_complete.p.toFixed(3)}`,
+      `final_answer_contract_pass=${probabilityScorecard.metrics.final_answer_contract_pass.p.toFixed(3)}`,
+      `uncertainty_research_contract_pass=${probabilityScorecard.metrics.uncertainty_research_contract_pass.p.toFixed(3)}`,
+      `semantic_repo_tech_contract_pass=${probabilityScorecard.metrics.semantic_repo_tech_contract_pass.p.toFixed(3)}`,
+      `claim_evidence_binding_pass=${probabilityScorecard.metrics.claim_evidence_binding_pass.p.toFixed(3)}`,
+      `research_tier_coverage_pass=${probabilityScorecard.metrics.research_tier_coverage_pass.p.toFixed(3)}`,
+      `uncertainty_estimator_present=${probabilityScorecard.metrics.uncertainty_estimator_present.p.toFixed(3)}`,
+      `experimental_math_guard_pass=${probabilityScorecard.metrics.experimental_math_guard_pass.p.toFixed(3)}`,
+      `tool_use_budget_pack_pass=${probabilityScorecard.metrics.tool_use_budget_pack_pass.p.toFixed(3)}`,
       `objective_complete_before_finalize=${probabilityScorecard.metrics.objective_complete_before_finalize.p.toFixed(3)}`,
       `objective_scoped_retrieval_success=${probabilityScorecard.metrics.objective_scoped_retrieval_success.p.toFixed(3)}`,
       `objective_assembly_success=${probabilityScorecard.metrics.objective_assembly_success.p.toFixed(3)}`,
@@ -1795,6 +2208,15 @@ const main = async () => {
     `- citation_repair_rate: ${(repairRate * 100).toFixed(2)}%`,
     `- citation_presence_rate: ${(citationRate * 100).toFixed(2)}%`,
     `- min_text_length_pass_rate: ${(minTextPassRate * 100).toFixed(2)}%`,
+    `- reasoning_debug_complete_rate: ${(reasoningDebugCompleteRate * 100).toFixed(2)}%`,
+    `- final_answer_contract_pass_rate: ${(finalAnswerContractPassRate * 100).toFixed(2)}%`,
+    `- uncertainty_research_contract_pass_rate: ${(uncertaintyResearchContractPassRate * 100).toFixed(2)}%`,
+    `- semantic_repo_tech_contract_pass_rate: ${(semanticRepoTechContractPassRate * 100).toFixed(2)}%`,
+    `- claim_evidence_binding_pass_rate: ${(claimEvidenceBindingPassRate * 100).toFixed(2)}%`,
+    `- research_tier_coverage_pass_rate: ${(researchTierCoveragePassRate * 100).toFixed(2)}%`,
+    `- uncertainty_estimator_present_rate: ${(uncertaintyEstimatorPresentRate * 100).toFixed(2)}%`,
+    `- experimental_math_guard_pass_rate: ${(experimentalMathGuardPassRate * 100).toFixed(2)}%`,
+    `- tool_use_budget_pack_pass_rate: ${(toolUseBudgetPackPassRate * 100).toFixed(2)}%`,
     `- debug_scaffold_leak_rate: ${(debugScaffoldLeakRate * 100).toFixed(2)}%`,
     `- code_fragment_spill_rate: ${(codeFragmentSpillRate * 100).toFixed(2)}%`,
     `- latency_total_p50_ms: ${percentile(totalLatencies, 50).toFixed(0)}`,
@@ -1812,6 +2234,15 @@ const main = async () => {
     `- frontier_scaffold_complete: p=${probabilityScorecard.metrics.frontier_scaffold_complete.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.frontier_scaffold_complete.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.frontier_scaffold_complete.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.frontier_scaffold_complete.total}`,
     `- no_debug_leak: p=${probabilityScorecard.metrics.no_debug_leak.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.no_debug_leak.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.no_debug_leak.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.no_debug_leak.total}`,
     `- no_runtime_fallback: p=${probabilityScorecard.metrics.no_runtime_fallback.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.no_runtime_fallback.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.no_runtime_fallback.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.no_runtime_fallback.total}`,
+    `- reasoning_debug_complete: p=${probabilityScorecard.metrics.reasoning_debug_complete.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.reasoning_debug_complete.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.reasoning_debug_complete.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.reasoning_debug_complete.total}`,
+    `- final_answer_contract_pass: p=${probabilityScorecard.metrics.final_answer_contract_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.final_answer_contract_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.final_answer_contract_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.final_answer_contract_pass.total}`,
+    `- uncertainty_research_contract_pass: p=${probabilityScorecard.metrics.uncertainty_research_contract_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.uncertainty_research_contract_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.uncertainty_research_contract_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.uncertainty_research_contract_pass.total}`,
+    `- semantic_repo_tech_contract_pass: p=${probabilityScorecard.metrics.semantic_repo_tech_contract_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.semantic_repo_tech_contract_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.semantic_repo_tech_contract_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.semantic_repo_tech_contract_pass.total}`,
+    `- claim_evidence_binding_pass: p=${probabilityScorecard.metrics.claim_evidence_binding_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.claim_evidence_binding_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.claim_evidence_binding_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.claim_evidence_binding_pass.total}`,
+    `- research_tier_coverage_pass: p=${probabilityScorecard.metrics.research_tier_coverage_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.research_tier_coverage_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.research_tier_coverage_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.research_tier_coverage_pass.total}`,
+    `- uncertainty_estimator_present: p=${probabilityScorecard.metrics.uncertainty_estimator_present.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.uncertainty_estimator_present.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.uncertainty_estimator_present.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.uncertainty_estimator_present.total}`,
+    `- experimental_math_guard_pass: p=${probabilityScorecard.metrics.experimental_math_guard_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.experimental_math_guard_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.experimental_math_guard_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.experimental_math_guard_pass.total}`,
+    `- tool_use_budget_pack_pass: p=${probabilityScorecard.metrics.tool_use_budget_pack_pass.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.tool_use_budget_pack_pass.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.tool_use_budget_pack_pass.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.tool_use_budget_pack_pass.total}`,
     `- objective_complete_before_finalize: p=${probabilityScorecard.metrics.objective_complete_before_finalize.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.objective_complete_before_finalize.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.objective_complete_before_finalize.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.objective_complete_before_finalize.total}`,
     `- objective_scoped_retrieval_success: p=${probabilityScorecard.metrics.objective_scoped_retrieval_success.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.objective_scoped_retrieval_success.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.objective_scoped_retrieval_success.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.objective_scoped_retrieval_success.total}`,
     `- objective_assembly_success: p=${probabilityScorecard.metrics.objective_assembly_success.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.objective_assembly_success.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.objective_assembly_success.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.objective_assembly_success.total}`,

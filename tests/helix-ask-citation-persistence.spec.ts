@@ -28,6 +28,38 @@ describe("helix ask sources policy helpers", () => {
     expect(sanitized).not.toContain("docs/missing.md");
   });
 
+  it("preserves allowlisted repo and https citations while dropping unsupported paths", () => {
+    const sanitized = sanitizeSourcesLine(
+      [
+        "Answer body.",
+        "",
+        "Sources: server/routes/agi.plan.ts, https://example.com/reference.pdf, docs/missing.md",
+      ].join("\n"),
+      ["server/routes/agi.plan.ts"],
+      ["https://example.com/reference.pdf"],
+    );
+
+    expect(sanitized).toContain(
+      "Sources: server/routes/agi.plan.ts, https://example.com/reference.pdf",
+    );
+    expect(sanitized).not.toContain("docs/missing.md");
+  });
+
+  it("preserves allowlisted DOI and arXiv citations in sources lines", () => {
+    const sanitized = sanitizeSourcesLine(
+      [
+        "Answer body.",
+        "",
+        "Sources: 10.48550/arXiv.2303.08896, arXiv:2309.11495, docs/missing.md",
+      ].join("\n"),
+      [],
+      ["10.48550/arXiv.2303.08896", "arXiv:2309.11495"],
+    );
+
+    expect(sanitized).toContain("Sources: 10.48550/arXiv.2303.08896, arXiv:2309.11495");
+    expect(sanitized).not.toContain("docs/missing.md");
+  });
+
   it("preserves the open-world marker during sanitization", () => {
     const sanitized = sanitizeSourcesLine(
       `Open-world answer.\n\n${OPEN_WORLD_SOURCES_MARKER_TEXT}`,

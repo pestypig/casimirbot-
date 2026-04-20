@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "rootId": "physics-solar-radiative-observables-tree",
+  "nodes": [
+    {
+      "id": "physics-solar-radiative-observables-tree",
+      "slug": "physics-solar-radiative-observables-tree",
+      "title": "Physics Solar Radiative Observables Tree",
+      "excerpt": "Dedicated diagnostic lane for solar flare spectral observables with explicit geometry, baseline, model-comparison, and interpretation guardrails.",
+      "bodyMD": "This tree records first-class solar flare observables as shared contracts rather than plain intensity arrays. It preserves baseline subtraction, mask semantics, response/PSF metadata, ribbon geometry, flare phase context, and guarded origin hypotheses.",
+      "tags": [
+        "physics",
+        "solar",
+        "flare",
+        "observables",
+        "diagnostic"
+      ],
+      "children": [
+        "physics-solar-radiative-observables-dkist-visp-contract",
+        "physics-solar-radiative-observables-line-origin-guardrail",
+        "physics-solar-radiative-observables-radiative-transfer-closure",
+        "physics-solar-radiative-observables-flare-phase-definition",
+        "physics-solar-radiative-observables-ribbon-geometry-definition"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Solar flare spectral observables with explicit quality, geometry, and hypothesis metadata.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dkist-visp-observable-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-radiative-observables-dkist-visp-contract",
+      "slug": "physics-solar-radiative-observables-dkist-visp-contract",
+      "title": "DKIST ViSP Observable Contract",
+      "excerpt": "Definition-level anchor for first-class DKIST flare spectral observables in CasimirBot.",
+      "bodyMD": "Defines contract fields for spectral windows, quality masks, baseline links, response metadata, and context-image co-registration in ViSP flare records.",
+      "tags": [
+        "physics",
+        "solar",
+        "definition",
+        "dkist",
+        "visp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Contract anchor for DKIST flare observables.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-radiative-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dkist-visp-observable-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-radiative-observables-line-origin-guardrail",
+      "slug": "physics-solar-radiative-observables-line-origin-guardrail",
+      "title": "Solar Flare Line-Origin Guardrail",
+      "excerpt": "Diagnostic guardrail for evidence-backed origin hypotheses in optically thick lines.",
+      "bodyMD": "Prevents direct promotion of line-shape decomposition into deterministic flow claims by requiring explicit evidence and interpretation status.",
+      "tags": [
+        "physics",
+        "solar",
+        "diagnostic",
+        "origin",
+        "guardrail"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Guardrail for non-overclaimed line-origin inference.",
+      "nodeType": "diagnostic",
+      "dependencies": [
+        "physics-solar-radiative-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-flare-line-origin.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-radiative-observables-radiative-transfer-closure",
+      "slug": "physics-solar-radiative-observables-radiative-transfer-closure",
+      "title": "Solar Flare Radiative-Transfer Closure",
+      "excerpt": "Diagnostic closure anchor for baseline and response-aware flare profile comparisons.",
+      "bodyMD": "Requires baseline-aware subtraction and response/PSF metadata for model-data flare profile comparison.",
+      "tags": [
+        "physics",
+        "solar",
+        "diagnostic",
+        "radiative-transfer",
+        "closure"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Closure anchor for flare line comparison workflows.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-radiative-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-radiative-transfer-closure.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-radiative-observables-flare-phase-definition",
+      "slug": "physics-solar-radiative-observables-flare-phase-definition",
+      "title": "Solar Flare Phase Definition",
+      "excerpt": "Definition anchor for flare-phase labels used in observable slicing.",
+      "bodyMD": "Encodes observational phase as context for comparison and avoids conflating phase labels with unique mechanism claims.",
+      "tags": [
+        "physics",
+        "solar",
+        "definition",
+        "flare-phase"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Phase labels for flare-observable comparisons.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-radiative-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-flare-phase-definition.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-radiative-observables-ribbon-geometry-definition",
+      "slug": "physics-solar-radiative-observables-ribbon-geometry-definition",
+      "title": "Solar Ribbon Geometry Definition",
+      "excerpt": "Definition anchor for helioprojective geometry and ribbon-segment context in flare observations.",
+      "bodyMD": "Encodes flare ribbon location and unresolved-mixing notes so line-profile interpretation can be conditioned on spatial context.",
+      "tags": [
+        "physics",
+        "solar",
+        "definition",
+        "geometry",
+        "ribbon"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Helioprojective ribbon context for flare spectra.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-radiative-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-ribbon-geometry-definition.md"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

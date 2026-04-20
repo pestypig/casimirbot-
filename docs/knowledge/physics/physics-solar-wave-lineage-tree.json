@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "rootId": "physics-solar-wave-lineage-tree",
+  "nodes": [
+    {
+      "id": "physics-solar-wave-lineage-tree",
+      "slug": "physics-solar-wave-lineage-tree",
+      "title": "Physics Solar Wave Lineage Tree",
+      "excerpt": "Cross-scale solar lineage lane connecting remote spectral variability and in-situ wave signatures through evidence-bounded hypotheses.",
+      "bodyMD": "This tree defines a diagnostic contract for linking remote solar spectral observables and in-situ heliospheric wave observables without asserting hard identity links.",
+      "tags": [
+        "physics",
+        "solar",
+        "lineage",
+        "waves",
+        "diagnostic"
+      ],
+      "children": [
+        "physics-solar-wave-lineage-origin-hypothesis-definition",
+        "physics-solar-wave-lineage-cryonirsp-fe13-observable-definition",
+        "physics-solar-wave-lineage-psp-5min-observable-definition",
+        "physics-solar-wave-lineage-remote-insitu-linkage-guardrail"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-solar-radiative-observables-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Cross-scale solar lineage and evidence rules for remote-to-in-situ wave interpretation.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-spectral-origin-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-wave-lineage-origin-hypothesis-definition",
+      "slug": "physics-solar-wave-lineage-origin-hypothesis-definition",
+      "title": "Solar Spectral Origin Hypothesis Definition",
+      "excerpt": "Definition for separating transition origin, formation region, and driver lineage.",
+      "bodyMD": "Prevents flattening cross-layer interpretation into one origin label and requires evidence-backed status fields.",
+      "tags": [
+        "physics",
+        "solar",
+        "definition",
+        "origin",
+        "hypothesis"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-wave-lineage-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Separate formation-region and driver-origin semantics for spectral interpretation.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-wave-lineage-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-spectral-origin-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-wave-lineage-cryonirsp-fe13-observable-definition",
+      "slug": "physics-solar-wave-lineage-cryonirsp-fe13-observable-definition",
+      "title": "Cryo-NIRSP Fe XIII Observable Definition",
+      "excerpt": "Definition for Cryo-NIRSP Fe XIII observables requiring geometry and provenance.",
+      "bodyMD": "Encodes off-limb geometry, WCS-preserving axes, and provenance requirements for remote coronal wave observables.",
+      "tags": [
+        "physics",
+        "solar",
+        "definition",
+        "cryonirsp",
+        "fe_xiii"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-wave-lineage-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Cryo-NIRSP remote observable contract branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-wave-lineage-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-cryonirsp-fe13-observable.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-wave-lineage-psp-5min-observable-definition",
+      "slug": "physics-solar-wave-lineage-psp-5min-observable-definition",
+      "title": "PSP 5-Minute In Situ Observable Definition",
+      "excerpt": "Definition for in-situ wave observables with RTN and heliocentric geometry context.",
+      "bodyMD": "Encodes in-situ PSD observables and significance metadata with explicit RTN frame and heliocentric distance.",
+      "tags": [
+        "physics",
+        "solar",
+        "definition",
+        "psp",
+        "in-situ"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-wave-lineage-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "In-situ heliospheric wave contract branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-solar-wave-lineage-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-psp-5min-wave-observable.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-solar-wave-lineage-remote-insitu-linkage-guardrail",
+      "slug": "physics-solar-wave-lineage-remote-insitu-linkage-guardrail",
+      "title": "Remote to In Situ Linkage Guardrail",
+      "excerpt": "Diagnostic guardrail enforcing evidence-bounded remote-to-in-situ linkage semantics.",
+      "bodyMD": "Requires frequency-band and heliocentric-geometry evidence for lineage links and blocks hard identity assertions.",
+      "tags": [
+        "physics",
+        "solar",
+        "diagnostic",
+        "lineage",
+        "guardrail"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-solar-wave-lineage-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Guardrails for remote/in-situ lineage claims.",
+      "nodeType": "diagnostic",
+      "dependencies": [
+        "physics-solar-wave-lineage-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/solar-remote-to-insitu-linkage.md"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

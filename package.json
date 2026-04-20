@@ -173,6 +173,7 @@
     "warp:full-solve:nhm2-shift-lapse:publish-source-closure": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-source-closure --reuse-existing-selected-shift-lapse-artifacts true",
     "warp:full-solve:nhm2-shift-lapse:publish-observer-audit": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-observer-audit --reuse-existing-selected-shift-lapse-artifacts true",
     "warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-full-loop-audit --reuse-existing-selected-shift-lapse-artifacts true",
+    "warp:full-solve:nhm2-shift-lapse:publish-metric-wec-feasibility": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-metric-wec-feasibility",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",
     "warp:deliverable:bundle": "tsx scripts/warp-deliverable-bundle.ts",

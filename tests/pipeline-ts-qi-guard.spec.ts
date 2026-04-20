@@ -324,11 +324,12 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect([
       "isotropic_pressure_proxy",
       "diagonal_tensor_components",
+      "same_chart_metric_tensor_projection",
     ]).toContain(artifact.tensors.tileEffective.model.pressureModel);
     expect(typeof artifact.tensors.tileEffective.typeI.fraction).toBe("number");
   });
 
-  it("applies the selected NHM2 shift-lapse profile on the metric T00 lane and the production tile proxy lane", async () => {
+  it("applies the selected NHM2 shift-lapse profile on the metric T00 lane and keeps tile observer lanes profile-consistent", async () => {
     process.env.WARP_STRICT_CONGRUENCE = "1";
     const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
 
@@ -390,14 +391,49 @@ describe("pipeline ts/qi autoscale integration", () => {
       12,
     );
     const expectedTileScale = 1;
-    expect(
-      tunedObserver.tensors.tileEffective.conditions.wec.robustMin /
-        baselineObserver.tensors.tileEffective.conditions.wec.robustMin,
-    ).toBeCloseTo(expectedTileScale, 6);
-    expect(
-      tunedObserver.tensors.tileEffective.conditions.dec.robustMin /
-        baselineObserver.tensors.tileEffective.conditions.dec.robustMin,
-    ).toBeCloseTo(expectedTileScale, 6);
+    const authorityMode = String(
+      tunedObserver.tileObserverConditionAuthorityMode ?? "unknown",
+    );
+    if (authorityMode === "commensurate_reconstituted_authoritative") {
+      expect(baselineObserver.tileObserverConditionAuthorityMode).toBe(
+        "commensurate_reconstituted_authoritative",
+      );
+      expect(baselineObserver.tileObserverLegacyProxyDiagnostics).toBeTruthy();
+      expect(tunedObserver.tileObserverLegacyProxyDiagnostics).toBeTruthy();
+      expect(
+        tunedObserver.tileObserverLegacyProxyDiagnostics.wecRobustMin,
+      ).toBeCloseTo(
+        baselineObserver.tileObserverLegacyProxyDiagnostics.wecRobustMin,
+        12,
+      );
+      expect(
+        tunedObserver.tileObserverLegacyProxyDiagnostics.decRobustMin,
+      ).toBeCloseTo(
+        baselineObserver.tileObserverLegacyProxyDiagnostics.decRobustMin,
+        12,
+      );
+      expect(
+        tunedObserver.tensors.tileEffective.conditions.wec.robustMin,
+      ).toBeCloseTo(
+        tunedObserver.tensors.metricRequired.conditions.wec.robustMin,
+        12,
+      );
+      expect(
+        tunedObserver.tensors.tileEffective.conditions.dec.robustMin,
+      ).toBeCloseTo(
+        tunedObserver.tensors.metricRequired.conditions.dec.robustMin,
+        12,
+      );
+    } else {
+      expect(
+        tunedObserver.tensors.tileEffective.conditions.wec.robustMin /
+          baselineObserver.tensors.tileEffective.conditions.wec.robustMin,
+      ).toBeCloseTo(expectedTileScale, 6);
+      expect(
+        tunedObserver.tensors.tileEffective.conditions.dec.robustMin /
+          baselineObserver.tensors.tileEffective.conditions.dec.robustMin,
+      ).toBeCloseTo(expectedTileScale, 6);
+    }
   });
 
   it("preserves configured QI tau/sampler for guard evaluation after telemetry refresh", async () => {

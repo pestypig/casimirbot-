@@ -367,10 +367,8 @@ import {
   createHelixAskExecutionObservability,
 } from "../services/helix-ask/runtime/ask-execution-observability";
 import {
-  executeHelixAskRouteFlow,
-  prepareHelixAskRouteRequest,
-  resolveHelixAskRouteContext,
-} from "../services/helix-ask/runtime/ask-handler";
+  executeHelixAskEngineShell,
+} from "../services/helix-ask/runtime/ask-engine";
 import {
   applyStage0DebugFields,
   applyStage05DebugFields,
@@ -631,6 +629,17 @@ import {
   scrubUnsupportedPaths,
   shouldAppendOpenWorldSourcesMarker,
 } from "../services/helix-ask/surface/sources-policy";
+import {
+  evaluateUncertaintyResearchContract,
+  selectResearchCitationFallback,
+  type UncertaintyResearchClaimTier,
+  type UncertaintyResearchContractEvaluation,
+} from "../services/helix-ask/surface/research-citation-policy";
+import {
+  buildSemanticRepoTechContractRepairAnswer,
+  buildSemanticRepoTechContractUnknownFallback,
+  evaluateSemanticRepoTechContract,
+} from "../services/helix-ask/surface/semantic-repo-tech-contract";
 import { collectStepCitations } from "../services/helix-ask/surface/step-citations";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
@@ -3959,6 +3968,323 @@ const hasRequiredFrontierHeadings = (value: string): boolean =>
     const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp(escaped, "i").test(value);
   });
+
+const HELIX_ASK_REPO_FETCH_DIRECT_ANSWER_RE = /(?:^|\n)\s*Direct Answer\s*:/im;
+const HELIX_ASK_REPO_FETCH_WHERE_IN_REPO_RE = /(?:^|\n)\s*Where in repo\s*:/im;
+const HELIX_ASK_REPO_FETCH_UNCERTAINTY_RE =
+  /(?:^|\n)\s*(?:Confidence(?:\s*\/\s*Uncertainty)?|Uncertainty(?:\s+band)?|Open Gaps?|Evidence Gaps?|Remaining uncertainty)\s*:/im;
+const HELIX_ASK_REPO_FETCH_UNCERTAINTY_SIGNAL_RE =
+  /\b(?:uncertain|uncertainty|partial|incomplete|missing slots?|open gaps?|unknown|claim tier|diagnostic stage)\b/i;
+const HELIX_ASK_RESEARCH_CONSTRAINT_REF_RE =
+  /(?:gr-qc\/0009013|gr-qc\/9510071|gr-qc\/9702026|gr-qc\/9707024|0904\.0141|2105\.03079|PhysRevD\.79\.124017|PhysRevD\.105\.064038|10\.1103\/PhysRevD\.53\.5496)/i;
+const HELIX_ASK_RESEARCH_PROPOSAL_REF_RE =
+  /(?:2006\.07125|2102\.06824|10\.1088\/1361-6382\/abe692)/i;
+const HELIX_ASK_CODEX_REASONING_REF_RE =
+  /external\/openai-codex\/codex-rs\/app-server(?:-protocol)?\/src\/(?:protocol\/v2\.rs|bespoke_event_handling\.rs|codex_message_processor\.rs)/i;
+const HELIX_ASK_REASONING_REFERENCE_FALLBACK_CITATIONS = [
+  "external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs",
+  "external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs",
+  "https://arxiv.org/abs/gr-qc/0009013",
+  "https://arxiv.org/abs/gr-qc/9702026",
+  "https://arxiv.org/abs/2105.03079",
+] as const;
+
+type HelixAskRepoFetchContractEvaluation = {
+  pass: boolean;
+  missingReasons: string[];
+  hasDirectAnswer: boolean;
+  hasWhereInRepo: boolean;
+  hasUncertainty: boolean;
+  hasSources: boolean;
+  uncertaintySignal: boolean;
+  researchCitationCount: number;
+  constraintRefCount: number;
+  proposalRefCount: number;
+  codexReferenceCount: number;
+  citations: string[];
+};
+
+const uniqueHelixAskCitations = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const trimmed = String(raw ?? "").trim();
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+};
+
+const extractHttpCitationsFromText = (value: string): string[] => {
+  if (!value) return [];
+  const matches = value.match(/https?:\/\/[^\s<>)\]}]+/gi) ?? [];
+  return uniqueHelixAskCitations(
+    matches.map((entry) => entry.replace(/[),.;]+$/g, "").trim()).filter(Boolean),
+  );
+};
+
+const isHelixAskRepoLikeCitation = (value: string): boolean =>
+  /^(?:docs|server|client|shared|modules|scripts|tests|external)\//i.test(
+    String(value ?? "").trim().replace(/\\/g, "/"),
+  );
+
+const evaluateHelixAskRepoFetchContract = (args: {
+  text: string;
+  requireResearchOnUncertainty: boolean;
+}): HelixAskRepoFetchContractEvaluation => {
+  const text = String(args.text ?? "");
+  const fileCitations = extractFilePathsFromText(text).map((entry) =>
+    normalizeConstraintPath(entry),
+  );
+  const httpCitations = extractHttpCitationsFromText(text);
+  const citations = uniqueHelixAskCitations([
+    ...fileCitations,
+    ...httpCitations,
+  ]);
+  const hasDirectAnswer = HELIX_ASK_REPO_FETCH_DIRECT_ANSWER_RE.test(text);
+  const hasWhereInRepo =
+    HELIX_ASK_REPO_FETCH_WHERE_IN_REPO_RE.test(text) ||
+    citations.some((entry) => isHelixAskRepoLikeCitation(entry));
+  const hasUncertainty =
+    HELIX_ASK_REPO_FETCH_UNCERTAINTY_RE.test(text) ||
+    HELIX_ASK_REPO_FETCH_UNCERTAINTY_SIGNAL_RE.test(text);
+  const uncertaintySignal = HELIX_ASK_REPO_FETCH_UNCERTAINTY_SIGNAL_RE.test(text);
+  const hasSources = hasSourcesLine(text);
+  const constraintRefCount = citations.filter((entry) =>
+    HELIX_ASK_RESEARCH_CONSTRAINT_REF_RE.test(entry),
+  ).length;
+  const proposalRefCount = citations.filter((entry) =>
+    HELIX_ASK_RESEARCH_PROPOSAL_REF_RE.test(entry),
+  ).length;
+  const codexReferenceCount = citations.filter((entry) =>
+    HELIX_ASK_CODEX_REASONING_REF_RE.test(entry),
+  ).length;
+  const researchCitationCount =
+    constraintRefCount + proposalRefCount + codexReferenceCount;
+  const missingReasons: string[] = [];
+  if (!hasDirectAnswer) missingReasons.push("repo_fetch_direct_answer_missing");
+  if (!hasWhereInRepo) missingReasons.push("repo_fetch_where_in_repo_missing");
+  if (!hasUncertainty) missingReasons.push("repo_fetch_uncertainty_missing");
+  if (!hasSources) missingReasons.push("sources_missing");
+  if (
+    args.requireResearchOnUncertainty &&
+    uncertaintySignal &&
+    researchCitationCount <= 0
+  ) {
+    missingReasons.push("uncertainty_research_reference_missing");
+  }
+  if (proposalRefCount > 0 && constraintRefCount <= 0) {
+    missingReasons.push("proposal_without_constraint_pair");
+  }
+  return {
+    pass: missingReasons.length === 0,
+    missingReasons,
+    hasDirectAnswer,
+    hasWhereInRepo,
+    hasUncertainty,
+    hasSources,
+    uncertaintySignal,
+    researchCitationCount,
+    constraintRefCount,
+    proposalRefCount,
+    codexReferenceCount,
+    citations: citations.slice(0, 16),
+  };
+};
+
+const buildHelixAskRepoFetchContractRepairAnswer = (args: {
+  question: string;
+  text: string;
+  citations: string[];
+}): string => {
+  const candidateClaims = extractClaimCandidates(args.text, 6)
+    .map((entry) => normalizeContractText(entry, 220))
+    .filter(Boolean);
+  const directAnswer =
+    ensureSentence(
+      candidateClaims[0] ??
+        `Current answer for "${normalizeContractText(args.question, 96)}" remains bounded to retrieved anchors in this turn.`,
+    ) || "Current answer remains bounded to retrieved anchors in this turn.";
+  const repoAnchors = uniqueHelixAskCitations(
+    args.citations.filter((entry) => isHelixAskRepoLikeCitation(entry)),
+  ).slice(0, 4);
+  const uncertaintyLine =
+    "Confidence/Uncertainty: bounded to currently retrieved evidence; unresolved gaps remain until narrower file-level anchors are provided.";
+  const researchAnchors = uniqueHelixAskCitations([
+    ...args.citations.filter(
+      (entry) =>
+        HELIX_ASK_RESEARCH_CONSTRAINT_REF_RE.test(entry) ||
+        HELIX_ASK_RESEARCH_PROPOSAL_REF_RE.test(entry) ||
+        HELIX_ASK_CODEX_REASONING_REF_RE.test(entry),
+    ),
+    ...HELIX_ASK_REASONING_REFERENCE_FALLBACK_CITATIONS,
+  ]).slice(0, 4);
+  const sourcePool = uniqueHelixAskCitations([
+    ...repoAnchors,
+    ...researchAnchors,
+  ]).slice(0, 8);
+  return [
+    "Direct Answer:",
+    `- ${directAnswer}`,
+    "",
+    "Where in repo:",
+    ...(repoAnchors.length > 0
+      ? repoAnchors.map((entry) => `- ${entry}`)
+      : [
+          "- Repo path anchors are incomplete in this turn; retry with explicit module/function/file references.",
+        ]),
+    "",
+    uncertaintyLine,
+    "",
+    sourcePool.length > 0 ? `Sources: ${sourcePool.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
+const buildHelixAskRepoFetchContractUnknownFallback = (args: {
+  question: string;
+  missingReasons: string[];
+  citations: string[];
+}): string => {
+  const unknownBlock = buildHelixAskObjectiveUnknownBlock({
+    objectiveLabel: "repo_fetch_contract",
+    missingSlots: [
+      "direct-answer",
+      "code-path",
+      "uncertainty",
+      "sources",
+    ],
+    evidenceRefs: args.citations.slice(0, 6),
+  });
+  const reasonText =
+    args.missingReasons.length > 0
+      ? `${unknownBlock.why}; missing contract checks: ${args.missingReasons
+          .slice(0, 4)
+          .join(", ")}`
+      : unknownBlock.why;
+  const repoAnchors = uniqueHelixAskCitations(
+    args.citations.filter((entry) => isHelixAskRepoLikeCitation(entry)),
+  ).slice(0, 4);
+  const checked = unknownBlock.what_i_checked.join(", ");
+  const sources = uniqueHelixAskCitations([
+    ...args.citations,
+    ...HELIX_ASK_REASONING_REFERENCE_FALLBACK_CITATIONS,
+  ]).slice(0, 8);
+  return [
+    "Direct Answer:",
+    `- UNKNOWN for "${normalizeContractText(args.question, 96)}" until repo fetch contract checks are satisfied.`,
+    "",
+    "Where in repo:",
+    ...(repoAnchors.length > 0
+      ? repoAnchors.map((entry) => `- ${entry}`)
+      : ["- Explicit file/module anchors are missing in this turn; retrieval must be narrowed."]),
+    "",
+    "Confidence/Uncertainty:",
+    "- High uncertainty; response is fail-closed pending explicit repo anchors and bounded uncertainty evidence.",
+    "",
+    `Why: ${normalizeContractText(reasonText, 320)}`,
+    `What I checked: ${checked || "none"}`,
+    `Next retrieval: ${normalizeContractText(
+      `Run a repo-scoped retrieval for "${args.question}" with explicit file:line anchors for implementation path and uncertainty bounds.`,
+      320,
+    )}`,
+    sources.length > 0 ? `Sources: ${sources.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
+const buildHelixAskUncertaintyResearchContractRepairAnswer = (args: {
+  text: string;
+  citations: string[];
+  evaluation: UncertaintyResearchContractEvaluation;
+}): string => {
+  const fallbackSources = selectResearchCitationFallback({
+    existingCitations: [...args.citations, ...args.evaluation.citations],
+    claimTier: args.evaluation.claimTier,
+    limit: 8,
+  });
+  if (fallbackSources.length <= 0) return args.text.trim();
+  const baseLines = String(args.text ?? "")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*sources?\s*:/i.test(line))
+    .map((line) => line.trimEnd());
+  while (baseLines.length > 0 && !baseLines[baseLines.length - 1]?.trim()) {
+    baseLines.pop();
+  }
+  const mergedSources = uniqueHelixAskCitations([
+    ...extractFilePathsFromText(args.text).map((entry) => normalizeConstraintPath(entry)),
+    ...extractHttpCitationsFromText(args.text),
+    ...fallbackSources,
+  ]).slice(0, 8);
+  if (mergedSources.length <= 0) {
+    return baseLines.join("\n").trim();
+  }
+  return [...baseLines, "", `Sources: ${mergedSources.join(", ")}`].join("\n").trim();
+};
+
+const buildHelixAskUncertaintyResearchContractUnknownFallback = (args: {
+  question: string;
+  missingReasons: string[];
+  citations: string[];
+  claimTier: UncertaintyResearchClaimTier;
+}): string => {
+  const fallbackSources = selectResearchCitationFallback({
+    existingCitations: args.citations,
+    claimTier: args.claimTier,
+    limit: 8,
+  });
+  const missingSlots = [
+    "research-citations",
+    "codex-reference",
+    ...(args.claimTier === "diagnostic"
+      ? ["foundational-or-verification-reference"]
+      : ["foundational-reference", "verification-reference", "uncertainty-estimation-reference"]),
+  ];
+  const unknownBlock = buildHelixAskObjectiveUnknownBlock({
+    objectiveLabel: "uncertainty_research_contract",
+    missingSlots,
+    evidenceRefs: fallbackSources.slice(0, 6),
+  });
+  const tierGuidance =
+    args.claimTier === "diagnostic"
+      ? "diagnostic tier requires codex-clone references plus at least one foundational or verification research citation."
+      : "reportable/certifying tiers require codex-clone references plus foundational, verification, and uncertainty-estimation research citations.";
+  const reasonText =
+    args.missingReasons.length > 0
+      ? `${unknownBlock.why}; missing uncertainty research checks: ${args.missingReasons
+          .slice(0, 5)
+          .join(", ")}`
+      : unknownBlock.why;
+  const checked = unknownBlock.what_i_checked.join(", ");
+  return [
+    "Direct Answer:",
+    `- UNKNOWN for "${normalizeContractText(args.question, 96)}" until uncertainty research contract checks are satisfied.`,
+    "",
+    "Where in repo:",
+    "- Research-policy coverage is incomplete for this turn; provide approved codex-clone and paper citations before claim promotion.",
+    "",
+    "Confidence/Uncertainty:",
+    `- High uncertainty; fail-closed until ${tierGuidance}`,
+    "",
+    `Why: ${normalizeContractText(reasonText, 320)}`,
+    `What I checked: ${checked || "none"}`,
+    `Next retrieval: ${normalizeContractText(
+      `Add approved citations for "${args.question}" so uncertainty research coverage satisfies ${args.claimTier} tier policy with codex-clone and peer-reviewed evidence.`,
+      320,
+    )}`,
+    fallbackSources.length > 0 ? `Sources: ${fallbackSources.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
 const HELIX_ASK_FRONTIER_LENS_RE =
   /\b(conscious|consciousness|sentient|sentience|orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|penrose|hameroff|microtubule|stellar consciousness|sun conscious|is the sun conscious)\b/i;
 const HELIX_ASK_FRONTIER_EXPLICIT_LENS_RE =
@@ -39695,14 +40021,19 @@ const executeHelixAsk = async ({
       !explicitRepoExpectation &&
       !hasFilePathHints &&
       !HELIX_ASK_WARP_FOCUS.test(baseQuestion);
+    const initialRequiresRepoEvidence =
+      explicitRepoExpectation || promptResearchRepoRequired;
+    const initialIntentProfile =
+      matchHelixAskIntent({ question: baseQuestion }).profile ??
+      getDefaultHelixAskIntentProfile();
     const preserveGeneralCompareRouting =
       shouldPreserveHelixAskGeneralCompareRouting({
         question: baseQuestion,
-        intentDomain: intentProfile.domain,
+        intentDomain: initialIntentProfile.domain,
         explicitRepoExpectation,
         hasFilePathHints,
         endpointHintCount: endpointHints.length,
-        requiresRepoEvidence,
+        requiresRepoEvidence: initialRequiresRepoEvidence,
       });
     const preferGeneralWhenNoRepoHints =
       preserveGeneralCompareRouting ||
@@ -53635,6 +53966,8 @@ const executeHelixAsk = async ({
           },
         });
         if (debugPayload) {
+          debugPayload.relation_packet_built =
+            relationPacketFloorCheck.ok && relationDualDomainOk;
           debugPayload.second_pass_attempted = true;
           debugPayload.second_pass_skipped_reason = "none";
           debugPayload.second_pass_result = relationPacketFloorCheck.ok && relationDualDomainOk ? "pass" : "fail";
@@ -60164,6 +60497,142 @@ const executeHelixAsk = async ({
                 : "",
             ].filter(Boolean)
           : [];
+      const finalModeGateRequireResearchOnUncertainty =
+        finalModeGateRepoOrHybrid && !finalModeGateFrontierIntent;
+      let finalRepoFetchContractEvaluation: HelixAskRepoFetchContractEvaluation | null = null;
+      if (finalModeGateRepoOrHybrid) {
+        const evaluateFinalRepoFetchContract = (): HelixAskRepoFetchContractEvaluation =>
+          evaluateHelixAskRepoFetchContract({
+            text: cleanedText,
+            requireResearchOnUncertainty: finalModeGateRequireResearchOnUncertainty,
+          });
+        finalRepoFetchContractEvaluation = evaluateFinalRepoFetchContract();
+        if (!finalRepoFetchContractEvaluation.pass) {
+          const repairedText = buildHelixAskRepoFetchContractRepairAnswer({
+            question: baseQuestion,
+            text: cleanedText,
+            citations: finalRepoFetchContractEvaluation.citations,
+          }).trim();
+          if (repairedText) {
+            cleanedText = applyTerminalAnswerText({
+              result,
+              nextText: repairedText,
+            });
+            answerPath.push("modeGate:repo_fetch_contract_repair");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).repo_fetch_contract_repair_applied = true;
+            }
+          }
+          finalRepoFetchContractEvaluation = evaluateFinalRepoFetchContract();
+        }
+        if (!finalRepoFetchContractEvaluation.pass) {
+          const unknownFallbackText = buildHelixAskRepoFetchContractUnknownFallback({
+            question: baseQuestion,
+            missingReasons: finalRepoFetchContractEvaluation.missingReasons,
+            citations: finalRepoFetchContractEvaluation.citations,
+          }).trim();
+          if (unknownFallbackText) {
+            cleanedText = applyTerminalAnswerText({
+              result,
+              nextText: unknownFallbackText,
+            });
+            answerPath.push("modeGate:repo_fetch_contract_fail_closed");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).repo_fetch_contract_fail_closed = true;
+            }
+          }
+          finalRepoFetchContractEvaluation = evaluateFinalRepoFetchContract();
+          if (
+            !finalRepoFetchContractEvaluation.pass &&
+            !finalRepoFetchContractEvaluation.missingReasons.includes("repo_fetch_contract_fail_closed")
+          ) {
+            finalRepoFetchContractEvaluation.missingReasons.push("repo_fetch_contract_fail_closed");
+          }
+        }
+      }
+      const finalIntentDomainForResearch =
+        debugPayload && typeof (debugPayload as Record<string, unknown>).intent_domain === "string"
+          ? coerceHelixAskDebugString((debugPayload as Record<string, unknown>).intent_domain)
+          : null;
+      const finalUncertaintyResearchClaimTier: UncertaintyResearchClaimTier =
+        result.certifying === true || result.claim_tier === "certified"
+          ? "certifying"
+          : result.claim_tier === "reduced-order"
+            ? "reportable"
+            : "diagnostic";
+      let finalUncertaintyResearchEvaluation: UncertaintyResearchContractEvaluation | null = null;
+      if (finalModeGateRepoOrHybrid) {
+        const evaluateFinalUncertaintyResearch = (): UncertaintyResearchContractEvaluation =>
+          evaluateUncertaintyResearchContract({
+            question: baseQuestion,
+            text: cleanedText,
+            intentDomain: finalIntentDomainForResearch,
+            requireResearchOnUncertainty: finalModeGateRequireResearchOnUncertainty,
+            uncertaintySignal:
+              finalRepoFetchContractEvaluation?.uncertaintySignal ??
+              HELIX_ASK_REPO_FETCH_UNCERTAINTY_SIGNAL_RE.test(cleanedText),
+            claimTier: finalUncertaintyResearchClaimTier,
+            seedCitations: finalRepoFetchContractEvaluation?.citations ?? [],
+          });
+        finalUncertaintyResearchEvaluation = evaluateFinalUncertaintyResearch();
+        if (
+          finalUncertaintyResearchEvaluation.required &&
+          !finalUncertaintyResearchEvaluation.pass
+        ) {
+          const repairedText = buildHelixAskUncertaintyResearchContractRepairAnswer({
+            text: cleanedText,
+            citations: finalRepoFetchContractEvaluation?.citations ?? [],
+            evaluation: finalUncertaintyResearchEvaluation,
+          }).trim();
+          if (repairedText) {
+            cleanedText = applyTerminalAnswerText({
+              result,
+              nextText: repairedText,
+            });
+            answerPath.push("modeGate:uncertainty_research_contract_repair");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).uncertainty_research_contract_repair_applied =
+                true;
+            }
+          }
+          finalUncertaintyResearchEvaluation = evaluateFinalUncertaintyResearch();
+        }
+        if (
+          finalUncertaintyResearchEvaluation.required &&
+          !finalUncertaintyResearchEvaluation.pass
+        ) {
+          const unknownFallbackText =
+            buildHelixAskUncertaintyResearchContractUnknownFallback({
+              question: baseQuestion,
+              missingReasons: finalUncertaintyResearchEvaluation.missingReasons,
+              citations: finalUncertaintyResearchEvaluation.citations,
+              claimTier: finalUncertaintyResearchEvaluation.claimTier,
+            }).trim();
+          if (unknownFallbackText) {
+            cleanedText = applyTerminalAnswerText({
+              result,
+              nextText: unknownFallbackText,
+            });
+            answerPath.push("modeGate:uncertainty_research_contract_fail_closed");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).uncertainty_research_contract_fail_closed =
+                true;
+            }
+          }
+          finalUncertaintyResearchEvaluation = evaluateFinalUncertaintyResearch();
+          if (
+            finalUncertaintyResearchEvaluation.required &&
+            !finalUncertaintyResearchEvaluation.pass &&
+            !finalUncertaintyResearchEvaluation.missingReasons.includes(
+              "uncertainty_research_contract_fail_closed",
+            )
+          ) {
+            finalUncertaintyResearchEvaluation.missingReasons.push(
+              "uncertainty_research_contract_fail_closed",
+            );
+          }
+        }
+      }
       finalModeGateConsistencyReasons.push(
         ...collectFinalModeGateConsistencyReasons({
           structuredSurface: finalModeGateStructuredSurface,
@@ -60180,6 +60649,91 @@ const executeHelixAsk = async ({
           finalObjectiveObligationsMissingCount,
         }),
       );
+      if (finalRepoFetchContractEvaluation) {
+        for (const reason of finalRepoFetchContractEvaluation.missingReasons) {
+          const normalized = String(reason ?? "").trim();
+          if (!normalized) continue;
+          if (!finalModeGateConsistencyReasons.includes(normalized)) {
+            finalModeGateConsistencyReasons.push(normalized);
+          }
+        }
+      }
+      if (finalUncertaintyResearchEvaluation) {
+        for (const reason of finalUncertaintyResearchEvaluation.missingReasons) {
+          const normalized = String(reason ?? "").trim();
+          if (!normalized) continue;
+          if (!finalModeGateConsistencyReasons.includes(normalized)) {
+            finalModeGateConsistencyReasons.push(normalized);
+          }
+        }
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.repo_fetch_contract_required = finalModeGateRepoOrHybrid;
+        debugRecord.repo_fetch_contract_require_research_on_uncertainty =
+          finalModeGateRequireResearchOnUncertainty;
+        if (finalRepoFetchContractEvaluation) {
+          debugRecord.repo_fetch_contract_pass = finalRepoFetchContractEvaluation.pass;
+          debugRecord.repo_fetch_contract_missing_reasons =
+            finalRepoFetchContractEvaluation.missingReasons;
+          debugRecord.repo_fetch_contract_has_direct_answer =
+            finalRepoFetchContractEvaluation.hasDirectAnswer;
+          debugRecord.repo_fetch_contract_has_where_in_repo =
+            finalRepoFetchContractEvaluation.hasWhereInRepo;
+          debugRecord.repo_fetch_contract_has_uncertainty =
+            finalRepoFetchContractEvaluation.hasUncertainty;
+          debugRecord.repo_fetch_contract_has_sources = finalRepoFetchContractEvaluation.hasSources;
+          debugRecord.repo_fetch_contract_uncertainty_signal =
+            finalRepoFetchContractEvaluation.uncertaintySignal;
+          debugRecord.repo_fetch_contract_research_citation_count =
+            finalRepoFetchContractEvaluation.researchCitationCount;
+          debugRecord.repo_fetch_contract_constraint_ref_count =
+            finalRepoFetchContractEvaluation.constraintRefCount;
+          debugRecord.repo_fetch_contract_proposal_ref_count =
+            finalRepoFetchContractEvaluation.proposalRefCount;
+          debugRecord.repo_fetch_contract_codex_reference_count =
+            finalRepoFetchContractEvaluation.codexReferenceCount;
+          debugRecord.repo_fetch_contract_citations = finalRepoFetchContractEvaluation.citations;
+        }
+        debugRecord.uncertainty_research_contract_required =
+          finalUncertaintyResearchEvaluation?.required ?? false;
+        debugRecord.uncertainty_research_contract_pass =
+          finalUncertaintyResearchEvaluation?.pass ?? true;
+        debugRecord.uncertainty_research_contract_claim_tier =
+          finalUncertaintyResearchEvaluation?.claimTier ?? finalUncertaintyResearchClaimTier;
+        debugRecord.uncertainty_research_contract_tier_coverage_pass =
+          finalUncertaintyResearchEvaluation?.tierCoveragePass ?? true;
+        debugRecord.uncertainty_research_contract_missing_reasons =
+          finalUncertaintyResearchEvaluation?.missingReasons ?? [];
+        debugRecord.uncertainty_research_contract_approved_entry_ids =
+          finalUncertaintyResearchEvaluation?.approvedEntryIds ?? [];
+        debugRecord.uncertainty_research_contract_citations =
+          finalUncertaintyResearchEvaluation?.citations ?? [];
+        debugRecord.uncertainty_research_contract_approved_citations =
+          finalUncertaintyResearchEvaluation?.approvedCitations ?? [];
+        debugRecord.uncertainty_research_contract_foundational_count =
+          finalUncertaintyResearchEvaluation?.foundationalCount ?? 0;
+        debugRecord.uncertainty_research_contract_verification_count =
+          finalUncertaintyResearchEvaluation?.verificationCount ?? 0;
+        debugRecord.uncertainty_research_contract_codex_reference_count =
+          finalUncertaintyResearchEvaluation?.codexReferenceCount ?? 0;
+        debugRecord.uncertainty_research_contract_uncertainty_estimation_count =
+          finalUncertaintyResearchEvaluation?.uncertaintyEstimationCount ?? 0;
+        debugRecord.uncertainty_research_contract_constraint_reference_count =
+          finalUncertaintyResearchEvaluation?.constraintReferenceCount ?? 0;
+        debugRecord.uncertainty_research_contract_proposal_reference_count =
+          finalUncertaintyResearchEvaluation?.proposalReferenceCount ?? 0;
+        debugRecord.uncertainty_research_contract_required_uncertainty_estimation =
+          finalUncertaintyResearchEvaluation?.requiredUncertaintyEstimation ?? false;
+        debugRecord.claim_evidence_binding_pass =
+          finalUncertaintyResearchEvaluation?.claimEvidenceBindingPass ?? true;
+        debugRecord.claim_evidence_binding_missing =
+          finalUncertaintyResearchEvaluation?.claimEvidenceBindingMissing ?? [];
+        debugRecord.experimental_math_risk =
+          finalUncertaintyResearchEvaluation?.experimentalMathRisk ?? false;
+        debugRecord.experimental_math_risk_signals =
+          finalUncertaintyResearchEvaluation?.experimentalMathSignals ?? [];
+      }
       const allowSoftModeGateSuppression =
         globalTerminalMode.startsWith("minimal_repair") &&
         !finalModeGateFrontierIntent &&
@@ -60681,6 +61235,36 @@ const executeHelixAsk = async ({
     (result as Record<string, unknown>).agent_stop_reason = agentStopReason ?? null;
     if (debugPayload) {
       const debugPayloadRecord = debugPayload as Record<string, unknown>;
+      const normalizedAgentStopReason =
+        typeof agentStopReason === "string" && agentStopReason.trim()
+          ? agentStopReason.trim()
+          : "completed";
+      if (
+        typeof debugPayloadRecord.agent_stop_reason !== "string" ||
+        !debugPayloadRecord.agent_stop_reason.trim()
+      ) {
+        debugPayloadRecord.agent_stop_reason = normalizedAgentStopReason;
+      }
+      if (
+        typeof debugPayloadRecord.controller_stop_reason !== "string" ||
+        !debugPayloadRecord.controller_stop_reason.trim()
+      ) {
+        debugPayloadRecord.controller_stop_reason = normalizedAgentStopReason;
+      }
+      if (!Array.isArray(debugPayloadRecord.answer_path)) {
+        debugPayloadRecord.answer_path = answerPath.slice();
+      } else if ((debugPayloadRecord.answer_path as unknown[]).length === 0 && answerPath.length > 0) {
+        debugPayloadRecord.answer_path = answerPath.slice();
+      }
+      if (typeof debugPayloadRecord.report_mode !== "boolean") {
+        debugPayloadRecord.report_mode = reportDecision.enabled;
+      }
+      if (
+        typeof debugPayloadRecord.intent_strategy !== "string" ||
+        !debugPayloadRecord.intent_strategy.trim()
+      ) {
+        debugPayloadRecord.intent_strategy = intentStrategy;
+      }
       const finalModeBlocked = debugPayloadRecord.final_mode_gate_consistency_blocked === true;
       const coverageUnresolved =
         typeof debugPayloadRecord.objective_coverage_unresolved_count === "number" &&
@@ -60805,6 +61389,215 @@ const executeHelixAsk = async ({
         if (answerPath) {
           answerPath.push("ideology:final_tree_walk_scrub");
         }
+      }
+    }
+    const finalSurfaceIntentDomain = (
+      (debugPayload && typeof (debugPayload as Record<string, unknown>).intent_domain === "string"
+        ? String((debugPayload as Record<string, unknown>).intent_domain)
+        : intentDomain) ?? ""
+    )
+      .trim()
+      .toLowerCase();
+    const finalSurfaceRepoOrHybrid =
+      finalSurfaceIntentDomain === "repo" || finalSurfaceIntentDomain === "hybrid";
+    const finalSurfaceRequireResearchOnUncertainty = finalSurfaceRepoOrHybrid;
+    if (finalSurfaceRepoOrHybrid && typeof responsePayload.text === "string") {
+      const applyFinalRepoContractText = (nextText: string, marker: string): void => {
+        const normalized = String(nextText ?? "").trim();
+        if (!normalized) return;
+        responsePayload.text = normalized;
+        responsePayload.answer = normalized;
+        result.text = normalized;
+        result.answer = normalized;
+        if (responsePayload.envelope?.answer) {
+          responsePayload.envelope.answer = normalized;
+        }
+        if (answerPath) {
+          answerPath.push(marker);
+        }
+      };
+      const readFinalSurfaceDebugCitations = (key: string): string[] => {
+        if (!debugPayload || typeof debugPayload !== "object") {
+          return [];
+        }
+        const value = (debugPayload as Record<string, unknown>)[key];
+        if (!Array.isArray(value)) {
+          return [];
+        }
+        return value
+          .filter((entry): entry is string => typeof entry === "string")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0);
+      };
+      const repoContractSeedCitations = uniqueHelixAskCitations([
+        ...extractFilePathsFromText(responsePayload.text).map((entry) => normalizeConstraintPath(entry)),
+        ...extractHttpCitationsFromText(responsePayload.text),
+        ...readFinalSurfaceDebugCitations("repo_fetch_contract_citations"),
+        ...readFinalSurfaceDebugCitations("uncertainty_research_contract_citations"),
+      ]);
+      let finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+        text: responsePayload.text,
+        requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+      });
+      if (!finalRepoContractEvaluation.pass) {
+        const repaired = buildHelixAskRepoFetchContractRepairAnswer({
+          question: baseQuestion,
+          text: responsePayload.text,
+          citations: uniqueHelixAskCitations([
+            ...repoContractSeedCitations,
+            ...finalRepoContractEvaluation.citations,
+          ]),
+        }).trim();
+        if (repaired) {
+          applyFinalRepoContractText(repaired, "modeGate:repo_fetch_contract_repair_after_surface");
+          finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+            text: responsePayload.text,
+            requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+          });
+        }
+      }
+      if (!finalRepoContractEvaluation.pass) {
+        const failClosed = buildHelixAskRepoFetchContractUnknownFallback({
+          question: baseQuestion,
+          missingReasons: finalRepoContractEvaluation.missingReasons,
+          citations: uniqueHelixAskCitations([
+            ...repoContractSeedCitations,
+            ...finalRepoContractEvaluation.citations,
+          ]),
+        }).trim();
+        if (failClosed) {
+          applyFinalRepoContractText(
+            failClosed,
+            "modeGate:repo_fetch_contract_fail_closed_after_surface",
+          );
+          finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+            text: responsePayload.text,
+            requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+          });
+        }
+      }
+      const evaluateFinalSemanticRepoTech = () =>
+        evaluateSemanticRepoTechContract({
+          question: baseQuestion,
+          text: responsePayload.text,
+          required: true,
+          seedCitations: uniqueHelixAskCitations([
+            ...repoContractSeedCitations,
+            ...finalRepoContractEvaluation.citations,
+            ...readFinalSurfaceDebugCitations("uncertainty_research_contract_approved_citations"),
+            ...readFinalSurfaceDebugCitations("uncertainty_research_contract_citations"),
+          ]),
+        });
+      let finalSemanticRepoTechEvaluation = evaluateFinalSemanticRepoTech();
+      if (!finalSemanticRepoTechEvaluation.pass) {
+        const repaired = buildSemanticRepoTechContractRepairAnswer({
+          question: baseQuestion,
+          text: responsePayload.text,
+          citations: finalSemanticRepoTechEvaluation.citations,
+        }).trim();
+        if (repaired) {
+          applyFinalRepoContractText(repaired, "modeGate:semantic_repo_tech_contract_repair_after_surface");
+          finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+            text: responsePayload.text,
+            requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+          });
+          finalSemanticRepoTechEvaluation = evaluateFinalSemanticRepoTech();
+        }
+      }
+      if (!finalSemanticRepoTechEvaluation.pass) {
+        const failClosed = buildSemanticRepoTechContractUnknownFallback({
+          question: baseQuestion,
+          citations: finalSemanticRepoTechEvaluation.citations,
+          missingReasons: finalSemanticRepoTechEvaluation.missingReasons,
+        }).trim();
+        if (failClosed) {
+          applyFinalRepoContractText(
+            failClosed,
+            "modeGate:semantic_repo_tech_contract_fail_closed_after_surface",
+          );
+          finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+            text: responsePayload.text,
+            requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+          });
+          finalSemanticRepoTechEvaluation = evaluateFinalSemanticRepoTech();
+        }
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.repo_fetch_contract_surface_guard_applied = true;
+        debugRecord.repo_fetch_contract_pass = finalRepoContractEvaluation.pass;
+        debugRecord.repo_fetch_contract_missing_reasons =
+          finalRepoContractEvaluation.missingReasons;
+        debugRecord.repo_fetch_contract_has_direct_answer =
+          finalRepoContractEvaluation.hasDirectAnswer;
+        debugRecord.repo_fetch_contract_has_where_in_repo =
+          finalRepoContractEvaluation.hasWhereInRepo;
+        debugRecord.repo_fetch_contract_has_uncertainty =
+          finalRepoContractEvaluation.hasUncertainty;
+        debugRecord.repo_fetch_contract_has_sources = finalRepoContractEvaluation.hasSources;
+        debugRecord.repo_fetch_contract_uncertainty_signal =
+          finalRepoContractEvaluation.uncertaintySignal;
+        debugRecord.repo_fetch_contract_research_citation_count =
+          finalRepoContractEvaluation.researchCitationCount;
+        debugRecord.repo_fetch_contract_constraint_ref_count =
+          finalRepoContractEvaluation.constraintRefCount;
+        debugRecord.repo_fetch_contract_proposal_ref_count =
+          finalRepoContractEvaluation.proposalRefCount;
+        debugRecord.repo_fetch_contract_codex_reference_count =
+          finalRepoContractEvaluation.codexReferenceCount;
+        debugRecord.repo_fetch_contract_citations = finalRepoContractEvaluation.citations;
+        debugRecord.semantic_repo_tech_contract_required = finalSemanticRepoTechEvaluation.required;
+        debugRecord.semantic_repo_tech_contract_pass = finalSemanticRepoTechEvaluation.pass;
+        debugRecord.semantic_repo_tech_missing_reasons = finalSemanticRepoTechEvaluation.missingReasons;
+        debugRecord.semantic_repo_tech_has_population_point =
+          finalSemanticRepoTechEvaluation.hasPopulationPoint;
+        debugRecord.semantic_repo_tech_has_diagnostic_read_point =
+          finalSemanticRepoTechEvaluation.hasDiagnosticReadPoint;
+        debugRecord.semantic_repo_tech_has_operator_use_step =
+          finalSemanticRepoTechEvaluation.hasOperatorUseStep;
+        debugRecord.semantic_repo_tech_claim_count = finalSemanticRepoTechEvaluation.claimCount;
+        debugRecord.semantic_repo_tech_repo_citation_count =
+          finalSemanticRepoTechEvaluation.repoCitationCount;
+        debugRecord.semantic_repo_tech_approved_research_citation_count =
+          finalSemanticRepoTechEvaluation.approvedResearchCitationCount;
+        debugRecord.semantic_repo_tech_codex_clone_citation_count =
+          finalSemanticRepoTechEvaluation.codexCloneCitationCount;
+        debugRecord.semantic_repo_tech_web_research_citation_count =
+          finalSemanticRepoTechEvaluation.webResearchCitationCount;
+        debugRecord.semantic_repo_tech_citations = finalSemanticRepoTechEvaluation.citations;
+        debugRecord.claim_evidence_binding_pass =
+          finalSemanticRepoTechEvaluation.claimEvidenceBindingPass;
+        debugRecord.claim_evidence_binding_missing =
+          finalSemanticRepoTechEvaluation.claimEvidenceBindingMissing;
+      }
+    }
+    const finalSurfaceText =
+      typeof responsePayload.text === "string" ? responsePayload.text.trim() : "";
+    if (!finalSurfaceText) {
+      const restoreCandidate =
+        (typeof result.text === "string" && result.text.trim()) ||
+        (typeof result.answer === "string" && result.answer.trim()) ||
+        (typeof cleanedText === "string" && cleanedText.trim()) ||
+        "";
+      const guardedText =
+        restoreCandidate ||
+        "I do not have enough grounded context in this turn to answer reliably without introducing guesswork. To move forward, provide one concrete anchor such as a file path, module name, API route, or the specific behavior you want fixed. With that anchor, I can return a direct non-report answer with explicit uncertainty and next steps.";
+      responsePayload.text = guardedText;
+      responsePayload.answer = guardedText;
+      result.text = guardedText;
+      result.answer = guardedText;
+      if (responsePayload.envelope?.answer) {
+        responsePayload.envelope.answer = guardedText;
+      }
+      if (answerPath) {
+        answerPath.push("finalSurface:non_empty_guard");
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.empty_answer_surface_guard_applied = true;
+        debugRecord.empty_answer_surface_guard_reason = restoreCandidate
+          ? "restore_existing_text"
+          : "generic_clarify_guard";
       }
     }
     logDebug("responder.send(200) start", {
@@ -61044,49 +61837,6 @@ planRouter.post("/ask", async (req, res) => {
     resolveMultilangRollout: resolveHelixAskMultilangRollout,
     resolveDispatchState: resolveHelixAskDispatchState,
   };
-  const preparedRequest = await prepareHelixAskRouteRequest({
-    request: parsed.data,
-    deps: askRuntimeDeps,
-  });
-  if (!preparedRequest.ok) {
-    return res.status(preparedRequest.status).json(preparedRequest.payload);
-  }
-  const { requestQuestionSeed } = preparedRequest;
-  let { requestData } = preparedRequest;
-  const routeContextResult = resolveHelixAskRouteContext({
-    requestData,
-    deps: askRuntimeDeps,
-  });
-  if (!routeContextResult.ok) {
-    return res.status(routeContextResult.status).json(routeContextResult.payload);
-  }
-  requestData = routeContextResult.requestData;
-  const requestMetadata = routeContextResult.requestMetadata;
-  const askThreadContext = routeContextResult.threadContext;
-  const threadId = routeContextResult.threadId;
-  const askTurnId = routeContextResult.turnId;
-  const multilangRollout = routeContextResult.multilangRollout;
-  const dispatchState = routeContextResult.dispatchState;
-  const includeMultilangMetadata = routeContextResult.includeMultilangMetadata;
-  let personaId = requestData.personaId ?? "default";
-  if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
-    personaId = req.auth.sub;
-  }
-  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
-    return res.status(403).json({ error: "forbidden" });
-  }
-  if (isHelixAskCircuitOpen()) {
-    const payload = buildHelixAskCircuitPayload(requestData.debug === true);
-    const retryAfterSeconds = Math.ceil(payload.retryAfterMs / 1000);
-    if (retryAfterSeconds > 0) {
-      res.setHeader("Retry-After", String(retryAfterSeconds));
-    }
-    return res.status(503).json(payload);
-  }
-  const keepAlive = createHelixAskJsonKeepAlive(res, {
-    enabled: HELIX_ASK_HTTP_KEEPALIVE && requestData.dryRun !== true,
-    intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
-  });
   const askRouteExecutionDeps = {
     ...askRuntimeDeps,
     buildStrictFailLedger: buildHelixAskStrictFailReasonLedger,
@@ -61107,34 +61857,70 @@ planRouter.post("/ask", async (req, res) => {
     canonicalTermPreservationRatio,
     withTimeout,
   };
-  await executeHelixAskRouteFlow({
+  const engineResult = await executeHelixAskEngineShell({
     askStartedAtMs,
     requestTimeoutMs: HELIX_ASK_REQUEST_TIMEOUT_MS,
-    requestData,
-    requestMetadata,
-    requestQuestionSeed,
-    threadId,
-    turnId: askTurnId,
-    threadContext: askThreadContext,
-    includeMultilangMetadata,
-    dispatchState,
-    multilangRollout,
-    keepAlive,
-    strictProvenance: requestData.strictProvenance === true,
-    executeAsk: (responder) =>
-      executeHelixAsk({
-        request: requestData,
-        personaId,
-        tenantId:
-          req.tenantId ??
-          req.get("x-tenant-id") ??
-          req.get("x-customer-id") ??
-          req.get("x-org-id") ??
-          null,
-        responder,
-      }),
-    deps: askRouteExecutionDeps,
+    request: parsed.data,
+    runtimeDeps: askRuntimeDeps,
+    executionDeps: askRouteExecutionDeps,
+    resolveExecutionControl: ({ requestData }) => {
+      let personaId = requestData.personaId ?? "default";
+      if (
+        personaPolicy.shouldRestrictRequest(req.auth) &&
+        (!personaId || personaId === "default") &&
+        req.auth?.sub
+      ) {
+        personaId = req.auth.sub;
+      }
+      if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
+        return {
+          allow: false as const,
+          status: 403,
+          payload: { error: "forbidden" },
+        };
+      }
+      if (isHelixAskCircuitOpen()) {
+        const payload = buildHelixAskCircuitPayload(requestData.debug === true);
+        const retryAfterSeconds = Math.ceil(payload.retryAfterMs / 1000);
+        return {
+          allow: false as const,
+          status: 503,
+          payload,
+          headers:
+            retryAfterSeconds > 0
+              ? { "Retry-After": String(retryAfterSeconds) }
+              : undefined,
+        };
+      }
+      const keepAlive = createHelixAskJsonKeepAlive(res, {
+        enabled: HELIX_ASK_HTTP_KEEPALIVE && requestData.dryRun !== true,
+        intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
+      });
+      return {
+        allow: true as const,
+        keepAlive,
+        strictProvenance: requestData.strictProvenance === true,
+        executeAsk: (responder) =>
+          executeHelixAsk({
+            request: requestData,
+            personaId,
+            tenantId:
+              req.tenantId ??
+              req.get("x-tenant-id") ??
+              req.get("x-customer-id") ??
+              req.get("x-org-id") ??
+              null,
+            responder,
+          }),
+      };
+    },
   });
+  if (!engineResult.completed) {
+    for (const [header, value] of Object.entries(engineResult.headers ?? {})) {
+      res.setHeader(header, value);
+    }
+    return res.status(engineResult.status).json(engineResult.payload);
+  }
 });
 
 const describeHelixAskJobError = (payload: unknown, status: number): string => {
