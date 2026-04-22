@@ -77,6 +77,9 @@ Use this checklist when validating one UI prompt quickly after a local patch.
 28. garbled code spill
 29. duplicated boilerplate lines
 30. scaffold/debug leakage
+31. For uncertainty-sensitive turns, final validator requires repo-grounded support.
+32. When codex-clone baseline telemetry is available, require codex-clone citations;
+fail-safe with explicit insufficient-evidence language if missing.
 
 ### What means we still failed
 

@@ -2401,7 +2401,7 @@ describe("nhm2 publication completion surfaces", () => {
       "metric-required coverage still misses T0i/off-diagonal inputs",
     );
     expect((json as any).observerNextTechnicalAction).toBe(
-      "targeted_dec_physics_remediation",
+      "extend_model_term_route",
     );
     expect((json as any).metricProducerAdmissionEvidence).toMatchObject({
       semanticsRef:
@@ -2456,7 +2456,16 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerDecRemediationEvidence).toMatchObject({
       selectedPath: "full_einstein_tensor",
       dominantViolationClass: "stress_dominance",
-      recommendedPatchClass: "physics_control_patch",
+      recommendedPatchClass: "model_term_extension_patch",
+      modelTermExtensionPlanEvidence: {
+        status: "required",
+        trigger: expect.stringMatching(
+          /^(bounded_envelope_exhausted|cross_zero_not_achieved|semantic_or_emission_not_stable|unknown)$/,
+        ),
+        selectedPath: "full_einstein_tensor",
+        preferredImplementationRoute: "full_einstein_tensor",
+        nextPatchClass: "model_term_extension_patch",
+      },
     });
     expect(
       (json as any).observerDecRemediationEvidence.citationRefs,
@@ -2488,6 +2497,7 @@ describe("nhm2 publication completion surfaces", () => {
         residualMarginToZero: expect.any(Number),
         gapToZero: expect.any(Number),
         crossZeroAchieved: expect.any(Boolean),
+        boundedEnvelopeExhausted: expect.any(Boolean),
         boundedControlEnvelope: {
           pressureScaleMin: expect.any(Number),
           pressureScaleMax: expect.any(Number),
@@ -2507,12 +2517,51 @@ describe("nhm2 publication completion surfaces", () => {
         },
         method: "bounded_sweep_margin_analysis",
       },
+      decResidualAttributionEvidence: {
+        status: expect.stringMatching(/^(available|unavailable)$/),
+        primarySurface: expect.stringMatching(
+          /^(metric|tile_reconstituted|mixed|unknown)$/,
+        ),
+        dominantViolationClass: expect.stringMatching(
+          /^(flux_dominance|stress_dominance|mixed|unknown)$/,
+        ),
+        baselinePrimaryMargin: expect.any(Number),
+        selectedPrimaryMargin: expect.any(Number),
+        requiredLiftToZero: expect.any(Number),
+        achievedLiftFromBaseline: expect.any(Number),
+        gapToZero: expect.any(Number),
+        selectionPlateauStatus: expect.stringMatching(
+          /^(cross_zero_candidate_found|best_margin_still_negative|no_passing_candidate)$/,
+        ),
+        zeroCrossFeasibilityDecision: expect.stringMatching(
+          /^(zero_cross_achieved|zero_cross_not_achievable_within_bounds|unknown)$/,
+        ),
+        selectedCandidate: {
+          candidateId: expect.any(String),
+          candidateClass: expect.stringMatching(
+            /^(baseline_hold|observer_domain_truncation|physics_control_proposal)$/,
+          ),
+          sweepPhase: expect.stringMatching(/^(baseline|coarse|refine|frontier)$/),
+        },
+      },
+      decFrontierImprovementEvidence: {
+        status: expect.stringMatching(/^(available|unavailable)$/),
+        frontierSeedCandidateId: expect.any(String),
+        frontierSelectedCandidateId: expect.any(String),
+        frontierCandidateCount: expect.any(Number),
+        frontierPassingCount: expect.any(Number),
+        preFrontierBestPrimaryMargin: expect.any(Number),
+        finalBestPrimaryMargin: expect.any(Number),
+        frontierBestDeltaFromPreFrontier: expect.any(Number),
+        frontierBestDeltaFromBaseline: expect.any(Number),
+        residualGapToZero: expect.any(Number),
+      },
       zeroCrossFeasibilityDecision: expect.stringMatching(
         /^(zero_cross_achieved|zero_cross_not_achievable_within_bounds|unknown)$/,
       ),
       zeroCrossFeasibilityReasonCodes: expect.arrayContaining([
         expect.stringMatching(
-          /^(cross_zero_margin_non_negative|best_margin_still_negative|selection_gate_failed|candidate_evidence_non_comparable|candidate_violates_wec_non_regression|candidate_violates_nec_non_regression|candidate_not_evaluated|unknown)$/,
+          /^(cross_zero_margin_non_negative|best_margin_still_negative|insufficient_dec_lift_after_tranche_4|model_term_extension_required|uncertainty_bound_failed|cross_check_sign_mismatch|selection_gate_failed|candidate_evidence_non_comparable|candidate_violates_wec_non_regression|candidate_violates_nec_non_regression|candidate_not_evaluated|unknown)$/,
         ),
       ]),
       boundedSearchEnvelope: {
@@ -2561,8 +2610,50 @@ describe("nhm2 publication completion surfaces", () => {
           independentCrossCheckStatus: "pass",
           pass: true,
         },
+        guardChecks: {
+          crossesZeroBothDecMargins: expect.any(Boolean),
+          independentCrossCheckSignAgreement: expect.any(Boolean),
+          uncertaintyBoundPass: expect.any(Boolean),
+          referenceCrossesZeroBothDecMargins: expect.any(Boolean),
+        },
+        observed: {
+          independentCrossCheckRelativeResidual: expect.any(Number),
+          uncertaintyRelativeBound: expect.any(Number),
+          metricDecConservativeMarginToZero: expect.any(Number),
+          tileReconstitutedDecConservativeMarginToZero: expect.any(Number),
+          referenceMetricDecRobustMarginToZero: expect.any(Number),
+          referenceTileReconstitutedDecRobustMarginToZero: expect.any(Number),
+        },
       },
-      recommendation: "physics_control_patch",
+      decRuntimeDecisionEvidence: {
+        status: expect.stringMatching(/^(not_attempted|applied|rolled_back)$/),
+        attempted: expect.any(Boolean),
+        enabled: expect.any(Boolean),
+        gatePass: expect.any(Boolean),
+        comparabilityPass: expect.any(Boolean),
+        sampleCountSufficient: expect.any(Boolean),
+        selectedCandidateId: expect.any(String),
+        decAttribution: expect.objectContaining({
+          selectedMetricDecRobustMarginToZero: expect.any(Number),
+          selectedTileReconstitutedDecRobustMarginToZero: expect.any(Number),
+          selectedMetricDecConservativeMarginToZero: expect.any(Number),
+          selectedTileReconstitutedDecConservativeMarginToZero:
+            expect.any(Number),
+          referenceMetricDecRobustMarginToZero: expect.any(Number),
+          referenceTileReconstitutedDecRobustMarginToZero: expect.any(Number),
+          referenceMetricDecConservativeMarginToZero: expect.any(Number),
+          referenceTileReconstitutedDecConservativeMarginToZero:
+            expect.any(Number),
+          independentCrossCheckRelativeResidual: expect.any(Number),
+          uncertaintyRelativeBound: expect.any(Number),
+          independentCrossCheckSignAgreement: expect.any(Boolean),
+          selectedCrossesZeroUnderUncertainty: expect.any(Boolean),
+          referenceCrossesZeroBothDecMargins: expect.any(Boolean),
+          uncertaintyBoundPass: expect.any(Boolean),
+        }),
+        reasonCodes: expect.any(Array),
+      },
+      recommendation: "model_term_extension_patch",
       decCoupledControlEvidence: {
         status: expect.stringMatching(/^(available|unavailable)$/),
         controlFamiliesUsed: expect.arrayContaining([
@@ -2587,6 +2678,9 @@ describe("nhm2 publication completion surfaces", () => {
       refineCandidateCount: expect.any(Number),
       refinePassingCount: expect.any(Number),
       refineSeedCandidateIds: expect.any(Array),
+      frontierCandidateCount: expect.any(Number),
+      frontierPassingCount: expect.any(Number),
+      frontierSeedCandidateId: expect.any(String),
     });
     expect(
       (json as any).observerDecPhysicsControlEvidence.topCandidateLeaderboard,
@@ -2595,7 +2689,7 @@ describe("nhm2 publication completion surfaces", () => {
         expect.objectContaining({
           rank: expect.any(Number),
           candidateId: expect.any(String),
-          sweepPhase: expect.stringMatching(/^(baseline|coarse|refine)$/),
+          sweepPhase: expect.stringMatching(/^(baseline|coarse|refine|frontier)$/),
           passesSelectionGate: expect.any(Boolean),
         }),
       ]),
@@ -2644,9 +2738,52 @@ describe("nhm2 publication completion surfaces", () => {
         .rollbackReasonCodes,
     ).toEqual(
       expect.arrayContaining([
-        "candidate_not_evaluated",
+        "runtime_apply_disabled",
       ]),
     );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.extensionTrancheId,
+    ).toMatch(
+      /^(tranche_1_primary|tranche_2_extended|tranche_3_fully_coupled|tranche_4_expanded_bounds|tranche_5_model_term_extension)$/,
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.familySearchOrder,
+    ).toEqual(
+      expect.arrayContaining([
+        "pressure_only",
+        "density_pressure_coupled",
+        "flux_shear_coupled",
+        "density_flux_shear_coupled",
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.appliedCandidateEvidence,
+    ).toMatchObject({
+      status: expect.stringMatching(/^(available|unavailable)$/),
+      citationRefs: expect.any(Array),
+    });
+    const appliedCandidateEvidence = (json as any).observerDecPhysicsControlEvidence
+      .appliedCandidateEvidence as Record<string, unknown>;
+    expect(appliedCandidateEvidence).toBeTruthy();
+    if (appliedCandidateEvidence.status === "available") {
+      expect(appliedCandidateEvidence.candidateId).toEqual(expect.any(String));
+      expect(appliedCandidateEvidence.familyId).toMatch(
+        /^(pressure_only|density_pressure_coupled|flux_shear_coupled|density_flux_shear_coupled)$/,
+      );
+      expect(appliedCandidateEvidence.extensionTrancheId).toMatch(
+        /^(tranche_1_primary|tranche_2_extended|tranche_3_fully_coupled|tranche_4_expanded_bounds|tranche_5_model_term_extension)$/,
+      );
+    }
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.rollbackLocalizationEvidence,
+    ).toMatchObject({
+      status: expect.stringMatching(/^(available|unavailable)$/),
+      failureMode: expect.stringMatching(
+        /^(none|not_attempted|runtime_apply_disabled|regression_wec|regression_nec|insufficient_dec_lift|uncertainty_bound_failed|cross_check_sign_mismatch|non_comparable|unknown)$/,
+      ),
+      reasonCodes: expect.any(Array),
+      citationRefs: expect.any(Array),
+    });
     expect(
       (json as any).observerDecPhysicsControlEvidence.claimCitationMap,
     ).toEqual(
@@ -2660,7 +2797,34 @@ describe("nhm2 publication completion surfaces", () => {
         expect.objectContaining({
           claimId: "bounded_probe_non_regression_policy",
         }),
+        expect.objectContaining({
+          claimId: "runtime_uncertainty_sign_guard_required",
+        }),
       ]),
+    );
+    expect((json as any).observerDecPhysicsControlEvidence.researchSupportMap).toEqual(
+      expect.objectContaining({
+        same_chart_projection_grammar_required: expect.objectContaining({
+          claimId: "same_chart_projection_grammar_required",
+          supportLevel: expect.stringMatching(
+            /^(primary_source|repo_measurement|inference)$/,
+          ),
+          citationRefs: expect.any(Array),
+          evidenceRefs: expect.any(Array),
+        }),
+        geometry_first_route_is_control_basis: expect.objectContaining({
+          claimId: "geometry_first_route_is_control_basis",
+          supportLevel: expect.stringMatching(
+            /^(primary_source|repo_measurement|inference)$/,
+          ),
+        }),
+        runtime_uncertainty_sign_guard_required: expect.objectContaining({
+          claimId: "runtime_uncertainty_sign_guard_required",
+          supportLevel: expect.stringMatching(
+            /^(primary_source|repo_measurement|inference)$/,
+          ),
+        }),
+      }),
     );
     expect(
       (json as any).observerDecPhysicsControlEvidence.claimCitationMapCompleteness,
@@ -2670,6 +2834,53 @@ describe("nhm2 publication completion surfaces", () => {
       coveredClaimCount: expect.any(Number),
       expectedClaimIds: expect.any(Array),
       missingClaimIds: expect.any(Array),
+    });
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.modelTermExtensionFamilyEvidence,
+    ).toMatchObject({
+      status: expect.stringMatching(/^(available|unavailable)$/),
+      selectionBasis: expect.any(String),
+      comparabilityGate: expect.objectContaining({
+        pass: expect.any(Boolean),
+        independentCrossCheckStatus: expect.stringMatching(
+          /^(pass|fail|warning|unknown|not_applicable)$/,
+        ),
+      }),
+      families: expect.arrayContaining([
+        expect.objectContaining({
+          familyId: "pressure_only",
+        }),
+        expect.objectContaining({
+          familyId: "density_pressure_coupled",
+        }),
+        expect.objectContaining({
+          familyId: "flux_shear_coupled",
+        }),
+        expect.objectContaining({
+          familyId: "density_flux_shear_coupled",
+        }),
+      ]),
+    });
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.fluxShearExtensionEvidence,
+    ).toMatchObject({
+      status: expect.stringMatching(/^(available|unavailable)$/),
+      selectedFamilyId: expect.stringMatching(
+        /^(flux_shear_coupled|density_flux_shear_coupled)$/,
+      ),
+      parameterEnvelope: expect.objectContaining({
+        fluxScaleMin: expect.any(Number),
+        fluxScaleMax: expect.any(Number),
+        shearScaleMin: expect.any(Number),
+        shearScaleMax: expect.any(Number),
+      }),
+      comparabilityGate: expect.objectContaining({
+        pass: expect.any(Boolean),
+        independentCrossCheckStatus: expect.stringMatching(
+          /^(pass|fail|warning|unknown|not_applicable)$/,
+        ),
+      }),
+      recommendation: "model_term_extension_patch",
     });
     expect((json as any).t00PolicyAdmissionBridgeEvidence).toMatchObject({
       status: "pass",
@@ -2919,7 +3130,8 @@ describe("nhm2 publication completion surfaces", () => {
         "routeAdmissionEffective=admitted",
         "routeAdmissionPromotionBasis=evidence_gate_promoted_full_einstein",
         "reasonCodes.blocking=none",
-        "reasonCodes.nonBlocking=support_field_route_not_admitted",
+        "reasonCodes.nonBlocking=none",
+        "reasonCodes.suppressedOutOfPath=support_field_route_not_admitted",
       ]),
     );
     expect(
@@ -3007,6 +3219,11 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("Metric Producer Admission Evidence");
     expect(markdown).toContain("Model-Term Semantic Admission Evidence");
     expect(markdown).toContain("Observer DEC Remediation Evidence");
+    expect(markdown).toContain("modelTermExtensionPlanEvidence.status");
+    expect(markdown).toContain("modelTermExtensionPlanEvidence.trigger");
+    expect(markdown).toContain(
+      "modelTermExtensionPlanEvidence.preferredImplementationRoute",
+    );
     expect(markdown).toContain("Observer DEC Physics Control Evidence");
     expect(markdown).toContain("selectionDecision");
     expect(markdown).toContain("selectionReasonCodes");
@@ -3019,6 +3236,7 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("crossZeroFeasibilityEvidence.requiredLiftToZero");
     expect(markdown).toContain("crossZeroFeasibilityEvidence.bestAchievedLift");
     expect(markdown).toContain("crossZeroFeasibilityEvidence.gapToZero");
+    expect(markdown).toContain("crossZeroFeasibilityEvidence.boundedEnvelopeExhausted");
     expect(markdown).toContain(
       "crossZeroFeasibilityEvidence.boundedControlEnvelope.fluxScaleMin",
     );
@@ -3028,6 +3246,21 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("crossZeroFeasibilityEvidence.evaluationRoute.routeId");
     expect(markdown).toContain("crossZeroFeasibilityEvidence.method");
     expect(markdown).toContain("crossZeroFeasibilityEvidence.inferenceLabel");
+    expect(markdown).toContain("decResidualAttributionEvidence.status");
+    expect(markdown).toContain("decResidualAttributionEvidence.primarySurface");
+    expect(markdown).toContain(
+      "decResidualAttributionEvidence.dominantViolationClass",
+    );
+    expect(markdown).toContain("decResidualAttributionEvidence.selectedPrimaryMargin");
+    expect(markdown).toContain("decResidualAttributionEvidence.gapToZero");
+    expect(markdown).toContain("decResidualAttributionEvidence.selectionReasonCodes");
+    expect(markdown).toContain("decResidualAttributionEvidence.selectedCandidate");
+    expect(markdown).toContain("decFrontierImprovementEvidence.status");
+    expect(markdown).toContain("decFrontierImprovementEvidence.frontierSeedCandidateId");
+    expect(markdown).toContain(
+      "decFrontierImprovementEvidence.frontierBestDeltaFromPreFrontier",
+    );
+    expect(markdown).toContain("decFrontierImprovementEvidence.residualGapToZero");
     expect(markdown).toContain("zeroCrossFeasibilityDecision");
     expect(markdown).toContain("zeroCrossFeasibilityReasonCodes");
     expect(markdown).toContain("boundedSearchEnvelope");
@@ -3048,14 +3281,48 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("runtimeApplication.comparabilityGate.independentCrossCheckStatus");
     expect(markdown).toContain("runtimeApplication.comparabilityGate.pass");
     expect(markdown).toContain("runtimeApplication.rollbackReasonCodes");
+    expect(markdown).toContain("runtimeApplication.guardChecks.crossesZeroBothDecMargins");
+    expect(markdown).toContain("runtimeApplication.guardChecks.independentCrossCheckSignAgreement");
+    expect(markdown).toContain("runtimeApplication.guardChecks.uncertaintyBoundPass");
+    expect(markdown).toContain("runtimeApplication.guardChecks.referenceCrossesZeroBothDecMargins");
     expect(markdown).toContain("runtimeApplication.observed.metricDecRobustLift");
     expect(markdown).toContain("runtimeApplication.observed.metricDecRobustMarginToZero");
+    expect(markdown).toContain("runtimeApplication.observed.independentCrossCheckRelativeResidual");
+    expect(markdown).toContain("runtimeApplication.observed.uncertaintyRelativeBound");
+    expect(markdown).toContain("runtimeApplication.observed.metricDecConservativeMarginToZero");
+    expect(markdown).toContain("runtimeApplication.observed.referenceMetricDecRobustMarginToZero");
     expect(markdown).toContain("runtimeApplication.observed.metricWecNonRegressionMargin");
+    expect(markdown).toContain("decRuntimeDecisionEvidence.status");
+    expect(markdown).toContain("decRuntimeDecisionEvidence.primaryReasonCode");
+    expect(markdown).toContain(
+      "decRuntimeDecisionEvidence.decAttribution.selectedMetricDecRobustMarginToZero",
+    );
+    expect(markdown).toContain(
+      "decRuntimeDecisionEvidence.decAttribution.referenceMetricDecConservativeMarginToZero",
+    );
+    expect(markdown).toContain(
+      "decRuntimeDecisionEvidence.decAttribution.independentCrossCheckSignAgreement",
+    );
+    expect(markdown).toContain(
+      "decRuntimeDecisionEvidence.decAttribution.uncertaintyBoundPass",
+    );
+    expect(markdown).toContain("extensionTrancheId");
+    expect(markdown).toContain("familySearchOrder");
+    expect(markdown).toContain("appliedCandidateEvidence");
+    expect(markdown).toContain("rollbackLocalizationEvidence");
+    expect(markdown).toContain("boundedSearchEnvelope.frontierStep.pressureScale");
+    expect(markdown).toContain("sweepPhaseSummary.frontierCandidateCount");
     expect(markdown).toContain("sweepCandidates");
     expect(markdown).toContain("claimCitationMap");
+    expect(markdown).toContain("researchSupportMap");
     expect(markdown).toContain("claimCitationMapCompleteness");
     expect(markdown).toContain("decCoupledControlEvidence");
     expect(markdown).toContain("decCoupledControlEvidence.researchClaims");
+    expect(markdown).toContain("modelTermExtensionFamilyEvidence");
+    expect(markdown).toContain("modelTermExtensionFamilyEvidence.families");
+    expect(markdown).toContain("fluxShearExtensionEvidence");
+    expect(markdown).toContain("fluxShearExtensionEvidence.parameterEnvelope");
+    expect(markdown).toContain("fluxShearExtensionEvidence.comparabilityGate");
     expect(markdown).toContain("uncertaintyTags");
     expect(markdown).toContain("same_chart_projection_grammar_required");
     expect(markdown).toContain("T00 Policy Admission Bridge Evidence");
@@ -3165,16 +3432,69 @@ describe("nhm2 publication completion surfaces", () => {
       ) as Record<string, unknown>;
       const runtimeApplication = (json as any).observerDecPhysicsControlEvidence
         ?.runtimeApplication as Record<string, unknown>;
+      const runtimeDecision = (json as any).observerDecPhysicsControlEvidence
+        ?.decRuntimeDecisionEvidence as Record<string, unknown>;
+      const appliedCandidateEvidence = (json as any).observerDecPhysicsControlEvidence
+        ?.appliedCandidateEvidence as Record<string, unknown>;
+      const rollbackLocalizationEvidence = (json as any).observerDecPhysicsControlEvidence
+        ?.rollbackLocalizationEvidence as Record<string, unknown>;
+      const crossZeroFeasibility = (json as any).observerDecPhysicsControlEvidence
+        ?.crossZeroFeasibilityEvidence as Record<string, unknown>;
 
       expect(runtimeApplication).toBeTruthy();
       expect(runtimeApplication.enabled).toBe(true);
       expect(runtimeApplication.attempted).toBe(true);
       expect(runtimeApplication.status).toMatch(/^(applied|rolled_back)$/);
       expect(runtimeApplication.status).not.toBe("not_attempted");
+      expect(runtimeApplication.guardChecks).toBeTruthy();
+      expect(
+        (runtimeApplication.guardChecks as Record<string, unknown>)
+          .independentCrossCheckSignAgreement,
+      ).toEqual(expect.any(Boolean));
+      expect(
+        (runtimeApplication.guardChecks as Record<string, unknown>)
+          .uncertaintyBoundPass,
+      ).toEqual(expect.any(Boolean));
+      expect(runtimeApplication.observed).toBeTruthy();
+      expect(
+        (runtimeApplication.observed as Record<string, unknown>)
+          .referenceMetricDecRobustMarginToZero,
+      ).toEqual(expect.any(Number));
+      expect(runtimeDecision).toBeTruthy();
+      expect(crossZeroFeasibility).toBeTruthy();
+      expect(runtimeDecision.status).toBe(runtimeApplication.status);
+      expect(runtimeDecision.enabled).toBe(true);
+      expect(runtimeDecision.attempted).toBe(true);
+      expect(runtimeDecision.decAttribution).toBeTruthy();
+      expect(
+        (runtimeDecision.decAttribution as Record<string, unknown>)
+          .independentCrossCheckSignAgreement,
+      ).toEqual(expect.any(Boolean));
+      expect(
+        (runtimeDecision.decAttribution as Record<string, unknown>)
+          .uncertaintyBoundPass,
+      ).toEqual(expect.any(Boolean));
+      expect(appliedCandidateEvidence).toBeTruthy();
+      expect(rollbackLocalizationEvidence).toBeTruthy();
+      if (runtimeApplication.status === "applied") {
+        expect(crossZeroFeasibility.crossZeroAchieved).toBe(true);
+        expect(appliedCandidateEvidence.status).toBe("available");
+        expect(rollbackLocalizationEvidence.status).toBe("unavailable");
+      }
       if (runtimeApplication.status === "rolled_back") {
+        expect(appliedCandidateEvidence.status).toBe("unavailable");
+        expect(rollbackLocalizationEvidence.status).toBe("available");
         expect(runtimeApplication.rollbackReasonCodes).not.toEqual(
           expect.arrayContaining(["candidate_not_evaluated"]),
         );
+        expect(runtimeDecision.reasonCodes).not.toEqual(
+          expect.arrayContaining(["candidate_not_evaluated"]),
+        );
+        if (crossZeroFeasibility.crossZeroAchieved === false) {
+          expect(runtimeDecision.reasonCodes).toEqual(
+            expect.arrayContaining(["best_margin_still_negative"]),
+          );
+        }
       }
     } finally {
       if (previousRuntimeApplyValue == null) {

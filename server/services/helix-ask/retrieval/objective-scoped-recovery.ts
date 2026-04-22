@@ -29,8 +29,32 @@ const HELIX_ASK_OBJECTIVE_LOOP_TERMINAL: ReadonlySet<HelixAskObjectiveLoopStatus
   "blocked",
 ]);
 
+const HELIX_ASK_SCOPED_RETRIEVAL_OPTIONAL_SLOTS: ReadonlySet<string> = new Set([
+  "definition",
+  "definitions",
+  "key_terms",
+  "key-terms",
+  "term",
+  "terms",
+  "glossary",
+]);
+
 const isHelixAskObjectiveTerminalStatus = (status: HelixAskObjectiveLoopStatus): boolean =>
   HELIX_ASK_OBJECTIVE_LOOP_TERMINAL.has(status);
+
+const normalizeSlot = (value: string): string =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+
+const objectiveRequiresScopedRetrieval = (state: HelixAskObjectiveLoopStateLike): boolean => {
+  const required = state.required_slots
+    .map((slot) => normalizeSlot(slot))
+    .filter(Boolean);
+  if (required.length === 0) return false;
+  return required.some((slot) => !HELIX_ASK_SCOPED_RETRIEVAL_OPTIONAL_SLOTS.has(slot));
+};
 
 const mergeObjectiveScopedRecoveryQueries = (
   primary: string[],
@@ -250,6 +274,7 @@ export const collectHelixAskObjectiveIdsWithoutScopedRetrievalPass = <
   return args.states
     .filter((state) => !unresolvedOnly || !isHelixAskObjectiveTerminalStatus(state.status))
     .filter((state) => state.required_slots.length > 0)
+    .filter((state) => objectiveRequiresScopedRetrieval(state))
     .filter((state) => !coveredObjectiveIds.has(state.objective_id))
     .map((state) => state.objective_id)
     .slice(0, Math.max(0, args.maxObjectives));

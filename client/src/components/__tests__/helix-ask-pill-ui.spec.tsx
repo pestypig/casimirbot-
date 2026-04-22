@@ -47,6 +47,7 @@ let shouldBypassVoicePlaybackGraph: typeof import("@/components/helix/HelixAskPi
 let normalizeVoiceCommandLaneEnvelope: typeof import("@/components/helix/HelixAskPill").normalizeVoiceCommandLaneEnvelope;
 let resolveReasoningAttemptTimelineText: typeof import("@/components/helix/HelixAskPill").resolveReasoningAttemptTimelineText;
 let describeVoiceCommandAction: typeof import("@/components/helix/HelixAskPill").describeVoiceCommandAction;
+let shouldKeepHelixReplyInBriefLane: typeof import("@/components/helix/HelixAskPill").shouldKeepHelixReplyInBriefLane;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -96,6 +97,7 @@ beforeAll(async () => {
     normalizeVoiceCommandLaneEnvelope,
     resolveReasoningAttemptTimelineText,
     describeVoiceCommandAction,
+    shouldKeepHelixReplyInBriefLane,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -358,8 +360,34 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(shouldDispatchReasoningAttempt("and what a warp bubble is the congruence of the code base")).toBe(
       true,
     );
+    expect(shouldDispatchReasoningAttempt("hello")).toBe(false);
+    expect(shouldDispatchReasoningAttempt("hello, how are you today?")).toBe(false);
     expect(shouldDispatchReasoningAttempt("ok")).toBe(false);
     expect(shouldDispatchReasoningAttempt("thanks")).toBe(false);
+  });
+
+  it("keeps smalltalk fast-path outputs in the brief lane", () => {
+    expect(shouldKeepHelixReplyInBriefLane(undefined)).toBe(false);
+    expect(
+      shouldKeepHelixReplyInBriefLane({
+        smalltalk_fast_path_applied: true,
+      } as never),
+    ).toBe(true);
+    expect(
+      shouldKeepHelixReplyInBriefLane({
+        fallback_reason_taxonomy: "smalltalk_fast_path",
+      } as never),
+    ).toBe(true);
+    expect(
+      shouldKeepHelixReplyInBriefLane({
+        answer_path: ["forcedAnswer:smalltalk_fast_path", "answer:forced"],
+      } as never),
+    ).toBe(true);
+    expect(
+      shouldKeepHelixReplyInBriefLane({
+        fallback_reason_taxonomy: "pre_intent_microplanner_answer",
+      } as never),
+    ).toBe(false);
   });
 
   it("forces observe dispatch for suppressed noisy codebase questions", () => {

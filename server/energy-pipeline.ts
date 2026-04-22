@@ -85,7 +85,10 @@ import {
 import {
   buildNhm2ObserverAuditArtifact,
   type BuildNhm2ObserverAuditTensorInput,
+  type Nhm2ObserverDecFluxShearExtensionEvidence,
+  type Nhm2ObserverDecExtensionTrancheId,
   type Nhm2ObserverDecPhysicsControlEvidence,
+  type Nhm2ObserverDecModelTermExtensionPlanEvidence,
   type Nhm2ObserverDecResidualAttributionEvidence,
   type Nhm2ObserverDecRemediationEvidence,
   type Nhm2ObserverAuditArtifact,
@@ -5170,7 +5173,13 @@ const NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS = [
   "https://arxiv.org/abs/gr-qc/9607003",
   "https://arxiv.org/abs/gr-qc/9805037",
 ] as const;
+const NHM2_DEC_PHYSICS_UNCERTAINTY_WEB_CITATION_REFS = [
+  "https://www.osti.gov/biblio/6817347",
+  "https://arxiv.org/abs/1306.6052",
+] as const;
 const NHM2_DEC_PHYSICS_RUNTIME_MIN_COMPARABLE_SAMPLE_COUNT = 3;
+const NHM2_DEC_PHYSICS_RUNTIME_UNCERTAINTY_RELATIVE_MARGIN_FLOOR = 1e-6;
+const NHM2_DEC_PHYSICS_RUNTIME_SIGN_EPSILON = 1e-12;
 const NHM2_DEC_PHYSICS_CONTROL_CLAIM_CITATION_MAP = [
   {
     claimId: "same_chart_projection_grammar_required",
@@ -5227,7 +5236,127 @@ const NHM2_DEC_PHYSICS_CONTROL_CLAIM_CITATION_MAP = [
     note:
       "Separates route comparability from single-sample observer outputs and keeps runtime-apply decisions tied to reproducible cross-check evidence.",
   },
+  {
+    claimId: "runtime_uncertainty_sign_guard_required",
+    claim:
+      "Runtime apply decisions require sign-consistent independent cross-check evidence and uncertainty-conservative DEC margin positivity on both selected and reference routes.",
+    citationRefs: [
+      "https://arxiv.org/abs/gr-qc/0507004",
+      "https://arxiv.org/abs/1306.6052",
+      "https://arxiv.org/abs/2404.10855",
+      "https://arxiv.org/abs/2602.18023",
+      "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+    ],
+    note:
+      "Prevents runtime apply from relying on raw-metric sign flips or uncertainty-blind margins when independent route evidence is available.",
+  },
+  {
+    claimId: "uncertainty_reporting_requires_refinement_evidence",
+    claim:
+      "Uncertainty-sensitive DEC runtime decisions should include refinement-aware or convergence-aware reporting so conservative margin signs are not inferred from a single unresolved discretization level.",
+    citationRefs: [
+      "https://www.osti.gov/biblio/6817347",
+      "https://arxiv.org/abs/1306.6052",
+      "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md",
+    ],
+    note:
+      "Uses V&V-style convergence-reporting precedent to keep DEC sign decisions tied to uncertainty-aware evidence.",
+  },
+  {
+    claimId: "model_term_extension_family_selection_requires_commensurate_evidence",
+    claim:
+      "When bounded DEC controls fail to cross zero, follow-up model-term families are ranked only on commensurate same-route evidence under unchanged non-regression and comparability gates.",
+    citationRefs: [
+      "https://arxiv.org/abs/gr-qc/0507004",
+      "https://arxiv.org/abs/1306.6052",
+      "https://arxiv.org/abs/2404.10855",
+      "https://arxiv.org/abs/2602.18023",
+      "docs/audits/research/warp-nhm2-semantic-closure-route-decision-brief-latest.md",
+    ],
+    note:
+      "Prevents model-term follow-up routing from being chosen by non-comparable or route-mismatched evidence.",
+  },
 ] as const;
+const NHM2_DEC_PHYSICS_CONTROL_RESEARCH_SUPPORT_MAP = {
+  same_chart_projection_grammar_required: {
+    supportLevel: "primary_source",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.claimCitationMap[same_chart_projection_grammar_required]",
+      "observerDecPhysicsControlEvidence.decCoupledControlEvidence.researchClaims[same_chart_projection_grammar_required]",
+      "observerDecPhysicsControlEvidence.crossZeroFeasibilityEvidence.evaluationRoute",
+    ],
+    note:
+      "Backed by accepted 3+1 projection grammar sources and mirrored by same-chart route metadata in the current audit evidence.",
+  },
+  geometry_first_route_is_control_basis: {
+    supportLevel: "primary_source",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.claimCitationMap[geometry_first_route_is_control_basis]",
+      "observerDecPhysicsControlEvidence.decCoupledControlEvidence.researchClaims[geometry_first_route_is_control_basis]",
+      "observerDecPhysicsControlEvidence.runtimeApplication.comparabilityGate",
+    ],
+    note:
+      "Backed by geometry-first stress-energy references plus route/chart parity checks on the selected Einstein path.",
+  },
+  bounded_probe_non_regression_policy: {
+    supportLevel: "repo_measurement",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.selectionReasonCodes",
+      "observerDecPhysicsControlEvidence.nonRegressionGate",
+      "observerDecPhysicsControlEvidence.runtimeApplication.guardChecks",
+      "observerDecPhysicsControlEvidence.sweepCandidates",
+    ],
+    note:
+      "Policy is literature-aligned and operationalized by measured gate outcomes from the bounded candidate sweep.",
+  },
+  comparability_requires_commensurate_sample_evidence: {
+    supportLevel: "repo_measurement",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.runtimeApplication.comparabilityGate",
+      "observerDecPhysicsControlEvidence.runtimeApplication.sampleCount",
+      "observerDecPhysicsControlEvidence.runtimeApplication.comparableSampleCount",
+      "observerDecPhysicsControlEvidence.runtimeApplication.minimumComparableSampleCount",
+    ],
+    note:
+      "Comparability is backed by explicit sample-count thresholds and independent-cross-check parity observed in runtime evidence.",
+  },
+  runtime_uncertainty_sign_guard_required: {
+    supportLevel: "repo_measurement",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.runtimeApplication.guardChecks.independentCrossCheckSignAgreement",
+      "observerDecPhysicsControlEvidence.runtimeApplication.guardChecks.uncertaintyBoundPass",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecConservativeMarginToZero",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.tileReconstitutedDecConservativeMarginToZero",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.referenceMetricDecConservativeMarginToZero",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.referenceTileReconstitutedDecConservativeMarginToZero",
+      "observerDecPhysicsControlEvidence.decRuntimeDecisionEvidence.decAttribution",
+    ],
+    note:
+      "Runtime decision evidence is attributed to selected/reference margin signs and uncertainty-conservative thresholds, not raw point estimates alone.",
+  },
+  uncertainty_reporting_requires_refinement_evidence: {
+    supportLevel: "primary_source",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecUncertaintyAbs",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.tileReconstitutedDecUncertaintyAbs",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecConservativeMarginToZero",
+      "observerDecPhysicsControlEvidence.runtimeApplication.observed.tileReconstitutedDecConservativeMarginToZero",
+      "observerDecPhysicsControlEvidence.decRuntimeDecisionEvidence.decAttribution.uncertaintyRelativeBound",
+    ],
+    note:
+      "Uncertainty-bound attribution is tied to published convergence-reporting references and explicit conservative-margin evidence.",
+  },
+  model_term_extension_family_selection_requires_commensurate_evidence: {
+    supportLevel: "repo_measurement",
+    evidenceRefs: [
+      "observerDecPhysicsControlEvidence.modelTermExtensionFamilyEvidence",
+      "observerDecPhysicsControlEvidence.modelTermExtensionFamilyEvidence.comparabilityGate",
+      "observerDecPhysicsControlEvidence.modelTermExtensionFamilyEvidence.families",
+    ],
+    note:
+      "Model-term extension-family ranking is localized to same-route comparable evidence after bounded sweep exhaustion.",
+  },
+} as const;
 const NHM2_DEC_PHYSICS_RUNTIME_APPLY_ENV =
   "NHM2_DEC_PHYSICS_CONTROL_RUNTIME_APPLY";
 const NHM2_MODEL_TERM_REASON_ORDER = [
@@ -5309,32 +5438,34 @@ const resolveRouteScopedModelTermReasonCodes = (args: {
 }): {
   blockerCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
   nonBlockingCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
+  suppressedOutOfPathCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"];
 } => {
   const fullSet = sortModelTermReasonCodes(args.reasonCodes);
-  // Keep out-of-path route failures visible as non-blocking diagnostics rather
-  // than suppressing them entirely; this preserves semantic-closure provenance.
-  const routeScopedSet = fullSet;
-  const blockerCodes = routeScopedSet.filter((code) => {
+  const suppressedOutOfPathCodes = fullSet.filter((code) => {
     if (
       args.selectedPath === "full_einstein_tensor" &&
       code === "support_field_route_not_admitted"
     ) {
-      return false;
+      return true;
     }
     if (
       args.selectedPath === "adm_complete" &&
       code === "full_einstein_tensor_route_not_admitted"
     ) {
-      return false;
+      return true;
     }
-    return true;
+    return false;
   });
-  const nonBlockingCodes = routeScopedSet.filter(
-    (code) => !blockerCodes.includes(code),
+  const routeScopedSet = fullSet.filter(
+    (code) => !suppressedOutOfPathCodes.includes(code),
   );
+  const blockerCodes = routeScopedSet;
+  const nonBlockingCodes: Nhm2ObserverModelTermSemanticAdmissionEvidence["reasonCodes"] =
+    [];
   return {
     blockerCodes: sortModelTermReasonCodes(blockerCodes),
     nonBlockingCodes: sortModelTermReasonCodes(nonBlockingCodes),
+    suppressedOutOfPathCodes: sortModelTermReasonCodes(suppressedOutOfPathCodes),
   };
 };
 
@@ -5599,6 +5730,10 @@ const deriveNhm2ModelTermClosurePathDecision = (args: {
     routeScopedReasonCodes.nonBlockingCodes.length > 0
       ? routeScopedReasonCodes.nonBlockingCodes.join(",")
       : "none";
+  const scopedSuppressedOutOfPath =
+    routeScopedReasonCodes.suppressedOutOfPathCodes.length > 0
+      ? routeScopedReasonCodes.suppressedOutOfPathCodes.join(",")
+      : "none";
 
   return {
     selectedPath,
@@ -5622,6 +5757,7 @@ const deriveNhm2ModelTermClosurePathDecision = (args: {
       `nextPatchClass=${nextPatchClass}`,
       `selectedPath.blockerCodes=${scopedBlockers}`,
       `selectedPath.nonBlockingCodes=${scopedNonBlockers}`,
+      `selectedPath.suppressedOutOfPathCodes=${scopedSuppressedOutOfPath}`,
     ],
   };
 };
@@ -6670,7 +6806,6 @@ const deriveNhm2ModelTermSemanticAdmissionEvidence = (args: {
   const routeScopedReasonCodes = resolveRouteScopedModelTermReasonCodes({
     selectedPath: closurePathDecision.selectedPath,
     reasonCodes,
-    checks,
   });
 
   const chartLabel =
@@ -6891,6 +7026,7 @@ const deriveNhm2ModelTermSemanticAdmissionEvidence = (args: {
       `closurePath.patchBriefRef=${closurePathDecision.patchBriefRef ?? "none"}`,
       `reasonCodes.blocking=${routeScopedReasonCodes.blockerCodes.length > 0 ? routeScopedReasonCodes.blockerCodes.join(",") : "none"}`,
       `reasonCodes.nonBlocking=${routeScopedReasonCodes.nonBlockingCodes.length > 0 ? routeScopedReasonCodes.nonBlockingCodes.join(",") : "none"}`,
+      `reasonCodes.suppressedOutOfPath=${routeScopedReasonCodes.suppressedOutOfPathCodes.length > 0 ? routeScopedReasonCodes.suppressedOutOfPathCodes.join(",") : "none"}`,
     ],
   };
 };
@@ -7569,6 +7705,19 @@ const getNhm2ModelTermNoteValue = (
   const prefix = `${key}=`;
   const matched = notes.find((entry) => entry.startsWith(prefix));
   return matched != null ? matched.slice(prefix.length) : null;
+};
+
+const getNhm2ModelTermNoteFiniteValue = (
+  notes: string[] | undefined,
+  key: string,
+): number | null => toFiniteNumber(getNhm2ModelTermNoteValue(notes, key));
+
+const getNhm2ModelTermNoteNonNegativeValue = (
+  notes: string[] | undefined,
+  key: string,
+): number | null => {
+  const value = getNhm2ModelTermNoteFiniteValue(notes, key);
+  return value != null && value >= 0 ? value : null;
 };
 
 const classifyNhm2WecSign = (
@@ -8303,6 +8452,7 @@ const deriveNhm2ObserverDecRemediationEvidence = (args: {
     typeIFractionTileReconstituted: tileTypeIFraction,
     dominantViolationClass,
     recommendedPatchClass,
+    modelTermExtensionPlanEvidence: null,
     citationRefs,
     notes: [
       `selectedPath=${selectedPath ?? "none"}`,
@@ -8400,17 +8550,33 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       sameChartTensorPhysicsControlBoundedDeltaMax,
     0,
   );
+  const sameChartTensorPhysicsControlExpandedBoundedDeltaMax = 0.2;
+  const sameChartTensorPhysicsControlExpandedMin = Math.max(
+    sameChartTensorPhysicsControlBaseline -
+      sameChartTensorPhysicsControlExpandedBoundedDeltaMax,
+    0,
+  );
   const sameChartTensorPhysicsControlProbeScale = sameChartTensorPhysicsControlMin;
   const sameChartTensorDensityLiftBaseline = 0;
   const sameChartTensorDensityLiftBoundedDeltaMax = 0.15;
   const sameChartTensorDensityLiftMax =
     sameChartTensorDensityLiftBaseline +
     sameChartTensorDensityLiftBoundedDeltaMax;
+  const sameChartTensorDensityLiftExpandedBoundedDeltaMax = 0.2;
+  const sameChartTensorDensityLiftExpandedMax =
+    sameChartTensorDensityLiftBaseline +
+    sameChartTensorDensityLiftExpandedBoundedDeltaMax;
   const sameChartTensorDensityLiftProbeFraction = sameChartTensorDensityLiftMax;
   const sameChartTensorFluxScaleBaseline = 1;
   const sameChartTensorFluxScaleBoundedDeltaMax = 0.15;
   const sameChartTensorFluxScaleMin = Math.max(
     sameChartTensorFluxScaleBaseline - sameChartTensorFluxScaleBoundedDeltaMax,
+    0,
+  );
+  const sameChartTensorFluxScaleExpandedBoundedDeltaMax = 0.2;
+  const sameChartTensorFluxScaleExpandedMin = Math.max(
+    sameChartTensorFluxScaleBaseline -
+      sameChartTensorFluxScaleExpandedBoundedDeltaMax,
     0,
   );
   const sameChartTensorFluxScaleProbe = sameChartTensorFluxScaleMin;
@@ -8420,7 +8586,33 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     sameChartTensorShearScaleBaseline - sameChartTensorShearScaleBoundedDeltaMax,
     0,
   );
+  const sameChartTensorShearScaleExpandedBoundedDeltaMax = 0.2;
+  const sameChartTensorShearScaleExpandedMin = Math.max(
+    sameChartTensorShearScaleBaseline -
+      sameChartTensorShearScaleExpandedBoundedDeltaMax,
+    0,
+  );
   const sameChartTensorShearScaleProbe = sameChartTensorShearScaleMin;
+  const sameChartTensorPrimaryBoundedEnvelope = {
+    pressureScaleMin: sameChartTensorPhysicsControlMin,
+    pressureScaleMax: sameChartTensorPhysicsControlBaseline,
+    densityLiftMin: sameChartTensorDensityLiftBaseline,
+    densityLiftMax: sameChartTensorDensityLiftMax,
+    fluxScaleMin: sameChartTensorFluxScaleMin,
+    fluxScaleMax: sameChartTensorFluxScaleBaseline,
+    shearScaleMin: sameChartTensorShearScaleMin,
+    shearScaleMax: sameChartTensorShearScaleBaseline,
+  };
+  const sameChartTensorExpandedBoundedEnvelope = {
+    pressureScaleMin: sameChartTensorPhysicsControlExpandedMin,
+    pressureScaleMax: sameChartTensorPhysicsControlBaseline,
+    densityLiftMin: sameChartTensorDensityLiftBaseline,
+    densityLiftMax: sameChartTensorDensityLiftExpandedMax,
+    fluxScaleMin: sameChartTensorFluxScaleExpandedMin,
+    fluxScaleMax: sameChartTensorFluxScaleBaseline,
+    shearScaleMin: sameChartTensorShearScaleExpandedMin,
+    shearScaleMax: sameChartTensorShearScaleBaseline,
+  };
   const baselineMetricRho = baselineMetricWecEulerianMin;
   const baselineMetricMinPressure =
     baselineMetricRho != null && baselineMetricNecRobustMin != null
@@ -8452,6 +8644,16 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     densityLiftFraction: number;
     fluxScale: number;
     shearScale: number;
+    boundedEnvelope?: {
+      pressureScaleMin: number;
+      pressureScaleMax: number;
+      densityLiftMin: number;
+      densityLiftMax: number;
+      fluxScaleMin: number;
+      fluxScaleMax: number;
+      shearScaleMin: number;
+      shearScaleMax: number;
+    };
   }) => {
     if (
       baselineMetricRho == null ||
@@ -8465,21 +8667,22 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         metricNecRobustMin: baselineMetricNecRobustMin,
       };
     }
+    const boundedEnvelope = args.boundedEnvelope ?? sameChartTensorPrimaryBoundedEnvelope;
     const boundedPressureScale = Math.min(
-      Math.max(args.pressureScale, sameChartTensorPhysicsControlMin),
-      sameChartTensorPhysicsControlBaseline,
+      Math.max(args.pressureScale, boundedEnvelope.pressureScaleMin),
+      boundedEnvelope.pressureScaleMax,
     );
     const boundedDensityLiftFraction = Math.min(
-      Math.max(args.densityLiftFraction, sameChartTensorDensityLiftBaseline),
-      sameChartTensorDensityLiftMax,
+      Math.max(args.densityLiftFraction, boundedEnvelope.densityLiftMin),
+      boundedEnvelope.densityLiftMax,
     );
     const boundedFluxScale = Math.min(
-      Math.max(args.fluxScale, sameChartTensorFluxScaleMin),
-      sameChartTensorFluxScaleBaseline,
+      Math.max(args.fluxScale, boundedEnvelope.fluxScaleMin),
+      boundedEnvelope.fluxScaleMax,
     );
     const boundedShearScale = Math.min(
-      Math.max(args.shearScale, sameChartTensorShearScaleMin),
-      sameChartTensorShearScaleBaseline,
+      Math.max(args.shearScale, boundedEnvelope.shearScaleMin),
+      boundedEnvelope.shearScaleMax,
     );
     const fluxReliefRatio =
       (1 - boundedFluxScale) * normalizedFluxInfluence * 0.35;
@@ -8994,12 +9197,271 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       }
     }
   }
+  const preFrontierSweepCandidates: Nhm2ObserverDecPhysicsControlEvidence["sweepCandidates"] =
+    [...baselineSweepCandidates, ...coarseSweepCandidates, ...refineSweepCandidates];
+  const preFrontierPassingCandidates = preFrontierSweepCandidates.filter(
+    (candidate) => candidate.passesSelectionGate,
+  );
+  const preFrontierRankedPassingCandidates = [...preFrontierPassingCandidates].sort(
+    compareCandidatesForSelection,
+  );
+  const preFrontierSelectedSweepCandidate =
+    preFrontierRankedPassingCandidates.length > 0
+      ? preFrontierRankedPassingCandidates[0]
+      : preFrontierSweepCandidates[0];
+  const preFrontierRankedPhysicsCandidates = [...preFrontierSweepCandidates]
+    .filter((candidate) => candidate.candidateClass === "physics_control_proposal")
+    .sort(compareCandidatesForSelection);
+  const frontierSeedCandidate =
+    preFrontierSelectedSweepCandidate?.candidateClass ===
+    "physics_control_proposal"
+      ? preFrontierSelectedSweepCandidate
+      : (preFrontierRankedPhysicsCandidates[0] ?? null);
+  const frontierSeedCandidateId = frontierSeedCandidate?.candidateId ?? null;
+  const frontierSeedControl =
+    frontierSeedCandidate != null &&
+    frontierSeedCandidate.pressureScale != null &&
+    frontierSeedCandidate.densityLiftFraction != null &&
+    frontierSeedCandidate.fluxScale != null &&
+    frontierSeedCandidate.shearScale != null
+      ? {
+          pressureScale: frontierSeedCandidate.pressureScale,
+          densityLiftFraction: frontierSeedCandidate.densityLiftFraction,
+          fluxScale: frontierSeedCandidate.fluxScale,
+          shearScale: frontierSeedCandidate.shearScale,
+        }
+      : null;
+  const frontierSweepCandidates: DecSweepCandidate[] = [];
+  const frontierPressureOffsets = [-0.00625, 0, 0.00625];
+  const frontierDensityOffsets = [-0.00625, 0, 0.00625];
+  const frontierFluxOffsets = [-0.00625, 0, 0.00625];
+  const frontierShearOffsets = [-0.00625, 0, 0.00625];
+  if (frontierSeedCandidateId != null && frontierSeedControl != null) {
+    for (const pressureOffset of frontierPressureOffsets) {
+      for (const densityOffset of frontierDensityOffsets) {
+        for (const fluxOffset of frontierFluxOffsets) {
+          for (const shearOffset of frontierShearOffsets) {
+            if (
+              pressureOffset === 0 &&
+              densityOffset === 0 &&
+              fluxOffset === 0 &&
+              shearOffset === 0
+            ) {
+              continue;
+            }
+            const pressureScale = Number(
+              clamp(
+                frontierSeedControl.pressureScale + pressureOffset,
+                minPressureScale,
+                maxPressureScale,
+              ).toFixed(6),
+            );
+            const densityLiftFraction = Number(
+              clamp(
+                frontierSeedControl.densityLiftFraction + densityOffset,
+                minDensityLiftFraction,
+                maxDensityLiftFraction,
+              ).toFixed(6),
+            );
+            const fluxScale = Number(
+              clamp(
+                frontierSeedControl.fluxScale + fluxOffset,
+                minFluxScale,
+                maxFluxScale,
+              ).toFixed(6),
+            );
+            const shearScale = Number(
+              clamp(
+                frontierSeedControl.shearScale + shearOffset,
+                minShearScale,
+                maxShearScale,
+              ).toFixed(6),
+            );
+            const key = makeControlConfigKey(
+              pressureScale,
+              densityLiftFraction,
+              fluxScale,
+              shearScale,
+            );
+            if (seenControlConfigs.has(key)) continue;
+            seenControlConfigs.add(key);
+            const evaluated = evaluateSameChartControlCandidate({
+              pressureScale,
+              densityLiftFraction,
+              fluxScale,
+              shearScale,
+            });
+            frontierSweepCandidates.push(
+              buildSweepCandidate({
+                candidateId: `same_chart_physics_control_frontier_seed_${frontierSeedCandidateId}_pressure_${makeControlToken(pressureScale)}_density_${makeControlToken(densityLiftFraction)}_flux_${makeControlToken(fluxScale)}_shear_${makeControlToken(shearScale)}_probe_v1`,
+                candidateClass: "physics_control_proposal",
+                sweepPhase: "frontier",
+                refineSeedCandidateId: frontierSeedCandidateId,
+                applied: false,
+                rapidityCap: baselineRapidityCap,
+                rapidityCapBeta: baselineRapidityCapBeta,
+                metricDecRobustMin: evaluated.metricDecRobustMin,
+                tileReconstitutedDecRobustMin:
+                  evaluated.tileReconstitutedDecRobustMin,
+                metricWecRobustMin: evaluated.metricWecRobustMin,
+                metricNecRobustMin: evaluated.metricNecRobustMin,
+                pressureScale,
+                densityLiftFraction,
+                fluxScale,
+                shearScale,
+                note:
+                  `Frontier neighborhood candidate around ${frontierSeedCandidateId} (s=${pressureScale}, rho_lift=${densityLiftFraction}, flux_scale=${fluxScale}, shear_scale=${shearScale}) for bounded local DEC improvement localization under unchanged observer-domain bounds.`,
+              }),
+            );
+          }
+        }
+      }
+    }
+  }
+  const primaryFrontierPassingCandidates = frontierSweepCandidates
+    .filter((candidate) => candidate.passesSelectionGate)
+    .sort(compareCandidatesForSelection);
+  const primaryFrontierBestCandidate =
+    primaryFrontierPassingCandidates.length > 0
+      ? primaryFrontierPassingCandidates[0]
+      : [...frontierSweepCandidates].sort(compareCandidatesForSelection)[0] ??
+        null;
+  const primarySweepCandidates: Nhm2ObserverDecPhysicsControlEvidence["sweepCandidates"] =
+    [...preFrontierSweepCandidates, ...frontierSweepCandidates];
+  const primaryPassingCandidates = primarySweepCandidates.filter(
+    (candidate) => candidate.passesSelectionGate,
+  );
+  const primaryRankedPassingCandidates = [...primaryPassingCandidates].sort(
+    compareCandidatesForSelection,
+  );
+  const primarySelectedSweepCandidate =
+    primaryRankedPassingCandidates.length > 0
+      ? primaryRankedPassingCandidates[0]
+      : primarySweepCandidates[0];
+  const primaryRankedPhysicsCandidates = [...primarySweepCandidates]
+    .filter((candidate) => candidate.candidateClass === "physics_control_proposal")
+    .sort(compareCandidatesForSelection);
+  const needsExpandedBoundsSweep =
+    primarySelectedSweepCandidate.crossesZeroBothDecMargins !== true &&
+    (primarySelectedSweepCandidate.selectionObjectivePrimaryMargin ??
+      Number.NEGATIVE_INFINITY) < 0;
+  const tranche4SeedCandidate =
+    primarySelectedSweepCandidate.candidateClass === "physics_control_proposal"
+      ? primarySelectedSweepCandidate
+      : (primaryRankedPhysicsCandidates[0] ?? null);
+  const tranche4SeedControl =
+    tranche4SeedCandidate != null &&
+    tranche4SeedCandidate.pressureScale != null &&
+    tranche4SeedCandidate.densityLiftFraction != null &&
+    tranche4SeedCandidate.fluxScale != null &&
+    tranche4SeedCandidate.shearScale != null
+      ? {
+          pressureScale: tranche4SeedCandidate.pressureScale,
+          densityLiftFraction: tranche4SeedCandidate.densityLiftFraction,
+          fluxScale: tranche4SeedCandidate.fluxScale,
+          shearScale: tranche4SeedCandidate.shearScale,
+        }
+      : null;
+  const tranche4SweepCandidates: DecSweepCandidate[] = [];
+  const tranche4PressureSweep = [0.8, 0.8125, 0.825, 0.8375, 0.85];
+  const tranche4DensityLiftSweep = [0.15, 0.1625, 0.175, 0.1875, 0.2];
+  const tranche4FluxScaleSweep = [0.8, 0.825, 0.85];
+  const tranche4ShearScaleSweep = [0.8, 0.825, 0.85];
+  if (needsExpandedBoundsSweep && tranche4SeedControl != null) {
+    for (const pressureScaleCandidate of tranche4PressureSweep) {
+      for (const densityLiftCandidate of tranche4DensityLiftSweep) {
+        for (const fluxScaleCandidate of tranche4FluxScaleSweep) {
+          for (const shearScaleCandidate of tranche4ShearScaleSweep) {
+            const pressureScale = Number(
+              clamp(
+                Math.min(
+                  tranche4SeedControl.pressureScale,
+                  pressureScaleCandidate,
+                ),
+                sameChartTensorExpandedBoundedEnvelope.pressureScaleMin,
+                sameChartTensorExpandedBoundedEnvelope.pressureScaleMax,
+              ).toFixed(6),
+            );
+            const densityLiftFraction = Number(
+              clamp(
+                Math.max(
+                  tranche4SeedControl.densityLiftFraction,
+                  densityLiftCandidate,
+                ),
+                sameChartTensorExpandedBoundedEnvelope.densityLiftMin,
+                sameChartTensorExpandedBoundedEnvelope.densityLiftMax,
+              ).toFixed(6),
+            );
+            const fluxScale = Number(
+              clamp(
+                Math.min(tranche4SeedControl.fluxScale, fluxScaleCandidate),
+                sameChartTensorExpandedBoundedEnvelope.fluxScaleMin,
+                sameChartTensorExpandedBoundedEnvelope.fluxScaleMax,
+              ).toFixed(6),
+            );
+            const shearScale = Number(
+              clamp(
+                Math.min(tranche4SeedControl.shearScale, shearScaleCandidate),
+                sameChartTensorExpandedBoundedEnvelope.shearScaleMin,
+                sameChartTensorExpandedBoundedEnvelope.shearScaleMax,
+              ).toFixed(6),
+            );
+            const key = makeControlConfigKey(
+              pressureScale,
+              densityLiftFraction,
+              fluxScale,
+              shearScale,
+            );
+            if (seenControlConfigs.has(key)) continue;
+            seenControlConfigs.add(key);
+            const evaluated = evaluateSameChartControlCandidate({
+              pressureScale,
+              densityLiftFraction,
+              fluxScale,
+              shearScale,
+              boundedEnvelope: sameChartTensorExpandedBoundedEnvelope,
+            });
+            tranche4SweepCandidates.push(
+              buildSweepCandidate({
+                candidateId: `same_chart_physics_control_tranche4_seed_${tranche4SeedCandidate.candidateId}_pressure_${makeControlToken(pressureScale)}_density_${makeControlToken(densityLiftFraction)}_flux_${makeControlToken(fluxScale)}_shear_${makeControlToken(shearScale)}_probe_v1`,
+                candidateClass: "physics_control_proposal",
+                sweepPhase: "frontier",
+                refineSeedCandidateId: tranche4SeedCandidate.candidateId,
+                applied: false,
+                rapidityCap: baselineRapidityCap,
+                rapidityCapBeta: baselineRapidityCapBeta,
+                metricDecRobustMin: evaluated.metricDecRobustMin,
+                tileReconstitutedDecRobustMin:
+                  evaluated.tileReconstitutedDecRobustMin,
+                metricWecRobustMin: evaluated.metricWecRobustMin,
+                metricNecRobustMin: evaluated.metricNecRobustMin,
+                pressureScale,
+                densityLiftFraction,
+                fluxScale,
+                shearScale,
+                note:
+                  `Tranche-4 expanded-envelope candidate around ${tranche4SeedCandidate.candidateId} (s=${pressureScale}, rho_lift=${densityLiftFraction}, flux_scale=${fluxScale}, shear_scale=${shearScale}) extends bounded same-chart controls beyond tranche-3 limits while preserving non-regression and comparability gates.`,
+              }),
+            );
+          }
+        }
+      }
+    }
+  }
+  const frontierSweepCandidatesAll: DecSweepCandidate[] = [
+    ...frontierSweepCandidates,
+    ...tranche4SweepCandidates,
+  ];
+  const frontierPassingCandidates = frontierSweepCandidatesAll
+    .filter((candidate) => candidate.passesSelectionGate)
+    .sort(compareCandidatesForSelection);
+  const frontierBestCandidate =
+    frontierPassingCandidates.length > 0
+      ? frontierPassingCandidates[0]
+      : [...frontierSweepCandidatesAll].sort(compareCandidatesForSelection)[0] ??
+        primaryFrontierBestCandidate;
   const sweepCandidates: Nhm2ObserverDecPhysicsControlEvidence["sweepCandidates"] =
-    [
-      ...baselineSweepCandidates,
-      ...coarseSweepCandidates,
-      ...refineSweepCandidates,
-    ];
+    [...preFrontierSweepCandidates, ...frontierSweepCandidatesAll];
   const passingCandidates = sweepCandidates.filter(
     (candidate) => candidate.passesSelectionGate,
   );
@@ -9043,6 +9505,10 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     selectionDecision === "apply_candidate"
       ? selectedSweepCandidate
       : (rankedPhysicsCandidates[0] ?? selectedSweepCandidate);
+  const activeBoundedEnvelope =
+    tranche4SweepCandidates.length > 0
+      ? sameChartTensorExpandedBoundedEnvelope
+      : sameChartTensorPrimaryBoundedEnvelope;
   if (selectionReasonCodes.length === 0) {
     selectionReasonCodes.push("candidate_not_evaluated");
   }
@@ -9055,10 +9521,17 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         (candidate) => candidate.passesSelectionGate,
       ).length,
       refineSeedCandidateIds,
+      frontierCandidateCount: frontierSweepCandidatesAll.length,
+      frontierPassingCount: frontierPassingCandidates.length,
+      frontierSeedCandidateId,
       note:
-        refineSeedCandidateIds.length > 0
-          ? "Refine sweep expanded around top coarse passing seeds under unchanged semantic and observer-domain constraints."
-          : "No coarse passing seed was available for refine expansion; selection remains constrained to baseline/coarse evidence.",
+        tranche4SweepCandidates.length > 0
+          ? `Frontier sweep extended with tranche-4 expanded-envelope probes (${tranche4SweepCandidates.length} candidates) after bounded tranche-3 exhaustion while keeping comparability and non-regression gates unchanged.`
+          : frontierSeedCandidateId != null && frontierSweepCandidates.length > 0
+            ? "Frontier neighborhood sweep expanded around the best pre-frontier physics-control candidate under unchanged semantic and observer-domain constraints."
+          : refineSeedCandidateIds.length > 0
+            ? "Refine sweep expanded around top coarse passing seeds under unchanged semantic and observer-domain constraints."
+            : "No coarse passing seed was available for refine expansion; selection remains constrained to baseline/coarse evidence.",
     };
   const topCandidateLeaderboard: Nhm2ObserverDecPhysicsControlEvidence["topCandidateLeaderboard"] =
     [...sweepCandidates]
@@ -9153,6 +9626,149 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     runtimeSweepCandidate.tileReconstitutedDecRobustLift;
   const runtimeMetricWecRobustDelta = runtimeSweepCandidate.metricWecRobustDelta;
   const runtimeMetricNecRobustDelta = runtimeSweepCandidate.metricNecRobustDelta;
+  const runtimeMetricDecRobustMarginToZero =
+    runtimeSweepCandidate.metricDecRobustMin;
+  const runtimeTileDecRobustMarginToZero =
+    runtimeSweepCandidate.tileReconstitutedDecRobustMin;
+  const runtimeIndependentCrossCheckRelativeResidual =
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "independentCrossCheckMaxRelativeResidual",
+    ) ??
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "einsteinTensorRoute.maxRelativeResidual",
+    ) ??
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "finiteDifferenceFallbackFinestT0iResidual",
+    ) ??
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "finiteDifferenceFallbackFinestOffDiagonalResidual",
+    ) ??
+    0;
+  const runtimeFiniteDifferenceResidualBoundCandidates = [
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "finiteDifferenceT0iDriftMax",
+    ),
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "finiteDifferenceOffDiagonalDriftMax",
+    ),
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "finiteDifferenceFallbackFinestT0iResidual",
+    ),
+    getNhm2ModelTermNoteNonNegativeValue(
+      args.modelTermSemanticEvidence.notes,
+      "finiteDifferenceFallbackFinestOffDiagonalResidual",
+    ),
+  ].filter((entry): entry is number => entry != null);
+  const runtimeFiniteDifferenceResidualBound =
+    runtimeFiniteDifferenceResidualBoundCandidates.length > 0
+      ? Math.max(...runtimeFiniteDifferenceResidualBoundCandidates)
+      : 0;
+  const runtimeUncertaintyRelativeBound = Math.max(
+    runtimeIndependentCrossCheckRelativeResidual,
+    runtimeFiniteDifferenceResidualBound,
+    NHM2_DEC_PHYSICS_RUNTIME_UNCERTAINTY_RELATIVE_MARGIN_FLOOR,
+  );
+  const runtimeMetricDecUncertaintyAbs =
+    runtimeMetricDecRobustMarginToZero != null
+      ? Math.abs(runtimeMetricDecRobustMarginToZero) *
+        runtimeUncertaintyRelativeBound
+      : null;
+  const runtimeTileDecUncertaintyAbs =
+    runtimeTileDecRobustMarginToZero != null
+      ? Math.abs(runtimeTileDecRobustMarginToZero) * runtimeUncertaintyRelativeBound
+      : null;
+  const runtimeMetricDecConservativeMarginToZero =
+    runtimeMetricDecRobustMarginToZero != null &&
+    runtimeMetricDecUncertaintyAbs != null
+      ? runtimeMetricDecRobustMarginToZero - runtimeMetricDecUncertaintyAbs
+      : null;
+  const runtimeTileDecConservativeMarginToZero =
+    runtimeTileDecRobustMarginToZero != null &&
+    runtimeTileDecUncertaintyAbs != null
+      ? runtimeTileDecRobustMarginToZero - runtimeTileDecUncertaintyAbs
+      : null;
+  const runtimeReferenceMetricDecRobustMarginToZero =
+    runtimeMetricDecRobustMarginToZero != null
+      ? runtimeMetricDecRobustMarginToZero >= 0
+        ? runtimeMetricDecRobustMarginToZero *
+          (1 - runtimeIndependentCrossCheckRelativeResidual)
+        : runtimeMetricDecRobustMarginToZero *
+          (1 + runtimeIndependentCrossCheckRelativeResidual)
+      : null;
+  const runtimeReferenceTileDecRobustMarginToZero =
+    runtimeTileDecRobustMarginToZero != null
+      ? runtimeTileDecRobustMarginToZero >= 0
+        ? runtimeTileDecRobustMarginToZero *
+          (1 - runtimeIndependentCrossCheckRelativeResidual)
+        : runtimeTileDecRobustMarginToZero *
+          (1 + runtimeIndependentCrossCheckRelativeResidual)
+      : null;
+  const runtimeReferenceMetricDecUncertaintyAbs =
+    runtimeReferenceMetricDecRobustMarginToZero != null
+      ? Math.abs(runtimeReferenceMetricDecRobustMarginToZero) *
+        runtimeUncertaintyRelativeBound
+      : null;
+  const runtimeReferenceTileDecUncertaintyAbs =
+    runtimeReferenceTileDecRobustMarginToZero != null
+      ? Math.abs(runtimeReferenceTileDecRobustMarginToZero) *
+        runtimeUncertaintyRelativeBound
+      : null;
+  const runtimeReferenceMetricDecConservativeMarginToZero =
+    runtimeReferenceMetricDecRobustMarginToZero != null &&
+    runtimeReferenceMetricDecUncertaintyAbs != null
+      ? runtimeReferenceMetricDecRobustMarginToZero -
+        runtimeReferenceMetricDecUncertaintyAbs
+      : null;
+  const runtimeReferenceTileDecConservativeMarginToZero =
+    runtimeReferenceTileDecRobustMarginToZero != null &&
+    runtimeReferenceTileDecUncertaintyAbs != null
+      ? runtimeReferenceTileDecRobustMarginToZero -
+        runtimeReferenceTileDecUncertaintyAbs
+      : null;
+  const runtimeMetricSignAgreement =
+    runtimeMetricDecRobustMarginToZero != null &&
+    runtimeReferenceMetricDecRobustMarginToZero != null
+      ? Math.abs(runtimeMetricDecRobustMarginToZero) >
+          NHM2_DEC_PHYSICS_RUNTIME_SIGN_EPSILON &&
+        Math.abs(runtimeReferenceMetricDecRobustMarginToZero) >
+          NHM2_DEC_PHYSICS_RUNTIME_SIGN_EPSILON &&
+        Math.sign(runtimeMetricDecRobustMarginToZero) ===
+          Math.sign(runtimeReferenceMetricDecRobustMarginToZero)
+      : null;
+  const runtimeTileSignAgreement =
+    runtimeTileDecRobustMarginToZero != null &&
+    runtimeReferenceTileDecRobustMarginToZero != null
+      ? Math.abs(runtimeTileDecRobustMarginToZero) >
+          NHM2_DEC_PHYSICS_RUNTIME_SIGN_EPSILON &&
+        Math.abs(runtimeReferenceTileDecRobustMarginToZero) >
+          NHM2_DEC_PHYSICS_RUNTIME_SIGN_EPSILON &&
+        Math.sign(runtimeTileDecRobustMarginToZero) ===
+          Math.sign(runtimeReferenceTileDecRobustMarginToZero)
+      : null;
+  const runtimeIndependentCrossCheckSignAgreement =
+    runtimeMetricSignAgreement === true && runtimeTileSignAgreement === true;
+  const runtimeReferenceCrossesZeroBothDecMargins =
+    runtimeReferenceMetricDecConservativeMarginToZero != null &&
+    runtimeReferenceTileDecConservativeMarginToZero != null
+      ? runtimeReferenceMetricDecConservativeMarginToZero > 0 &&
+        runtimeReferenceTileDecConservativeMarginToZero > 0
+      : false;
+  const runtimeSelectedCrossesZeroUnderUncertainty =
+    runtimeMetricDecConservativeMarginToZero != null &&
+    runtimeTileDecConservativeMarginToZero != null
+      ? runtimeMetricDecConservativeMarginToZero > 0 &&
+        runtimeTileDecConservativeMarginToZero > 0
+      : false;
+  const runtimeUncertaintyBoundPass =
+    runtimeSelectedCrossesZeroUnderUncertainty &&
+    runtimeReferenceCrossesZeroBothDecMargins;
   const runtimeMetricWecNonRegression =
     runtimeSweepCandidate.guardChecks.metricWecNonRegression;
   const runtimeMetricNecNonRegression =
@@ -9161,6 +9777,34 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     (runtimeMetricDecRobustLift ?? Number.NEGATIVE_INFINITY) > 0;
   const runtimeTileDecRobustLiftNonNegative =
     (runtimeTileReconstitutedDecRobustLift ?? Number.NEGATIVE_INFINITY) >= 0;
+  const runtimeCrossesZeroBothDecMargins =
+    runtimeSweepCandidate.crossesZeroBothDecMargins === true;
+  const isExpandedBoundsCandidate = (
+    candidate:
+      | Pick<
+          DecSweepCandidate,
+          "pressureScale" | "densityLiftFraction" | "fluxScale" | "shearScale"
+        >
+      | null,
+  ): boolean => {
+    if (candidate == null) return false;
+    const pressureScale = candidate.pressureScale;
+    const densityLiftFraction = candidate.densityLiftFraction;
+    const fluxScale = candidate.fluxScale;
+    const shearScale = candidate.shearScale;
+    return (
+      (pressureScale != null &&
+        pressureScale < sameChartTensorPrimaryBoundedEnvelope.pressureScaleMin) ||
+      (densityLiftFraction != null &&
+        densityLiftFraction > sameChartTensorPrimaryBoundedEnvelope.densityLiftMax) ||
+      (fluxScale != null &&
+        fluxScale < sameChartTensorPrimaryBoundedEnvelope.fluxScaleMin) ||
+      (shearScale != null &&
+        shearScale < sameChartTensorPrimaryBoundedEnvelope.shearScaleMin)
+    );
+  };
+  const runtimeCandidateUsesExpandedBounds =
+    runtimeApplicationAttempted && isExpandedBoundsCandidate(runtimeSweepCandidate);
   const nonRegressionGateRequired = [
     "metricWecNonRegression",
     "metricNecNonRegression",
@@ -9194,12 +9838,32 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     runtimeSweepCandidate.candidateClass !== "observer_domain_truncation" &&
     runtimeMetricDecRobustLiftPositive &&
     runtimeTileDecRobustLiftNonNegative &&
-    runtimeEvaluationComparable;
+    runtimeCrossesZeroBothDecMargins &&
+    runtimeEvaluationComparable &&
+    runtimeIndependentCrossCheckSignAgreement &&
+    runtimeUncertaintyBoundPass;
   const runtimeApplicationApplied =
     runtimeApplicationAttempted &&
     runtimeApplicationEnabled &&
     runtimeApplicationGatePass;
-  const runtimeFailureMode: "none" | "not_attempted" | "runtime_apply_disabled" | "regression_wec" | "regression_nec" | "insufficient_dec_lift" | "non_comparable" | "unknown" =
+  const runtimeDecLiftBlocked =
+    !runtimeMetricDecRobustLiftPositive ||
+    !runtimeTileDecRobustLiftNonNegative ||
+    !runtimeCrossesZeroBothDecMargins;
+  const runtimeExpandedBoundsExhausted =
+    runtimeCandidateUsesExpandedBounds &&
+    (runtimeDecLiftBlocked || !runtimeUncertaintyBoundPass);
+  const runtimeFailureMode:
+    | "none"
+    | "not_attempted"
+    | "runtime_apply_disabled"
+    | "regression_wec"
+    | "regression_nec"
+    | "insufficient_dec_lift"
+    | "uncertainty_bound_failed"
+    | "cross_check_sign_mismatch"
+    | "non_comparable"
+    | "unknown" =
     !runtimeApplicationAttempted
       ? "not_attempted"
       : runtimeApplicationApplied
@@ -9208,19 +9872,22 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
           ? "runtime_apply_disabled"
           : !runtimeEvaluationComparable
             ? "non_comparable"
-            : runtimeMetricWecNonRegression !== true
-              ? "regression_wec"
-              : runtimeMetricNecNonRegression !== true
-                ? "regression_nec"
-                : !runtimeMetricDecRobustLiftPositive ||
-                    !runtimeTileDecRobustLiftNonNegative
-                  ? "insufficient_dec_lift"
-                  : "unknown";
+          : !runtimeIndependentCrossCheckSignAgreement
+            ? "cross_check_sign_mismatch"
+          : runtimeMetricWecNonRegression !== true
+            ? "regression_wec"
+          : runtimeMetricNecNonRegression !== true
+            ? "regression_nec"
+          : !runtimeUncertaintyBoundPass
+            ? "uncertainty_bound_failed"
+          : runtimeDecLiftBlocked
+            ? "insufficient_dec_lift"
+            : "unknown";
   const runtimeRollbackReasonCodes: Nhm2ObserverDecPhysicsControlEvidence["selectionReasonCodes"] =
     runtimeApplicationAttempted && !runtimeApplicationApplied
       ? Array.from(
           new Set([
-            ...(runtimeApplicationEnabled ? [] : ["candidate_not_evaluated"]),
+            ...(runtimeApplicationEnabled ? [] : ["runtime_apply_disabled"]),
             ...(runtimeMetricWecNonRegression === true
               ? []
               : ["candidate_violates_wec_non_regression"]),
@@ -9236,6 +9903,9 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
             ...(runtimeEvaluationComparable
               ? []
               : ["candidate_evidence_non_comparable"]),
+            ...(runtimeIndependentCrossCheckSignAgreement
+              ? []
+              : ["cross_check_sign_mismatch"]),
             ...(runtimeSweepCandidate.candidateClass ===
             "observer_domain_truncation"
               ? ["candidate_is_observer_domain_truncation"]
@@ -9246,6 +9916,15 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
             ...(runtimeTileDecRobustLiftNonNegative
               ? []
               : ["no_candidate_improves_dec"]),
+            ...(runtimeCrossesZeroBothDecMargins
+              ? []
+              : ["best_margin_still_negative"]),
+            ...(runtimeUncertaintyBoundPass
+              ? []
+              : ["uncertainty_bound_failed"]),
+            ...(runtimeExpandedBoundsExhausted
+              ? ["insufficient_dec_lift_after_tranche_4"]
+              : []),
           ]),
         )
       : [];
@@ -9256,7 +9935,9 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         ? "applied"
         : "rolled_back";
   const runtimeComparabilityNote = runtimeEvaluationComparable
-    ? `Comparable evidence passes route/chart parity with ${runtimeComparableSampleCount ?? "null"} comparable samples (threshold ${runtimeMinimumComparableSampleCount}).`
+    ? runtimeIndependentCrossCheckSignAgreement
+      ? `Comparable evidence passes route/chart parity with ${runtimeComparableSampleCount ?? "null"} comparable samples (threshold ${runtimeMinimumComparableSampleCount}) and preserves DEC-margin sign agreement against the independent route.`
+      : `Comparable sample evidence is present (${runtimeComparableSampleCount ?? "null"} samples), but DEC-margin sign agreement fails against the independent route.`
     : !runtimeRouteComparable
       ? "Comparable evidence failed route/chart/independent-cross-check parity on the selected Einstein route."
       : `Comparable evidence sample count (${runtimeComparableSampleCount ?? "null"}) is below threshold (${runtimeMinimumComparableSampleCount}).`;
@@ -9267,9 +9948,195 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         ? runtimeApplicationEnabled
           ? runtimeFailureMode === "non_comparable"
             ? "Runtime DEC-control candidate was attempted but rolled back because baseline/candidate evidence is non-comparable on the selected Einstein route."
+            : runtimeFailureMode === "cross_check_sign_mismatch"
+              ? "Runtime DEC-control candidate was attempted but rolled back because DEC-margin sign agreement fails against the independent Einstein-route cross-check."
+            : runtimeFailureMode === "uncertainty_bound_failed"
+              ? "Runtime DEC-control candidate was attempted but rolled back because uncertainty-bounded DEC margins do not remain positive on both selected and reference routes."
+            : !runtimeCrossesZeroBothDecMargins || !runtimeUncertaintyBoundPass
+              ? "Runtime DEC-control candidate was attempted but rolled back because DEC robust margins remain below zero after uncertainty-bounded independent-route checks."
+            : runtimeExpandedBoundsExhausted
+              ? "Runtime DEC-control candidate was attempted through tranche-4 expanded bounds, but the DEC lift remained insufficient for runtime apply."
             : "Runtime DEC-control candidate was attempted but rolled back because one or more non-regression gates failed."
           : `Runtime DEC-control candidate remains staged-only because ${NHM2_DEC_PHYSICS_RUNTIME_APPLY_ENV} is disabled; evidence remains comparable but non-applied.`
         : "No runtime DEC-control application was attempted because no candidate cleared the selection gate.";
+  const runtimeMetricWecNonRegressionMargin = runtimeMetricWecRobustDelta;
+  const runtimeMetricNecNonRegressionMargin = runtimeMetricNecRobustDelta;
+  const runtimeDecisionReasonCodes: Nhm2ObserverDecPhysicsControlEvidence["selectionReasonCodes"] =
+    runtimeApplicationStatus === "applied"
+      ? ["selection_gate_pass"]
+      : runtimeApplicationStatus === "rolled_back"
+        ? runtimeRollbackReasonCodes.length > 0
+          ? runtimeRollbackReasonCodes
+          : runtimeApplicationEnabled
+            ? ["candidate_not_evaluated"]
+            : ["runtime_apply_disabled"]
+        : ["candidate_not_evaluated"];
+  const decRuntimeCitationRefs = Array.from(
+    new Set([
+      ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+      ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+      ...NHM2_DEC_PHYSICS_UNCERTAINTY_WEB_CITATION_REFS,
+      ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+    ]),
+  );
+  const runtimeDecisionFamilyId:
+    | "pressure_only"
+    | "density_pressure_coupled"
+    | "flux_shear_coupled"
+    | "density_flux_shear_coupled"
+    | null =
+    runtimeApplicationAttempted &&
+    runtimeSweepCandidate.candidateClass === "physics_control_proposal"
+      ? (() => {
+          const densityLift = runtimeSweepCandidate.densityLiftFraction ?? 0;
+          const fluxScale =
+            runtimeSweepCandidate.fluxScale ?? sameChartTensorFluxScaleBaseline;
+          const shearScale =
+            runtimeSweepCandidate.shearScale ?? sameChartTensorShearScaleBaseline;
+          const usesDensity = densityLift > 0;
+          const usesFluxOrShear =
+            fluxScale < sameChartTensorFluxScaleBaseline ||
+            shearScale < sameChartTensorShearScaleBaseline;
+          if (!usesDensity && !usesFluxOrShear) {
+            return "pressure_only";
+          }
+          if (usesDensity && !usesFluxOrShear) {
+            return "density_pressure_coupled";
+          }
+          if (!usesDensity && usesFluxOrShear) {
+            return "flux_shear_coupled";
+          }
+          return "density_flux_shear_coupled";
+        })()
+      : null;
+  const runtimeDecisionTrancheId: Nhm2ObserverDecExtensionTrancheId | null =
+    runtimeDecisionFamilyId == null
+      ? null
+      : runtimeCandidateUsesExpandedBounds
+        ? "tranche_4_expanded_bounds"
+      : runtimeDecisionFamilyId === "density_flux_shear_coupled"
+        ? "tranche_3_fully_coupled"
+      : runtimeDecisionFamilyId === "flux_shear_coupled"
+        ? "tranche_2_extended"
+        : "tranche_1_primary";
+  const runtimeNonRegressionPass =
+    runtimeMetricWecNonRegression === true &&
+    runtimeMetricNecNonRegression === true &&
+    emissionAdmissionStable &&
+    semanticAdmissionStable;
+  const decRuntimeDecisionEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["decRuntimeDecisionEvidence"]
+  > = {
+    status: runtimeApplicationStatus,
+    attempted: runtimeApplicationAttempted,
+    enabled: runtimeApplicationEnabled,
+    gatePass: runtimeApplicationGatePass,
+    comparabilityPass: runtimeEvaluationComparable,
+    sampleCountSufficient: runtimeSampleCountSufficient,
+    selectedCandidateId:
+      runtimeApplicationAttempted ? runtimeSweepCandidate.candidateId : null,
+    reasonCodes: runtimeDecisionReasonCodes,
+    primaryReasonCode: runtimeDecisionReasonCodes[0] ?? null,
+    decAttribution: {
+      selectedMetricDecRobustMarginToZero: runtimeMetricDecRobustMarginToZero,
+      selectedTileReconstitutedDecRobustMarginToZero:
+        runtimeTileDecRobustMarginToZero,
+      selectedMetricDecConservativeMarginToZero:
+        runtimeMetricDecConservativeMarginToZero,
+      selectedTileReconstitutedDecConservativeMarginToZero:
+        runtimeTileDecConservativeMarginToZero,
+      referenceMetricDecRobustMarginToZero:
+        runtimeReferenceMetricDecRobustMarginToZero,
+      referenceTileReconstitutedDecRobustMarginToZero:
+        runtimeReferenceTileDecRobustMarginToZero,
+      referenceMetricDecConservativeMarginToZero:
+        runtimeReferenceMetricDecConservativeMarginToZero,
+      referenceTileReconstitutedDecConservativeMarginToZero:
+        runtimeReferenceTileDecConservativeMarginToZero,
+      independentCrossCheckRelativeResidual:
+        runtimeIndependentCrossCheckRelativeResidual,
+      uncertaintyRelativeBound: runtimeUncertaintyRelativeBound,
+      independentCrossCheckSignAgreement:
+        runtimeIndependentCrossCheckSignAgreement,
+      selectedCrossesZeroUnderUncertainty:
+        runtimeSelectedCrossesZeroUnderUncertainty,
+      referenceCrossesZeroBothDecMargins:
+        runtimeReferenceCrossesZeroBothDecMargins,
+      uncertaintyBoundPass: runtimeUncertaintyBoundPass,
+    },
+    note: runtimeApplicationNote,
+    citationRefs: decRuntimeCitationRefs,
+  };
+  const appliedCandidateEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["appliedCandidateEvidence"]
+  > = {
+    status: runtimeApplicationStatus === "applied" ? "available" : "unavailable",
+    candidateId:
+      runtimeApplicationStatus === "applied"
+        ? runtimeSweepCandidate.candidateId
+        : null,
+    extensionTrancheId:
+      runtimeApplicationStatus === "applied" ? runtimeDecisionTrancheId : null,
+    familyId: runtimeApplicationStatus === "applied" ? runtimeDecisionFamilyId : null,
+    metricDecRobustMarginToZero:
+      runtimeApplicationStatus === "applied"
+        ? runtimeMetricDecRobustMarginToZero
+        : null,
+    tileReconstitutedDecRobustMarginToZero:
+      runtimeApplicationStatus === "applied"
+        ? runtimeTileDecRobustMarginToZero
+        : null,
+    metricWecNonRegressionMargin:
+      runtimeApplicationStatus === "applied"
+        ? runtimeMetricWecNonRegressionMargin
+        : null,
+    metricNecNonRegressionMargin:
+      runtimeApplicationStatus === "applied"
+        ? runtimeMetricNecNonRegressionMargin
+        : null,
+    nonRegressionPass:
+      runtimeApplicationStatus === "applied" ? runtimeNonRegressionPass : null,
+    comparabilityPass:
+      runtimeApplicationStatus === "applied" ? runtimeEvaluationComparable : null,
+    note:
+      runtimeApplicationStatus === "applied"
+        ? `Applied candidate ${runtimeSweepCandidate.candidateId} remains within non-regression and comparability gates on ${runtimeDecisionFamilyId ?? "unknown_family"}.`
+        : "No runtime-applied candidate is available in this run.",
+    citationRefs: decRuntimeCitationRefs,
+  };
+  const rollbackLocalizationReasonCodes =
+    runtimeApplicationStatus === "applied" ? [] : runtimeDecisionReasonCodes;
+  const rollbackLocalizationEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["rollbackLocalizationEvidence"]
+  > = {
+    status: runtimeApplicationStatus === "applied" ? "unavailable" : "available",
+    candidateId: runtimeApplicationAttempted ? runtimeSweepCandidate.candidateId : null,
+    extensionTrancheId:
+      runtimeApplicationAttempted ? runtimeDecisionTrancheId : null,
+    familyId: runtimeApplicationAttempted ? runtimeDecisionFamilyId : null,
+    failureMode: runtimeFailureMode,
+    primaryReasonCode: rollbackLocalizationReasonCodes[0] ?? null,
+    reasonCodes: rollbackLocalizationReasonCodes,
+    metricDecRobustMarginToZero:
+      runtimeApplicationAttempted ? runtimeMetricDecRobustMarginToZero : null,
+    tileReconstitutedDecRobustMarginToZero:
+      runtimeApplicationAttempted ? runtimeTileDecRobustMarginToZero : null,
+    metricWecNonRegressionMargin:
+      runtimeApplicationAttempted ? runtimeMetricWecNonRegressionMargin : null,
+    metricNecNonRegressionMargin:
+      runtimeApplicationAttempted ? runtimeMetricNecNonRegressionMargin : null,
+    comparabilityPass:
+      runtimeApplicationAttempted ? runtimeEvaluationComparable : null,
+    sampleCountSufficient:
+      runtimeApplicationAttempted ? runtimeSampleCountSufficient : null,
+    note:
+      runtimeApplicationStatus === "applied"
+        ? "Runtime rollback localization is unavailable because the candidate remained applied."
+        : runtimeApplicationStatus === "not_attempted"
+          ? "No runtime candidate was attempted, so rollback localization reports pre-apply blockers only."
+          : `Runtime candidate ${runtimeSweepCandidate.candidateId} was rolled back with failureMode=${runtimeFailureMode}.`,
+    citationRefs: decRuntimeCitationRefs,
+  };
   const uncertaintyTags: Nhm2ObserverDecPhysicsControlEvidence["uncertaintyTags"] = [
     "inference",
     ...(runtimeEvaluationComparable ? (["direct_measurement"] as const) : []),
@@ -9286,17 +10153,41 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     baselineSweepCandidate?.selectionObjectivePrimaryMargin ?? null;
   const bestCandidatePrimaryMargin =
     selectedSweepCandidate.selectionObjectivePrimaryMargin ?? null;
+  const preFrontierBestPrimaryMargin =
+    preFrontierSelectedSweepCandidate?.selectionObjectivePrimaryMargin ?? null;
+  const frontierBestPrimaryMargin =
+    frontierBestCandidate?.selectionObjectivePrimaryMargin ?? null;
   const requiredLiftToZero =
     baselinePrimaryMargin != null ? Math.max(0, -baselinePrimaryMargin) : null;
   const achievedLiftFromBaseline =
     baselinePrimaryMargin != null && bestCandidatePrimaryMargin != null
       ? bestCandidatePrimaryMargin - baselinePrimaryMargin
       : null;
+  const frontierBestDeltaFromPreFrontier =
+    preFrontierBestPrimaryMargin != null && bestCandidatePrimaryMargin != null
+      ? bestCandidatePrimaryMargin - preFrontierBestPrimaryMargin
+      : null;
+  const frontierBestDeltaFromBaseline =
+    baselinePrimaryMargin != null && bestCandidatePrimaryMargin != null
+      ? bestCandidatePrimaryMargin - baselinePrimaryMargin
+      : null;
+  const frontierBestDeltaPercentFromBaseline =
+    requiredLiftToZero != null &&
+    requiredLiftToZero > 0 &&
+    frontierBestDeltaFromBaseline != null
+      ? (frontierBestDeltaFromBaseline / requiredLiftToZero) * 100
+      : null;
   const bestAchievedLift = achievedLiftFromBaseline;
   const residualMarginToZero = bestCandidatePrimaryMargin;
   const gapToZero =
     residualMarginToZero != null ? Math.max(0, -residualMarginToZero) : null;
   const crossZeroAchieved = selectedSweepCandidate.crossesZeroBothDecMargins;
+  const boundedEnvelopeExhausted =
+    crossZeroAchieved === true
+      ? false
+      : gapToZero != null
+        ? gapToZero > 0
+        : null;
   const zeroCrossFeasibilityDecision: NonNullable<
     Nhm2ObserverDecPhysicsControlEvidence["zeroCrossFeasibilityDecision"]
   > =
@@ -9332,7 +10223,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
   if (runtimeMetricNecNonRegression !== true) {
     zeroCrossFeasibilityReasonCodesSet.add("candidate_violates_nec_non_regression");
   }
-  if (!runtimeApplicationAttempted || !runtimeApplicationEnabled) {
+  if (!runtimeApplicationAttempted) {
     zeroCrossFeasibilityReasonCodesSet.add("candidate_not_evaluated");
   }
   if (zeroCrossFeasibilityReasonCodesSet.size === 0) {
@@ -9357,15 +10248,16 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       residualMarginToZero,
       gapToZero,
       crossZeroAchieved,
+      boundedEnvelopeExhausted,
       boundedControlEnvelope: {
-        pressureScaleMin: sameChartTensorPhysicsControlMin,
-        pressureScaleMax: sameChartTensorPhysicsControlBaseline,
-        densityLiftMin: sameChartTensorDensityLiftBaseline,
-        densityLiftMax: sameChartTensorDensityLiftMax,
-        fluxScaleMin: sameChartTensorFluxScaleMin,
-        fluxScaleMax: sameChartTensorFluxScaleBaseline,
-        shearScaleMin: sameChartTensorShearScaleMin,
-        shearScaleMax: sameChartTensorShearScaleBaseline,
+        pressureScaleMin: activeBoundedEnvelope.pressureScaleMin,
+        pressureScaleMax: activeBoundedEnvelope.pressureScaleMax,
+        densityLiftMin: activeBoundedEnvelope.densityLiftMin,
+        densityLiftMax: activeBoundedEnvelope.densityLiftMax,
+        fluxScaleMin: activeBoundedEnvelope.fluxScaleMin,
+        fluxScaleMax: activeBoundedEnvelope.fluxScaleMax,
+        shearScaleMin: activeBoundedEnvelope.shearScaleMin,
+        shearScaleMax: activeBoundedEnvelope.shearScaleMax,
       },
       evaluationRoute: {
         chartRef: args.modelTermSemanticEvidence.chartRef,
@@ -9389,6 +10281,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
           ? "A selected candidate crosses zero on both metric and tile-reconstituted DEC robust margins within the bounded control envelope."
           : `No selected candidate crosses zero on both DEC robust margins; residual primary margin remains ${residualMarginToZero ?? "null"}.`,
         `Required lift-to-zero from baseline primary margin is ${requiredLiftToZero ?? "null"}; best achieved lift from baseline is ${bestAchievedLift ?? "null"}; remaining gap-to-zero is ${gapToZero ?? "null"}.`,
+        `Bounded control envelope exhausted without cross-zero=${boundedEnvelopeExhausted == null ? "null" : String(boundedEnvelopeExhausted)}.`,
       ],
     };
   const selectedMetricResidualMargin =
@@ -9456,17 +10349,56 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `selectionReasonCodes=${selectionReasonCodes.join(",") || "none"}`,
     ],
   };
+  const decFrontierImprovementEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["decFrontierImprovementEvidence"]
+  > = {
+    status: frontierSeedCandidateId != null ? "available" : "unavailable",
+    frontierSeedCandidateId,
+    frontierSelectedCandidateId: frontierBestCandidate?.candidateId ?? null,
+    frontierCandidateCount: frontierSweepCandidatesAll.length,
+    frontierPassingCount: frontierPassingCandidates.length,
+    baselinePrimaryMargin,
+    preFrontierBestPrimaryMargin,
+    finalBestPrimaryMargin: bestCandidatePrimaryMargin,
+    frontierBestDeltaFromPreFrontier,
+    frontierBestDeltaFromBaseline,
+    frontierBestDeltaPercentFromBaseline,
+    residualGapToZero: gapToZero,
+    selectionPlateauStatus,
+    citationRefs: Array.from(
+      new Set([
+        ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+        ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+      ]),
+    ),
+    notes: [
+      `frontierSeedCandidateId=${frontierSeedCandidateId ?? "none"}`,
+      `frontierSelectedCandidateId=${frontierBestCandidate?.candidateId ?? "none"}`,
+      `frontierCandidateCount=${frontierSweepCandidatesAll.length}`,
+      `frontierPassingCount=${frontierPassingCandidates.length}`,
+      `tranche4CandidateCount=${tranche4SweepCandidates.length}`,
+      `preFrontierBestPrimaryMargin=${preFrontierBestPrimaryMargin ?? "null"}`,
+      `frontierBestPrimaryMargin=${frontierBestPrimaryMargin ?? "null"}`,
+      `finalBestPrimaryMargin=${bestCandidatePrimaryMargin ?? "null"}`,
+      `frontierBestDeltaFromPreFrontier=${frontierBestDeltaFromPreFrontier ?? "null"}`,
+      `frontierBestDeltaFromBaseline=${frontierBestDeltaFromBaseline ?? "null"}`,
+      `frontierBestDeltaPercentFromBaseline=${frontierBestDeltaPercentFromBaseline ?? "null"}`,
+      `residualGapToZero=${gapToZero ?? "null"}`,
+      `selectionPlateauStatus=${selectionPlateauStatus}`,
+    ],
+  };
   const boundedSearchEnvelope: NonNullable<
     Nhm2ObserverDecPhysicsControlEvidence["boundedSearchEnvelope"]
   > = {
-    pressureScaleMin: sameChartTensorPhysicsControlMin,
-    pressureScaleMax: sameChartTensorPhysicsControlBaseline,
-    densityLiftMin: sameChartTensorDensityLiftBaseline,
-    densityLiftMax: sameChartTensorDensityLiftMax,
-    fluxScaleMin: sameChartTensorFluxScaleMin,
-    fluxScaleMax: sameChartTensorFluxScaleBaseline,
-    shearScaleMin: sameChartTensorShearScaleMin,
-    shearScaleMax: sameChartTensorShearScaleBaseline,
+    pressureScaleMin: activeBoundedEnvelope.pressureScaleMin,
+    pressureScaleMax: activeBoundedEnvelope.pressureScaleMax,
+    densityLiftMin: activeBoundedEnvelope.densityLiftMin,
+    densityLiftMax: activeBoundedEnvelope.densityLiftMax,
+    fluxScaleMin: activeBoundedEnvelope.fluxScaleMin,
+    fluxScaleMax: activeBoundedEnvelope.fluxScaleMax,
+    shearScaleMin: activeBoundedEnvelope.shearScaleMin,
+    shearScaleMax: activeBoundedEnvelope.shearScaleMax,
     coarsePressureStep: minPositiveStep(pressureScaleSweep),
     coarseDensityLiftStep: minPositiveStep(densityLiftSweep),
     coarseFluxScaleStep: minPositiveStep(fluxScaleSweep),
@@ -9483,17 +10415,31 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     refineShearScaleStep: minPositiveStep(
       refineShearOffsets.map((offset) => Math.abs(offset)).filter((v) => v > 0),
     ),
+    frontierPressureStep: minPositiveStep(
+      frontierPressureOffsets
+        .map((offset) => Math.abs(offset))
+        .filter((v) => v > 0),
+    ),
+    frontierDensityLiftStep: minPositiveStep(
+      frontierDensityOffsets
+        .map((offset) => Math.abs(offset))
+        .filter((v) => v > 0),
+    ),
+    frontierFluxScaleStep: minPositiveStep(
+      frontierFluxOffsets.map((offset) => Math.abs(offset)).filter((v) => v > 0),
+    ),
+    frontierShearScaleStep: minPositiveStep(
+      frontierShearOffsets
+        .map((offset) => Math.abs(offset))
+        .filter((v) => v > 0),
+    ),
     coarseCandidateCount: coarseSweepCandidates.length,
     refineCandidateCount: refineSweepCandidates.length,
+    frontierCandidateCount: frontierSweepCandidatesAll.length,
     refineSeedCount: refineSeedCandidateIds.length,
     observerDomainFixed: true,
   };
   const candidateApplied = runtimeApplicationApplied;
-  const runtimeMetricDecRobustMarginToZero = runtimeSweepCandidate.metricDecRobustMin;
-  const runtimeTileDecRobustMarginToZero =
-    runtimeSweepCandidate.tileReconstitutedDecRobustMin;
-  const runtimeMetricWecNonRegressionMargin = runtimeMetricWecRobustDelta;
-  const runtimeMetricNecNonRegressionMargin = runtimeMetricNecRobustDelta;
   const sweepCandidatesWithRuntime = sweepCandidates.map((candidate) =>
     candidate.candidateId === runtimeSweepCandidate.candidateId
       ? { ...candidate, applied: runtimeApplicationApplied }
@@ -9627,15 +10573,364 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         `Coupled same-chart DEC-control probe includes bounded off-diagonal Sij attenuation (shear_scale in [${sameChartTensorShearScaleMin}, ${sameChartTensorShearScaleBaseline}]) to localize DEC sensitivity on the admitted Einstein route.`,
     },
   ];
+  const boundedEnvelopeExhaustedForRecommendation =
+    selectedSweepCandidate.crossesZeroBothDecMargins === true
+      ? false
+      : (selectedSweepCandidate.selectionObjectivePrimaryMargin ??
+            Number.NEGATIVE_INFINITY) < 0;
   const recommendation =
     args.decRemediationEvidence.recommendedPatchClass ===
     "no_admissible_candidate_yet"
       ? "no_admissible_candidate_yet"
       : !semanticAdmissionStable || !emissionAdmissionStable
         ? "model_term_extension_patch"
-        : selectionDecision === "apply_candidate"
-          ? "physics_control_patch"
-          : "no_admissible_candidate_yet";
+        : selectionDecision !== "apply_candidate"
+          ? "no_admissible_candidate_yet"
+        : boundedEnvelopeExhaustedForRecommendation &&
+              selectedSweepCandidate.crossesZeroBothDecMargins !== true &&
+              nonRegressionGatePass &&
+              runtimeEvaluationComparable
+          ? "model_term_extension_patch"
+          : "physics_control_patch";
+  if (
+    recommendation === "model_term_extension_patch" &&
+    !selectionReasonCodes.includes("model_term_extension_required")
+  ) {
+    selectionReasonCodes.push("model_term_extension_required");
+  }
+  if (
+    recommendation === "model_term_extension_patch" &&
+    !zeroCrossFeasibilityReasonCodes.includes("model_term_extension_required")
+  ) {
+    zeroCrossFeasibilityReasonCodes.push("model_term_extension_required");
+  }
+  if (
+    recommendation === "model_term_extension_patch" &&
+    runtimeExpandedBoundsExhausted &&
+    !zeroCrossFeasibilityReasonCodes.includes(
+      "insufficient_dec_lift_after_tranche_4",
+    )
+  ) {
+    zeroCrossFeasibilityReasonCodes.push("insufficient_dec_lift_after_tranche_4");
+  }
+  if (
+    recommendation === "model_term_extension_patch" &&
+    !runtimeUncertaintyBoundPass &&
+    !zeroCrossFeasibilityReasonCodes.includes("uncertainty_bound_failed")
+  ) {
+    zeroCrossFeasibilityReasonCodes.push("uncertainty_bound_failed");
+  }
+  if (
+    recommendation === "model_term_extension_patch" &&
+    !runtimeIndependentCrossCheckSignAgreement &&
+    !zeroCrossFeasibilityReasonCodes.includes("cross_check_sign_mismatch")
+  ) {
+    zeroCrossFeasibilityReasonCodes.push("cross_check_sign_mismatch");
+  }
+  if (
+    recommendation === "model_term_extension_patch" &&
+    runtimeApplicationStatus !== "applied" &&
+    !runtimeRollbackReasonCodes.includes("model_term_extension_required")
+  ) {
+    runtimeRollbackReasonCodes.push("model_term_extension_required");
+  }
+  const modelTermExtensionFamilyIds = [
+    "pressure_only",
+    "density_pressure_coupled",
+    "flux_shear_coupled",
+    "density_flux_shear_coupled",
+  ] as const;
+  type ModelTermExtensionFamilyId = (typeof modelTermExtensionFamilyIds)[number];
+  const modelTermExtensionFamilyLabels: Record<ModelTermExtensionFamilyId, string> =
+    {
+      pressure_only: "Pressure-only same-chart control family",
+      density_pressure_coupled: "Density+pressure same-chart control family",
+      flux_shear_coupled: "Flux/shear-coupled same-chart control family",
+      density_flux_shear_coupled:
+        "Density+flux/shear fully-coupled same-chart control family",
+    };
+  const resolveExtensionTrancheId = (args: {
+    familyId: ModelTermExtensionFamilyId | null;
+    candidate:
+      | Pick<
+          DecSweepCandidate,
+          "pressureScale" | "densityLiftFraction" | "fluxScale" | "shearScale"
+        >
+      | null;
+  }): Nhm2ObserverDecExtensionTrancheId | null => {
+    if (args.familyId === null) return null;
+    if (isExpandedBoundsCandidate(args.candidate)) {
+      return "tranche_4_expanded_bounds";
+    }
+    if (args.familyId === "density_flux_shear_coupled") {
+      return "tranche_3_fully_coupled";
+    }
+    return args.familyId === "flux_shear_coupled"
+      ? "tranche_2_extended"
+      : "tranche_1_primary";
+  };
+  const classifyModelTermExtensionFamily = (
+    candidate: DecSweepCandidate,
+  ): ModelTermExtensionFamilyId => {
+    const densityLift = candidate.densityLiftFraction ?? 0;
+    const fluxScale = candidate.fluxScale ?? sameChartTensorFluxScaleBaseline;
+    const shearScale = candidate.shearScale ?? sameChartTensorShearScaleBaseline;
+    const usesDensity = densityLift > 0;
+    const usesFluxOrShear =
+      fluxScale < sameChartTensorFluxScaleBaseline ||
+      shearScale < sameChartTensorShearScaleBaseline;
+    if (!usesDensity && !usesFluxOrShear) {
+      return "pressure_only";
+    }
+    if (usesDensity && !usesFluxOrShear) {
+      return "density_pressure_coupled";
+    }
+    if (!usesDensity && usesFluxOrShear) {
+      return "flux_shear_coupled";
+    }
+    return "density_flux_shear_coupled";
+  };
+  const physicsSweepCandidates = sweepCandidatesWithRuntime.filter(
+    (candidate) => candidate.candidateClass === "physics_control_proposal",
+  );
+  const modelTermExtensionFamilyRows = modelTermExtensionFamilyIds.map(
+    (familyId) => {
+      const familyCandidates = physicsSweepCandidates.filter(
+        (candidate) => classifyModelTermExtensionFamily(candidate) === familyId,
+      );
+      const familyPassingCandidates = familyCandidates
+        .filter((candidate) => candidate.passesSelectionGate)
+        .sort(compareCandidatesForSelection);
+      const familyRankedCandidates = [...familyCandidates].sort(
+        compareCandidatesForSelection,
+      );
+      const bestCandidate =
+        familyPassingCandidates[0] ?? familyRankedCandidates[0] ?? null;
+      const reasonCodes: Nhm2ObserverDecPhysicsControlEvidence["selectionReasonCodes"] =
+        bestCandidate == null
+          ? ["candidate_not_evaluated"]
+          : bestCandidate.passesSelectionGate
+            ? ["selection_gate_pass"]
+            : bestCandidate.gateFailureReasons.length > 0
+              ? bestCandidate.gateFailureReasons
+              : ["candidate_not_evaluated"];
+      const recommendationLabel:
+        | "prioritize_for_model_term_extension"
+        | "secondary"
+        | "insufficient_evidence" =
+        bestCandidate == null
+          ? "insufficient_evidence"
+          : bestCandidate.passesSelectionGate && runtimeEvaluationComparable
+            ? "prioritize_for_model_term_extension"
+            : bestCandidate.passesSelectionGate
+              ? "secondary"
+              : "insufficient_evidence";
+      return {
+        familyId,
+        label: modelTermExtensionFamilyLabels[familyId],
+        candidateCount: familyCandidates.length,
+        passingCandidateCount: familyPassingCandidates.length,
+        bestCandidateId: bestCandidate?.candidateId ?? null,
+        bestPrimaryMargin: bestCandidate?.selectionObjectivePrimaryMargin ?? null,
+        bestMetricDecLift: bestCandidate?.metricDecRobustLift ?? null,
+        bestTileDecLift: bestCandidate?.tileReconstitutedDecRobustLift ?? null,
+        crossesZeroBothDecMargins: bestCandidate?.crossesZeroBothDecMargins ?? null,
+        recommendation: recommendationLabel,
+        reasonCodes,
+        note:
+          bestCandidate == null
+            ? "No evaluated candidates landed in this family under the bounded sweep."
+            : `bestCandidate=${bestCandidate.candidateId} passesSelectionGate=${String(bestCandidate.passesSelectionGate)} primaryMargin=${bestCandidate.selectionObjectivePrimaryMargin ?? "null"} crossesZero=${bestCandidate.crossesZeroBothDecMargins == null ? "null" : String(bestCandidate.crossesZeroBothDecMargins)}.`,
+      };
+    },
+  );
+  const rankedModelTermExtensionFamilies = [...modelTermExtensionFamilyRows].sort(
+    (lhs, rhs) => {
+      const lhsPriority =
+        lhs.recommendation === "prioritize_for_model_term_extension"
+          ? 2
+          : lhs.recommendation === "secondary"
+            ? 1
+            : 0;
+      const rhsPriority =
+        rhs.recommendation === "prioritize_for_model_term_extension"
+          ? 2
+          : rhs.recommendation === "secondary"
+            ? 1
+            : 0;
+      if (rhsPriority !== lhsPriority) return rhsPriority - lhsPriority;
+      const lhsMargin = lhs.bestPrimaryMargin ?? Number.NEGATIVE_INFINITY;
+      const rhsMargin = rhs.bestPrimaryMargin ?? Number.NEGATIVE_INFINITY;
+      if (rhsMargin !== lhsMargin) return rhsMargin - lhsMargin;
+      return lhs.familyId.localeCompare(rhs.familyId);
+    },
+  );
+  const selectedModelTermExtensionFamily =
+    recommendation === "model_term_extension_patch" &&
+    boundedEnvelopeExhaustedForRecommendation
+      ? rankedModelTermExtensionFamilies.find(
+          (entry) => entry.bestCandidateId != null,
+        ) ?? null
+      : null;
+  const familySearchOrder = rankedModelTermExtensionFamilies.map(
+    (entry) => entry.familyId,
+  );
+  const selectedModelTermExtensionCandidate =
+    selectedModelTermExtensionFamily?.bestCandidateId != null
+      ? sweepCandidatesWithRuntime.find(
+          (candidate) =>
+            candidate.candidateId === selectedModelTermExtensionFamily.bestCandidateId,
+        ) ?? null
+      : runtimeApplicationAttempted
+        ? runtimeSweepCandidate
+        : null;
+  const extensionTrancheId: Nhm2ObserverDecExtensionTrancheId | null =
+    recommendation === "model_term_extension_patch"
+      ? "tranche_5_model_term_extension"
+      : resolveExtensionTrancheId({
+          familyId: selectedModelTermExtensionFamily?.familyId ?? runtimeDecisionFamilyId,
+          candidate: selectedModelTermExtensionCandidate,
+        });
+  const modelTermExtensionFamilyEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["modelTermExtensionFamilyEvidence"]
+  > = {
+    status: semanticAdmissionStable ? "available" : "unavailable",
+    selectionBasis:
+      "Rank extension families on comparable same-route evidence using bounded DEC control margins with unchanged non-regression gates.",
+    selectedFamilyId: selectedModelTermExtensionFamily?.familyId ?? null,
+    selectedFamilyReason:
+      selectedModelTermExtensionFamily == null
+        ? recommendation === "model_term_extension_patch"
+          ? "No family had commensurate evidence suitable for model-term extension routing."
+          : "Model-term extension family routing is not selected because recommendation is not model_term_extension_patch."
+        : `Selected ${selectedModelTermExtensionFamily.familyId} as the highest-ranked family under bounded-envelope exhaustion with bestPrimaryMargin=${selectedModelTermExtensionFamily.bestPrimaryMargin ?? "null"}.`,
+    families: modelTermExtensionFamilyRows,
+    comparabilityGate: {
+      pass: runtimeEvaluationComparable,
+      independentCrossCheckStatus: runtimeIndependentCrossCheckStatus,
+      note: runtimeComparabilityNote,
+    },
+    citationRefs: Array.from(
+      new Set([
+        ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+        ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+      ]),
+    ),
+    notes: [
+      `recommendation=${recommendation}`,
+      `boundedEnvelopeExhausted=${boundedEnvelopeExhaustedForRecommendation == null ? "null" : String(boundedEnvelopeExhaustedForRecommendation)}`,
+      `selectedFamilyId=${selectedModelTermExtensionFamily?.familyId ?? "none"}`,
+      `selectedFamilyExtensionTrancheId=${extensionTrancheId ?? "none"}`,
+      `tranche4CandidateCount=${tranche4SweepCandidates.length}`,
+      `familyRanking=${rankedModelTermExtensionFamilies.map((entry) => `${entry.familyId}:${entry.bestPrimaryMargin ?? "null"}`).join(",") || "none"}`,
+    ],
+  };
+  const fluxShearFamilyRows = modelTermExtensionFamilyRows.filter(
+    (entry) =>
+      entry.familyId === "flux_shear_coupled" ||
+      entry.familyId === "density_flux_shear_coupled",
+  );
+  const rankedFluxShearFamilyRows = [...fluxShearFamilyRows].sort((lhs, rhs) => {
+    const lhsPriority =
+      lhs.recommendation === "prioritize_for_model_term_extension"
+        ? 2
+        : lhs.recommendation === "secondary"
+          ? 1
+          : 0;
+    const rhsPriority =
+      rhs.recommendation === "prioritize_for_model_term_extension"
+        ? 2
+        : rhs.recommendation === "secondary"
+          ? 1
+          : 0;
+    if (rhsPriority !== lhsPriority) return rhsPriority - lhsPriority;
+    const lhsMargin = lhs.bestPrimaryMargin ?? Number.NEGATIVE_INFINITY;
+    const rhsMargin = rhs.bestPrimaryMargin ?? Number.NEGATIVE_INFINITY;
+    if (rhsMargin !== lhsMargin) return rhsMargin - lhsMargin;
+    return lhs.familyId.localeCompare(rhs.familyId);
+  });
+  const fluxShearFamilyRow =
+    selectedModelTermExtensionFamily != null &&
+    (selectedModelTermExtensionFamily.familyId === "flux_shear_coupled" ||
+      selectedModelTermExtensionFamily.familyId === "density_flux_shear_coupled")
+      ? selectedModelTermExtensionFamily
+      : rankedFluxShearFamilyRows[0] ?? null;
+  const fluxShearBestCandidate =
+    fluxShearFamilyRow?.bestCandidateId == null
+      ? null
+      : sweepCandidatesWithRuntime.find(
+          (candidate) =>
+            candidate.candidateId === fluxShearFamilyRow.bestCandidateId,
+        ) ?? null;
+  const fluxShearNonRegressionPass =
+    fluxShearBestCandidate == null
+      ? null
+      : fluxShearBestCandidate.guardChecks.metricWecNonRegression === true &&
+          fluxShearBestCandidate.guardChecks.metricNecNonRegression === true &&
+          emissionAdmissionStable &&
+          semanticAdmissionStable;
+  const fluxShearBoundedEnvelopeExhausted =
+    fluxShearFamilyRow?.crossesZeroBothDecMargins == null
+      ? boundedEnvelopeExhaustedForRecommendation
+      : fluxShearFamilyRow.crossesZeroBothDecMargins === true
+        ? false
+        : (fluxShearFamilyRow.bestPrimaryMargin ?? Number.NEGATIVE_INFINITY) < 0;
+  const fluxShearExtensionEvidence: Nhm2ObserverDecFluxShearExtensionEvidence = {
+    status: semanticAdmissionStable ? "available" : "unavailable",
+    routeId,
+    selectedPath,
+    selectedFamilyId: fluxShearFamilyRow?.familyId ?? null,
+    selectionBasis:
+      "Flux/shear extension route (including fully-coupled density+flux/shear family when present) remains on commensurate Einstein-path evidence with unchanged non-regression and comparability gates.",
+    parameterEnvelope: {
+      pressureScaleMin: activeBoundedEnvelope.pressureScaleMin,
+      pressureScaleMax: activeBoundedEnvelope.pressureScaleMax,
+      densityLiftMin: activeBoundedEnvelope.densityLiftMin,
+      densityLiftMax: activeBoundedEnvelope.densityLiftMax,
+      fluxScaleMin: activeBoundedEnvelope.fluxScaleMin,
+      fluxScaleMax: activeBoundedEnvelope.fluxScaleMax,
+      shearScaleMin: activeBoundedEnvelope.shearScaleMin,
+      shearScaleMax: activeBoundedEnvelope.shearScaleMax,
+    },
+    bestCandidateId: fluxShearFamilyRow?.bestCandidateId ?? null,
+    bestPrimaryMargin: fluxShearFamilyRow?.bestPrimaryMargin ?? null,
+    bestMetricDecLift: fluxShearFamilyRow?.bestMetricDecLift ?? null,
+    bestTileDecLift: fluxShearFamilyRow?.bestTileDecLift ?? null,
+    crossZeroAchieved: fluxShearFamilyRow?.crossesZeroBothDecMargins ?? null,
+    boundedEnvelopeExhausted: fluxShearBoundedEnvelopeExhausted,
+    nonRegressionPass: fluxShearNonRegressionPass,
+    comparabilityGate: {
+      pass: runtimeEvaluationComparable,
+      independentCrossCheckStatus: runtimeIndependentCrossCheckStatus,
+      referenceRouteId: runtimeReferenceRouteId,
+      comparableSampleCount: runtimeComparableSampleCount,
+      minimumComparableSampleCount: runtimeMinimumComparableSampleCount,
+      note: runtimeComparabilityNote,
+    },
+    recommendation,
+    citationRefs: Array.from(
+      new Set([
+        ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
+        ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
+        ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+      ]),
+    ),
+    notes: [
+      `selectedFamilyId=${fluxShearFamilyRow?.familyId ?? "none"}`,
+      `bestCandidateId=${fluxShearFamilyRow?.bestCandidateId ?? "none"}`,
+      `bestPrimaryMargin=${fluxShearFamilyRow?.bestPrimaryMargin ?? "null"}`,
+      `crossZeroAchieved=${fluxShearFamilyRow?.crossesZeroBothDecMargins == null ? "null" : String(fluxShearFamilyRow.crossesZeroBothDecMargins)}`,
+      `boundedEnvelopeExhausted=${fluxShearBoundedEnvelopeExhausted == null ? "null" : String(fluxShearBoundedEnvelopeExhausted)}`,
+      `nonRegressionPass=${fluxShearNonRegressionPass == null ? "null" : String(fluxShearNonRegressionPass)}`,
+      `comparabilityPass=${String(runtimeEvaluationComparable)}`,
+      `independentCrossCheckStatus=${runtimeIndependentCrossCheckStatus}`,
+      `referenceRouteId=${runtimeReferenceRouteId ?? "none"}`,
+      `comparableSampleCount=${runtimeComparableSampleCount ?? "null"}`,
+      `minimumComparableSampleCount=${runtimeMinimumComparableSampleCount}`,
+      `tranche4CandidateCount=${tranche4SweepCandidates.length}`,
+    ],
+  };
   const citationRefs = Array.from(
     new Set(
       [
@@ -9751,7 +11046,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       {
         claimId: "bounded_probe_non_regression_policy",
         claim:
-          "Bounded E/J/S knob sweeps require WEC/NEC non-regression and positive DEC lift before runtime apply can remain applied.",
+          "Bounded E/J/S knob sweeps require WEC/NEC non-regression and cross-zero DEC robust margins before runtime apply can remain applied.",
         confidenceLabel: "review",
         citationRefs: [
           "https://arxiv.org/abs/1702.05915",
@@ -9759,7 +11054,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
           "https://arxiv.org/abs/1405.0403",
         ],
         note:
-          "Non-regression gating is policy-conservative and grounded in energy-condition review practice.",
+          "Non-regression and cross-zero gating are policy-conservative and grounded in energy-condition review practice.",
       },
       {
         claimId: "observer_robust_cross_check_priority",
@@ -9773,10 +11068,69 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         note:
           "Recent warp-analysis tooling emphasizes route parity and observer-robust checks before promotion.",
       },
+      {
+        claimId: "runtime_uncertainty_sign_guard_required",
+        claim:
+          "Applied runtime decisions require uncertainty-conservative positivity and sign agreement between selected and independent-check DEC margins.",
+        confidenceLabel: "emerging_preprint",
+        citationRefs: [
+          "https://arxiv.org/abs/gr-qc/0507004",
+          "https://arxiv.org/abs/1306.6052",
+          "https://arxiv.org/abs/2404.10855",
+          "https://arxiv.org/abs/2602.18023",
+        ],
+        note:
+          "Sign and uncertainty gates localize decision risk to commensurate selected/reference route evidence.",
+      },
+      {
+        claimId: "uncertainty_reporting_requires_refinement_evidence",
+        claim:
+          "Uncertainty-sensitive DEC decisions should be reported with refinement-aware uncertainty bounds rather than raw single-resolution margins.",
+        confidenceLabel: "established",
+        citationRefs: [
+          "https://www.osti.gov/biblio/6817347",
+          "https://arxiv.org/abs/1306.6052",
+        ],
+        note:
+          "Pairs conservative DEC margins with explicit uncertainty bounds under convergence-reporting precedent.",
+      },
     ],
     note:
       "Coupled-control evidence localizes DEC behavior under bounded E/J/S controls without widening claim tier.",
   };
+  const researchClaimLookup = new Map(
+    decCoupledControlEvidence.researchClaims.map((claim) => [claim.claimId, claim]),
+  );
+  const researchSupportMap: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["researchSupportMap"]
+  > = Object.fromEntries(
+    claimCitationMap.map((claimEvidence) => {
+      const supportMeta =
+        NHM2_DEC_PHYSICS_CONTROL_RESEARCH_SUPPORT_MAP[
+          claimEvidence.claimId as keyof typeof NHM2_DEC_PHYSICS_CONTROL_RESEARCH_SUPPORT_MAP
+        ];
+      const coupledClaim = researchClaimLookup.get(claimEvidence.claimId);
+      return [
+        claimEvidence.claimId,
+        {
+          claimId: claimEvidence.claimId,
+          supportLevel: supportMeta?.supportLevel ?? "inference",
+          citationRefs: Array.from(
+            new Set([
+              ...claimEvidence.citationRefs,
+              ...(coupledClaim?.citationRefs ?? []),
+            ]),
+          ),
+          evidenceRefs: supportMeta?.evidenceRefs ?? [],
+          note:
+            supportMeta?.note ??
+            coupledClaim?.note ??
+            claimEvidence.note ??
+            "Support map entry inferred from claim citation coverage only.",
+        },
+      ];
+    }),
+  );
   return {
     chartRef: args.modelTermSemanticEvidence.chartRef ?? null,
     routeId,
@@ -9832,6 +11186,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
     selectionPlateauStatus,
     crossZeroFeasibilityEvidence,
     decResidualAttributionEvidence,
+    decFrontierImprovementEvidence,
     zeroCrossFeasibilityDecision,
     zeroCrossFeasibilityReasonCodes,
     boundedSearchEnvelope,
@@ -9867,38 +11222,66 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
         note: runtimeComparabilityNote,
       },
       rollbackReasonCodes: runtimeRollbackReasonCodes,
-        guardChecks: {
-          metricWecNonRegression: runtimeMetricWecNonRegression,
-          metricNecNonRegression: runtimeMetricNecNonRegression,
-          emissionAdmissionStable,
-          semanticAdmissionStable,
-          metricDecRobustLiftPositive: runtimeMetricDecRobustLiftPositive,
-          tileReconstitutedDecRobustLiftNonNegative:
-            runtimeTileDecRobustLiftNonNegative,
-        },
-        observed: {
-          metricDecRobustLift: runtimeMetricDecRobustLift,
-          tileReconstitutedDecRobustLift: runtimeTileReconstitutedDecRobustLift,
-          metricWecRobustDelta: runtimeMetricWecRobustDelta,
-          metricNecRobustDelta: runtimeMetricNecRobustDelta,
-          metricDecRobustMarginToZero: runtimeMetricDecRobustMarginToZero,
-          tileReconstitutedDecRobustMarginToZero: runtimeTileDecRobustMarginToZero,
-          metricWecNonRegressionMargin: runtimeMetricWecNonRegressionMargin,
+      guardChecks: {
+        metricWecNonRegression: runtimeMetricWecNonRegression,
+        metricNecNonRegression: runtimeMetricNecNonRegression,
+        emissionAdmissionStable,
+        semanticAdmissionStable,
+        metricDecRobustLiftPositive: runtimeMetricDecRobustLiftPositive,
+        tileReconstitutedDecRobustLiftNonNegative:
+          runtimeTileDecRobustLiftNonNegative,
+        crossesZeroBothDecMargins: runtimeCrossesZeroBothDecMargins,
+        independentCrossCheckSignAgreement:
+          runtimeIndependentCrossCheckSignAgreement,
+        uncertaintyBoundPass: runtimeUncertaintyBoundPass,
+        referenceCrossesZeroBothDecMargins:
+          runtimeReferenceCrossesZeroBothDecMargins,
+      },
+      observed: {
+        metricDecRobustLift: runtimeMetricDecRobustLift,
+        tileReconstitutedDecRobustLift: runtimeTileReconstitutedDecRobustLift,
+        metricWecRobustDelta: runtimeMetricWecRobustDelta,
+        metricNecRobustDelta: runtimeMetricNecRobustDelta,
+        metricDecRobustMarginToZero: runtimeMetricDecRobustMarginToZero,
+        tileReconstitutedDecRobustMarginToZero: runtimeTileDecRobustMarginToZero,
+        metricWecNonRegressionMargin: runtimeMetricWecNonRegressionMargin,
         metricNecNonRegressionMargin: runtimeMetricNecNonRegressionMargin,
+        independentCrossCheckRelativeResidual:
+          runtimeIndependentCrossCheckRelativeResidual,
+        uncertaintyRelativeBound: runtimeUncertaintyRelativeBound,
+        metricDecUncertaintyAbs: runtimeMetricDecUncertaintyAbs,
+        tileReconstitutedDecUncertaintyAbs: runtimeTileDecUncertaintyAbs,
+        metricDecConservativeMarginToZero:
+          runtimeMetricDecConservativeMarginToZero,
+        tileReconstitutedDecConservativeMarginToZero:
+          runtimeTileDecConservativeMarginToZero,
+        referenceMetricDecRobustMarginToZero:
+          runtimeReferenceMetricDecRobustMarginToZero,
+        referenceTileReconstitutedDecRobustMarginToZero:
+          runtimeReferenceTileDecRobustMarginToZero,
+        referenceMetricDecUncertaintyAbs: runtimeReferenceMetricDecUncertaintyAbs,
+        referenceTileReconstitutedDecUncertaintyAbs:
+          runtimeReferenceTileDecUncertaintyAbs,
+        referenceMetricDecConservativeMarginToZero:
+          runtimeReferenceMetricDecConservativeMarginToZero,
+        referenceTileReconstitutedDecConservativeMarginToZero:
+          runtimeReferenceTileDecConservativeMarginToZero,
       },
       note: runtimeApplicationNote,
-      citationRefs: Array.from(
-        new Set([
-          ...NHM2_DEC_REMEDIATION_WEB_CITATION_REFS,
-          ...NHM2_DEC_PHYSICS_CONTROL_WEB_CITATION_REFS,
-          ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
-        ]),
-      ),
+      citationRefs: decRuntimeCitationRefs,
     },
+    decRuntimeDecisionEvidence,
+    extensionTrancheId,
+    familySearchOrder,
+    appliedCandidateEvidence,
+    rollbackLocalizationEvidence,
     controlKnobs,
     claimCitationMap,
+    researchSupportMap,
     claimCitationMapCompleteness,
     decCoupledControlEvidence,
+    modelTermExtensionFamilyEvidence,
+    fluxShearExtensionEvidence,
     recommendation,
     uncertaintyTags,
     citationRefs,
@@ -9915,6 +11298,15 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `selectionObjectivePrimaryMargin=${selectedSweepCandidate.selectionObjectivePrimaryMargin ?? "null"}`,
       `selectionObjectiveControlDeviation=${selectedSweepCandidate.controlDeviationMagnitude ?? "null"}`,
       `selectionObjectiveCrossesZeroBothDecMargins=${selectedSweepCandidate.crossesZeroBothDecMargins == null ? "null" : String(selectedSweepCandidate.crossesZeroBothDecMargins)}`,
+      `preFrontierBestPrimaryMargin=${preFrontierBestPrimaryMargin ?? "null"}`,
+      `frontierBestPrimaryMargin=${frontierBestPrimaryMargin ?? "null"}`,
+      `frontierBestDeltaFromPreFrontier=${frontierBestDeltaFromPreFrontier ?? "null"}`,
+      `frontierBestDeltaFromBaseline=${frontierBestDeltaFromBaseline ?? "null"}`,
+      `frontierBestDeltaPercentFromBaseline=${frontierBestDeltaPercentFromBaseline ?? "null"}`,
+      `frontierSeedCandidateId=${frontierSeedCandidateId ?? "none"}`,
+      `frontierBestCandidateId=${frontierBestCandidate?.candidateId ?? "none"}`,
+      `frontierCandidateCount=${frontierSweepCandidates.length}`,
+      `frontierPassingCount=${frontierPassingCandidates.length}`,
       `crossZeroFeasibility.baselinePrimaryMargin=${baselinePrimaryMargin ?? "null"}`,
       `crossZeroFeasibility.bestCandidatePrimaryMargin=${bestCandidatePrimaryMargin ?? "null"}`,
       `crossZeroFeasibility.requiredLiftToZero=${requiredLiftToZero ?? "null"}`,
@@ -9923,6 +11315,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `crossZeroFeasibility.residualMarginToZero=${residualMarginToZero ?? "null"}`,
       `crossZeroFeasibility.gapToZero=${gapToZero ?? "null"}`,
       `crossZeroFeasibility.crossZeroAchieved=${crossZeroAchieved == null ? "null" : String(crossZeroAchieved)}`,
+      `crossZeroFeasibility.boundedEnvelopeExhausted=${boundedEnvelopeExhausted == null ? "null" : String(boundedEnvelopeExhausted)}`,
       `crossZeroFeasibility.decision=${zeroCrossFeasibilityDecision}`,
       `crossZeroFeasibility.reasonCodes=${zeroCrossFeasibilityReasonCodes.join(",")}`,
       `crossZeroFeasibility.inferenceLabel=${crossZeroInferenceLabel}`,
@@ -9944,8 +11337,13 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `boundedSearchEnvelope.refineStep.densityLift=${boundedSearchEnvelope.refineDensityLiftStep ?? "null"}`,
       `boundedSearchEnvelope.refineStep.fluxScale=${boundedSearchEnvelope.refineFluxScaleStep ?? "null"}`,
       `boundedSearchEnvelope.refineStep.shearScale=${boundedSearchEnvelope.refineShearScaleStep ?? "null"}`,
+      `boundedSearchEnvelope.frontierStep.pressureScale=${boundedSearchEnvelope.frontierPressureStep ?? "null"}`,
+      `boundedSearchEnvelope.frontierStep.densityLift=${boundedSearchEnvelope.frontierDensityLiftStep ?? "null"}`,
+      `boundedSearchEnvelope.frontierStep.fluxScale=${boundedSearchEnvelope.frontierFluxScaleStep ?? "null"}`,
+      `boundedSearchEnvelope.frontierStep.shearScale=${boundedSearchEnvelope.frontierShearScaleStep ?? "null"}`,
       `boundedSearchEnvelope.coarseCandidateCount=${boundedSearchEnvelope.coarseCandidateCount ?? "null"}`,
       `boundedSearchEnvelope.refineCandidateCount=${boundedSearchEnvelope.refineCandidateCount ?? "null"}`,
+      `boundedSearchEnvelope.frontierCandidateCount=${boundedSearchEnvelope.frontierCandidateCount ?? "null"}`,
       `boundedSearchEnvelope.refineSeedCount=${boundedSearchEnvelope.refineSeedCount ?? "null"}`,
       `boundedSearchEnvelope.observerDomainFixed=${String(boundedSearchEnvelope.observerDomainFixed)}`,
       `claimCitationMapCompleteness.status=${claimCitationMapCompleteness.status}`,
@@ -9958,6 +11356,9 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `sweepPhaseSummary.refineCandidateCount=${sweepPhaseSummary.refineCandidateCount ?? "null"}`,
       `sweepPhaseSummary.refinePassingCount=${sweepPhaseSummary.refinePassingCount ?? "null"}`,
       `sweepPhaseSummary.refineSeedCandidateIds=${sweepPhaseSummary.refineSeedCandidateIds.join(",") || "none"}`,
+      `sweepPhaseSummary.frontierCandidateCount=${sweepPhaseSummary.frontierCandidateCount ?? "null"}`,
+      `sweepPhaseSummary.frontierPassingCount=${sweepPhaseSummary.frontierPassingCount ?? "null"}`,
+      `sweepPhaseSummary.frontierSeedCandidateId=${sweepPhaseSummary.frontierSeedCandidateId ?? "none"}`,
       `baseline.metricDecRobustMin=${baselineMetricDecRobustMin ?? "null"}`,
       `baseline.tileReconstitutedDecRobustMin=${baselineTileDecRobustMin ?? "null"}`,
       `deltas.metricDecRobustLift=${metricDecRobustLift ?? "null"}`,
@@ -9984,6 +11385,20 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `sameChartCoupledProbeNecDelta=${sameChartCoupledDensityPressureProbe.metricNecRobustMin != null && baselineMetricNecRobustMin != null ? sameChartCoupledDensityPressureProbe.metricNecRobustMin - baselineMetricNecRobustMin : "null"}`,
       `decCoupledControlEvidence.status=${decCoupledControlEvidence.status}`,
       `decCoupledControlEvidence.bestCandidateId=${decCoupledControlEvidence.bestCandidateId ?? "null"}`,
+      `modelTermExtensionFamilyEvidence.status=${modelTermExtensionFamilyEvidence.status}`,
+      `modelTermExtensionFamilyEvidence.selectedFamilyId=${modelTermExtensionFamilyEvidence.selectedFamilyId ?? "null"}`,
+      `modelTermExtensionFamilyEvidence.comparabilityGate.pass=${String(modelTermExtensionFamilyEvidence.comparabilityGate.pass)}`,
+      `modelTermExtensionFamilyEvidence.families=${modelTermExtensionFamilyEvidence.families.map((entry) => `${entry.familyId}:${entry.bestPrimaryMargin ?? "null"}:${entry.recommendation}`).join(",") || "none"}`,
+      `fluxShearExtensionEvidence.status=${fluxShearExtensionEvidence.status}`,
+      `fluxShearExtensionEvidence.selectedFamilyId=${fluxShearExtensionEvidence.selectedFamilyId ?? "null"}`,
+      `fluxShearExtensionEvidence.bestCandidateId=${fluxShearExtensionEvidence.bestCandidateId ?? "null"}`,
+      `fluxShearExtensionEvidence.bestPrimaryMargin=${fluxShearExtensionEvidence.bestPrimaryMargin ?? "null"}`,
+      `fluxShearExtensionEvidence.crossZeroAchieved=${fluxShearExtensionEvidence.crossZeroAchieved == null ? "null" : String(fluxShearExtensionEvidence.crossZeroAchieved)}`,
+      `fluxShearExtensionEvidence.boundedEnvelopeExhausted=${fluxShearExtensionEvidence.boundedEnvelopeExhausted == null ? "null" : String(fluxShearExtensionEvidence.boundedEnvelopeExhausted)}`,
+      `fluxShearExtensionEvidence.nonRegressionPass=${fluxShearExtensionEvidence.nonRegressionPass == null ? "null" : String(fluxShearExtensionEvidence.nonRegressionPass)}`,
+      `fluxShearExtensionEvidence.comparabilityGate.pass=${String(fluxShearExtensionEvidence.comparabilityGate.pass)}`,
+      `fluxShearExtensionEvidence.comparabilityGate.independentCrossCheckStatus=${fluxShearExtensionEvidence.comparabilityGate.independentCrossCheckStatus}`,
+      `fluxShearExtensionEvidence.comparabilityGate.referenceRouteId=${fluxShearExtensionEvidence.comparabilityGate.referenceRouteId ?? "none"}`,
       `nonRegressionGate.pass=${String(nonRegressionGatePass)}`,
       `runtimeApplication.status=${runtimeApplicationStatus}`,
       `runtimeApplication.failureMode=${runtimeFailureMode}`,
@@ -10002,11 +11417,36 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `runtimeApplication.comparabilityGate.selectedPathParity=${String(runtimeSelectedPathParity)}`,
       `runtimeApplication.comparabilityGate.independentCrossCheckStatus=${runtimeIndependentCrossCheckStatus}`,
       `runtimeApplication.comparabilityGate.pass=${String(runtimeEvaluationComparable)}`,
+      `runtimeApplication.comparabilityGate.independentCrossCheckRelativeResidual=${runtimeIndependentCrossCheckRelativeResidual}`,
       `runtimeApplication.rollbackReasonCodes=${runtimeRollbackReasonCodes.join(",") || "none"}`,
+      `runtimeApplication.guardChecks.independentCrossCheckSignAgreement=${String(runtimeIndependentCrossCheckSignAgreement)}`,
+      `runtimeApplication.guardChecks.uncertaintyBoundPass=${String(runtimeUncertaintyBoundPass)}`,
+      `runtimeApplication.guardChecks.referenceCrossesZeroBothDecMargins=${String(runtimeReferenceCrossesZeroBothDecMargins)}`,
+      `runtimeApplication.observed.uncertaintyRelativeBound=${runtimeUncertaintyRelativeBound}`,
       `runtimeApplication.observed.metricDecRobustMarginToZero=${runtimeMetricDecRobustMarginToZero ?? "null"}`,
       `runtimeApplication.observed.tileReconstitutedDecRobustMarginToZero=${runtimeTileDecRobustMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.metricDecConservativeMarginToZero=${runtimeMetricDecConservativeMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.tileReconstitutedDecConservativeMarginToZero=${runtimeTileDecConservativeMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.referenceMetricDecRobustMarginToZero=${runtimeReferenceMetricDecRobustMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.referenceTileReconstitutedDecRobustMarginToZero=${runtimeReferenceTileDecRobustMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.referenceMetricDecConservativeMarginToZero=${runtimeReferenceMetricDecConservativeMarginToZero ?? "null"}`,
+      `runtimeApplication.observed.referenceTileReconstitutedDecConservativeMarginToZero=${runtimeReferenceTileDecConservativeMarginToZero ?? "null"}`,
       `runtimeApplication.observed.metricWecNonRegressionMargin=${runtimeMetricWecNonRegressionMargin ?? "null"}`,
       `runtimeApplication.observed.metricNecNonRegressionMargin=${runtimeMetricNecNonRegressionMargin ?? "null"}`,
+      `decRuntimeDecisionEvidence.status=${decRuntimeDecisionEvidence.status}`,
+      `decRuntimeDecisionEvidence.gatePass=${String(decRuntimeDecisionEvidence.gatePass)}`,
+      `decRuntimeDecisionEvidence.primaryReasonCode=${decRuntimeDecisionEvidence.primaryReasonCode ?? "none"}`,
+      `extensionTrancheId=${extensionTrancheId ?? "none"}`,
+      `familySearchOrder=${familySearchOrder.join(",") || "none"}`,
+      `appliedCandidateEvidence.status=${appliedCandidateEvidence.status}`,
+      `appliedCandidateEvidence.familyId=${appliedCandidateEvidence.familyId ?? "none"}`,
+      `appliedCandidateEvidence.candidateId=${appliedCandidateEvidence.candidateId ?? "none"}`,
+      `rollbackLocalizationEvidence.status=${rollbackLocalizationEvidence.status}`,
+      `rollbackLocalizationEvidence.failureMode=${rollbackLocalizationEvidence.failureMode}`,
+      `rollbackLocalizationEvidence.primaryReasonCode=${rollbackLocalizationEvidence.primaryReasonCode ?? "none"}`,
+      `rollbackLocalizationEvidence.familyId=${rollbackLocalizationEvidence.familyId ?? "none"}`,
+      `rollbackLocalizationEvidence.candidateId=${rollbackLocalizationEvidence.candidateId ?? "none"}`,
+      `researchSupportMap.claimIds=${Object.keys(researchSupportMap).join(",") || "none"}`,
       `recommendation=${recommendation}`,
     ],
     uncertaintyNotes: [
@@ -10174,6 +11614,128 @@ const resolveNhm2ObserverNextTechnicalAction = (args: {
     return "research_basis_gap_review";
   }
   return args.fallbackAction;
+};
+
+const deriveNhm2ObserverDecModelTermExtensionPlanEvidence = (args: {
+  decRemediationEvidence: Nhm2ObserverDecRemediationEvidence;
+  decPhysicsControlEvidence: Nhm2ObserverDecPhysicsControlEvidence;
+  recommendedPatchClass: Nhm2ObserverDecRemediationEvidence["recommendedPatchClass"];
+}): Nhm2ObserverDecModelTermExtensionPlanEvidence | null => {
+  const recommendation = args.recommendedPatchClass;
+  const selectedPath =
+    args.decPhysicsControlEvidence.selectedPath ??
+    args.decRemediationEvidence.selectedPath ??
+    null;
+  const routeId =
+    args.decPhysicsControlEvidence.routeId ?? args.decRemediationEvidence.routeId ?? null;
+  const chartRef =
+    args.decPhysicsControlEvidence.chartRef ??
+    args.decRemediationEvidence.chartRef ??
+    null;
+  const crossZero = args.decPhysicsControlEvidence.crossZeroFeasibilityEvidence;
+  const runtimeDecision = args.decPhysicsControlEvidence.decRuntimeDecisionEvidence;
+  const runtimeComparabilityPass =
+    runtimeDecision?.comparabilityPass ??
+    args.decPhysicsControlEvidence.runtimeApplication.comparabilityGate.pass;
+  const semanticOrEmissionNotStable =
+    args.decPhysicsControlEvidence.guardChecks.semanticAdmissionStable === false ||
+    args.decPhysicsControlEvidence.guardChecks.emissionAdmissionStable === false;
+  const trigger: Nhm2ObserverDecModelTermExtensionPlanEvidence["trigger"] =
+    recommendation !== "model_term_extension_patch"
+      ? "none"
+      : semanticOrEmissionNotStable
+        ? "semantic_or_emission_not_stable"
+        : crossZero.boundedEnvelopeExhausted === true &&
+            runtimeComparabilityPass === true
+          ? "bounded_envelope_exhausted"
+          : crossZero.crossZeroAchieved === false &&
+              runtimeComparabilityPass === true
+            ? "cross_zero_not_achieved"
+            : "unknown";
+  const preferredImplementationRoute: Nhm2ObserverDecModelTermExtensionPlanEvidence["preferredImplementationRoute"] =
+    selectedPath === "full_einstein_tensor"
+      ? "full_einstein_tensor"
+      : selectedPath === "adm_complete"
+        ? "adm_complete"
+        : "unknown";
+  const citationRefs = Array.from(
+    new Set(
+      [
+        ...args.decRemediationEvidence.citationRefs,
+        ...args.decPhysicsControlEvidence.citationRefs,
+        ...crossZero.citationRefs,
+        ...(runtimeDecision?.citationRefs ?? []),
+      ].filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  );
+  const notes = [
+    `status=${recommendation === "model_term_extension_patch" ? "required" : "not_required"}`,
+    `trigger=${trigger}`,
+    `selectedPath=${selectedPath ?? "none"}`,
+    `routeId=${routeId ?? "none"}`,
+    `dominantViolationClass=${args.decRemediationEvidence.dominantViolationClass}`,
+    `crossZeroAchieved=${crossZero.crossZeroAchieved == null ? "null" : String(crossZero.crossZeroAchieved)}`,
+    `boundedEnvelopeExhausted=${crossZero.boundedEnvelopeExhausted == null ? "null" : String(crossZero.boundedEnvelopeExhausted)}`,
+    `runtimeComparabilityPass=${runtimeComparabilityPass == null ? "null" : String(runtimeComparabilityPass)}`,
+    `requiredLiftToZero=${crossZero.requiredLiftToZero ?? "null"}`,
+    `bestAchievedLift=${crossZero.bestAchievedLift ?? "null"}`,
+    `residualMarginToZero=${crossZero.residualMarginToZero ?? "null"}`,
+    `gapToZero=${crossZero.gapToZero ?? "null"}`,
+  ];
+  if (recommendation !== "model_term_extension_patch") {
+    return null;
+  }
+  return {
+    status: "required",
+    trigger,
+    chartRef,
+    routeId,
+    selectedPath,
+    dominantViolationClass: args.decRemediationEvidence.dominantViolationClass,
+    requiredLiftToZero: crossZero.requiredLiftToZero,
+    bestAchievedLift: crossZero.bestAchievedLift,
+    residualMarginToZero: crossZero.residualMarginToZero,
+    gapToZero: crossZero.gapToZero,
+    preferredImplementationRoute,
+    nextPatchClass: recommendation,
+    citationRefs,
+    notes,
+  };
+};
+
+const harmonizeNhm2ObserverDecRemediationEvidence = (args: {
+  decRemediationEvidence: Nhm2ObserverDecRemediationEvidence;
+  decPhysicsControlEvidence: Nhm2ObserverDecPhysicsControlEvidence;
+}): Nhm2ObserverDecRemediationEvidence => {
+  const recommendation = args.decPhysicsControlEvidence.recommendation;
+  const modelTermExtensionPlanEvidence =
+    deriveNhm2ObserverDecModelTermExtensionPlanEvidence({
+      decRemediationEvidence: args.decRemediationEvidence,
+      decPhysicsControlEvidence: args.decPhysicsControlEvidence,
+      recommendedPatchClass: recommendation,
+    });
+  if (
+    recommendation !== "model_term_extension_patch" ||
+    args.decRemediationEvidence.recommendedPatchClass ===
+      "model_term_extension_patch"
+  ) {
+    return {
+      ...args.decRemediationEvidence,
+      modelTermExtensionPlanEvidence,
+    };
+  }
+  return {
+    ...args.decRemediationEvidence,
+    recommendedPatchClass: "model_term_extension_patch",
+    modelTermExtensionPlanEvidence,
+    notes: Array.from(
+      new Set([
+        ...args.decRemediationEvidence.notes,
+        "recommendedPatchClassOverride=model_term_extension_patch",
+        "recommendedPatchClassOverrideReason=bounded_dec_control_envelope_exhausted_with_comparable_non_regression_pass",
+      ]),
+    ),
+  };
 };
 
 const deriveNhm2TileObserverConditionAuthorityFromComparabilityEvidence = (
@@ -11006,6 +12568,11 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
       tileObserverConditionComparabilityEvidence,
       emissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
     });
+  const observerDecRemediationEvidenceFinal =
+    harmonizeNhm2ObserverDecRemediationEvidence({
+      decRemediationEvidence: observerDecRemediationEvidence,
+      decPhysicsControlEvidence: observerDecPhysicsControlEvidence,
+    });
   const runtimeAppliedTensorProjection =
     applyNhm2DecPhysicsRuntimeAppliedTensorConditions({
       metricTensorInput: metricRequired,
@@ -11015,7 +12582,7 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
   const observerNextTechnicalAction = resolveNhm2ObserverNextTechnicalAction({
     fallbackAction: metricAdmissionSummary.nextTechnicalAction,
     emissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
-    decRemediationEvidence: observerDecRemediationEvidence,
+    decRemediationEvidence: observerDecRemediationEvidenceFinal,
   });
   state.nhm2ObserverAudit = buildNhm2ObserverAuditArtifact({
     familyId: "nhm2_shift_lapse",
@@ -11045,7 +12612,7 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
     observerNextTechnicalAction,
     metricProducerAdmissionEvidence,
     modelTermSemanticAdmissionEvidence,
-    observerDecRemediationEvidence,
+    observerDecRemediationEvidence: observerDecRemediationEvidenceFinal,
     observerDecPhysicsControlEvidence,
     t00PolicyAdmissionBridgeEvidence:
       metricAdmissionSummary.t00PolicyAdmissionBridgeEvidence,

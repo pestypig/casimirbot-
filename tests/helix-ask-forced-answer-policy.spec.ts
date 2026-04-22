@@ -40,20 +40,50 @@ describe("helix ask forced answer policy", () => {
         verbosity: "brief",
       }),
     ).toBe(false);
+    expect(
+      shouldFastPathFinalizeHelixAskForcedAnswer({
+        shouldShortCircuitAnswer: true,
+        fallbackAnswer: "Hello! How can I assist you today?",
+        forcedAnswerIsHard: true,
+        forcedRule: "forcedAnswer:smalltalk_fast_path",
+        conceptFastPath: false,
+        isIdeologyReferenceIntent: false,
+        verbosity: "brief",
+      }),
+    ).toBe(true);
   });
 
   it("preserves only the intended forced-answer categories across composer and finalizer", () => {
     expect(isHelixAskHardForcedShortCircuitRule("forcedAnswer:concept_short_definition")).toBe(
       true,
     );
+    expect(
+      isHelixAskHardForcedShortCircuitRule("forcedAnswer:pre_intent_microplanner_answer"),
+    ).toBe(true);
+    expect(isHelixAskHardForcedShortCircuitRule("forcedAnswer:smalltalk_fast_path")).toBe(true);
     expect(isHelixAskConceptForcedShortCircuitRule("forcedAnswer:concept")).toBe(true);
     expect(isHelixAskClarifyForcedShortCircuitRule("forcedAnswer:pre_intent_clarify")).toBe(
       true,
     );
     expect(
+      isHelixAskClarifyForcedShortCircuitRule("forcedAnswer:pre_intent_clarify_deictic"),
+    ).toBe(true);
+    expect(
       shouldPreserveHelixAskForcedAnswerAcrossComposer({
         forcedAnswerPinned: true,
         forcedRule: "forcedAnswer:concept_short_definition",
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:pre_intent_microplanner_answer",
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:smalltalk_fast_path",
       }),
     ).toBe(true);
     expect(

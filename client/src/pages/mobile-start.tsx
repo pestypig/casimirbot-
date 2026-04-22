@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock3,
   Home,
+  LayoutGrid,
   MessageCircle,
   PanelsTopLeft,
   Pin,
@@ -10,7 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import { panelRegistry } from "@/lib/desktop/panelRegistry";
+import { getPanelDef, panelRegistry } from "@/lib/desktop/panelRegistry";
 import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { MobilePanelHost } from "@/components/mobile/MobilePanelHost";
 import { recordPanelActivity } from "@/lib/essence/activityReporter";
@@ -23,13 +24,24 @@ import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogCont
 import { PROFILE_STORAGE_KEY, useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import { MobileHelixAskDrawer } from "@/components/workstation/mobile/MobileHelixAskDrawer";
+import {
+  HELIX_WORKSTATION_ACTION_EVENT,
+  coerceHelixWorkstationActions,
+  type HelixWorkstationAction,
+} from "@/lib/workstation/workstationActionContract";
+import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
+import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
+const PENDING_PANEL_KEY = "helix:pending-panel";
 
 export default function MobileStartPage() {
   const [, setLocation] = useLocation();
   const { stack, activeId, open, activate, close, closeAll, goHome } = useMobileAppStore();
+  const toggleMobileDrawer = useWorkstationLayoutStore((state) => state.toggleMobileDrawer);
   const { userSettings, updateSettings } = useHelixStartSettings();
   const {
     settingsOpen,
@@ -38,8 +50,10 @@ export default function MobileStartPage() {
     openSettings,
     handleSettingsOpenChange,
   } = useHelixSettingsDialog("preferences");
+  const mobileWorkstationEnabled =
+    String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_MOBILE_SHELL ?? "1") !== "0";
   const [showSwitcher, setShowSwitcher] = useState(false);
-  const [appViewerOpen, setAppViewerOpen] = useState(false);
+  const [appViewerOpen, setAppViewerOpen] = useState(mobileWorkstationEnabled);
   const pressTimer = useRef<ReturnType<typeof setTimeout>>();
   const pressTriggered = useRef(false);
 
@@ -71,6 +85,18 @@ export default function MobileStartPage() {
   const gridPanels = useMemo(
     () => panelRegistry.filter((panel) => !pinnedIds.has(panel.id)),
     [pinnedIds]
+  );
+  const launcherPanels = useMemo(
+    () =>
+      panelRegistry
+        .filter((panel) => !panel.startHidden)
+        .sort((a, b) => {
+          const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
+          const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
+          if (aReady !== bReady) return bReady - aReady;
+          return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+        }),
+    [],
   );
 
   const recents = useMemo(
@@ -110,10 +136,12 @@ export default function MobileStartPage() {
   }, []);
 
   const closeAppViewer = useCallback(() => {
-    setAppViewerOpen(false);
+    if (!mobileWorkstationEnabled) {
+      setAppViewerOpen(false);
+    }
     setShowSwitcher(false);
     goHome();
-  }, [goHome]);
+  }, [goHome, mobileWorkstationEnabled]);
 
   const startLongPress = () => {
     pressTriggered.current = false;
@@ -137,6 +165,17 @@ export default function MobileStartPage() {
     pressTriggered.current = false;
   };
 
+  const openPanelUniversal = useCallback(
+    (panelId: string) => {
+      if (!panelId) return;
+      if (!getPanelDef(panelId)) return;
+      open(panelId);
+      setAppViewerOpen(true);
+      setShowSwitcher(false);
+    },
+    [open],
+  );
+
   const handleTilePress = (panelId: string) => {
     const panel = panelRegistry.find((p) => p.id === panelId);
     if (!panel) return;
@@ -150,28 +189,21 @@ export default function MobileStartPage() {
       window.alert("Closing older panels to keep performance steady on this device.");
     }
     recordPanelActivity(panel.id, "openMobile");
-    open(panelId);
-    setAppViewerOpen(true);
-    setShowSwitcher(false);
+    openPanelUniversal(panelId);
   };
 
   const handleOpenPanel = useCallback(
     (panelId: string) => {
-      if (!panelId) return;
-      open(panelId);
-      setAppViewerOpen(true);
-      setShowSwitcher(false);
+      openPanelUniversal(panelId);
     },
-    [open]
+    [openPanelUniversal]
   );
 
   const handleOpenConversation = useCallback(
     (_sessionId: string) => {
-      open("agi-essence-console");
-      setAppViewerOpen(true);
-      setShowSwitcher(false);
+      openPanelUniversal("agi-essence-console");
     },
-    [open]
+    [openPanelUniversal]
   );
 
   useEffect(() => {
@@ -180,9 +212,111 @@ export default function MobileStartPage() {
   }, []);
 
   useEffect(() => {
-    goHome();
-    setShowSwitcher(false);
-  }, [goHome]);
+    if (!mobileWorkstationEnabled) {
+      goHome();
+      setShowSwitcher(false);
+    }
+  }, [goHome, mobileWorkstationEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const pending = window.localStorage.getItem(PENDING_PANEL_KEY);
+      if (pending) {
+        openPanelUniversal(pending);
+        window.localStorage.removeItem(PENDING_PANEL_KEY);
+      }
+    } catch {
+      // ignore storage failures
+    }
+    const handleOpen = (event: Event) => {
+      const custom = event as CustomEvent<{ id?: string }>;
+      const id = custom?.detail?.id;
+      if (!id) return;
+      openPanelUniversal(id);
+    };
+    window.addEventListener("open-helix-panel", handleOpen as EventListener);
+    const handleWorkstationAction = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>)?.detail;
+      const actions = coerceHelixWorkstationActions(detail);
+      if (actions.length === 0) return;
+      const store = useWorkstationLayoutStore.getState();
+      const runAction = (action: HelixWorkstationAction) => {
+        switch (action.action) {
+          case "open_panel":
+          case "focus_panel":
+            openPanelUniversal(action.panel_id);
+            return;
+          case "close_panel":
+            close(action.panel_id);
+            return;
+          case "open_settings":
+            openSettings(action.tab ?? "preferences");
+            return;
+          case "toggle_mobile_drawer":
+            if (typeof action.open === "boolean") {
+              store.setMobileDrawerOpen(action.open);
+            } else {
+              store.toggleMobileDrawer();
+            }
+            if (action.snap) {
+              store.setMobileDrawerSnap(action.snap);
+            }
+            return;
+          case "run_panel_action":
+            executeHelixPanelAction(
+              {
+                panel_id: action.panel_id,
+                action_id: action.action_id,
+                args: action.args,
+              },
+              {
+                openPanel: (panelId) => openPanelUniversal(panelId),
+                focusPanel: (panelId) => {
+                  openPanelUniversal(panelId);
+                  activate(panelId);
+                },
+                closePanel: (panelId) => close(panelId),
+                openSettings: (tab) => openSettings(tab ?? "preferences"),
+              },
+            );
+            return;
+          case "run_job":
+            void runWorkstationJob({
+              contextId: HELIX_ASK_CONTEXT_ID.mobile,
+              payload: action.payload,
+              executionContext: {
+                openPanel: (panelId) => openPanelUniversal(panelId),
+                focusPanel: (panelId) => {
+                  openPanelUniversal(panelId);
+                  activate(panelId);
+                },
+                closePanel: (panelId) => close(panelId),
+                openSettings: (tab) => openSettings(tab ?? "preferences"),
+              },
+            });
+            return;
+          case "set_chat_dock":
+          case "split_active_group":
+            return;
+          default:
+            return;
+        }
+      };
+      actions.forEach(runAction);
+    };
+    window.addEventListener(
+      HELIX_WORKSTATION_ACTION_EVENT,
+      handleWorkstationAction as EventListener,
+    );
+    return () => {
+      window.removeEventListener("open-helix-panel", handleOpen as EventListener);
+      window.removeEventListener(
+        HELIX_WORKSTATION_ACTION_EVENT,
+        handleWorkstationAction as EventListener,
+      );
+    };
+  }, [activate, close, openPanelUniversal, openSettings]);
 
   const clearSavedChoice = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -240,6 +374,16 @@ export default function MobileStartPage() {
               Home
             </button>
             <div className="flex items-center gap-2">
+              {mobileWorkstationEnabled ? (
+                <button
+                  type="button"
+                  className={`inline-flex ${navButtonClass}`}
+                  onClick={() => setShowSwitcher(true)}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Panels
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={`inline-flex ${navButtonClass}`}
@@ -250,7 +394,13 @@ export default function MobileStartPage() {
               </button>
               <button
                 className={`inline-flex ${navPrimaryButtonClass}`}
-                onClick={closeAppViewer}
+                onClick={() => {
+                  if (mobileWorkstationEnabled) {
+                    toggleMobileDrawer();
+                    return;
+                  }
+                  closeAppViewer();
+                }}
               >
                 <MessageCircle className="h-4 w-4" />
                 Ask
@@ -317,7 +467,9 @@ export default function MobileStartPage() {
                   <div>
                     <h2 className="text-base font-semibold text-foreground">Pick a panel</h2>
                     <p className="text-sm text-muted-foreground/85">
-                      Tap a tile to open it full-screen. Long-press Home to jump between open panels.
+                      {mobileWorkstationEnabled
+                        ? "Tap a tile to open it while keeping Helix Ask available in the drawer."
+                        : "Tap a tile to open it full-screen. Long-press Home to jump between open panels."}
                     </p>
                   </div>
                   <button
@@ -365,8 +517,9 @@ export default function MobileStartPage() {
               {!stack.length && (
                 <section className={sectionCardClass}>
                   <p className="text-sm text-muted-foreground/90">
-                    No panels are open yet. Tap any tile above to launch it. Short-tap Home to return here; hold Home to
-                    open the task switcher.
+                    {mobileWorkstationEnabled
+                      ? "No panels are open yet. Tap any tile above or use Panels in the header to launch one."
+                      : "No panels are open yet. Tap any tile above to launch it. Short-tap Home to return here; hold Home to open the task switcher."}
                   </p>
                 </section>
               )}
@@ -418,6 +571,13 @@ export default function MobileStartPage() {
           </div>
         )}
 
+        {mobileWorkstationEnabled ? (
+          <MobileHelixAskDrawer
+            onOpenPanel={handleOpenPanel}
+            onOpenConversation={handleOpenConversation}
+          />
+        ) : null}
+
         <button
           type="button"
           className="pointer-events-auto fixed right-5 top-4 z-30 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-primary/45 bg-card/74 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -427,7 +587,7 @@ export default function MobileStartPage() {
           Settings
         </button>
 
-        {!appViewerOpen && (
+        {!mobileWorkstationEnabled && !appViewerOpen && (
           <button
             className="pointer-events-auto fixed bottom-6 left-5 z-20 flex min-h-[48px] items-center gap-2 rounded-full border border-primary/45 bg-primary/18 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary shadow-[0_0_26px_hsl(var(--primary)/0.32)] transition hover:bg-primary/26 active:scale-[0.99] active:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={openAppViewer}
@@ -450,7 +610,9 @@ export default function MobileStartPage() {
             <div className="flex items-center justify-between rounded-2xl border border-primary/35 bg-card/86 px-4 py-3 text-foreground shadow-[0_30px_90px_hsl(var(--primary)/0.2)]">
               <div className="flex items-center gap-2">
                 <PanelsTopLeft className="h-4 w-4 text-primary" />
-                <p className="text-sm font-semibold text-foreground">Task switcher</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {mobileWorkstationEnabled ? "Panels" : "Task switcher"}
+                </p>
               </div>
               <button
                 className="rounded-full p-1 text-foreground/85 transition hover:bg-primary/18 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -461,6 +623,47 @@ export default function MobileStartPage() {
             </div>
 
             <div className="mt-4 space-y-3">
+              {mobileWorkstationEnabled ? (
+                <div className="rounded-xl border border-primary/25 bg-card/74 p-3 text-foreground shadow-[0_20px_60px_hsl(var(--primary)/0.14)]">
+                  <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
+                    Launch panel
+                  </p>
+                  <button
+                    type="button"
+                    className="mb-2 flex w-full min-h-[38px] items-center justify-between rounded-lg border border-sky-300/30 bg-sky-500/10 px-3 py-2 text-left text-xs text-sky-100 transition hover:bg-sky-500/20"
+                    onClick={() => {
+                      openSettings("preferences");
+                      setShowSwitcher(false);
+                    }}
+                  >
+                    <span>Helix Start Settings</span>
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="max-h-40 space-y-1 overflow-y-auto">
+                    {launcherPanels.map((panel) => (
+                      <button
+                        key={`launch-${panel.id}`}
+                        className="flex w-full min-h-[38px] items-center justify-between rounded-lg border border-primary/25 bg-card/68 px-3 py-2 text-left text-xs text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary"
+                        onClick={() => {
+                          handleTilePress(panel.id);
+                          setShowSwitcher(false);
+                        }}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <span className="line-clamp-1">{panel.title}</span>
+                          {panel.workstationCapabilities?.v1_job_ready ? (
+                            <span className="rounded border border-emerald-300/40 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-200">
+                              Job-ready
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground/80">Open</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {stack.length === 0 && (
                 <div className="rounded-xl border border-primary/25 bg-card/74 px-4 py-3 text-sm text-muted-foreground/85 shadow-[inset_0_0_24px_hsl(var(--primary)/0.08)]">
                   No panels open. Tap a tile to launch one.

@@ -30365,6 +30365,16 @@ const renderNhm2ObserverAuditMarkdown = (
         ? evidence.citationRefs.join("<br>")
         : "none";
     const notes = evidence.notes.length > 0 ? evidence.notes.join("<br>") : "none";
+    const extensionPlanEvidence = evidence.modelTermExtensionPlanEvidence;
+    const extensionPlanCitationRefs =
+      extensionPlanEvidence?.citationRefs != null &&
+      extensionPlanEvidence.citationRefs.length > 0
+        ? extensionPlanEvidence.citationRefs.join("<br>")
+        : "none";
+    const extensionPlanNotes =
+      extensionPlanEvidence?.notes != null && extensionPlanEvidence.notes.length > 0
+        ? extensionPlanEvidence.notes.join("<br>")
+        : "none";
     return `## Observer DEC Remediation Evidence
 | field | value |
 |---|---|
@@ -30381,6 +30391,20 @@ const renderNhm2ObserverAuditMarkdown = (
 | typeIFractionTileReconstituted | ${evidence.typeIFractionTileReconstituted ?? "null"} |
 | dominantViolationClass | ${evidence.dominantViolationClass} |
 | recommendedPatchClass | ${evidence.recommendedPatchClass} |
+| modelTermExtensionPlanEvidence.status | ${extensionPlanEvidence?.status ?? "null"} |
+| modelTermExtensionPlanEvidence.trigger | ${extensionPlanEvidence?.trigger ?? "null"} |
+| modelTermExtensionPlanEvidence.chartRef | ${extensionPlanEvidence?.chartRef ?? "null"} |
+| modelTermExtensionPlanEvidence.routeId | ${extensionPlanEvidence?.routeId ?? "null"} |
+| modelTermExtensionPlanEvidence.selectedPath | ${extensionPlanEvidence?.selectedPath ?? "null"} |
+| modelTermExtensionPlanEvidence.dominantViolationClass | ${extensionPlanEvidence?.dominantViolationClass ?? "null"} |
+| modelTermExtensionPlanEvidence.requiredLiftToZero | ${extensionPlanEvidence?.requiredLiftToZero ?? "null"} |
+| modelTermExtensionPlanEvidence.bestAchievedLift | ${extensionPlanEvidence?.bestAchievedLift ?? "null"} |
+| modelTermExtensionPlanEvidence.residualMarginToZero | ${extensionPlanEvidence?.residualMarginToZero ?? "null"} |
+| modelTermExtensionPlanEvidence.gapToZero | ${extensionPlanEvidence?.gapToZero ?? "null"} |
+| modelTermExtensionPlanEvidence.preferredImplementationRoute | ${extensionPlanEvidence?.preferredImplementationRoute ?? "null"} |
+| modelTermExtensionPlanEvidence.nextPatchClass | ${extensionPlanEvidence?.nextPatchClass ?? "null"} |
+| modelTermExtensionPlanEvidence.citationRefs | ${extensionPlanCitationRefs} |
+| modelTermExtensionPlanEvidence.notes | ${extensionPlanNotes} |
 | citationRefs | ${citationRefs} |
       | notes | ${notes} |
 `;
@@ -30415,7 +30439,7 @@ const renderNhm2ObserverAuditMarkdown = (
             )
             .join("<br>")
         : "none";
-    const sweepPhaseSummary = `coarseCandidates=${evidence.sweepPhaseSummary.coarseCandidateCount ?? "null"} coarsePassing=${evidence.sweepPhaseSummary.coarsePassingCount ?? "null"} refineCandidates=${evidence.sweepPhaseSummary.refineCandidateCount ?? "null"} refinePassing=${evidence.sweepPhaseSummary.refinePassingCount ?? "null"} refineSeeds=${evidence.sweepPhaseSummary.refineSeedCandidateIds.join(",") || "none"} note=${evidence.sweepPhaseSummary.note ?? "none"}`;
+    const sweepPhaseSummary = `coarseCandidates=${evidence.sweepPhaseSummary.coarseCandidateCount ?? "null"} coarsePassing=${evidence.sweepPhaseSummary.coarsePassingCount ?? "null"} refineCandidates=${evidence.sweepPhaseSummary.refineCandidateCount ?? "null"} refinePassing=${evidence.sweepPhaseSummary.refinePassingCount ?? "null"} refineSeeds=${evidence.sweepPhaseSummary.refineSeedCandidateIds.join(",") || "none"} frontierCandidates=${evidence.sweepPhaseSummary.frontierCandidateCount ?? "null"} frontierPassing=${evidence.sweepPhaseSummary.frontierPassingCount ?? "null"} frontierSeed=${evidence.sweepPhaseSummary.frontierSeedCandidateId ?? "null"} note=${evidence.sweepPhaseSummary.note ?? "none"}`;
     const topCandidateLeaderboard =
       evidence.topCandidateLeaderboard.length > 0
         ? evidence.topCandidateLeaderboard
@@ -30447,6 +30471,38 @@ const renderNhm2ObserverAuditMarkdown = (
       evidence.runtimeApplication.citationRefs.length > 0
         ? evidence.runtimeApplication.citationRefs.join("<br>")
         : "none";
+    const decRuntimeDecisionReasonCodes =
+      evidence.decRuntimeDecisionEvidence?.reasonCodes != null &&
+      evidence.decRuntimeDecisionEvidence.reasonCodes.length > 0
+        ? evidence.decRuntimeDecisionEvidence.reasonCodes.join(", ")
+        : "none";
+    const decRuntimeDecisionCitationRefs =
+      evidence.decRuntimeDecisionEvidence?.citationRefs != null &&
+      evidence.decRuntimeDecisionEvidence.citationRefs.length > 0
+        ? evidence.decRuntimeDecisionEvidence.citationRefs.join("<br>")
+        : "none";
+    const familySearchOrder =
+      evidence.familySearchOrder != null && evidence.familySearchOrder.length > 0
+        ? evidence.familySearchOrder.join(", ")
+        : "none";
+    const appliedCandidateEvidence =
+      evidence.appliedCandidateEvidence == null
+        ? "none"
+        : `status=${evidence.appliedCandidateEvidence.status} candidateId=${evidence.appliedCandidateEvidence.candidateId ?? "null"} extensionTrancheId=${evidence.appliedCandidateEvidence.extensionTrancheId ?? "null"} familyId=${evidence.appliedCandidateEvidence.familyId ?? "null"} metricDecMarginToZero=${evidence.appliedCandidateEvidence.metricDecRobustMarginToZero ?? "null"} tileDecMarginToZero=${evidence.appliedCandidateEvidence.tileReconstitutedDecRobustMarginToZero ?? "null"} metricWecNonRegressionMargin=${evidence.appliedCandidateEvidence.metricWecNonRegressionMargin ?? "null"} metricNecNonRegressionMargin=${evidence.appliedCandidateEvidence.metricNecNonRegressionMargin ?? "null"} nonRegressionPass=${evidence.appliedCandidateEvidence.nonRegressionPass == null ? "null" : String(evidence.appliedCandidateEvidence.nonRegressionPass)} comparabilityPass=${evidence.appliedCandidateEvidence.comparabilityPass == null ? "null" : String(evidence.appliedCandidateEvidence.comparabilityPass)} note=${evidence.appliedCandidateEvidence.note ?? "none"}`;
+    const appliedCandidateCitationRefs =
+      evidence.appliedCandidateEvidence?.citationRefs != null &&
+      evidence.appliedCandidateEvidence.citationRefs.length > 0
+        ? evidence.appliedCandidateEvidence.citationRefs.join("<br>")
+        : "none";
+    const rollbackLocalizationEvidence =
+      evidence.rollbackLocalizationEvidence == null
+        ? "none"
+        : `status=${evidence.rollbackLocalizationEvidence.status} candidateId=${evidence.rollbackLocalizationEvidence.candidateId ?? "null"} extensionTrancheId=${evidence.rollbackLocalizationEvidence.extensionTrancheId ?? "null"} familyId=${evidence.rollbackLocalizationEvidence.familyId ?? "null"} failureMode=${evidence.rollbackLocalizationEvidence.failureMode} primaryReasonCode=${evidence.rollbackLocalizationEvidence.primaryReasonCode ?? "null"} reasonCodes=${evidence.rollbackLocalizationEvidence.reasonCodes.join(",") || "none"} metricDecMarginToZero=${evidence.rollbackLocalizationEvidence.metricDecRobustMarginToZero ?? "null"} tileDecMarginToZero=${evidence.rollbackLocalizationEvidence.tileReconstitutedDecRobustMarginToZero ?? "null"} metricWecNonRegressionMargin=${evidence.rollbackLocalizationEvidence.metricWecNonRegressionMargin ?? "null"} metricNecNonRegressionMargin=${evidence.rollbackLocalizationEvidence.metricNecNonRegressionMargin ?? "null"} comparabilityPass=${evidence.rollbackLocalizationEvidence.comparabilityPass == null ? "null" : String(evidence.rollbackLocalizationEvidence.comparabilityPass)} sampleCountSufficient=${evidence.rollbackLocalizationEvidence.sampleCountSufficient == null ? "null" : String(evidence.rollbackLocalizationEvidence.sampleCountSufficient)} note=${evidence.rollbackLocalizationEvidence.note ?? "none"}`;
+    const rollbackLocalizationCitationRefs =
+      evidence.rollbackLocalizationEvidence?.citationRefs != null &&
+      evidence.rollbackLocalizationEvidence.citationRefs.length > 0
+        ? evidence.rollbackLocalizationEvidence.citationRefs.join("<br>")
+        : "none";
     const crossZeroCitationRefs =
       evidence.crossZeroFeasibilityEvidence.citationRefs.length > 0
         ? evidence.crossZeroFeasibilityEvidence.citationRefs.join("<br>")
@@ -30477,15 +30533,60 @@ const renderNhm2ObserverAuditMarkdown = (
             )
             .join("<br>")
         : "none";
+    const researchSupportMap =
+      evidence.researchSupportMap != null &&
+      Object.keys(evidence.researchSupportMap).length > 0
+        ? Object.values(evidence.researchSupportMap)
+            .map(
+              (entry) =>
+                `${entry.claimId}:${entry.supportLevel}:citations=${entry.citationRefs.join(",") || "none"}:evidence=${entry.evidenceRefs.join(",") || "none"}:note=${entry.note ?? "none"}`,
+            )
+            .join("<br>")
+        : "none";
     const zeroCrossReasonCodes =
       evidence.zeroCrossFeasibilityReasonCodes != null &&
       evidence.zeroCrossFeasibilityReasonCodes.length > 0
         ? evidence.zeroCrossFeasibilityReasonCodes.join(", ")
         : "none";
+    const decResidualAttributionStatus =
+      evidence.decResidualAttributionEvidence?.status ?? "none";
+    const decResidualAttributionPrimarySurface =
+      evidence.decResidualAttributionEvidence?.primarySurface ?? "none";
+    const decResidualAttributionDominantViolationClass =
+      evidence.decResidualAttributionEvidence?.dominantViolationClass ?? "none";
+    const decResidualAttributionSelectionReasonCodes =
+      evidence.decResidualAttributionEvidence?.selectionReasonCodes != null &&
+      evidence.decResidualAttributionEvidence.selectionReasonCodes.length > 0
+        ? evidence.decResidualAttributionEvidence.selectionReasonCodes.join(", ")
+        : "none";
+    const decResidualAttributionSelectedCandidate =
+      evidence.decResidualAttributionEvidence == null
+        ? "none"
+        : `candidateId=${evidence.decResidualAttributionEvidence.selectedCandidate.candidateId ?? "null"} class=${evidence.decResidualAttributionEvidence.selectedCandidate.candidateClass ?? "null"} phase=${evidence.decResidualAttributionEvidence.selectedCandidate.sweepPhase ?? "null"} metricMargin=${evidence.decResidualAttributionEvidence.selectedCandidate.metricDecRobustMarginToZero ?? "null"} tileMargin=${evidence.decResidualAttributionEvidence.selectedCandidate.tileReconstitutedDecRobustMarginToZero ?? "null"} metricLift=${evidence.decResidualAttributionEvidence.selectedCandidate.metricDecRobustLift ?? "null"} tileLift=${evidence.decResidualAttributionEvidence.selectedCandidate.tileReconstitutedDecRobustLift ?? "null"} deviation=${evidence.decResidualAttributionEvidence.selectedCandidate.controlDeviationMagnitude ?? "null"}`;
+    const decResidualAttributionCitationRefs =
+      evidence.decResidualAttributionEvidence?.citationRefs != null &&
+      evidence.decResidualAttributionEvidence.citationRefs.length > 0
+        ? evidence.decResidualAttributionEvidence.citationRefs.join("<br>")
+        : "none";
+    const decResidualAttributionNotes =
+      evidence.decResidualAttributionEvidence?.notes != null &&
+      evidence.decResidualAttributionEvidence.notes.length > 0
+        ? evidence.decResidualAttributionEvidence.notes.join("<br>")
+        : "none";
+    const decFrontierImprovementCitationRefs =
+      evidence.decFrontierImprovementEvidence?.citationRefs != null &&
+      evidence.decFrontierImprovementEvidence.citationRefs.length > 0
+        ? evidence.decFrontierImprovementEvidence.citationRefs.join("<br>")
+        : "none";
+    const decFrontierImprovementNotes =
+      evidence.decFrontierImprovementEvidence?.notes != null &&
+      evidence.decFrontierImprovementEvidence.notes.length > 0
+        ? evidence.decFrontierImprovementEvidence.notes.join("<br>")
+        : "none";
     const boundedSearchEnvelope =
       evidence.boundedSearchEnvelope == null
         ? "none"
-        : `pressureScale=[${evidence.boundedSearchEnvelope.pressureScaleMin ?? "null"},${evidence.boundedSearchEnvelope.pressureScaleMax ?? "null"}] densityLift=[${evidence.boundedSearchEnvelope.densityLiftMin ?? "null"},${evidence.boundedSearchEnvelope.densityLiftMax ?? "null"}] fluxScale=[${evidence.boundedSearchEnvelope.fluxScaleMin ?? "null"},${evidence.boundedSearchEnvelope.fluxScaleMax ?? "null"}] shearScale=[${evidence.boundedSearchEnvelope.shearScaleMin ?? "null"},${evidence.boundedSearchEnvelope.shearScaleMax ?? "null"}] coarseStep={pressureScale:${evidence.boundedSearchEnvelope.coarsePressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.coarseDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.coarseFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.coarseShearScaleStep ?? "null"}} refineStep={pressureScale:${evidence.boundedSearchEnvelope.refinePressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.refineDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.refineFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.refineShearScaleStep ?? "null"}} coarseCandidates=${evidence.boundedSearchEnvelope.coarseCandidateCount ?? "null"} refineCandidates=${evidence.boundedSearchEnvelope.refineCandidateCount ?? "null"} refineSeeds=${evidence.boundedSearchEnvelope.refineSeedCount ?? "null"} observerDomainFixed=${String(evidence.boundedSearchEnvelope.observerDomainFixed)}`;
+        : `pressureScale=[${evidence.boundedSearchEnvelope.pressureScaleMin ?? "null"},${evidence.boundedSearchEnvelope.pressureScaleMax ?? "null"}] densityLift=[${evidence.boundedSearchEnvelope.densityLiftMin ?? "null"},${evidence.boundedSearchEnvelope.densityLiftMax ?? "null"}] fluxScale=[${evidence.boundedSearchEnvelope.fluxScaleMin ?? "null"},${evidence.boundedSearchEnvelope.fluxScaleMax ?? "null"}] shearScale=[${evidence.boundedSearchEnvelope.shearScaleMin ?? "null"},${evidence.boundedSearchEnvelope.shearScaleMax ?? "null"}] coarseStep={pressureScale:${evidence.boundedSearchEnvelope.coarsePressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.coarseDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.coarseFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.coarseShearScaleStep ?? "null"}} refineStep={pressureScale:${evidence.boundedSearchEnvelope.refinePressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.refineDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.refineFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.refineShearScaleStep ?? "null"}} frontierStep={pressureScale:${evidence.boundedSearchEnvelope.frontierPressureStep ?? "null"},densityLift:${evidence.boundedSearchEnvelope.frontierDensityLiftStep ?? "null"},fluxScale:${evidence.boundedSearchEnvelope.frontierFluxScaleStep ?? "null"},shearScale:${evidence.boundedSearchEnvelope.frontierShearScaleStep ?? "null"}} coarseCandidates=${evidence.boundedSearchEnvelope.coarseCandidateCount ?? "null"} refineCandidates=${evidence.boundedSearchEnvelope.refineCandidateCount ?? "null"} frontierCandidates=${evidence.boundedSearchEnvelope.frontierCandidateCount ?? "null"} refineSeeds=${evidence.boundedSearchEnvelope.refineSeedCount ?? "null"} observerDomainFixed=${String(evidence.boundedSearchEnvelope.observerDomainFixed)}`;
     const claimCitationMapCompleteness =
       evidence.claimCitationMapCompleteness == null
         ? "none"
@@ -30504,6 +30605,52 @@ const renderNhm2ObserverAuditMarkdown = (
                 `${entry.claimId}:${entry.confidenceLabel}:citations=${entry.citationRefs.join(",") || "none"}:note=${entry.note ?? "none"}`,
             )
             .join("<br>");
+    const modelTermExtensionFamilyEvidence =
+      evidence.modelTermExtensionFamilyEvidence == null
+        ? "none"
+        : `status=${evidence.modelTermExtensionFamilyEvidence.status} selectionBasis=${evidence.modelTermExtensionFamilyEvidence.selectionBasis ?? "none"} selectedFamilyId=${evidence.modelTermExtensionFamilyEvidence.selectedFamilyId ?? "null"} selectedFamilyReason=${evidence.modelTermExtensionFamilyEvidence.selectedFamilyReason ?? "none"} comparabilityPass=${String(evidence.modelTermExtensionFamilyEvidence.comparabilityGate.pass)} independentCrossCheckStatus=${evidence.modelTermExtensionFamilyEvidence.comparabilityGate.independentCrossCheckStatus} note=${evidence.modelTermExtensionFamilyEvidence.comparabilityGate.note ?? "none"}`;
+    const modelTermExtensionFamilyRows =
+      evidence.modelTermExtensionFamilyEvidence?.families == null ||
+      evidence.modelTermExtensionFamilyEvidence.families.length === 0
+        ? "none"
+        : evidence.modelTermExtensionFamilyEvidence.families
+            .map(
+              (entry) =>
+                `${entry.familyId}:${entry.label}:candidates=${entry.candidateCount}:passing=${entry.passingCandidateCount}:bestCandidate=${entry.bestCandidateId ?? "null"}:bestPrimaryMargin=${entry.bestPrimaryMargin ?? "null"}:bestMetricLift=${entry.bestMetricDecLift ?? "null"}:bestTileLift=${entry.bestTileDecLift ?? "null"}:crossesZero=${entry.crossesZeroBothDecMargins == null ? "null" : String(entry.crossesZeroBothDecMargins)}:recommendation=${entry.recommendation}:reasonCodes=${entry.reasonCodes.join(",") || "none"}:note=${entry.note ?? "none"}`,
+            )
+            .join("<br>");
+    const modelTermExtensionFamilyCitationRefs =
+      evidence.modelTermExtensionFamilyEvidence?.citationRefs != null &&
+      evidence.modelTermExtensionFamilyEvidence.citationRefs.length > 0
+        ? evidence.modelTermExtensionFamilyEvidence.citationRefs.join("<br>")
+        : "none";
+    const modelTermExtensionFamilyNotes =
+      evidence.modelTermExtensionFamilyEvidence?.notes != null &&
+      evidence.modelTermExtensionFamilyEvidence.notes.length > 0
+        ? evidence.modelTermExtensionFamilyEvidence.notes.join("<br>")
+        : "none";
+    const fluxShearExtensionEvidence =
+      evidence.fluxShearExtensionEvidence == null
+        ? "none"
+        : `status=${evidence.fluxShearExtensionEvidence.status} routeId=${evidence.fluxShearExtensionEvidence.routeId ?? "null"} selectedPath=${evidence.fluxShearExtensionEvidence.selectedPath ?? "null"} selectedFamilyId=${evidence.fluxShearExtensionEvidence.selectedFamilyId ?? "null"} selectionBasis=${evidence.fluxShearExtensionEvidence.selectionBasis ?? "none"} bestCandidateId=${evidence.fluxShearExtensionEvidence.bestCandidateId ?? "null"} bestPrimaryMargin=${evidence.fluxShearExtensionEvidence.bestPrimaryMargin ?? "null"} bestMetricLift=${evidence.fluxShearExtensionEvidence.bestMetricDecLift ?? "null"} bestTileLift=${evidence.fluxShearExtensionEvidence.bestTileDecLift ?? "null"} crossZeroAchieved=${evidence.fluxShearExtensionEvidence.crossZeroAchieved == null ? "null" : String(evidence.fluxShearExtensionEvidence.crossZeroAchieved)} boundedEnvelopeExhausted=${evidence.fluxShearExtensionEvidence.boundedEnvelopeExhausted == null ? "null" : String(evidence.fluxShearExtensionEvidence.boundedEnvelopeExhausted)} nonRegressionPass=${evidence.fluxShearExtensionEvidence.nonRegressionPass == null ? "null" : String(evidence.fluxShearExtensionEvidence.nonRegressionPass)} recommendation=${evidence.fluxShearExtensionEvidence.recommendation}`;
+    const fluxShearExtensionParameterEnvelope =
+      evidence.fluxShearExtensionEvidence == null
+        ? "none"
+        : `pressureScale=[${evidence.fluxShearExtensionEvidence.parameterEnvelope.pressureScaleMin ?? "null"},${evidence.fluxShearExtensionEvidence.parameterEnvelope.pressureScaleMax ?? "null"}] densityLift=[${evidence.fluxShearExtensionEvidence.parameterEnvelope.densityLiftMin ?? "null"},${evidence.fluxShearExtensionEvidence.parameterEnvelope.densityLiftMax ?? "null"}] fluxScale=[${evidence.fluxShearExtensionEvidence.parameterEnvelope.fluxScaleMin ?? "null"},${evidence.fluxShearExtensionEvidence.parameterEnvelope.fluxScaleMax ?? "null"}] shearScale=[${evidence.fluxShearExtensionEvidence.parameterEnvelope.shearScaleMin ?? "null"},${evidence.fluxShearExtensionEvidence.parameterEnvelope.shearScaleMax ?? "null"}]`;
+    const fluxShearExtensionComparabilityGate =
+      evidence.fluxShearExtensionEvidence == null
+        ? "none"
+        : `pass=${String(evidence.fluxShearExtensionEvidence.comparabilityGate.pass)} independentCrossCheckStatus=${evidence.fluxShearExtensionEvidence.comparabilityGate.independentCrossCheckStatus} referenceRouteId=${evidence.fluxShearExtensionEvidence.comparabilityGate.referenceRouteId ?? "null"} comparableSampleCount=${evidence.fluxShearExtensionEvidence.comparabilityGate.comparableSampleCount ?? "null"} minimumComparableSampleCount=${evidence.fluxShearExtensionEvidence.comparabilityGate.minimumComparableSampleCount ?? "null"} note=${evidence.fluxShearExtensionEvidence.comparabilityGate.note ?? "none"}`;
+    const fluxShearExtensionCitationRefs =
+      evidence.fluxShearExtensionEvidence?.citationRefs != null &&
+      evidence.fluxShearExtensionEvidence.citationRefs.length > 0
+        ? evidence.fluxShearExtensionEvidence.citationRefs.join("<br>")
+        : "none";
+    const fluxShearExtensionNotes =
+      evidence.fluxShearExtensionEvidence?.notes != null &&
+      evidence.fluxShearExtensionEvidence.notes.length > 0
+        ? evidence.fluxShearExtensionEvidence.notes.join("<br>")
+        : "none";
     return `## Observer DEC Physics Control Evidence
 | field | value |
 |---|---|
@@ -30549,6 +30696,7 @@ const renderNhm2ObserverAuditMarkdown = (
 | crossZeroFeasibilityEvidence.residualMarginToZero | ${evidence.crossZeroFeasibilityEvidence.residualMarginToZero ?? "null"} |
 | crossZeroFeasibilityEvidence.gapToZero | ${evidence.crossZeroFeasibilityEvidence.gapToZero ?? "null"} |
 | crossZeroFeasibilityEvidence.crossZeroAchieved | ${evidence.crossZeroFeasibilityEvidence.crossZeroAchieved == null ? "null" : String(evidence.crossZeroFeasibilityEvidence.crossZeroAchieved)} |
+| crossZeroFeasibilityEvidence.boundedEnvelopeExhausted | ${evidence.crossZeroFeasibilityEvidence.boundedEnvelopeExhausted == null ? "null" : String(evidence.crossZeroFeasibilityEvidence.boundedEnvelopeExhausted)} |
 | crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMin | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMin ?? "null"} |
 | crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMax | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.pressureScaleMax ?? "null"} |
 | crossZeroFeasibilityEvidence.boundedControlEnvelope.densityLiftMin | ${evidence.crossZeroFeasibilityEvidence.boundedControlEnvelope.densityLiftMin ?? "null"} |
@@ -30566,6 +30714,34 @@ const renderNhm2ObserverAuditMarkdown = (
 | crossZeroFeasibilityEvidence.inferenceLabel | ${evidence.crossZeroFeasibilityEvidence.inferenceLabel} |
 | crossZeroFeasibilityEvidence.citationRefs | ${crossZeroCitationRefs} |
 | crossZeroFeasibilityEvidence.notes | ${crossZeroNotes} |
+| decResidualAttributionEvidence.status | ${decResidualAttributionStatus} |
+| decResidualAttributionEvidence.primarySurface | ${decResidualAttributionPrimarySurface} |
+| decResidualAttributionEvidence.dominantViolationClass | ${decResidualAttributionDominantViolationClass} |
+| decResidualAttributionEvidence.selectedPrimaryMargin | ${evidence.decResidualAttributionEvidence?.selectedPrimaryMargin ?? "null"} |
+| decResidualAttributionEvidence.requiredLiftToZero | ${evidence.decResidualAttributionEvidence?.requiredLiftToZero ?? "null"} |
+| decResidualAttributionEvidence.achievedLiftFromBaseline | ${evidence.decResidualAttributionEvidence?.achievedLiftFromBaseline ?? "null"} |
+| decResidualAttributionEvidence.gapToZero | ${evidence.decResidualAttributionEvidence?.gapToZero ?? "null"} |
+| decResidualAttributionEvidence.selectionPlateauStatus | ${evidence.decResidualAttributionEvidence?.selectionPlateauStatus ?? "null"} |
+| decResidualAttributionEvidence.zeroCrossFeasibilityDecision | ${evidence.decResidualAttributionEvidence?.zeroCrossFeasibilityDecision ?? "null"} |
+| decResidualAttributionEvidence.selectionReasonCodes | ${decResidualAttributionSelectionReasonCodes} |
+| decResidualAttributionEvidence.rankingBasis | ${evidence.decResidualAttributionEvidence?.rankingBasis ?? "null"} |
+| decResidualAttributionEvidence.selectedCandidate | ${decResidualAttributionSelectedCandidate} |
+| decResidualAttributionEvidence.citationRefs | ${decResidualAttributionCitationRefs} |
+| decResidualAttributionEvidence.notes | ${decResidualAttributionNotes} |
+| decFrontierImprovementEvidence.status | ${evidence.decFrontierImprovementEvidence?.status ?? "none"} |
+| decFrontierImprovementEvidence.frontierSeedCandidateId | ${evidence.decFrontierImprovementEvidence?.frontierSeedCandidateId ?? "null"} |
+| decFrontierImprovementEvidence.frontierSelectedCandidateId | ${evidence.decFrontierImprovementEvidence?.frontierSelectedCandidateId ?? "null"} |
+| decFrontierImprovementEvidence.frontierCandidateCount | ${evidence.decFrontierImprovementEvidence?.frontierCandidateCount ?? "null"} |
+| decFrontierImprovementEvidence.frontierPassingCount | ${evidence.decFrontierImprovementEvidence?.frontierPassingCount ?? "null"} |
+| decFrontierImprovementEvidence.preFrontierBestPrimaryMargin | ${evidence.decFrontierImprovementEvidence?.preFrontierBestPrimaryMargin ?? "null"} |
+| decFrontierImprovementEvidence.finalBestPrimaryMargin | ${evidence.decFrontierImprovementEvidence?.finalBestPrimaryMargin ?? "null"} |
+| decFrontierImprovementEvidence.frontierBestDeltaFromPreFrontier | ${evidence.decFrontierImprovementEvidence?.frontierBestDeltaFromPreFrontier ?? "null"} |
+| decFrontierImprovementEvidence.frontierBestDeltaFromBaseline | ${evidence.decFrontierImprovementEvidence?.frontierBestDeltaFromBaseline ?? "null"} |
+| decFrontierImprovementEvidence.frontierBestDeltaPercentFromBaseline | ${evidence.decFrontierImprovementEvidence?.frontierBestDeltaPercentFromBaseline ?? "null"} |
+| decFrontierImprovementEvidence.residualGapToZero | ${evidence.decFrontierImprovementEvidence?.residualGapToZero ?? "null"} |
+| decFrontierImprovementEvidence.selectionPlateauStatus | ${evidence.decFrontierImprovementEvidence?.selectionPlateauStatus ?? "null"} |
+| decFrontierImprovementEvidence.citationRefs | ${decFrontierImprovementCitationRefs} |
+| decFrontierImprovementEvidence.notes | ${decFrontierImprovementNotes} |
 | zeroCrossFeasibilityDecision | ${evidence.zeroCrossFeasibilityDecision ?? "null"} |
 | zeroCrossFeasibilityReasonCodes | ${zeroCrossReasonCodes} |
 | boundedSearchEnvelope | ${boundedSearchEnvelope} |
@@ -30601,6 +30777,10 @@ const renderNhm2ObserverAuditMarkdown = (
 | runtimeApplication.guardChecks.semanticAdmissionStable | ${evidence.runtimeApplication.guardChecks.semanticAdmissionStable == null ? "null" : String(evidence.runtimeApplication.guardChecks.semanticAdmissionStable)} |
 | runtimeApplication.guardChecks.metricDecRobustLiftPositive | ${evidence.runtimeApplication.guardChecks.metricDecRobustLiftPositive == null ? "null" : String(evidence.runtimeApplication.guardChecks.metricDecRobustLiftPositive)} |
 | runtimeApplication.guardChecks.tileReconstitutedDecRobustLiftNonNegative | ${evidence.runtimeApplication.guardChecks.tileReconstitutedDecRobustLiftNonNegative == null ? "null" : String(evidence.runtimeApplication.guardChecks.tileReconstitutedDecRobustLiftNonNegative)} |
+| runtimeApplication.guardChecks.crossesZeroBothDecMargins | ${evidence.runtimeApplication.guardChecks.crossesZeroBothDecMargins == null ? "null" : String(evidence.runtimeApplication.guardChecks.crossesZeroBothDecMargins)} |
+| runtimeApplication.guardChecks.independentCrossCheckSignAgreement | ${evidence.runtimeApplication.guardChecks.independentCrossCheckSignAgreement == null ? "null" : String(evidence.runtimeApplication.guardChecks.independentCrossCheckSignAgreement)} |
+| runtimeApplication.guardChecks.uncertaintyBoundPass | ${evidence.runtimeApplication.guardChecks.uncertaintyBoundPass == null ? "null" : String(evidence.runtimeApplication.guardChecks.uncertaintyBoundPass)} |
+| runtimeApplication.guardChecks.referenceCrossesZeroBothDecMargins | ${evidence.runtimeApplication.guardChecks.referenceCrossesZeroBothDecMargins == null ? "null" : String(evidence.runtimeApplication.guardChecks.referenceCrossesZeroBothDecMargins)} |
 | runtimeApplication.observed.metricDecRobustLift | ${evidence.runtimeApplication.observed.metricDecRobustLift ?? "null"} |
 | runtimeApplication.observed.tileReconstitutedDecRobustLift | ${evidence.runtimeApplication.observed.tileReconstitutedDecRobustLift ?? "null"} |
 | runtimeApplication.observed.metricWecRobustDelta | ${evidence.runtimeApplication.observed.metricWecRobustDelta ?? "null"} |
@@ -30609,15 +30789,68 @@ const renderNhm2ObserverAuditMarkdown = (
 | runtimeApplication.observed.tileReconstitutedDecRobustMarginToZero | ${evidence.runtimeApplication.observed.tileReconstitutedDecRobustMarginToZero ?? "null"} |
 | runtimeApplication.observed.metricWecNonRegressionMargin | ${evidence.runtimeApplication.observed.metricWecNonRegressionMargin ?? "null"} |
 | runtimeApplication.observed.metricNecNonRegressionMargin | ${evidence.runtimeApplication.observed.metricNecNonRegressionMargin ?? "null"} |
+| runtimeApplication.observed.independentCrossCheckRelativeResidual | ${evidence.runtimeApplication.observed.independentCrossCheckRelativeResidual ?? "null"} |
+| runtimeApplication.observed.uncertaintyRelativeBound | ${evidence.runtimeApplication.observed.uncertaintyRelativeBound ?? "null"} |
+| runtimeApplication.observed.metricDecUncertaintyAbs | ${evidence.runtimeApplication.observed.metricDecUncertaintyAbs ?? "null"} |
+| runtimeApplication.observed.tileReconstitutedDecUncertaintyAbs | ${evidence.runtimeApplication.observed.tileReconstitutedDecUncertaintyAbs ?? "null"} |
+| runtimeApplication.observed.metricDecConservativeMarginToZero | ${evidence.runtimeApplication.observed.metricDecConservativeMarginToZero ?? "null"} |
+| runtimeApplication.observed.tileReconstitutedDecConservativeMarginToZero | ${evidence.runtimeApplication.observed.tileReconstitutedDecConservativeMarginToZero ?? "null"} |
+| runtimeApplication.observed.referenceMetricDecRobustMarginToZero | ${evidence.runtimeApplication.observed.referenceMetricDecRobustMarginToZero ?? "null"} |
+| runtimeApplication.observed.referenceTileReconstitutedDecRobustMarginToZero | ${evidence.runtimeApplication.observed.referenceTileReconstitutedDecRobustMarginToZero ?? "null"} |
+| runtimeApplication.observed.referenceMetricDecUncertaintyAbs | ${evidence.runtimeApplication.observed.referenceMetricDecUncertaintyAbs ?? "null"} |
+| runtimeApplication.observed.referenceTileReconstitutedDecUncertaintyAbs | ${evidence.runtimeApplication.observed.referenceTileReconstitutedDecUncertaintyAbs ?? "null"} |
+| runtimeApplication.observed.referenceMetricDecConservativeMarginToZero | ${evidence.runtimeApplication.observed.referenceMetricDecConservativeMarginToZero ?? "null"} |
+| runtimeApplication.observed.referenceTileReconstitutedDecConservativeMarginToZero | ${evidence.runtimeApplication.observed.referenceTileReconstitutedDecConservativeMarginToZero ?? "null"} |
 | runtimeApplication.note | ${evidence.runtimeApplication.note ?? "null"} |
 | runtimeApplication.citationRefs | ${runtimeCitationRefs} |
+| decRuntimeDecisionEvidence.status | ${evidence.decRuntimeDecisionEvidence?.status ?? "none"} |
+| decRuntimeDecisionEvidence.attempted | ${evidence.decRuntimeDecisionEvidence == null ? "null" : String(evidence.decRuntimeDecisionEvidence.attempted)} |
+| decRuntimeDecisionEvidence.enabled | ${evidence.decRuntimeDecisionEvidence == null ? "null" : String(evidence.decRuntimeDecisionEvidence.enabled)} |
+| decRuntimeDecisionEvidence.gatePass | ${evidence.decRuntimeDecisionEvidence == null ? "null" : String(evidence.decRuntimeDecisionEvidence.gatePass)} |
+| decRuntimeDecisionEvidence.comparabilityPass | ${evidence.decRuntimeDecisionEvidence == null ? "null" : String(evidence.decRuntimeDecisionEvidence.comparabilityPass)} |
+| decRuntimeDecisionEvidence.sampleCountSufficient | ${evidence.decRuntimeDecisionEvidence?.sampleCountSufficient == null ? "null" : String(evidence.decRuntimeDecisionEvidence.sampleCountSufficient)} |
+| decRuntimeDecisionEvidence.selectedCandidateId | ${evidence.decRuntimeDecisionEvidence?.selectedCandidateId ?? "null"} |
+| decRuntimeDecisionEvidence.primaryReasonCode | ${evidence.decRuntimeDecisionEvidence?.primaryReasonCode ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.selectedMetricDecRobustMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.selectedMetricDecRobustMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.selectedTileReconstitutedDecRobustMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.selectedTileReconstitutedDecRobustMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.selectedMetricDecConservativeMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.selectedMetricDecConservativeMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.selectedTileReconstitutedDecConservativeMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.selectedTileReconstitutedDecConservativeMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.referenceMetricDecRobustMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.referenceMetricDecRobustMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.referenceTileReconstitutedDecRobustMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.referenceTileReconstitutedDecRobustMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.referenceMetricDecConservativeMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.referenceMetricDecConservativeMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.referenceTileReconstitutedDecConservativeMarginToZero | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.referenceTileReconstitutedDecConservativeMarginToZero ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.independentCrossCheckRelativeResidual | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.independentCrossCheckRelativeResidual ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.uncertaintyRelativeBound | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.uncertaintyRelativeBound ?? "null"} |
+| decRuntimeDecisionEvidence.decAttribution.independentCrossCheckSignAgreement | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.independentCrossCheckSignAgreement == null ? "null" : String(evidence.decRuntimeDecisionEvidence.decAttribution.independentCrossCheckSignAgreement)} |
+| decRuntimeDecisionEvidence.decAttribution.selectedCrossesZeroUnderUncertainty | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.selectedCrossesZeroUnderUncertainty == null ? "null" : String(evidence.decRuntimeDecisionEvidence.decAttribution.selectedCrossesZeroUnderUncertainty)} |
+| decRuntimeDecisionEvidence.decAttribution.referenceCrossesZeroBothDecMargins | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.referenceCrossesZeroBothDecMargins == null ? "null" : String(evidence.decRuntimeDecisionEvidence.decAttribution.referenceCrossesZeroBothDecMargins)} |
+| decRuntimeDecisionEvidence.decAttribution.uncertaintyBoundPass | ${evidence.decRuntimeDecisionEvidence?.decAttribution?.uncertaintyBoundPass == null ? "null" : String(evidence.decRuntimeDecisionEvidence.decAttribution.uncertaintyBoundPass)} |
+| decRuntimeDecisionEvidence.reasonCodes | ${decRuntimeDecisionReasonCodes} |
+| decRuntimeDecisionEvidence.note | ${evidence.decRuntimeDecisionEvidence?.note ?? "null"} |
+| decRuntimeDecisionEvidence.citationRefs | ${decRuntimeDecisionCitationRefs} |
+| extensionTrancheId | ${evidence.extensionTrancheId ?? "null"} |
+| familySearchOrder | ${familySearchOrder} |
+| appliedCandidateEvidence | ${appliedCandidateEvidence} |
+| appliedCandidateEvidence.citationRefs | ${appliedCandidateCitationRefs} |
+| rollbackLocalizationEvidence | ${rollbackLocalizationEvidence} |
+| rollbackLocalizationEvidence.citationRefs | ${rollbackLocalizationCitationRefs} |
 | sweepCandidates | ${sweepCandidates} |
 | recommendation | ${evidence.recommendation} |
 | controlKnobs | ${knobs} |
 | claimCitationMap | ${claimCitationMap} |
+| researchSupportMap | ${researchSupportMap} |
 | claimCitationMapCompleteness | ${claimCitationMapCompleteness} |
 | decCoupledControlEvidence | ${decCoupledControlEvidence} |
 | decCoupledControlEvidence.researchClaims | ${decCoupledResearchClaims} |
+| modelTermExtensionFamilyEvidence | ${modelTermExtensionFamilyEvidence} |
+| modelTermExtensionFamilyEvidence.families | ${modelTermExtensionFamilyRows} |
+| modelTermExtensionFamilyEvidence.citationRefs | ${modelTermExtensionFamilyCitationRefs} |
+| modelTermExtensionFamilyEvidence.notes | ${modelTermExtensionFamilyNotes} |
+| fluxShearExtensionEvidence | ${fluxShearExtensionEvidence} |
+| fluxShearExtensionEvidence.parameterEnvelope | ${fluxShearExtensionParameterEnvelope} |
+| fluxShearExtensionEvidence.comparabilityGate | ${fluxShearExtensionComparabilityGate} |
+| fluxShearExtensionEvidence.citationRefs | ${fluxShearExtensionCitationRefs} |
+| fluxShearExtensionEvidence.notes | ${fluxShearExtensionNotes} |
 | uncertaintyTags | ${uncertaintyTags} |
 | citationRefs | ${citationRefs} |
 | derivationNotes | ${derivationNotes} |

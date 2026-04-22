@@ -46,6 +46,13 @@ import {
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
 import {
+  dispatchHelixWorkstationAction,
+  dispatchHelixWorkstationActions,
+  coerceHelixWorkstationActions,
+  extractHelixWorkstationActionBlocks,
+  type HelixWorkstationAction,
+} from "@/lib/workstation/workstationActionContract";
+import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
   writeMissionContextControls,
@@ -2761,29 +2768,34 @@ export function shouldDispatchReasoningAttempt(transcript: string): boolean {
   const hasSolveOrDefinitionCue = /\b(full solve|solve|solved|definition|define|defined|explain)\b/.test(
     effective,
   );
+  const hasVerificationCue = /\b(verify|prove|check|pass fail|certificate|integrity|evidence|risk|decision)\b/.test(
+    effective,
+  );
+  const hasExecutionCue = /\b(implement|fix|change|update|remove|add|create|run|patch|deploy|execute)\b/.test(
+    effective,
+  );
+  const hasMonitoringCue = /\b(what changed|status|monitor|state|watch)\b/.test(effective);
+  const hasOperationalCue = hasVerificationCue || hasExecutionCue || hasMonitoringCue;
   if (
     (hasQuestionWordAnywhere || hasSolveOrDefinitionCue || effective.includes("?")) &&
     (hasCodebaseCue || hasTechnicalTopicCue)
   ) {
     return true;
   }
-  if (/\b(verify|prove|check|pass fail|certificate|integrity|evidence|risk|decision)\b/.test(effective)) {
+  if (hasOperationalCue) {
     return true;
   }
-  if (/\b(implement|fix|change|update|remove|add|create|run|patch|deploy|execute)\b/.test(effective)) {
-    return true;
-  }
-  if (/\b(what changed|status|monitor|state|watch)\b/.test(effective)) {
+  const hasReasoningFramingCue = /\b(how|why|explain|define|walk me through|full solve|tell me about|break down|understand)\b/.test(
+    effective,
+  );
+  if (hasReasoningFramingCue && (hasCodebaseCue || hasTechnicalTopicCue || hasSolveOrDefinitionCue)) {
     return true;
   }
   if (
-    /\b(how|why|explain|define|walk me through|full solve|tell me about|break down|understand)\b/.test(
-      effective,
-    )
+    effective.includes("?") &&
+    effective.length >= 16 &&
+    (hasCodebaseCue || hasTechnicalTopicCue || hasSolveOrDefinitionCue || hasOperationalCue)
   ) {
-    return true;
-  }
-  if (effective.includes("?") && effective.length >= 16) {
     return true;
   }
   return false;
@@ -4273,8 +4285,11 @@ type HelixAskPillProps = {
   className?: string;
   maxWidthClassName?: string;
   onOpenPanel?: (panelId: PanelDefinition["id"]) => void;
+  onRunWorkstationAction?: (action: HelixWorkstationAction) => void;
   onOpenConversation?: (sessionId: string) => void;
   placeholder?: string;
+  layoutVariant?: "hero" | "dock";
+  replyListClassName?: string;
 };
 
 function readNumber(value: unknown, fallback: number): number {
@@ -4821,6 +4836,22 @@ function dedupeStrings(values: string[]): string[] {
     out.push(value);
   }
   return out;
+}
+
+export function shouldKeepHelixReplyInBriefLane(debug: HelixAskReply["debug"] | undefined): boolean {
+  const record = asObjectRecord(debug);
+  if (!record) return false;
+  if (record.smalltalk_fast_path_applied === true) return true;
+  const fallbackReasonTaxonomy =
+    typeof record.fallback_reason_taxonomy === "string"
+      ? record.fallback_reason_taxonomy.trim().toLowerCase()
+      : "";
+  if (fallbackReasonTaxonomy === "smalltalk_fast_path") return true;
+  const fallbackReason =
+    typeof record.fallback_reason === "string" ? record.fallback_reason.trim().toLowerCase() : "";
+  if (fallbackReason === "smalltalk_fast_path") return true;
+  const answerPath = asStringArray(record.answer_path).map((step) => step.toLowerCase());
+  return answerPath.includes("forcedanswer:smalltalk_fast_path");
 }
 
 function buildHelixAskDebugContextSummary(
@@ -6796,6 +6827,111 @@ function parseOpenPanelCommand(value: string): PanelDefinition["id"] | null {
   return resolvePanelIdFromText(raw);
 }
 
+function parseWorkstationActionCommand(value: string): HelixWorkstationAction | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const runJobMatch = trimmed.match(/^\/run-job(?:\s+(.+))?$/i);
+  if (runJobMatch) {
+    const rawPayload = runJobMatch[1]?.trim();
+    let payload: {
+      title?: string;
+      objective?: string;
+      preferred_panels?: string[];
+      max_steps?: number;
+    } = {};
+    if (rawPayload) {
+      try {
+        const parsed = JSON.parse(rawPayload) as Record<string, unknown>;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
+          const objective = typeof parsed.objective === "string" ? parsed.objective.trim() : "";
+          const preferredPanels = Array.isArray(parsed.preferred_panels)
+            ? parsed.preferred_panels
+                .filter((entry) => typeof entry === "string")
+                .map((entry) => (entry as string).trim())
+                .filter(Boolean)
+            : [];
+          const maxSteps =
+            typeof parsed.max_steps === "number" && Number.isFinite(parsed.max_steps)
+              ? Math.max(1, Math.min(12, Math.floor(parsed.max_steps)))
+              : undefined;
+          payload = {
+            ...(title ? { title } : {}),
+            ...(objective ? { objective } : {}),
+            ...(preferredPanels.length > 0 ? { preferred_panels: preferredPanels } : {}),
+            ...(typeof maxSteps === "number" ? { max_steps: maxSteps } : {}),
+          };
+        }
+      } catch {
+        payload = {
+          objective: rawPayload,
+        };
+      }
+    }
+    return {
+      action: "run_job",
+      payload,
+    };
+  }
+
+  const panelActionMatch = trimmed.match(/^\/panel-action\s+([a-z0-9._-]+)\s+([a-z0-9._-]+)(?:\s+(.+))?$/i);
+  if (panelActionMatch) {
+    const panelId = panelActionMatch[1]?.trim();
+    const actionId = panelActionMatch[2]?.trim();
+    const argsRaw = panelActionMatch[3]?.trim();
+    let args: Record<string, unknown> | undefined;
+    if (argsRaw) {
+      try {
+        const parsed = JSON.parse(argsRaw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          args = parsed as Record<string, unknown>;
+        }
+      } catch {
+        args = { target: argsRaw };
+      }
+    }
+    if (panelId && actionId) {
+      return {
+        action: "run_panel_action",
+        panel_id: panelId,
+        action_id: actionId,
+        args,
+      };
+    }
+  }
+
+  const splitMatch = trimmed.match(/^(?:\/split|split)\s+(right|row|down|column)$/i);
+  if (splitMatch) {
+    return {
+      action: "split_active_group",
+      direction: /down|column/i.test(splitMatch[1]) ? "column" : "row",
+    };
+  }
+
+  if (/^(?:\/settings|open settings|show settings)$/i.test(trimmed)) {
+    return { action: "open_settings", tab: "preferences" };
+  }
+
+  if (/^(?:\/knowledge settings|open knowledge settings)$/i.test(trimmed)) {
+    return { action: "open_settings", tab: "knowledge" };
+  }
+
+  if (/^(?:\/ask-dock collapse|collapse ask dock)$/i.test(trimmed)) {
+    return { action: "set_chat_dock", collapsed: true };
+  }
+
+  if (/^(?:\/ask-dock expand|expand ask dock)$/i.test(trimmed)) {
+    return { action: "set_chat_dock", collapsed: false };
+  }
+
+  if (/^(?:\/ask|open ask|show ask)$/i.test(trimmed)) {
+    return { action: "toggle_mobile_drawer", open: true };
+  }
+
+  return null;
+}
+
 function buildHelixAskSearchQueries(question: string): string[] {
   const base = question.trim();
   if (!base) return [];
@@ -7205,8 +7341,11 @@ export function HelixAskPill({
   className,
   maxWidthClassName,
   onOpenPanel,
+  onRunWorkstationAction,
   onOpenConversation,
   placeholder,
+  layoutVariant = "hero",
+  replyListClassName,
 }: HelixAskPillProps) {
   const { userSettings } = useHelixStartSettings();
   const preferredResponseLanguage = useMemo(() => {
@@ -8685,6 +8824,33 @@ export function HelixAskPill({
       onOpenPanel?.(panelId);
     },
     [onOpenPanel],
+  );
+
+  const runWorkstationAction = useCallback(
+    (action: HelixWorkstationAction) => {
+      if (onRunWorkstationAction) {
+        onRunWorkstationAction(action);
+        return;
+      }
+      dispatchHelixWorkstationAction(action);
+    },
+    [onRunWorkstationAction],
+  );
+
+  const applyWorkstationActionsFromPayload = useCallback(
+    (...payloads: unknown[]) => {
+      const resolved: HelixWorkstationAction[] = [];
+      payloads.forEach((payload) => {
+        resolved.push(...coerceHelixWorkstationActions(payload));
+      });
+      if (resolved.length === 0) return;
+      if (onRunWorkstationAction) {
+        resolved.forEach((action) => onRunWorkstationAction(action));
+        return;
+      }
+      dispatchHelixWorkstationActions(resolved);
+    },
+    [onRunWorkstationAction],
   );
 
   const launchAtomicViewer = useCallback(
@@ -17050,6 +17216,14 @@ export function HelixAskPill({
           if (!responseText) {
             responseText = "No response returned.";
           }
+          const actionBlock = extractHelixWorkstationActionBlocks(responseText);
+          if (actionBlock.actions.length > 0) {
+            applyWorkstationActionsFromPayload(actionBlock.actions);
+            if (actionBlock.cleanedText) {
+              responseText = actionBlock.cleanedText;
+            }
+          }
+          applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
           if (responseContextCapsule) {
             upsertContextCapsuleSessionLedger(responseContextCapsule);
           }
@@ -17105,6 +17279,7 @@ export function HelixAskPill({
     },
     [
       addMessage,
+      applyWorkstationActionsFromPayload,
       buildConvergenceSnapshot,
       cancelMoodHint,
       clearLiveDraftFlush,
@@ -17138,6 +17313,11 @@ export function HelixAskPill({
           : resolveSelectedContextCapsuleIds(trimmed, undefined, { source: "manual" });
       const pinnedCapsuleCount = getPinnedContextCapsuleCount();
       const inferredMode = inferAskMode(trimmed);
+      const manualDispatchHint =
+        shouldDispatchReasoningAttempt(trimmed) || isStrongQuestionDispatchCandidate(trimmed);
+      const manualRouteReasonCode = manualDispatchHint
+        ? "dispatch:heuristic"
+        : "suppressed:heuristic_low_salience";
       setAskBusy(true);
       setAskStatus("Interpreting prompt...");
       setAskError(null);
@@ -17163,22 +17343,46 @@ export function HelixAskPill({
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
       const traceId = `ask:${crypto.randomUUID()}`;
-      const manualAttempt = createReasoningAttempt({
-        prompt: trimmed,
-        contextCapsuleIds: selectedCapsuleIds,
-        contextCapsuleCount: selectedCapsuleIds.length,
-        contextCapsulePinnedCount: pinnedCapsuleCount,
+      const manualAttempt = manualDispatchHint
+        ? createReasoningAttempt({
+            prompt: trimmed,
+            contextCapsuleIds: selectedCapsuleIds,
+            contextCapsuleCount: selectedCapsuleIds.length,
+            contextCapsulePinnedCount: pinnedCapsuleCount,
+            source: "manual",
+            mode: inferredMode,
+            status: "running",
+            traceId,
+            responseLanguage: preferredResponseLanguage ?? null,
+            preferredResponseLanguage: preferredResponseLanguage ?? null,
+            completionScore: conversationGovernor.completion_score.score,
+            floorOwner: conversationGovernor.floor_owner,
+          })
+        : null;
+      const manualTimelineEntryId = manualAttempt ? ensureReasoningTimelineEntry(manualAttempt, "running") : null;
+      reasoningAttemptManualIdRef.current = manualAttempt?.id ?? null;
+      const manualBriefTimelineEntry = addHelixTimelineEntry({
+        type: "conversation_brief",
         source: "manual",
+        status: manualDispatchHint ? "queued" : "suppressed",
+        text: manualDispatchHint
+          ? formatVoiceDecisionSentence({
+              lifecycle: "queued",
+              mode: normalizeConversationModeForDispatch(inferredMode) ?? "observe",
+              routeReasonCode: manualRouteReasonCode,
+            })
+          : "Quick reply mode: no background reasoning queued for this turn.",
+        detail: manualDispatchHint
+          ? "manual dispatch queued"
+          : "manual dispatch suppressed (low salience prompt)",
         mode: inferredMode,
-        status: "running",
         traceId,
-        responseLanguage: preferredResponseLanguage ?? null,
-        preferredResponseLanguage: preferredResponseLanguage ?? null,
-        completionScore: conversationGovernor.completion_score.score,
-        floorOwner: conversationGovernor.floor_owner,
+        attemptId: manualAttempt?.id,
+        meta: {
+          dispatchHint: manualDispatchHint,
+          routeReasonCode: manualRouteReasonCode,
+        },
       });
-      const manualTimelineEntryId = ensureReasoningTimelineEntry(manualAttempt, "running");
-      reasoningAttemptManualIdRef.current = manualAttempt.id;
       setAskLiveSessionId(sessionId ?? null);
       setAskLiveTraceId(traceId);
       if (sessionId) {
@@ -17204,7 +17408,8 @@ export function HelixAskPill({
         let timelineDebugContext: Record<string, unknown> | null = null;
         setAskStatus("Generating answer...");
         try {
-          const askModeForRequest = inferredMode === "observe" ? undefined : inferredMode;
+          const askModeForRequest =
+            !manualDispatchHint || inferredMode === "observe" ? undefined : inferredMode;
           const askResult = await askLocalWithPreflightScopeFallback(undefined, {
             sessionId: sessionId ?? undefined,
             traceId,
@@ -17259,150 +17464,186 @@ export function HelixAskPill({
           if (aborted) {
             skipReply = true;
             setAskStatus("Generation stopped.");
-            updateReasoningAttempt(manualAttempt.id, (current) => ({
-              ...current,
-              status: "cancelled",
-              completedAtMs: Date.now(),
-            }));
-            patchHelixTimelineEntry(manualTimelineEntryId, {
-              status: "suppressed",
-              detail: "cancelled",
-            });
-            addHelixTimelineEntry({
-              type: "suppressed",
-              source: "manual",
-              status: "suppressed",
-              text: "Manual reasoning cancelled by user.",
-              detail: "cancelled",
-              mode: inferredMode,
-              traceId,
-              attemptId: manualAttempt.id,
-            });
+            if (manualAttempt) {
+              updateReasoningAttempt(manualAttempt.id, (current) => ({
+                ...current,
+                status: "cancelled",
+                completedAtMs: Date.now(),
+              }));
+              if (manualTimelineEntryId) {
+                patchHelixTimelineEntry(manualTimelineEntryId, {
+                  status: "suppressed",
+                  detail: "cancelled",
+                });
+              }
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: "manual",
+                status: "suppressed",
+                text: "Manual reasoning cancelled by user.",
+                detail: "cancelled",
+                mode: inferredMode,
+                traceId,
+                attemptId: manualAttempt.id,
+              });
+            }
           } else {
             const message = error instanceof Error ? error.message : String(error);
             const streamedFallback = askLiveDraftRef.current.trim();
             responseText = streamedFallback || message || "Request failed.";
-            updateReasoningAttempt(manualAttempt.id, (current) => ({
-              ...current,
-              status: "failed",
-              suppression_reason: message || "reasoning_failed",
-              completedAtMs: Date.now(),
-            }));
-            patchHelixTimelineEntry(manualTimelineEntryId, {
-              status: "failed",
-              detail: clipText(message || "reasoning_failed", 180),
-            });
-            addHelixTimelineEntry({
-              type: "suppressed",
-              source: "manual",
-              status: "suppressed",
-              text: clipText(message || "reasoning_failed", 280),
-              detail: "manual reasoning failed",
-              mode: inferredMode,
-              traceId,
-              attemptId: manualAttempt.id,
-            });
+            if (manualAttempt) {
+              updateReasoningAttempt(manualAttempt.id, (current) => ({
+                ...current,
+                status: "failed",
+                suppression_reason: message || "reasoning_failed",
+                completedAtMs: Date.now(),
+              }));
+              if (manualTimelineEntryId) {
+                patchHelixTimelineEntry(manualTimelineEntryId, {
+                  status: "failed",
+                  detail: clipText(message || "reasoning_failed", 180),
+                });
+              }
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: "manual",
+                status: "suppressed",
+                text: clipText(message || "reasoning_failed", 280),
+                detail: "manual reasoning failed",
+                mode: inferredMode,
+                traceId,
+                attemptId: manualAttempt.id,
+              });
+            }
           }
         }
         if (!skipReply) {
           if (!responseText) {
             responseText = "No response returned.";
           }
+          const actionBlock = extractHelixWorkstationActionBlocks(responseText);
+          if (actionBlock.actions.length > 0) {
+            applyWorkstationActionsFromPayload(actionBlock.actions);
+            if (actionBlock.cleanedText) {
+              responseText = actionBlock.cleanedText;
+            }
+          }
+          applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
           if (responseContextCapsule) {
             upsertContextCapsuleSessionLedger(responseContextCapsule);
           }
           launchAtomicViewer(responseViewerLaunch);
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
-          const replyId = crypto.randomUUID();
+          const responseDebugPayload = responseDebugWithClientMode ?? responseDebug;
+          const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugPayload);
           const liveEventsSnapshot = [...askLiveEventsRef.current];
           const convergenceSnapshot = buildConvergenceSnapshot({
             events: liveEventsSnapshot,
             proof: responseProof,
             debug: responseDebug,
           });
-          setAskReplies((prev) =>
-            [
-              {
-                id: replyId,
-                content: responseText,
-                question: trimmed,
-                debug: responseDebugWithClientMode ?? responseDebug,
-                promptIngested: responsePromptIngested,
-                envelope: responseEnvelope,
-                mode: responseMode,
-                proof: responseProof,
-                contextCapsule: responseContextCapsule,
-                sources:
-                  (responseDebugWithClientMode ?? responseDebug)?.context_files ??
-                  (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
-                  [],
-                liveEvents: liveEventsSnapshot,
-                convergenceSnapshot,
+          if (briefOnlyReply) {
+            patchHelixTimelineEntry(manualBriefTimelineEntry.id, {
+              status: "done",
+              text: clipText(responseText, 560),
+              detail: "smalltalk fast-path reply",
+              mode: responseMode ?? "read",
+              meta: {
+                smalltalkFastPath: true,
+                briefSource: "llm",
+                fallbackReasonTaxonomy: "smalltalk_fast_path",
               },
-              ...prev,
-            ].slice(0, 3),
-          );
+            });
+          } else {
+            const replyId = crypto.randomUUID();
+            setAskReplies((prev) =>
+              [
+                {
+                  id: replyId,
+                  content: responseText,
+                  question: trimmed,
+                  debug: responseDebugPayload,
+                  promptIngested: responsePromptIngested,
+                  envelope: responseEnvelope,
+                  mode: responseMode,
+                  proof: responseProof,
+                  contextCapsule: responseContextCapsule,
+                  sources:
+                    responseDebugPayload?.context_files ??
+                    responseDebugPayload?.prompt_context_files ??
+                    [],
+                  liveEvents: liveEventsSnapshot,
+                  convergenceSnapshot,
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+          }
           if (sessionId) {
             addMessage(sessionId, { role: "assistant", content: responseText });
           }
-          const detailMode =
-            responseMode === "observe" || responseMode === "act" || responseMode === "verify"
-              ? responseMode
-              : responseMode === "read"
-                ? "observe"
-                : inferredMode;
-          updateReasoningAttempt(manualAttempt.id, (current) => ({
-            ...current,
-            status: "done",
-            partial: askLiveDraftRef.current || responseText,
-            finalAnswer: responseText,
-            certaintyClass:
-              ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
-                ?.certainty_class) ??
-              ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
-            evidenceRefs:
-              (responseDebugWithClientMode ?? responseDebug)?.context_files ??
-              (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
-              [],
-            completedAtMs: Date.now(),
-          }));
-          patchHelixTimelineEntry(manualTimelineEntryId, {
-            status: "done",
-            detail: formatReasoningAttemptDetail(
-              {
-                mode: detailMode,
-              },
-              "done",
-            ),
-            mode: responseMode ?? inferredMode,
-          });
-          addHelixTimelineEntry({
-            type: responseMode === "act" ? "action_receipt" : "reasoning_final",
-            source: "manual",
-            status: "done",
-            text: clipText(responseText, 520),
-            detail: formatReasoningAttemptDetail(
-              {
-                mode: detailMode,
-              },
-              "manual complete",
-            ),
-            mode: responseMode ?? inferredMode,
-            traceId,
-            attemptId: manualAttempt.id,
-            meta: buildReasoningTimelineMeta(manualAttempt, {
+          if (manualAttempt) {
+            const detailMode =
+              responseMode === "observe" || responseMode === "act" || responseMode === "verify"
+                ? responseMode
+                : responseMode === "read"
+                  ? "observe"
+                  : inferredMode;
+            updateReasoningAttempt(manualAttempt.id, (current) => ({
+              ...current,
+              status: "done",
+              partial: askLiveDraftRef.current || responseText,
+              finalAnswer: responseText,
               certaintyClass:
                 ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
                   ?.certainty_class) ??
                 ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
-              contextFiles:
+              evidenceRefs:
                 (responseDebugWithClientMode ?? responseDebug)?.context_files ??
                 (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
                 [],
-              ...(timelineDebugContext ? { helixDebugContext: timelineDebugContext } : {}),
-            }),
-          });
+              completedAtMs: Date.now(),
+            }));
+            if (manualTimelineEntryId) {
+              patchHelixTimelineEntry(manualTimelineEntryId, {
+                status: "done",
+                detail: formatReasoningAttemptDetail(
+                  {
+                    mode: detailMode,
+                  },
+                  "done",
+                ),
+                mode: responseMode ?? inferredMode,
+              });
+            }
+            addHelixTimelineEntry({
+              type: responseMode === "act" ? "action_receipt" : "reasoning_final",
+              source: "manual",
+              status: "done",
+              text: clipText(responseText, 520),
+              detail: formatReasoningAttemptDetail(
+                {
+                  mode: detailMode,
+                },
+                "manual complete",
+              ),
+              mode: responseMode ?? inferredMode,
+              traceId,
+              attemptId: manualAttempt.id,
+              meta: buildReasoningTimelineMeta(manualAttempt, {
+                certaintyClass:
+                  ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
+                    ?.certainty_class) ??
+                  ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
+                contextFiles:
+                  (responseDebugWithClientMode ?? responseDebug)?.context_files ??
+                  (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
+                  [],
+                ...(timelineDebugContext ? { helixDebugContext: timelineDebugContext } : {}),
+              }),
+            });
+          }
         }
       } finally {
         if (askRunIdRef.current === runId) {
@@ -17419,7 +17660,7 @@ export function HelixAskPill({
         if (askAbortRef.current === controller) {
           askAbortRef.current = null;
         }
-        if (reasoningAttemptManualIdRef.current === manualAttempt.id) {
+        if (manualAttempt && reasoningAttemptManualIdRef.current === manualAttempt.id) {
           reasoningAttemptManualIdRef.current = null;
         }
       }
@@ -17427,6 +17668,7 @@ export function HelixAskPill({
     [
       addHelixTimelineEntry,
       addMessage,
+      applyWorkstationActionsFromPayload,
       askBusy,
       conversationGovernor.completion_score.score,
       conversationGovernor.floor_owner,
@@ -17727,6 +17969,38 @@ export function HelixAskPill({
         }
         return;
       }
+      const workstationCommand =
+        normalizedEntries.length === 1 ? parseWorkstationActionCommand(normalizedEntries[0]) : null;
+      if (workstationCommand) {
+        if (askInputRef.current) {
+          askInputRef.current.value = "";
+          resizeTextarea();
+        }
+        askDraftRef.current = "";
+        setContextCapsuleDetectedId(null);
+        clearMoodTimer();
+        cancelMoodHint();
+        updateMoodFromText(normalizedEntries[0] ?? entries[0] ?? "");
+        requestMoodHint(normalizedEntries[0] ?? entries[0] ?? "", { force: true });
+        const sessionId = getHelixAskSessionId();
+        if (sessionId) {
+          setActive(sessionId);
+          addMessage(sessionId, { role: "user", content: normalizedEntries[0] ?? entries[0] });
+        }
+        runWorkstationAction(workstationCommand);
+        const replyId = crypto.randomUUID();
+        const responseText = "Executed workstation action.";
+        setAskReplies((prev) =>
+          [
+            { id: replyId, content: responseText, question: normalizedEntries[0] ?? entries[0] },
+            ...prev,
+          ].slice(0, 3),
+        );
+        if (sessionId) {
+          addMessage(sessionId, { role: "assistant", content: responseText });
+        }
+        return;
+      }
       if (askInputRef.current) {
         askInputRef.current.value = "";
         resizeTextarea();
@@ -17762,6 +18036,7 @@ export function HelixAskPill({
       resolveSelectedContextCapsuleIds,
       requestMoodHint,
       resizeTextarea,
+      runWorkstationAction,
       setActive,
       updateMoodFromText,
       runAsk,
@@ -17771,6 +18046,11 @@ export function HelixAskPill({
 
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
+  const replyListClassNameResolved =
+    replyListClassName ??
+    (layoutVariant === "dock"
+      ? "mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2"
+      : "mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2");
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
   const voiceInputStatusLabel = buildVoiceInputStatusLabel(
     micArmState,
@@ -18309,7 +18589,7 @@ export function HelixAskPill({
 
   return (
     <HelixAskErrorBoundary>
-      <div className={className}>
+      <div className={[className, layoutVariant === "dock" ? "min-h-0" : ""].filter(Boolean).join(" ")}>
         <form
           className={`w-full ${maxWidthClass} transition-[max-width] duration-300 ease-out`}
           style={formMaxWidthStyle}
@@ -18980,7 +19260,7 @@ export function HelixAskPill({
           <p className="mt-3 text-xs text-rose-200">{askError}</p>
         ) : null}
         {askReplies.length > 0 ? (
-          <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2">
+          <div className={replyListClassNameResolved}>
           {askReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {

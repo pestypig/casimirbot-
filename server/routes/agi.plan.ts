@@ -501,6 +501,13 @@ import {
   shouldPreserveHelixAskForcedAnswerAcrossFinalizer,
 } from "../services/helix-ask/policy/forced-answer";
 import {
+  buildHelixAskClarifyRescuePrompt,
+  isHelixAskClarifyRescueCandidateQuestion,
+  isHelixAskClarifyRescueGreetingOnlyQuestion,
+  parseHelixAskClarifyRescueDecision,
+  renderHelixAskClarifyRescueGreetingOnlyAnswer,
+} from "../services/helix-ask/policy/clarify-rescue";
+import {
   hasAcceptedHelixAskRepoFallbackShape,
   selectDeterministicRepoRuntimeFallbackCandidate,
   shouldDirectUseDeterministicRepoRuntimeFallback,
@@ -640,6 +647,12 @@ import {
   buildSemanticRepoTechContractUnknownFallback,
   evaluateSemanticRepoTechContract,
 } from "../services/helix-ask/surface/semantic-repo-tech-contract";
+import {
+  buildHelixAskStrategyProgressContractRepairAnswer,
+  buildHelixAskStrategyProgressContractUnknownFallback,
+  evaluateHelixAskStrategyProgressContract,
+  type HelixAskStrategyProgressContractEvaluation,
+} from "../services/helix-ask/surface/strategy-progress-contract";
 import { collectStepCitations } from "../services/helix-ask/surface/step-citations";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
@@ -3907,6 +3920,15 @@ const HELIX_ASK_AMBIGUOUS_MAX_TERMS = clampNumber(
   1,
   6,
 );
+const HELIX_ASK_CLARIFY_RESCUE_MICRO_PLANNER =
+  String(process.env.HELIX_ASK_CLARIFY_RESCUE_MICRO_PLANNER ?? "1").trim() !== "0";
+const HELIX_ASK_CLARIFY_RESCUE_MIN_CONFIDENCE = clampNumber(
+  readNumber(process.env.HELIX_ASK_CLARIFY_RESCUE_MIN_CONFIDENCE, 0.58),
+  0,
+  1,
+);
+const HELIX_ASK_SMALLTALK_FAST_PATH =
+  String(process.env.HELIX_ASK_SMALLTALK_FAST_PATH ?? "1").trim() !== "0";
 const HELIX_ASK_SCIENTIFIC_CLARIFY =
   String(process.env.HELIX_ASK_SCIENTIFIC_CLARIFY ?? "1").trim() !== "0";
 const HELIX_ASK_HYPOTHESIS =
@@ -6184,6 +6206,63 @@ function hasSourcesLine(value: string): boolean {
   return /(?:^|\n)sources?\s*:\s*\S/i.test(value);
 }
 
+const HELIX_ASK_MACHINE_LEAK_LINE_RE =
+  /^(?:Draft synthesis initialized for|Expand With Retrieved Evidence|Objective-first situational view|Suppression inspector:|Convergence snapshot|Capsule guards|Context sources|Proof|Key files)\b/i;
+const HELIX_ASK_MACHINE_SCORE_LINE_RE =
+  /\b(?:score=\d+(?:\.\d+)?|symbol=|file=|unknown\s*->\s*unknown|diagnostic|debrief)\b/i;
+const HELIX_ASK_UNCERTAINTY_SIGNAL_RE =
+  /\b(?:uncertain|uncertainty|unknown|inconclusive|cannot confirm|not enough evidence|best-effort)\b/i;
+
+const stripHelixAskMachineLanguageLeakage = (value: string): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const cleaned = raw
+    .split(/\r?\n/)
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return true;
+      if (HELIX_ASK_MACHINE_LEAK_LINE_RE.test(trimmed)) return false;
+      if (HELIX_ASK_MACHINE_SCORE_LINE_RE.test(trimmed) && /[|]/.test(trimmed)) return false;
+      return true;
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return cleaned;
+};
+
+const buildHelixAskHumanClarifyFallback = (question: string): string => {
+  const normalized = String(question ?? "").trim();
+  const codebaseCue =
+    /\b(?:codebase|repo|repository|module|file path|function|route|api|implementation)\b/i.test(
+      normalized,
+    );
+  if (codebaseCue) {
+    return "I can answer this cleanly once you pin one code anchor. Which file, module, route, or function should I ground to?";
+  }
+  return "I need one concrete anchor to answer reliably. Do you want a codebase-grounded answer, or a general explanation?";
+};
+
+const inferHelixAskClaimBasis = (value: string): "repo-grounded" | "inferred-from-sources" | "uncertain" => {
+  const text = String(value ?? "");
+  if (!text.trim()) return "uncertain";
+  const hasUncertainty = HELIX_ASK_UNCERTAINTY_SIGNAL_RE.test(text);
+  if (hasUncertainty) return "uncertain";
+  const repoRefs = extractFilePathsFromText(text).filter((entry) =>
+    /\b(?:docs|server|client|modules|shared|scripts|tests|tools)\//i.test(entry),
+  ).length;
+  if (repoRefs > 0) return "repo-grounded";
+  return "inferred-from-sources";
+};
+
+const ensureHelixAskClaimBasisLine = (value: string): string => {
+  const body = String(value ?? "").trim();
+  if (!body) return body;
+  if (/(?:^|\n)\s*Claim basis\s*:/i.test(body)) return body;
+  const basis = inferHelixAskClaimBasis(body);
+  return `${body}\n\nClaim basis: ${basis}.`;
+};
+
 function stripRepoCitationsForOpenWorldBypass(value: string): string {
   if (!value) return value;
   return value
@@ -6338,6 +6417,8 @@ const repairHelixAskStrictCoveredAssemblyDraft = (value: string): string => {
 const isHelixAskWeakObjectiveAssemblyDraft = (value: string): boolean => {
   const normalized = String(value ?? "").trim();
   if (!normalized) return true;
+  if (isHelixAskMetaNonAnswerDraft(normalized)) return true;
+  if (isHelixAskGenericNonAnswerDraft(normalized)) return true;
   if (/^Objective loop primary execution for:/i.test(normalized)) return true;
   const lines = normalized
     .split(/\r?\n/)
@@ -6350,6 +6431,72 @@ const isHelixAskWeakObjectiveAssemblyDraft = (value: string): boolean => {
     if (wordCount <= 28) return true;
   }
   return false;
+};
+
+const isHelixAskMetaNonAnswerDraft = (value: string): boolean => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return false;
+  return (
+    /(?:^|\b)(?:this|it)\s+appears?\s+to\s+be\s+(?:a\s+)?prompt(?:\s+or\s+question)?\b/i.test(
+      normalized,
+    ) ||
+    /\bcurrent\s+draft\b/i.test(normalized) ||
+    /\bdoes\s+not\s+provide\s+a\s+clear\s+answer\b/i.test(normalized) ||
+    /\blacks\s+concrete\s+information\b/i.test(normalized) ||
+    /\b(prompt|question)\s+asking\s+for\s+clarification\b/i.test(normalized)
+  );
+};
+
+const isHelixAskGenericNonAnswerDraft = (value: string): boolean => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return false;
+  return (
+    /\bthis\s+refers?\s+to\s+(?:a\s+)?specific\s+topic\b/i.test(normalized) ||
+    /\b(?:requires?|need[s]?)\s+clarification(?:\s+or\s+definition)?\b/i.test(normalized) ||
+    /\bfor\s+further\s+details,\s*please\s+refer\s+to\s+the\s+relevant\s+documentation\b/i.test(
+      normalized,
+    ) ||
+    /\bplease\s+refer\s+to\s+(?:the\s+)?(?:relevant\s+)?documentation\b/i.test(normalized)
+  );
+};
+
+const isHelixAskDeicticQuestionWithoutAnchor = (question: string): boolean => {
+  const normalized = String(question ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  if (!/\b(?:this|that|it)\b/.test(normalized)) return false;
+  const canonical = normalized.replace(/\bwhats\b/g, "what's");
+  const deicticQuestion =
+    /^(?:ok\s+|so\s+)?(?:what(?:'s|s)?(?:\s+is)?|what\s+is)\s+(?:this|that|it)\s*\??$/.test(
+      canonical,
+    ) ||
+    /^(?:ok\s+|so\s+)?(?:what(?:'s|s)?(?:\s+is)?|what\s+is)\s+(?:this|that|it)\s+(?:used\s+for|for)\s*\??$/.test(
+      canonical,
+    ) ||
+    /^(?:ok\s+|so\s+)?what\s+does\s+(?:this|that|it)\s+mean\s*\??$/.test(canonical);
+  if (!deicticQuestion) return false;
+  const hasAnchor = /["`]/.test(canonical) || /:\s*\S+/.test(canonical);
+  return !hasAnchor;
+};
+
+const isHelixAskDeicticClarifyResponse = (value: string): boolean => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return false;
+  return (
+    /\bwhat\s+does\s+['"]?(?:this|that|it)['"]?\s+refer\s+to\b/i.test(normalized) ||
+    /\bwhat\s+object,\s*file,\s*or\s*concept\s+does\s+['"]?(?:this|that|it)['"]?\s+refer\s+to\b/i.test(
+      normalized,
+    ) ||
+    /\bwhat\s+are\s+you\s+referring\s+to\b/i.test(normalized) ||
+    /\bi\s+need\s+one\s+concrete\s+anchor\s+to\s+answer\s+reliably\b/i.test(normalized) ||
+    /\bdo\s+you\s+want\s+a\s+codebase-grounded\s+answer,\s*or\s+a\s+general\s+explanation\b/i.test(
+      normalized,
+    ) ||
+    /\bi\s+can\s+answer\s+this\s+cleanly\s+once\s+you\s+pin\s+one\s+code\s+anchor\b/i.test(normalized) ||
+    /\bplease\s+(?:share|paste|specify|clarify)\b.*\b(?:context|reference|text|snippet|topic|item|file)\b/i.test(
+      normalized,
+    ) ||
+    /\bwhich\s+(?:file|module|topic|item|reference)\b/i.test(normalized)
+  );
 };
 
 function extractOpenWorldDefinitionTarget(question: string): string | null {
@@ -7625,12 +7772,75 @@ const isCapsuleIntentAmbiguous = (question: string): boolean => {
   return tokenCount <= 3;
 };
 
+const CAPSULE_CLARIFIER_SEED_BLOCKLIST = new Set([
+  "hello",
+  "hi",
+  "hey",
+  "assist",
+  "today",
+  "unknown",
+  "this",
+  "that",
+  "it",
+]);
+
+const CAPSULE_CLARIFIER_QUERY_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "any",
+  "are",
+  "be",
+  "can",
+  "does",
+  "for",
+  "from",
+  "how",
+  "i",
+  "in",
+  "is",
+  "it",
+  "me",
+  "of",
+  "or",
+  "the",
+  "this",
+  "to",
+  "used",
+  "what",
+  "where",
+  "which",
+  "why",
+  "you",
+]);
+
+const sanitizeCapsuleClarifierSeed = (seed: string): string => {
+  const normalized = seed.trim().toLowerCase();
+  if (!normalized) return "";
+  if (CAPSULE_CLARIFIER_SEED_BLOCKLIST.has(normalized)) return "";
+  if (/^hxfp[-_a-z0-9]*$/i.test(normalized)) return "";
+  if (normalized.length <= 2) return "";
+  return seed.trim();
+};
+
 const buildCapsuleTargetedClarifier = (question: string, mustKeepTerms: string[]): string => {
-  const seed = mustKeepTerms[0] ?? tokenizeAskQuery(question).slice(0, 2).join(" ");
+  const capsuleSeed = mustKeepTerms
+    .map((entry) => sanitizeCapsuleClarifierSeed(entry))
+    .find((entry) => entry.length > 0);
+  const querySeed = tokenizeAskQuery(question)
+    .map((entry) => entry.trim())
+    .filter((entry) => {
+      if (!entry) return false;
+      const lowered = entry.toLowerCase();
+      return !CAPSULE_CLARIFIER_QUERY_STOPWORDS.has(lowered) && lowered.length > 2;
+    })
+    .slice(0, 3)
+    .join(" ");
+  const seed = capsuleSeed || sanitizeCapsuleClarifierSeed(querySeed);
   if (seed) {
     return `Quick check: should I keep this anchored to "${seed}" or switch to a different focus?`;
   }
-  return "Quick check: what exact concept should I anchor this follow-up to?";
+  return 'Quick check: what object, file, or concept does "this" refer to?';
 };
 
 const rewriteAnswerWithCapsuleConstraints = (args: {
@@ -12498,6 +12708,32 @@ function resolveRetrievalFootprintEventMeta(args: {
   };
 }
 
+const HELIX_ASK_REPO_SCOPED_QUESTION_RE =
+  /\b(?:codebase|repo|repository|in\s+repo|where\s+in\s+repo|module|function|route|api|implementation)\b/i;
+const HELIX_ASK_REPO_PREFERRED_PATH_RE =
+  /^(?:server|client|modules|shared|configs|scripts|tests|docs\/architecture|docs\/reference|docs\/guides)\//i;
+const HELIX_ASK_REPO_DISFAVORED_PATH_RE = /^(?:external|docs\/audits\/research)\//i;
+
+const applyRepoScopedCandidateFilter = (args: {
+  question: string;
+  candidates: AskCandidate[];
+  minPreferredFloor: number;
+}): AskCandidate[] => {
+  if (!HELIX_ASK_REPO_SCOPED_QUESTION_RE.test(args.question)) {
+    return args.candidates;
+  }
+  const preferred = args.candidates.filter((entry) =>
+    HELIX_ASK_REPO_PREFERRED_PATH_RE.test(entry.filePath),
+  );
+  if (preferred.length < args.minPreferredFloor) {
+    return args.candidates;
+  }
+  const filtered = args.candidates.filter(
+    (entry) => !HELIX_ASK_REPO_DISFAVORED_PATH_RE.test(entry.filePath),
+  );
+  return filtered.length > 0 ? filtered : args.candidates;
+};
+
 async function buildAskContextFromQueries(
   question: string,
   queries: string[],
@@ -12687,7 +12923,12 @@ async function buildAskContextFromQueries(
       constrainedMerged.length >= 2
         ? Math.max(0, constrainedMerged[0].rrfScore - constrainedMerged[1].rrfScore)
         : topScore;
-    const tierSelected = selectCandidatesWithMmr(constrainedMerged, limit, HELIX_ASK_MMR_LAMBDA);
+    const tierSelectedRaw = selectCandidatesWithMmr(constrainedMerged, limit, HELIX_ASK_MMR_LAMBDA);
+    const tierSelected = applyRepoScopedCandidateFilter({
+      question,
+      candidates: tierSelectedRaw,
+      minPreferredFloor: Math.max(3, Math.floor(limit / 3)),
+    });
     if (!tierSelected.length) {
       stage0Telemetry = mergeRepoSearchStage0Telemetry(stage0Telemetry, tierStage0Telemetry);
       stage05Telemetry = mergeStage05Telemetry(stage05Telemetry, tierStage05Telemetry);
@@ -35668,6 +35909,11 @@ export const __testHelixAskReliabilityGuards = {
   shouldRestoreHelixAskDeterministicPlatonicAnswer,
   sanitizePinnedHelixAskDeterministicAnswer,
   finalizePinnedHelixAskDeterministicAnswer,
+  isHelixAskWeakObjectiveAssemblyDraft,
+  isHelixAskMetaNonAnswerDraft,
+  isHelixAskGenericNonAnswerDraft,
+  isHelixAskDeicticQuestionWithoutAnchor,
+  isHelixAskDeicticClarifyResponse,
   stripHelixAskObjectiveCheckpointArtifacts,
   shouldSkipCitationRelinkingForStructuredDeterministicAnswer,
   scrubSkippedLlmTransportErrors,
@@ -35816,6 +36062,7 @@ export const __testCapsuleGrounding = {
   resolveCapsuleMustKeepTerms,
   resolveCapsulePreferredEvidencePaths,
   buildHelixAskSearchQueries,
+  buildCapsuleTargetedClarifier,
   answerContainsCapsuleFocusTerm,
   answerHasCapsulePreferredAnchor,
   isCapsuleIntentAmbiguous,
@@ -40415,9 +40662,136 @@ const executeHelixAsk = async ({
     let conceptScopeCandidates: HelixAskConceptCandidate[] = [];
     let ambiguityCandidates: HelixAskConceptCandidate[] = [];
     let ambiguityCandidateLabels: string[] = [];
+    const smalltalkFastPathEligible =
+      HELIX_ASK_SMALLTALK_FAST_PATH &&
+      !forcedAnswer &&
+      !reportDecision.enabled &&
+      !blockScoped &&
+      !explicitRepoExpectation &&
+      !requiresRepoEvidence &&
+      !promptResearchRepoRequired &&
+      !hasFilePathHints &&
+      endpointHints.length === 0 &&
+      repoExpectationLevel === "low" &&
+      !isSecurityRiskPrompt(baseQuestion) &&
+      isHelixAskClarifyRescueGreetingOnlyQuestion(baseQuestion);
+    const smalltalkFastReply = smalltalkFastPathEligible
+      ? renderHelixAskClarifyRescueGreetingOnlyAnswer(baseQuestion)
+      : null;
+    if (debugPayload) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.smalltalk_fast_path_eligible = smalltalkFastPathEligible;
+      debugRecord.smalltalk_fast_path_applied = Boolean(smalltalkFastReply);
+    }
+    if (smalltalkFastReply) {
+      forcedAnswer = smalltalkFastReply;
+      forcedAnswerIsHard = true;
+      answerPath.push("forcedAnswer:smalltalk_fast_path");
+      answerPath.push("smalltalk:direct_fast_path");
+      logEvent("Smalltalk fast path", "answer", "greeting_only");
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.smalltalk_fast_path_reason = "greeting_only";
+        debugRecord.fallback_reason = "smalltalk_fast_path";
+      }
+      const smalltalkAnswerStart = Date.now();
+      const smalltalkFinalText = stripDeterministicNoiseArtifacts(
+        stripTruncationMarkers(formatHelixAskAnswer(smalltalkFastReply)),
+      );
+      const smalltalkMeta = isShortAnswer(smalltalkFinalText, "brief");
+      markLlmSkipDebug("short_circuit_forced_answer", "forcedAnswer:smalltalk_fast_path");
+      applyShortCircuitDebugPayload({
+        debugPayload,
+        shouldShortCircuitAnswer: true,
+        shortCircuitReason: "forced_answer_hard",
+        bypassShortCircuit: false,
+        isStage05HardFailForcedRule: false,
+      });
+      applyForcedShortCircuitAnswerDebugPayload({
+        debugPayload,
+        answerShortSentences: smalltalkMeta.sentences,
+        answerShortTokens: smalltalkMeta.tokens,
+        blocked: false,
+      });
+      answerPath.push("answer:forced");
+      answerPath.push("answer:fast_path_finalize");
+      logProgress("Generating answer");
+      logProgress("Answer ready", "concept", smalltalkAnswerStart);
+      logEvent("Answer raw preview", "llm", smalltalkFinalText, smalltalkAnswerStart, true);
+      const smalltalkResult: LocalAskResult = {
+        text: smalltalkFinalText,
+        answer: smalltalkFinalText,
+      };
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        const preview = clipAskText(smalltalkFinalText, HELIX_ASK_ANSWER_PREVIEW_CHARS);
+        debugRecord.answer_raw_text = preview;
+        debugRecord.answer_after_format = preview;
+        debugRecord.answer_after_fallback = preview;
+        debugRecord.answer_final_text = preview;
+        debugRecord.answer_path = answerPath.slice();
+        debugRecord.answer_surface_mode = "conversational";
+        debugRecord.answer_surface_visible_sources = false;
+        debugRecord.answer_surface_explicit_sources_requested = false;
+        debugRecord.micro_pass = false;
+        debugRecord.micro_pass_enabled = false;
+        debugRecord.fallback_reason_taxonomy = "smalltalk_fast_path";
+      }
+      streamEmitter.finalize(smalltalkFinalText);
+      logEvent("Finalization", "done", "response_ready", undefined, true);
+      if (debugPayload && captureLiveHistory) {
+        attachTraceSummaryDebugPayload({
+          debugPayload,
+          traceEvents: liveEventHistory.slice(),
+        });
+      }
+      const responsePayload = buildCleanFinalResponsePayload({
+        result: smalltalkResult,
+        debugPayload,
+        finalText: smalltalkFinalText,
+        attachContextCapsuleToResult: (target, finalTextRaw) =>
+          attachContextCapsuleToResult(target as LocalAskResult, finalTextRaw),
+      });
+      responder.send(200, responsePayload);
+      return;
+    }
+    const deicticPreIntentClarifyEligible =
+      HELIX_ASK_AMBIGUITY_RESOLVER &&
+      !forcedAnswer &&
+      !reportDecision.enabled &&
+      !blockScoped &&
+      !explicitRepoExpectation &&
+      !requiresRepoEvidence &&
+      !promptResearchRepoRequired &&
+      !hasFilePathHints &&
+      endpointHints.length === 0 &&
+      repoExpectationLevel === "low" &&
+      !isSecurityRiskPrompt(baseQuestion) &&
+      isHelixAskDeicticQuestionWithoutAnchor(baseQuestion);
+    if (debugPayload) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.deictic_pre_intent_clarify_eligible = deicticPreIntentClarifyEligible;
+      debugRecord.deictic_pre_intent_clarify_applied = false;
+    }
+    if (deicticPreIntentClarifyEligible) {
+      forcedAnswer = buildCapsuleTargetedClarifier(baseQuestion, []);
+      forcedAnswerIsHard = true;
+      answerPath.push("forcedAnswer:pre_intent_clarify_deictic");
+      answerPath.push("clarify:pre_intent");
+      answerPath.push("clarify:deictic_pre_intent_short_circuit");
+      logEvent("Ambiguity resolver", "deictic_short_circuit", "deictic_no_anchor");
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.deictic_pre_intent_clarify_applied = true;
+        debugPayload.clarify_triggered = true;
+        debugPayload.fallback_reason = "ambiguity_clarify";
+        debugPayload.ambiguity_clarify_rate = 1;
+      }
+    }
     if (!forcedAnswer) {
       const equationClarifyBypass = isEquationQuotePrompt(baseQuestion);
       const ambiguityTargetSpan = extractClarifySpan(baseQuestion);
+      const deicticNoAnchorPrompt = isHelixAskDeicticQuestionWithoutAnchor(baseQuestion);
       const ambiguitySeedLabels = collectAmbiguitySeedLabels(
         [
           ...(slotPreview?.slots ?? []),
@@ -40432,7 +40806,7 @@ const executeHelixAsk = async ({
       }
       const fastQualitySafetyContext = reportDecision.enabled;
       const shouldSkipAmbiguityClusters =
-        (fastQualityMode && !fastQualitySafetyContext) || equationClarifyBypass;
+        (fastQualityMode && !fastQualitySafetyContext) || equationClarifyBypass || deicticNoAnchorPrompt;
       if (debugPayload && fastQualityMode) {
         debugPayload.fast_quality_ambiguity_clusters_skipped = shouldSkipAmbiguityClusters;
         debugPayload.fast_quality_ambiguity_labels_disabled = true;
@@ -44032,9 +44406,15 @@ const executeHelixAsk = async ({
         ) {
           forcedAnswer = shortConceptDefinition || conceptAnswer;
           forcedAnswerIsHard = true;
-          if (answerPath.includes("forcedAnswer:pre_intent_clarify")) {
+          if (
+            answerPath.includes("forcedAnswer:pre_intent_clarify") ||
+            answerPath.includes("forcedAnswer:pre_intent_clarify_deictic")
+          ) {
             const filteredAnswerPath = answerPath.filter(
-              (entry) => entry !== "forcedAnswer:pre_intent_clarify" && entry !== "clarify:pre_intent",
+              (entry) =>
+                entry !== "forcedAnswer:pre_intent_clarify" &&
+                entry !== "forcedAnswer:pre_intent_clarify_deictic" &&
+                entry !== "clarify:pre_intent",
             );
             answerPath.splice(0, answerPath.length, ...filteredAnswerPath);
             answerPath.push("clarify:pre_intent_superseded_by_concept");
@@ -50047,7 +50427,7 @@ const executeHelixAsk = async ({
         (debugPayload as Record<string, unknown>).stage05_summary_soft_bypass = true;
       }
     }
-    const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
+    let fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
     const applyImmediateQualityFloor = (inputText: string): { text: string; reasons: string[] } => {
       let next = stripRunawayAnswerArtifacts(
         stripTruncationMarkers(stripInlineJsonArtifacts(String(inputText ?? "").trim())),
@@ -50130,6 +50510,171 @@ const executeHelixAsk = async ({
       });
       return { text: next, reasons };
     };
+    let preIntentClarifySoftened = false;
+    const preIntentForcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
+    const preIntentClarifyForcedRule = isHelixAskClarifyForcedShortCircuitRule(preIntentForcedRule);
+    const preIntentClarifyStrongRepoCues =
+      explicitRepoExpectation ||
+      requiresRepoEvidence ||
+      hasFilePathHints ||
+      endpointHints.length > 0 ||
+      repoExpectationLevel !== "low" ||
+      isRepoQuestion;
+    const preIntentClarifyRescueEligible =
+      HELIX_ASK_CLARIFY_RESCUE_MICRO_PLANNER &&
+      forcedAnswerIsHard &&
+      preIntentClarifyForcedRule &&
+      !isHelixAskDeicticQuestionWithoutAnchor(baseQuestion) &&
+      isHelixAskClarifyRescueCandidateQuestion(baseQuestion) &&
+      !preIntentClarifyStrongRepoCues &&
+      !llmUnavailableAtTurnStart &&
+      !String(evidenceText ?? "").trim() &&
+      !String(promptScaffold ?? "").trim() &&
+      !String(repoScaffold ?? "").trim() &&
+      !String(generalScaffold ?? "").trim() &&
+      contextFiles.length === 0;
+    if (debugPayload) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.microplanner_used = false;
+      debugRecord.microplanner_action = "none";
+      debugRecord.microplanner_confidence = 0;
+      debugRecord.clarify_softened = false;
+      debugRecord.skip_overridden = false;
+    }
+    if (preIntentClarifyRescueEligible) {
+      const rescueBudget = canStartFastHelper(
+        "pre_intent_clarify_microplanner",
+        fastQualityBudgets.helperMinMs,
+        fastStageDeadlines.finalize,
+      );
+      if (!fastQualityMode || rescueBudget.ok) {
+        const rescueTokens = clampNumber(Math.round(repairTokens * 0.65), 96, 224);
+        const rescueStart = logStepStart(
+          "LLM pre-intent clarify rescue",
+          `tokens=${rescueTokens}`,
+          {
+            maxTokens: rescueTokens,
+            fn: "runHelixAskLocalWithOverflowRetry",
+            label: "pre_intent_clarify_microplanner",
+            prompt: "buildHelixAskClarifyRescuePrompt",
+          },
+        );
+        const rescuePrompt = buildHelixAskClarifyRescuePrompt({
+          question: baseQuestion,
+          currentClarify: fallbackAnswer || "Clarify the intended topic.",
+          repoCueSummary:
+            "explicitRepoExpectation=no; requiresRepoEvidence=no; filePathHints=no; endpointHints=0; repoExpectation=low",
+        });
+        const rescueAttempt = await runHelperWithRuntimeGuard(
+          "pre_intent_clarify_microplanner",
+          FAST_QUALITY_FINALIZE_BY_MS,
+          () =>
+            runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: rescuePrompt,
+                max_tokens: rescueTokens,
+                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.2),
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+                model: parsed.data.model,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+              },
+              {
+                fallbackMaxTokens: rescueTokens,
+                allowContextDrop: true,
+                label: "pre_intent_clarify_microplanner",
+              },
+            ),
+        );
+        if (!rescueAttempt) {
+          logStepEnd(
+            "LLM pre-intent clarify rescue",
+            "timeout",
+            rescueStart,
+            false,
+            {
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "pre_intent_clarify_microplanner",
+              error: "helper_timeout_fallback",
+            },
+          );
+        } else {
+          const {
+            result: rescueResult,
+            overflow: rescueOverflow,
+            llm: rescueLlm,
+          } = rescueAttempt;
+          recordOverflow("pre_intent_clarify_microplanner", rescueOverflow);
+          appendLlmCallDebug(rescueLlm);
+          const rescueDecision = parseHelixAskClarifyRescueDecision(rescueResult.text ?? "");
+          const rescueAction = rescueDecision?.action ?? "none";
+          const rescueConfidence = rescueDecision?.confidence ?? 0;
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.microplanner_used = true;
+            debugRecord.microplanner_action = rescueAction;
+            debugRecord.microplanner_confidence = rescueConfidence;
+          }
+          const rescueAnswerCandidate = rescueDecision?.answer
+            ? ensureSentence(formatHelixAskAnswer(rescueDecision.answer))
+            : "";
+          if (
+            rescueDecision &&
+            rescueDecision.action === "answer" &&
+            rescueAnswerCandidate &&
+            rescueDecision.confidence >= HELIX_ASK_CLARIFY_RESCUE_MIN_CONFIDENCE
+          ) {
+            forcedAnswer = rescueAnswerCandidate;
+            forcedAnswerIsHard = true;
+            fallbackAnswer = forcedAnswer;
+          const filteredAnswerPath = answerPath.filter(
+              (entry) =>
+                entry !== "forcedAnswer:pre_intent_clarify" &&
+                entry !== "forcedAnswer:pre_intent_clarify_deictic" &&
+                entry !== "clarify:pre_intent",
+            );
+            answerPath.splice(0, answerPath.length, ...filteredAnswerPath);
+            answerPath.push("clarify:pre_intent_softened");
+            answerPath.push("forcedAnswer:pre_intent_microplanner_answer");
+            preIntentClarifySoftened = true;
+            if (debugPayload) {
+              debugPayload.clarify_triggered = false;
+              debugPayload.ambiguity_clarify_rate = 0;
+              debugPayload.fallback_reason = "pre_intent_microplanner_answer";
+              const debugRecord = debugPayload as Record<string, unknown>;
+              debugRecord.clarify_softened = true;
+              debugRecord.skip_overridden = true;
+            }
+          } else {
+            preIntentClarifySoftened = true;
+            if (debugPayload) {
+              const debugRecord = debugPayload as Record<string, unknown>;
+              debugRecord.clarify_softened = true;
+              debugRecord.skip_overridden = true;
+            }
+          }
+          logStepEnd(
+            "LLM pre-intent clarify rescue",
+            rescueDecision
+              ? `${rescueDecision.action}@${rescueDecision.confidence.toFixed(2)}`
+              : "parse_fail",
+            rescueStart,
+            Boolean(rescueDecision),
+            {
+              textLength: typeof rescueResult?.text === "string" ? rescueResult.text.length : 0,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "pre_intent_clarify_microplanner",
+            },
+          );
+        }
+      } else if (debugPayload) {
+        (debugPayload as Record<string, unknown>).microplanner_budget_skipped = true;
+      }
+    }
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) &&
       (() => {
@@ -50139,10 +50684,21 @@ const executeHelixAsk = async ({
           forcedRule === "forcedAnswer:math_solver_warp_guard";
         const isConceptForcedRule = isHelixAskConceptForcedShortCircuitRule(forcedRule);
         const isClarifyForcedRule = isHelixAskClarifyForcedShortCircuitRule(forcedRule);
+        const isMicroplannerForcedRule =
+          forcedRule === "forcedAnswer:pre_intent_microplanner_answer";
         const isResearchContractFailClosedForcedRule =
           isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule);
         const isStage05HardFailForcedRule =
           forcedRule === "forcedAnswer:stage05_summary_hard_fail";
+        const preIntentClarifyHardShortCircuitAllowed =
+          !isClarifyForcedRule ||
+          forcedRule === "forcedAnswer:pre_intent_clarify_deictic" ||
+          explicitRepoExpectation ||
+          requiresRepoEvidence ||
+          hasFilePathHints ||
+          endpointHints.length > 0 ||
+          repoExpectationLevel !== "low" ||
+          isRepoQuestion;
         const hasClarifyOrFailClosedPath = answerPath.some(
           (entry) => entry.startsWith("clarify:") || entry.startsWith("failClosed:"),
         );
@@ -50151,7 +50707,8 @@ const executeHelixAsk = async ({
           (!hasClarifyOrFailClosedPath ||
             isMathForcedRule ||
             isConceptForcedRule ||
-            isClarifyForcedRule ||
+            isMicroplannerForcedRule ||
+            (isClarifyForcedRule && preIntentClarifyHardShortCircuitAllowed) ||
             isResearchContractFailClosedForcedRule) &&
           forcedRule !== null &&
           isHelixAskHardForcedShortCircuitRule(forcedRule);
@@ -50169,10 +50726,21 @@ const executeHelixAsk = async ({
       forcedRule === "forcedAnswer:math_solver_warp_guard";
     const isConceptForcedRule = isHelixAskConceptForcedShortCircuitRule(forcedRule);
     const isClarifyForcedRule = isHelixAskClarifyForcedShortCircuitRule(forcedRule);
+    const isMicroplannerForcedRule =
+      forcedRule === "forcedAnswer:pre_intent_microplanner_answer";
     const isResearchContractFailClosedForcedRule =
       isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule);
     const isStage05HardFailForcedRule =
       forcedRule === "forcedAnswer:stage05_summary_hard_fail";
+    const preIntentClarifyHardShortCircuitAllowed =
+      !isClarifyForcedRule ||
+      forcedRule === "forcedAnswer:pre_intent_clarify_deictic" ||
+      explicitRepoExpectation ||
+      requiresRepoEvidence ||
+      hasFilePathHints ||
+      endpointHints.length > 0 ||
+      repoExpectationLevel !== "low" ||
+      isRepoQuestion;
     const hasClarifyOrFailClosedPath = answerPath.some(
       (entry) => entry.startsWith("clarify:") || entry.startsWith("failClosed:"),
     );
@@ -50181,7 +50749,8 @@ const executeHelixAsk = async ({
       ((!hasClarifyOrFailClosedPath ||
         isMathForcedRule ||
         isConceptForcedRule ||
-        isClarifyForcedRule ||
+        isMicroplannerForcedRule ||
+        (isClarifyForcedRule && preIntentClarifyHardShortCircuitAllowed) ||
         isResearchContractFailClosedForcedRule) ||
         isStage05HardFailForcedRule) &&
       forcedRule !== null &&
@@ -50190,6 +50759,10 @@ const executeHelixAsk = async ({
     if (forcedAnswerIsHard) shortCircuitReasonTokens.push("forced_answer_hard");
     if (forcedAnswerIsHard && !forcedAnswerShortCircuitEligible) {
       shortCircuitReasonTokens.push("forced_answer_softened");
+    }
+    if (isClarifyForcedRule && !preIntentClarifyHardShortCircuitAllowed) {
+      shortCircuitReasonTokens.push("clarify_softened");
+      preIntentClarifySoftened = true;
     }
     if (!prompt && !isIdeologyReferenceIntent) shortCircuitReasonTokens.push("missing_prompt_non_ideology");
     const shortCircuitReason = shortCircuitReasonTokens.length > 0
@@ -50204,6 +50777,13 @@ const executeHelixAsk = async ({
       bypassShortCircuit,
       isStage05HardFailForcedRule,
     });
+    if (debugPayload && preIntentClarifySoftened) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.clarify_softened = true;
+      if (!shouldShortCircuitAnswer || isMicroplannerForcedRule) {
+        debugRecord.skip_overridden = true;
+      }
+    }
     const shouldFastPathFinalize = shouldFastPathFinalizeHelixAskForcedAnswer({
       shouldShortCircuitAnswer,
       fallbackAnswer,
@@ -58557,7 +59137,7 @@ const executeHelixAsk = async ({
             objectiveRetrievalQueriesLog,
             debugPayload: debugPayload as Record<string, unknown> | undefined,
             applyDialogueProfilePrompt,
-            recordObjectivePromptRewriteStage,
+            recordPromptRewriteStage: recordObjectivePromptRewriteStage,
             runLocalWithOverflowRetry: runHelixAskLocalWithOverflowRetry,
             appendLlmCallDebug,
             stripPromptEchoFromAnswer,
@@ -60497,8 +61077,13 @@ const executeHelixAsk = async ({
                 : "",
             ].filter(Boolean)
           : [];
+      const finalModeGateResearchRequested =
+        /\b(?:paper|peer[-\s]?reviewed|arxiv|citation|sources?|evidence|research|prove|proof)\b/i
+          .test(baseQuestion);
       const finalModeGateRequireResearchOnUncertainty =
-        finalModeGateRepoOrHybrid && !finalModeGateFrontierIntent;
+        finalModeGateRepoOrHybrid &&
+        !finalModeGateFrontierIntent &&
+        finalModeGateResearchRequested;
       let finalRepoFetchContractEvaluation: HelixAskRepoFetchContractEvaluation | null = null;
       if (finalModeGateRepoOrHybrid) {
         const evaluateFinalRepoFetchContract = (): HelixAskRepoFetchContractEvaluation =>
@@ -60633,6 +61218,70 @@ const executeHelixAsk = async ({
           }
         }
       }
+      let finalStrategyProgressEvaluation: HelixAskStrategyProgressContractEvaluation | null = null;
+      if (finalModeGateRepoOrHybrid) {
+        const evaluateFinalStrategyProgress = (): HelixAskStrategyProgressContractEvaluation =>
+          evaluateHelixAskStrategyProgressContract({
+            question: baseQuestion,
+            text: cleanedText,
+            seedCitations: uniqueHelixAskCitations([
+              ...extractFilePathsFromText(cleanedText).map((entry) => normalizeConstraintPath(entry)),
+              ...extractHttpCitationsFromText(cleanedText),
+              ...(finalRepoFetchContractEvaluation?.citations ?? []),
+              ...(finalUncertaintyResearchEvaluation?.citations ?? []),
+              ...(finalUncertaintyResearchEvaluation?.approvedCitations ?? []),
+            ]),
+          });
+        finalStrategyProgressEvaluation = evaluateFinalStrategyProgress();
+        if (finalStrategyProgressEvaluation.required && !finalStrategyProgressEvaluation.pass) {
+          const repairedText = buildHelixAskStrategyProgressContractRepairAnswer({
+            question: baseQuestion,
+            text: cleanedText,
+            citations: finalStrategyProgressEvaluation.citations,
+          }).trim();
+          if (repairedText) {
+            cleanedText = applyTerminalAnswerText({
+              result,
+              nextText: repairedText,
+            });
+            answerPath.push("modeGate:strategy_progress_contract_repair");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).strategy_progress_contract_repair_applied = true;
+            }
+          }
+          finalStrategyProgressEvaluation = evaluateFinalStrategyProgress();
+        }
+        if (finalStrategyProgressEvaluation.required && !finalStrategyProgressEvaluation.pass) {
+          const unknownFallbackText =
+            buildHelixAskStrategyProgressContractUnknownFallback({
+              question: baseQuestion,
+              citations: finalStrategyProgressEvaluation.citations,
+              missingReasons: finalStrategyProgressEvaluation.missingReasons,
+            }).trim();
+          if (unknownFallbackText) {
+            cleanedText = applyTerminalAnswerText({
+              result,
+              nextText: unknownFallbackText,
+            });
+            answerPath.push("modeGate:strategy_progress_contract_fail_closed");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).strategy_progress_contract_fail_closed = true;
+            }
+          }
+          finalStrategyProgressEvaluation = evaluateFinalStrategyProgress();
+          if (
+            finalStrategyProgressEvaluation.required &&
+            !finalStrategyProgressEvaluation.pass &&
+            !finalStrategyProgressEvaluation.missingReasons.includes(
+              "strategy_progress_contract_fail_closed",
+            )
+          ) {
+            finalStrategyProgressEvaluation.missingReasons.push(
+              "strategy_progress_contract_fail_closed",
+            );
+          }
+        }
+      }
       finalModeGateConsistencyReasons.push(
         ...collectFinalModeGateConsistencyReasons({
           structuredSurface: finalModeGateStructuredSurface,
@@ -60660,6 +61309,15 @@ const executeHelixAsk = async ({
       }
       if (finalUncertaintyResearchEvaluation) {
         for (const reason of finalUncertaintyResearchEvaluation.missingReasons) {
+          const normalized = String(reason ?? "").trim();
+          if (!normalized) continue;
+          if (!finalModeGateConsistencyReasons.includes(normalized)) {
+            finalModeGateConsistencyReasons.push(normalized);
+          }
+        }
+      }
+      if (finalStrategyProgressEvaluation) {
+        for (const reason of finalStrategyProgressEvaluation.missingReasons) {
           const normalized = String(reason ?? "").trim();
           if (!normalized) continue;
           if (!finalModeGateConsistencyReasons.includes(normalized)) {
@@ -60725,10 +61383,45 @@ const executeHelixAsk = async ({
           finalUncertaintyResearchEvaluation?.proposalReferenceCount ?? 0;
         debugRecord.uncertainty_research_contract_required_uncertainty_estimation =
           finalUncertaintyResearchEvaluation?.requiredUncertaintyEstimation ?? false;
-        debugRecord.claim_evidence_binding_pass =
+        debugRecord.strategy_progress_contract_required =
+          finalStrategyProgressEvaluation?.required ?? false;
+        debugRecord.strategy_progress_contract_pass = finalStrategyProgressEvaluation?.pass ?? true;
+        debugRecord.strategy_progress_contract_missing_reasons =
+          finalStrategyProgressEvaluation?.missingReasons ?? [];
+        debugRecord.strategy_progress_contract_has_single_experiment =
+          finalStrategyProgressEvaluation?.hasSingleExperiment ?? false;
+        debugRecord.strategy_progress_contract_has_pass_threshold =
+          finalStrategyProgressEvaluation?.hasPassThreshold ?? false;
+        debugRecord.strategy_progress_contract_has_pivot_threshold =
+          finalStrategyProgressEvaluation?.hasPivotThreshold ?? false;
+        debugRecord.strategy_progress_contract_has_measurement_artifact =
+          finalStrategyProgressEvaluation?.hasMeasurementArtifact ?? false;
+        debugRecord.strategy_progress_contract_claim_evidence_binding_pass =
+          finalStrategyProgressEvaluation?.claimEvidenceBindingPass ?? true;
+        debugRecord.strategy_progress_contract_claim_evidence_binding_missing =
+          finalStrategyProgressEvaluation?.claimEvidenceBindingMissing ?? [];
+        debugRecord.strategy_progress_contract_non_trivial_claim_count =
+          finalStrategyProgressEvaluation?.nonTrivialClaimCount ?? 0;
+        debugRecord.strategy_progress_contract_repo_citation_count =
+          finalStrategyProgressEvaluation?.repoCitationCount ?? 0;
+        debugRecord.strategy_progress_contract_codex_clone_citation_count =
+          finalStrategyProgressEvaluation?.codexCloneCitationCount ?? 0;
+        debugRecord.strategy_progress_contract_web_research_citation_count =
+          finalStrategyProgressEvaluation?.webResearchCitationCount ?? 0;
+        debugRecord.strategy_progress_contract_citations =
+          finalStrategyProgressEvaluation?.citations ?? [];
+        const uncertaintyClaimEvidenceBindingPass =
           finalUncertaintyResearchEvaluation?.claimEvidenceBindingPass ?? true;
-        debugRecord.claim_evidence_binding_missing =
-          finalUncertaintyResearchEvaluation?.claimEvidenceBindingMissing ?? [];
+        const strategyClaimEvidenceBindingPass =
+          finalStrategyProgressEvaluation?.claimEvidenceBindingPass ?? true;
+        debugRecord.claim_evidence_binding_pass =
+          uncertaintyClaimEvidenceBindingPass && strategyClaimEvidenceBindingPass;
+        debugRecord.claim_evidence_binding_missing = Array.from(
+          new Set([
+            ...(finalUncertaintyResearchEvaluation?.claimEvidenceBindingMissing ?? []),
+            ...(finalStrategyProgressEvaluation?.claimEvidenceBindingMissing ?? []),
+          ]),
+        );
         debugRecord.experimental_math_risk =
           finalUncertaintyResearchEvaluation?.experimentalMathRisk ?? false;
         debugRecord.experimental_math_risk_signals =
@@ -61087,18 +61780,11 @@ const executeHelixAsk = async ({
         },
       );
     }
-    logEvent(
-      "Finalization",
-      "done",
-      "response_ready",
-      undefined,
-      true,
-      {
-        epistemic: finalEpistemicMeta,
-        verification: finalVerificationMeta,
-        intent: finalIntentMeta,
-      },
-    );
+    const finalizationEventMeta = {
+      epistemic: finalEpistemicMeta,
+      verification: finalVerificationMeta,
+      intent: finalIntentMeta,
+    };
     attachFinalResponseObservabilityDebugPayload({
       debugPayload: debugPayload as Record<string, unknown> | null | undefined,
       captureLiveHistory,
@@ -61364,6 +62050,294 @@ const executeHelixAsk = async ({
       attachContextCapsuleToResult: (target, finalTextRaw) =>
         attachContextCapsuleToResult(target as LocalAskResult, finalTextRaw),
     });
+    const applyFinalPayloadText = (nextText: string, marker: string): void => {
+      const normalized = String(nextText ?? "").trim();
+      if (!normalized) return;
+      responsePayload.text = normalized;
+      responsePayload.answer = normalized;
+      result.text = normalized;
+      result.answer = normalized;
+      if (responsePayload.envelope?.answer) {
+        responsePayload.envelope.answer = normalized;
+      }
+      if (answerPath) {
+        answerPath.push(marker);
+      }
+    };
+    if (typeof responsePayload.text === "string") {
+      const scrubbed = stripHelixAskMachineLanguageLeakage(responsePayload.text);
+      if (scrubbed && scrubbed !== responsePayload.text.trim()) {
+        applyFinalPayloadText(scrubbed, "finalSurface:machine_leak_scrub");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).machine_leak_scrub_applied = true;
+        }
+      }
+    }
+    const objectiveConsistencyBlocked =
+      debugPayload &&
+      typeof debugPayload === "object" &&
+      ((debugPayload as Record<string, unknown>).objective_mode_gate_consistency_blocked === true ||
+        (debugPayload as Record<string, unknown>).final_mode_gate_consistency_blocked === true);
+    const deicticQuestionWithoutAnchor = isHelixAskDeicticQuestionWithoutAnchor(baseQuestion);
+    const genericNonAnswerDetectedInitial =
+      typeof responsePayload.text === "string" && isHelixAskGenericNonAnswerDraft(responsePayload.text);
+    const deicticClarifyMissingInitial =
+      typeof responsePayload.text === "string" &&
+      deicticQuestionWithoutAnchor &&
+      !isHelixAskDeicticClarifyResponse(responsePayload.text);
+    if (
+      objectiveConsistencyBlocked &&
+      deicticQuestionWithoutAnchor &&
+      typeof responsePayload.text === "string" &&
+      (hasHelixAskObjectiveUnknownLeakage(responsePayload.text) ||
+        isHelixAskWeakObjectiveAssemblyDraft(responsePayload.text) ||
+        isHelixAskMetaNonAnswerDraft(responsePayload.text) ||
+        isHelixAskGenericNonAnswerDraft(responsePayload.text) ||
+        /draft synthesis initialized for/i.test(responsePayload.text))
+    ) {
+      const clarify = buildHelixAskHumanClarifyFallback(baseQuestion);
+      applyFinalPayloadText(clarify, "finalSurface:blocked_mode_clarify_fallback");
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.blocked_mode_clarify_fallback_applied = true;
+        debugRecord.blocked_mode_clarify_meta_non_answer_detected = isHelixAskMetaNonAnswerDraft(
+          responsePayload.text,
+        );
+        debugRecord.blocked_mode_clarify_generic_non_answer_detected =
+          isHelixAskGenericNonAnswerDraft(responsePayload.text);
+      }
+    }
+    if (deicticClarifyMissingInitial) {
+      const clarify = buildHelixAskHumanClarifyFallback(baseQuestion);
+      applyFinalPayloadText(clarify, "finalSurface:deictic_clarify_fallback");
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.deictic_clarify_fallback_applied = true;
+      }
+    }
+    const genericNonAnswerDetected =
+      typeof responsePayload.text === "string" && isHelixAskGenericNonAnswerDraft(responsePayload.text);
+    const deicticClarifyMissing =
+      typeof responsePayload.text === "string" &&
+      deicticQuestionWithoutAnchor &&
+      !isHelixAskDeicticClarifyResponse(responsePayload.text);
+    const deicticClarifyTerminalProfile =
+      typeof responsePayload.text === "string" &&
+      deicticQuestionWithoutAnchor &&
+      isHelixAskDeicticClarifyResponse(responsePayload.text);
+    const finalFocusGuardResult =
+      debugPayload && typeof debugPayload === "object"
+        ? String((debugPayload as Record<string, unknown>).focus_guard_result ?? "").trim()
+        : "";
+    const finalObligationsMissing =
+      debugPayload &&
+      typeof debugPayload === "object" &&
+      Array.isArray((debugPayload as Record<string, unknown>).answer_obligations_missing)
+        ? ((debugPayload as Record<string, unknown>).answer_obligations_missing as unknown[])
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean)
+        : [];
+    const finalPreflightEvidenceOk =
+      debugPayload && typeof debugPayload === "object"
+        ? (debugPayload as Record<string, unknown>).preflight_evidence_ok === true
+        : true;
+    const finalUncertaintyContractRequired =
+      debugPayload && typeof debugPayload === "object"
+        ? (debugPayload as Record<string, unknown>).uncertainty_research_contract_required === true
+        : false;
+    const finalClaimTier =
+      debugPayload && typeof debugPayload === "object"
+        ? String((debugPayload as Record<string, unknown>).uncertainty_research_contract_claim_tier ?? "")
+            .trim()
+            .toLowerCase()
+        : "";
+    const finalClaimCitationLinkOk =
+      debugPayload && typeof debugPayload === "object"
+        ? (debugPayload as Record<string, unknown>).claim_citation_link_ok === true
+        : true;
+    const finalCodexCloneCitationSignals =
+      debugPayload && typeof debugPayload === "object"
+        ? [
+            (debugPayload as Record<string, unknown>).strategy_progress_contract_codex_clone_citation_count,
+            (debugPayload as Record<string, unknown>).semantic_repo_tech_codex_clone_citation_count,
+            (debugPayload as Record<string, unknown>).repo_fetch_contract_codex_reference_count,
+            (debugPayload as Record<string, unknown>).uncertainty_research_contract_codex_reference_count,
+          ]
+        : [];
+    const finalCodexCloneSignalAvailable = finalCodexCloneCitationSignals.some(
+      (value) => typeof value === "number" && Number.isFinite(value),
+    );
+    const finalCodexCloneCitationCount = finalCodexCloneCitationSignals
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+      .reduce((sum, value) => sum + Math.max(0, Math.floor(value)), 0);
+    const finalRequiresUncertaintyResearch =
+      finalUncertaintyContractRequired &&
+      (finalClaimTier === "exploratory" ||
+        finalClaimTier === "diagnostic" ||
+        !finalClaimCitationLinkOk);
+    const finalTextCitations =
+      typeof responsePayload.text === "string"
+        ? uniqueHelixAskCitations([
+            ...extractFilePathsFromText(responsePayload.text),
+            ...extractHttpCitationsFromText(responsePayload.text),
+          ])
+        : [];
+    const finalDebugUncertaintyCitations =
+      debugPayload &&
+      typeof debugPayload === "object" &&
+      Array.isArray((debugPayload as Record<string, unknown>).uncertainty_research_contract_citations)
+        ? ((debugPayload as Record<string, unknown>).uncertainty_research_contract_citations as unknown[])
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [];
+    const finalDebugStrategyCitations =
+      debugPayload &&
+      typeof debugPayload === "object" &&
+      Array.isArray((debugPayload as Record<string, unknown>).strategy_progress_contract_citations)
+        ? ((debugPayload as Record<string, unknown>).strategy_progress_contract_citations as unknown[])
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [];
+    const finalKnownCitations = uniqueHelixAskCitations([
+      ...finalTextCitations,
+      ...finalDebugUncertaintyCitations,
+      ...finalDebugStrategyCitations,
+    ]);
+    const finalHasRepoOrCloneCitation = finalKnownCitations.some(
+      (citation) => !/^https?:\/\//i.test(citation),
+    );
+    const finalObligationsMissingForValidation = deicticClarifyTerminalProfile
+      ? []
+      : finalObligationsMissing;
+    const finalValidationReasons = [
+      genericNonAnswerDetected ? "generic_non_answer" : "",
+      deicticClarifyMissing ? "deictic_clarify_missing" : "",
+      !deicticClarifyTerminalProfile &&
+      finalFocusGuardResult === "clarify" &&
+      typeof responsePayload.text === "string" &&
+      !isHelixAskDeicticClarifyResponse(responsePayload.text)
+        ? "focus_guard_clarify_required"
+        : "",
+      finalObligationsMissingForValidation.length > 0 ? "answer_obligations_missing" : "",
+      !deicticClarifyTerminalProfile && !finalPreflightEvidenceOk && !deicticClarifyMissing
+        ? "preflight_evidence_missing"
+        : "",
+      finalRequiresUncertaintyResearch && !finalHasRepoOrCloneCitation
+        ? "uncertainty_missing_repo_or_clone_citation"
+        : "",
+      finalRequiresUncertaintyResearch &&
+      finalCodexCloneSignalAvailable &&
+      finalCodexCloneCitationCount <= 0
+        ? "uncertainty_missing_codex_clone_baseline"
+        : "",
+    ].filter(Boolean);
+    const finalValidationOnlyObligationsMissing =
+      finalValidationReasons.length > 0 &&
+      finalValidationReasons.every((reason) => reason === "answer_obligations_missing");
+    let finalAnswerValidated =
+      typeof responsePayload.text === "string" &&
+      responsePayload.text.trim().length > 0 &&
+      (finalValidationReasons.length === 0 || finalValidationOnlyObligationsMissing);
+    if (!finalAnswerValidated && !finalValidationOnlyObligationsMissing) {
+      const clarify = finalFocusGuardResult === "clarify"
+        ? buildHelixAskHumanClarifyFallback(baseQuestion)
+        : deicticQuestionWithoutAnchor
+        ? buildHelixAskHumanClarifyFallback(baseQuestion)
+        : finalRequiresUncertaintyResearch
+          ? finalCodexCloneSignalAvailable
+            ? "I do not have enough verifiable evidence to answer safely in this turn. I need repo-grounded support with codex-clone baseline citations."
+            : "I do not have enough verifiable evidence to answer safely in this turn. I need repo-grounded support with concrete codebase citations."
+          : buildHelixAskHumanClarifyFallback(baseQuestion);
+      applyFinalPayloadText(clarify, "finalSurface:final_answer_validator_fallback");
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.final_answer_validator_fallback_applied = true;
+      }
+    }
+    if (!finalAnswerValidated && finalValidationOnlyObligationsMissing) {
+      finalAnswerValidated = true;
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.final_answer_validator_soft_pass = true;
+        debugRecord.final_answer_validator_soft_pass_reason = "answer_obligations_missing_only";
+      }
+    }
+    if (objectiveMiniAnswers.length > 0) {
+      const miniSynthSummary = objectiveMiniAnswers
+        .map((entry) => `${entry.objective_id}:${entry.status}`)
+        .join(" | ");
+      logEvent(
+        "Objective mini-synth",
+        "summary",
+        miniSynthSummary || "none",
+        undefined,
+        true,
+        {
+          objective_count: objectiveMiniAnswers.length,
+          covered_count: objectiveMiniAnswers.filter((entry) => entry.status === "covered").length,
+        },
+      );
+      const miniCriticSummary = objectiveMiniAnswers
+        .map((entry) => {
+          const missing = Array.isArray(entry.missing_slots) ? entry.missing_slots.length : 0;
+          return `${entry.objective_id}:${entry.status}:missing=${missing}`;
+        })
+        .join(" | ");
+      logEvent(
+        "Objective mini-critic",
+        "summary",
+        miniCriticSummary || "none",
+        undefined,
+        true,
+        {
+          objective_count: objectiveMiniAnswers.length,
+          unresolved_count: objectiveMiniAnswers.filter((entry) => entry.status !== "covered")
+            .length,
+        },
+      );
+    }
+    if (debugPayload) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.final_phase = "final_answer";
+      debugRecord.final_answer_validated = finalAnswerValidated;
+      debugRecord.final_answer_validation_reasons = finalValidationReasons;
+      debugRecord.final_codex_clone_baseline_required =
+        finalRequiresUncertaintyResearch && finalCodexCloneSignalAvailable;
+      debugRecord.final_codex_clone_citation_count = finalCodexCloneCitationCount;
+      debugRecord.deictic_clarify_terminal_profile_applied = deicticClarifyTerminalProfile;
+      debugRecord.global_terminal_validator_applied = true;
+      debugRecord.global_terminal_validator_mode =
+        finalAnswerValidated ? "strict_pass" : "strict_fail";
+      debugRecord.global_terminal_validator_reasons = finalValidationReasons;
+    }
+    logEvent(
+      "Final answer validator",
+      finalAnswerValidated ? "pass" : "fail",
+      finalAnswerValidated ? "final_answer_validated" : "final_answer_rejected",
+      undefined,
+      finalAnswerValidated,
+      {
+        final_phase: "final_answer",
+        final_answer_validated: finalAnswerValidated,
+        generic_non_answer_detected: genericNonAnswerDetected,
+        deictic_clarify_missing: deicticClarifyMissing,
+        final_answer_validation_reasons: finalValidationReasons,
+      },
+    );
+    logEvent(
+      "Finalization",
+      finalAnswerValidated ? "done" : "blocked",
+      finalAnswerValidated ? "response_ready" : "response_blocked_final_validator",
+      undefined,
+      finalAnswerValidated,
+      {
+        ...finalizationEventMeta,
+        final_answer_validated: finalAnswerValidated,
+        final_answer_validation_reasons: finalValidationReasons,
+      },
+    );
     if (
       ideologyLockEligible &&
       typeof responsePayload.text === "string" &&
@@ -61400,22 +62374,42 @@ const executeHelixAsk = async ({
       .toLowerCase();
     const finalSurfaceRepoOrHybrid =
       finalSurfaceIntentDomain === "repo" || finalSurfaceIntentDomain === "hybrid";
-    const finalSurfaceRequireResearchOnUncertainty = finalSurfaceRepoOrHybrid;
-    if (finalSurfaceRepoOrHybrid && typeof responsePayload.text === "string") {
-      const applyFinalRepoContractText = (nextText: string, marker: string): void => {
-        const normalized = String(nextText ?? "").trim();
-        if (!normalized) return;
-        responsePayload.text = normalized;
-        responsePayload.answer = normalized;
-        result.text = normalized;
-        result.answer = normalized;
-        if (responsePayload.envelope?.answer) {
-          responsePayload.envelope.answer = normalized;
-        }
-        if (answerPath) {
-          answerPath.push(marker);
-        }
-      };
+    const finalSurfaceResearchRequested =
+      /\b(?:paper|peer[-\s]?reviewed|arxiv|citation|sources?|evidence|research|prove|proof)\b/i
+        .test(baseQuestion);
+    const finalSurfaceRequireResearchOnUncertainty =
+      finalSurfaceRepoOrHybrid && finalSurfaceResearchRequested;
+    const forcedDeicticClarifyTerminal =
+      answerPath.includes("forcedAnswer:pre_intent_clarify_deictic") ||
+      answerPath.includes("forcedAnswer:pre_intent_clarify");
+    if (forcedDeicticClarifyTerminal && typeof responsePayload.text === "string") {
+      const normalizedClarify = buildHelixAskHumanClarifyFallback(baseQuestion);
+      if (normalizedClarify && normalizedClarify !== responsePayload.text.trim()) {
+        applyFinalPayloadText(normalizedClarify, "finalSurface:deictic_clarify_terminal_normalize");
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.deictic_clarify_terminal_profile_applied = true;
+        debugRecord.deictic_clarify_terminal_normalized = true;
+      }
+    }
+    const skipClaimBasisLine =
+      forcedDeicticClarifyTerminal ||
+      (typeof responsePayload.text === "string" &&
+        isHelixAskDeicticClarifyResponse(responsePayload.text));
+    if (!skipClaimBasisLine && typeof responsePayload.text === "string") {
+      const withClaimBasis = ensureHelixAskClaimBasisLine(responsePayload.text);
+      if (withClaimBasis !== responsePayload.text.trim()) {
+        applyFinalPayloadText(withClaimBasis, "finalSurface:claim_basis_line");
+      }
+    }
+    if (
+      finalSurfaceRepoOrHybrid &&
+      typeof responsePayload.text === "string" &&
+      !answerPath.includes("finalSurface:final_answer_validator_fallback")
+    ) {
+      const applyFinalRepoContractText = (nextText: string, marker: string): void =>
+        applyFinalPayloadText(nextText, marker);
       const readFinalSurfaceDebugCitations = (key: string): string[] => {
         if (!debugPayload || typeof debugPayload !== "object") {
           return [];
@@ -61522,6 +62516,71 @@ const executeHelixAsk = async ({
           finalSemanticRepoTechEvaluation = evaluateFinalSemanticRepoTech();
         }
       }
+      const evaluateFinalSurfaceStrategyProgress = () =>
+        evaluateHelixAskStrategyProgressContract({
+          question: baseQuestion,
+          text: responsePayload.text,
+          seedCitations: uniqueHelixAskCitations([
+            ...repoContractSeedCitations,
+            ...finalRepoContractEvaluation.citations,
+            ...finalSemanticRepoTechEvaluation.citations,
+            ...readFinalSurfaceDebugCitations("uncertainty_research_contract_approved_citations"),
+            ...readFinalSurfaceDebugCitations("uncertainty_research_contract_citations"),
+          ]),
+        });
+      let finalSurfaceStrategyProgressEvaluation = evaluateFinalSurfaceStrategyProgress();
+      if (
+        finalSurfaceStrategyProgressEvaluation.required &&
+        !finalSurfaceStrategyProgressEvaluation.pass
+      ) {
+        const repaired = buildHelixAskStrategyProgressContractRepairAnswer({
+          question: baseQuestion,
+          text: responsePayload.text,
+          citations: finalSurfaceStrategyProgressEvaluation.citations,
+        }).trim();
+        if (repaired) {
+          applyFinalRepoContractText(repaired, "modeGate:strategy_progress_contract_repair_after_surface");
+          finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+            text: responsePayload.text,
+            requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+          });
+          finalSemanticRepoTechEvaluation = evaluateFinalSemanticRepoTech();
+          finalSurfaceStrategyProgressEvaluation = evaluateFinalSurfaceStrategyProgress();
+        }
+      }
+      if (
+        finalSurfaceStrategyProgressEvaluation.required &&
+        !finalSurfaceStrategyProgressEvaluation.pass
+      ) {
+        const failClosed = buildHelixAskStrategyProgressContractUnknownFallback({
+          question: baseQuestion,
+          citations: finalSurfaceStrategyProgressEvaluation.citations,
+          missingReasons: finalSurfaceStrategyProgressEvaluation.missingReasons,
+        }).trim();
+        if (failClosed) {
+          applyFinalRepoContractText(
+            failClosed,
+            "modeGate:strategy_progress_contract_fail_closed_after_surface",
+          );
+          finalRepoContractEvaluation = evaluateHelixAskRepoFetchContract({
+            text: responsePayload.text,
+            requireResearchOnUncertainty: finalSurfaceRequireResearchOnUncertainty,
+          });
+          finalSemanticRepoTechEvaluation = evaluateFinalSemanticRepoTech();
+          finalSurfaceStrategyProgressEvaluation = evaluateFinalSurfaceStrategyProgress();
+          if (
+            finalSurfaceStrategyProgressEvaluation.required &&
+            !finalSurfaceStrategyProgressEvaluation.pass &&
+            !finalSurfaceStrategyProgressEvaluation.missingReasons.includes(
+              "strategy_progress_contract_fail_closed",
+            )
+          ) {
+            finalSurfaceStrategyProgressEvaluation.missingReasons.push(
+              "strategy_progress_contract_fail_closed",
+            );
+          }
+        }
+      }
       if (debugPayload) {
         const debugRecord = debugPayload as Record<string, unknown>;
         debugRecord.repo_fetch_contract_surface_guard_applied = true;
@@ -61565,10 +62624,42 @@ const executeHelixAsk = async ({
         debugRecord.semantic_repo_tech_web_research_citation_count =
           finalSemanticRepoTechEvaluation.webResearchCitationCount;
         debugRecord.semantic_repo_tech_citations = finalSemanticRepoTechEvaluation.citations;
+        debugRecord.strategy_progress_contract_required =
+          finalSurfaceStrategyProgressEvaluation.required;
+        debugRecord.strategy_progress_contract_pass = finalSurfaceStrategyProgressEvaluation.pass;
+        debugRecord.strategy_progress_contract_missing_reasons =
+          finalSurfaceStrategyProgressEvaluation.missingReasons;
+        debugRecord.strategy_progress_contract_has_single_experiment =
+          finalSurfaceStrategyProgressEvaluation.hasSingleExperiment;
+        debugRecord.strategy_progress_contract_has_pass_threshold =
+          finalSurfaceStrategyProgressEvaluation.hasPassThreshold;
+        debugRecord.strategy_progress_contract_has_pivot_threshold =
+          finalSurfaceStrategyProgressEvaluation.hasPivotThreshold;
+        debugRecord.strategy_progress_contract_has_measurement_artifact =
+          finalSurfaceStrategyProgressEvaluation.hasMeasurementArtifact;
+        debugRecord.strategy_progress_contract_claim_evidence_binding_pass =
+          finalSurfaceStrategyProgressEvaluation.claimEvidenceBindingPass;
+        debugRecord.strategy_progress_contract_claim_evidence_binding_missing =
+          finalSurfaceStrategyProgressEvaluation.claimEvidenceBindingMissing;
+        debugRecord.strategy_progress_contract_non_trivial_claim_count =
+          finalSurfaceStrategyProgressEvaluation.nonTrivialClaimCount;
+        debugRecord.strategy_progress_contract_repo_citation_count =
+          finalSurfaceStrategyProgressEvaluation.repoCitationCount;
+        debugRecord.strategy_progress_contract_codex_clone_citation_count =
+          finalSurfaceStrategyProgressEvaluation.codexCloneCitationCount;
+        debugRecord.strategy_progress_contract_web_research_citation_count =
+          finalSurfaceStrategyProgressEvaluation.webResearchCitationCount;
+        debugRecord.strategy_progress_contract_citations =
+          finalSurfaceStrategyProgressEvaluation.citations;
         debugRecord.claim_evidence_binding_pass =
-          finalSemanticRepoTechEvaluation.claimEvidenceBindingPass;
-        debugRecord.claim_evidence_binding_missing =
-          finalSemanticRepoTechEvaluation.claimEvidenceBindingMissing;
+          finalSemanticRepoTechEvaluation.claimEvidenceBindingPass &&
+          finalSurfaceStrategyProgressEvaluation.claimEvidenceBindingPass;
+        debugRecord.claim_evidence_binding_missing = Array.from(
+          new Set([
+            ...finalSemanticRepoTechEvaluation.claimEvidenceBindingMissing,
+            ...finalSurfaceStrategyProgressEvaluation.claimEvidenceBindingMissing,
+          ]),
+        );
       }
     }
     const finalSurfaceText =
@@ -61598,6 +62689,37 @@ const executeHelixAsk = async ({
         debugRecord.empty_answer_surface_guard_reason = restoreCandidate
           ? "restore_existing_text"
           : "generic_clarify_guard";
+      }
+    }
+    if (typeof responsePayload.text === "string") {
+      const artifactSurfaceRequested = shouldExposeHelixAskSecondaryArtifacts(baseQuestion);
+      const finalSurfaceMode = resolveHelixAskAnswerSurfaceMode({
+        reportModeEnabled: reportDecision.enabled,
+        answerText: responsePayload.text,
+      });
+      if (finalSurfaceMode === "conversational" && !artifactSurfaceRequested) {
+        const naturalizationOptions = resolveHelixAskConversationalNaturalizationOptions(baseQuestion);
+        let scrubbed = stripHelixAskConversationalSurfaceScaffolding(
+          stripHelixAskVisibleSourcesLines(
+            stripHelixAskSecondaryArtifactBlocks(responsePayload.text),
+          ),
+          naturalizationOptions,
+        ).trim();
+        scrubbed = scrubbed
+          .replace(/\b([A-Za-z][A-Za-z0-9\s-]{1,80})\s+used is\b/gi, "$1 is used")
+          .replace(/\bDefinition:\s*/gi, "")
+          .replace(/\bRepo anchors:\s*/gi, "")
+          .replace(/\bOpen Gaps:\s*/gi, "")
+          .replace(/\bSources:\s*.+$/i, "")
+          .replace(/[ \t]{2,}/g, " ")
+          .replace(/\.\s+\./g, ". ")
+          .trim();
+        if (scrubbed) {
+          scrubbed = ensureSentence(scrubbed);
+        }
+        if (scrubbed && scrubbed !== responsePayload.text.trim()) {
+          applyFinalPayloadText(scrubbed, "finalSurface:terminal_non_report_scrub");
+        }
       }
     }
     logDebug("responder.send(200) start", {

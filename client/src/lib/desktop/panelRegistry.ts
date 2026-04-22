@@ -5,6 +5,10 @@ import type { HelixPanelRef } from "@/pages/helix-core.panels";
 import { HELIX_PANELS } from "@/pages/helix-core.panels";
 import { isFlagEnabled } from "@/lib/envFlags";
 import { getResonanceWatcherState } from "@/lib/agi/resonanceVersion";
+import {
+  getWorkstationPanelCapabilities,
+  type WorkstationPanelCapabilities,
+} from "@/lib/workstation/panelCapabilities";
 
 export type PanelId =
   | "live-energy"
@@ -64,6 +68,7 @@ export interface PanelDefinition {
   startHidden?: boolean;
   telemetryKind?: string;
   collectTelemetry?: PanelTelemetryCollector;
+  workstationCapabilities?: WorkstationPanelCapabilities;
 }
 
 type ModuleLoader<T = Record<string, ComponentType<any>>> = () => Promise<T>;
@@ -282,7 +287,10 @@ const BASE_PANELS: PanelDefinition[] = [
 const existingIds = new Set(BASE_PANELS.map((p) => p.id));
 const mergedHelix = HELIX_PANELS.filter((p) => !existingIds.has(p.id));
 
-export const panelRegistry: PanelDefinition[] = [...BASE_PANELS, ...mergedHelix];
+export const panelRegistry: PanelDefinition[] = [...BASE_PANELS, ...mergedHelix].map((panel) => ({
+  ...panel,
+  workstationCapabilities: panel.workstationCapabilities ?? getWorkstationPanelCapabilities(panel.id),
+}));
 
 export function getPanelDef(id: PanelDefinition["id"]) {
   return panelRegistry.find((p) => p.id === id);

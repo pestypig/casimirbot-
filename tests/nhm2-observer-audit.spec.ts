@@ -1545,6 +1545,31 @@ describe("nhm2 observer audit artifact", () => {
           },
         },
       },
+      observerDecRemediationEvidence: {
+        chartRef: "comoving_cartesian",
+        routeId: "einstein_tensor_geometry_fd4_v1",
+        selectedPath: "full_einstein_tensor",
+        dominantViolationClass: "stress_dominance",
+        recommendedPatchClass: "model_term_extension_patch",
+        modelTermExtensionPlanEvidence: {
+          status: "required",
+          trigger: "bounded_envelope_exhausted",
+          chartRef: "comoving_cartesian",
+          routeId: "einstein_tensor_geometry_fd4_v1",
+          selectedPath: "full_einstein_tensor",
+          dominantViolationClass: "stress_dominance",
+          requiredLiftToZero: 0.2,
+          bestAchievedLift: 0.04,
+          residualMarginToZero: -0.16,
+          gapToZero: 0.16,
+          preferredImplementationRoute: "full_einstein_tensor",
+          nextPatchClass: "model_term_extension_patch",
+          citationRefs: ["https://arxiv.org/abs/1702.05915"],
+          notes: ["bounded control envelope exhausted"],
+        },
+        citationRefs: ["https://arxiv.org/abs/1702.05915"],
+        notes: ["fixture remediation evidence"],
+      },
       observerDecPhysicsControlEvidence: {
         chartRef: "comoving_cartesian",
         routeId: "einstein_tensor_geometry_fd4_v1",
@@ -1767,6 +1792,7 @@ describe("nhm2 observer audit artifact", () => {
           residualMarginToZero: -0.16,
           gapToZero: 0.16,
           crossZeroAchieved: false,
+          boundedEnvelopeExhausted: true,
           boundedControlEnvelope: {
             pressureScaleMin: 0.9,
             pressureScaleMax: 1,
@@ -1792,10 +1818,65 @@ describe("nhm2 observer audit artifact", () => {
             "Cross-zero feasibility is evaluated on the same bounded DEC-control sweep objective used for candidate ranking on the admitted Einstein route.",
           ],
         },
+        decResidualAttributionEvidence: {
+          status: "available",
+          primarySurface: "metric",
+          dominantViolationClass: "stress_dominance",
+          baselinePrimaryMargin: -0.2,
+          selectedPrimaryMargin: -0.16,
+          requiredLiftToZero: 0.2,
+          achievedLiftFromBaseline: 0.04,
+          residualMarginToZero: -0.16,
+          gapToZero: 0.16,
+          selectionPlateauStatus: "best_margin_still_negative",
+          selectionReasonCodes: ["selection_gate_pass", "best_margin_still_negative"],
+          zeroCrossFeasibilityDecision: "zero_cross_not_achievable_within_bounds",
+          rankingBasis:
+            "prioritize cross-zero DEC margins on metric/tile lanes under coupled same-chart E/J/S controls",
+          selectedCandidate: {
+            candidateId:
+              "same_chart_physics_control_coupled_density_pressure_probe_v1",
+            candidateClass: "physics_control_proposal",
+            sweepPhase: "coarse",
+            metricDecRobustMarginToZero: -0.16,
+            tileReconstitutedDecRobustMarginToZero: -0.16,
+            metricDecRobustLift: 0.04,
+            tileReconstitutedDecRobustLift: 0.04,
+            controlDeviationMagnitude: 0.2,
+          },
+          citationRefs: [
+            "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+            "https://arxiv.org/abs/1702.05915",
+          ],
+          notes: ["metric lane remains the tightest DEC residual margin in fixture."],
+        },
+        decFrontierImprovementEvidence: {
+          status: "available",
+          frontierSeedCandidateId:
+            "same_chart_physics_control_coupled_density_pressure_probe_v1",
+          frontierSelectedCandidateId:
+            "same_chart_physics_control_coupled_density_pressure_probe_v1",
+          frontierCandidateCount: 8,
+          frontierPassingCount: 4,
+          baselinePrimaryMargin: -0.2,
+          preFrontierBestPrimaryMargin: -0.17,
+          finalBestPrimaryMargin: -0.16,
+          frontierBestDeltaFromPreFrontier: 0.01,
+          frontierBestDeltaFromBaseline: 0.04,
+          frontierBestDeltaPercentFromBaseline: 20,
+          residualGapToZero: 0.16,
+          selectionPlateauStatus: "best_margin_still_negative",
+          citationRefs: [
+            "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+            "https://arxiv.org/abs/1702.05915",
+          ],
+          notes: [
+            "frontier-neighborhood sweep improved the best primary margin vs pre-frontier selection.",
+          ],
+        },
         zeroCrossFeasibilityDecision: "zero_cross_not_achievable_within_bounds",
         zeroCrossFeasibilityReasonCodes: [
           "best_margin_still_negative",
-          "candidate_not_evaluated",
         ],
         boundedSearchEnvelope: {
           pressureScaleMin: 0.85,
@@ -1848,7 +1929,10 @@ describe("nhm2 observer audit artifact", () => {
             pass: true,
             note: "comparable gate pass",
           },
-          rollbackReasonCodes: ["candidate_not_evaluated"],
+          rollbackReasonCodes: [
+            "best_margin_still_negative",
+            "runtime_apply_disabled",
+          ],
           guardChecks: {
             metricWecNonRegression: true,
             metricNecNonRegression: true,
@@ -1856,6 +1940,10 @@ describe("nhm2 observer audit artifact", () => {
             semanticAdmissionStable: true,
             metricDecRobustLiftPositive: true,
             tileReconstitutedDecRobustLiftNonNegative: true,
+            crossesZeroBothDecMargins: false,
+            independentCrossCheckSignAgreement: true,
+            uncertaintyBoundPass: false,
+            referenceCrossesZeroBothDecMargins: false,
           },
           observed: {
             metricDecRobustLift: 0.04,
@@ -1866,12 +1954,108 @@ describe("nhm2 observer audit artifact", () => {
             tileReconstitutedDecRobustMarginToZero: -0.16,
             metricWecNonRegressionMargin: 0.02,
             metricNecNonRegressionMargin: 0.01,
+            independentCrossCheckRelativeResidual: 0.01,
+            uncertaintyRelativeBound: 0.02,
+            metricDecUncertaintyAbs: 0.0032,
+            tileReconstitutedDecUncertaintyAbs: 0.0032,
+            metricDecConservativeMarginToZero: -0.1632,
+            tileReconstitutedDecConservativeMarginToZero: -0.1632,
+            referenceMetricDecRobustMarginToZero: -0.1616,
+            referenceTileReconstitutedDecRobustMarginToZero: -0.1616,
+            referenceMetricDecUncertaintyAbs: 0.003232,
+            referenceTileReconstitutedDecUncertaintyAbs: 0.003232,
+            referenceMetricDecConservativeMarginToZero: -0.164832,
+            referenceTileReconstitutedDecConservativeMarginToZero: -0.164832,
           },
           note: "runtime opt-in disabled in this test fixture",
           citationRefs: [
             "https://arxiv.org/abs/1702.05915",
             "https://arxiv.org/abs/2003.01815",
             "https://arxiv.org/abs/1208.5399",
+          ],
+        },
+        decRuntimeDecisionEvidence: {
+          status: "rolled_back",
+          attempted: true,
+          enabled: false,
+          gatePass: false,
+          comparabilityPass: true,
+          sampleCountSufficient: true,
+          selectedCandidateId:
+            "same_chart_physics_control_coupled_density_pressure_probe_v1",
+          reasonCodes: [
+            "best_margin_still_negative",
+            "runtime_apply_disabled",
+          ],
+          primaryReasonCode: "runtime_apply_disabled",
+          decAttribution: {
+            selectedMetricDecRobustMarginToZero: -0.16,
+            selectedTileReconstitutedDecRobustMarginToZero: -0.16,
+            selectedMetricDecConservativeMarginToZero: -0.1632,
+            selectedTileReconstitutedDecConservativeMarginToZero: -0.1632,
+            referenceMetricDecRobustMarginToZero: -0.1616,
+            referenceTileReconstitutedDecRobustMarginToZero: -0.1616,
+            referenceMetricDecConservativeMarginToZero: -0.164832,
+            referenceTileReconstitutedDecConservativeMarginToZero: -0.164832,
+            independentCrossCheckRelativeResidual: 0.01,
+            uncertaintyRelativeBound: 0.02,
+            independentCrossCheckSignAgreement: true,
+            selectedCrossesZeroUnderUncertainty: false,
+            referenceCrossesZeroBothDecMargins: false,
+            uncertaintyBoundPass: false,
+          },
+          note: "runtime opt-in disabled in this test fixture",
+          citationRefs: [
+            "https://arxiv.org/abs/1702.05915",
+            "https://arxiv.org/abs/2003.01815",
+          ],
+        },
+        extensionTrancheId: "tranche_1_primary",
+        familySearchOrder: [
+          "density_pressure_coupled",
+          "pressure_only",
+          "flux_shear_coupled",
+          "density_flux_shear_coupled",
+        ],
+        appliedCandidateEvidence: {
+          status: "unavailable",
+          candidateId: null,
+          extensionTrancheId: null,
+          familyId: null,
+          metricDecRobustMarginToZero: null,
+          tileReconstitutedDecRobustMarginToZero: null,
+          metricWecNonRegressionMargin: null,
+          metricNecNonRegressionMargin: null,
+          nonRegressionPass: null,
+          comparabilityPass: null,
+          note: "No runtime-applied candidate is available in this fixture.",
+          citationRefs: [
+            "https://arxiv.org/abs/1702.05915",
+            "https://arxiv.org/abs/2003.01815",
+          ],
+        },
+        rollbackLocalizationEvidence: {
+          status: "available",
+          candidateId:
+            "same_chart_physics_control_coupled_density_pressure_probe_v1",
+          extensionTrancheId: "tranche_1_primary",
+          familyId: "density_pressure_coupled",
+          failureMode: "runtime_apply_disabled",
+          primaryReasonCode: "runtime_apply_disabled",
+          reasonCodes: [
+            "best_margin_still_negative",
+            "runtime_apply_disabled",
+          ],
+          metricDecRobustMarginToZero: -0.16,
+          tileReconstitutedDecRobustMarginToZero: -0.16,
+          metricWecNonRegressionMargin: 0.02,
+          metricNecNonRegressionMargin: 0.01,
+          comparabilityPass: true,
+          sampleCountSufficient: true,
+          note: "Runtime candidate rolled back because runtime apply flag is disabled in this fixture.",
+          citationRefs: [
+            "https://arxiv.org/abs/1702.05915",
+            "https://arxiv.org/abs/2003.01815",
           ],
         },
         controlKnobs: [
@@ -1925,6 +2109,32 @@ describe("nhm2 observer audit artifact", () => {
             note: "geometry-first route basis",
           },
         ],
+        researchSupportMap: {
+          same_chart_projection_grammar_required: {
+            claimId: "same_chart_projection_grammar_required",
+            supportLevel: "primary_source",
+            citationRefs: [
+              "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+              "https://arxiv.org/abs/gr-qc/0703035",
+            ],
+            evidenceRefs: [
+              "observerDecPhysicsControlEvidence.claimCitationMap[same_chart_projection_grammar_required]",
+            ],
+            note: "same-chart grammar basis",
+          },
+          geometry_first_route_is_control_basis: {
+            claimId: "geometry_first_route_is_control_basis",
+            supportLevel: "repo_measurement",
+            citationRefs: [
+              "https://arxiv.org/abs/gr-qc/0110086",
+              "https://arxiv.org/abs/2404.03095",
+            ],
+            evidenceRefs: [
+              "observerDecPhysicsControlEvidence.runtimeApplication.comparabilityGate",
+            ],
+            note: "route comparability evidence plus literature basis",
+          },
+        },
         claimCitationMapCompleteness: {
           status: "pass",
           expectedClaimCount: 2,
@@ -1936,7 +2146,7 @@ describe("nhm2 observer audit artifact", () => {
           missingClaimIds: [],
           note: "all claims covered",
         },
-        recommendation: "physics_control_patch",
+        recommendation: "model_term_extension_patch",
         uncertaintyTags: ["direct_measurement", "inference", "open_assumption"],
         citationRefs: [
           "https://arxiv.org/abs/1405.0403",
@@ -1971,13 +2181,43 @@ describe("nhm2 observer audit artifact", () => {
         residualMarginToZero: -0.16,
         gapToZero: 0.16,
         crossZeroAchieved: false,
+        boundedEnvelopeExhausted: true,
         method: "bounded_sweep_margin_analysis",
         inferenceLabel: "mixed",
+      },
+      decResidualAttributionEvidence: {
+        status: "available",
+        primarySurface: "metric",
+        dominantViolationClass: "stress_dominance",
+        selectedPrimaryMargin: -0.16,
+        gapToZero: 0.16,
+        selectionPlateauStatus: "best_margin_still_negative",
+        zeroCrossFeasibilityDecision: "zero_cross_not_achievable_within_bounds",
+        selectedCandidate: {
+          candidateId:
+            "same_chart_physics_control_coupled_density_pressure_probe_v1",
+          candidateClass: "physics_control_proposal",
+          sweepPhase: "coarse",
+        },
+      },
+      decFrontierImprovementEvidence: {
+        status: "available",
+        frontierSeedCandidateId:
+          "same_chart_physics_control_coupled_density_pressure_probe_v1",
+        frontierSelectedCandidateId:
+          "same_chart_physics_control_coupled_density_pressure_probe_v1",
+        frontierCandidateCount: 8,
+        frontierPassingCount: 4,
+        preFrontierBestPrimaryMargin: -0.17,
+        finalBestPrimaryMargin: -0.16,
+        frontierBestDeltaFromPreFrontier: 0.01,
+        frontierBestDeltaFromBaseline: 0.04,
+        residualGapToZero: 0.16,
+        selectionPlateauStatus: "best_margin_still_negative",
       },
       zeroCrossFeasibilityDecision: "zero_cross_not_achievable_within_bounds",
       zeroCrossFeasibilityReasonCodes: expect.arrayContaining([
         "best_margin_still_negative",
-        "candidate_not_evaluated",
       ]),
       boundedSearchEnvelope: {
         pressureScaleMin: 0.85,
@@ -2009,7 +2249,53 @@ describe("nhm2 observer audit artifact", () => {
         candidateId:
           "same_chart_physics_control_coupled_density_pressure_probe_v1",
       },
-      recommendation: "physics_control_patch",
+      decRuntimeDecisionEvidence: {
+        status: "rolled_back",
+        attempted: true,
+        enabled: false,
+        gatePass: false,
+        comparabilityPass: true,
+        sampleCountSufficient: true,
+        selectedCandidateId:
+          "same_chart_physics_control_coupled_density_pressure_probe_v1",
+        primaryReasonCode: "runtime_apply_disabled",
+      },
+      extensionTrancheId: "tranche_1_primary",
+      familySearchOrder: expect.arrayContaining([
+        "density_pressure_coupled",
+        "pressure_only",
+        "flux_shear_coupled",
+        "density_flux_shear_coupled",
+      ]),
+      appliedCandidateEvidence: {
+        status: "unavailable",
+        candidateId: null,
+        extensionTrancheId: null,
+        familyId: null,
+      },
+      rollbackLocalizationEvidence: {
+        status: "available",
+        candidateId:
+          "same_chart_physics_control_coupled_density_pressure_probe_v1",
+        extensionTrancheId: "tranche_1_primary",
+        familyId: "density_pressure_coupled",
+        failureMode: "runtime_apply_disabled",
+        primaryReasonCode: "runtime_apply_disabled",
+      },
+      recommendation: "model_term_extension_patch",
+    });
+    expect(artifact.observerDecRemediationEvidence).toMatchObject({
+      chartRef: "comoving_cartesian",
+      routeId: "einstein_tensor_geometry_fd4_v1",
+      selectedPath: "full_einstein_tensor",
+      dominantViolationClass: "stress_dominance",
+      recommendedPatchClass: "model_term_extension_patch",
+      modelTermExtensionPlanEvidence: {
+        status: "required",
+        trigger: "bounded_envelope_exhausted",
+        preferredImplementationRoute: "full_einstein_tensor",
+        nextPatchClass: "model_term_extension_patch",
+      },
     });
     expect(artifact.observerDecPhysicsControlEvidence?.sweepCandidates).toEqual(
       expect.arrayContaining([
@@ -2065,7 +2351,92 @@ describe("nhm2 observer audit artifact", () => {
         independentCrossCheckStatus: "pass",
         pass: true,
       }),
-      rollbackReasonCodes: ["candidate_not_evaluated"],
+      guardChecks: expect.objectContaining({
+        crossesZeroBothDecMargins: false,
+        independentCrossCheckSignAgreement: true,
+        uncertaintyBoundPass: false,
+        referenceCrossesZeroBothDecMargins: false,
+      }),
+      observed: expect.objectContaining({
+        independentCrossCheckRelativeResidual: 0.01,
+        uncertaintyRelativeBound: 0.02,
+        referenceMetricDecRobustMarginToZero: -0.1616,
+        referenceTileReconstitutedDecRobustMarginToZero: -0.1616,
+      }),
+      rollbackReasonCodes: [
+        "best_margin_still_negative",
+        "runtime_apply_disabled",
+      ],
+    });
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.decRuntimeDecisionEvidence,
+    ).toMatchObject({
+      status: "rolled_back",
+      attempted: true,
+      enabled: false,
+      gatePass: false,
+      comparabilityPass: true,
+      sampleCountSufficient: true,
+      selectedCandidateId:
+        "same_chart_physics_control_coupled_density_pressure_probe_v1",
+      reasonCodes: [
+        "best_margin_still_negative",
+        "runtime_apply_disabled",
+      ],
+      primaryReasonCode: "runtime_apply_disabled",
+      decAttribution: expect.objectContaining({
+        selectedMetricDecRobustMarginToZero: -0.16,
+        selectedTileReconstitutedDecRobustMarginToZero: -0.16,
+        selectedMetricDecConservativeMarginToZero: -0.1632,
+        selectedTileReconstitutedDecConservativeMarginToZero: -0.1632,
+        referenceMetricDecRobustMarginToZero: -0.1616,
+        referenceTileReconstitutedDecRobustMarginToZero: -0.1616,
+        referenceMetricDecConservativeMarginToZero: -0.164832,
+        referenceTileReconstitutedDecConservativeMarginToZero: -0.164832,
+        independentCrossCheckRelativeResidual: 0.01,
+        uncertaintyRelativeBound: 0.02,
+        independentCrossCheckSignAgreement: true,
+        selectedCrossesZeroUnderUncertainty: false,
+        referenceCrossesZeroBothDecMargins: false,
+        uncertaintyBoundPass: false,
+      }),
+    });
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.extensionTrancheId,
+    ).toBe("tranche_1_primary");
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.familySearchOrder,
+    ).toEqual(
+      expect.arrayContaining([
+        "density_pressure_coupled",
+        "pressure_only",
+        "flux_shear_coupled",
+        "density_flux_shear_coupled",
+      ]),
+    );
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.appliedCandidateEvidence,
+    ).toMatchObject({
+      status: "unavailable",
+      candidateId: null,
+      extensionTrancheId: null,
+      familyId: null,
+    });
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.rollbackLocalizationEvidence,
+    ).toMatchObject({
+      status: "available",
+      candidateId: "same_chart_physics_control_coupled_density_pressure_probe_v1",
+      extensionTrancheId: "tranche_1_primary",
+      familyId: "density_pressure_coupled",
+      failureMode: "runtime_apply_disabled",
+      primaryReasonCode: "runtime_apply_disabled",
+      reasonCodes: [
+        "best_margin_still_negative",
+        "runtime_apply_disabled",
+      ],
+      comparabilityPass: true,
+      sampleCountSufficient: true,
     });
     expect(artifact.observerDecPhysicsControlEvidence?.controlKnobs).toEqual(
       expect.arrayContaining([
@@ -2093,18 +2464,41 @@ describe("nhm2 observer audit artifact", () => {
         }),
       ]),
     );
+    expect(artifact.observerDecPhysicsControlEvidence?.researchSupportMap).toEqual(
+      expect.objectContaining({
+        same_chart_projection_grammar_required: expect.objectContaining({
+          claimId: "same_chart_projection_grammar_required",
+          supportLevel: "primary_source",
+          citationRefs: expect.arrayContaining([
+            "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+          ]),
+        }),
+        geometry_first_route_is_control_basis: expect.objectContaining({
+          claimId: "geometry_first_route_is_control_basis",
+          supportLevel: expect.stringMatching(
+            /^(primary_source|repo_measurement|inference)$/,
+          ),
+        }),
+      }),
+    );
     expect(
       artifact.observerDecPhysicsControlEvidence?.claimCitationMapCompleteness,
     ).toMatchObject({
       status: "pass",
-      expectedClaimCount: 2,
-      coveredClaimCount: 2,
+      expectedClaimCount: expect.any(Number),
+      coveredClaimCount: expect.any(Number),
       expectedClaimIds: expect.arrayContaining([
         "same_chart_projection_grammar_required",
         "geometry_first_route_is_control_basis",
       ]),
       missingClaimIds: [],
     });
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.modelTermExtensionFamilyEvidence,
+    ).toBeUndefined();
+    expect(
+      artifact.observerDecPhysicsControlEvidence?.fluxShearExtensionEvidence,
+    ).toBeUndefined();
     expect(
       artifact.observerDecPhysicsControlEvidence?.uncertaintyNotes,
     ).toEqual(

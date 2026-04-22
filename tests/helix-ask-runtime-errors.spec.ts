@@ -1752,6 +1752,59 @@ describe("helix ask universal answer plan shadow", () => {
     ).toBe(false);
   });
 
+  it("flags meta non-answer objective assembly drafts as weak output", () => {
+    const metaDraft =
+      "This appears to be a prompt or question asking for clarification or definition of a specific topic, but the current draft does not provide a clear answer. It suggests a consideration of focus but lacks concrete information.";
+    expect(__testHelixAskReliabilityGuards.isHelixAskMetaNonAnswerDraft(metaDraft)).toBe(true);
+    expect(__testHelixAskReliabilityGuards.isHelixAskWeakObjectiveAssemblyDraft(metaDraft)).toBe(
+      true,
+    );
+
+    const genericNonAnswer =
+      "This refers to a specific topic or item that requires clarification or definition. For further details, please refer to the relevant documentation.";
+    expect(__testHelixAskReliabilityGuards.isHelixAskGenericNonAnswerDraft(genericNonAnswer)).toBe(
+      true,
+    );
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskWeakObjectiveAssemblyDraft(genericNonAnswer),
+    ).toBe(true);
+
+    const directAnswer = "It is an ambiguous reference. Please share what 'this' refers to.";
+    expect(__testHelixAskReliabilityGuards.isHelixAskMetaNonAnswerDraft(directAnswer)).toBe(
+      false,
+    );
+    expect(__testHelixAskReliabilityGuards.isHelixAskGenericNonAnswerDraft(directAnswer)).toBe(
+      false,
+    );
+  });
+
+  it("detects deictic questions without anchors and requires clarify-style responses", () => {
+    expect(__testHelixAskReliabilityGuards.isHelixAskDeicticQuestionWithoutAnchor("what is this?")).toBe(
+      true,
+    );
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskDeicticQuestionWithoutAnchor("what is this used for?"),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskDeicticQuestionWithoutAnchor("what is this code path?"),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskDeicticClarifyResponse(
+        "Please share the exact snippet or context you mean by 'this'.",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskDeicticClarifyResponse(
+        "I need one concrete anchor to answer reliably. Do you want a codebase-grounded answer, or a general explanation?",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskDeicticClarifyResponse(
+        "This refers to a specific topic or item that requires clarification.",
+      ),
+    ).toBe(false);
+  });
+
   it("keeps open-world definition prompts out of stage0 promotion and ambiguity clarify gate", () => {
     const routeSource = fs.readFileSync(
       path.join(process.cwd(), "server/routes/agi.plan.ts"),
@@ -1761,6 +1814,38 @@ describe("helix ask universal answer plan shadow", () => {
     expect(routeSource).toContain("general_definition_ambiguity_gate_bypass");
     expect(routeSource).toContain("!generalDefinitionTargetNoRepoPromote");
     expect(routeSource).toContain("!generalDefinitionAmbiguityGateBypass");
+  });
+
+  it("contains final answer validator and phase markers", () => {
+    const routeSource = fs.readFileSync(path.join(process.cwd(), "server/routes/agi.plan.ts"), "utf8");
+    expect(routeSource).toContain("Final answer validator");
+    expect(routeSource).toContain("final_answer_validated");
+    expect(routeSource).toContain("finalSurface:deictic_clarify_fallback");
+    expect(routeSource).toContain("finalSurface:deictic_clarify_terminal_normalize");
+    expect(routeSource).toContain("clarify:deictic_pre_intent_short_circuit");
+    expect(routeSource).toContain("forcedAnswer:pre_intent_clarify_deictic");
+    expect(routeSource).toContain("deictic_short_circuit");
+    expect(routeSource).toContain("deictic_clarify_terminal_profile_applied");
+    expect(routeSource).toContain("blocked_mode_clarify_generic_non_answer_detected");
+    expect(routeSource).toContain("focus_guard_clarify_required");
+    expect(routeSource).toContain("answer_obligations_missing");
+    expect(routeSource).toContain("preflight_evidence_missing");
+    expect(routeSource).toContain("uncertainty_missing_repo_or_clone_citation");
+    expect(routeSource).toContain("uncertainty_missing_codex_clone_baseline");
+    expect(routeSource).toContain("final_codex_clone_baseline_required");
+    expect(routeSource).toContain("final_codex_clone_citation_count");
+    expect(routeSource).toContain("global_terminal_validator_mode");
+    expect(routeSource).toContain("final_answer_rejected");
+    expect(routeSource).toContain("response_blocked_final_validator");
+  });
+
+  it("contains live event summaries for objective mini synth and critic", () => {
+    const routeSource = fs.readFileSync(path.join(process.cwd(), "server/routes/agi.plan.ts"), "utf8");
+    expect(routeSource).toContain("Objective mini-synth");
+    expect(routeSource).toContain("Objective mini-critic");
+    expect(routeSource).toContain("objective_count");
+    expect(routeSource).toContain("covered_count");
+    expect(routeSource).toContain("unresolved_count");
   });
 
   it("forces repo-grounded mode for repo api lookup under clarify pressure when evidence is strong", () => {
@@ -1965,12 +2050,22 @@ describe("helix ask universal answer plan shadow", () => {
     ).toBe(true);
     expect(
       __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
+        "forcedAnswer:pre_intent_clarify_deictic",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
         "forcedAnswer:simple_composition",
       ),
     ).toBe(true);
     expect(
       __testHelixAskReliabilityGuards.isHelixAskClarifyForcedShortCircuitRule(
         "forcedAnswer:pre_intent_clarify",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskClarifyForcedShortCircuitRule(
+        "forcedAnswer:pre_intent_clarify_deictic",
       ),
     ).toBe(true);
     expect(
@@ -2635,7 +2730,7 @@ describe("helix ask universal answer plan shadow", () => {
           {
             objective_id: "obj_pending",
             objective_label: "pending objective",
-            required_slots: ["definition"],
+            required_slots: ["mechanism"],
             matched_slots: [],
             status: "pending",
             attempt: 0,

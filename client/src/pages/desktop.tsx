@@ -4,6 +4,7 @@ import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { DesktopWindow } from "@/components/desktop/DesktopWindow";
 import { DesktopTaskbar } from "@/components/desktop/DesktopTaskbar";
+import { HelixWorkstationShell } from "@/components/workstation/HelixWorkstationShell";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import SplashCursor from "@/components/SplashCursor";
@@ -19,6 +20,14 @@ import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference }
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import {
+  HELIX_WORKSTATION_ACTION_EVENT,
+  coerceHelixWorkstationActions,
+  type HelixWorkstationAction,
+} from "@/lib/workstation/workstationActionContract";
+import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
+import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -78,6 +87,7 @@ function collectPanelIdsFromStructure(
 
 export default function DesktopPage() {
   const { windows, registerFromManifest, open } = useDesktopStore();
+  const workstationMode = useWorkstationLayoutStore((state) => state.mode);
   const { userSettings, updateSettings } = useHelixStartSettings();
   const {
     settingsOpen,
@@ -107,6 +117,22 @@ export default function DesktopPage() {
     [],
   );
   const allowAutoOpen = false;
+  const workstationEnabledFlag =
+    String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_SHELL ?? "1") !== "0";
+  const workstationEnabled = workstationEnabledFlag && workstationMode === "workstation";
+
+  const openPanelUniversal = useCallback(
+    (panelId: string) => {
+      if (!panelId) return;
+      if (!getPanelDef(panelId)) return;
+      if (workstationEnabled) {
+        useWorkstationLayoutStore.getState().openPanelInActiveGroup(panelId);
+        return;
+      }
+      open(panelId);
+    },
+    [open, workstationEnabled],
+  );
 
   useEffect(() => {
     registerFromManifest(panelRegistry, { allowDefaultOpen: false });
@@ -120,13 +146,13 @@ export default function DesktopPage() {
         if (pending === NOISE_GENS_PANEL_ID) {
           autoOpenSuppressRef.current = NOISE_GENS_AUTO_OPEN_SUPPRESS;
         }
-        open(pending);
+        openPanelUniversal(pending);
         window.localStorage.removeItem(PENDING_PANEL_KEY);
       }
     } catch {
       // ignore storage read failures
     }
-  }, [open]);
+  }, [openPanelUniversal]);
 
   useEffect(() => {
     void refreshProjects();
@@ -137,13 +163,13 @@ export default function DesktopPage() {
       const custom = event as CustomEvent<{ id?: string }>;
       const id = custom?.detail?.id;
       if (!id) return;
-      open(id);
+      openPanelUniversal(id);
     };
     window.addEventListener("open-helix-panel", handleOpen as EventListener);
     return () => {
       window.removeEventListener("open-helix-panel", handleOpen as EventListener);
     };
-  }, [open]);
+  }, [openPanelUniversal]);
 
   useEffect(() => {
     const handleKnowledgeOpen = (event: Event) => {
@@ -160,6 +186,193 @@ export default function DesktopPage() {
     };
   }, [openSettings, selectProjects]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleWorkstationAction = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>)?.detail;
+      const actions = coerceHelixWorkstationActions(detail);
+      if (actions.length === 0) return;
+      const store = useWorkstationLayoutStore.getState();
+      const runAction = (action: HelixWorkstationAction) => {
+        switch (action.action) {
+          case "open_panel":
+            openPanelUniversal(action.panel_id);
+            return;
+          case "focus_panel": {
+            if (!workstationEnabled) {
+              openPanelUniversal(action.panel_id);
+              return;
+            }
+            const groupId =
+              action.group_id ??
+              Object.values(store.groups).find((group) => group.panelIds.includes(action.panel_id))
+                ?.id;
+            if (groupId) {
+              store.setActivePanel(groupId, action.panel_id);
+              store.focusGroup(groupId);
+              return;
+            }
+            openPanelUniversal(action.panel_id);
+            return;
+          }
+          case "close_panel": {
+            if (!workstationEnabled) return;
+            if (action.group_id) {
+              store.closePanelFromGroup(action.group_id, action.panel_id);
+              return;
+            }
+            Object.values(store.groups).forEach((group) => {
+              if (group.panelIds.includes(action.panel_id)) {
+                store.closePanelFromGroup(group.id, action.panel_id);
+              }
+            });
+            return;
+          }
+          case "split_active_group":
+            if (workstationEnabled) {
+              store.splitActiveGroup(action.direction);
+            }
+            return;
+          case "open_settings":
+            openSettings(action.tab ?? "preferences");
+            return;
+          case "set_chat_dock":
+            if (!workstationEnabled) return;
+            if (typeof action.width_px === "number") {
+              store.setChatDockWidth(action.width_px);
+            }
+            if (
+              typeof action.collapsed === "boolean" &&
+              action.collapsed !== store.chatDock.collapsed
+            ) {
+              store.toggleChatDock();
+            }
+            return;
+          case "run_panel_action":
+            executeHelixPanelAction(
+              {
+                panel_id: action.panel_id,
+                action_id: action.action_id,
+                args: action.args,
+              },
+              {
+                openPanel: (panelId, groupId) => {
+                  if (groupId && workstationEnabled) {
+                    store.openPanelInGroup(groupId, panelId);
+                    return;
+                  }
+                  openPanelUniversal(panelId);
+                },
+                focusPanel: (panelId, groupId) => {
+                  if (groupId && workstationEnabled) {
+                    store.setActivePanel(groupId, panelId);
+                    store.focusGroup(groupId);
+                    return;
+                  }
+                  if (workstationEnabled) {
+                    const hit = Object.values(store.groups).find((group) =>
+                      group.panelIds.includes(panelId),
+                    );
+                    if (hit) {
+                      store.setActivePanel(hit.id, panelId);
+                      store.focusGroup(hit.id);
+                      return;
+                    }
+                  }
+                  openPanelUniversal(panelId);
+                },
+                closePanel: (panelId, groupId) => {
+                  if (!workstationEnabled) return;
+                  if (groupId) {
+                    store.closePanelFromGroup(groupId, panelId);
+                    return;
+                  }
+                  Object.values(store.groups).forEach((group) => {
+                    if (group.panelIds.includes(panelId)) {
+                      store.closePanelFromGroup(group.id, panelId);
+                    }
+                  });
+                },
+                openSettings: (tab) => openSettings(tab ?? "preferences"),
+              },
+            );
+            return;
+          case "run_job":
+            void runWorkstationJob({
+              contextId: HELIX_ASK_CONTEXT_ID.desktop,
+              payload: action.payload,
+              executionContext: {
+                openPanel: (panelId, groupId) => {
+                  if (groupId && workstationEnabled) {
+                    store.openPanelInGroup(groupId, panelId);
+                    return;
+                  }
+                  openPanelUniversal(panelId);
+                },
+                focusPanel: (panelId, groupId) => {
+                  if (groupId && workstationEnabled) {
+                    store.setActivePanel(groupId, panelId);
+                    store.focusGroup(groupId);
+                    return;
+                  }
+                  if (workstationEnabled) {
+                    const hit = Object.values(store.groups).find((group) =>
+                      group.panelIds.includes(panelId),
+                    );
+                    if (hit) {
+                      store.setActivePanel(hit.id, panelId);
+                      store.focusGroup(hit.id);
+                      return;
+                    }
+                  }
+                  openPanelUniversal(panelId);
+                },
+                closePanel: (panelId, groupId) => {
+                  if (!workstationEnabled) return;
+                  if (groupId) {
+                    store.closePanelFromGroup(groupId, panelId);
+                    return;
+                  }
+                  Object.values(store.groups).forEach((group) => {
+                    if (group.panelIds.includes(panelId)) {
+                      store.closePanelFromGroup(group.id, panelId);
+                    }
+                  });
+                },
+                openSettings: (tab) => openSettings(tab ?? "preferences"),
+              },
+            });
+            return;
+          case "toggle_mobile_drawer":
+            return;
+          default:
+            return;
+        }
+      };
+      actions.forEach(runAction);
+    };
+    window.addEventListener(HELIX_WORKSTATION_ACTION_EVENT, handleWorkstationAction as EventListener);
+    return () => {
+      window.removeEventListener(
+        HELIX_WORKSTATION_ACTION_EVENT,
+        handleWorkstationAction as EventListener,
+      );
+    };
+  }, [openPanelUniversal, openSettings, workstationEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isMeta = event.metaKey || event.ctrlKey;
+      if (!isMeta) return;
+      if (event.key !== ",") return;
+      event.preventDefault();
+      openSettings("preferences");
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [openSettings]);
+
   const applyLayout = useCallback(
     (layout: DesktopLayoutHash) => {
       if (layout.projectSlug) {
@@ -172,9 +385,9 @@ export default function DesktopPage() {
       if (panels.includes(NOISE_GENS_PANEL_ID)) {
         autoOpenSuppressRef.current = NOISE_GENS_AUTO_OPEN_SUPPRESS;
       }
-      panels.forEach((id) => open(id));
+      panels.forEach((id) => openPanelUniversal(id));
     },
-    [open, projects, selectProjects],
+    [openPanelUniversal, projects, selectProjects],
   );
 
   const applyEnvironment = useCallback(
@@ -190,11 +403,11 @@ export default function DesktopPage() {
           if (autoOpenSuppressRef.current?.has(panelId)) {
             return;
           }
-          open(panelId);
+          openPanelUniversal(panelId);
         }
       });
     },
-    [allowAutoOpen, open],
+    [allowAutoOpen, openPanelUniversal],
   );
 
   useEffect(() => {
@@ -247,13 +460,13 @@ export default function DesktopPage() {
             if (autoOpenSuppressRef.current?.has(panelId)) {
               return;
             }
-            open(panelId);
+            openPanelUniversal(panelId);
             seen.add(pref.key);
           }
         }
       });
     },
-    [allowAutoOpen, open],
+    [allowAutoOpen, openPanelUniversal],
   );
 
   useEffect(() => {
@@ -279,9 +492,9 @@ export default function DesktopPage() {
     (panelId: PanelDefinition["id"]) => {
       if (!panelId) return;
       if (!getPanelDef(panelId)) return;
-      open(panelId);
+      openPanelUniversal(panelId);
     },
-    [open],
+    [openPanelUniversal],
   );
   return (
     <Dialog
@@ -308,34 +521,43 @@ export default function DesktopPage() {
           </DialogTrigger>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
-          <HelixAskPill
-            className="pointer-events-auto w-full"
-            contextId={HELIX_ASK_CONTEXT_ID.desktop}
-            maxWidthClassName="max-w-4xl mx-auto"
-            onOpenPanel={openPanelById}
-            onOpenConversation={() => {
-              open(ESSENCE_CONSOLE_PANEL_ID);
-            }}
-          />
-        </div>
-        {Object.values(windows)
-          .filter((w) => w.isOpen)
-          .sort((a, b) => a.z - b.z)
-          .map((w) => {
-            const def = getPanelDef(w.id);
-            if (!def) return null;
-            return (
-              <DesktopWindow
-                key={w.id}
-                id={w.id}
-                title={def.title}
-                Loader={def.loader}
+        {workstationEnabled ? (
+          <HelixWorkstationShell onOpenPanel={openPanelUniversal} />
+        ) : (
+          <>
+            <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
+              <HelixAskPill
+                className="pointer-events-auto w-full"
+                contextId={HELIX_ASK_CONTEXT_ID.desktop}
+                maxWidthClassName="max-w-4xl mx-auto"
+                onOpenPanel={openPanelById}
+                onOpenConversation={() => {
+                  openPanelUniversal(ESSENCE_CONSOLE_PANEL_ID);
+                }}
               />
-            );
-          })}
+            </div>
+            {Object.values(windows)
+              .filter((w) => w.isOpen)
+              .sort((a, b) => a.z - b.z)
+              .map((w) => {
+                const def = getPanelDef(w.id);
+                if (!def) return null;
+                return (
+                  <DesktopWindow
+                    key={w.id}
+                    id={w.id}
+                    title={def.title}
+                    Loader={def.loader}
+                  />
+                );
+              })}
+          </>
+        )}
 
-        <DesktopTaskbar />
+        <DesktopTaskbar
+          onOpenPanel={openPanelUniversal}
+          showStart={!workstationEnabled}
+        />
       </div>
 
       <HelixSettingsDialogContent

@@ -19,7 +19,12 @@ import {
   CommandList
 } from "@/components/ui/command";
 
-export function DesktopTaskbar() {
+type DesktopTaskbarProps = {
+  onOpenPanel?: (panelId: string) => void;
+  showStart?: boolean;
+};
+
+export function DesktopTaskbar({ onOpenPanel, showStart = true }: DesktopTaskbarProps) {
   const { open } = useDesktopStore();
   const handleOpenTaskbarPanel = React.useCallback(() => open("taskbar"), [open]);
 
@@ -39,7 +44,7 @@ export function DesktopTaskbar() {
           aria-hidden
         />
         <div className="relative flex w-full items-center gap-3">
-          <HelixStartLauncher />
+          {showStart ? <HelixStartLauncher onOpenPanel={onOpenPanel} /> : null}
           <div className="flex-1 overflow-hidden">
             <TaskbarShelf variant="fixed" onOpenFloatingTaskbar={handleOpenTaskbarPanel} />
           </div>
@@ -49,7 +54,7 @@ export function DesktopTaskbar() {
   );
 }
 
-function HelixStartLauncher() {
+function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) => void }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const { windows, open, focus, restore } = useDesktopStore();
 
@@ -77,6 +82,11 @@ function HelixStartLauncher() {
 
   const handleLaunch = React.useCallback(
     (panelId: string) => {
+      if (onOpenPanel) {
+        onOpenPanel(panelId);
+        setMenuOpen(false);
+        return;
+      }
       const win = windows[panelId];
       if (!win || !win.isOpen) {
         open(panelId);
@@ -89,7 +99,7 @@ function HelixStartLauncher() {
       }
       setMenuOpen(false);
     },
-    [focus, open, restore, windows]
+    [focus, onOpenPanel, open, restore, windows]
   );
 
   return (

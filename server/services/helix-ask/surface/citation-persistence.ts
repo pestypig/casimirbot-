@@ -151,11 +151,8 @@ export const applyOpenWorldSourcesPolicy = (args: {
     return cleaned;
   }
   if (args.suppressGeneralCitations) {
-    let cleaned = args.cleaned;
-    if (!hasSourcesLine(cleaned)) {
-      cleaned = appendOpenWorldSourcesMarker(cleaned);
-      args.answerPath.push("citationScrub:open_world_sources_marker_forced_clarify");
-    }
+    const cleaned = args.stripRepoCitationsForOpenWorldBypass(args.cleaned);
+    args.answerPath.push("citationScrub:open_world_sources_marker_skipped_forced_clarify");
     args.answerPath.push("citationScrub:skipped_forced_clarify");
     return cleaned;
   }

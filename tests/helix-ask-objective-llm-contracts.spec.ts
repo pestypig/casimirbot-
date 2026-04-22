@@ -177,4 +177,26 @@ describe("helix ask objective llm contracts", () => {
     expect(prompt).toContain("fail closed");
     expect(prompt).toContain("Objective checkpoints:");
   });
+
+  it("builds assembly prompts that forbid meta non-answer framing", () => {
+    const prompt = buildHelixAskObjectiveAssemblyPrompt({
+      question: "what is this?",
+      currentAnswer: "Draft",
+      miniAnswers: [
+        {
+          objective_id: "obj-1",
+          objective_label: "Definition",
+          status: "covered",
+          matched_slots: ["definition"],
+          missing_slots: [],
+          evidence_refs: ["docs/foo.md"],
+          summary: "Covered",
+        },
+      ],
+      responseLanguage: "en",
+    });
+    expect(prompt).toContain("Answer the user's question directly");
+    expect(prompt).toContain("Forbidden meta framing");
+    expect(prompt).toContain("does not provide a clear answer");
+  });
 });

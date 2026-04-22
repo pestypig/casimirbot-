@@ -107,4 +107,25 @@ describe("helix ask capsule grounding relevance", () => {
     expect(normalized.some((entry) => entry.includes("mission overwatch intent context"))).toBe(false);
     expect(normalized.some((entry) => entry.includes("docs/business_model.md"))).toBe(false);
   });
+
+  it("does not anchor clarify prompts to stale greeting capsule seeds", () => {
+    const clarifier = __testCapsuleGrounding.buildCapsuleTargetedClarifier("what is this used for?", [
+      "hello",
+      "assist",
+      "today",
+      "unknown",
+    ]);
+
+    expect(clarifier.toLowerCase()).not.toContain('"hello"');
+    expect(clarifier.toLowerCase()).toContain("object, file, or concept");
+  });
+
+  it("keeps meaningful capsule seeds when they are relevant", () => {
+    const clarifier = __testCapsuleGrounding.buildCapsuleTargetedClarifier(
+      "what is this used for?",
+      ["paper ingestion runtime tree", "hello"],
+    );
+
+    expect(clarifier).toContain('"paper ingestion runtime tree"');
+  });
 });

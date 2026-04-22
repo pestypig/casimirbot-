@@ -98,7 +98,7 @@ describe("helix ask objective retrieval recovery", () => {
         {
           objective_id: "obj_pending",
           objective_label: "pending objective",
-          required_slots: ["definition"],
+          required_slots: ["mechanism"],
           matched_slots: [],
           status: "pending" as const,
           attempt: 0,
@@ -138,5 +138,53 @@ describe("helix ask objective retrieval recovery", () => {
     expect(enforced.missingObjectiveIds).toEqual(["obj_pending"]);
     expect(enforced.miniAnswers[0]?.status).toBe("partial");
     expect(enforced.miniAnswers[0]?.missing_slots).toEqual(expect.arrayContaining(["mechanism"]));
+  });
+
+  it("does not require scoped retrieval for definition-only objectives", () => {
+    const ids = collectHelixAskObjectiveIdsWithoutScopedRetrievalPass({
+      states: [
+        {
+          objective_id: "obj_definition",
+          objective_label: "definition objective",
+          required_slots: ["definition"],
+          matched_slots: ["definition"],
+          status: "pending" as const,
+          attempt: 0,
+        },
+      ],
+      retrievalQueries: [],
+      unresolvedOnly: true,
+      maxObjectives: 4,
+    });
+    const enforced = enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers({
+      miniAnswers: [
+        {
+          objective_id: "obj_definition",
+          objective_label: "definition objective",
+          status: "covered" as const,
+          matched_slots: ["definition"],
+          missing_slots: [],
+          evidence_refs: ["docs/knowledge/trees/paper-ingestion-runtime-tree.md"],
+          summary: "definition objective: covered.",
+        },
+      ],
+      states: [
+        {
+          objective_id: "obj_definition",
+          objective_label: "definition objective",
+          required_slots: ["definition"],
+          matched_slots: ["definition"],
+          status: "pending" as const,
+          attempt: 0,
+        },
+      ],
+      retrievalQueries: [],
+      maxObjectives: 4,
+    });
+
+    expect(ids).toEqual([]);
+    expect(enforced.missingObjectiveIds).toEqual([]);
+    expect(enforced.miniAnswers[0]?.status).toBe("covered");
+    expect(enforced.miniAnswers[0]?.missing_slots).toEqual([]);
   });
 });

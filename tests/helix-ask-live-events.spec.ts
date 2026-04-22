@@ -147,6 +147,41 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.synthesis_reason).toMatch(/mode=/);
   }, 45000);
 
+  it("short-circuits greeting-only prompts before planner and gates", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Hello",
+        debug: true,
+        sessionId: "test-smalltalk-fast-path-short-circuit",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        fallback_reason?: string;
+        fallback_reason_taxonomy?: string;
+        smalltalk_fast_path_applied?: boolean;
+        live_events?: Array<{ stage?: string }>;
+      };
+    };
+    const stages = new Set((payload.debug?.live_events ?? []).map((entry) => entry.stage));
+    expect(payload.text.trim()).toBe("Hello! How can I assist you today?");
+    expect(payload.text).not.toMatch(/^Sources:/im);
+    expect(payload.debug?.smalltalk_fast_path_applied).toBe(true);
+    expect(payload.debug?.fallback_reason).toBe("smalltalk_fast_path");
+    expect(payload.debug?.fallback_reason_taxonomy).toBe("smalltalk_fast_path");
+    expect(stages.has("Smalltalk fast path")).toBe(true);
+    expect(stages.has("Plan")).toBe(false);
+    expect(stages.has("Plan pass")).toBe(false);
+    expect(stages.has("Coverage gate")).toBe(false);
+    expect(stages.has("Belief gate")).toBe(false);
+    expect(stages.has("Rattling gate")).toBe(false);
+    expect(stages.has("Citations")).toBe(false);
+  }, 45000);
+
   it("answers ideology concept query with grounded narrative + technical notes", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

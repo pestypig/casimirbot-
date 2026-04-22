@@ -150,6 +150,16 @@ describe("helix ask research citation policy", () => {
     expect(evaluation.missingReasons).toContain("experimental_math_without_research_pair");
   });
 
+  it("does not mark non-math diagnostic repo prompts as experimental math risk", () => {
+    const risk = detectExperimentalMathRisk({
+      question: "What is helix ask used for?",
+      text: "Confidence/Uncertainty: diagnostic stage only for this repo answer.",
+      intentDomain: "hybrid",
+    });
+    expect(risk.isRisk).toBe(false);
+    expect(risk.signals).toEqual([]);
+  });
+
   it("requires constraint+proposal evidence binding for experimental math uncertainty claims", () => {
     const missingConstraint = evaluateUncertaintyResearchContract({
       question: "Is this experimental warp metric ready for promotion?",

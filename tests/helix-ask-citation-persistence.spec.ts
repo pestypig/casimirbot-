@@ -154,4 +154,28 @@ describe("helix ask citation persistence helpers", () => {
     expect(cleaned).toContain(OPEN_WORLD_SOURCES_MARKER_TEXT);
     expect(answerPath).toContain("citationScrub:open_world_sources_marker");
   });
+
+  it("does not append open-world sources marker for forced clarify preservation", () => {
+    const answerPath: string[] = [];
+    const cleaned = applyOpenWorldSourcesPolicy({
+      cleaned: `Quick check: what object, file, or concept does "this" refer to?\n\n${OPEN_WORLD_SOURCES_MARKER_TEXT}`,
+      suppressGeneralCitations: true,
+      preserveForcedAnswerAcrossFinalizer: true,
+      securityOpenWorldPrompt: false,
+      baseQuestion: "ok what is this used for?",
+      treeWalkBlock: null,
+      answerPath,
+      stripRepoCitationsForOpenWorldBypass: (value) =>
+        value
+          .split(/\r?\n/)
+          .filter((line) => !/^\s*Sources:\s*/i.test(line.trim()))
+          .join("\n")
+          .trim(),
+      rewriteOpenWorldBestEffortAnswer: (value) => value,
+    });
+
+    expect(cleaned).not.toContain("Sources: open-world best-effort");
+    expect(answerPath).toContain("citationScrub:open_world_sources_marker_skipped_forced_clarify");
+    expect(answerPath).toContain("citationScrub:skipped_forced_clarify");
+  });
 });

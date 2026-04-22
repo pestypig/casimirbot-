@@ -727,6 +727,7 @@ export const buildHelixAskObjectiveAssemblyPrompt = (args: {
   return [
     "You are Helix Ask objective assembler.",
     "Return a concise final answer only, no JSON and no debug metadata.",
+    "Answer the user's question directly; do not describe the draft/question quality.",
     "Preserve existing citations and uncertainty statements.",
     ...(hasUnresolvedObjectives
       ? [
@@ -742,6 +743,7 @@ export const buildHelixAskObjectiveAssemblyPrompt = (args: {
         ]),
     "Never present unresolved objectives as complete.",
     "Use objective checkpoints internally; do not expose planner/checkpoint labels or status fields in the final answer.",
+    'Forbidden meta framing: "This appears to be", "current draft", "does not provide a clear answer", "lacks concrete information".',
     "Use the same language as the current answer unless responseLanguage explicitly requests a different language.",
     `responseLanguage=${args.responseLanguage ?? "auto"}`,
     "",

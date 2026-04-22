@@ -43,7 +43,7 @@ const PATHLIKE_CITATION_RE =
 const EXPERIMENTAL_MATH_RE =
   /\b(?:experimental|speculative|hypothesis|unverified|frontier|diagnostic|not certified)\b/i;
 const WARP_MATH_RE =
-  /\b(?:warp|alcubierre|natario|casimir|metric|tensor|curvature|einstein|general relativity|gr|qft|quantum inequality|proof|derivation|solver)\b/i;
+  /\b(?:warp|alcubierre|natario|casimir|einstein|general relativity|gravity|spacetime|qft|quantum inequality|stress[-\s]?energy|riemann|ricci|christoffel|metric tensor|tensor)\b/i;
 
 const FALLBACK_RESEARCH_REGISTRY: ResearchCitationRegistry = {
   version: 1,
@@ -404,10 +404,12 @@ export const detectExperimentalMathRisk = (args: {
   const combined = `${String(args.question ?? "")}\n${String(args.text ?? "")}`.trim();
   const intentDomain = String(args.intentDomain ?? "").trim().toLowerCase();
   const signals: string[] = [];
-  if (EXPERIMENTAL_MATH_RE.test(combined)) {
+  const hasExperimentalSignal = EXPERIMENTAL_MATH_RE.test(combined);
+  const hasWarpMathSignal = WARP_MATH_RE.test(combined);
+  if (hasExperimentalSignal && hasWarpMathSignal) {
     signals.push("experimental_math_signal");
   }
-  if (WARP_MATH_RE.test(combined)) {
+  if (hasWarpMathSignal) {
     signals.push("warp_math_signal");
   }
   if (/(?:^|[._-])(math|physics|warp|gr)(?:$|[._-])/.test(intentDomain)) {

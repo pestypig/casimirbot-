@@ -238,6 +238,25 @@ export const NHM2_OBSERVER_DEC_RECOMMENDED_PATCH_CLASS_VALUES = [
   "no_admissible_candidate_yet",
 ] as const;
 
+export const NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PLAN_STATUS_VALUES = [
+  "required",
+  "not_required",
+] as const;
+
+export const NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_TRIGGER_VALUES = [
+  "none",
+  "semantic_or_emission_not_stable",
+  "bounded_envelope_exhausted",
+  "cross_zero_not_achieved",
+  "unknown",
+] as const;
+
+export const NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PREFERRED_ROUTE_VALUES = [
+  "full_einstein_tensor",
+  "adm_complete",
+  "unknown",
+] as const;
+
 export const NHM2_OBSERVER_DEC_PHYSICS_SELECTION_DECISION_VALUES = [
   "apply_candidate",
   "hold_baseline",
@@ -252,6 +271,10 @@ export const NHM2_OBSERVER_DEC_PHYSICS_SELECTION_PLATEAU_STATUS_VALUES = [
 export const NHM2_OBSERVER_DEC_PHYSICS_SELECTION_REASON_CODE_VALUES = [
   "selection_gate_pass",
   "best_margin_still_negative",
+  "insufficient_dec_lift_after_tranche_4",
+  "model_term_extension_required",
+  "uncertainty_bound_failed",
+  "cross_check_sign_mismatch",
   "no_candidate_improves_dec",
   "candidate_violates_wec_non_regression",
   "candidate_violates_nec_non_regression",
@@ -259,6 +282,7 @@ export const NHM2_OBSERVER_DEC_PHYSICS_SELECTION_REASON_CODE_VALUES = [
   "candidate_breaks_semantic_admission_stability",
   "candidate_is_observer_domain_truncation",
   "candidate_evidence_non_comparable",
+  "runtime_apply_disabled",
   "candidate_not_evaluated",
 ] as const;
 
@@ -266,6 +290,7 @@ export const NHM2_OBSERVER_DEC_PHYSICS_SWEEP_PHASE_VALUES = [
   "baseline",
   "coarse",
   "refine",
+  "frontier",
 ] as const;
 
 export const NHM2_OBSERVER_DEC_PHYSICS_UNCERTAINTY_TAG_VALUES = [
@@ -275,6 +300,11 @@ export const NHM2_OBSERVER_DEC_PHYSICS_UNCERTAINTY_TAG_VALUES = [
 ] as const;
 
 export const NHM2_OBSERVER_DEC_RESIDUAL_ATTRIBUTION_STATUS_VALUES = [
+  "available",
+  "unavailable",
+] as const;
+
+export const NHM2_OBSERVER_DEC_FRONTIER_IMPROVEMENT_STATUS_VALUES = [
   "available",
   "unavailable",
 ] as const;
@@ -299,8 +329,18 @@ export const NHM2_OBSERVER_DEC_PHYSICS_RUNTIME_FAILURE_MODE_VALUES = [
   "regression_wec",
   "regression_nec",
   "insufficient_dec_lift",
+  "uncertainty_bound_failed",
+  "cross_check_sign_mismatch",
   "non_comparable",
   "unknown",
+] as const;
+
+export const NHM2_OBSERVER_DEC_EXTENSION_TRANCHE_ID_VALUES = [
+  "tranche_1_primary",
+  "tranche_2_extended",
+  "tranche_3_fully_coupled",
+  "tranche_4_expanded_bounds",
+  "tranche_5_model_term_extension",
 ] as const;
 
 export const NHM2_OBSERVER_DEC_PHYSICS_CROSS_ZERO_METHOD_VALUES = [
@@ -322,6 +362,10 @@ export const NHM2_OBSERVER_DEC_PHYSICS_ZERO_CROSS_FEASIBILITY_DECISION_VALUES = 
 export const NHM2_OBSERVER_DEC_PHYSICS_ZERO_CROSS_REASON_CODE_VALUES = [
   "cross_zero_margin_non_negative",
   "best_margin_still_negative",
+  "insufficient_dec_lift_after_tranche_4",
+  "model_term_extension_required",
+  "uncertainty_bound_failed",
+  "cross_check_sign_mismatch",
   "selection_gate_failed",
   "candidate_evidence_non_comparable",
   "candidate_violates_wec_non_regression",
@@ -334,6 +378,12 @@ export const NHM2_OBSERVER_RESEARCH_CLAIM_CONFIDENCE_LABEL_VALUES = [
   "established",
   "review",
   "emerging_preprint",
+] as const;
+
+export const NHM2_OBSERVER_DEC_RESEARCH_SUPPORT_LEVEL_VALUES = [
+  "primary_source",
+  "repo_measurement",
+  "inference",
 ] as const;
 
 export const NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES = [
@@ -509,6 +559,12 @@ export type Nhm2ObserverDecDominantViolationClass =
   (typeof NHM2_OBSERVER_DEC_DOMINANT_VIOLATION_CLASS_VALUES)[number];
 export type Nhm2ObserverDecRecommendedPatchClass =
   (typeof NHM2_OBSERVER_DEC_RECOMMENDED_PATCH_CLASS_VALUES)[number];
+export type Nhm2ObserverDecModelTermExtensionPlanStatus =
+  (typeof NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PLAN_STATUS_VALUES)[number];
+export type Nhm2ObserverDecModelTermExtensionTrigger =
+  (typeof NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_TRIGGER_VALUES)[number];
+export type Nhm2ObserverDecModelTermExtensionPreferredRoute =
+  (typeof NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PREFERRED_ROUTE_VALUES)[number];
 export type Nhm2ObserverDecPhysicsSelectionDecision =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_SELECTION_DECISION_VALUES)[number];
 export type Nhm2ObserverDecPhysicsSelectionPlateauStatus =
@@ -521,12 +577,16 @@ export type Nhm2ObserverDecPhysicsUncertaintyTag =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_UNCERTAINTY_TAG_VALUES)[number];
 export type Nhm2ObserverDecResidualAttributionStatus =
   (typeof NHM2_OBSERVER_DEC_RESIDUAL_ATTRIBUTION_STATUS_VALUES)[number];
+export type Nhm2ObserverDecFrontierImprovementStatus =
+  (typeof NHM2_OBSERVER_DEC_FRONTIER_IMPROVEMENT_STATUS_VALUES)[number];
 export type Nhm2ObserverDecResidualPrimarySurface =
   (typeof NHM2_OBSERVER_DEC_RESIDUAL_PRIMARY_SURFACE_VALUES)[number];
 export type Nhm2ObserverDecPhysicsRuntimeApplicationStatus =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_RUNTIME_APPLICATION_STATUS_VALUES)[number];
 export type Nhm2ObserverDecPhysicsRuntimeFailureMode =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_RUNTIME_FAILURE_MODE_VALUES)[number];
+export type Nhm2ObserverDecExtensionTrancheId =
+  (typeof NHM2_OBSERVER_DEC_EXTENSION_TRANCHE_ID_VALUES)[number];
 export type Nhm2ObserverDecPhysicsCrossZeroMethod =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_CROSS_ZERO_METHOD_VALUES)[number];
 export type Nhm2ObserverDecPhysicsCrossZeroInferenceLabel =
@@ -537,6 +597,8 @@ export type Nhm2ObserverDecPhysicsZeroCrossReasonCode =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_ZERO_CROSS_REASON_CODE_VALUES)[number];
 export type Nhm2ObserverResearchClaimConfidenceLabel =
   (typeof NHM2_OBSERVER_RESEARCH_CLAIM_CONFIDENCE_LABEL_VALUES)[number];
+export type Nhm2ObserverDecResearchSupportLevel =
+  (typeof NHM2_OBSERVER_DEC_RESEARCH_SUPPORT_LEVEL_VALUES)[number];
 export type Nhm2ObserverMetricEmissionAdmissionStatus =
   (typeof NHM2_OBSERVER_METRIC_EMISSION_ADMISSION_STATUS_VALUES)[number];
 export type Nhm2ObserverMetricComponentAdmissionStatus =
@@ -840,6 +902,24 @@ export type Nhm2ObserverDecRemediationEvidence = {
   typeIFractionTileReconstituted: number | null;
   dominantViolationClass: Nhm2ObserverDecDominantViolationClass;
   recommendedPatchClass: Nhm2ObserverDecRecommendedPatchClass;
+  modelTermExtensionPlanEvidence: Nhm2ObserverDecModelTermExtensionPlanEvidence | null;
+  citationRefs: string[];
+  notes: string[];
+};
+
+export type Nhm2ObserverDecModelTermExtensionPlanEvidence = {
+  status: Nhm2ObserverDecModelTermExtensionPlanStatus;
+  trigger: Nhm2ObserverDecModelTermExtensionTrigger;
+  chartRef: string | null;
+  routeId: string | null;
+  selectedPath: Nhm2ObserverModelTermClosurePath | null;
+  dominantViolationClass: Nhm2ObserverDecDominantViolationClass;
+  requiredLiftToZero: number | null;
+  bestAchievedLift: number | null;
+  residualMarginToZero: number | null;
+  gapToZero: number | null;
+  preferredImplementationRoute: Nhm2ObserverDecModelTermExtensionPreferredRoute;
+  nextPatchClass: Nhm2ObserverDecRecommendedPatchClass;
   citationRefs: string[];
   notes: string[];
 };
@@ -884,6 +964,10 @@ export type Nhm2ObserverDecPhysicsRuntimeApplicationEvidence = {
     semanticAdmissionStable: boolean | null;
     metricDecRobustLiftPositive: boolean | null;
     tileReconstitutedDecRobustLiftNonNegative: boolean | null;
+    crossesZeroBothDecMargins: boolean | null;
+    independentCrossCheckSignAgreement?: boolean | null;
+    uncertaintyBoundPass?: boolean | null;
+    referenceCrossesZeroBothDecMargins?: boolean | null;
   };
   observed: {
     metricDecRobustLift: number | null;
@@ -894,9 +978,59 @@ export type Nhm2ObserverDecPhysicsRuntimeApplicationEvidence = {
     tileReconstitutedDecRobustMarginToZero: number | null;
     metricWecNonRegressionMargin: number | null;
     metricNecNonRegressionMargin: number | null;
+    independentCrossCheckRelativeResidual?: number | null;
+    uncertaintyRelativeBound?: number | null;
+    metricDecUncertaintyAbs?: number | null;
+    tileReconstitutedDecUncertaintyAbs?: number | null;
+    metricDecConservativeMarginToZero?: number | null;
+    tileReconstitutedDecConservativeMarginToZero?: number | null;
+    referenceMetricDecRobustMarginToZero?: number | null;
+    referenceTileReconstitutedDecRobustMarginToZero?: number | null;
+    referenceMetricDecUncertaintyAbs?: number | null;
+    referenceTileReconstitutedDecUncertaintyAbs?: number | null;
+    referenceMetricDecConservativeMarginToZero?: number | null;
+    referenceTileReconstitutedDecConservativeMarginToZero?: number | null;
   };
   note: string | null;
   citationRefs: string[];
+};
+
+export type Nhm2ObserverDecRuntimeDecisionEvidence = {
+  status: Nhm2ObserverDecPhysicsRuntimeApplicationStatus;
+  attempted: boolean;
+  enabled: boolean;
+  gatePass: boolean;
+  comparabilityPass: boolean;
+  sampleCountSufficient: boolean | null;
+  selectedCandidateId: string | null;
+  reasonCodes: Nhm2ObserverDecPhysicsSelectionReasonCode[];
+  primaryReasonCode: Nhm2ObserverDecPhysicsSelectionReasonCode | null;
+  decAttribution?: {
+    selectedMetricDecRobustMarginToZero: number | null;
+    selectedTileReconstitutedDecRobustMarginToZero: number | null;
+    selectedMetricDecConservativeMarginToZero: number | null;
+    selectedTileReconstitutedDecConservativeMarginToZero: number | null;
+    referenceMetricDecRobustMarginToZero: number | null;
+    referenceTileReconstitutedDecRobustMarginToZero: number | null;
+    referenceMetricDecConservativeMarginToZero: number | null;
+    referenceTileReconstitutedDecConservativeMarginToZero: number | null;
+    independentCrossCheckRelativeResidual: number | null;
+    uncertaintyRelativeBound: number | null;
+    independentCrossCheckSignAgreement: boolean | null;
+    selectedCrossesZeroUnderUncertainty: boolean | null;
+    referenceCrossesZeroBothDecMargins: boolean | null;
+    uncertaintyBoundPass: boolean | null;
+  };
+  note: string | null;
+  citationRefs: string[];
+};
+
+export type Nhm2ObserverDecResearchSupportEvidence = {
+  claimId: string;
+  supportLevel: Nhm2ObserverDecResearchSupportLevel;
+  citationRefs: string[];
+  evidenceRefs: string[];
+  note: string | null;
 };
 
 export type Nhm2ObserverClaimCitationEvidence = {
@@ -944,6 +1078,116 @@ export type Nhm2ObserverDecCoupledControlEvidence = {
   };
   researchClaims: Nhm2ObserverResearchClaimEvidence[];
   note: string | null;
+};
+
+export type Nhm2ObserverDecModelTermExtensionFamilyEvidence = {
+  status: "available" | "unavailable";
+  selectionBasis: string | null;
+  selectedFamilyId: string | null;
+  selectedFamilyReason: string | null;
+  families: Array<{
+    familyId: string;
+    label: string;
+    candidateCount: number;
+    passingCandidateCount: number;
+    bestCandidateId: string | null;
+    bestPrimaryMargin: number | null;
+    bestMetricDecLift: number | null;
+    bestTileDecLift: number | null;
+    crossesZeroBothDecMargins: boolean | null;
+    recommendation:
+      | "prioritize_for_model_term_extension"
+      | "secondary"
+      | "insufficient_evidence";
+    reasonCodes: Nhm2ObserverDecPhysicsSelectionReasonCode[];
+    note: string | null;
+  }>;
+  comparabilityGate: {
+    pass: boolean;
+    independentCrossCheckStatus: Nhm2ObserverModelTermSemanticCheckStatus;
+    note: string | null;
+  };
+  citationRefs: string[];
+  notes: string[];
+};
+
+export type Nhm2ObserverDecFluxShearExtensionEvidence = {
+  status: "available" | "unavailable";
+  routeId: string | null;
+  selectedPath: Nhm2ObserverModelTermClosurePath | null;
+  selectedFamilyId: string | null;
+  selectionBasis: string | null;
+  parameterEnvelope: {
+    pressureScaleMin: number | null;
+    pressureScaleMax: number | null;
+    densityLiftMin: number | null;
+    densityLiftMax: number | null;
+    fluxScaleMin: number | null;
+    fluxScaleMax: number | null;
+    shearScaleMin: number | null;
+    shearScaleMax: number | null;
+  };
+  bestCandidateId: string | null;
+  bestPrimaryMargin: number | null;
+  bestMetricDecLift: number | null;
+  bestTileDecLift: number | null;
+  crossZeroAchieved: boolean | null;
+  boundedEnvelopeExhausted: boolean | null;
+  nonRegressionPass: boolean | null;
+  comparabilityGate: {
+    pass: boolean;
+    independentCrossCheckStatus: Nhm2ObserverModelTermSemanticCheckStatus;
+    referenceRouteId: string | null;
+    comparableSampleCount: number | null;
+    minimumComparableSampleCount: number | null;
+    note: string | null;
+  };
+  recommendation: Nhm2ObserverDecRecommendedPatchClass;
+  citationRefs: string[];
+  notes: string[];
+};
+
+export type Nhm2ObserverDecRuntimeAppliedCandidateEvidence = {
+  status: "available" | "unavailable";
+  candidateId: string | null;
+  extensionTrancheId: Nhm2ObserverDecExtensionTrancheId | null;
+  familyId: string | null;
+  metricDecRobustMarginToZero: number | null;
+  tileReconstitutedDecRobustMarginToZero: number | null;
+  metricWecNonRegressionMargin: number | null;
+  metricNecNonRegressionMargin: number | null;
+  nonRegressionPass: boolean | null;
+  comparabilityPass: boolean | null;
+  note: string | null;
+  citationRefs: string[];
+};
+
+export type Nhm2ObserverDecRuntimeRollbackLocalizationEvidence = {
+  status: "available" | "unavailable";
+  candidateId: string | null;
+  extensionTrancheId: Nhm2ObserverDecExtensionTrancheId | null;
+  familyId: string | null;
+  failureMode:
+    | "none"
+    | "not_attempted"
+    | "runtime_apply_disabled"
+    | "regression_wec"
+    | "regression_nec"
+    | "insufficient_dec_lift"
+    | "uncertainty_bound_failed"
+    | "cross_check_sign_mismatch"
+    | "non_comparable"
+    | "unknown";
+  primaryReasonCode: Nhm2ObserverDecPhysicsSelectionReasonCode | null;
+  reasonCodes: Nhm2ObserverDecPhysicsSelectionReasonCode[];
+  metricDecRobustMarginToZero: number | null;
+  tileReconstitutedDecRobustMarginToZero: number | null;
+  metricWecNonRegressionMargin: number | null;
+  metricNecNonRegressionMargin: number | null;
+  comparabilityPass: boolean | null;
+  sampleCountSufficient: boolean | null;
+  note: string | null;
+  citationRefs: string[];
 };
 
 export type Nhm2ObserverDecPhysicsControlSweepCandidate = {
@@ -996,6 +1240,7 @@ export type Nhm2ObserverDecPhysicsCrossZeroFeasibilityEvidence = {
   residualMarginToZero: number | null;
   gapToZero: number | null;
   crossZeroAchieved: boolean | null;
+  boundedEnvelopeExhausted: boolean | null;
   boundedControlEnvelope: {
     pressureScaleMin: number | null;
     pressureScaleMax: number | null;
@@ -1047,6 +1292,24 @@ export type Nhm2ObserverDecResidualAttributionEvidence = {
     tileReconstitutedDecRobustLift: number | null;
     controlDeviationMagnitude: number | null;
   };
+  citationRefs: string[];
+  notes: string[];
+};
+
+export type Nhm2ObserverDecFrontierImprovementEvidence = {
+  status: Nhm2ObserverDecFrontierImprovementStatus;
+  frontierSeedCandidateId: string | null;
+  frontierSelectedCandidateId: string | null;
+  frontierCandidateCount: number | null;
+  frontierPassingCount: number | null;
+  baselinePrimaryMargin: number | null;
+  preFrontierBestPrimaryMargin: number | null;
+  finalBestPrimaryMargin: number | null;
+  frontierBestDeltaFromPreFrontier: number | null;
+  frontierBestDeltaFromBaseline: number | null;
+  frontierBestDeltaPercentFromBaseline: number | null;
+  residualGapToZero: number | null;
+  selectionPlateauStatus: Nhm2ObserverDecPhysicsSelectionPlateauStatus;
   citationRefs: string[];
   notes: string[];
 };
@@ -1104,6 +1367,9 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
     refineCandidateCount: number | null;
     refinePassingCount: number | null;
     refineSeedCandidateIds: string[];
+    frontierCandidateCount: number | null;
+    frontierPassingCount: number | null;
+    frontierSeedCandidateId: string | null;
     note: string | null;
   };
   topCandidateLeaderboard: Array<{
@@ -1127,6 +1393,7 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
   selectionPlateauStatus: Nhm2ObserverDecPhysicsSelectionPlateauStatus;
   crossZeroFeasibilityEvidence: Nhm2ObserverDecPhysicsCrossZeroFeasibilityEvidence;
   decResidualAttributionEvidence?: Nhm2ObserverDecResidualAttributionEvidence;
+  decFrontierImprovementEvidence?: Nhm2ObserverDecFrontierImprovementEvidence;
   zeroCrossFeasibilityDecision?: Nhm2ObserverDecPhysicsZeroCrossFeasibilityDecision;
   zeroCrossFeasibilityReasonCodes?: Nhm2ObserverDecPhysicsZeroCrossReasonCode[];
   boundedSearchEnvelope?: {
@@ -1146,8 +1413,13 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
     refineDensityLiftStep: number | null;
     refineFluxScaleStep: number | null;
     refineShearScaleStep: number | null;
+    frontierPressureStep: number | null;
+    frontierDensityLiftStep: number | null;
+    frontierFluxScaleStep: number | null;
+    frontierShearScaleStep: number | null;
     coarseCandidateCount: number | null;
     refineCandidateCount: number | null;
+    frontierCandidateCount: number | null;
     refineSeedCount: number | null;
     observerDomainFixed: boolean;
   };
@@ -1158,8 +1430,14 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
     note: string | null;
   };
   runtimeApplication: Nhm2ObserverDecPhysicsRuntimeApplicationEvidence;
+  decRuntimeDecisionEvidence?: Nhm2ObserverDecRuntimeDecisionEvidence;
+  extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId;
+  familySearchOrder?: string[];
+  appliedCandidateEvidence?: Nhm2ObserverDecRuntimeAppliedCandidateEvidence;
+  rollbackLocalizationEvidence?: Nhm2ObserverDecRuntimeRollbackLocalizationEvidence;
   controlKnobs: Nhm2ObserverDecPhysicsControlKnobEvidence[];
   claimCitationMap?: Nhm2ObserverClaimCitationEvidence[];
+  researchSupportMap?: Record<string, Nhm2ObserverDecResearchSupportEvidence>;
   claimCitationMapCompleteness?: {
     status: "pass" | "fail";
     expectedClaimCount: number;
@@ -1169,6 +1447,8 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
     note: string | null;
   };
   decCoupledControlEvidence?: Nhm2ObserverDecCoupledControlEvidence;
+  modelTermExtensionFamilyEvidence?: Nhm2ObserverDecModelTermExtensionFamilyEvidence;
+  fluxShearExtensionEvidence?: Nhm2ObserverDecFluxShearExtensionEvidence;
   recommendation: Nhm2ObserverDecRecommendedPatchClass;
   uncertaintyTags: Nhm2ObserverDecPhysicsUncertaintyTag[];
   citationRefs: string[];
@@ -1671,6 +1951,24 @@ export type BuildNhm2ObserverAuditArtifactInput = {
     typeIFractionTileReconstituted?: number | null;
     dominantViolationClass?: Nhm2ObserverDecDominantViolationClass | null;
     recommendedPatchClass?: Nhm2ObserverDecRecommendedPatchClass | null;
+    modelTermExtensionPlanEvidence?: {
+      status?: Nhm2ObserverDecModelTermExtensionPlanStatus | null;
+      trigger?: Nhm2ObserverDecModelTermExtensionTrigger | null;
+      chartRef?: string | null;
+      routeId?: string | null;
+      selectedPath?: Nhm2ObserverModelTermClosurePath | null;
+      dominantViolationClass?: Nhm2ObserverDecDominantViolationClass | null;
+      requiredLiftToZero?: number | null;
+      bestAchievedLift?: number | null;
+      residualMarginToZero?: number | null;
+      gapToZero?: number | null;
+      preferredImplementationRoute?:
+        | Nhm2ObserverDecModelTermExtensionPreferredRoute
+        | null;
+      nextPatchClass?: Nhm2ObserverDecRecommendedPatchClass | null;
+      citationRefs?: string[] | null;
+      notes?: string[] | null;
+    } | null;
     citationRefs?: string[] | null;
     notes?: string[] | null;
   } | null;
@@ -1767,6 +2065,9 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       refineCandidateCount?: number | null;
       refinePassingCount?: number | null;
       refineSeedCandidateIds?: string[] | null;
+      frontierCandidateCount?: number | null;
+      frontierPassingCount?: number | null;
+      frontierSeedCandidateId?: string | null;
       note?: string | null;
     } | null;
     topCandidateLeaderboard?: Array<{
@@ -1800,6 +2101,7 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       residualMarginToZero?: number | null;
       gapToZero?: number | null;
       crossZeroAchieved?: boolean | null;
+      boundedEnvelopeExhausted?: boolean | null;
       boundedControlEnvelope?: {
         pressureScaleMin?: number | null;
         pressureScaleMax?: number | null;
@@ -1859,6 +2161,25 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       citationRefs?: string[] | null;
       notes?: string[] | null;
     } | null;
+    decFrontierImprovementEvidence?: {
+      status?: Nhm2ObserverDecFrontierImprovementStatus | null;
+      frontierSeedCandidateId?: string | null;
+      frontierSelectedCandidateId?: string | null;
+      frontierCandidateCount?: number | null;
+      frontierPassingCount?: number | null;
+      baselinePrimaryMargin?: number | null;
+      preFrontierBestPrimaryMargin?: number | null;
+      finalBestPrimaryMargin?: number | null;
+      frontierBestDeltaFromPreFrontier?: number | null;
+      frontierBestDeltaFromBaseline?: number | null;
+      frontierBestDeltaPercentFromBaseline?: number | null;
+      residualGapToZero?: number | null;
+      selectionPlateauStatus?:
+        | Nhm2ObserverDecPhysicsSelectionPlateauStatus
+        | null;
+      citationRefs?: string[] | null;
+      notes?: string[] | null;
+    } | null;
     zeroCrossFeasibilityDecision?:
       | Nhm2ObserverDecPhysicsZeroCrossFeasibilityDecision
       | null;
@@ -1882,8 +2203,13 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       refineDensityLiftStep?: number | null;
       refineFluxScaleStep?: number | null;
       refineShearScaleStep?: number | null;
+      frontierPressureStep?: number | null;
+      frontierDensityLiftStep?: number | null;
+      frontierFluxScaleStep?: number | null;
+      frontierShearScaleStep?: number | null;
       coarseCandidateCount?: number | null;
       refineCandidateCount?: number | null;
+      frontierCandidateCount?: number | null;
       refineSeedCount?: number | null;
       observerDomainFixed?: boolean | null;
     } | null;
@@ -1923,6 +2249,10 @@ export type BuildNhm2ObserverAuditArtifactInput = {
         semanticAdmissionStable?: boolean | null;
         metricDecRobustLiftPositive?: boolean | null;
         tileReconstitutedDecRobustLiftNonNegative?: boolean | null;
+        crossesZeroBothDecMargins?: boolean | null;
+        independentCrossCheckSignAgreement?: boolean | null;
+        uncertaintyBoundPass?: boolean | null;
+        referenceCrossesZeroBothDecMargins?: boolean | null;
       } | null;
       observed?: {
         metricDecRobustLift?: number | null;
@@ -1933,7 +2263,92 @@ export type BuildNhm2ObserverAuditArtifactInput = {
         tileReconstitutedDecRobustMarginToZero?: number | null;
         metricWecNonRegressionMargin?: number | null;
         metricNecNonRegressionMargin?: number | null;
+        independentCrossCheckRelativeResidual?: number | null;
+        uncertaintyRelativeBound?: number | null;
+        metricDecUncertaintyAbs?: number | null;
+        tileReconstitutedDecUncertaintyAbs?: number | null;
+        metricDecConservativeMarginToZero?: number | null;
+        tileReconstitutedDecConservativeMarginToZero?: number | null;
+        referenceMetricDecRobustMarginToZero?: number | null;
+        referenceTileReconstitutedDecRobustMarginToZero?: number | null;
+        referenceMetricDecUncertaintyAbs?: number | null;
+        referenceTileReconstitutedDecUncertaintyAbs?: number | null;
+        referenceMetricDecConservativeMarginToZero?: number | null;
+        referenceTileReconstitutedDecConservativeMarginToZero?: number | null;
       } | null;
+      note?: string | null;
+      citationRefs?: string[] | null;
+    } | null;
+    decRuntimeDecisionEvidence?: {
+      status?: Nhm2ObserverDecPhysicsRuntimeApplicationStatus | null;
+      attempted?: boolean | null;
+      enabled?: boolean | null;
+      gatePass?: boolean | null;
+      comparabilityPass?: boolean | null;
+      sampleCountSufficient?: boolean | null;
+      selectedCandidateId?: string | null;
+      reasonCodes?: Nhm2ObserverDecPhysicsSelectionReasonCode[] | null;
+      primaryReasonCode?: Nhm2ObserverDecPhysicsSelectionReasonCode | null;
+      decAttribution?: {
+        selectedMetricDecRobustMarginToZero?: number | null;
+        selectedTileReconstitutedDecRobustMarginToZero?: number | null;
+        selectedMetricDecConservativeMarginToZero?: number | null;
+        selectedTileReconstitutedDecConservativeMarginToZero?: number | null;
+        referenceMetricDecRobustMarginToZero?: number | null;
+        referenceTileReconstitutedDecRobustMarginToZero?: number | null;
+        referenceMetricDecConservativeMarginToZero?: number | null;
+        referenceTileReconstitutedDecConservativeMarginToZero?: number | null;
+        independentCrossCheckRelativeResidual?: number | null;
+        uncertaintyRelativeBound?: number | null;
+        independentCrossCheckSignAgreement?: boolean | null;
+        selectedCrossesZeroUnderUncertainty?: boolean | null;
+        referenceCrossesZeroBothDecMargins?: boolean | null;
+        uncertaintyBoundPass?: boolean | null;
+      } | null;
+      note?: string | null;
+      citationRefs?: string[] | null;
+    } | null;
+    extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId | null;
+    familySearchOrder?: string[] | null;
+    appliedCandidateEvidence?: {
+      status?: "available" | "unavailable" | null;
+      candidateId?: string | null;
+      extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId | null;
+      familyId?: string | null;
+      metricDecRobustMarginToZero?: number | null;
+      tileReconstitutedDecRobustMarginToZero?: number | null;
+      metricWecNonRegressionMargin?: number | null;
+      metricNecNonRegressionMargin?: number | null;
+      nonRegressionPass?: boolean | null;
+      comparabilityPass?: boolean | null;
+      note?: string | null;
+      citationRefs?: string[] | null;
+    } | null;
+    rollbackLocalizationEvidence?: {
+      status?: "available" | "unavailable" | null;
+      candidateId?: string | null;
+      extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId | null;
+      familyId?: string | null;
+      failureMode?:
+        | "none"
+        | "not_attempted"
+        | "runtime_apply_disabled"
+        | "regression_wec"
+        | "regression_nec"
+        | "insufficient_dec_lift"
+        | "uncertainty_bound_failed"
+        | "cross_check_sign_mismatch"
+        | "non_comparable"
+        | "unknown"
+        | null;
+      primaryReasonCode?: Nhm2ObserverDecPhysicsSelectionReasonCode | null;
+      reasonCodes?: Nhm2ObserverDecPhysicsSelectionReasonCode[] | null;
+      metricDecRobustMarginToZero?: number | null;
+      tileReconstitutedDecRobustMarginToZero?: number | null;
+      metricWecNonRegressionMargin?: number | null;
+      metricNecNonRegressionMargin?: number | null;
+      comparabilityPass?: boolean | null;
+      sampleCountSufficient?: boolean | null;
       note?: string | null;
       citationRefs?: string[] | null;
     } | null;
@@ -1952,6 +2367,16 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       citationRefs?: string[] | null;
       note?: string | null;
     }> | null;
+    researchSupportMap?: Record<
+      string,
+      {
+        claimId?: string | null;
+        supportLevel?: Nhm2ObserverDecResearchSupportLevel | null;
+        citationRefs?: string[] | null;
+        evidenceRefs?: string[] | null;
+        note?: string | null;
+      }
+    > | null;
     claimCitationMapCompleteness?: {
       status?: "pass" | "fail" | null;
       expectedClaimCount?: number | null;
@@ -1998,6 +2423,76 @@ export type BuildNhm2ObserverAuditArtifactInput = {
         note?: string | null;
       }> | null;
       note?: string | null;
+    } | null;
+    modelTermExtensionFamilyEvidence?: {
+      status?: "available" | "unavailable" | null;
+      selectionBasis?: string | null;
+      selectedFamilyId?: string | null;
+      selectedFamilyReason?: string | null;
+      families?: Array<{
+        familyId?: string | null;
+        label?: string | null;
+        candidateCount?: number | null;
+        passingCandidateCount?: number | null;
+        bestCandidateId?: string | null;
+        bestPrimaryMargin?: number | null;
+        bestMetricDecLift?: number | null;
+        bestTileDecLift?: number | null;
+        crossesZeroBothDecMargins?: boolean | null;
+        recommendation?:
+          | "prioritize_for_model_term_extension"
+          | "secondary"
+          | "insufficient_evidence"
+          | null;
+        reasonCodes?: Nhm2ObserverDecPhysicsSelectionReasonCode[] | null;
+        note?: string | null;
+      }> | null;
+      comparabilityGate?: {
+        pass?: boolean | null;
+        independentCrossCheckStatus?:
+          | Nhm2ObserverModelTermSemanticCheckStatus
+          | null;
+        note?: string | null;
+      } | null;
+      citationRefs?: string[] | null;
+      notes?: string[] | null;
+    } | null;
+    fluxShearExtensionEvidence?: {
+      status?: "available" | "unavailable" | null;
+      routeId?: string | null;
+      selectedPath?: Nhm2ObserverModelTermClosurePath | null;
+      selectedFamilyId?: string | null;
+      selectionBasis?: string | null;
+      parameterEnvelope?: {
+        pressureScaleMin?: number | null;
+        pressureScaleMax?: number | null;
+        densityLiftMin?: number | null;
+        densityLiftMax?: number | null;
+        fluxScaleMin?: number | null;
+        fluxScaleMax?: number | null;
+        shearScaleMin?: number | null;
+        shearScaleMax?: number | null;
+      } | null;
+      bestCandidateId?: string | null;
+      bestPrimaryMargin?: number | null;
+      bestMetricDecLift?: number | null;
+      bestTileDecLift?: number | null;
+      crossZeroAchieved?: boolean | null;
+      boundedEnvelopeExhausted?: boolean | null;
+      nonRegressionPass?: boolean | null;
+      comparabilityGate?: {
+        pass?: boolean | null;
+        independentCrossCheckStatus?:
+          | Nhm2ObserverModelTermSemanticCheckStatus
+          | null;
+        referenceRouteId?: string | null;
+        comparableSampleCount?: number | null;
+        minimumComparableSampleCount?: number | null;
+        note?: string | null;
+      } | null;
+      recommendation?: Nhm2ObserverDecRecommendedPatchClass | null;
+      citationRefs?: string[] | null;
+      notes?: string[] | null;
     } | null;
     recommendation?: Nhm2ObserverDecRecommendedPatchClass | null;
     uncertaintyTags?: Nhm2ObserverDecPhysicsUncertaintyTag[] | null;
@@ -2330,6 +2825,33 @@ const normalizeDecRecommendedPatchClass = (
     ? (value as Nhm2ObserverDecRecommendedPatchClass)
     : "no_admissible_candidate_yet";
 
+const normalizeDecModelTermExtensionPlanStatus = (
+  value: unknown,
+): Nhm2ObserverDecModelTermExtensionPlanStatus =>
+  NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PLAN_STATUS_VALUES.includes(
+    value as Nhm2ObserverDecModelTermExtensionPlanStatus,
+  )
+    ? (value as Nhm2ObserverDecModelTermExtensionPlanStatus)
+    : "not_required";
+
+const normalizeDecModelTermExtensionTrigger = (
+  value: unknown,
+): Nhm2ObserverDecModelTermExtensionTrigger =>
+  NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_TRIGGER_VALUES.includes(
+    value as Nhm2ObserverDecModelTermExtensionTrigger,
+  )
+    ? (value as Nhm2ObserverDecModelTermExtensionTrigger)
+    : "unknown";
+
+const normalizeDecModelTermExtensionPreferredRoute = (
+  value: unknown,
+): Nhm2ObserverDecModelTermExtensionPreferredRoute =>
+  NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PREFERRED_ROUTE_VALUES.includes(
+    value as Nhm2ObserverDecModelTermExtensionPreferredRoute,
+  )
+    ? (value as Nhm2ObserverDecModelTermExtensionPreferredRoute)
+    : "unknown";
+
 const normalizeDecPhysicsSelectionDecision = (
   value: unknown,
 ): Nhm2ObserverDecPhysicsSelectionDecision =>
@@ -2402,6 +2924,15 @@ const normalizeDecResidualAttributionStatus = (
     ? (value as Nhm2ObserverDecResidualAttributionStatus)
     : "unavailable";
 
+const normalizeDecFrontierImprovementStatus = (
+  value: unknown,
+): Nhm2ObserverDecFrontierImprovementStatus =>
+  NHM2_OBSERVER_DEC_FRONTIER_IMPROVEMENT_STATUS_VALUES.includes(
+    value as Nhm2ObserverDecFrontierImprovementStatus,
+  )
+    ? (value as Nhm2ObserverDecFrontierImprovementStatus)
+    : "unavailable";
+
 const normalizeDecResidualPrimarySurface = (
   value: unknown,
   fallback: Nhm2ObserverDecResidualPrimarySurface = "unknown",
@@ -2430,6 +2961,15 @@ const normalizeDecPhysicsRuntimeFailureMode = (
   )
     ? (value as Nhm2ObserverDecPhysicsRuntimeFailureMode)
     : fallback;
+
+const normalizeDecExtensionTrancheId = (
+  value: unknown,
+): Nhm2ObserverDecExtensionTrancheId | null =>
+  NHM2_OBSERVER_DEC_EXTENSION_TRANCHE_ID_VALUES.includes(
+    value as Nhm2ObserverDecExtensionTrancheId,
+  )
+    ? (value as Nhm2ObserverDecExtensionTrancheId)
+    : null;
 
 const normalizeDecPhysicsCrossZeroMethod = (
   value: unknown,
@@ -2486,6 +3026,15 @@ const normalizeResearchClaimConfidenceLabel = (
   )
     ? (value as Nhm2ObserverResearchClaimConfidenceLabel)
     : "review";
+
+const normalizeDecResearchSupportLevel = (
+  value: unknown,
+): Nhm2ObserverDecResearchSupportLevel =>
+  NHM2_OBSERVER_DEC_RESEARCH_SUPPORT_LEVEL_VALUES.includes(
+    value as Nhm2ObserverDecResearchSupportLevel,
+  )
+    ? (value as Nhm2ObserverDecResearchSupportLevel)
+    : "inference";
 
 const normalizeModelTermSemanticReasonCodes = (
   value: unknown,
@@ -2891,6 +3440,70 @@ const normalizeObserverDecRemediationEvidence = (
         .map((entry) => asText(entry))
         .filter((entry): entry is string => entry != null)
     : [];
+  const modelTermExtensionPlanInput =
+    value.modelTermExtensionPlanEvidence != null &&
+    typeof value.modelTermExtensionPlanEvidence === "object"
+      ? (value.modelTermExtensionPlanEvidence as Record<string, unknown>)
+      : null;
+  const extensionPlanCitationRefs = Array.isArray(
+    modelTermExtensionPlanInput?.citationRefs,
+  )
+    ? modelTermExtensionPlanInput.citationRefs
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const extensionPlanNotes = Array.isArray(modelTermExtensionPlanInput?.notes)
+    ? modelTermExtensionPlanInput.notes
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const recommendedPatchClass = normalizeDecRecommendedPatchClass(
+    value.recommendedPatchClass,
+  );
+  const extensionPlanFallbackStatus: Nhm2ObserverDecModelTermExtensionPlanStatus =
+    recommendedPatchClass === "model_term_extension_patch"
+      ? "required"
+      : "not_required";
+  const extensionPlanFallbackTrigger: Nhm2ObserverDecModelTermExtensionTrigger =
+    extensionPlanFallbackStatus === "required" ? "unknown" : "none";
+  const modelTermExtensionPlanEvidence =
+    modelTermExtensionPlanInput == null &&
+    extensionPlanFallbackStatus === "not_required"
+      ? null
+      : {
+          status: normalizeDecModelTermExtensionPlanStatus(
+            modelTermExtensionPlanInput?.status ?? extensionPlanFallbackStatus,
+          ),
+          trigger: normalizeDecModelTermExtensionTrigger(
+            modelTermExtensionPlanInput?.trigger ?? extensionPlanFallbackTrigger,
+          ),
+          chartRef: asText(modelTermExtensionPlanInput?.chartRef) ?? asText(value.chartRef),
+          routeId: asText(modelTermExtensionPlanInput?.routeId) ?? asText(value.routeId),
+          selectedPath:
+            modelTermExtensionPlanInput?.selectedPath != null
+              ? normalizeModelTermClosurePath(modelTermExtensionPlanInput.selectedPath)
+              : value.selectedPath != null
+                ? normalizeModelTermClosurePath(value.selectedPath)
+                : null,
+          dominantViolationClass: normalizeDecDominantViolationClass(
+            modelTermExtensionPlanInput?.dominantViolationClass ??
+              value.dominantViolationClass,
+          ),
+          requiredLiftToZero: toFinite(modelTermExtensionPlanInput?.requiredLiftToZero),
+          bestAchievedLift: toFinite(modelTermExtensionPlanInput?.bestAchievedLift),
+          residualMarginToZero: toFinite(
+            modelTermExtensionPlanInput?.residualMarginToZero,
+          ),
+          gapToZero: toFinite(modelTermExtensionPlanInput?.gapToZero),
+          preferredImplementationRoute: normalizeDecModelTermExtensionPreferredRoute(
+            modelTermExtensionPlanInput?.preferredImplementationRoute,
+          ),
+          nextPatchClass: normalizeDecRecommendedPatchClass(
+            modelTermExtensionPlanInput?.nextPatchClass ?? value.recommendedPatchClass,
+          ),
+          citationRefs: unique(extensionPlanCitationRefs),
+          notes: extensionPlanNotes,
+        };
   return {
     chartRef: asText(value.chartRef),
     routeId: asText(value.routeId),
@@ -2911,9 +3524,8 @@ const normalizeObserverDecRemediationEvidence = (
     dominantViolationClass: normalizeDecDominantViolationClass(
       value.dominantViolationClass,
     ),
-    recommendedPatchClass: normalizeDecRecommendedPatchClass(
-      value.recommendedPatchClass,
-    ),
+    recommendedPatchClass,
+    modelTermExtensionPlanEvidence,
     citationRefs: unique(citationRefs),
     notes,
   };
@@ -2962,6 +3574,12 @@ const normalizeObserverDecPhysicsControlEvidence = (
   const crossZeroGapToZero =
     toFinite(crossZeroFeasibilityInput.gapToZero) ??
     (crossZeroResidualMargin != null ? Math.max(0, -crossZeroResidualMargin) : null);
+  const crossZeroBoundedEnvelopeExhausted =
+    toNullableBoolean(crossZeroFeasibilityInput.boundedEnvelopeExhausted) ??
+    (crossZeroGapToZero != null
+      ? crossZeroGapToZero > 0 &&
+        toNullableBoolean(crossZeroFeasibilityInput.crossZeroAchieved) !== true
+      : null);
   const nonRegressionGateInput = (value.nonRegressionGate ??
     {}) as Record<string, unknown>;
   const runtimeApplicationInput = (value.runtimeApplication ??
@@ -2981,12 +3599,258 @@ const normalizeObserverDecPhysicsControlEvidence = (
     {}) as Record<string, unknown>;
   const runtimeComparabilityGateInput = (runtimeApplicationInput.comparabilityGate ??
     {}) as Record<string, unknown>;
+  const decRuntimeDecisionInput = (value.decRuntimeDecisionEvidence ??
+    {}) as Record<string, unknown>;
+  const decRuntimeDecisionCitationRefs = Array.isArray(
+    decRuntimeDecisionInput.citationRefs,
+  )
+    ? decRuntimeDecisionInput.citationRefs
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const decRuntimeDecisionReasonCodes = normalizeDecPhysicsSelectionReasonCodes(
+    decRuntimeDecisionInput.reasonCodes,
+  );
+  const decRuntimeDecisionAttributionInput = (decRuntimeDecisionInput.decAttribution ??
+    {}) as Record<string, unknown>;
+  const decRuntimeDecisionAttributionEvidence =
+    decRuntimeDecisionInput.decAttribution == null
+      ? undefined
+      : {
+          selectedMetricDecRobustMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.selectedMetricDecRobustMarginToZero,
+          ),
+          selectedTileReconstitutedDecRobustMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.selectedTileReconstitutedDecRobustMarginToZero,
+          ),
+          selectedMetricDecConservativeMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.selectedMetricDecConservativeMarginToZero,
+          ),
+          selectedTileReconstitutedDecConservativeMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.selectedTileReconstitutedDecConservativeMarginToZero,
+          ),
+          referenceMetricDecRobustMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.referenceMetricDecRobustMarginToZero,
+          ),
+          referenceTileReconstitutedDecRobustMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.referenceTileReconstitutedDecRobustMarginToZero,
+          ),
+          referenceMetricDecConservativeMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.referenceMetricDecConservativeMarginToZero,
+          ),
+          referenceTileReconstitutedDecConservativeMarginToZero: toFinite(
+            decRuntimeDecisionAttributionInput.referenceTileReconstitutedDecConservativeMarginToZero,
+          ),
+          independentCrossCheckRelativeResidual: toFinite(
+            decRuntimeDecisionAttributionInput.independentCrossCheckRelativeResidual,
+          ),
+          uncertaintyRelativeBound: toFinite(
+            decRuntimeDecisionAttributionInput.uncertaintyRelativeBound,
+          ),
+          independentCrossCheckSignAgreement: toNullableBoolean(
+            decRuntimeDecisionAttributionInput.independentCrossCheckSignAgreement,
+          ),
+          selectedCrossesZeroUnderUncertainty: toNullableBoolean(
+            decRuntimeDecisionAttributionInput.selectedCrossesZeroUnderUncertainty,
+          ),
+          referenceCrossesZeroBothDecMargins: toNullableBoolean(
+            decRuntimeDecisionAttributionInput.referenceCrossesZeroBothDecMargins,
+          ),
+          uncertaintyBoundPass: toNullableBoolean(
+            decRuntimeDecisionAttributionInput.uncertaintyBoundPass,
+          ),
+        };
+  const decRuntimeDecisionEvidence =
+    value.decRuntimeDecisionEvidence == null
+      ? undefined
+      : {
+          status: normalizeDecPhysicsRuntimeApplicationStatus(
+            decRuntimeDecisionInput.status,
+          ),
+          attempted: toNullableBoolean(decRuntimeDecisionInput.attempted) ?? false,
+          enabled: toNullableBoolean(decRuntimeDecisionInput.enabled) ?? false,
+          gatePass: toNullableBoolean(decRuntimeDecisionInput.gatePass) ?? false,
+          comparabilityPass:
+            toNullableBoolean(decRuntimeDecisionInput.comparabilityPass) ?? false,
+          sampleCountSufficient:
+            toNullableBoolean(decRuntimeDecisionInput.sampleCountSufficient) ??
+            null,
+          selectedCandidateId: asText(decRuntimeDecisionInput.selectedCandidateId),
+          reasonCodes: decRuntimeDecisionReasonCodes,
+          primaryReasonCode:
+            normalizeDecPhysicsSelectionReasonCodes([
+              decRuntimeDecisionInput.primaryReasonCode,
+            ])[0] ??
+            decRuntimeDecisionReasonCodes[0] ??
+            null,
+          decAttribution: decRuntimeDecisionAttributionEvidence,
+          note: asText(decRuntimeDecisionInput.note),
+          citationRefs: unique(decRuntimeDecisionCitationRefs),
+        };
+  const extensionTrancheId = normalizeDecExtensionTrancheId(
+    value.extensionTrancheId,
+  );
+  const familySearchOrder = Array.isArray(value.familySearchOrder)
+    ? unique(
+        value.familySearchOrder
+          .map((entry) => asText(entry))
+          .filter((entry): entry is string => entry != null),
+      )
+    : [];
+  const appliedCandidateEvidenceInput = (value.appliedCandidateEvidence ??
+    {}) as Record<string, unknown>;
+  const appliedCandidateEvidenceCitationRefs = Array.isArray(
+    appliedCandidateEvidenceInput.citationRefs,
+  )
+    ? unique(
+        appliedCandidateEvidenceInput.citationRefs
+          .map((entry) => asText(entry))
+          .filter((entry): entry is string => entry != null),
+      )
+    : [];
+  const appliedCandidateEvidence =
+    value.appliedCandidateEvidence == null
+      ? undefined
+      : {
+          status:
+            appliedCandidateEvidenceInput.status === "available" ||
+            appliedCandidateEvidenceInput.status === "unavailable"
+              ? appliedCandidateEvidenceInput.status
+              : "unavailable",
+          candidateId: asText(appliedCandidateEvidenceInput.candidateId),
+          extensionTrancheId: normalizeDecExtensionTrancheId(
+            appliedCandidateEvidenceInput.extensionTrancheId,
+          ),
+          familyId: asText(appliedCandidateEvidenceInput.familyId),
+          metricDecRobustMarginToZero: toFinite(
+            appliedCandidateEvidenceInput.metricDecRobustMarginToZero,
+          ),
+          tileReconstitutedDecRobustMarginToZero: toFinite(
+            appliedCandidateEvidenceInput.tileReconstitutedDecRobustMarginToZero,
+          ),
+          metricWecNonRegressionMargin: toFinite(
+            appliedCandidateEvidenceInput.metricWecNonRegressionMargin,
+          ),
+          metricNecNonRegressionMargin: toFinite(
+            appliedCandidateEvidenceInput.metricNecNonRegressionMargin,
+          ),
+          nonRegressionPass: toNullableBoolean(
+            appliedCandidateEvidenceInput.nonRegressionPass,
+          ),
+          comparabilityPass: toNullableBoolean(
+            appliedCandidateEvidenceInput.comparabilityPass,
+          ),
+          note: asText(appliedCandidateEvidenceInput.note),
+          citationRefs: appliedCandidateEvidenceCitationRefs,
+        };
+  const rollbackLocalizationEvidenceInput = (value.rollbackLocalizationEvidence ??
+    {}) as Record<string, unknown>;
+  const rollbackLocalizationEvidenceCitationRefs = Array.isArray(
+    rollbackLocalizationEvidenceInput.citationRefs,
+  )
+    ? unique(
+        rollbackLocalizationEvidenceInput.citationRefs
+          .map((entry) => asText(entry))
+          .filter((entry): entry is string => entry != null),
+      )
+    : [];
+  const rollbackLocalizationReasonCodes = normalizeDecPhysicsSelectionReasonCodes(
+    rollbackLocalizationEvidenceInput.reasonCodes,
+  );
+  const rollbackLocalizationEvidence =
+    value.rollbackLocalizationEvidence == null
+      ? undefined
+      : {
+          status:
+            rollbackLocalizationEvidenceInput.status === "available" ||
+            rollbackLocalizationEvidenceInput.status === "unavailable"
+              ? rollbackLocalizationEvidenceInput.status
+              : "unavailable",
+          candidateId: asText(rollbackLocalizationEvidenceInput.candidateId),
+          extensionTrancheId: normalizeDecExtensionTrancheId(
+            rollbackLocalizationEvidenceInput.extensionTrancheId,
+          ),
+          familyId: asText(rollbackLocalizationEvidenceInput.familyId),
+          failureMode: normalizeDecPhysicsRuntimeFailureMode(
+            rollbackLocalizationEvidenceInput.failureMode,
+            "unknown",
+          ),
+          primaryReasonCode:
+            normalizeDecPhysicsSelectionReasonCodes([
+              rollbackLocalizationEvidenceInput.primaryReasonCode,
+            ])[0] ??
+            rollbackLocalizationReasonCodes[0] ??
+            null,
+          reasonCodes: rollbackLocalizationReasonCodes,
+          metricDecRobustMarginToZero: toFinite(
+            rollbackLocalizationEvidenceInput.metricDecRobustMarginToZero,
+          ),
+          tileReconstitutedDecRobustMarginToZero: toFinite(
+            rollbackLocalizationEvidenceInput.tileReconstitutedDecRobustMarginToZero,
+          ),
+          metricWecNonRegressionMargin: toFinite(
+            rollbackLocalizationEvidenceInput.metricWecNonRegressionMargin,
+          ),
+          metricNecNonRegressionMargin: toFinite(
+            rollbackLocalizationEvidenceInput.metricNecNonRegressionMargin,
+          ),
+          comparabilityPass: toNullableBoolean(
+            rollbackLocalizationEvidenceInput.comparabilityPass,
+          ),
+          sampleCountSufficient: toNullableBoolean(
+            rollbackLocalizationEvidenceInput.sampleCountSufficient,
+          ),
+          note: asText(rollbackLocalizationEvidenceInput.note),
+          citationRefs: rollbackLocalizationEvidenceCitationRefs,
+        };
   const controlKnobsInput = Array.isArray(value.controlKnobs)
     ? value.controlKnobs
     : [];
   const claimCitationMapInput = Array.isArray(value.claimCitationMap)
     ? value.claimCitationMap
     : [];
+  const researchSupportMapInput =
+    value.researchSupportMap != null &&
+    typeof value.researchSupportMap === "object" &&
+    !Array.isArray(value.researchSupportMap)
+      ? (value.researchSupportMap as Record<string, unknown>)
+      : {};
+  const researchSupportMap =
+    value.researchSupportMap == null
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(researchSupportMapInput)
+            .filter(
+              ([, entry]): entry is Record<string, unknown> =>
+                entry != null && typeof entry === "object" && !Array.isArray(entry),
+            )
+            .map(([claimKey, entry]) => {
+              const citationRefs = Array.isArray(entry.citationRefs)
+                ? unique(
+                    entry.citationRefs
+                      .map((citation) => asText(citation))
+                      .filter((citation): citation is string => citation != null),
+                  )
+                : [];
+              const evidenceRefs = Array.isArray(entry.evidenceRefs)
+                ? unique(
+                    entry.evidenceRefs
+                      .map((ref) => asText(ref))
+                      .filter((ref): ref is string => ref != null),
+                  )
+                : [];
+              return [
+                claimKey,
+                {
+                  claimId: asText(entry.claimId) ?? claimKey,
+                  supportLevel: normalizeDecResearchSupportLevel(entry.supportLevel),
+                  citationRefs,
+                  evidenceRefs,
+                  note: asText(entry.note),
+                } satisfies Nhm2ObserverDecResearchSupportEvidence,
+              ];
+            }),
+        );
   const claimCitationMapCompletenessInput = (value.claimCitationMapCompleteness ??
     {}) as Record<string, unknown>;
   const decCoupledControlEvidenceInput = (value.decCoupledControlEvidence ??
@@ -3005,6 +3869,24 @@ const normalizeObserverDecPhysicsControlEvidence = (
   )
     ? decCoupledControlEvidenceInput.researchClaims
     : [];
+  const modelTermExtensionFamilyEvidenceInput = (value.modelTermExtensionFamilyEvidence ??
+    {}) as Record<string, unknown>;
+  const modelTermExtensionFamilyComparabilityGateInput =
+    (modelTermExtensionFamilyEvidenceInput.comparabilityGate ??
+      {}) as Record<string, unknown>;
+  const modelTermExtensionFamilyFamiliesInput = Array.isArray(
+    modelTermExtensionFamilyEvidenceInput.families,
+  )
+    ? modelTermExtensionFamilyEvidenceInput.families
+    : [];
+  const fluxShearExtensionEvidenceInput = (value.fluxShearExtensionEvidence ??
+    {}) as Record<string, unknown>;
+  const fluxShearExtensionParameterEnvelopeInput =
+    (fluxShearExtensionEvidenceInput.parameterEnvelope ??
+      {}) as Record<string, unknown>;
+  const fluxShearExtensionComparabilityGateInput =
+    (fluxShearExtensionEvidenceInput.comparabilityGate ??
+      {}) as Record<string, unknown>;
   const citationRefs = Array.isArray(value.citationRefs)
     ? value.citationRefs
         .map((entry) => asText(entry))
@@ -3128,6 +4010,224 @@ const normalizeObserverDecPhysicsControlEvidence = (
           },
           citationRefs: unique(decResidualAttributionCitationRefs),
           notes: decResidualAttributionNotes,
+        };
+  const decFrontierImprovementInput = (value.decFrontierImprovementEvidence ??
+    {}) as Record<string, unknown>;
+  const decFrontierImprovementCitationRefs = Array.isArray(
+    decFrontierImprovementInput.citationRefs,
+  )
+    ? decFrontierImprovementInput.citationRefs
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const decFrontierImprovementNotes = Array.isArray(
+    decFrontierImprovementInput.notes,
+  )
+    ? decFrontierImprovementInput.notes
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const decFrontierImprovementEvidence =
+    value.decFrontierImprovementEvidence == null
+      ? undefined
+      : {
+          status: normalizeDecFrontierImprovementStatus(
+            decFrontierImprovementInput.status,
+          ),
+          frontierSeedCandidateId: asText(
+            decFrontierImprovementInput.frontierSeedCandidateId,
+          ),
+          frontierSelectedCandidateId: asText(
+            decFrontierImprovementInput.frontierSelectedCandidateId,
+          ),
+          frontierCandidateCount: toFinite(
+            decFrontierImprovementInput.frontierCandidateCount,
+          ),
+          frontierPassingCount: toFinite(
+            decFrontierImprovementInput.frontierPassingCount,
+          ),
+          baselinePrimaryMargin: toFinite(
+            decFrontierImprovementInput.baselinePrimaryMargin,
+          ),
+          preFrontierBestPrimaryMargin: toFinite(
+            decFrontierImprovementInput.preFrontierBestPrimaryMargin,
+          ),
+          finalBestPrimaryMargin: toFinite(
+            decFrontierImprovementInput.finalBestPrimaryMargin,
+          ),
+          frontierBestDeltaFromPreFrontier: toFinite(
+            decFrontierImprovementInput.frontierBestDeltaFromPreFrontier,
+          ),
+          frontierBestDeltaFromBaseline: toFinite(
+            decFrontierImprovementInput.frontierBestDeltaFromBaseline,
+          ),
+          frontierBestDeltaPercentFromBaseline: toFinite(
+            decFrontierImprovementInput.frontierBestDeltaPercentFromBaseline,
+          ),
+          residualGapToZero: toFinite(decFrontierImprovementInput.residualGapToZero),
+          selectionPlateauStatus: normalizeDecPhysicsSelectionPlateauStatus(
+            decFrontierImprovementInput.selectionPlateauStatus,
+            "no_passing_candidate",
+          ),
+          citationRefs: unique(decFrontierImprovementCitationRefs),
+          notes: decFrontierImprovementNotes,
+        };
+  const modelTermExtensionFamilyEvidence =
+    value.modelTermExtensionFamilyEvidence == null
+      ? undefined
+      : {
+          status:
+            modelTermExtensionFamilyEvidenceInput.status === "available" ||
+            modelTermExtensionFamilyEvidenceInput.status === "unavailable"
+              ? modelTermExtensionFamilyEvidenceInput.status
+              : "unavailable",
+          selectionBasis: asText(modelTermExtensionFamilyEvidenceInput.selectionBasis),
+          selectedFamilyId: asText(modelTermExtensionFamilyEvidenceInput.selectedFamilyId),
+          selectedFamilyReason: asText(
+            modelTermExtensionFamilyEvidenceInput.selectedFamilyReason,
+          ),
+          families: modelTermExtensionFamilyFamiliesInput
+            .filter(
+              (entry): entry is Record<string, unknown> =>
+                entry != null && typeof entry === "object",
+            )
+            .map((entry) => ({
+              familyId: asText(entry.familyId) ?? "unknown_family",
+              label: asText(entry.label) ?? "unknown",
+              candidateCount: Math.max(
+                0,
+                Math.trunc(toFinite(entry.candidateCount) ?? 0),
+              ),
+              passingCandidateCount: Math.max(
+                0,
+                Math.trunc(toFinite(entry.passingCandidateCount) ?? 0),
+              ),
+              bestCandidateId: asText(entry.bestCandidateId),
+              bestPrimaryMargin: toFinite(entry.bestPrimaryMargin),
+              bestMetricDecLift: toFinite(entry.bestMetricDecLift),
+              bestTileDecLift: toFinite(entry.bestTileDecLift),
+              crossesZeroBothDecMargins:
+                toNullableBoolean(entry.crossesZeroBothDecMargins) ?? null,
+              recommendation:
+                entry.recommendation === "prioritize_for_model_term_extension" ||
+                entry.recommendation === "secondary" ||
+                entry.recommendation === "insufficient_evidence"
+                  ? entry.recommendation
+                  : "insufficient_evidence",
+              reasonCodes: normalizeDecPhysicsSelectionReasonCodes(
+                entry.reasonCodes,
+              ),
+              note: asText(entry.note),
+            })),
+          comparabilityGate: {
+            pass:
+              toNullableBoolean(modelTermExtensionFamilyComparabilityGateInput.pass) ??
+              false,
+            independentCrossCheckStatus: normalizeModelTermSemanticCheckStatus(
+              modelTermExtensionFamilyComparabilityGateInput.independentCrossCheckStatus,
+            ),
+            note: asText(modelTermExtensionFamilyComparabilityGateInput.note),
+          },
+          citationRefs: Array.isArray(modelTermExtensionFamilyEvidenceInput.citationRefs)
+            ? unique(
+                modelTermExtensionFamilyEvidenceInput.citationRefs
+                  .map((entry) => asText(entry))
+                  .filter((entry): entry is string => entry != null),
+              )
+            : [],
+          notes: Array.isArray(modelTermExtensionFamilyEvidenceInput.notes)
+            ? modelTermExtensionFamilyEvidenceInput.notes
+                .map((entry) => asText(entry))
+                .filter((entry): entry is string => entry != null)
+            : [],
+        };
+  const fluxShearExtensionEvidence =
+    value.fluxShearExtensionEvidence == null
+      ? undefined
+      : {
+          status:
+            fluxShearExtensionEvidenceInput.status === "available" ||
+            fluxShearExtensionEvidenceInput.status === "unavailable"
+              ? fluxShearExtensionEvidenceInput.status
+              : "unavailable",
+          routeId: asText(fluxShearExtensionEvidenceInput.routeId),
+          selectedPath:
+            fluxShearExtensionEvidenceInput.selectedPath == null
+              ? null
+              : normalizeModelTermClosurePath(
+                  fluxShearExtensionEvidenceInput.selectedPath,
+                ),
+          selectedFamilyId: asText(fluxShearExtensionEvidenceInput.selectedFamilyId),
+          selectionBasis: asText(fluxShearExtensionEvidenceInput.selectionBasis),
+          parameterEnvelope: {
+            pressureScaleMin: toFinite(
+              fluxShearExtensionParameterEnvelopeInput.pressureScaleMin,
+            ),
+            pressureScaleMax: toFinite(
+              fluxShearExtensionParameterEnvelopeInput.pressureScaleMax,
+            ),
+            densityLiftMin: toFinite(
+              fluxShearExtensionParameterEnvelopeInput.densityLiftMin,
+            ),
+            densityLiftMax: toFinite(
+              fluxShearExtensionParameterEnvelopeInput.densityLiftMax,
+            ),
+            fluxScaleMin: toFinite(fluxShearExtensionParameterEnvelopeInput.fluxScaleMin),
+            fluxScaleMax: toFinite(fluxShearExtensionParameterEnvelopeInput.fluxScaleMax),
+            shearScaleMin: toFinite(
+              fluxShearExtensionParameterEnvelopeInput.shearScaleMin,
+            ),
+            shearScaleMax: toFinite(
+              fluxShearExtensionParameterEnvelopeInput.shearScaleMax,
+            ),
+          },
+          bestCandidateId: asText(fluxShearExtensionEvidenceInput.bestCandidateId),
+          bestPrimaryMargin: toFinite(fluxShearExtensionEvidenceInput.bestPrimaryMargin),
+          bestMetricDecLift: toFinite(fluxShearExtensionEvidenceInput.bestMetricDecLift),
+          bestTileDecLift: toFinite(fluxShearExtensionEvidenceInput.bestTileDecLift),
+          crossZeroAchieved:
+            toNullableBoolean(fluxShearExtensionEvidenceInput.crossZeroAchieved) ??
+            null,
+          boundedEnvelopeExhausted:
+            toNullableBoolean(
+              fluxShearExtensionEvidenceInput.boundedEnvelopeExhausted,
+            ) ?? null,
+          nonRegressionPass:
+            toNullableBoolean(fluxShearExtensionEvidenceInput.nonRegressionPass) ??
+            null,
+          comparabilityGate: {
+            pass:
+              toNullableBoolean(fluxShearExtensionComparabilityGateInput.pass) ??
+              false,
+            independentCrossCheckStatus: normalizeModelTermSemanticCheckStatus(
+              fluxShearExtensionComparabilityGateInput.independentCrossCheckStatus,
+            ),
+            referenceRouteId: asText(
+              fluxShearExtensionComparabilityGateInput.referenceRouteId,
+            ),
+            comparableSampleCount: toFinite(
+              fluxShearExtensionComparabilityGateInput.comparableSampleCount,
+            ),
+            minimumComparableSampleCount: toFinite(
+              fluxShearExtensionComparabilityGateInput.minimumComparableSampleCount,
+            ),
+            note: asText(fluxShearExtensionComparabilityGateInput.note),
+          },
+          recommendation: normalizeDecRecommendedPatchClass(
+            fluxShearExtensionEvidenceInput.recommendation,
+          ),
+          citationRefs: Array.isArray(fluxShearExtensionEvidenceInput.citationRefs)
+            ? unique(
+                fluxShearExtensionEvidenceInput.citationRefs
+                  .map((entry) => asText(entry))
+                  .filter((entry): entry is string => entry != null),
+              )
+            : [],
+          notes: Array.isArray(fluxShearExtensionEvidenceInput.notes)
+            ? fluxShearExtensionEvidenceInput.notes
+                .map((entry) => asText(entry))
+                .filter((entry): entry is string => entry != null)
+            : [],
         };
   const zeroCrossDecisionFallback: Nhm2ObserverDecPhysicsZeroCrossFeasibilityDecision =
     toNullableBoolean(crossZeroFeasibilityInput.crossZeroAchieved) === true
@@ -3328,6 +4428,9 @@ const normalizeObserverDecPhysicsControlEvidence = (
               .filter((entry): entry is string => entry != null),
           )
         : [],
+      frontierCandidateCount: toFinite(sweepPhaseSummaryInput.frontierCandidateCount),
+      frontierPassingCount: toFinite(sweepPhaseSummaryInput.frontierPassingCount),
+      frontierSeedCandidateId: asText(sweepPhaseSummaryInput.frontierSeedCandidateId),
       note: asText(sweepPhaseSummaryInput.note),
     },
     topCandidateLeaderboard: topCandidateLeaderboardInput
@@ -3376,6 +4479,7 @@ const normalizeObserverDecPhysicsControlEvidence = (
       gapToZero: crossZeroGapToZero,
       crossZeroAchieved:
         toNullableBoolean(crossZeroFeasibilityInput.crossZeroAchieved) ?? null,
+      boundedEnvelopeExhausted: crossZeroBoundedEnvelopeExhausted,
       boundedControlEnvelope: {
         pressureScaleMin: toFinite(crossZeroBoundedEnvelopeInput.pressureScaleMin),
         pressureScaleMax: toFinite(crossZeroBoundedEnvelopeInput.pressureScaleMax),
@@ -3411,6 +4515,7 @@ const normalizeObserverDecPhysicsControlEvidence = (
       notes: crossZeroNotes,
     },
     decResidualAttributionEvidence,
+    decFrontierImprovementEvidence,
     zeroCrossFeasibilityDecision: normalizeDecPhysicsZeroCrossFeasibilityDecision(
       value.zeroCrossFeasibilityDecision,
       zeroCrossDecisionFallback,
@@ -3442,8 +4547,23 @@ const normalizeObserverDecPhysicsControlEvidence = (
       refineShearScaleStep: toFinite(
         boundedSearchEnvelopeInput.refineShearScaleStep,
       ),
+      frontierPressureStep: toFinite(
+        boundedSearchEnvelopeInput.frontierPressureStep,
+      ),
+      frontierDensityLiftStep: toFinite(
+        boundedSearchEnvelopeInput.frontierDensityLiftStep,
+      ),
+      frontierFluxScaleStep: toFinite(
+        boundedSearchEnvelopeInput.frontierFluxScaleStep,
+      ),
+      frontierShearScaleStep: toFinite(
+        boundedSearchEnvelopeInput.frontierShearScaleStep,
+      ),
       coarseCandidateCount: toFinite(boundedSearchEnvelopeInput.coarseCandidateCount),
       refineCandidateCount: toFinite(boundedSearchEnvelopeInput.refineCandidateCount),
+      frontierCandidateCount: toFinite(
+        boundedSearchEnvelopeInput.frontierCandidateCount,
+      ),
       refineSeedCount: toFinite(boundedSearchEnvelopeInput.refineSeedCount),
       observerDomainFixed:
         toNullableBoolean(boundedSearchEnvelopeInput.observerDomainFixed) ?? true,
@@ -3521,6 +4641,19 @@ const normalizeObserverDecPhysicsControlEvidence = (
           toNullableBoolean(
             runtimeGuardChecksInput.tileReconstitutedDecRobustLiftNonNegative,
           ) ?? null,
+        crossesZeroBothDecMargins:
+          toNullableBoolean(runtimeGuardChecksInput.crossesZeroBothDecMargins) ??
+          null,
+        independentCrossCheckSignAgreement:
+          toNullableBoolean(
+            runtimeGuardChecksInput.independentCrossCheckSignAgreement,
+          ) ?? null,
+        uncertaintyBoundPass:
+          toNullableBoolean(runtimeGuardChecksInput.uncertaintyBoundPass) ?? null,
+        referenceCrossesZeroBothDecMargins:
+          toNullableBoolean(
+            runtimeGuardChecksInput.referenceCrossesZeroBothDecMargins,
+          ) ?? null,
       },
       observed: {
         metricDecRobustLift: toFinite(runtimeObservedInput.metricDecRobustLift),
@@ -3541,6 +4674,40 @@ const normalizeObserverDecPhysicsControlEvidence = (
         metricNecNonRegressionMargin: toFinite(
           runtimeObservedInput.metricNecNonRegressionMargin,
         ),
+        independentCrossCheckRelativeResidual: toFinite(
+          runtimeObservedInput.independentCrossCheckRelativeResidual,
+        ),
+        uncertaintyRelativeBound: toFinite(
+          runtimeObservedInput.uncertaintyRelativeBound,
+        ),
+        metricDecUncertaintyAbs: toFinite(runtimeObservedInput.metricDecUncertaintyAbs),
+        tileReconstitutedDecUncertaintyAbs: toFinite(
+          runtimeObservedInput.tileReconstitutedDecUncertaintyAbs,
+        ),
+        metricDecConservativeMarginToZero: toFinite(
+          runtimeObservedInput.metricDecConservativeMarginToZero,
+        ),
+        tileReconstitutedDecConservativeMarginToZero: toFinite(
+          runtimeObservedInput.tileReconstitutedDecConservativeMarginToZero,
+        ),
+        referenceMetricDecRobustMarginToZero: toFinite(
+          runtimeObservedInput.referenceMetricDecRobustMarginToZero,
+        ),
+        referenceTileReconstitutedDecRobustMarginToZero: toFinite(
+          runtimeObservedInput.referenceTileReconstitutedDecRobustMarginToZero,
+        ),
+        referenceMetricDecUncertaintyAbs: toFinite(
+          runtimeObservedInput.referenceMetricDecUncertaintyAbs,
+        ),
+        referenceTileReconstitutedDecUncertaintyAbs: toFinite(
+          runtimeObservedInput.referenceTileReconstitutedDecUncertaintyAbs,
+        ),
+        referenceMetricDecConservativeMarginToZero: toFinite(
+          runtimeObservedInput.referenceMetricDecConservativeMarginToZero,
+        ),
+        referenceTileReconstitutedDecConservativeMarginToZero: toFinite(
+          runtimeObservedInput.referenceTileReconstitutedDecConservativeMarginToZero,
+        ),
       },
       note: asText(runtimeApplicationInput.note),
       citationRefs: Array.isArray(runtimeApplicationInput.citationRefs)
@@ -3551,6 +4718,12 @@ const normalizeObserverDecPhysicsControlEvidence = (
           )
         : [],
     },
+    decRuntimeDecisionEvidence,
+    extensionTrancheId: extensionTrancheId ?? undefined,
+    familySearchOrder:
+      value.familySearchOrder == null ? undefined : familySearchOrder,
+    appliedCandidateEvidence,
+    rollbackLocalizationEvidence,
     controlKnobs: controlKnobsInput
       .filter(
         (entry): entry is Record<string, unknown> =>
@@ -3583,6 +4756,7 @@ const normalizeObserverDecPhysicsControlEvidence = (
           note: asText(entry.note),
         };
       }),
+    researchSupportMap,
     claimCitationMapCompleteness: {
       status:
         claimCitationMapCompletenessInput.status === "pass" ||
@@ -3681,6 +4855,8 @@ const normalizeObserverDecPhysicsControlEvidence = (
         })),
       note: asText(decCoupledControlEvidenceInput.note),
     },
+    modelTermExtensionFamilyEvidence,
+    fluxShearExtensionEvidence,
     recommendation: normalizeDecRecommendedPatchClass(value.recommendation),
     uncertaintyTags,
     citationRefs: unique(citationRefs),
@@ -5489,6 +6665,27 @@ const isDecRecommendedPatchClass = (
     value as Nhm2ObserverDecRecommendedPatchClass,
   );
 
+const isDecModelTermExtensionPlanStatus = (
+  value: unknown,
+): value is Nhm2ObserverDecModelTermExtensionPlanStatus =>
+  NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PLAN_STATUS_VALUES.includes(
+    value as Nhm2ObserverDecModelTermExtensionPlanStatus,
+  );
+
+const isDecModelTermExtensionTrigger = (
+  value: unknown,
+): value is Nhm2ObserverDecModelTermExtensionTrigger =>
+  NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_TRIGGER_VALUES.includes(
+    value as Nhm2ObserverDecModelTermExtensionTrigger,
+  );
+
+const isDecModelTermExtensionPreferredRoute = (
+  value: unknown,
+): value is Nhm2ObserverDecModelTermExtensionPreferredRoute =>
+  NHM2_OBSERVER_DEC_MODEL_TERM_EXTENSION_PREFERRED_ROUTE_VALUES.includes(
+    value as Nhm2ObserverDecModelTermExtensionPreferredRoute,
+  );
+
 const isDecPhysicsSelectionDecision = (
   value: unknown,
 ): value is Nhm2ObserverDecPhysicsSelectionDecision =>
@@ -5552,6 +6749,13 @@ const isDecPhysicsRuntimeFailureMode = (
     value as Nhm2ObserverDecPhysicsRuntimeFailureMode,
   );
 
+const isDecExtensionTrancheId = (
+  value: unknown,
+): value is Nhm2ObserverDecExtensionTrancheId =>
+  NHM2_OBSERVER_DEC_EXTENSION_TRANCHE_ID_VALUES.includes(
+    value as Nhm2ObserverDecExtensionTrancheId,
+  );
+
 const isDecPhysicsCrossZeroMethod = (
   value: unknown,
 ): value is Nhm2ObserverDecPhysicsCrossZeroMethod =>
@@ -5587,11 +6791,29 @@ const isResearchClaimConfidenceLabel = (
     value as Nhm2ObserverResearchClaimConfidenceLabel,
   );
 
+const isDecResearchSupportLevel = (
+  value: unknown,
+): value is Nhm2ObserverDecResearchSupportLevel =>
+  NHM2_OBSERVER_DEC_RESEARCH_SUPPORT_LEVEL_VALUES.includes(
+    value as Nhm2ObserverDecResearchSupportLevel,
+  );
+
+const isDecFrontierImprovementStatus = (
+  value: unknown,
+): value is Nhm2ObserverDecFrontierImprovementStatus =>
+  NHM2_OBSERVER_DEC_FRONTIER_IMPROVEMENT_STATUS_VALUES.includes(
+    value as Nhm2ObserverDecFrontierImprovementStatus,
+  );
+
 const isObserverDecRemediationEvidence = (
   value: unknown,
 ): value is Nhm2ObserverDecRemediationEvidence => {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
+  const extensionPlan = record.modelTermExtensionPlanEvidence as
+    | Record<string, unknown>
+    | null
+    | undefined;
   return (
     (record.chartRef === null || typeof record.chartRef === "string") &&
     (record.routeId === null || typeof record.routeId === "string") &&
@@ -5612,6 +6834,32 @@ const isObserverDecRemediationEvidence = (
       typeof record.typeIFractionTileReconstituted === "number") &&
     isDecDominantViolationClass(record.dominantViolationClass) &&
     isDecRecommendedPatchClass(record.recommendedPatchClass) &&
+    (extensionPlan === undefined ||
+      extensionPlan === null ||
+      (isDecModelTermExtensionPlanStatus(extensionPlan.status) &&
+        isDecModelTermExtensionTrigger(extensionPlan.trigger) &&
+        (extensionPlan.chartRef === null ||
+          typeof extensionPlan.chartRef === "string") &&
+        (extensionPlan.routeId === null || typeof extensionPlan.routeId === "string") &&
+        (extensionPlan.selectedPath === null ||
+          isModelTermClosurePath(extensionPlan.selectedPath)) &&
+        isDecDominantViolationClass(extensionPlan.dominantViolationClass) &&
+        (extensionPlan.requiredLiftToZero === null ||
+          typeof extensionPlan.requiredLiftToZero === "number") &&
+        (extensionPlan.bestAchievedLift === null ||
+          typeof extensionPlan.bestAchievedLift === "number") &&
+        (extensionPlan.residualMarginToZero === null ||
+          typeof extensionPlan.residualMarginToZero === "number") &&
+        (extensionPlan.gapToZero === null ||
+          typeof extensionPlan.gapToZero === "number") &&
+        isDecModelTermExtensionPreferredRoute(
+          extensionPlan.preferredImplementationRoute,
+        ) &&
+        isDecRecommendedPatchClass(extensionPlan.nextPatchClass) &&
+        Array.isArray(extensionPlan.citationRefs) &&
+        extensionPlan.citationRefs.every((entry) => typeof entry === "string") &&
+        Array.isArray(extensionPlan.notes) &&
+        extensionPlan.notes.every((entry) => typeof entry === "string"))) &&
     Array.isArray(record.citationRefs) &&
     record.citationRefs.every((entry) => typeof entry === "string") &&
     Array.isArray(record.notes) &&
@@ -5647,6 +6895,9 @@ const isObserverDecPhysicsControlEvidence = (
     | undefined;
   const decResidualSelectedCandidate = decResidualAttributionEvidence
     ?.selectedCandidate as Record<string, unknown> | undefined;
+  const decFrontierImprovementEvidence = record.decFrontierImprovementEvidence as
+    | Record<string, unknown>
+    | undefined;
   const boundedSearchEnvelope = record.boundedSearchEnvelope as
     | Record<string, unknown>
     | undefined;
@@ -5654,6 +6905,17 @@ const isObserverDecPhysicsControlEvidence = (
     | Record<string, unknown>
     | undefined;
   const runtimeApplication = record.runtimeApplication as
+    | Record<string, unknown>
+    | undefined;
+  const decRuntimeDecisionEvidence = record.decRuntimeDecisionEvidence as
+    | Record<string, unknown>
+    | undefined;
+  const decRuntimeDecisionAttribution = decRuntimeDecisionEvidence
+    ?.decAttribution as Record<string, unknown> | undefined;
+  const appliedCandidateEvidence = record.appliedCandidateEvidence as
+    | Record<string, unknown>
+    | undefined;
+  const rollbackLocalizationEvidence = record.rollbackLocalizationEvidence as
     | Record<string, unknown>
     | undefined;
   const runtimeComparabilityGate = runtimeApplication?.comparabilityGate as
@@ -5667,6 +6929,10 @@ const isObserverDecPhysicsControlEvidence = (
     | undefined;
   const controlKnobs = record.controlKnobs as unknown[] | undefined;
   const claimCitationMap = record.claimCitationMap as unknown[] | undefined;
+  const researchSupportMap = record.researchSupportMap as
+    | Record<string, unknown>
+    | null
+    | undefined;
   const claimCitationMapCompleteness = record.claimCitationMapCompleteness as
     | Record<string, unknown>
     | undefined;
@@ -5684,6 +6950,27 @@ const isObserverDecPhysicsControlEvidence = (
   const decCoupledResearchClaims = decCoupledControlEvidence?.researchClaims as
     | unknown[]
     | undefined;
+  const modelTermExtensionFamilyEvidence =
+    record.modelTermExtensionFamilyEvidence as
+      | Record<string, unknown>
+      | undefined;
+  const modelTermExtensionFamilyComparabilityGate =
+    modelTermExtensionFamilyEvidence?.comparabilityGate as
+      | Record<string, unknown>
+      | undefined;
+  const modelTermExtensionFamilyFamilies = modelTermExtensionFamilyEvidence
+    ?.families as unknown[] | undefined;
+  const fluxShearExtensionEvidence = record.fluxShearExtensionEvidence as
+    | Record<string, unknown>
+    | undefined;
+  const fluxShearExtensionParameterEnvelope =
+    fluxShearExtensionEvidence?.parameterEnvelope as
+      | Record<string, unknown>
+      | undefined;
+  const fluxShearExtensionComparabilityGate =
+    fluxShearExtensionEvidence?.comparabilityGate as
+      | Record<string, unknown>
+      | undefined;
   const uncertaintyTags = record.uncertaintyTags as unknown[] | undefined;
   const isNumericOrNull = (entry: unknown): boolean =>
     entry === null || typeof entry === "number";
@@ -5797,6 +7084,10 @@ const isObserverDecPhysicsControlEvidence = (
     sweepPhaseSummary.refineSeedCandidateIds.every(
       (entry) => typeof entry === "string",
     ) &&
+    isNumericOrNull(sweepPhaseSummary.frontierCandidateCount) &&
+    isNumericOrNull(sweepPhaseSummary.frontierPassingCount) &&
+    (sweepPhaseSummary.frontierSeedCandidateId === null ||
+      typeof sweepPhaseSummary.frontierSeedCandidateId === "string") &&
     (sweepPhaseSummary.note === null ||
       typeof sweepPhaseSummary.note === "string") &&
     Array.isArray(topCandidateLeaderboard) &&
@@ -5835,6 +7126,8 @@ const isObserverDecPhysicsControlEvidence = (
     isNumericOrNull(crossZeroFeasibilityEvidence.gapToZero) &&
     (crossZeroFeasibilityEvidence.crossZeroAchieved === null ||
       typeof crossZeroFeasibilityEvidence.crossZeroAchieved === "boolean") &&
+    (crossZeroFeasibilityEvidence.boundedEnvelopeExhausted === null ||
+      typeof crossZeroFeasibilityEvidence.boundedEnvelopeExhausted === "boolean") &&
     crossZeroBoundedEnvelope != null &&
     isNumericOrNull(crossZeroBoundedEnvelope.pressureScaleMin) &&
     isNumericOrNull(crossZeroBoundedEnvelope.pressureScaleMax) &&
@@ -5914,6 +7207,42 @@ const isObserverDecPhysicsControlEvidence = (
         decResidualAttributionEvidence.notes.every(
           (entry) => typeof entry === "string",
         ))) &&
+    (decFrontierImprovementEvidence === undefined ||
+      (isDecFrontierImprovementStatus(decFrontierImprovementEvidence.status) &&
+        (decFrontierImprovementEvidence.frontierSeedCandidateId === null ||
+          typeof decFrontierImprovementEvidence.frontierSeedCandidateId ===
+            "string") &&
+        (decFrontierImprovementEvidence.frontierSelectedCandidateId === null ||
+          typeof decFrontierImprovementEvidence.frontierSelectedCandidateId ===
+            "string") &&
+        isNumericOrNull(decFrontierImprovementEvidence.frontierCandidateCount) &&
+        isNumericOrNull(decFrontierImprovementEvidence.frontierPassingCount) &&
+        isNumericOrNull(decFrontierImprovementEvidence.baselinePrimaryMargin) &&
+        isNumericOrNull(
+          decFrontierImprovementEvidence.preFrontierBestPrimaryMargin,
+        ) &&
+        isNumericOrNull(decFrontierImprovementEvidence.finalBestPrimaryMargin) &&
+        isNumericOrNull(
+          decFrontierImprovementEvidence.frontierBestDeltaFromPreFrontier,
+        ) &&
+        isNumericOrNull(
+          decFrontierImprovementEvidence.frontierBestDeltaFromBaseline,
+        ) &&
+        isNumericOrNull(
+          decFrontierImprovementEvidence.frontierBestDeltaPercentFromBaseline,
+        ) &&
+        isNumericOrNull(decFrontierImprovementEvidence.residualGapToZero) &&
+        isDecPhysicsSelectionPlateauStatus(
+          decFrontierImprovementEvidence.selectionPlateauStatus,
+        ) &&
+        Array.isArray(decFrontierImprovementEvidence.citationRefs) &&
+        decFrontierImprovementEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ) &&
+        Array.isArray(decFrontierImprovementEvidence.notes) &&
+        decFrontierImprovementEvidence.notes.every(
+          (entry) => typeof entry === "string",
+        ))) &&
     (record.zeroCrossFeasibilityDecision === undefined ||
       isDecPhysicsZeroCrossFeasibilityDecision(
         record.zeroCrossFeasibilityDecision,
@@ -5941,8 +7270,13 @@ const isObserverDecPhysicsControlEvidence = (
         isNumericOrNull(boundedSearchEnvelope.refineDensityLiftStep) &&
         isNumericOrNull(boundedSearchEnvelope.refineFluxScaleStep) &&
         isNumericOrNull(boundedSearchEnvelope.refineShearScaleStep) &&
+        isNumericOrNull(boundedSearchEnvelope.frontierPressureStep) &&
+        isNumericOrNull(boundedSearchEnvelope.frontierDensityLiftStep) &&
+        isNumericOrNull(boundedSearchEnvelope.frontierFluxScaleStep) &&
+        isNumericOrNull(boundedSearchEnvelope.frontierShearScaleStep) &&
         isNumericOrNull(boundedSearchEnvelope.coarseCandidateCount) &&
         isNumericOrNull(boundedSearchEnvelope.refineCandidateCount) &&
+        isNumericOrNull(boundedSearchEnvelope.frontierCandidateCount) &&
         isNumericOrNull(boundedSearchEnvelope.refineSeedCount) &&
         typeof boundedSearchEnvelope.observerDomainFixed === "boolean")) &&
     Array.isArray(record.selectionReasonCodes) &&
@@ -6005,6 +7339,19 @@ const isObserverDecPhysicsControlEvidence = (
     (runtimeGuardChecks.tileReconstitutedDecRobustLiftNonNegative === null ||
       typeof runtimeGuardChecks.tileReconstitutedDecRobustLiftNonNegative ===
         "boolean") &&
+    (runtimeGuardChecks.crossesZeroBothDecMargins === null ||
+      typeof runtimeGuardChecks.crossesZeroBothDecMargins === "boolean") &&
+    (runtimeGuardChecks.independentCrossCheckSignAgreement === undefined ||
+      runtimeGuardChecks.independentCrossCheckSignAgreement === null ||
+      typeof runtimeGuardChecks.independentCrossCheckSignAgreement ===
+        "boolean") &&
+    (runtimeGuardChecks.uncertaintyBoundPass === undefined ||
+      runtimeGuardChecks.uncertaintyBoundPass === null ||
+      typeof runtimeGuardChecks.uncertaintyBoundPass === "boolean") &&
+    (runtimeGuardChecks.referenceCrossesZeroBothDecMargins === undefined ||
+      runtimeGuardChecks.referenceCrossesZeroBothDecMargins === null ||
+      typeof runtimeGuardChecks.referenceCrossesZeroBothDecMargins ===
+        "boolean") &&
     runtimeObserved != null &&
     isNumericOrNull(runtimeObserved.metricDecRobustLift) &&
     isNumericOrNull(runtimeObserved.tileReconstitutedDecRobustLift) &&
@@ -6014,10 +7361,173 @@ const isObserverDecPhysicsControlEvidence = (
     isNumericOrNull(runtimeObserved.tileReconstitutedDecRobustMarginToZero) &&
     isNumericOrNull(runtimeObserved.metricWecNonRegressionMargin) &&
     isNumericOrNull(runtimeObserved.metricNecNonRegressionMargin) &&
+    (runtimeObserved.independentCrossCheckRelativeResidual === undefined ||
+      isNumericOrNull(runtimeObserved.independentCrossCheckRelativeResidual)) &&
+    (runtimeObserved.uncertaintyRelativeBound === undefined ||
+      isNumericOrNull(runtimeObserved.uncertaintyRelativeBound)) &&
+    (runtimeObserved.metricDecUncertaintyAbs === undefined ||
+      isNumericOrNull(runtimeObserved.metricDecUncertaintyAbs)) &&
+    (runtimeObserved.tileReconstitutedDecUncertaintyAbs === undefined ||
+      isNumericOrNull(runtimeObserved.tileReconstitutedDecUncertaintyAbs)) &&
+    (runtimeObserved.metricDecConservativeMarginToZero === undefined ||
+      isNumericOrNull(runtimeObserved.metricDecConservativeMarginToZero)) &&
+    (runtimeObserved.tileReconstitutedDecConservativeMarginToZero === undefined ||
+      isNumericOrNull(runtimeObserved.tileReconstitutedDecConservativeMarginToZero)) &&
+    (runtimeObserved.referenceMetricDecRobustMarginToZero === undefined ||
+      isNumericOrNull(runtimeObserved.referenceMetricDecRobustMarginToZero)) &&
+    (runtimeObserved.referenceTileReconstitutedDecRobustMarginToZero ===
+      undefined ||
+      isNumericOrNull(runtimeObserved.referenceTileReconstitutedDecRobustMarginToZero)) &&
+    (runtimeObserved.referenceMetricDecUncertaintyAbs === undefined ||
+      isNumericOrNull(runtimeObserved.referenceMetricDecUncertaintyAbs)) &&
+    (runtimeObserved.referenceTileReconstitutedDecUncertaintyAbs === undefined ||
+      isNumericOrNull(runtimeObserved.referenceTileReconstitutedDecUncertaintyAbs)) &&
+    (runtimeObserved.referenceMetricDecConservativeMarginToZero === undefined ||
+      isNumericOrNull(runtimeObserved.referenceMetricDecConservativeMarginToZero)) &&
+    (runtimeObserved.referenceTileReconstitutedDecConservativeMarginToZero ===
+      undefined ||
+      isNumericOrNull(
+        runtimeObserved.referenceTileReconstitutedDecConservativeMarginToZero,
+      )) &&
     (runtimeApplication.note === null ||
       typeof runtimeApplication.note === "string") &&
     Array.isArray(runtimeApplication.citationRefs) &&
     runtimeApplication.citationRefs.every((entry) => typeof entry === "string") &&
+    (decRuntimeDecisionEvidence === undefined ||
+      (isDecPhysicsRuntimeApplicationStatus(decRuntimeDecisionEvidence.status) &&
+        typeof decRuntimeDecisionEvidence.attempted === "boolean" &&
+        typeof decRuntimeDecisionEvidence.enabled === "boolean" &&
+        typeof decRuntimeDecisionEvidence.gatePass === "boolean" &&
+        typeof decRuntimeDecisionEvidence.comparabilityPass === "boolean" &&
+        (decRuntimeDecisionEvidence.sampleCountSufficient === null ||
+          typeof decRuntimeDecisionEvidence.sampleCountSufficient === "boolean") &&
+        (decRuntimeDecisionEvidence.selectedCandidateId === null ||
+          typeof decRuntimeDecisionEvidence.selectedCandidateId === "string") &&
+        Array.isArray(decRuntimeDecisionEvidence.reasonCodes) &&
+        decRuntimeDecisionEvidence.reasonCodes.every((reason) =>
+          isDecPhysicsSelectionReasonCode(reason),
+        ) &&
+        (decRuntimeDecisionEvidence.primaryReasonCode === null ||
+          isDecPhysicsSelectionReasonCode(
+            decRuntimeDecisionEvidence.primaryReasonCode,
+          )) &&
+        (decRuntimeDecisionAttribution === undefined ||
+          (isNumericOrNull(
+            decRuntimeDecisionAttribution.selectedMetricDecRobustMarginToZero,
+          ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.selectedTileReconstitutedDecRobustMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.selectedMetricDecConservativeMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.selectedTileReconstitutedDecConservativeMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.referenceMetricDecRobustMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.referenceTileReconstitutedDecRobustMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.referenceMetricDecConservativeMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.referenceTileReconstitutedDecConservativeMarginToZero,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.independentCrossCheckRelativeResidual,
+            ) &&
+            isNumericOrNull(
+              decRuntimeDecisionAttribution.uncertaintyRelativeBound,
+            ) &&
+            (decRuntimeDecisionAttribution.independentCrossCheckSignAgreement ===
+              null ||
+              typeof decRuntimeDecisionAttribution.independentCrossCheckSignAgreement ===
+                "boolean") &&
+            (decRuntimeDecisionAttribution.selectedCrossesZeroUnderUncertainty ===
+              null ||
+              typeof decRuntimeDecisionAttribution.selectedCrossesZeroUnderUncertainty ===
+                "boolean") &&
+            (decRuntimeDecisionAttribution.referenceCrossesZeroBothDecMargins ===
+              null ||
+              typeof decRuntimeDecisionAttribution.referenceCrossesZeroBothDecMargins ===
+                "boolean") &&
+            (decRuntimeDecisionAttribution.uncertaintyBoundPass === null ||
+              typeof decRuntimeDecisionAttribution.uncertaintyBoundPass ===
+                "boolean"))) &&
+        (decRuntimeDecisionEvidence.note === null ||
+          typeof decRuntimeDecisionEvidence.note === "string") &&
+        Array.isArray(decRuntimeDecisionEvidence.citationRefs) &&
+        decRuntimeDecisionEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ))) &&
+    (record.extensionTrancheId === undefined ||
+      isDecExtensionTrancheId(record.extensionTrancheId)) &&
+    (record.familySearchOrder === undefined ||
+      (Array.isArray(record.familySearchOrder) &&
+        record.familySearchOrder.every((entry) => typeof entry === "string"))) &&
+    (appliedCandidateEvidence === undefined ||
+      ((appliedCandidateEvidence.status === "available" ||
+        appliedCandidateEvidence.status === "unavailable") &&
+        (appliedCandidateEvidence.candidateId === null ||
+          typeof appliedCandidateEvidence.candidateId === "string") &&
+        (appliedCandidateEvidence.extensionTrancheId === null ||
+          isDecExtensionTrancheId(appliedCandidateEvidence.extensionTrancheId)) &&
+        (appliedCandidateEvidence.familyId === null ||
+          typeof appliedCandidateEvidence.familyId === "string") &&
+        isNumericOrNull(appliedCandidateEvidence.metricDecRobustMarginToZero) &&
+        isNumericOrNull(
+          appliedCandidateEvidence.tileReconstitutedDecRobustMarginToZero,
+        ) &&
+        isNumericOrNull(appliedCandidateEvidence.metricWecNonRegressionMargin) &&
+        isNumericOrNull(appliedCandidateEvidence.metricNecNonRegressionMargin) &&
+        (appliedCandidateEvidence.nonRegressionPass === null ||
+          typeof appliedCandidateEvidence.nonRegressionPass === "boolean") &&
+        (appliedCandidateEvidence.comparabilityPass === null ||
+          typeof appliedCandidateEvidence.comparabilityPass === "boolean") &&
+        (appliedCandidateEvidence.note === null ||
+          typeof appliedCandidateEvidence.note === "string") &&
+        Array.isArray(appliedCandidateEvidence.citationRefs) &&
+        appliedCandidateEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ))) &&
+    (rollbackLocalizationEvidence === undefined ||
+      ((rollbackLocalizationEvidence.status === "available" ||
+        rollbackLocalizationEvidence.status === "unavailable") &&
+        (rollbackLocalizationEvidence.candidateId === null ||
+          typeof rollbackLocalizationEvidence.candidateId === "string") &&
+        (rollbackLocalizationEvidence.extensionTrancheId === null ||
+          isDecExtensionTrancheId(rollbackLocalizationEvidence.extensionTrancheId)) &&
+        (rollbackLocalizationEvidence.familyId === null ||
+          typeof rollbackLocalizationEvidence.familyId === "string") &&
+        isDecPhysicsRuntimeFailureMode(rollbackLocalizationEvidence.failureMode) &&
+        (rollbackLocalizationEvidence.primaryReasonCode === null ||
+          isDecPhysicsSelectionReasonCode(
+            rollbackLocalizationEvidence.primaryReasonCode,
+          )) &&
+        Array.isArray(rollbackLocalizationEvidence.reasonCodes) &&
+        rollbackLocalizationEvidence.reasonCodes.every((reason) =>
+          isDecPhysicsSelectionReasonCode(reason),
+        ) &&
+        isNumericOrNull(rollbackLocalizationEvidence.metricDecRobustMarginToZero) &&
+        isNumericOrNull(
+          rollbackLocalizationEvidence.tileReconstitutedDecRobustMarginToZero,
+        ) &&
+        isNumericOrNull(rollbackLocalizationEvidence.metricWecNonRegressionMargin) &&
+        isNumericOrNull(rollbackLocalizationEvidence.metricNecNonRegressionMargin) &&
+        (rollbackLocalizationEvidence.comparabilityPass === null ||
+          typeof rollbackLocalizationEvidence.comparabilityPass === "boolean") &&
+        (rollbackLocalizationEvidence.sampleCountSufficient === null ||
+          typeof rollbackLocalizationEvidence.sampleCountSufficient ===
+            "boolean") &&
+        (rollbackLocalizationEvidence.note === null ||
+          typeof rollbackLocalizationEvidence.note === "string") &&
+        Array.isArray(rollbackLocalizationEvidence.citationRefs) &&
+        rollbackLocalizationEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ))) &&
     Array.isArray(controlKnobs) &&
     controlKnobs.every((entry) => {
       if (!entry || typeof entry !== "object") return false;
@@ -6045,6 +7555,20 @@ const isObserverDecPhysicsControlEvidence = (
             (claimEntry.note === null || typeof claimEntry.note === "string")
           );
         }))) &&
+    (researchSupportMap == null ||
+      Object.entries(researchSupportMap).every(([, entry]) => {
+        if (!entry || typeof entry !== "object") return false;
+        const support = entry as Record<string, unknown>;
+        return (
+          typeof support.claimId === "string" &&
+          isDecResearchSupportLevel(support.supportLevel) &&
+          Array.isArray(support.citationRefs) &&
+          support.citationRefs.every((citation) => typeof citation === "string") &&
+          Array.isArray(support.evidenceRefs) &&
+          support.evidenceRefs.every((ref) => typeof ref === "string") &&
+          (support.note === null || typeof support.note === "string")
+        );
+      })) &&
     (claimCitationMapCompleteness === undefined ||
       ((claimCitationMapCompleteness.status === "pass" ||
         claimCitationMapCompleteness.status === "fail") &&
@@ -6115,6 +7639,113 @@ const isObserverDecPhysicsControlEvidence = (
         (decCoupledControlEvidence.note === null ||
           typeof decCoupledControlEvidence.note === "string")) ||
         decCoupledControlEvidence == null)) &&
+    (modelTermExtensionFamilyEvidence === undefined ||
+      ((modelTermExtensionFamilyEvidence.status === "available" ||
+        modelTermExtensionFamilyEvidence.status === "unavailable") &&
+        (modelTermExtensionFamilyEvidence.selectionBasis === null ||
+          typeof modelTermExtensionFamilyEvidence.selectionBasis === "string") &&
+        (modelTermExtensionFamilyEvidence.selectedFamilyId === null ||
+          typeof modelTermExtensionFamilyEvidence.selectedFamilyId === "string") &&
+        (modelTermExtensionFamilyEvidence.selectedFamilyReason === null ||
+          typeof modelTermExtensionFamilyEvidence.selectedFamilyReason ===
+            "string") &&
+        Array.isArray(modelTermExtensionFamilyFamilies) &&
+        modelTermExtensionFamilyFamilies.every((entry) => {
+          if (!entry || typeof entry !== "object") return false;
+          const family = entry as Record<string, unknown>;
+          return (
+            typeof family.familyId === "string" &&
+            typeof family.label === "string" &&
+            typeof family.candidateCount === "number" &&
+            typeof family.passingCandidateCount === "number" &&
+            (family.bestCandidateId === null ||
+              typeof family.bestCandidateId === "string") &&
+            isNumericOrNull(family.bestPrimaryMargin) &&
+            isNumericOrNull(family.bestMetricDecLift) &&
+            isNumericOrNull(family.bestTileDecLift) &&
+            (family.crossesZeroBothDecMargins === null ||
+              typeof family.crossesZeroBothDecMargins === "boolean") &&
+            (family.recommendation ===
+              "prioritize_for_model_term_extension" ||
+              family.recommendation === "secondary" ||
+              family.recommendation === "insufficient_evidence") &&
+            Array.isArray(family.reasonCodes) &&
+            family.reasonCodes.every((reason) =>
+              isDecPhysicsSelectionReasonCode(reason),
+            ) &&
+            (family.note === null || typeof family.note === "string")
+          );
+        }) &&
+        modelTermExtensionFamilyComparabilityGate != null &&
+        typeof modelTermExtensionFamilyComparabilityGate.pass === "boolean" &&
+        isModelTermSemanticCheckStatus(
+          modelTermExtensionFamilyComparabilityGate.independentCrossCheckStatus,
+        ) &&
+        (modelTermExtensionFamilyComparabilityGate.note === null ||
+          typeof modelTermExtensionFamilyComparabilityGate.note === "string") &&
+        Array.isArray(modelTermExtensionFamilyEvidence.citationRefs) &&
+        modelTermExtensionFamilyEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ) &&
+        Array.isArray(modelTermExtensionFamilyEvidence.notes) &&
+        modelTermExtensionFamilyEvidence.notes.every(
+          (entry) => typeof entry === "string",
+        ))) &&
+    (fluxShearExtensionEvidence === undefined ||
+      ((fluxShearExtensionEvidence.status === "available" ||
+        fluxShearExtensionEvidence.status === "unavailable") &&
+        (fluxShearExtensionEvidence.routeId === null ||
+          typeof fluxShearExtensionEvidence.routeId === "string") &&
+        (fluxShearExtensionEvidence.selectedPath === null ||
+          isModelTermClosurePath(fluxShearExtensionEvidence.selectedPath)) &&
+        (fluxShearExtensionEvidence.selectedFamilyId === null ||
+          typeof fluxShearExtensionEvidence.selectedFamilyId === "string") &&
+        (fluxShearExtensionEvidence.selectionBasis === null ||
+          typeof fluxShearExtensionEvidence.selectionBasis === "string") &&
+        fluxShearExtensionParameterEnvelope != null &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.pressureScaleMin) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.pressureScaleMax) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.densityLiftMin) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.densityLiftMax) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.fluxScaleMin) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.fluxScaleMax) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.shearScaleMin) &&
+        isNumericOrNull(fluxShearExtensionParameterEnvelope.shearScaleMax) &&
+        (fluxShearExtensionEvidence.bestCandidateId === null ||
+          typeof fluxShearExtensionEvidence.bestCandidateId === "string") &&
+        isNumericOrNull(fluxShearExtensionEvidence.bestPrimaryMargin) &&
+        isNumericOrNull(fluxShearExtensionEvidence.bestMetricDecLift) &&
+        isNumericOrNull(fluxShearExtensionEvidence.bestTileDecLift) &&
+        (fluxShearExtensionEvidence.crossZeroAchieved === null ||
+          typeof fluxShearExtensionEvidence.crossZeroAchieved === "boolean") &&
+        (fluxShearExtensionEvidence.boundedEnvelopeExhausted === null ||
+          typeof fluxShearExtensionEvidence.boundedEnvelopeExhausted ===
+            "boolean") &&
+        (fluxShearExtensionEvidence.nonRegressionPass === null ||
+          typeof fluxShearExtensionEvidence.nonRegressionPass === "boolean") &&
+        fluxShearExtensionComparabilityGate != null &&
+        typeof fluxShearExtensionComparabilityGate.pass === "boolean" &&
+        isModelTermSemanticCheckStatus(
+          fluxShearExtensionComparabilityGate.independentCrossCheckStatus,
+        ) &&
+        (fluxShearExtensionComparabilityGate.referenceRouteId === null ||
+          typeof fluxShearExtensionComparabilityGate.referenceRouteId ===
+            "string") &&
+        isNumericOrNull(fluxShearExtensionComparabilityGate.comparableSampleCount) &&
+        isNumericOrNull(
+          fluxShearExtensionComparabilityGate.minimumComparableSampleCount,
+        ) &&
+        (fluxShearExtensionComparabilityGate.note === null ||
+          typeof fluxShearExtensionComparabilityGate.note === "string") &&
+        isDecRecommendedPatchClass(fluxShearExtensionEvidence.recommendation) &&
+        Array.isArray(fluxShearExtensionEvidence.citationRefs) &&
+        fluxShearExtensionEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ) &&
+        Array.isArray(fluxShearExtensionEvidence.notes) &&
+        fluxShearExtensionEvidence.notes.every(
+          (entry) => typeof entry === "string",
+        ))) &&
     isDecRecommendedPatchClass(record.recommendation) &&
     Array.isArray(uncertaintyTags) &&
     uncertaintyTags.every((entry) => isDecPhysicsUncertaintyTag(entry)) &&
