@@ -388,11 +388,78 @@ export type LocalAskResponse = {
     stage05_two_pass_used?: boolean;
     stage05_two_pass_batches?: number;
     stage05_overflow_policy?: "single_pass" | "two_pass" | null;
+    reasoning_theater_state_v1?: HelixAskReasoningTheaterStateV1;
     fail_reason?: string | null;
     fail_class?: string | null;
     helix_ask_fail_reason?: string | null;
     helix_ask_fail_class?: string | null;
   };
+};
+
+export type HelixAskReasoningTheaterPhase =
+  | "observe"
+  | "plan"
+  | "retrieve"
+  | "gate"
+  | "synthesize"
+  | "verify"
+  | "execute"
+  | "debrief";
+
+export type HelixAskReasoningTheaterStance = "winning" | "contested" | "losing" | "fail_closed";
+
+export type HelixAskReasoningTheaterArchetype =
+  | "ambiguity"
+  | "missing_evidence"
+  | "coverage_gap"
+  | "contradiction"
+  | "overload";
+
+export type HelixAskReasoningTheaterSuppressionReason =
+  | "context_ineligible"
+  | "dedupe_cooldown"
+  | "mission_rate_limited"
+  | "voice_rate_limited"
+  | "voice_budget_exceeded"
+  | "voice_backend_error"
+  | "missing_evidence"
+  | "contract_violation"
+  | "agi_overload_admission_control";
+
+export type HelixAskReasoningTheaterStateV1 = {
+  contract_version: "reasoning_theater.v1";
+  trace_id: string;
+  mission_id?: string;
+  event_id?: string;
+  phase: HelixAskReasoningTheaterPhase;
+  archetype: HelixAskReasoningTheaterArchetype;
+  certainty_class: "confirmed" | "reasoned" | "hypothesis" | "unknown";
+  suppression_reason: HelixAskReasoningTheaterSuppressionReason | null;
+  telemetry: {
+    evidence_gate_ok: boolean | null;
+    coverage_ratio: number | null;
+    evidence_claim_ratio: number | null;
+    belief_unsupported_rate: number | null;
+    belief_contradictions: number | null;
+    ambiguity_term_count: number;
+    graph_block_ratio: number | null;
+    graph_cross_tree_ratio: number | null;
+    alignment_margin: number | null;
+    alignment_decision: "PASS" | "BORDERLINE" | "FAIL" | null;
+    event_latency_ms_p95: number | null;
+    suppression_active: boolean;
+    proof_verdict: "PASS" | "FAIL" | null;
+    certificate_integrity_ok: boolean | null;
+  };
+  indices: {
+    momentum: number;
+    ambiguity_pressure: number;
+    battle_index: number;
+  };
+  stance: HelixAskReasoningTheaterStance;
+  scenario_id: string;
+  seed: number;
+  ts: string;
 };
 
 export type HelixAskJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";

@@ -2653,6 +2653,24 @@ describe("nhm2 publication completion surfaces", () => {
         }),
         reasonCodes: expect.any(Array),
       },
+      refinementEvidence: {
+        status: expect.stringMatching(/^(available|missing|non_comparable)$/),
+        referenceRouteId: expect.any(String),
+        routeComparable: expect.any(Boolean),
+        comparableSampleCount: expect.any(Number),
+        minimumComparableSampleCount: expect.any(Number),
+        coarseStepM: expect.any(Number),
+        refinedStepM: expect.any(Number),
+        superRefinedStepM: expect.any(Number),
+        observedConvergenceOrderT0i: expect.any(Number),
+        observedConvergenceOrderOffDiagonal: expect.any(Number),
+        richardsonExtrapolatedResidualT0i: expect.any(Number),
+        richardsonExtrapolatedResidualOffDiagonal: expect.any(Number),
+        uncertaintyRelativeBound: expect.any(Number),
+        conservativeMetricDecMarginToZero: expect.any(Number),
+        conservativeTileReconstitutedDecMarginToZero: expect.any(Number),
+        uncertaintyBoundPass: expect.any(Boolean),
+      },
       recommendation: "model_term_extension_patch",
       decCoupledControlEvidence: {
         status: expect.stringMatching(/^(available|unavailable)$/),
@@ -3306,6 +3324,8 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain(
       "decRuntimeDecisionEvidence.decAttribution.uncertaintyBoundPass",
     );
+    expect(markdown).toContain("refinementEvidence");
+    expect(markdown).toContain("refinementEvidence.citationRefs");
     expect(markdown).toContain("extensionTrancheId");
     expect(markdown).toContain("familySearchOrder");
     expect(markdown).toContain("appliedCandidateEvidence");

@@ -585,6 +585,10 @@ import {
   type HelixAskReasoningSidebar,
 } from "../services/helix-ask/surface/reasoning-sidebar";
 import {
+  attachHelixAskReasoningTheaterStateToDebug,
+  type HelixAskReasoningTheaterStateV1,
+} from "../services/helix-ask/surface/reasoning-theater-state";
+import {
   scrubSkippedLlmTransportErrors,
 } from "../services/helix-ask/surface/response-debug-scrub";
 import {
@@ -36521,6 +36525,136 @@ const buildHelixThreadRequestQuestionsFromText = (
   return [{ id: "clarify", text: question.slice(0, 320) }];
 };
 
+type HelixAskActionabilityPlanV1 = {
+  schema_version: "helix.ask.action_plan.v1";
+  intent_family: "open_docs" | "run_workstation_job";
+  normalized_prompt: string;
+  actions: Array<Record<string, unknown>>;
+  confidence: number;
+  required_capabilities: string[];
+  fallback_reason: string | null;
+  summary: string;
+  objective_slots: string[];
+};
+
+const HELIX_ASK_ACTIONABILITY_DOC_HINTS: Array<{ pattern: RegExp; path: string }> = [
+  {
+    pattern: /\bnhm2\b/i,
+    path: "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+  },
+  {
+    pattern: /\bneedle\s*hull\s*(?:mark\s*2|mk\s*2|mark\s*ii|mkii)\b/i,
+    path: "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+  },
+  {
+    pattern: /\bneedle\s*hull\b/i,
+    path: "docs/needle-hull-mainframe.md",
+  },
+];
+
+const normalizeHelixAskActionabilityPrompt = (value: string): string =>
+  value
+    .trim()
+    .replace(/^["'\s]+|["'\s]+$/g, "")
+    .replace(/^question\s*:\s*/i, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+
+const resolveHelixAskActionabilityDocPath = (
+  prompt: string,
+): string | null => {
+  const explicitPath = prompt.match(
+    /\b(docs\/[a-z0-9._/-]+\.(?:md|json))\b/i,
+  )?.[1];
+  if (explicitPath) return explicitPath.trim();
+  for (const hint of HELIX_ASK_ACTIONABILITY_DOC_HINTS) {
+    if (hint.pattern.test(prompt)) return hint.path;
+  }
+  return null;
+};
+
+const parseHelixAskRunJobObjective = (prompt: string): string => {
+  const objectiveQuoted =
+    prompt.match(/\bobjective\s*[:=]?\s*"([^"]+)"/i)?.[1]?.trim() ??
+    prompt.match(/\bobjective\s*[:=]?\s*'([^']+)'/i)?.[1]?.trim();
+  if (objectiveQuoted) return objectiveQuoted;
+  const objectiveBare = prompt
+    .match(/\bobjective\s*[:=]?\s*([^,]+)(?:,|$)/i)?.[1]
+    ?.trim();
+  if (objectiveBare) return objectiveBare.replace(/\.$/, "").trim();
+  return prompt.trim();
+};
+
+const resolveHelixAskActionabilityPlan = (
+  rawPrompt: string,
+): HelixAskActionabilityPlanV1 | null => {
+  const normalizedPrompt = normalizeHelixAskActionabilityPrompt(rawPrompt);
+  if (!normalizedPrompt) return null;
+  const openDocsMatch = normalizedPrompt.match(
+    /^(?:(?:can|could|would)\s+you\s+|please\s+)?(?:open|show|pull\s+up|bring\s+up)\s+(?:(?:a|an|the)\s+)?(?:docs?|documentation)\b(?:\s+(?:about|for|on|regarding)\s+(.+?))?[?.!]*$/i,
+  );
+  if (openDocsMatch) {
+    const topic = openDocsMatch[1]?.trim() ?? "";
+    const resolvedPath = resolveHelixAskActionabilityDocPath(
+      topic || normalizedPrompt,
+    );
+    if (resolvedPath) {
+      return {
+        schema_version: "helix.ask.action_plan.v1",
+        intent_family: "open_docs",
+        normalized_prompt: normalizedPrompt,
+        actions: [
+          {
+            action: "run_panel_action",
+            panel_id: "docs-viewer",
+            action_id: "open_doc",
+            args: { path: resolvedPath },
+          },
+        ],
+        confidence: 0.93,
+        required_capabilities: ["docs-viewer.open_doc"],
+        fallback_reason: null,
+        summary: `Opening docs in Docs Viewer: ${resolvedPath}`,
+        objective_slots: ["open", "docs"],
+      };
+    }
+    return {
+      schema_version: "helix.ask.action_plan.v1",
+      intent_family: "open_docs",
+      normalized_prompt: normalizedPrompt,
+      actions: [{ action: "open_panel", panel_id: "docs-viewer" }],
+      confidence: 0.78,
+      required_capabilities: ["docs-viewer.open_panel"],
+      fallback_reason: "doc_path_unresolved",
+      summary: "Opening Docs Viewer.",
+      objective_slots: ["open", "docs"],
+    };
+  }
+
+  const runJobMatch = normalizedPrompt.match(
+    /^(?:run|start|execute)\s+(?:a\s+)?workstation\s+job\b[:\s,-]*(.*)$/i,
+  );
+  if (runJobMatch) {
+    const objective = parseHelixAskRunJobObjective(runJobMatch[1] ?? "");
+    const payload: Record<string, unknown> = {};
+    if (objective) payload.objective = objective;
+    return {
+      schema_version: "helix.ask.action_plan.v1",
+      intent_family: "run_workstation_job",
+      normalized_prompt: normalizedPrompt,
+      actions: [{ action: "run_job", payload }],
+      confidence: 0.9,
+      required_capabilities: ["workstation.run_job"],
+      fallback_reason: null,
+      summary: objective
+        ? `Starting workstation job: ${objective}`
+        : "Starting workstation job.",
+      objective_slots: ["run", "job"],
+    };
+  }
+  return null;
+};
+
 const resolveHelixThreadNeedsInputFromPayload = (payload: Record<string, unknown> | null): {
   needsInput: boolean;
   requestKind: HelixThreadRequestKind;
@@ -36993,6 +37127,59 @@ const executeHelixAsk = async ({
         prompt: prompt ?? "",
       }) || undefined;
     let questionValue = question;
+    const actionabilitySource = (questionValue ?? prompt ?? "").trim();
+    const actionabilityPlan = resolveHelixAskActionabilityPlan(actionabilitySource);
+    if (actionabilityPlan && actionabilityPlan.confidence >= 0.72) {
+      const actionPayload = {
+        workstation_actions: actionabilityPlan.actions,
+        action_plan: actionabilityPlan,
+      };
+      const responseText = `${actionabilityPlan.summary}\n\n\`\`\`json\n${JSON.stringify(
+        actionPayload,
+        null,
+        2,
+      )}\n\`\`\``;
+      streamEmitter.finalize(responseText);
+      logEvent(
+        "Actionability",
+        "plan_applied",
+        [
+          `intent=${actionabilityPlan.intent_family}`,
+          `confidence=${actionabilityPlan.confidence.toFixed(2)}`,
+          `actions=${actionabilityPlan.actions.length}`,
+        ].join(" | "),
+        undefined,
+        true,
+        {
+          actionability_stage_applied: true,
+          actionability_plan_confidence: actionabilityPlan.confidence,
+          actionability_dispatch_result: "planned",
+          actionability_intent_family: actionabilityPlan.intent_family,
+          objective_slots_satisfied_by_execution: actionabilityPlan.objective_slots,
+        },
+      );
+      responder.send(200, {
+        ok: true,
+        mode: "act",
+        text: responseText,
+        answer: responseText,
+        debug: {
+          trace_id: askTraceId,
+          actionability_stage_applied: true,
+          actionability_plan_confidence: actionabilityPlan.confidence,
+          actionability_dispatch_result: "planned",
+          actionability_intent_family: actionabilityPlan.intent_family,
+          objective_slots_satisfied_by_execution: actionabilityPlan.objective_slots,
+          workstation_actions: actionabilityPlan.actions,
+          action_plan: actionabilityPlan,
+          codex_clone_references: [
+            "external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs",
+            "external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs",
+          ],
+        },
+      } satisfies LocalAskResult);
+      return;
+    }
     if (HELIX_ASK_SESSION_MEMORY && askSessionId && requestedContextCapsuleIds.length > 0) {
       contextCapsuleMemoryPatchSummary = buildSessionMemoryPatchFromCapsules({
         capsuleIds: requestedContextCapsuleIds,
@@ -38546,6 +38733,7 @@ const executeHelixAsk = async ({
       reasoning_sidebar_markdown?: string;
       reasoning_sidebar_step_count?: number;
       reasoning_sidebar_event_count?: number;
+      reasoning_theater_state_v1?: HelixAskReasoningTheaterStateV1;
     } | undefined = debugEnabled
       ? { two_pass: false, micro_pass: false }
       : undefined;
@@ -40181,15 +40369,21 @@ const executeHelixAsk = async ({
           debugPayload: debugPayload as Record<string, unknown>,
           traceEvents: combinedEvents,
           attachReasoningSidebarToDebug: ({ debugRecord, traceEvents }) =>
-            attachHelixAskReasoningSidebarToDebug({
-              debugRecord,
-              traceEvents,
-              coerceDebugString: coerceHelixAskDebugString,
-              coerceDebugBoolean: coerceHelixAskDebugBoolean,
-              coerceDebugNumber: coerceHelixAskDebugNumber,
-              coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
-              clipText: clipAskText,
-            }),
+            (() => {
+              attachHelixAskReasoningSidebarToDebug({
+                debugRecord,
+                traceEvents,
+                coerceDebugString: coerceHelixAskDebugString,
+                coerceDebugBoolean: coerceHelixAskDebugBoolean,
+                coerceDebugNumber: coerceHelixAskDebugNumber,
+                coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+                clipText: clipAskText,
+              });
+              attachHelixAskReasoningTheaterStateToDebug({
+                debugRecord,
+                traceEvents,
+              });
+            })(),
         });
       }
       attachContextCapsuleToResult(reportPayload, reportText);
@@ -50909,15 +51103,21 @@ const executeHelixAsk = async ({
           fastQualityMode,
           fastQualityDecisions,
           attachReasoningSidebarToDebug: ({ debugRecord, traceEvents: sidebarTraceEvents }) =>
-            attachHelixAskReasoningSidebarToDebug({
-              debugRecord,
-              traceEvents: sidebarTraceEvents,
-              coerceDebugString: coerceHelixAskDebugString,
-              coerceDebugBoolean: coerceHelixAskDebugBoolean,
-              coerceDebugNumber: coerceHelixAskDebugNumber,
-              coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
-              clipText: clipAskText,
-            }),
+            (() => {
+              attachHelixAskReasoningSidebarToDebug({
+                debugRecord,
+                traceEvents: sidebarTraceEvents,
+                coerceDebugString: coerceHelixAskDebugString,
+                coerceDebugBoolean: coerceHelixAskDebugBoolean,
+                coerceDebugNumber: coerceHelixAskDebugNumber,
+                coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+                clipText: clipAskText,
+              });
+              attachHelixAskReasoningTheaterStateToDebug({
+                debugRecord,
+                traceEvents: sidebarTraceEvents,
+              });
+            })(),
           clipText: clipAskText,
           answerPreviewChars: HELIX_ASK_ANSWER_PREVIEW_CHARS,
         });
@@ -59049,7 +59249,7 @@ const executeHelixAsk = async ({
           pushObjectiveStepTranscript,
           pushAnswerPath: (entry) => answerPath.push(entry),
           applyDialogueProfilePrompt,
-          recordObjectivePromptRewriteStage,
+          recordPromptRewriteStage: recordObjectivePromptRewriteStage,
           runLocalWithOverflowRetry: runHelixAskLocalWithOverflowRetry,
           appendLlmCallDebug,
           stripPromptEchoFromAnswer,
@@ -61792,15 +61992,21 @@ const executeHelixAsk = async ({
       buildEventStableFields,
       hashStableJson,
       attachReasoningSidebarToDebug: ({ debugRecord, traceEvents }) =>
-        attachHelixAskReasoningSidebarToDebug({
-          debugRecord,
-          traceEvents,
-          coerceDebugString: coerceHelixAskDebugString,
-          coerceDebugBoolean: coerceHelixAskDebugBoolean,
-          coerceDebugNumber: coerceHelixAskDebugNumber,
-          coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
-          clipText: clipAskText,
-        }),
+        (() => {
+          attachHelixAskReasoningSidebarToDebug({
+            debugRecord,
+            traceEvents,
+            coerceDebugString: coerceHelixAskDebugString,
+            coerceDebugBoolean: coerceHelixAskDebugBoolean,
+            coerceDebugNumber: coerceHelixAskDebugNumber,
+            coerceDebugObjectArray: coerceHelixAskDebugObjectArray,
+            clipText: clipAskText,
+          });
+          attachHelixAskReasoningTheaterStateToDebug({
+            debugRecord,
+            traceEvents,
+          });
+        })(),
       retrievalRoute: graphPack?.primaryTreeId
         ? `graph:${graphPack.primaryTreeId}`
         : contextFiles.length > 0

@@ -33,6 +33,11 @@ import {
 } from "@/lib/workstation/workstationActionContract";
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
+import {
+  createWorkstationActionTraceId,
+  emitWorkstationActionLiveEvent,
+} from "@/lib/workstation/workstationActionLiveEvents";
+import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
@@ -89,7 +94,7 @@ export default function MobileStartPage() {
   const launcherPanels = useMemo(
     () =>
       panelRegistry
-        .filter((panel) => !panel.startHidden)
+        .filter((panel) => !panel.startHidden && isUserLaunchPanel(String(panel.id)))
         .sort((a, b) => {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
@@ -242,16 +247,47 @@ export default function MobileStartPage() {
       if (actions.length === 0) return;
       const store = useWorkstationLayoutStore.getState();
       const runAction = (action: HelixWorkstationAction) => {
+        const traceId = createWorkstationActionTraceId(action.action);
+        const startedAtMs = Date.now();
+        const publish = (args: {
+          ok: boolean;
+          message?: string;
+          artifact?: Record<string, unknown> | null;
+        }) => {
+          emitWorkstationActionLiveEvent({
+            contextId: HELIX_ASK_CONTEXT_ID.mobile,
+            traceId,
+            action,
+            ok: args.ok,
+            message: args.message,
+            artifact: args.artifact ?? null,
+            durationMs: Math.max(0, Date.now() - startedAtMs),
+          });
+        };
         switch (action.action) {
           case "open_panel":
-          case "focus_panel":
+            if (!getPanelDef(action.panel_id)) {
+              publish({ ok: false, message: `Unknown panel: ${action.panel_id}` });
+              return;
+            }
             openPanelUniversal(action.panel_id);
+            publish({ ok: true });
+            return;
+          case "focus_panel":
+            if (!getPanelDef(action.panel_id)) {
+              publish({ ok: false, message: `Unknown panel: ${action.panel_id}` });
+              return;
+            }
+            openPanelUniversal(action.panel_id);
+            publish({ ok: true });
             return;
           case "close_panel":
             close(action.panel_id);
+            publish({ ok: true });
             return;
           case "open_settings":
             openSettings(action.tab ?? "preferences");
+            publish({ ok: true });
             return;
           case "toggle_mobile_drawer":
             if (typeof action.open === "boolean") {
@@ -262,9 +298,10 @@ export default function MobileStartPage() {
             if (action.snap) {
               store.setMobileDrawerSnap(action.snap);
             }
+            publish({ ok: true });
             return;
-          case "run_panel_action":
-            executeHelixPanelAction(
+          case "run_panel_action": {
+            const result = executeHelixPanelAction(
               {
                 panel_id: action.panel_id,
                 action_id: action.action_id,
@@ -280,8 +317,15 @@ export default function MobileStartPage() {
                 openSettings: (tab) => openSettings(tab ?? "preferences"),
               },
             );
+            publish({
+              ok: result.ok,
+              message: result.message,
+              artifact: result.artifact ?? null,
+            });
             return;
+          }
           case "run_job":
+            publish({ ok: true, message: "Delegated to workstation job executor." });
             void runWorkstationJob({
               contextId: HELIX_ASK_CONTEXT_ID.mobile,
               payload: action.payload,
@@ -298,8 +342,10 @@ export default function MobileStartPage() {
             return;
           case "set_chat_dock":
           case "split_active_group":
+            publish({ ok: false, message: `${action.action} is not supported on mobile.` });
             return;
           default:
+            publish({ ok: false, message: "Unhandled workstation action." });
             return;
         }
       };

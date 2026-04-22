@@ -536,7 +536,8 @@
         "https://arxiv.org/abs/2105.03079",
         "https://arxiv.org/abs/1208.5399",
         "https://arxiv.org/abs/gr-qc/9607003",
-        "https://arxiv.org/abs/gr-qc/9805037"
+        "https://arxiv.org/abs/gr-qc/9805037",
+        "https://www.osti.gov/biblio/6817347"
       ],
       "notes": [
         "status=required",
@@ -26791,7 +26792,8 @@
       "selectionPlateauStatus": "best_margin_still_negative",
       "selectionReasonCodes": [
         "selection_gate_pass",
-        "best_margin_still_negative"
+        "best_margin_still_negative",
+        "model_term_extension_required"
       ],
       "zeroCrossFeasibilityDecision": "zero_cross_not_achievable_within_bounds",
       "rankingBasis": "prioritize cross-zero DEC margins on metric/tile lanes under coupled same-chart E/J/S controls; otherwise maximize min(metricDecRobustMarginToZero,tileReconstitutedDecRobustMarginToZero), tie-break by metricDecRobustLift desc, then controlDeviationMagnitude asc",
@@ -26885,7 +26887,10 @@
     },
     "zeroCrossFeasibilityDecision": "zero_cross_not_achievable_within_bounds",
     "zeroCrossFeasibilityReasonCodes": [
-      "best_margin_still_negative"
+      "best_margin_still_negative",
+      "insufficient_dec_lift_after_tranche_4",
+      "model_term_extension_required",
+      "uncertainty_bound_failed"
     ],
     "boundedSearchEnvelope": {
       "pressureScaleMin": 0.8,
@@ -26916,7 +26921,8 @@
     },
     "selectionReasonCodes": [
       "selection_gate_pass",
-      "best_margin_still_negative"
+      "best_margin_still_negative",
+      "model_term_extension_required"
     ],
     "nonRegressionGate": {
       "required": [
@@ -26935,9 +26941,9 @@
     },
     "runtimeApplication": {
       "attempted": true,
-      "enabled": true,
+      "enabled": false,
       "status": "rolled_back",
-      "failureMode": "uncertainty_bound_failed",
+      "failureMode": "runtime_apply_disabled",
       "evaluationComparable": true,
       "sampleCount": 1,
       "comparableSampleCount": 9,
@@ -26958,7 +26964,9 @@
       "rollbackReasonCodes": [
         "best_margin_still_negative",
         "insufficient_dec_lift_after_tranche_4",
-        "uncertainty_bound_failed"
+        "model_term_extension_required",
+        "uncertainty_bound_failed",
+        "runtime_apply_disabled"
       ],
       "guardChecks": {
         "metricWecNonRegression": true,
@@ -26994,7 +27002,7 @@
         "referenceMetricDecConservativeMarginToZero": -30881779.906215247,
         "referenceTileReconstitutedDecConservativeMarginToZero": -30881779.906215247
       },
-      "note": "Runtime DEC-control candidate was attempted but rolled back because uncertainty-bounded DEC margins do not remain positive on both selected and reference routes.",
+      "note": "Runtime DEC-control candidate remains staged-only because NHM2_DEC_PHYSICS_CONTROL_RUNTIME_APPLY is disabled; evidence remains comparable but non-applied.",
       "citationRefs": [
         "https://arxiv.org/abs/1702.05915",
         "https://arxiv.org/abs/2003.01815",
@@ -27003,12 +27011,13 @@
         "https://arxiv.org/abs/1208.5399",
         "https://arxiv.org/abs/gr-qc/9607003",
         "https://arxiv.org/abs/gr-qc/9805037",
+        "https://www.osti.gov/biblio/6817347",
+        "https://arxiv.org/abs/1306.6052",
         "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
         "https://arxiv.org/abs/gr-qc/0703035",
         "https://arxiv.org/abs/gr-qc/0110086",
         "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
         "https://arxiv.org/abs/gr-qc/0507004",
-        "https://arxiv.org/abs/1306.6052",
         "https://arxiv.org/abs/2404.03095",
         "https://arxiv.org/abs/2404.10855",
         "https://arxiv.org/abs/2602.18023"
@@ -27017,7 +27026,7 @@
     "decRuntimeDecisionEvidence": {
       "status": "rolled_back",
       "attempted": true,
-      "enabled": true,
+      "enabled": false,
       "gatePass": false,
       "comparabilityPass": true,
       "sampleCountSufficient": true,
@@ -27025,9 +27034,11 @@
       "reasonCodes": [
         "best_margin_still_negative",
         "insufficient_dec_lift_after_tranche_4",
-        "uncertainty_bound_failed"
+        "model_term_extension_required",
+        "uncertainty_bound_failed",
+        "runtime_apply_disabled"
       ],
-      "primaryReasonCode": "best_margin_still_negative",
+      "primaryReasonCode": "runtime_apply_disabled",
       "decAttribution": {
         "selectedMetricDecRobustMarginToZero": -30881749.024466224,
         "selectedTileReconstitutedDecRobustMarginToZero": -30881749.024466224,
@@ -27044,7 +27055,7 @@
         "referenceCrossesZeroBothDecMargins": false,
         "uncertaintyBoundPass": false
       },
-      "note": "Runtime DEC-control candidate was attempted but rolled back because uncertainty-bounded DEC margins do not remain positive on both selected and reference routes.",
+      "note": "Runtime DEC-control candidate remains staged-only because NHM2_DEC_PHYSICS_CONTROL_RUNTIME_APPLY is disabled; evidence remains comparable but non-applied.",
       "citationRefs": [
         "https://arxiv.org/abs/1702.05915",
         "https://arxiv.org/abs/2003.01815",
@@ -27053,18 +27064,54 @@
         "https://arxiv.org/abs/1208.5399",
         "https://arxiv.org/abs/gr-qc/9607003",
         "https://arxiv.org/abs/gr-qc/9805037",
+        "https://www.osti.gov/biblio/6817347",
+        "https://arxiv.org/abs/1306.6052",
         "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
         "https://arxiv.org/abs/gr-qc/0703035",
         "https://arxiv.org/abs/gr-qc/0110086",
         "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
         "https://arxiv.org/abs/gr-qc/0507004",
-        "https://arxiv.org/abs/1306.6052",
         "https://arxiv.org/abs/2404.03095",
         "https://arxiv.org/abs/2404.10855",
         "https://arxiv.org/abs/2602.18023"
       ]
     },
-    "extensionTrancheId": "tranche_4_expanded_bounds",
+    "refinementEvidence": {
+      "status": "available",
+      "referenceRouteId": "einstein_tensor_geometry_fd2_independent_v1",
+      "routeComparable": true,
+      "comparableSampleCount": 9,
+      "minimumComparableSampleCount": 3,
+      "coarseStepM": 3.5828324597676766,
+      "refinedStepM": 1.7914162298838383,
+      "superRefinedStepM": 0.8957081149419192,
+      "observedConvergenceOrderT0i": 0,
+      "observedConvergenceOrderOffDiagonal": 0,
+      "richardsonExtrapolatedResidualT0i": 0,
+      "richardsonExtrapolatedResidualOffDiagonal": 0,
+      "richardsonExtrapolatedMetricDecMarginToZero": -30881749.024466224,
+      "richardsonExtrapolatedTileReconstitutedDecMarginToZero": -30881749.024466224,
+      "uncertaintyRelativeBound": 0.000001,
+      "uncertaintyAbsMetricDec": 30.881749024466224,
+      "uncertaintyAbsTileReconstitutedDec": 30.881749024466224,
+      "conservativeMetricDecMarginToZero": -30881779.906215247,
+      "conservativeTileReconstitutedDecMarginToZero": -30881779.906215247,
+      "uncertaintyBoundPass": false,
+      "note": "Refinement-aware uncertainty evidence is comparable and admitted for conservative DEC sign interpretation.",
+      "citationRefs": [
+        "https://www.osti.gov/biblio/6817347",
+        "https://arxiv.org/abs/1306.6052",
+        "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+        "https://arxiv.org/abs/gr-qc/0703035",
+        "https://arxiv.org/abs/gr-qc/0110086",
+        "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
+        "https://arxiv.org/abs/gr-qc/0507004",
+        "https://arxiv.org/abs/2404.03095",
+        "https://arxiv.org/abs/2404.10855",
+        "https://arxiv.org/abs/2602.18023"
+      ]
+    },
+    "extensionTrancheId": "tranche_5_model_term_extension",
     "familySearchOrder": [
       "density_flux_shear_coupled",
       "flux_shear_coupled",
@@ -27091,12 +27138,13 @@
         "https://arxiv.org/abs/1208.5399",
         "https://arxiv.org/abs/gr-qc/9607003",
         "https://arxiv.org/abs/gr-qc/9805037",
+        "https://www.osti.gov/biblio/6817347",
+        "https://arxiv.org/abs/1306.6052",
         "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
         "https://arxiv.org/abs/gr-qc/0703035",
         "https://arxiv.org/abs/gr-qc/0110086",
         "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
         "https://arxiv.org/abs/gr-qc/0507004",
-        "https://arxiv.org/abs/1306.6052",
         "https://arxiv.org/abs/2404.03095",
         "https://arxiv.org/abs/2404.10855",
         "https://arxiv.org/abs/2602.18023"
@@ -27107,12 +27155,14 @@
       "candidateId": "same_chart_physics_control_tranche4_seed_same_chart_physics_control_frontier_seed_same_chart_physics_control_refine_seed_same_chart_physics_control_pressure_0p85_density_0p15_flux_0p95_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p9625_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p96875_shear_0p85_probe_v1_pressure_0p8_density_0p2_flux_0p85_shear_0p8_probe_v1",
       "extensionTrancheId": "tranche_4_expanded_bounds",
       "familyId": "density_flux_shear_coupled",
-      "failureMode": "uncertainty_bound_failed",
-      "primaryReasonCode": "best_margin_still_negative",
+      "failureMode": "runtime_apply_disabled",
+      "primaryReasonCode": "runtime_apply_disabled",
       "reasonCodes": [
         "best_margin_still_negative",
         "insufficient_dec_lift_after_tranche_4",
-        "uncertainty_bound_failed"
+        "model_term_extension_required",
+        "uncertainty_bound_failed",
+        "runtime_apply_disabled"
       ],
       "metricDecRobustMarginToZero": -30881749.024466224,
       "tileReconstitutedDecRobustMarginToZero": -30881749.024466224,
@@ -27120,7 +27170,7 @@
       "metricNecNonRegressionMargin": 1019680.3923172876,
       "comparabilityPass": true,
       "sampleCountSufficient": true,
-      "note": "Runtime candidate same_chart_physics_control_tranche4_seed_same_chart_physics_control_frontier_seed_same_chart_physics_control_refine_seed_same_chart_physics_control_pressure_0p85_density_0p15_flux_0p95_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p9625_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p96875_shear_0p85_probe_v1_pressure_0p8_density_0p2_flux_0p85_shear_0p8_probe_v1 was rolled back with failureMode=uncertainty_bound_failed.",
+      "note": "Runtime candidate same_chart_physics_control_tranche4_seed_same_chart_physics_control_frontier_seed_same_chart_physics_control_refine_seed_same_chart_physics_control_pressure_0p85_density_0p15_flux_0p95_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p9625_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p96875_shear_0p85_probe_v1_pressure_0p8_density_0p2_flux_0p85_shear_0p8_probe_v1 was rolled back with failureMode=runtime_apply_disabled.",
       "citationRefs": [
         "https://arxiv.org/abs/1702.05915",
         "https://arxiv.org/abs/2003.01815",
@@ -27129,12 +27179,13 @@
         "https://arxiv.org/abs/1208.5399",
         "https://arxiv.org/abs/gr-qc/9607003",
         "https://arxiv.org/abs/gr-qc/9805037",
+        "https://www.osti.gov/biblio/6817347",
+        "https://arxiv.org/abs/1306.6052",
         "https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
         "https://arxiv.org/abs/gr-qc/0703035",
         "https://arxiv.org/abs/gr-qc/0110086",
         "https://einsteintoolkit.org/thornguide/EinsteinBase/TmunuBase/documentation.html",
         "https://arxiv.org/abs/gr-qc/0507004",
-        "https://arxiv.org/abs/1306.6052",
         "https://arxiv.org/abs/2404.03095",
         "https://arxiv.org/abs/2404.10855",
         "https://arxiv.org/abs/2602.18023"
@@ -27257,6 +27308,16 @@
         "note": "Prevents runtime apply from relying on raw-metric sign flips or uncertainty-blind margins when independent route evidence is available."
       },
       {
+        "claimId": "uncertainty_reporting_requires_refinement_evidence",
+        "claim": "Uncertainty-sensitive DEC runtime decisions should include refinement-aware or convergence-aware reporting so conservative margin signs are not inferred from a single unresolved discretization level.",
+        "citationRefs": [
+          "https://www.osti.gov/biblio/6817347",
+          "https://arxiv.org/abs/1306.6052",
+          "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md"
+        ],
+        "note": "Uses V&V-style convergence-reporting precedent to keep DEC sign decisions tied to uncertainty-aware evidence."
+      },
+      {
         "claimId": "model_term_extension_family_selection_requires_commensurate_evidence",
         "claim": "When bounded DEC controls fail to cross zero, follow-up model-term families are ranked only on commensurate same-route evidence under unchanged non-regression and comparability gates.",
         "citationRefs": [
@@ -27361,6 +27422,33 @@
         ],
         "note": "Runtime decision evidence is attributed to selected/reference margin signs and uncertainty-conservative thresholds, not raw point estimates alone."
       },
+      "uncertainty_reporting_requires_refinement_evidence": {
+        "claimId": "uncertainty_reporting_requires_refinement_evidence",
+        "supportLevel": "primary_source",
+        "citationRefs": [
+          "https://www.osti.gov/biblio/6817347",
+          "https://arxiv.org/abs/1306.6052",
+          "docs/audits/research/warp-nhm2-metric-evaluator-research-basis-latest.md"
+        ],
+        "evidenceRefs": [
+          "observerDecPhysicsControlEvidence.refinementEvidence.status",
+          "observerDecPhysicsControlEvidence.refinementEvidence.coarseStepM",
+          "observerDecPhysicsControlEvidence.refinementEvidence.refinedStepM",
+          "observerDecPhysicsControlEvidence.refinementEvidence.superRefinedStepM",
+          "observerDecPhysicsControlEvidence.refinementEvidence.richardsonExtrapolatedResidualT0i",
+          "observerDecPhysicsControlEvidence.refinementEvidence.richardsonExtrapolatedResidualOffDiagonal",
+          "observerDecPhysicsControlEvidence.refinementEvidence.uncertaintyRelativeBound",
+          "observerDecPhysicsControlEvidence.refinementEvidence.conservativeMetricDecMarginToZero",
+          "observerDecPhysicsControlEvidence.refinementEvidence.conservativeTileReconstitutedDecMarginToZero",
+          "observerDecPhysicsControlEvidence.refinementEvidence.uncertaintyBoundPass",
+          "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecUncertaintyAbs",
+          "observerDecPhysicsControlEvidence.runtimeApplication.observed.tileReconstitutedDecUncertaintyAbs",
+          "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecConservativeMarginToZero",
+          "observerDecPhysicsControlEvidence.runtimeApplication.observed.tileReconstitutedDecConservativeMarginToZero",
+          "observerDecPhysicsControlEvidence.decRuntimeDecisionEvidence.decAttribution.uncertaintyRelativeBound"
+        ],
+        "note": "Uncertainty-bound attribution is tied to published convergence-reporting references and explicit conservative-margin evidence."
+      },
       "model_term_extension_family_selection_requires_commensurate_evidence": {
         "claimId": "model_term_extension_family_selection_requires_commensurate_evidence",
         "supportLevel": "repo_measurement",
@@ -27381,14 +27469,15 @@
     },
     "claimCitationMapCompleteness": {
       "status": "pass",
-      "expectedClaimCount": 6,
-      "coveredClaimCount": 6,
+      "expectedClaimCount": 7,
+      "coveredClaimCount": 7,
       "expectedClaimIds": [
         "same_chart_projection_grammar_required",
         "geometry_first_route_is_control_basis",
         "bounded_probe_non_regression_policy",
         "comparability_requires_commensurate_sample_evidence",
         "runtime_uncertainty_sign_guard_required",
+        "uncertainty_reporting_requires_refinement_evidence",
         "model_term_extension_family_selection_requires_commensurate_evidence"
       ],
       "missingClaimIds": [],
@@ -27518,6 +27607,16 @@
             "https://arxiv.org/abs/2602.18023"
           ],
           "note": "Sign and uncertainty gates localize decision risk to commensurate selected/reference route evidence."
+        },
+        {
+          "claimId": "uncertainty_reporting_requires_refinement_evidence",
+          "claim": "Uncertainty-sensitive DEC decisions should be reported with refinement-aware uncertainty bounds rather than raw single-resolution margins.",
+          "confidenceLabel": "established",
+          "citationRefs": [
+            "https://www.osti.gov/biblio/6817347",
+            "https://arxiv.org/abs/1306.6052"
+          ],
+          "note": "Pairs conservative DEC margins with explicit uncertainty bounds under convergence-reporting precedent."
         }
       ],
       "note": "Coupled-control evidence localizes DEC behavior under bounded E/J/S controls without widening claim tier."
@@ -27620,7 +27719,7 @@
         "recommendation=model_term_extension_patch",
         "boundedEnvelopeExhausted=true",
         "selectedFamilyId=density_flux_shear_coupled",
-        "selectedFamilyExtensionTrancheId=tranche_4_expanded_bounds",
+        "selectedFamilyExtensionTrancheId=tranche_5_model_term_extension",
         "tranche4CandidateCount=224",
         "familyRanking=density_flux_shear_coupled:-30881749.024466224,flux_shear_coupled:-46468292.16417322,pressure_only:-49527333.34112507,density_pressure_coupled:null"
       ]
@@ -27725,7 +27824,7 @@
       "selectedCandidateClass=physics_control_proposal",
       "selectionDecision=apply_candidate",
       "selectionPlateauStatus=best_margin_still_negative",
-      "selectionReasonCodes=selection_gate_pass,best_margin_still_negative",
+      "selectionReasonCodes=selection_gate_pass,best_margin_still_negative,model_term_extension_required",
       "selectionObjective=prioritize cross-zero DEC margins on metric/tile lanes under coupled same-chart E/J/S controls; otherwise maximize min(metricDecRobustMarginToZero,tileReconstitutedDecRobustMarginToZero), tie-break by metricDecRobustLift desc, then controlDeviationMagnitude asc",
       "selectionObjectivePrimaryMargin=-30881749.024466224",
       "selectionObjectiveControlDeviation=0.75",
@@ -27749,14 +27848,14 @@
       "crossZeroFeasibility.crossZeroAchieved=false",
       "crossZeroFeasibility.boundedEnvelopeExhausted=true",
       "crossZeroFeasibility.decision=zero_cross_not_achievable_within_bounds",
-      "crossZeroFeasibility.reasonCodes=best_margin_still_negative",
+      "crossZeroFeasibility.reasonCodes=best_margin_still_negative,model_term_extension_required,insufficient_dec_lift_after_tranche_4,uncertainty_bound_failed",
       "crossZeroFeasibility.inferenceLabel=mixed",
       "decResidualAttribution.status=available",
       "decResidualAttribution.primarySurface=mixed",
       "decResidualAttribution.dominantViolationClass=stress_dominance",
       "decResidualAttribution.selectedPrimaryMargin=-30881749.024466224",
       "decResidualAttribution.gapToZero=30881749.024466224",
-      "decResidualAttribution.selectionReasonCodes=selection_gate_pass,best_margin_still_negative",
+      "decResidualAttribution.selectionReasonCodes=selection_gate_pass,best_margin_still_negative,model_term_extension_required",
       "boundedSearchEnvelope.pressureScale=[0.8,1]",
       "boundedSearchEnvelope.densityLift=[0,0.2]",
       "boundedSearchEnvelope.fluxScale=[0.8,1]",
@@ -27779,8 +27878,8 @@
       "boundedSearchEnvelope.refineSeedCount=3",
       "boundedSearchEnvelope.observerDomainFixed=true",
       "claimCitationMapCompleteness.status=pass",
-      "claimCitationMapCompleteness.expectedClaimCount=6",
-      "claimCitationMapCompleteness.coveredClaimCount=6",
+      "claimCitationMapCompleteness.expectedClaimCount=7",
+      "claimCitationMapCompleteness.coveredClaimCount=7",
       "claimCitationMapCompleteness.missingClaimIds=none",
       "sweepCandidateCount=689",
       "sweepPhaseSummary.coarseCandidateCount=379",
@@ -27833,9 +27932,9 @@
       "fluxShearExtensionEvidence.comparabilityGate.referenceRouteId=einstein_tensor_geometry_fd2_independent_v1",
       "nonRegressionGate.pass=true",
       "runtimeApplication.status=rolled_back",
-      "runtimeApplication.failureMode=uncertainty_bound_failed",
+      "runtimeApplication.failureMode=runtime_apply_disabled",
       "runtimeApplication.attempted=true",
-      "runtimeApplication.enabled=true",
+      "runtimeApplication.enabled=false",
       "runtimeApplication.evaluationComparable=true",
       "runtimeApplication.sampleCount=1",
       "runtimeApplication.comparableSampleCount=9",
@@ -27850,7 +27949,7 @@
       "runtimeApplication.comparabilityGate.independentCrossCheckStatus=pass",
       "runtimeApplication.comparabilityGate.pass=true",
       "runtimeApplication.comparabilityGate.independentCrossCheckRelativeResidual=0",
-      "runtimeApplication.rollbackReasonCodes=best_margin_still_negative,uncertainty_bound_failed,insufficient_dec_lift_after_tranche_4",
+      "runtimeApplication.rollbackReasonCodes=runtime_apply_disabled,best_margin_still_negative,uncertainty_bound_failed,insufficient_dec_lift_after_tranche_4,model_term_extension_required",
       "runtimeApplication.guardChecks.independentCrossCheckSignAgreement=true",
       "runtimeApplication.guardChecks.uncertaintyBoundPass=false",
       "runtimeApplication.guardChecks.referenceCrossesZeroBothDecMargins=false",
@@ -27865,25 +27964,36 @@
       "runtimeApplication.observed.referenceTileReconstitutedDecConservativeMarginToZero=-30881779.906215247",
       "runtimeApplication.observed.metricWecNonRegressionMargin=11653490.197911782",
       "runtimeApplication.observed.metricNecNonRegressionMargin=1019680.3923172876",
+      "refinementEvidence.status=available",
+      "refinementEvidence.coarseStepM=3.5828324597676766",
+      "refinementEvidence.refinedStepM=1.7914162298838383",
+      "refinementEvidence.superRefinedStepM=0.8957081149419192",
+      "refinementEvidence.richardsonExtrapolatedResidualT0i=0",
+      "refinementEvidence.richardsonExtrapolatedResidualOffDiagonal=0",
+      "refinementEvidence.uncertaintyRelativeBound=0.000001",
+      "refinementEvidence.conservativeMetricDecMarginToZero=-30881779.906215247",
+      "refinementEvidence.conservativeTileReconstitutedDecMarginToZero=-30881779.906215247",
+      "refinementEvidence.uncertaintyBoundPass=false",
       "decRuntimeDecisionEvidence.status=rolled_back",
       "decRuntimeDecisionEvidence.gatePass=false",
-      "decRuntimeDecisionEvidence.primaryReasonCode=best_margin_still_negative",
-      "extensionTrancheId=tranche_4_expanded_bounds",
+      "decRuntimeDecisionEvidence.primaryReasonCode=runtime_apply_disabled",
+      "extensionTrancheId=tranche_5_model_term_extension",
       "familySearchOrder=density_flux_shear_coupled,flux_shear_coupled,pressure_only,density_pressure_coupled",
       "appliedCandidateEvidence.status=unavailable",
       "appliedCandidateEvidence.familyId=none",
       "appliedCandidateEvidence.candidateId=none",
       "rollbackLocalizationEvidence.status=available",
-      "rollbackLocalizationEvidence.failureMode=uncertainty_bound_failed",
-      "rollbackLocalizationEvidence.primaryReasonCode=best_margin_still_negative",
+      "rollbackLocalizationEvidence.failureMode=runtime_apply_disabled",
+      "rollbackLocalizationEvidence.primaryReasonCode=runtime_apply_disabled",
       "rollbackLocalizationEvidence.familyId=density_flux_shear_coupled",
       "rollbackLocalizationEvidence.candidateId=same_chart_physics_control_tranche4_seed_same_chart_physics_control_frontier_seed_same_chart_physics_control_refine_seed_same_chart_physics_control_pressure_0p85_density_0p15_flux_0p95_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p9625_shear_0p85_probe_v1_pressure_0p85_density_0p15_flux_0p96875_shear_0p85_probe_v1_pressure_0p8_density_0p2_flux_0p85_shear_0p8_probe_v1",
-      "researchSupportMap.claimIds=same_chart_projection_grammar_required,geometry_first_route_is_control_basis,bounded_probe_non_regression_policy,comparability_requires_commensurate_sample_evidence,runtime_uncertainty_sign_guard_required,model_term_extension_family_selection_requires_commensurate_evidence",
+      "researchSupportMap.claimIds=same_chart_projection_grammar_required,geometry_first_route_is_control_basis,bounded_probe_non_regression_policy,comparability_requires_commensurate_sample_evidence,runtime_uncertainty_sign_guard_required,uncertainty_reporting_requires_refinement_evidence,model_term_extension_family_selection_requires_commensurate_evidence",
       "recommendation=model_term_extension_patch"
     ],
     "uncertaintyNotes": [
       "Bounded sweep includes an observer-domain truncation probe (zeta=0) for sensitivity localization only; it is excluded from physical-control admission.",
-      "Bounded non-truncation coupled same-chart probe (s=0.85, rho_lift=0.15) satisfies DEC-lift and WEC/NEC non-regression gates on the admitted Einstein route; runtime application is still gated by explicit opt-in and revalidation."
+      "Bounded non-truncation coupled same-chart probe (s=0.85, rho_lift=0.15) satisfies DEC-lift and WEC/NEC non-regression gates on the admitted Einstein route; runtime application is still gated by explicit opt-in and revalidation.",
+      "Refinement evidence status=available; uncertaintyBoundPass=false; coarseStepM=3.5828324597676766; refinedStepM=1.7914162298838383; superRefinedStepM=0.8957081149419192."
     ]
   },
   "t00PolicyAdmissionBridgeEvidence": {

@@ -28,6 +28,10 @@ import {
 } from "@/lib/workstation/workstationActionContract";
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
+import {
+  createWorkstationActionTraceId,
+  emitWorkstationActionLiveEvent,
+} from "@/lib/workstation/workstationActionLiveEvents";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -194,13 +198,40 @@ export default function DesktopPage() {
       if (actions.length === 0) return;
       const store = useWorkstationLayoutStore.getState();
       const runAction = (action: HelixWorkstationAction) => {
+        const traceId = createWorkstationActionTraceId(action.action);
+        const startedAtMs = Date.now();
+        const publish = (args: {
+          ok: boolean;
+          message?: string;
+          artifact?: Record<string, unknown> | null;
+        }) => {
+          emitWorkstationActionLiveEvent({
+            contextId: HELIX_ASK_CONTEXT_ID.desktop,
+            traceId,
+            action,
+            ok: args.ok,
+            message: args.message,
+            artifact: args.artifact ?? null,
+            durationMs: Math.max(0, Date.now() - startedAtMs),
+          });
+        };
         switch (action.action) {
           case "open_panel":
+            if (!getPanelDef(action.panel_id)) {
+              publish({ ok: false, message: `Unknown panel: ${action.panel_id}` });
+              return;
+            }
             openPanelUniversal(action.panel_id);
+            publish({ ok: true });
             return;
           case "focus_panel": {
+            if (!getPanelDef(action.panel_id)) {
+              publish({ ok: false, message: `Unknown panel: ${action.panel_id}` });
+              return;
+            }
             if (!workstationEnabled) {
               openPanelUniversal(action.panel_id);
+              publish({ ok: true, message: "Focused via freeform mode." });
               return;
             }
             const groupId =
@@ -210,15 +241,21 @@ export default function DesktopPage() {
             if (groupId) {
               store.setActivePanel(groupId, action.panel_id);
               store.focusGroup(groupId);
+              publish({ ok: true });
               return;
             }
             openPanelUniversal(action.panel_id);
+            publish({ ok: true, message: "Panel opened because no existing group owned it." });
             return;
           }
           case "close_panel": {
-            if (!workstationEnabled) return;
+            if (!workstationEnabled) {
+              publish({ ok: false, message: "Close panel ignored outside workstation mode." });
+              return;
+            }
             if (action.group_id) {
               store.closePanelFromGroup(action.group_id, action.panel_id);
+              publish({ ok: true });
               return;
             }
             Object.values(store.groups).forEach((group) => {
@@ -226,18 +263,26 @@ export default function DesktopPage() {
                 store.closePanelFromGroup(group.id, action.panel_id);
               }
             });
+            publish({ ok: true });
             return;
           }
           case "split_active_group":
             if (workstationEnabled) {
               store.splitActiveGroup(action.direction);
+              publish({ ok: true });
+              return;
             }
+            publish({ ok: false, message: "Split active group ignored outside workstation mode." });
             return;
           case "open_settings":
             openSettings(action.tab ?? "preferences");
+            publish({ ok: true });
             return;
           case "set_chat_dock":
-            if (!workstationEnabled) return;
+            if (!workstationEnabled) {
+              publish({ ok: false, message: "Set chat dock ignored outside workstation mode." });
+              return;
+            }
             if (typeof action.width_px === "number") {
               store.setChatDockWidth(action.width_px);
             }
@@ -247,9 +292,10 @@ export default function DesktopPage() {
             ) {
               store.toggleChatDock();
             }
+            publish({ ok: true });
             return;
-          case "run_panel_action":
-            executeHelixPanelAction(
+          case "run_panel_action": {
+            const result = executeHelixPanelAction(
               {
                 panel_id: action.panel_id,
                 action_id: action.action_id,
@@ -296,8 +342,15 @@ export default function DesktopPage() {
                 openSettings: (tab) => openSettings(tab ?? "preferences"),
               },
             );
+            publish({
+              ok: result.ok,
+              message: result.message,
+              artifact: result.artifact ?? null,
+            });
             return;
+          }
           case "run_job":
+            publish({ ok: true, message: "Delegated to workstation job executor." });
             void runWorkstationJob({
               contextId: HELIX_ASK_CONTEXT_ID.desktop,
               payload: action.payload,
@@ -344,8 +397,10 @@ export default function DesktopPage() {
             });
             return;
           case "toggle_mobile_drawer":
+            publish({ ok: false, message: "Toggle mobile drawer is not supported on desktop." });
             return;
           default:
+            publish({ ok: false, message: "Unhandled workstation action." });
             return;
         }
       };

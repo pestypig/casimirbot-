@@ -1,10 +1,10 @@
-import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { getWorkstationPanelCapabilities } from "@/lib/workstation/panelCapabilities";
 import {
   executeHelixPanelAction,
   type HelixPanelActionExecutionContext,
 } from "@/lib/workstation/panelActionAdapters";
+import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 
 export type WorkstationJobPayload = {
   job_id?: string;
@@ -55,23 +55,40 @@ function chooseActionId(panelId: string): string | null {
   return capabilities.actions[0]?.id ?? null;
 }
 
-function writeReceiptToTaskHistory(args: {
+function emitJobLiveEvent(args: {
   contextId: string;
-  role: "tool" | "assistant";
-  content: string;
   traceId: string;
+  kind: "job_started" | "job_step_receipt" | "job_completed";
+  content: string;
+  durationMs?: number;
+  step?: number;
+  panelId?: string;
+  actionId?: string;
+  ok?: boolean;
+  artifact?: Record<string, unknown> | null;
   tool?: string;
 }): void {
-  useAgiChatStore.getState().addContextMessage(
-    args.contextId,
-    {
-      role: args.role,
-      content: args.content,
-      traceId: args.traceId,
-      tool: args.tool,
+  const tsIso = new Date().toISOString();
+  emitHelixAskLiveEvent({
+    contextId: args.contextId,
+    traceId: args.traceId,
+    entry: {
+      id: `workstation-job:${args.traceId}:${args.kind}:${args.step ?? 0}:${Date.now()}`,
+      text: args.content,
+      tool: args.tool ?? "workstation.job_executor",
+      ts: tsIso,
+      durationMs: args.durationMs,
+      meta: {
+        kind: args.kind,
+        step: args.step,
+        panel_id: args.panelId,
+        action_id: args.actionId,
+        ok: args.ok,
+        artifact: args.artifact ?? null,
+        trace_id: args.traceId,
+      },
     },
-    "Task History",
-  );
+  });
 }
 
 export async function runWorkstationJob(args: {
@@ -86,10 +103,10 @@ export async function runWorkstationJob(args: {
   const objective = args.payload.objective?.trim() || "Execute job-ready panel actions.";
   const traceId = `workstation-job:${jobId}`;
 
-  writeReceiptToTaskHistory({
+  emitJobLiveEvent({
     contextId: args.contextId,
-    role: "assistant",
     traceId,
+    kind: "job_started",
     content: `Started job "${title}". Objective: ${objective}`,
   });
 
@@ -123,29 +140,27 @@ export async function runWorkstationJob(args: {
     };
     receipts.push(receipt);
 
-    writeReceiptToTaskHistory({
+    emitJobLiveEvent({
       contextId: args.contextId,
-      role: "tool",
       traceId,
-      tool: "workstation.job_executor",
-      content: JSON.stringify(
-        {
-          kind: "job_step_receipt",
-          job_id: jobId,
-          ...receipt,
-        },
-        null,
-        2,
-      ),
+      kind: "job_step_receipt",
+      step: receipt.step,
+      panelId,
+      actionId,
+      ok: result.ok,
+      durationMs: durationMs,
+      artifact: result.artifact ?? null,
+      content: `Step ${receipt.step}: ${panelId}.${actionId} -> ${result.ok ? "ok" : "fail"}${result.message ? ` (${result.message})` : ""}`,
     });
   }
 
   const completedAt = new Date().toISOString();
   const ok = receipts.length > 0 && receipts.every((receipt) => receipt.ok);
-  writeReceiptToTaskHistory({
+  emitJobLiveEvent({
     contextId: args.contextId,
-    role: "assistant",
     traceId,
+    kind: "job_completed",
+    ok,
     content: `Completed job "${title}" with ${receipts.length} step(s). Status: ${ok ? "ok" : "partial/fail"}.`,
   });
 

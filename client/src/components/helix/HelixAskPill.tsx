@@ -28,6 +28,7 @@ import {
   type ConversationClarifierPolicy,
   type ConversationExplorationPacket,
   type HelixInterpreterArtifact,
+  type HelixAskReasoningTheaterStateV1,
   type PendingHelixAskJob,
   type VoiceCommandLaneEnvelope,
   type ToolLogEvent,
@@ -45,6 +46,10 @@ import {
   consumePendingHelixAskPrompt,
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
+import {
+  HELIX_ASK_LIVE_EVENT_BUS_EVENT,
+  coerceHelixAskLiveEventBusPayload,
+} from "@/lib/helix/liveEventsBus";
 import {
   dispatchHelixWorkstationAction,
   dispatchHelixWorkstationActions,
@@ -4062,6 +4067,7 @@ type HelixAskReply = {
     stage05_two_pass_used?: boolean;
     stage05_two_pass_batches?: number;
     stage05_overflow_policy?: "single_pass" | "two_pass" | null;
+    reasoning_theater_state_v1?: HelixAskReasoningTheaterStateV1;
     intent_contract_hash?: string;
     intent_contract_mutation_detected?: boolean;
     equation_candidate_total?: number;
@@ -6444,6 +6450,108 @@ function resolveReasoningTheaterCertaintyClass(input: {
   return "reasoned";
 }
 
+const REASONING_THEATER_SUPPRESSION_REASON_SET = new Set<ReasoningTheaterSuppressionReason>([
+  "context_ineligible",
+  "dedupe_cooldown",
+  "mission_rate_limited",
+  "voice_rate_limited",
+  "voice_budget_exceeded",
+  "voice_backend_error",
+  "missing_evidence",
+  "contract_violation",
+  "agi_overload_admission_control",
+]);
+
+function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheaterStateV1 | null {
+  const record = asObjectRecord(value);
+  if (!record) return null;
+  if (record.contract_version !== "reasoning_theater.v1") return null;
+  if (typeof record.trace_id !== "string" || !record.trace_id.trim()) return null;
+  const phase = String(record.phase ?? "").trim() as ReasoningTheaterPhase;
+  if (!(phase in REASONING_THEATER_PHASE_LABEL)) return null;
+  const archetype = String(record.archetype ?? "").trim() as ReasoningTheaterArchetype;
+  if (!(archetype in REASONING_THEATER_ARCHETYPE_LABEL)) return null;
+  const certaintyClass = String(record.certainty_class ?? "").trim() as ReasoningTheaterCertaintyClass;
+  if (!(certaintyClass in REASONING_THEATER_CERTAINTY_LABEL)) return null;
+  const stance = String(record.stance ?? "").trim() as ReasoningTheaterStance;
+  if (!(stance in REASONING_THEATER_STANCE_META)) return null;
+  return record as unknown as HelixAskReasoningTheaterStateV1;
+}
+
+function deriveReasoningTheaterStateFromCanonical(
+  canonical: HelixAskReasoningTheaterStateV1,
+): ReasoningTheaterState {
+  const suppressionRaw = canonical.suppression_reason;
+  const suppressionReason =
+    suppressionRaw && REASONING_THEATER_SUPPRESSION_REASON_SET.has(suppressionRaw)
+      ? suppressionRaw
+      : null;
+  const momentum = clamp01(canonical.indices.momentum);
+  const ambiguityPressure = clamp01(canonical.indices.ambiguity_pressure);
+  const battleIndex = clampNumber(canonical.indices.battle_index, -1, 1);
+  const phase = canonical.phase;
+  const stance = canonical.stance;
+  const archetype = canonical.archetype;
+  const certaintyClass = canonical.certainty_class;
+
+  const symbolicLine =
+    stance === "fail_closed"
+      ? "Seal engaged: deterministic fail reason surfaced."
+      : stance === "winning"
+        ? "Momentum is clearing the fog around the objective."
+        : stance === "losing"
+          ? "Ambiguity pressure is pushing back; tighten evidence."
+          : "Battle is contested; keep resolving the highest-signal gaps.";
+
+  const evidenceHits = Math.max(
+    0,
+    Math.round(
+      (canonical.telemetry.evidence_gate_ok ? 1 : 0) * 2 +
+        clamp01(canonical.telemetry.evidence_claim_ratio ?? 0) * 3,
+    ),
+  );
+  const passHits = Math.max(
+    0,
+    Math.round((canonical.telemetry.proof_verdict === "PASS" ? 2 : 0) + momentum * 3),
+  );
+  const stageTransitions = 0;
+  const pulseHz = 0.8 + 1.4 * clamp01(Math.abs(battleIndex));
+  const fogOpacity = clamp01(0.12 + 0.75 * ambiguityPressure);
+  const particleCount = clampNumber(Math.round(6 + momentum * 16), 4, 24);
+  const seed = Number.isFinite(canonical.seed) ? canonical.seed >>> 0 : hash32(canonical.scenario_id);
+  const allText = [
+    phase,
+    archetype,
+    certaintyClass,
+    stance,
+    suppressionReason ?? "",
+    canonical.telemetry.proof_verdict ?? "",
+  ]
+    .join(" ")
+    .trim()
+    .toLowerCase();
+
+  return {
+    stance,
+    archetype,
+    phase,
+    certaintyClass,
+    suppressionReason,
+    momentum,
+    ambiguityPressure,
+    battleIndex,
+    pulseHz,
+    fogOpacity,
+    particleCount,
+    passHits,
+    evidenceHits,
+    stageTransitions,
+    allText,
+    symbolicLine,
+    seed,
+  };
+}
+
 function resolveReasoningTheaterMedal(input: {
   current: ReasoningTheaterState;
   previous: ReasoningTheaterState | null;
@@ -6774,6 +6882,20 @@ const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition[
   { pattern: /(agi\.plan|training-trace|essence|trace)/i, panelId: "agi-essence-console" },
   { pattern: /(docs\/|\.md$)/i, panelId: "docs-viewer" },
 ];
+const HELIX_DOC_TOPIC_PATH_HINTS: Array<{ pattern: RegExp; path: string }> = [
+  {
+    pattern: /\bnhm2\b/i,
+    path: "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+  },
+  {
+    pattern: /\bneedle\s*hull\s*(?:mark\s*2|mk\s*2|mark\s*ii|mkii)\b/i,
+    path: "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+  },
+  {
+    pattern: /\bneedle\s*hull\b/i,
+    path: "docs/needle-hull-mainframe.md",
+  },
+];
 const HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID: PanelDefinition["id"] = "needle-mk2-calculator";
 
 const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
@@ -6830,6 +6952,116 @@ function parseOpenPanelCommand(value: string): PanelDefinition["id"] | null {
 function parseWorkstationActionCommand(value: string): HelixWorkstationAction | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
+  const conversationalCandidate = trimmed
+    .replace(/^["'\s]+|["'\s]+$/g, "")
+    .replace(/^question\s*:\s*/i, "")
+    .trim();
+
+  const parsePayloadToJob = (
+    payload: Record<string, unknown>,
+  ): {
+    title?: string;
+    objective?: string;
+    preferred_panels?: string[];
+    max_steps?: number;
+  } => {
+    const title = typeof payload.title === "string" ? payload.title.trim() : "";
+    const objective = typeof payload.objective === "string" ? payload.objective.trim() : "";
+    const preferredPanels = Array.isArray(payload.preferred_panels)
+      ? payload.preferred_panels
+          .filter((entry) => typeof entry === "string")
+          .map((entry) => (entry as string).trim())
+          .filter(Boolean)
+      : [];
+    const maxSteps =
+      typeof payload.max_steps === "number" && Number.isFinite(payload.max_steps)
+        ? Math.max(1, Math.min(12, Math.floor(payload.max_steps)))
+        : undefined;
+    return {
+      ...(title ? { title } : {}),
+      ...(objective ? { objective } : {}),
+      ...(preferredPanels.length > 0 ? { preferred_panels: preferredPanels } : {}),
+      ...(typeof maxSteps === "number" ? { max_steps: maxSteps } : {}),
+    };
+  };
+
+  const parseNaturalLanguageRunJob = (
+    source: string,
+  ): {
+    title?: string;
+    objective?: string;
+    preferred_panels?: string[];
+    max_steps?: number;
+  } => {
+    const payload: {
+      title?: string;
+      objective?: string;
+      preferred_panels?: string[];
+      max_steps?: number;
+    } = {};
+    const text = source.trim();
+    const objectiveQuoted =
+      text.match(/\bobjective\s*[:=]?\s*"([^"]+)"/i)?.[1]?.trim() ??
+      text.match(/\bobjective\s*[:=]?\s*'([^']+)'/i)?.[1]?.trim();
+    if (objectiveQuoted) {
+      payload.objective = objectiveQuoted;
+    } else {
+      const objectiveBare = text.match(/\bobjective\s*[:=]?\s*([^,]+)(?:,|$)/i)?.[1]?.trim();
+      if (objectiveBare) payload.objective = objectiveBare.replace(/\.$/, "").trim();
+    }
+
+    const titleQuoted =
+      text.match(/\btitle\s*[:=]?\s*"([^"]+)"/i)?.[1]?.trim() ??
+      text.match(/\btitle\s*[:=]?\s*'([^']+)'/i)?.[1]?.trim();
+    if (titleQuoted) payload.title = titleQuoted;
+
+    const preferredPanelsMatch = text.match(/\bpreferred_panels\s*[:=]?\s*(\[[^\]]*\])/i)?.[1];
+    if (preferredPanelsMatch) {
+      try {
+        const parsed = JSON.parse(preferredPanelsMatch) as unknown;
+        if (Array.isArray(parsed)) {
+          const normalized = parsed
+            .filter((entry) => typeof entry === "string")
+            .map((entry) => (entry as string).trim())
+            .filter(Boolean);
+          if (normalized.length > 0) payload.preferred_panels = normalized;
+        }
+      } catch {
+        // ignore malformed preferred_panels arrays
+      }
+    }
+
+    const maxStepsText = text.match(/\bmax_steps\s*[:=]?\s*(\d{1,2})\b/i)?.[1];
+    if (maxStepsText) {
+      const parsed = Number(maxStepsText);
+      if (Number.isFinite(parsed)) {
+        payload.max_steps = Math.max(1, Math.min(12, Math.floor(parsed)));
+      }
+    }
+    return payload;
+  };
+
+  const resolveDocPathFromPrompt = (source: string): string | null => {
+    const explicitPath = source.match(/\b(docs\/[a-z0-9._/-]+\.(?:md|json))\b/i)?.[1]?.trim();
+    if (explicitPath) return explicitPath;
+    for (const hint of HELIX_DOC_TOPIC_PATH_HINTS) {
+      if (hint.pattern.test(source)) return hint.path;
+    }
+    return null;
+  };
+
+  const jsonActionMatch = trimmed.match(
+    /^(?:\/(?:workstation|action)|workstation|action)\s*:?\s*(\{[\s\S]+\})$/i,
+  );
+  if (jsonActionMatch) {
+    try {
+      const parsed = JSON.parse(jsonActionMatch[1]) as unknown;
+      const actions = coerceHelixWorkstationActions(parsed);
+      if (actions.length > 0) return actions[0] ?? null;
+    } catch {
+      // ignore malformed structured delegation envelopes
+    }
+  }
 
   const runJobMatch = trimmed.match(/^\/run-job(?:\s+(.+))?$/i);
   if (runJobMatch) {
@@ -6844,24 +7076,7 @@ function parseWorkstationActionCommand(value: string): HelixWorkstationAction | 
       try {
         const parsed = JSON.parse(rawPayload) as Record<string, unknown>;
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
-          const objective = typeof parsed.objective === "string" ? parsed.objective.trim() : "";
-          const preferredPanels = Array.isArray(parsed.preferred_panels)
-            ? parsed.preferred_panels
-                .filter((entry) => typeof entry === "string")
-                .map((entry) => (entry as string).trim())
-                .filter(Boolean)
-            : [];
-          const maxSteps =
-            typeof parsed.max_steps === "number" && Number.isFinite(parsed.max_steps)
-              ? Math.max(1, Math.min(12, Math.floor(parsed.max_steps)))
-              : undefined;
-          payload = {
-            ...(title ? { title } : {}),
-            ...(objective ? { objective } : {}),
-            ...(preferredPanels.length > 0 ? { preferred_panels: preferredPanels } : {}),
-            ...(typeof maxSteps === "number" ? { max_steps: maxSteps } : {}),
-          };
+          payload = parsePayloadToJob(parsed);
         }
       } catch {
         payload = {
@@ -6872,6 +7087,37 @@ function parseWorkstationActionCommand(value: string): HelixWorkstationAction | 
     return {
       action: "run_job",
       payload,
+    };
+  }
+
+  const naturalRunJobMatch = conversationalCandidate.match(
+    /^(?:run|start|execute)\s+(?:a\s+)?workstation\s+job\b[:\s,-]*(.*)$/i,
+  );
+  if (naturalRunJobMatch) {
+    const extracted = parseNaturalLanguageRunJob(naturalRunJobMatch[1] ?? "");
+    return {
+      action: "run_job",
+      payload: extracted,
+    };
+  }
+
+  const conversationalOpenDocsMatch = conversationalCandidate.match(
+    /^(?:(?:can|could|would)\s+you\s+|please\s+)?(?:open|show|pull\s+up|bring\s+up)\s+(?:(?:a|an|the)\s+)?(?:docs?|documentation)\b(?:\s+(?:about|for|on|regarding)\s+(.+?))?[?.!]*$/i,
+  );
+  if (conversationalOpenDocsMatch) {
+    const topic = conversationalOpenDocsMatch[1]?.trim() ?? "";
+    const path = resolveDocPathFromPrompt(topic || conversationalCandidate);
+    if (path) {
+      return {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+        args: { path },
+      };
+    }
+    return {
+      action: "open_panel",
+      panel_id: "docs-viewer",
     };
   }
 
@@ -6898,6 +7144,19 @@ function parseWorkstationActionCommand(value: string): HelixWorkstationAction | 
         action_id: actionId,
         args,
       };
+    }
+  }
+
+  const panelActionJsonMatch = trimmed.match(/^\/panel-action\s+(\{[\s\S]+\})$/i);
+  if (panelActionJsonMatch) {
+    try {
+      const parsed = JSON.parse(panelActionJsonMatch[1]) as unknown;
+      const actions = coerceHelixWorkstationActions(parsed).filter((action) => action.action === "run_panel_action");
+      if (actions.length > 0) {
+        return actions[0] ?? null;
+      }
+    } catch {
+      // ignore malformed /panel-action JSON payloads
     }
   }
 
@@ -8142,17 +8401,43 @@ export function HelixAskPill({
   const moodLabel = moodAsset?.label ?? "Helix mood";
   const moodPalette = LUMA_MOOD_PALETTE[askMood] ?? LUMA_MOOD_PALETTE.question;
   const moodRingClass = moodPalette.ring;
+  const reasoningTheaterCanonicalState = useMemo(() => {
+    for (let index = askLiveEvents.length - 1; index >= 0; index -= 1) {
+      const candidate = coerceReasoningTheaterStateV1(
+        asObjectRecord(askLiveEvents[index]?.meta)?.reasoning_theater_state_v1,
+      );
+      if (candidate) return candidate;
+    }
+    const latestReplyDebug = askReplies[askReplies.length - 1]?.debug;
+    return coerceReasoningTheaterStateV1(latestReplyDebug?.reasoning_theater_state_v1);
+  }, [askLiveEvents, askReplies]);
   const reasoningTheater = useMemo(
-    () =>
-      deriveReasoningTheaterState({
+    () => {
+      if (!askBusy) return null;
+      if (
+        reasoningTheaterCanonicalState &&
+        (!askLiveTraceId || reasoningTheaterCanonicalState.trace_id === askLiveTraceId)
+      ) {
+        return deriveReasoningTheaterStateFromCanonical(reasoningTheaterCanonicalState);
+      }
+      return deriveReasoningTheaterState({
         askBusy,
         askStatus,
         askLiveDraft,
         askElapsedMs,
         askLiveEvents,
         askLiveTraceId,
-      }),
-    [askBusy, askElapsedMs, askLiveDraft, askLiveEvents, askLiveTraceId, askStatus],
+      });
+    },
+    [
+      askBusy,
+      askElapsedMs,
+      askLiveDraft,
+      askLiveEvents,
+      askLiveTraceId,
+      askStatus,
+      reasoningTheaterCanonicalState,
+    ],
   );
   const reasoningTheaterParticles = useMemo(() => {
     if (!reasoningTheater) return [];
@@ -17010,6 +17295,61 @@ export function HelixAskPill({
     scheduleLiveDraftFlush,
     updateReasoningTheaterEventClock,
   ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleExternalLiveEvent = (event: Event) => {
+      const detail = coerceHelixAskLiveEventBusPayload((event as CustomEvent<unknown>)?.detail);
+      if (!detail || detail.contextId !== contextId) return;
+      const toolName = detail.entry.tool?.trim() || "workstation.job_executor";
+      const text = clipText(detail.entry.text.trim(), HELIX_ASK_LIVE_EVENT_MAX_CHARS);
+      if (!text) return;
+      const eventTs = parseTimestampMs(detail.entry.ts);
+      setAskStatus(text);
+      setAskLiveEvents((prev) => {
+        if (prev.some((entry) => entry.id === detail.entry.id)) return prev;
+        const next = [
+          ...prev,
+          {
+            id: detail.entry.id,
+            text,
+            tool: toolName,
+            ts: detail.entry.ts,
+            tsMs: detail.entry.tsMs ?? eventTs ?? undefined,
+            seq:
+              typeof detail.entry.seq === "number" && Number.isFinite(detail.entry.seq)
+                ? detail.entry.seq
+                : undefined,
+            durationMs:
+              typeof detail.entry.durationMs === "number" && Number.isFinite(detail.entry.durationMs)
+                ? detail.entry.durationMs
+                : undefined,
+            meta:
+              detail.entry.meta && typeof detail.entry.meta === "object" && !Array.isArray(detail.entry.meta)
+                ? detail.entry.meta
+                : undefined,
+          },
+        ];
+        const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+        askLiveEventsRef.current = clipped;
+        const manualAttemptId = reasoningAttemptManualIdRef.current;
+        if (manualAttemptId) {
+          const appendedEvent = clipped[clipped.length - 1];
+          if (appendedEvent) {
+            updateReasoningAttempt(manualAttemptId, (current) => ({
+              ...current,
+              events: [...current.events, appendedEvent].slice(-HELIX_ASK_LIVE_EVENT_LIMIT),
+            }));
+          }
+        }
+        return clipped;
+      });
+    };
+    window.addEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, handleExternalLiveEvent as EventListener);
+    return () => {
+      window.removeEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, handleExternalLiveEvent as EventListener);
+    };
+  }, [contextId, updateReasoningAttempt]);
 
   const askLiveStatusText = useMemo(() => {
     const statusTrimmed = askStatus?.trim() ?? "";

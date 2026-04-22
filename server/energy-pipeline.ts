@@ -5337,6 +5337,16 @@ const NHM2_DEC_PHYSICS_CONTROL_RESEARCH_SUPPORT_MAP = {
   uncertainty_reporting_requires_refinement_evidence: {
     supportLevel: "primary_source",
     evidenceRefs: [
+      "observerDecPhysicsControlEvidence.refinementEvidence.status",
+      "observerDecPhysicsControlEvidence.refinementEvidence.coarseStepM",
+      "observerDecPhysicsControlEvidence.refinementEvidence.refinedStepM",
+      "observerDecPhysicsControlEvidence.refinementEvidence.superRefinedStepM",
+      "observerDecPhysicsControlEvidence.refinementEvidence.richardsonExtrapolatedResidualT0i",
+      "observerDecPhysicsControlEvidence.refinementEvidence.richardsonExtrapolatedResidualOffDiagonal",
+      "observerDecPhysicsControlEvidence.refinementEvidence.uncertaintyRelativeBound",
+      "observerDecPhysicsControlEvidence.refinementEvidence.conservativeMetricDecMarginToZero",
+      "observerDecPhysicsControlEvidence.refinementEvidence.conservativeTileReconstitutedDecMarginToZero",
+      "observerDecPhysicsControlEvidence.refinementEvidence.uncertaintyBoundPass",
       "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecUncertaintyAbs",
       "observerDecPhysicsControlEvidence.runtimeApplication.observed.tileReconstitutedDecUncertaintyAbs",
       "observerDecPhysicsControlEvidence.runtimeApplication.observed.metricDecConservativeMarginToZero",
@@ -9769,6 +9779,140 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
   const runtimeUncertaintyBoundPass =
     runtimeSelectedCrossesZeroUnderUncertainty &&
     runtimeReferenceCrossesZeroBothDecMargins;
+  const evaluatorClosureEvidence =
+    args.modelTermSemanticEvidence.einsteinEvaluatorClosureEvidence ?? null;
+  const refinementCoarseStepM = toFiniteNumber(
+    evaluatorClosureEvidence?.resolutionSweep?.coarse?.step_m,
+  );
+  const refinementRefinedStepM = toFiniteNumber(
+    evaluatorClosureEvidence?.resolutionSweep?.refined?.step_m,
+  );
+  const refinementSuperRefinedStepM = toFiniteNumber(
+    evaluatorClosureEvidence?.resolutionSweep?.superRefined?.step_m,
+  );
+  const refinementObservedConvergenceOrderT0i = toFiniteNumber(
+    evaluatorClosureEvidence?.observedConvergenceOrder?.t0i,
+  );
+  const refinementObservedConvergenceOrderOffDiagonal = toFiniteNumber(
+    evaluatorClosureEvidence?.observedConvergenceOrder?.offDiagonal,
+  );
+  const refinementRichardsonExtrapolatedResidualT0i = toFiniteNumber(
+    evaluatorClosureEvidence?.richardsonExtrapolatedResidual?.t0i,
+  );
+  const refinementRichardsonExtrapolatedResidualOffDiagonal = toFiniteNumber(
+    evaluatorClosureEvidence?.richardsonExtrapolatedResidual?.offDiagonal,
+  );
+  const refinementRichardsonRelativeBoundCandidates = [
+    refinementRichardsonExtrapolatedResidualT0i,
+    refinementRichardsonExtrapolatedResidualOffDiagonal,
+  ].filter((entry): entry is number => entry != null && Number.isFinite(entry));
+  const refinementRichardsonRelativeBound =
+    refinementRichardsonRelativeBoundCandidates.length > 0
+      ? Math.max(...refinementRichardsonRelativeBoundCandidates)
+      : null;
+  const refinementUncertaintyRelativeBound = Math.max(
+    runtimeUncertaintyRelativeBound,
+    refinementRichardsonRelativeBound ?? 0,
+    NHM2_DEC_PHYSICS_RUNTIME_UNCERTAINTY_RELATIVE_MARGIN_FLOOR,
+  );
+  const refinementUncertaintyAbsMetricDec =
+    runtimeMetricDecRobustMarginToZero != null
+      ? Math.abs(runtimeMetricDecRobustMarginToZero) *
+        refinementUncertaintyRelativeBound
+      : null;
+  const refinementUncertaintyAbsTileReconstitutedDec =
+    runtimeTileDecRobustMarginToZero != null
+      ? Math.abs(runtimeTileDecRobustMarginToZero) *
+        refinementUncertaintyRelativeBound
+      : null;
+  const refinementConservativeMetricDecMarginToZero =
+    runtimeMetricDecRobustMarginToZero != null &&
+    refinementUncertaintyAbsMetricDec != null
+      ? runtimeMetricDecRobustMarginToZero - refinementUncertaintyAbsMetricDec
+      : null;
+  const refinementConservativeTileReconstitutedDecMarginToZero =
+    runtimeTileDecRobustMarginToZero != null &&
+    refinementUncertaintyAbsTileReconstitutedDec != null
+      ? runtimeTileDecRobustMarginToZero -
+        refinementUncertaintyAbsTileReconstitutedDec
+      : null;
+  const refinementRichardsonExtrapolatedMetricDecMarginToZero =
+    runtimeMetricDecRobustMarginToZero != null &&
+    refinementRichardsonRelativeBound != null
+      ? runtimeMetricDecRobustMarginToZero -
+        Math.abs(runtimeMetricDecRobustMarginToZero) *
+          refinementRichardsonRelativeBound
+      : null;
+  const refinementRichardsonExtrapolatedTileReconstitutedDecMarginToZero =
+    runtimeTileDecRobustMarginToZero != null &&
+    refinementRichardsonRelativeBound != null
+      ? runtimeTileDecRobustMarginToZero -
+        Math.abs(runtimeTileDecRobustMarginToZero) *
+          refinementRichardsonRelativeBound
+      : null;
+  const refinementUncertaintyBoundPass =
+    refinementConservativeMetricDecMarginToZero != null &&
+    refinementConservativeTileReconstitutedDecMarginToZero != null
+      ? refinementConservativeMetricDecMarginToZero > 0 &&
+        refinementConservativeTileReconstitutedDecMarginToZero > 0 &&
+        runtimeReferenceCrossesZeroBothDecMargins
+      : null;
+  const refinementHasResolutionEvidence =
+    refinementCoarseStepM != null &&
+    refinementRefinedStepM != null &&
+    (refinementObservedConvergenceOrderT0i != null ||
+      refinementObservedConvergenceOrderOffDiagonal != null ||
+      refinementRichardsonRelativeBound != null);
+  const refinementEvidenceStatus:
+    NonNullable<Nhm2ObserverDecPhysicsControlEvidence["refinementEvidence"]>["status"] =
+    runtimeEvaluationComparable
+      ? refinementHasResolutionEvidence
+        ? "available"
+        : "missing"
+      : "non_comparable";
+  const refinementEvidenceCitationRefs = Array.from(
+    new Set([
+      ...NHM2_DEC_PHYSICS_UNCERTAINTY_WEB_CITATION_REFS,
+      ...NHM2_MODEL_TERM_REQUIRED_WEB_CITATION_REFS,
+    ]),
+  );
+  const refinementEvidence: NonNullable<
+    Nhm2ObserverDecPhysicsControlEvidence["refinementEvidence"]
+  > = {
+    status: refinementEvidenceStatus,
+    referenceRouteId: runtimeReferenceRouteId,
+    routeComparable: runtimeEvaluationComparable,
+    comparableSampleCount: runtimeComparableSampleCount,
+    minimumComparableSampleCount: runtimeMinimumComparableSampleCount,
+    coarseStepM: refinementCoarseStepM,
+    refinedStepM: refinementRefinedStepM,
+    superRefinedStepM: refinementSuperRefinedStepM,
+    observedConvergenceOrderT0i: refinementObservedConvergenceOrderT0i,
+    observedConvergenceOrderOffDiagonal:
+      refinementObservedConvergenceOrderOffDiagonal,
+    richardsonExtrapolatedResidualT0i:
+      refinementRichardsonExtrapolatedResidualT0i,
+    richardsonExtrapolatedResidualOffDiagonal:
+      refinementRichardsonExtrapolatedResidualOffDiagonal,
+    richardsonExtrapolatedMetricDecMarginToZero:
+      refinementRichardsonExtrapolatedMetricDecMarginToZero,
+    richardsonExtrapolatedTileReconstitutedDecMarginToZero:
+      refinementRichardsonExtrapolatedTileReconstitutedDecMarginToZero,
+    uncertaintyRelativeBound: refinementUncertaintyRelativeBound,
+    uncertaintyAbsMetricDec: refinementUncertaintyAbsMetricDec,
+    uncertaintyAbsTileReconstitutedDec: refinementUncertaintyAbsTileReconstitutedDec,
+    conservativeMetricDecMarginToZero: refinementConservativeMetricDecMarginToZero,
+    conservativeTileReconstitutedDecMarginToZero:
+      refinementConservativeTileReconstitutedDecMarginToZero,
+    uncertaintyBoundPass: refinementUncertaintyBoundPass,
+    note:
+      refinementEvidenceStatus === "available"
+        ? "Refinement-aware uncertainty evidence is comparable and admitted for conservative DEC sign interpretation."
+        : refinementEvidenceStatus === "missing"
+          ? "Comparable route evidence exists, but refinement/convergence artifacts are incomplete for full uncertainty localization."
+          : "Refinement evidence remains non-comparable because runtime route parity/sample gates are not pass-level.",
+    citationRefs: refinementEvidenceCitationRefs,
+  };
   const runtimeMetricWecNonRegression =
     runtimeSweepCandidate.guardChecks.metricWecNonRegression;
   const runtimeMetricNecNonRegression =
@@ -11271,6 +11415,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       citationRefs: decRuntimeCitationRefs,
     },
     decRuntimeDecisionEvidence,
+    refinementEvidence,
     extensionTrancheId,
     familySearchOrder,
     appliedCandidateEvidence,
@@ -11433,6 +11578,16 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
       `runtimeApplication.observed.referenceTileReconstitutedDecConservativeMarginToZero=${runtimeReferenceTileDecConservativeMarginToZero ?? "null"}`,
       `runtimeApplication.observed.metricWecNonRegressionMargin=${runtimeMetricWecNonRegressionMargin ?? "null"}`,
       `runtimeApplication.observed.metricNecNonRegressionMargin=${runtimeMetricNecNonRegressionMargin ?? "null"}`,
+      `refinementEvidence.status=${refinementEvidence.status}`,
+      `refinementEvidence.coarseStepM=${refinementEvidence.coarseStepM ?? "null"}`,
+      `refinementEvidence.refinedStepM=${refinementEvidence.refinedStepM ?? "null"}`,
+      `refinementEvidence.superRefinedStepM=${refinementEvidence.superRefinedStepM ?? "null"}`,
+      `refinementEvidence.richardsonExtrapolatedResidualT0i=${refinementEvidence.richardsonExtrapolatedResidualT0i ?? "null"}`,
+      `refinementEvidence.richardsonExtrapolatedResidualOffDiagonal=${refinementEvidence.richardsonExtrapolatedResidualOffDiagonal ?? "null"}`,
+      `refinementEvidence.uncertaintyRelativeBound=${refinementEvidence.uncertaintyRelativeBound ?? "null"}`,
+      `refinementEvidence.conservativeMetricDecMarginToZero=${refinementEvidence.conservativeMetricDecMarginToZero ?? "null"}`,
+      `refinementEvidence.conservativeTileReconstitutedDecMarginToZero=${refinementEvidence.conservativeTileReconstitutedDecMarginToZero ?? "null"}`,
+      `refinementEvidence.uncertaintyBoundPass=${refinementEvidence.uncertaintyBoundPass == null ? "null" : String(refinementEvidence.uncertaintyBoundPass)}`,
       `decRuntimeDecisionEvidence.status=${decRuntimeDecisionEvidence.status}`,
       `decRuntimeDecisionEvidence.gatePass=${String(decRuntimeDecisionEvidence.gatePass)}`,
       `decRuntimeDecisionEvidence.primaryReasonCode=${decRuntimeDecisionEvidence.primaryReasonCode ?? "none"}`,
@@ -11456,6 +11611,7 @@ const deriveNhm2ObserverDecPhysicsControlEvidence = (args: {
           ? `Bounded non-truncation coupled same-chart probe (s=${sameChartTensorPhysicsControlProbeScale}, rho_lift=${sameChartTensorDensityLiftProbeFraction}) satisfies DEC-lift and WEC/NEC non-regression gates on the admitted Einstein route and is runtime-applied for this evidence pass.`
           : `Bounded non-truncation coupled same-chart probe (s=${sameChartTensorPhysicsControlProbeScale}, rho_lift=${sameChartTensorDensityLiftProbeFraction}) satisfies DEC-lift and WEC/NEC non-regression gates on the admitted Einstein route; runtime application is still gated by explicit opt-in and revalidation.`
         : `A bounded non-truncation same-chart pressure-scale probe (s=${sameChartTensorPhysicsControlProbeScale}) was evaluated with fixed observer-domain bounds; it lifted DEC but reduced NEC, so baseline hold is retained under strict non-regression policy.`,
+      `Refinement evidence status=${refinementEvidence.status}; uncertaintyBoundPass=${refinementEvidence.uncertaintyBoundPass == null ? "null" : String(refinementEvidence.uncertaintyBoundPass)}; coarseStepM=${refinementEvidence.coarseStepM ?? "null"}; refinedStepM=${refinementEvidence.refinedStepM ?? "null"}; superRefinedStepM=${refinementEvidence.superRefinedStepM ?? "null"}.`,
     ],
   };
 };

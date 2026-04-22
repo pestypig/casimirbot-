@@ -335,6 +335,12 @@ export const NHM2_OBSERVER_DEC_PHYSICS_RUNTIME_FAILURE_MODE_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_OBSERVER_DEC_REFINEMENT_EVIDENCE_STATUS_VALUES = [
+  "available",
+  "missing",
+  "non_comparable",
+] as const;
+
 export const NHM2_OBSERVER_DEC_EXTENSION_TRANCHE_ID_VALUES = [
   "tranche_1_primary",
   "tranche_2_extended",
@@ -585,6 +591,8 @@ export type Nhm2ObserverDecPhysicsRuntimeApplicationStatus =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_RUNTIME_APPLICATION_STATUS_VALUES)[number];
 export type Nhm2ObserverDecPhysicsRuntimeFailureMode =
   (typeof NHM2_OBSERVER_DEC_PHYSICS_RUNTIME_FAILURE_MODE_VALUES)[number];
+export type Nhm2ObserverDecRefinementEvidenceStatus =
+  (typeof NHM2_OBSERVER_DEC_REFINEMENT_EVIDENCE_STATUS_VALUES)[number];
 export type Nhm2ObserverDecExtensionTrancheId =
   (typeof NHM2_OBSERVER_DEC_EXTENSION_TRANCHE_ID_VALUES)[number];
 export type Nhm2ObserverDecPhysicsCrossZeroMethod =
@@ -1025,6 +1033,31 @@ export type Nhm2ObserverDecRuntimeDecisionEvidence = {
   citationRefs: string[];
 };
 
+export type Nhm2ObserverDecRefinementEvidence = {
+  status: Nhm2ObserverDecRefinementEvidenceStatus;
+  referenceRouteId: string | null;
+  routeComparable: boolean | null;
+  comparableSampleCount: number | null;
+  minimumComparableSampleCount: number | null;
+  coarseStepM: number | null;
+  refinedStepM: number | null;
+  superRefinedStepM: number | null;
+  observedConvergenceOrderT0i: number | null;
+  observedConvergenceOrderOffDiagonal: number | null;
+  richardsonExtrapolatedResidualT0i: number | null;
+  richardsonExtrapolatedResidualOffDiagonal: number | null;
+  richardsonExtrapolatedMetricDecMarginToZero: number | null;
+  richardsonExtrapolatedTileReconstitutedDecMarginToZero: number | null;
+  uncertaintyRelativeBound: number | null;
+  uncertaintyAbsMetricDec: number | null;
+  uncertaintyAbsTileReconstitutedDec: number | null;
+  conservativeMetricDecMarginToZero: number | null;
+  conservativeTileReconstitutedDecMarginToZero: number | null;
+  uncertaintyBoundPass: boolean | null;
+  note: string | null;
+  citationRefs: string[];
+};
+
 export type Nhm2ObserverDecResearchSupportEvidence = {
   claimId: string;
   supportLevel: Nhm2ObserverDecResearchSupportLevel;
@@ -1431,6 +1464,7 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
   };
   runtimeApplication: Nhm2ObserverDecPhysicsRuntimeApplicationEvidence;
   decRuntimeDecisionEvidence?: Nhm2ObserverDecRuntimeDecisionEvidence;
+  refinementEvidence?: Nhm2ObserverDecRefinementEvidence;
   extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId;
   familySearchOrder?: string[];
   appliedCandidateEvidence?: Nhm2ObserverDecRuntimeAppliedCandidateEvidence;
@@ -2308,6 +2342,30 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       note?: string | null;
       citationRefs?: string[] | null;
     } | null;
+    refinementEvidence?: {
+      status?: Nhm2ObserverDecRefinementEvidenceStatus | null;
+      referenceRouteId?: string | null;
+      routeComparable?: boolean | null;
+      comparableSampleCount?: number | null;
+      minimumComparableSampleCount?: number | null;
+      coarseStepM?: number | null;
+      refinedStepM?: number | null;
+      superRefinedStepM?: number | null;
+      observedConvergenceOrderT0i?: number | null;
+      observedConvergenceOrderOffDiagonal?: number | null;
+      richardsonExtrapolatedResidualT0i?: number | null;
+      richardsonExtrapolatedResidualOffDiagonal?: number | null;
+      richardsonExtrapolatedMetricDecMarginToZero?: number | null;
+      richardsonExtrapolatedTileReconstitutedDecMarginToZero?: number | null;
+      uncertaintyRelativeBound?: number | null;
+      uncertaintyAbsMetricDec?: number | null;
+      uncertaintyAbsTileReconstitutedDec?: number | null;
+      conservativeMetricDecMarginToZero?: number | null;
+      conservativeTileReconstitutedDecMarginToZero?: number | null;
+      uncertaintyBoundPass?: boolean | null;
+      note?: string | null;
+      citationRefs?: string[] | null;
+    } | null;
     extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId | null;
     familySearchOrder?: string[] | null;
     appliedCandidateEvidence?: {
@@ -2961,6 +3019,15 @@ const normalizeDecPhysicsRuntimeFailureMode = (
   )
     ? (value as Nhm2ObserverDecPhysicsRuntimeFailureMode)
     : fallback;
+
+const normalizeDecRefinementEvidenceStatus = (
+  value: unknown,
+): Nhm2ObserverDecRefinementEvidenceStatus =>
+  NHM2_OBSERVER_DEC_REFINEMENT_EVIDENCE_STATUS_VALUES.includes(
+    value as Nhm2ObserverDecRefinementEvidenceStatus,
+  )
+    ? (value as Nhm2ObserverDecRefinementEvidenceStatus)
+    : "missing";
 
 const normalizeDecExtensionTrancheId = (
   value: unknown,
@@ -3686,6 +3753,74 @@ const normalizeObserverDecPhysicsControlEvidence = (
           decAttribution: decRuntimeDecisionAttributionEvidence,
           note: asText(decRuntimeDecisionInput.note),
           citationRefs: unique(decRuntimeDecisionCitationRefs),
+        };
+  const refinementEvidenceInput = (value.refinementEvidence ??
+    {}) as Record<string, unknown>;
+  const refinementEvidenceCitationRefs = Array.isArray(
+    refinementEvidenceInput.citationRefs,
+  )
+    ? unique(
+        refinementEvidenceInput.citationRefs
+          .map((entry) => asText(entry))
+          .filter((entry): entry is string => entry != null),
+      )
+    : [];
+  const refinementEvidence =
+    value.refinementEvidence == null
+      ? undefined
+      : {
+          status: normalizeDecRefinementEvidenceStatus(
+            refinementEvidenceInput.status,
+          ),
+          referenceRouteId: asText(refinementEvidenceInput.referenceRouteId),
+          routeComparable: toNullableBoolean(refinementEvidenceInput.routeComparable),
+          comparableSampleCount: toFinite(
+            refinementEvidenceInput.comparableSampleCount,
+          ),
+          minimumComparableSampleCount: toFinite(
+            refinementEvidenceInput.minimumComparableSampleCount,
+          ),
+          coarseStepM: toFinite(refinementEvidenceInput.coarseStepM),
+          refinedStepM: toFinite(refinementEvidenceInput.refinedStepM),
+          superRefinedStepM: toFinite(refinementEvidenceInput.superRefinedStepM),
+          observedConvergenceOrderT0i: toFinite(
+            refinementEvidenceInput.observedConvergenceOrderT0i,
+          ),
+          observedConvergenceOrderOffDiagonal: toFinite(
+            refinementEvidenceInput.observedConvergenceOrderOffDiagonal,
+          ),
+          richardsonExtrapolatedResidualT0i: toFinite(
+            refinementEvidenceInput.richardsonExtrapolatedResidualT0i,
+          ),
+          richardsonExtrapolatedResidualOffDiagonal: toFinite(
+            refinementEvidenceInput.richardsonExtrapolatedResidualOffDiagonal,
+          ),
+          richardsonExtrapolatedMetricDecMarginToZero: toFinite(
+            refinementEvidenceInput.richardsonExtrapolatedMetricDecMarginToZero,
+          ),
+          richardsonExtrapolatedTileReconstitutedDecMarginToZero: toFinite(
+            refinementEvidenceInput.richardsonExtrapolatedTileReconstitutedDecMarginToZero,
+          ),
+          uncertaintyRelativeBound: toFinite(
+            refinementEvidenceInput.uncertaintyRelativeBound,
+          ),
+          uncertaintyAbsMetricDec: toFinite(
+            refinementEvidenceInput.uncertaintyAbsMetricDec,
+          ),
+          uncertaintyAbsTileReconstitutedDec: toFinite(
+            refinementEvidenceInput.uncertaintyAbsTileReconstitutedDec,
+          ),
+          conservativeMetricDecMarginToZero: toFinite(
+            refinementEvidenceInput.conservativeMetricDecMarginToZero,
+          ),
+          conservativeTileReconstitutedDecMarginToZero: toFinite(
+            refinementEvidenceInput.conservativeTileReconstitutedDecMarginToZero,
+          ),
+          uncertaintyBoundPass: toNullableBoolean(
+            refinementEvidenceInput.uncertaintyBoundPass,
+          ),
+          note: asText(refinementEvidenceInput.note),
+          citationRefs: refinementEvidenceCitationRefs,
         };
   const extensionTrancheId = normalizeDecExtensionTrancheId(
     value.extensionTrancheId,
@@ -4719,6 +4854,7 @@ const normalizeObserverDecPhysicsControlEvidence = (
         : [],
     },
     decRuntimeDecisionEvidence,
+    refinementEvidence,
     extensionTrancheId: extensionTrancheId ?? undefined,
     familySearchOrder:
       value.familySearchOrder == null ? undefined : familySearchOrder,
@@ -6749,6 +6885,13 @@ const isDecPhysicsRuntimeFailureMode = (
     value as Nhm2ObserverDecPhysicsRuntimeFailureMode,
   );
 
+const isDecRefinementEvidenceStatus = (
+  value: unknown,
+): value is Nhm2ObserverDecRefinementEvidenceStatus =>
+  NHM2_OBSERVER_DEC_REFINEMENT_EVIDENCE_STATUS_VALUES.includes(
+    value as Nhm2ObserverDecRefinementEvidenceStatus,
+  );
+
 const isDecExtensionTrancheId = (
   value: unknown,
 ): value is Nhm2ObserverDecExtensionTrancheId =>
@@ -6912,6 +7055,9 @@ const isObserverDecPhysicsControlEvidence = (
     | undefined;
   const decRuntimeDecisionAttribution = decRuntimeDecisionEvidence
     ?.decAttribution as Record<string, unknown> | undefined;
+  const refinementEvidence = record.refinementEvidence as
+    | Record<string, unknown>
+    | undefined;
   const appliedCandidateEvidence = record.appliedCandidateEvidence as
     | Record<string, unknown>
     | undefined;
@@ -7461,6 +7607,44 @@ const isObserverDecPhysicsControlEvidence = (
           typeof decRuntimeDecisionEvidence.note === "string") &&
         Array.isArray(decRuntimeDecisionEvidence.citationRefs) &&
         decRuntimeDecisionEvidence.citationRefs.every(
+          (entry) => typeof entry === "string",
+        ))) &&
+    (refinementEvidence === undefined ||
+      (isDecRefinementEvidenceStatus(refinementEvidence.status) &&
+        (refinementEvidence.referenceRouteId === null ||
+          typeof refinementEvidence.referenceRouteId === "string") &&
+        (refinementEvidence.routeComparable === null ||
+          typeof refinementEvidence.routeComparable === "boolean") &&
+        isNumericOrNull(refinementEvidence.comparableSampleCount) &&
+        isNumericOrNull(refinementEvidence.minimumComparableSampleCount) &&
+        isNumericOrNull(refinementEvidence.coarseStepM) &&
+        isNumericOrNull(refinementEvidence.refinedStepM) &&
+        isNumericOrNull(refinementEvidence.superRefinedStepM) &&
+        isNumericOrNull(refinementEvidence.observedConvergenceOrderT0i) &&
+        isNumericOrNull(refinementEvidence.observedConvergenceOrderOffDiagonal) &&
+        isNumericOrNull(refinementEvidence.richardsonExtrapolatedResidualT0i) &&
+        isNumericOrNull(
+          refinementEvidence.richardsonExtrapolatedResidualOffDiagonal,
+        ) &&
+        isNumericOrNull(
+          refinementEvidence.richardsonExtrapolatedMetricDecMarginToZero,
+        ) &&
+        isNumericOrNull(
+          refinementEvidence.richardsonExtrapolatedTileReconstitutedDecMarginToZero,
+        ) &&
+        isNumericOrNull(refinementEvidence.uncertaintyRelativeBound) &&
+        isNumericOrNull(refinementEvidence.uncertaintyAbsMetricDec) &&
+        isNumericOrNull(refinementEvidence.uncertaintyAbsTileReconstitutedDec) &&
+        isNumericOrNull(refinementEvidence.conservativeMetricDecMarginToZero) &&
+        isNumericOrNull(
+          refinementEvidence.conservativeTileReconstitutedDecMarginToZero,
+        ) &&
+        (refinementEvidence.uncertaintyBoundPass === null ||
+          typeof refinementEvidence.uncertaintyBoundPass === "boolean") &&
+        (refinementEvidence.note === null ||
+          typeof refinementEvidence.note === "string") &&
+        Array.isArray(refinementEvidence.citationRefs) &&
+        refinementEvidence.citationRefs.every(
           (entry) => typeof entry === "string",
         ))) &&
     (record.extensionTrancheId === undefined ||

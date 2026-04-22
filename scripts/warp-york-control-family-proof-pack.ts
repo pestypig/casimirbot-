@@ -30481,6 +30481,15 @@ const renderNhm2ObserverAuditMarkdown = (
       evidence.decRuntimeDecisionEvidence.citationRefs.length > 0
         ? evidence.decRuntimeDecisionEvidence.citationRefs.join("<br>")
         : "none";
+    const refinementEvidence =
+      evidence.refinementEvidence == null
+        ? "none"
+        : `status=${evidence.refinementEvidence.status} referenceRouteId=${evidence.refinementEvidence.referenceRouteId ?? "null"} routeComparable=${evidence.refinementEvidence.routeComparable == null ? "null" : String(evidence.refinementEvidence.routeComparable)} comparableSampleCount=${evidence.refinementEvidence.comparableSampleCount ?? "null"} minimumComparableSampleCount=${evidence.refinementEvidence.minimumComparableSampleCount ?? "null"} coarseStepM=${evidence.refinementEvidence.coarseStepM ?? "null"} refinedStepM=${evidence.refinementEvidence.refinedStepM ?? "null"} superRefinedStepM=${evidence.refinementEvidence.superRefinedStepM ?? "null"} observedConvergenceOrderT0i=${evidence.refinementEvidence.observedConvergenceOrderT0i ?? "null"} observedConvergenceOrderOffDiagonal=${evidence.refinementEvidence.observedConvergenceOrderOffDiagonal ?? "null"} richardsonExtrapolatedResidualT0i=${evidence.refinementEvidence.richardsonExtrapolatedResidualT0i ?? "null"} richardsonExtrapolatedResidualOffDiagonal=${evidence.refinementEvidence.richardsonExtrapolatedResidualOffDiagonal ?? "null"} uncertaintyRelativeBound=${evidence.refinementEvidence.uncertaintyRelativeBound ?? "null"} conservativeMetricDecMarginToZero=${evidence.refinementEvidence.conservativeMetricDecMarginToZero ?? "null"} conservativeTileReconstitutedDecMarginToZero=${evidence.refinementEvidence.conservativeTileReconstitutedDecMarginToZero ?? "null"} uncertaintyBoundPass=${evidence.refinementEvidence.uncertaintyBoundPass == null ? "null" : String(evidence.refinementEvidence.uncertaintyBoundPass)} note=${evidence.refinementEvidence.note ?? "none"}`;
+    const refinementCitationRefs =
+      evidence.refinementEvidence?.citationRefs != null &&
+      evidence.refinementEvidence.citationRefs.length > 0
+        ? evidence.refinementEvidence.citationRefs.join("<br>")
+        : "none";
     const familySearchOrder =
       evidence.familySearchOrder != null && evidence.familySearchOrder.length > 0
         ? evidence.familySearchOrder.join(", ")
@@ -30828,6 +30837,8 @@ const renderNhm2ObserverAuditMarkdown = (
 | decRuntimeDecisionEvidence.reasonCodes | ${decRuntimeDecisionReasonCodes} |
 | decRuntimeDecisionEvidence.note | ${evidence.decRuntimeDecisionEvidence?.note ?? "null"} |
 | decRuntimeDecisionEvidence.citationRefs | ${decRuntimeDecisionCitationRefs} |
+| refinementEvidence | ${refinementEvidence} |
+| refinementEvidence.citationRefs | ${refinementCitationRefs} |
 | extensionTrancheId | ${evidence.extensionTrancheId ?? "null"} |
 | familySearchOrder | ${familySearchOrder} |
 | appliedCandidateEvidence | ${appliedCandidateEvidence} |

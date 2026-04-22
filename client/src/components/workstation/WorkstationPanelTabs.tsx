@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
+import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 
 export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
@@ -24,7 +25,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const availablePanels = useMemo(
     () =>
       panelRegistry
-        .filter((panel) => !panel.startHidden)
+        .filter((panel) => !panel.startHidden && isUserLaunchPanel(String(panel.id)))
         .sort((a, b) => {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
