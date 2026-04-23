@@ -70,6 +70,93 @@ export function findRandomPaperForTopic(
   return best[pick] ?? null;
 }
 
+export function findBestDocForTopic(
+  topic: string,
+  options?: { entries?: DocManifestEntry[] },
+): DocManifestEntry | null {
+  const entries = options?.entries ?? DOC_MANIFEST;
+  if (entries.length === 0) return null;
+  const cleanedTopic = normalizeSpokenPrompt(String(topic ?? "").replace(/^["'`\s]+|["'`\s]+$/g, ""));
+  if (!cleanedTopic) return null;
+  const normalizedTopic = normalizeLookup(cleanedTopic);
+  const tokens = tokenize(cleanedTopic);
+  const queryVersionTokens = normalizedTopic.match(/\bv\d+\b/g) ?? [];
+  if (!normalizedTopic && tokens.length === 0) return null;
+  const ranked = entries
+    .map((entry) => {
+      const title = entry.title.toLowerCase();
+      const path = entry.relativePath.toLowerCase();
+      const haystack = `${entry.searchText} ${path} ${title}`;
+      const normalizedTitle = normalizeLookup(entry.title);
+      const normalizedPath = normalizeLookup(entry.relativePath);
+      const normalizedFileBase = normalizeLookup(
+        entry.relativePath
+          .split("/")
+          .at(-1)
+          ?.replace(/\.md$/i, "") ?? "",
+      );
+      let score = 0;
+      let tokenHits = 0;
+
+      if (normalizedTopic) {
+        if (normalizedTopic === normalizedFileBase) score += 240;
+        if (normalizedTopic === normalizedTitle) score += 220;
+        if (normalizedPath.includes(normalizedTopic)) score += 120;
+        if (normalizedFileBase.includes(normalizedTopic)) score += 140;
+        if (normalizedTitle.includes(normalizedTopic)) score += 110;
+      }
+
+      for (const token of tokens) {
+        if (!token) continue;
+        if (title.includes(token)) {
+          score += 10;
+          tokenHits += 1;
+          continue;
+        }
+        if (path.includes(token)) {
+          score += 8;
+          tokenHits += 1;
+          continue;
+        }
+        if (haystack.includes(token)) {
+          score += 4;
+          tokenHits += 1;
+        }
+      }
+
+      if (queryVersionTokens.length > 0) {
+        for (const versionToken of queryVersionTokens) {
+          const hasVersion =
+            normalizedTitle.includes(versionToken) ||
+            normalizedFileBase.includes(versionToken) ||
+            normalizedPath.includes(versionToken);
+          if (hasVersion) {
+            score += 130;
+          } else {
+            score -= 70;
+          }
+        }
+      }
+
+      return {
+        entry,
+        score,
+        tokenHits,
+        lengthDelta: Math.abs(normalizedTitle.length - normalizedTopic.length),
+      };
+    })
+    .filter((item) => item.score > 0);
+
+  if (ranked.length === 0) return null;
+  ranked.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.tokenHits !== a.tokenHits) return b.tokenHits - a.tokenHits;
+    if (a.lengthDelta !== b.lengthDelta) return a.lengthDelta - b.lengthDelta;
+    return a.entry.title.localeCompare(b.entry.title);
+  });
+  return ranked[0]?.entry ?? null;
+}
+
 function extractTopic(input: string): string | null {
   const cleaned = normalizeSpokenPrompt(
     input
@@ -122,6 +209,14 @@ function tokenize(value: string): string[] {
     .split(/\s+/)
     .map((token) => token.trim())
     .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+
+function normalizeLookup(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function scoreEntry(entry: DocManifestEntry, tokens: string[]): number {

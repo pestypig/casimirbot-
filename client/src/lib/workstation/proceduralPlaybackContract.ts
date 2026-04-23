@@ -6,7 +6,14 @@ export type HelixWorkstationProceduralStep =
   | "target_panel"
   | "close_picker"
   | "open_doc"
-  | "read_start";
+  | "read_start"
+  | "open_note_panel"
+  | "start_note"
+  | "highlight_copy"
+  | "paste_note"
+  | "save_note"
+  | "attach_note_to_chat"
+  | "compare_topics_start";
 
 export type HelixWorkstationProceduralStepPayload = {
   traceId: string;

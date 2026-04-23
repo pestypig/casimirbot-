@@ -5,12 +5,15 @@ export const HELIX_WORKSTATION_ACTION_EVENT = "helix-workstation-action";
 
 type WorkstationSplitDirection = "row" | "column";
 type WorkstationDrawerSnap = "peek" | "half" | "full";
+type WorkstationJobWorkflow = "observable_research_pipeline";
 type WorkstationJobPayload = {
   job_id?: string;
   title?: string;
   objective?: string;
   preferred_panels?: string[];
   max_steps?: number;
+  workflow?: WorkstationJobWorkflow;
+  workflow_args?: Record<string, unknown>;
 };
 
 export type HelixWorkstationAction =
@@ -206,6 +209,10 @@ function coerceAction(value: unknown): HelixWorkstationAction | null {
           .filter((value): value is string => Boolean(value))
       : [];
     const maxSteps = asFiniteNumber(payloadRecord?.max_steps);
+    const workflowRaw = asNonEmptyString(payloadRecord?.workflow);
+    const workflow: WorkstationJobWorkflow | undefined =
+      workflowRaw === "observable_research_pipeline" ? workflowRaw : undefined;
+    const workflowArgs = asRecord(payloadRecord?.workflow_args ?? payloadRecord?.workflowArgs) ?? undefined;
     return {
       schema_version: HELIX_WORKSTATION_ACTION_SCHEMA_VERSION,
       action,
@@ -216,6 +223,8 @@ function coerceAction(value: unknown): HelixWorkstationAction | null {
         preferred_panels: preferredPanels.length > 0 ? preferredPanels : undefined,
         max_steps:
           typeof maxSteps === "number" && Number.isFinite(maxSteps) ? Math.max(1, Math.floor(maxSteps)) : undefined,
+        workflow,
+        workflow_args: workflowArgs,
       },
     };
   }

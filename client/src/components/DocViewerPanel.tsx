@@ -174,6 +174,8 @@ export function DocViewerPanel() {
                 ? "Agent: opening selected document."
                 : detail.step === "read_start"
                   ? "Agent: starting read-aloud."
+                  : detail.step === "highlight_copy"
+                    ? "Agent: highlighting topic section for copy."
                   : null;
       if (!label) return;
       setProceduralStatus(label);

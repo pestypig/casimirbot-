@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DocManifestEntry } from "@/lib/docs/docManifest";
-import { findRandomPaperForTopic, parsePaperReadCommand } from "@/lib/docs/paperReadCommand";
+import { findBestDocForTopic, findRandomPaperForTopic, parsePaperReadCommand } from "@/lib/docs/paperReadCommand";
 
 function makeEntry(id: string, title: string, relativePath: string): DocManifestEntry {
   return {
@@ -76,5 +76,39 @@ describe("findRandomPaperForTopic", () => {
       random: () => 0.99,
     });
     expect(["a", "b"]).toContain(picked?.id);
+  });
+});
+
+describe("findBestDocForTopic", () => {
+  const entries: DocManifestEntry[] = [
+    makeEntry(
+      "overview-draft",
+      "Nhm2 Full Solve Overview Draft 2026 04 23",
+      "docs/research/nhm2-full-solve-overview-draft-2026-04-23.md",
+    ),
+    makeEntry(
+      "overview-v2",
+      "Nhm2 Full Solve Overview V2 2026 04 23",
+      "docs/research/nhm2-full-solve-overview-v2-2026-04-23.md",
+    ),
+    makeEntry(
+      "needle-directory",
+      "Needle Hull Mark2 Theory Directory Latest",
+      "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+    ),
+  ];
+
+  it("prefers exact-ish title matches over generic nearby docs", () => {
+    const picked = findBestDocForTopic("NHM2 Full Solve Overview v2 (Journal-Style Draft, 2026-04-23)", {
+      entries,
+    });
+    expect(picked?.id).toBe("overview-v2");
+  });
+
+  it("supports file-like queries and resolves the best path deterministically", () => {
+    const picked = findBestDocForTopic("nhm2-full-solve-overview-draft-2026-04-23", {
+      entries,
+    });
+    expect(picked?.id).toBe("overview-draft");
   });
 });

@@ -35220,22 +35220,32 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
     artifactRootDir,
     path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_JSON),
   );
+  const explicitProfileIds = options?.profileIds ?? [];
+  const targetedProfileRefresh = explicitProfileIds.length > 0;
   const requestedProfileIds =
-    options?.profileIds != null && options.profileIds.length > 0
-      ? options.profileIds.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+    targetedProfileRefresh
+      ? explicitProfileIds.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
       : [...STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS];
-  const existingEntries =
-    options?.profileIds != null && options.profileIds.length > 0
-      ? []
-      : readExistingBoundarySweepEntries(latestBoundaryJsonPath).filter((entry) =>
-          requestedProfileIds.includes(entry.shiftLapseProfileId),
-        );
-  const existingFirstFailure =
-    existingEntries.find((entry) => !isPassingSelectedShiftLapseSweepEntry(entry)) ?? null;
-  const completedProfileIds = new Set(
-    existingEntries.map((entry) => entry.shiftLapseProfileId),
+  const existingEntries = readExistingBoundarySweepEntries(latestBoundaryJsonPath);
+  const entriesByProfileId = new Map(
+    existingEntries.map((entry) => [entry.shiftLapseProfileId, entry] as const),
   );
-  const entries: Nhm2ShiftLapseBoundarySweepEntry[] = [...existingEntries];
+  const existingFirstFailure =
+    targetedProfileRefresh
+      ? null
+      : (requestedProfileIds
+          .map((profileId) => entriesByProfileId.get(profileId) ?? null)
+          .find(
+            (
+              entry,
+            ): entry is Nhm2ShiftLapseBoundarySweepEntry =>
+              entry != null && !isPassingSelectedShiftLapseSweepEntry(entry),
+          ) ?? null);
+  const completedProfileIds = targetedProfileRefresh
+    ? new Set<string>()
+    : new Set(
+        requestedProfileIds.filter((profileId) => entriesByProfileId.has(profileId)),
+      );
   const profileIds =
     existingFirstFailure != null
       ? []
@@ -35256,15 +35266,17 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
     } satisfies Partial<ControlRequestSelectors>;
     const refreshedState = await refreshPipelineStateForPublication(requestSelectors);
     if (!stateHasGateAdmittedSelectedTransportSurface(refreshedState, requestSelectors)) {
-      entries.push(
-        buildNhm2ShiftLapseBoundaryEntryFromPublicationState({
-          state: refreshedState,
-          profileId,
-          artifactRootDir: profileArtifactRoot,
-          auditRootDir: profileAuditRoot,
-        }),
-      );
-      break;
+      const refreshedEntry = buildNhm2ShiftLapseBoundaryEntryFromPublicationState({
+        state: refreshedState,
+        profileId,
+        artifactRootDir: profileArtifactRoot,
+        auditRootDir: profileAuditRoot,
+      });
+      entriesByProfileId.set(refreshedEntry.shiftLapseProfileId, refreshedEntry);
+      if (!targetedProfileRefresh) {
+        break;
+      }
+      continue;
     }
     const published = await publishNhm2ShiftLapseSelectedTransportBundle({
       baseUrl: options?.baseUrl,
@@ -35280,7 +35292,7 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
     const gate =
       published.boundedStack.worldline.artifact.sourceSurface.shiftLapseTransportPromotionGate ??
       null;
-    entries.push({
+    const refreshedEntry: Nhm2ShiftLapseBoundarySweepEntry = {
       shiftLapseProfileId: transportResult.selectedFamily.shiftLapseProfileId ?? profileId,
       shiftLapseProfileStage:
         transportResult.selectedFamily.shiftLapseProfileStage ?? resolvedProfile.profileStage,
@@ -35315,11 +35327,28 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
       thetaKConsistencyStatus: gate?.thetaKConsistencyStatus ?? null,
       thetaKResidualAbs: gate?.thetaKResidualAbs ?? null,
       thetaKTolerance: gate?.thetaKTolerance ?? null,
-    });
-    if (!isPassingSelectedShiftLapseSweepEntry(entries[entries.length - 1]!)) {
+    };
+    entriesByProfileId.set(refreshedEntry.shiftLapseProfileId, refreshedEntry);
+    if (!targetedProfileRefresh && !isPassingSelectedShiftLapseSweepEntry(refreshedEntry)) {
       break;
     }
   }
+  const canonicalProfileOrder = new Map(
+    STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS.map((profileId, index) => [
+      profileId,
+      index,
+    ]),
+  );
+  const entries = Array.from(entriesByProfileId.values()).sort((left, right) => {
+    const leftOrder = canonicalProfileOrder.get(left.shiftLapseProfileId);
+    const rightOrder = canonicalProfileOrder.get(right.shiftLapseProfileId);
+    if (leftOrder != null && rightOrder != null && leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    if (leftOrder != null && rightOrder == null) return -1;
+    if (leftOrder == null && rightOrder != null) return 1;
+    return left.shiftLapseProfileId.localeCompare(right.shiftLapseProfileId);
+  });
   const artifact = buildNhm2ShiftLapseBoundarySweepArtifact({ entries });
   const markdown = renderNhm2ShiftLapseBoundarySweepMarkdown(artifact);
   const outJsonPath = path.join(
@@ -35938,6 +35967,32 @@ const buildEnvelopeWallSafetySummary = (
   };
 };
 
+const inferSolverHealthStatus = (args: {
+  explicitStatus: string | null;
+  totalClampFraction: number | null;
+  maxAlphaBeforeClamp: number | null;
+  maxKBeforeClamp: number | null;
+}): string | null => {
+  if (args.explicitStatus != null) return args.explicitStatus;
+  const hasAnyHealthEvidence =
+    args.totalClampFraction != null ||
+    args.maxAlphaBeforeClamp != null ||
+    args.maxKBeforeClamp != null;
+  if (!hasAnyHealthEvidence) return null;
+  const clampLimitExceeded =
+    args.totalClampFraction != null &&
+    args.totalClampFraction > GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT;
+  const alphaLimitExceeded =
+    args.maxAlphaBeforeClamp != null &&
+    args.maxAlphaBeforeClamp > GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT;
+  const kLimitExceeded =
+    args.maxKBeforeClamp != null &&
+    args.maxKBeforeClamp > GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT;
+  return clampLimitExceeded || alphaLimitExceeded || kLimitExceeded
+    ? "UNSTABLE"
+    : "CERTIFIED";
+};
+
 const buildEnvelopeSolverHealthSummary = (
   gr: Record<string, unknown> | null,
 ): BuildNhm2EnvelopePerturbationCaseInput["solverHealth"] => {
@@ -35946,8 +36001,14 @@ const buildEnvelopeSolverHealthSummary = (
   const totalClampFraction = toFiniteNumber(health?.totalClampFraction);
   const maxAlphaBeforeClamp = toFiniteNumber(health?.maxAlphaBeforeClamp);
   const maxKBeforeClamp = toFiniteNumber(health?.maxKBeforeClamp);
+  const explicitStatus = typeof health?.status === "string" ? String(health.status) : null;
   return {
-    status: typeof health?.status === "string" ? String(health.status) : null,
+    status: inferSolverHealthStatus({
+      explicitStatus,
+      totalClampFraction,
+      maxAlphaBeforeClamp,
+      maxKBeforeClamp,
+    }),
     reasons: Array.isArray(health?.reasons)
       ? health.reasons
           .map((entry) => (typeof entry === "string" ? entry : null))
@@ -36118,6 +36179,41 @@ const buildEnvelopePublishedEntryGate = (
   wallHorizonMargin: entry.wallHorizonMargin ?? null,
 });
 
+const buildEnvelopePublishedEntrySolverHealthSummary = (args: {
+  inHullArtifact: Nhm2InHullProperAccelerationArtifact | null;
+}): BuildNhm2EnvelopePerturbationCaseInput["solverHealth"] => {
+  const sourceSurface = asRecordOrNull(args.inHullArtifact?.sourceSurface as unknown);
+  const explicitStatus =
+    typeof sourceSurface?.brickSolverStatus === "string"
+      ? String(sourceSurface.brickSolverStatus)
+      : typeof sourceSurface?.brickStatus === "string"
+        ? String(sourceSurface.brickStatus)
+        : null;
+  return {
+    status: inferSolverHealthStatus({
+      explicitStatus,
+      totalClampFraction: null,
+      maxAlphaBeforeClamp: null,
+      maxKBeforeClamp: null,
+    }),
+    reasons:
+      explicitStatus != null
+        ? ["in_hull_proper_acceleration_source_surface_solver_status"]
+        : [],
+    alphaClampFraction: null,
+    kClampFraction: null,
+    totalClampFraction: null,
+    maxAlphaBeforeClamp: null,
+    maxKBeforeClamp: null,
+    clampFractionLimit: GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT,
+    alphaMultiplierLimit: GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT,
+    kMultiplierLimit: GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT,
+    clampFractionHeadroom: null,
+    alphaMultiplierHeadroom: null,
+    kMultiplierHeadroom: null,
+  };
+};
+
 const buildEnvelopeCaseFromPublishedEntry = (args: {
   entry: Nhm2ShiftLapseProfileSweepEntry | Nhm2ShiftLapseBoundarySweepEntry;
   suiteId: Nhm2EnvelopePerturbationSuiteId;
@@ -36134,6 +36230,9 @@ const buildEnvelopeCaseFromPublishedEntry = (args: {
   const comparisonArtifact = readJsonArtifactIfPresent<Record<string, unknown>>(
     args.entry.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath,
   );
+  const inHullArtifact = readJsonArtifactIfPresent<Nhm2InHullProperAccelerationArtifact>(
+    args.entry.selectedBundleArtifacts.inHullProperAccelerationLatestJsonPath,
+  );
   const sourceSurface = resolvePublicationSurfaceRecord(worldlineArtifact);
   const gate =
     sourceSurface?.shiftLapseTransportPromotionGate &&
@@ -36142,6 +36241,9 @@ const buildEnvelopeCaseFromPublishedEntry = (args: {
       : buildEnvelopePublishedEntryGate(args.entry);
   const lowExpansion = buildEnvelopeLowExpansionSummary(gate);
   const wallSafety = buildEnvelopeWallSafetySummary(gate);
+  const solverHealth = buildEnvelopePublishedEntrySolverHealthSummary({
+    inHullArtifact,
+  });
   const missionTimeSource =
     estimatorArtifact != null || comparisonArtifact != null
       ? "live_pipeline_contracts"
@@ -36174,7 +36276,7 @@ const buildEnvelopeCaseFromPublishedEntry = (args: {
     transportCertificationStatus: args.entry.transportCertificationStatus ?? null,
     lowExpansionStatus: lowExpansion?.status ?? null,
     wallSafetyStatus: wallSafety?.status ?? null,
-    solverHealthStatus: null,
+    solverHealthStatus: solverHealth.status,
     missionTimeSource: missionTime.source,
   });
   return {
@@ -36191,7 +36293,7 @@ const buildEnvelopeCaseFromPublishedEntry = (args: {
       status: assessment.status,
       transportCertificationStatus: args.entry.transportCertificationStatus ?? null,
       interpretationStatus: missionTime.interpretationStatus ?? null,
-      solverHealthStatus: null,
+      solverHealthStatus: solverHealth.status,
     }),
     selectors: {
       ...SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS,
@@ -36224,21 +36326,7 @@ const buildEnvelopeCaseFromPublishedEntry = (args: {
     },
     lowExpansion,
     wallSafety,
-    solverHealth: {
-      status: null,
-      reasons: [],
-      alphaClampFraction: null,
-      kClampFraction: null,
-      totalClampFraction: null,
-      maxAlphaBeforeClamp: null,
-      maxKBeforeClamp: null,
-      clampFractionLimit: GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT,
-      alphaMultiplierLimit: GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT,
-      kMultiplierLimit: GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT,
-      clampFractionHeadroom: null,
-      alphaMultiplierHeadroom: null,
-      kMultiplierHeadroom: null,
-    },
+    solverHealth,
     missionTime,
     artifactRefs: {
       transportResultLatestJsonPath: args.entry.transportResultLatestJsonPath,
@@ -52513,6 +52601,9 @@ if (isEntryPoint) {
     metricWecFeasibilityProfileIds: parseCommaSeparatedArg(
       readArgValue("--metric-wec-feasibility-profile-ids", argv),
     ),
+    boundarySweepProfileIds: parseCommaSeparatedArg(
+      readArgValue("--boundary-sweep-profile-ids", argv),
+    ),
     metricWecFeasibilityBoundaryProfileCount: parsePositiveInt(
       readArgValue("--metric-wec-feasibility-boundary-profile-count", argv),
       DEFAULT_NHM2_METRIC_WEC_FEASIBILITY_BOUNDARY_PROFILE_COUNT,
@@ -52551,6 +52642,7 @@ if (isEntryPoint) {
     : publishSelectedShiftLapseBoundarySweep
     ? publishNhm2ShiftLapseBoundarySweep({
         baseUrl: parsedOptions.baseUrl,
+        profileIds: parsedOptions.boundarySweepProfileIds,
       })
     : publishSelectedShiftLapseEnvelopeSuite
     ? publishNhm2ShiftLapseEnvelopeSuite({

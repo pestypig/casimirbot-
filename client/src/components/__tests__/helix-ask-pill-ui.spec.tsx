@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { useDocViewerStore } from "@/store/useDocViewerStore";
 
 let mergeVoiceTranscriptDraft: typeof import("@/components/helix/HelixAskPill").mergeVoiceTranscriptDraft;
 let buildVoiceInputStatusLabel: typeof import("@/components/helix/HelixAskPill").buildVoiceInputStatusLabel;
@@ -195,6 +196,53 @@ describe("HelixAskPill mic helper behavior", () => {
     });
   });
 
+  it("maps copy-docs-to-notes compare requests to observable research workflow jobs", () => {
+    const action = parseWorkstationActionCommand(
+      "Copy sections about quantum inequalities in docs and paste in notes mission-notes, then compare the topics for an explanation",
+    );
+    expect(action).not.toBeNull();
+    expect(action?.action).toBe("run_job");
+    if (action?.action !== "run_job") return;
+    expect(action.payload.workflow).toBe("observable_research_pipeline");
+    const workflowArgs = (action.payload.workflow_args ?? {}) as Record<string, unknown>;
+    expect(String(workflowArgs.topic ?? "")).toContain("quantum inequalities");
+    expect(String(workflowArgs.note_title ?? "")).toContain("mission-notes");
+    expect(String(workflowArgs.compare_instruction ?? "").toLowerCase()).toContain("compare");
+  });
+
+  it("routes deictic read-this-doc prompts to open_doc_and_read using active docs context", () => {
+    useDocViewerStore.getState().viewDoc("/docs/papers.md");
+    expect(parseWorkstationActionCommand("ok read this doc to me")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "open_doc_and_read",
+      args: { path: "docs/papers.md" },
+    });
+  });
+
+  it("routes latest-topic doc prompts to deterministic docs-viewer actions", () => {
+    const pickLatest = parseWorkstationActionCommand("ok pick the latest NHM2 doc");
+    expect(pickLatest?.action).toBe("run_panel_action");
+    if (pickLatest?.action !== "run_panel_action") return;
+    expect(pickLatest.panel_id).toBe("docs-viewer");
+    expect(pickLatest.action_id).toBe("open_doc");
+    expect((pickLatest.args as { path?: string } | undefined)?.path).toBeTruthy();
+
+    const viewLatest = parseWorkstationActionCommand("ok view the latest NHM2 doc");
+    expect(viewLatest?.action).toBe("run_panel_action");
+    if (viewLatest?.action !== "run_panel_action") return;
+    expect(viewLatest.panel_id).toBe("docs-viewer");
+    expect(viewLatest.action_id).toBe("open_doc");
+    expect((viewLatest.args as { path?: string } | undefined)?.path).toBeTruthy();
+
+    const pullLatestToday = parseWorkstationActionCommand("Ok pull up the latest NHM2 doc from today");
+    expect(pullLatestToday?.action).toBe("run_panel_action");
+    if (pullLatestToday?.action !== "run_panel_action") return;
+    expect(pullLatestToday.panel_id).toBe("docs-viewer");
+    expect(pullLatestToday.action_id).toBe("open_doc");
+    expect((pullLatestToday.args as { path?: string } | undefined)?.path).toBeTruthy();
+  });
+
   it("keeps summarize-doc prompts on summarize action (not read-aloud)", () => {
     expect(parseWorkstationActionCommand("ok summarize a doc about the sun to me")).toEqual({
       action: "run_panel_action",
@@ -220,6 +268,36 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(action?.panel_id).toBe("docs-viewer");
     expect(action?.action_id).toBe("summarize_doc");
     expect((action as { args?: { path?: string } } | null)?.args?.path).toBeTruthy();
+  });
+
+  it("routes quoted open-doc title prompts through workstation docs actions", () => {
+    const action = parseWorkstationActionCommand(
+      'Ok open the doc "NHM2 Full Solve Overview v2 (Journal-Style Draft, 2026-04-23)"',
+    );
+    expect(action).not.toBeNull();
+    if (action?.action === "run_panel_action") {
+      expect(action.panel_id).toBe("docs-viewer");
+      expect(action.action_id).toBe("open_doc");
+      expect((action as { args?: { path?: string } }).args?.path).toBeTruthy();
+    } else {
+      expect(action).toEqual({
+        action: "open_panel",
+        panel_id: "docs-viewer",
+      });
+    }
+  });
+
+  it("does not let nhm2 topic hints override explicit direct-title open requests", () => {
+    const action = parseWorkstationActionCommand(
+      "ok open up the doc NHM2 Full Solve Overview v2 (Journal-Style Draft, 2026-04-23)",
+    );
+    expect(action?.action).toBe("run_panel_action");
+    if (action?.action !== "run_panel_action") return;
+    expect(action.panel_id).toBe("docs-viewer");
+    expect(action.action_id).toBe("open_doc");
+    expect((action.args as { path?: string } | undefined)?.path).toContain(
+      "/docs/research/nhm2-full-solve-overview-v2-2026-04-23.md",
+    );
   });
 
   it("builds observer lane commentary with user-perspective restating", () => {

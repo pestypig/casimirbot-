@@ -781,6 +781,17 @@ const computeHighestPassingTier = (
   return reversedTiers.find((tier) => readiness[tier].state === "pass") ?? null;
 };
 
+const clampTierToMaximum = (
+  tier: Nhm2FullLoopAuditClaimTier | null,
+  maximumTier: Nhm2FullLoopAuditClaimTier,
+): Nhm2FullLoopAuditClaimTier | null => {
+  if (tier == null) return null;
+  const tierIndex = NHM2_FULL_LOOP_AUDIT_CLAIM_TIERS.indexOf(tier);
+  const maximumTierIndex = NHM2_FULL_LOOP_AUDIT_CLAIM_TIERS.indexOf(maximumTier);
+  if (tierIndex === -1 || maximumTierIndex === -1) return null;
+  return tierIndex <= maximumTierIndex ? tier : maximumTier;
+};
+
 const computeBlockingReasons = (
   sections: Nhm2FullLoopAuditSections,
 ): Nhm2FullLoopAuditReasonCode[] =>
@@ -964,6 +975,11 @@ export const buildNhm2FullLoopAuditContract = (args: {
     "reduced-order": computeTierReadiness("reduced-order", sections),
     certified: computeTierReadiness("certified", sections),
   };
+  const maximumClaimTier = sections.claim_tier.maximumClaimTier;
+  const highestPassingClaimTier = clampTierToMaximum(
+    computeHighestPassingTier(claimTierReadiness),
+    maximumClaimTier,
+  );
   return {
     contractVersion: NHM2_FULL_LOOP_AUDIT_CONTRACT_VERSION,
     auditId: NHM2_FULL_LOOP_AUDIT_ID,
@@ -980,8 +996,8 @@ export const buildNhm2FullLoopAuditContract = (args: {
     },
     claimTierReadiness,
     currentClaimTier: sections.claim_tier.currentTier,
-    maximumClaimTier: sections.claim_tier.maximumClaimTier,
-    highestPassingClaimTier: computeHighestPassingTier(claimTierReadiness),
+    maximumClaimTier,
+    highestPassingClaimTier,
     overallState: aggregateStates(
       NHM2_FULL_LOOP_AUDIT_SECTION_ORDER.map(
         (sectionId) => sections[sectionId].state,
@@ -1437,9 +1453,13 @@ export const isNhm2FullLoopAuditContract = (
     "reduced-order": computeTierReadiness("reduced-order", sections),
     certified: computeTierReadiness("certified", sections),
   };
+  const expectedMaximumClaimTier = sections.claim_tier.maximumClaimTier;
+  const expectedHighestPassingClaimTier = clampTierToMaximum(
+    computeHighestPassingTier(expectedReadiness),
+    expectedMaximumClaimTier,
+  );
   if (
-    record.highestPassingClaimTier !==
-    computeHighestPassingTier(expectedReadiness)
+    record.highestPassingClaimTier !== expectedHighestPassingClaimTier
   ) {
     return false;
   }

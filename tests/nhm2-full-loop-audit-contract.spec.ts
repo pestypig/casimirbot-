@@ -368,6 +368,121 @@ describe("nhm2 full-loop audit contract", () => {
     expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
   });
 
+  it("clamps highest passing tier to the declared maximum claim tier", () => {
+    const sections = makeSections();
+    sections.claim_tier = {
+      ...sections.claim_tier,
+      state: "pass",
+      reasons: [],
+      maximumClaimTier: "reduced-order",
+      viabilityStatus: "ADMISSIBLE",
+      promotionReason: null,
+    };
+    sections.lapse_provenance = {
+      ...sections.lapse_provenance,
+      state: "pass",
+      reasons: [],
+    };
+    sections.strict_signal_readiness = {
+      ...sections.strict_signal_readiness,
+      state: "pass",
+      reasons: [],
+      tsMetricDerived: true,
+      qiMetricDerived: true,
+      qiApplicabilityStatus: "PASS",
+      missingSignals: [],
+    };
+    sections.source_closure = {
+      ...sections.source_closure,
+      state: "pass",
+      reasons: [],
+      metricTensorRef: "artifact://metric-tensor",
+      tileEffectiveTensorRef: "artifact://tile-effective",
+      residualRms: 1e-6,
+      residualMax: 1e-5,
+      residualByRegion: { hull: 1e-6, wall: 1e-5, exteriorShell: 1e-6 },
+      toleranceRef: "source_closure_tolerance/v1",
+      assumptionsDrifted: false,
+    };
+    sections.observer_audit = {
+      ...sections.observer_audit,
+      state: "pass",
+      reasons: [],
+      metric: {
+        ...sections.observer_audit.metric,
+        state: "pass",
+      },
+      tile: {
+        state: "pass",
+        wecMinOverAllTimelike: 0,
+        necMinOverAllNull: 0,
+        decStatus: "PASS",
+        secStatus: "PASS",
+        observerWorstCaseLocation: "wall",
+        typeIFraction: 1,
+        missedViolationFraction: 0,
+        maxRobustMinusEulerian: 0,
+      },
+    };
+    sections.gr_stability_safety = {
+      ...sections.gr_stability_safety,
+      state: "pass",
+      reasons: [],
+    };
+    sections.shift_vs_lapse_decomposition = {
+      ...sections.shift_vs_lapse_decomposition,
+      state: "pass",
+      reasons: [],
+      shiftDrivenContribution: 0.5,
+      lapseDrivenContribution: 0.5,
+      expansionLeakageBound: 0,
+      thetaFlatnessStatus: "PASS",
+      divBetaFlatnessStatus: "PASS",
+      natarioBaselineComparisonRef: "artifact://natario-baseline",
+    };
+    sections.uncertainty_perturbation_reproducibility = {
+      ...sections.uncertainty_perturbation_reproducibility,
+      state: "pass",
+      reasons: [],
+      precisionAgreementStatus: "within_tolerance",
+      meshConvergenceOrder: 2,
+      boundaryConditionSensitivity: 0.01,
+      smoothingKernelSensitivity: 0.01,
+      coldStartReproductionStatus: "reproduced",
+      independentReproductionStatus: "reproduced",
+      artifactHashConsistencyStatus: "ok",
+    };
+    sections.certificate_policy_result = {
+      ...sections.certificate_policy_result,
+      state: "pass",
+      reasons: [],
+      viabilityStatus: "ADMISSIBLE",
+      hardConstraintPass: true,
+      firstHardFailureId: null,
+      certificateStatus: "ADMISSIBLE",
+      certificateHash: "cafefeed",
+      certificateIntegrity: "ok",
+      promotionReason: null,
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-04-23T01:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.claimTierReadiness.certified.state).toBe("pass");
+    expect(contract?.maximumClaimTier).toBe("reduced-order");
+    expect(contract?.highestPassingClaimTier).toBe("reduced-order");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+    expect(
+      isNhm2FullLoopAuditContract({
+        ...contract,
+        highestPassingClaimTier: "certified",
+      }),
+    ).toBe(false);
+  });
+
   it("accepts source-closure version lag as an explicit fail-closed blocker", () => {
     const sections = makeSections();
     sections.source_closure = {

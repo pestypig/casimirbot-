@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_shift_lapse_boundary_sweep/v1",
-  "generatedOn": "2026-04-08",
-  "generatedAt": "2026-04-08T04:25:41.159Z",
+  "generatedOn": "2026-04-23",
+  "generatedAt": "2026-04-23T03:05:00.528Z",
   "boundaryStatement": "This artifact records a small stronger-side boundary sweep beyond the locally robust nhm2_shift_lapse selected-family bracket. It does not replace canonical baseline latest aliases and does not widen speed, ETA, viability, gravity, or horizon claims.",
   "publicationCommand": "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep",
   "canonicalBaselineMetricT00Ref": "warp.metric.T00.natario_sdf.shift",
@@ -4003,6 +4003,7 @@
         "routeTimeWorldlineLatestJsonPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-route-time-worldline-latest.json",
         "missionTimeEstimatorLatestJsonPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-mission-time-estimator-latest.json",
         "missionTimeComparisonLatestJsonPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-mission-time-comparison-latest.json",
+        "shiftVsLapseDecompositionLatestJsonPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-shift-vs-lapse-decomposition-latest.json",
         "cruiseEnvelopeLatestJsonPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-cruise-envelope-latest.json",
         "inHullProperAccelerationLatestJsonPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-in-hull-proper-acceleration-latest.json"
       },
@@ -4542,5 +4543,5 @@
     "does not convert wall-safety guardrails into a theorem-level horizon claim",
     "does not widen source/mechanism authority"
   ],
-  "checksum": "a6a63bb5228fb978a5121248fdf009cb3d93315ea1ab0e1093820faf3913917d"
+  "checksum": "49762a807967da6970db6e9169cc3eef97cddf2abee2562274834eccbde6969e"
 }

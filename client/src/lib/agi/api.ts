@@ -1847,6 +1847,7 @@ export async function askLocal(
     searchQuery?: string;
     topK?: number;
     context?: string;
+    contextFiles?: string[];
     signal?: AbortSignal;
     mode?: "read" | "observe" | "act" | "verify";
     allowTools?: string[];
@@ -1931,6 +1932,12 @@ export async function askLocal(
   if (typeof options?.topK === "number") body.topK = options.topK;
   if (typeof options?.context === "string" && options.context.trim()) {
     body.context = options.context;
+  }
+  if (Array.isArray(options?.contextFiles) && options.contextFiles.length > 0) {
+    body.contextFiles = options.contextFiles
+      .map((entry) => String(entry ?? "").trim())
+      .filter((entry) => entry.length > 0)
+      .slice(0, 48);
   }
   if (options?.mode) body.mode = options.mode;
   if (options?.allowTools?.length) body.allowTools = options.allowTools;

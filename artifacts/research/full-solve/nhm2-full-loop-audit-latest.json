@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-22T21:36:23.470Z",
+  "generatedAt": "2026-04-23T03:45:47.383Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -331,10 +331,8 @@
     },
     "gr_stability_safety": {
       "sectionId": "gr_stability_safety",
-      "state": "review",
-      "reasons": [
-        "policy_review_required"
-      ],
+      "state": "pass",
+      "reasons": [],
       "artifactRefs": [
         {
           "artifactId": "nhm2_shift_lapse_transport_result",
@@ -346,13 +344,13 @@
           "artifactId": "nhm2_envelope_perturbation_suite_root",
           "path": "artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json",
           "contractVersion": "nhm2_envelope_perturbation_suite/v1",
-          "status": "review"
+          "status": "pass"
         },
         {
           "artifactId": "nhm2_envelope_perturbation_suite_selected",
           "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope/nhm2-envelope-perturbation-suite-latest.json",
           "contractVersion": "nhm2_envelope_perturbation_suite/v1",
-          "status": "review"
+          "status": "pass"
         },
         {
           "artifactId": "nhm2_in_hull_proper_acceleration",
@@ -375,7 +373,7 @@
       "centerlineProperAcceleration_mps2": null,
       "wallNormalSafetyMargin": 1,
       "blueshiftMax": null,
-      "stabilityWorstCase": "profile_stage1_centerline_alpha_0p9975_v1",
+      "stabilityWorstCase": null,
       "safetyWorstCaseLocation": "cabin_center",
       "supportedClaimTiers": [
         "reduced-order",
@@ -471,13 +469,13 @@
           "artifactId": "nhm2_envelope_perturbation_suite_root",
           "path": "artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json",
           "contractVersion": "nhm2_envelope_perturbation_suite/v1",
-          "status": "review"
+          "status": "pass"
         },
         {
           "artifactId": "nhm2_envelope_perturbation_suite_selected",
           "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope/nhm2-envelope-perturbation-suite-latest.json",
           "contractVersion": "nhm2_envelope_perturbation_suite/v1",
-          "status": "review"
+          "status": "pass"
         }
       ],
       "precisionAgreementStatus": "pass",
@@ -576,7 +574,7 @@
     },
     "reduced-order": {
       "tier": "reduced-order",
-      "state": "review",
+      "state": "pass",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -596,17 +594,16 @@
         "strict_signal_readiness",
         "source_closure",
         "observer_audit",
+        "gr_stability_safety",
         "mission_time_outputs",
         "shift_vs_lapse_decomposition",
         "uncertainty_perturbation_reproducibility"
       ],
-      "blockingReasons": [
-        "policy_review_required"
-      ]
+      "blockingReasons": []
     },
     "certified": {
       "tier": "certified",
-      "state": "review",
+      "state": "pass",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -627,21 +624,18 @@
         "strict_signal_readiness",
         "source_closure",
         "observer_audit",
+        "gr_stability_safety",
         "mission_time_outputs",
         "shift_vs_lapse_decomposition",
         "uncertainty_perturbation_reproducibility",
         "certificate_policy_result"
       ],
-      "blockingReasons": [
-        "policy_review_required"
-      ]
+      "blockingReasons": []
     }
   },
   "currentClaimTier": "diagnostic",
   "maximumClaimTier": "reduced-order",
-  "highestPassingClaimTier": "diagnostic",
-  "overallState": "review",
-  "blockingReasons": [
-    "policy_review_required"
-  ]
+  "highestPassingClaimTier": "reduced-order",
+  "overallState": "pass",
+  "blockingReasons": []
 }

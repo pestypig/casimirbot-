@@ -1,10 +1,10 @@
 {
   "artifactId": "nhm2_envelope_perturbation_suite",
   "schemaVersion": "nhm2_envelope_perturbation_suite/v1",
-  "generatedOn": "2026-04-08",
-  "generatedAt": "2026-04-08T18:13:36.128Z",
-  "status": "review",
-  "completeness": "incomplete",
+  "generatedOn": "2026-04-23",
+  "generatedAt": "2026-04-23T03:14:30.712Z",
+  "status": "pass",
+  "completeness": "complete",
   "boundaryStatement": "This artifact records reproducible NHM2 envelope evidence over the selected nhm2_shift_lapse family. It names perturbation suites, preserves negative outcomes, and does not widen speed, viability, or ETA claims.",
   "publicationCommand": "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite",
   "family": {
@@ -720,7 +720,7 @@
       "axis": "lapse_profile",
       "referenceCaseId": "profile_stage1_centerline_alpha_0p995_v1",
       "status": "pass",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "caseCount": 4,
       "caseOrder": [
         "profile_stage1_centerline_alpha_0p9975_v1",
@@ -736,12 +736,7 @@
         "unavailable": 0
       },
       "negativeCaseIds": [],
-      "incompleteCaseIds": [
-        "profile_stage1_centerline_alpha_0p9975_v1",
-        "profile_stage1_centerline_alpha_0p995_v1",
-        "profile_stage1_centerline_alpha_0p9925_v1",
-        "profile_stage1_centerline_alpha_0p9900_v1"
-      ],
+      "incompleteCaseIds": [],
       "worstWallSafetyMargin": 1,
       "tightestSolverHealthClampHeadroom": 0,
       "missionTimeInterpretationStatuses": [
@@ -755,11 +750,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Profile stage1_centerline_alpha_0p9975_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Profile stage1_centerline_alpha_0p9975_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -812,8 +805,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -854,11 +849,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Profile stage1_centerline_alpha_0p995_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Profile stage1_centerline_alpha_0p995_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -911,8 +904,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -953,11 +948,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Profile stage1_centerline_alpha_0p9925_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Profile stage1_centerline_alpha_0p9925_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1010,8 +1003,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1052,11 +1047,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Profile stage1_centerline_alpha_0p9900_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Profile stage1_centerline_alpha_0p9900_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1109,8 +1102,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1151,8 +1146,8 @@
       "suiteLabel": "Stronger-Boundary Lapse Perturbations",
       "axis": "lapse_profile",
       "referenceCaseId": "stronger_stage1_centerline_alpha_0p9875_v1",
-      "status": "review",
-      "completeness": "incomplete",
+      "status": "pass",
+      "completeness": "complete",
       "caseCount": 104,
       "caseOrder": [
         "stronger_stage1_centerline_alpha_0p9875_v1",
@@ -1262,118 +1257,13 @@
       ],
       "summary": "No first-failure boundary was reached within the tested stronger bracket. Through stage1_centerline_alpha_0p7300_v1, every tested stronger-side profile remained gate-admitted, and the bounded timing differential scales monotonic within the passing region. The current predefined exploration stop is stage1_centerline_alpha_0p7300_v1.",
       "statusCounts": {
-        "pass": 100,
+        "pass": 104,
         "fail": 0,
-        "review": 4,
+        "review": 0,
         "unavailable": 0
       },
       "negativeCaseIds": [],
-      "incompleteCaseIds": [
-        "stronger_stage1_centerline_alpha_0p9875_v1",
-        "stronger_stage1_centerline_alpha_0p9850_v1",
-        "stronger_stage1_centerline_alpha_0p9825_v1",
-        "stronger_stage1_centerline_alpha_0p9800_v1",
-        "stronger_stage1_centerline_alpha_0p9775_v1",
-        "stronger_stage1_centerline_alpha_0p9750_v1",
-        "stronger_stage1_centerline_alpha_0p9725_v1",
-        "stronger_stage1_centerline_alpha_0p9700_v1",
-        "stronger_stage1_centerline_alpha_0p9675_v1",
-        "stronger_stage1_centerline_alpha_0p9650_v1",
-        "stronger_stage1_centerline_alpha_0p9625_v1",
-        "stronger_stage1_centerline_alpha_0p9600_v1",
-        "stronger_stage1_centerline_alpha_0p9575_v1",
-        "stronger_stage1_centerline_alpha_0p9550_v1",
-        "stronger_stage1_centerline_alpha_0p9525_v1",
-        "stronger_stage1_centerline_alpha_0p9500_v1",
-        "stronger_stage1_centerline_alpha_0p9475_v1",
-        "stronger_stage1_centerline_alpha_0p9450_v1",
-        "stronger_stage1_centerline_alpha_0p9425_v1",
-        "stronger_stage1_centerline_alpha_0p9400_v1",
-        "stronger_stage1_centerline_alpha_0p9375_v1",
-        "stronger_stage1_centerline_alpha_0p9350_v1",
-        "stronger_stage1_centerline_alpha_0p9325_v1",
-        "stronger_stage1_centerline_alpha_0p9300_v1",
-        "stronger_stage1_centerline_alpha_0p9275_v1",
-        "stronger_stage1_centerline_alpha_0p9250_v1",
-        "stronger_stage1_centerline_alpha_0p9225_v1",
-        "stronger_stage1_centerline_alpha_0p9200_v1",
-        "stronger_stage1_centerline_alpha_0p9175_v1",
-        "stronger_stage1_centerline_alpha_0p9150_v1",
-        "stronger_stage1_centerline_alpha_0p9125_v1",
-        "stronger_stage1_centerline_alpha_0p9100_v1",
-        "stronger_stage1_centerline_alpha_0p9075_v1",
-        "stronger_stage1_centerline_alpha_0p9050_v1",
-        "stronger_stage1_centerline_alpha_0p9025_v1",
-        "stronger_stage1_centerline_alpha_0p9000_v1",
-        "stronger_stage1_centerline_alpha_0p8975_v1",
-        "stronger_stage1_centerline_alpha_0p8950_v1",
-        "stronger_stage1_centerline_alpha_0p8925_v1",
-        "stronger_stage1_centerline_alpha_0p8900_v1",
-        "stronger_stage1_centerline_alpha_0p8875_v1",
-        "stronger_stage1_centerline_alpha_0p8850_v1",
-        "stronger_stage1_centerline_alpha_0p8825_v1",
-        "stronger_stage1_centerline_alpha_0p8800_v1",
-        "stronger_stage1_centerline_alpha_0p8775_v1",
-        "stronger_stage1_centerline_alpha_0p8750_v1",
-        "stronger_stage1_centerline_alpha_0p8725_v1",
-        "stronger_stage1_centerline_alpha_0p8700_v1",
-        "stronger_stage1_centerline_alpha_0p8675_v1",
-        "stronger_stage1_centerline_alpha_0p8650_v1",
-        "stronger_stage1_centerline_alpha_0p8625_v1",
-        "stronger_stage1_centerline_alpha_0p8600_v1",
-        "stronger_stage1_centerline_alpha_0p8575_v1",
-        "stronger_stage1_centerline_alpha_0p8550_v1",
-        "stronger_stage1_centerline_alpha_0p8525_v1",
-        "stronger_stage1_centerline_alpha_0p8500_v1",
-        "stronger_stage1_centerline_alpha_0p8475_v1",
-        "stronger_stage1_centerline_alpha_0p8450_v1",
-        "stronger_stage1_centerline_alpha_0p8425_v1",
-        "stronger_stage1_centerline_alpha_0p8400_v1",
-        "stronger_stage1_centerline_alpha_0p8375_v1",
-        "stronger_stage1_centerline_alpha_0p8350_v1",
-        "stronger_stage1_centerline_alpha_0p8325_v1",
-        "stronger_stage1_centerline_alpha_0p8300_v1",
-        "stronger_stage1_centerline_alpha_0p8275_v1",
-        "stronger_stage1_centerline_alpha_0p8250_v1",
-        "stronger_stage1_centerline_alpha_0p8225_v1",
-        "stronger_stage1_centerline_alpha_0p8200_v1",
-        "stronger_stage1_centerline_alpha_0p8175_v1",
-        "stronger_stage1_centerline_alpha_0p8150_v1",
-        "stronger_stage1_centerline_alpha_0p8125_v1",
-        "stronger_stage1_centerline_alpha_0p8100_v1",
-        "stronger_stage1_centerline_alpha_0p8075_v1",
-        "stronger_stage1_centerline_alpha_0p8050_v1",
-        "stronger_stage1_centerline_alpha_0p8025_v1",
-        "stronger_stage1_centerline_alpha_0p8000_v1",
-        "stronger_stage1_centerline_alpha_0p7975_v1",
-        "stronger_stage1_centerline_alpha_0p7950_v1",
-        "stronger_stage1_centerline_alpha_0p7925_v1",
-        "stronger_stage1_centerline_alpha_0p7900_v1",
-        "stronger_stage1_centerline_alpha_0p7875_v1",
-        "stronger_stage1_centerline_alpha_0p7850_v1",
-        "stronger_stage1_centerline_alpha_0p7825_v1",
-        "stronger_stage1_centerline_alpha_0p7800_v1",
-        "stronger_stage1_centerline_alpha_0p7775_v1",
-        "stronger_stage1_centerline_alpha_0p7750_v1",
-        "stronger_stage1_centerline_alpha_0p7725_v1",
-        "stronger_stage1_centerline_alpha_0p7700_v1",
-        "stronger_stage1_centerline_alpha_0p7675_v1",
-        "stronger_stage1_centerline_alpha_0p7650_v1",
-        "stronger_stage1_centerline_alpha_0p7625_v1",
-        "stronger_stage1_centerline_alpha_0p7600_v1",
-        "stronger_stage1_centerline_alpha_0p7575_v1",
-        "stronger_stage1_centerline_alpha_0p7550_v1",
-        "stronger_stage1_centerline_alpha_0p7525_v1",
-        "stronger_stage1_centerline_alpha_0p7500_v1",
-        "stronger_stage1_centerline_alpha_0p7475_v1",
-        "stronger_stage1_centerline_alpha_0p7450_v1",
-        "stronger_stage1_centerline_alpha_0p7425_v1",
-        "stronger_stage1_centerline_alpha_0p7400_v1",
-        "stronger_stage1_centerline_alpha_0p7375_v1",
-        "stronger_stage1_centerline_alpha_0p7350_v1",
-        "stronger_stage1_centerline_alpha_0p7325_v1",
-        "stronger_stage1_centerline_alpha_0p7300_v1"
-      ],
+      "incompleteCaseIds": [],
       "worstWallSafetyMargin": 1,
       "tightestSolverHealthClampHeadroom": 0,
       "missionTimeInterpretationStatuses": [
@@ -1387,11 +1277,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9875_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9875_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1444,8 +1332,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1486,11 +1376,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9850_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9850_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1543,8 +1431,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1585,11 +1475,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9825_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9825_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1642,8 +1530,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1684,11 +1574,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9800_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9800_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1741,8 +1629,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1783,11 +1673,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9775_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9775_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1840,8 +1728,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1882,11 +1772,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9750_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9750_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -1939,8 +1827,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -1981,11 +1871,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9725_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9725_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2038,8 +1926,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2080,11 +1970,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9700_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9700_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2137,8 +2025,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2179,11 +2069,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9675_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9675_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2236,8 +2124,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2278,11 +2168,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9650_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9650_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2335,8 +2223,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2377,11 +2267,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9625_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9625_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2434,8 +2322,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2476,11 +2366,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9600_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9600_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2533,8 +2421,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2575,11 +2465,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9575_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9575_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2632,8 +2520,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2674,11 +2564,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9550_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9550_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2731,8 +2619,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2773,11 +2663,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9525_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9525_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2830,8 +2718,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2872,11 +2762,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9500_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9500_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -2929,8 +2817,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -2971,11 +2861,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9475_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9475_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3028,8 +2916,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3070,11 +2960,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9450_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9450_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3127,8 +3015,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3169,11 +3059,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9425_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9425_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3226,8 +3114,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3268,11 +3158,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9400_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9400_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3325,8 +3213,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3367,11 +3257,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9375_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9375_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3424,8 +3312,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3466,11 +3356,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9350_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9350_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3523,8 +3411,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3565,11 +3455,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9325_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9325_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3622,8 +3510,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3664,11 +3554,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9300_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9300_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3721,8 +3609,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3763,11 +3653,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9275_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9275_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3820,8 +3708,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3862,11 +3752,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9250_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9250_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -3919,8 +3807,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -3961,11 +3851,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9225_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9225_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4018,8 +3906,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4060,11 +3950,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9200_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9200_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4117,8 +4005,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4159,11 +4049,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9175_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9175_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4216,8 +4104,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4258,11 +4148,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9150_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9150_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4315,8 +4203,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4357,11 +4247,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9125_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9125_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4414,8 +4302,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4456,11 +4346,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9100_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9100_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4513,8 +4401,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4555,11 +4445,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9075_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9075_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4612,8 +4500,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4654,11 +4544,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9050_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9050_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4711,8 +4599,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4753,11 +4643,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9025_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9025_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4810,8 +4698,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4852,11 +4742,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p9000_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p9000_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -4909,8 +4797,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -4951,11 +4841,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8975_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8975_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5008,8 +4896,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5050,11 +4940,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8950_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8950_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5107,8 +4995,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5149,11 +5039,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8925_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8925_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5206,8 +5094,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5248,11 +5138,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8900_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8900_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5305,8 +5193,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5347,11 +5237,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8875_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8875_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5404,8 +5292,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5446,11 +5336,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8850_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8850_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5503,8 +5391,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5545,11 +5435,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8825_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8825_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5602,8 +5490,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5644,11 +5534,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8800_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8800_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5701,8 +5589,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5743,11 +5633,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8775_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8775_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5800,8 +5688,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5842,11 +5732,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8750_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8750_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5899,8 +5787,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -5941,11 +5831,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8725_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8725_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -5998,8 +5886,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6040,11 +5930,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8700_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8700_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6097,8 +5985,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6139,11 +6029,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8675_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8675_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6196,8 +6084,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6238,11 +6128,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8650_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8650_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6295,8 +6183,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6337,11 +6227,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8625_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8625_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6394,8 +6282,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6436,11 +6326,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8600_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8600_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6493,8 +6381,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6535,11 +6425,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8575_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8575_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6592,8 +6480,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6634,11 +6524,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8550_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8550_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6691,8 +6579,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6733,11 +6623,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8525_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8525_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6790,8 +6678,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6832,11 +6722,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8500_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8500_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6889,8 +6777,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -6931,11 +6821,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8475_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8475_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -6988,8 +6876,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7030,11 +6920,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8450_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8450_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7087,8 +6975,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7129,11 +7019,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8425_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8425_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7186,8 +7074,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7228,11 +7118,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8400_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8400_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7285,8 +7173,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7327,11 +7217,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8375_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8375_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7384,8 +7272,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7426,11 +7316,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8350_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8350_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7483,8 +7371,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7525,11 +7415,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8325_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8325_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7582,8 +7470,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7624,11 +7514,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8300_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8300_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7681,8 +7569,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7723,11 +7613,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8275_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8275_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7780,8 +7668,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7822,11 +7712,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8250_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8250_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7879,8 +7767,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -7921,11 +7811,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8225_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8225_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -7978,8 +7866,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8020,11 +7910,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8200_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8200_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8077,8 +7965,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8119,11 +8009,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8175_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8175_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8176,8 +8064,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8218,11 +8108,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8150_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8150_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8275,8 +8163,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8317,11 +8207,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8125_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8125_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8374,8 +8262,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8416,11 +8306,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8100_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8100_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8473,8 +8361,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8515,11 +8405,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8075_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8075_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8572,8 +8460,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8614,11 +8504,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8050_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8050_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8671,8 +8559,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8713,11 +8603,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8025_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8025_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8770,8 +8658,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8812,11 +8702,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p8000_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p8000_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8869,8 +8757,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -8911,11 +8801,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7975_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7975_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -8968,8 +8856,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9010,11 +8900,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7950_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7950_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9067,8 +8955,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9109,11 +8999,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7925_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7925_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9166,8 +9054,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9208,11 +9098,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7900_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7900_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9265,8 +9153,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9307,11 +9197,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7875_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7875_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9364,8 +9252,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9406,11 +9296,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7850_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7850_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9463,8 +9351,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9505,11 +9395,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7825_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7825_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9562,8 +9450,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9604,11 +9494,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7800_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7800_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9661,8 +9549,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9703,11 +9593,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7775_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7775_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9760,8 +9648,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9802,11 +9692,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7750_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7750_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9859,8 +9747,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -9901,11 +9791,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7725_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7725_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -9958,8 +9846,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10000,11 +9890,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7700_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7700_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10057,8 +9945,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10098,13 +9988,10 @@
           "suiteId": "stronger_boundary_lapse_perturbations",
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
-          "status": "review",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing",
-            "mission_time_reused_from_selected_bundle"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7675_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=review",
+          "status": "pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7675_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10157,8 +10044,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10172,16 +10061,16 @@
             "kMultiplierHeadroom": 0
           },
           "missionTime": {
-            "source": "selected_bundle_contracts_reused",
-            "estimatorStatus": null,
-            "comparisonStatus": null,
+            "source": "live_pipeline_contracts",
+            "estimatorStatus": "bounded_target_coupled_estimate_ready",
+            "comparisonStatus": "bounded_target_coupled_comparison_ready",
             "interpretationStatus": "bounded_relativistic_differential_detected",
-            "coordinateYears": 0,
-            "properYears": 0,
-            "classicalYears": 0,
+            "coordinateYears": 4.3652231448899625,
+            "properYears": 3.3503087637030466,
+            "classicalYears": 4.3652231448899625,
             "properMinusCoordinateSeconds": -32028262.075744227,
             "properMinusClassicalSeconds": -32028262.075744227,
-            "sourceArtifactPath": null,
+            "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7675_v1/nhm2-mission-time-comparison-latest.json",
             "reportPath": "docs/audits/research/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7675_v1/warp-nhm2-shift-lapse-transport-result-latest.md"
           },
           "artifactRefs": {
@@ -10198,13 +10087,10 @@
           "suiteId": "stronger_boundary_lapse_perturbations",
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
-          "status": "review",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing",
-            "mission_time_reused_from_selected_bundle"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7650_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=review",
+          "status": "pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7650_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10257,8 +10143,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10272,16 +10160,16 @@
             "kMultiplierHeadroom": 0
           },
           "missionTime": {
-            "source": "selected_bundle_contracts_reused",
-            "estimatorStatus": null,
-            "comparisonStatus": null,
+            "source": "live_pipeline_contracts",
+            "estimatorStatus": "bounded_target_coupled_estimate_ready",
+            "comparisonStatus": "bounded_target_coupled_comparison_ready",
             "interpretationStatus": "bounded_relativistic_differential_detected",
-            "coordinateYears": 0,
-            "properYears": 0,
-            "classicalYears": 0,
+            "coordinateYears": 4.3652231448899625,
+            "properYears": 3.3393957058408223,
+            "classicalYears": 4.3652231448899625,
             "properMinusCoordinateSeconds": -32372651.990537167,
             "properMinusClassicalSeconds": -32372651.990537167,
-            "sourceArtifactPath": null,
+            "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7650_v1/nhm2-mission-time-comparison-latest.json",
             "reportPath": "docs/audits/research/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7650_v1/warp-nhm2-shift-lapse-transport-result-latest.md"
           },
           "artifactRefs": {
@@ -10298,13 +10186,10 @@
           "suiteId": "stronger_boundary_lapse_perturbations",
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
-          "status": "review",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing",
-            "mission_time_reused_from_selected_bundle"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7625_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=review",
+          "status": "pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7625_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10357,8 +10242,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10372,16 +10259,16 @@
             "kMultiplierHeadroom": 0
           },
           "missionTime": {
-            "source": "selected_bundle_contracts_reused",
-            "estimatorStatus": null,
-            "comparisonStatus": null,
+            "source": "live_pipeline_contracts",
+            "estimatorStatus": "bounded_target_coupled_estimate_ready",
+            "comparisonStatus": "bounded_target_coupled_comparison_ready",
             "interpretationStatus": "bounded_relativistic_differential_detected",
-            "coordinateYears": 0,
-            "properYears": 0,
-            "classicalYears": 0,
+            "coordinateYears": 4.3652231448899625,
+            "properYears": 3.3284826479785963,
+            "classicalYears": 4.3652231448899625,
             "properMinusCoordinateSeconds": -32717041.90533015,
             "properMinusClassicalSeconds": -32717041.90533015,
-            "sourceArtifactPath": null,
+            "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7625_v1/nhm2-mission-time-comparison-latest.json",
             "reportPath": "docs/audits/research/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7625_v1/warp-nhm2-shift-lapse-transport-result-latest.md"
           },
           "artifactRefs": {
@@ -10398,13 +10285,10 @@
           "suiteId": "stronger_boundary_lapse_perturbations",
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
-          "status": "review",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing",
-            "mission_time_reused_from_selected_bundle"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7600_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=review",
+          "status": "pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7600_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10457,8 +10341,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10472,16 +10358,16 @@
             "kMultiplierHeadroom": 0
           },
           "missionTime": {
-            "source": "selected_bundle_contracts_reused",
-            "estimatorStatus": null,
-            "comparisonStatus": null,
+            "source": "live_pipeline_contracts",
+            "estimatorStatus": "bounded_target_coupled_estimate_ready",
+            "comparisonStatus": "bounded_target_coupled_comparison_ready",
             "interpretationStatus": "bounded_relativistic_differential_detected",
-            "coordinateYears": 0,
-            "properYears": 0,
-            "classicalYears": 0,
+            "coordinateYears": 4.3652231448899625,
+            "properYears": 3.317569590116372,
+            "classicalYears": 4.3652231448899625,
             "properMinusCoordinateSeconds": -33061431.820123076,
             "properMinusClassicalSeconds": -33061431.820123076,
-            "sourceArtifactPath": null,
+            "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/nhm2-mission-time-comparison-latest.json",
             "reportPath": "docs/audits/research/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p7600_v1/warp-nhm2-shift-lapse-transport-result-latest.md"
           },
           "artifactRefs": {
@@ -10499,11 +10385,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7575_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7575_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10556,8 +10440,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10598,11 +10484,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7550_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7550_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10655,8 +10539,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10697,11 +10583,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7525_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7525_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10754,8 +10638,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10796,11 +10682,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7500_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7500_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10853,8 +10737,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10895,11 +10781,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7475_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7475_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -10952,8 +10836,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -10994,11 +10880,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7450_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7450_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11051,8 +10935,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11093,11 +10979,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7425_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7425_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11150,8 +11034,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11192,11 +11078,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7400_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7400_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11249,8 +11133,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11291,11 +11177,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7375_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7375_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11348,8 +11232,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11390,11 +11276,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7350_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7350_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11447,8 +11331,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11489,11 +11375,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7325_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7325_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11546,8 +11430,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11588,11 +11474,9 @@
           "axis": "lapse_profile",
           "provenance": "published_selected_bundle",
           "status": "pass",
-          "completeness": "incomplete",
-          "reasonCodes": [
-            "solver_health_missing"
-          ],
-          "summary": "Stronger boundary stage1_centerline_alpha_0p7300_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=null status=pass",
+          "completeness": "complete",
+          "reasonCodes": [],
+          "summary": "Stronger boundary stage1_centerline_alpha_0p7300_v1: transport=bounded_transport_proof_bearing_gate_admitted mission_time=bounded_relativistic_differential_detected solver=CERTIFIED status=pass",
           "selectors": {
             "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
             "metricT00Source": "metric",
@@ -11645,8 +11529,10 @@
             "worstMargin": 1
           },
           "solverHealth": {
-            "status": null,
-            "reasons": [],
+            "status": "CERTIFIED",
+            "reasons": [
+              "in_hull_proper_acceleration_source_surface_solver_status"
+            ],
             "alphaClampFraction": 0,
             "kClampFraction": 0,
             "totalClampFraction": 0,
@@ -11687,122 +11573,13 @@
     "suiteCount": 4,
     "caseCount": 114,
     "statusCounts": {
-      "pass": 110,
+      "pass": 114,
       "fail": 0,
-      "review": 4,
+      "review": 0,
       "unavailable": 0
     },
     "negativeCaseIds": [],
-    "incompleteCaseIds": [
-      "profile_stage1_centerline_alpha_0p9975_v1",
-      "profile_stage1_centerline_alpha_0p995_v1",
-      "profile_stage1_centerline_alpha_0p9925_v1",
-      "profile_stage1_centerline_alpha_0p9900_v1",
-      "stronger_stage1_centerline_alpha_0p9875_v1",
-      "stronger_stage1_centerline_alpha_0p9850_v1",
-      "stronger_stage1_centerline_alpha_0p9825_v1",
-      "stronger_stage1_centerline_alpha_0p9800_v1",
-      "stronger_stage1_centerline_alpha_0p9775_v1",
-      "stronger_stage1_centerline_alpha_0p9750_v1",
-      "stronger_stage1_centerline_alpha_0p9725_v1",
-      "stronger_stage1_centerline_alpha_0p9700_v1",
-      "stronger_stage1_centerline_alpha_0p9675_v1",
-      "stronger_stage1_centerline_alpha_0p9650_v1",
-      "stronger_stage1_centerline_alpha_0p9625_v1",
-      "stronger_stage1_centerline_alpha_0p9600_v1",
-      "stronger_stage1_centerline_alpha_0p9575_v1",
-      "stronger_stage1_centerline_alpha_0p9550_v1",
-      "stronger_stage1_centerline_alpha_0p9525_v1",
-      "stronger_stage1_centerline_alpha_0p9500_v1",
-      "stronger_stage1_centerline_alpha_0p9475_v1",
-      "stronger_stage1_centerline_alpha_0p9450_v1",
-      "stronger_stage1_centerline_alpha_0p9425_v1",
-      "stronger_stage1_centerline_alpha_0p9400_v1",
-      "stronger_stage1_centerline_alpha_0p9375_v1",
-      "stronger_stage1_centerline_alpha_0p9350_v1",
-      "stronger_stage1_centerline_alpha_0p9325_v1",
-      "stronger_stage1_centerline_alpha_0p9300_v1",
-      "stronger_stage1_centerline_alpha_0p9275_v1",
-      "stronger_stage1_centerline_alpha_0p9250_v1",
-      "stronger_stage1_centerline_alpha_0p9225_v1",
-      "stronger_stage1_centerline_alpha_0p9200_v1",
-      "stronger_stage1_centerline_alpha_0p9175_v1",
-      "stronger_stage1_centerline_alpha_0p9150_v1",
-      "stronger_stage1_centerline_alpha_0p9125_v1",
-      "stronger_stage1_centerline_alpha_0p9100_v1",
-      "stronger_stage1_centerline_alpha_0p9075_v1",
-      "stronger_stage1_centerline_alpha_0p9050_v1",
-      "stronger_stage1_centerline_alpha_0p9025_v1",
-      "stronger_stage1_centerline_alpha_0p9000_v1",
-      "stronger_stage1_centerline_alpha_0p8975_v1",
-      "stronger_stage1_centerline_alpha_0p8950_v1",
-      "stronger_stage1_centerline_alpha_0p8925_v1",
-      "stronger_stage1_centerline_alpha_0p8900_v1",
-      "stronger_stage1_centerline_alpha_0p8875_v1",
-      "stronger_stage1_centerline_alpha_0p8850_v1",
-      "stronger_stage1_centerline_alpha_0p8825_v1",
-      "stronger_stage1_centerline_alpha_0p8800_v1",
-      "stronger_stage1_centerline_alpha_0p8775_v1",
-      "stronger_stage1_centerline_alpha_0p8750_v1",
-      "stronger_stage1_centerline_alpha_0p8725_v1",
-      "stronger_stage1_centerline_alpha_0p8700_v1",
-      "stronger_stage1_centerline_alpha_0p8675_v1",
-      "stronger_stage1_centerline_alpha_0p8650_v1",
-      "stronger_stage1_centerline_alpha_0p8625_v1",
-      "stronger_stage1_centerline_alpha_0p8600_v1",
-      "stronger_stage1_centerline_alpha_0p8575_v1",
-      "stronger_stage1_centerline_alpha_0p8550_v1",
-      "stronger_stage1_centerline_alpha_0p8525_v1",
-      "stronger_stage1_centerline_alpha_0p8500_v1",
-      "stronger_stage1_centerline_alpha_0p8475_v1",
-      "stronger_stage1_centerline_alpha_0p8450_v1",
-      "stronger_stage1_centerline_alpha_0p8425_v1",
-      "stronger_stage1_centerline_alpha_0p8400_v1",
-      "stronger_stage1_centerline_alpha_0p8375_v1",
-      "stronger_stage1_centerline_alpha_0p8350_v1",
-      "stronger_stage1_centerline_alpha_0p8325_v1",
-      "stronger_stage1_centerline_alpha_0p8300_v1",
-      "stronger_stage1_centerline_alpha_0p8275_v1",
-      "stronger_stage1_centerline_alpha_0p8250_v1",
-      "stronger_stage1_centerline_alpha_0p8225_v1",
-      "stronger_stage1_centerline_alpha_0p8200_v1",
-      "stronger_stage1_centerline_alpha_0p8175_v1",
-      "stronger_stage1_centerline_alpha_0p8150_v1",
-      "stronger_stage1_centerline_alpha_0p8125_v1",
-      "stronger_stage1_centerline_alpha_0p8100_v1",
-      "stronger_stage1_centerline_alpha_0p8075_v1",
-      "stronger_stage1_centerline_alpha_0p8050_v1",
-      "stronger_stage1_centerline_alpha_0p8025_v1",
-      "stronger_stage1_centerline_alpha_0p8000_v1",
-      "stronger_stage1_centerline_alpha_0p7975_v1",
-      "stronger_stage1_centerline_alpha_0p7950_v1",
-      "stronger_stage1_centerline_alpha_0p7925_v1",
-      "stronger_stage1_centerline_alpha_0p7900_v1",
-      "stronger_stage1_centerline_alpha_0p7875_v1",
-      "stronger_stage1_centerline_alpha_0p7850_v1",
-      "stronger_stage1_centerline_alpha_0p7825_v1",
-      "stronger_stage1_centerline_alpha_0p7800_v1",
-      "stronger_stage1_centerline_alpha_0p7775_v1",
-      "stronger_stage1_centerline_alpha_0p7750_v1",
-      "stronger_stage1_centerline_alpha_0p7725_v1",
-      "stronger_stage1_centerline_alpha_0p7700_v1",
-      "stronger_stage1_centerline_alpha_0p7675_v1",
-      "stronger_stage1_centerline_alpha_0p7650_v1",
-      "stronger_stage1_centerline_alpha_0p7625_v1",
-      "stronger_stage1_centerline_alpha_0p7600_v1",
-      "stronger_stage1_centerline_alpha_0p7575_v1",
-      "stronger_stage1_centerline_alpha_0p7550_v1",
-      "stronger_stage1_centerline_alpha_0p7525_v1",
-      "stronger_stage1_centerline_alpha_0p7500_v1",
-      "stronger_stage1_centerline_alpha_0p7475_v1",
-      "stronger_stage1_centerline_alpha_0p7450_v1",
-      "stronger_stage1_centerline_alpha_0p7425_v1",
-      "stronger_stage1_centerline_alpha_0p7400_v1",
-      "stronger_stage1_centerline_alpha_0p7375_v1",
-      "stronger_stage1_centerline_alpha_0p7350_v1",
-      "stronger_stage1_centerline_alpha_0p7325_v1",
-      "stronger_stage1_centerline_alpha_0p7300_v1"
-    ],
+    "incompleteCaseIds": [],
     "missionTimeInterpretationStatuses": [
       "bounded_relativistic_differential_detected"
     ],
@@ -11830,5 +11607,5 @@
     "does not widen viability claims",
     "negative and incomplete perturbation cases remain first-class evidence"
   ],
-  "checksum": "f89a8127223edeff09ded4abd2e9d7abf35056b65219da6871313a2b0b506b16"
+  "checksum": "2b30392dba55b986714f7e65ce8df90f435bcd7d5ab6df2132dbfd509f72c6f0"
 }

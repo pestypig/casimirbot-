@@ -247,6 +247,27 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultPosition: { x: 180, y: 120 }
   },
   {
+    id: "workstation-notes",
+    title: "Workstation Notes",
+    loader: load(() => import("@/components/workstation/WorkstationNotesPanel")),
+    defaultSize: { w: 980, h: 700 },
+    defaultPosition: { x: 220, y: 140 },
+  },
+  {
+    id: "workstation-clipboard-history",
+    title: "Clipboard History",
+    loader: load(() => import("@/components/workstation/WorkstationClipboardHistoryPanel")),
+    defaultSize: { w: 760, h: 620 },
+    defaultPosition: { x: 260, y: 180 },
+  },
+  {
+    id: "workstation-workflow-timeline",
+    title: "Workflow Timeline",
+    loader: load(() => import("@/components/workstation/WorkstationWorkflowTimelinePanel")),
+    defaultSize: { w: 820, h: 640 },
+    defaultPosition: { x: 300, y: 200 },
+  },
+  {
     id: "casimir-tiles",
     title: "Casimir Tiles",
     loader: load(() => import("@/components/panels/CasimirTilesPanel")),

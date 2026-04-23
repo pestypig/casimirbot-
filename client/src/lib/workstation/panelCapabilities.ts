@@ -167,6 +167,45 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
       },
     ],
   }),
+  "workstation-notes": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Notes",
+        description: "Open and focus workstation notes for macro note storage.",
+        risk: "low",
+      },
+    ],
+  }),
+  "workstation-clipboard-history": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Clipboard History",
+        description: "Open and focus clipboard receipts timeline.",
+        risk: "low",
+      },
+    ],
+  }),
+  "workstation-workflow-timeline": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Workflow Timeline",
+        description: "Open and focus cross-panel workflow timeline.",
+        risk: "low",
+      },
+    ],
+  }),
 };
 
 export function getWorkstationPanelCapabilities(panelId: string): WorkstationPanelCapabilities | null {

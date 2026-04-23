@@ -13,7 +13,7 @@ import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
 import { BrainCircuit, Mic, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
-import { findRandomPaperForTopic, parsePaperReadCommand } from "@/lib/docs/paperReadCommand";
+import { findBestDocForTopic, findRandomPaperForTopic, parsePaperReadCommand } from "@/lib/docs/paperReadCommand";
 import {
   askLocal,
   askMoodHint,
@@ -214,8 +214,45 @@ const HELIX_VOICE_COMMAND_LANE_ENABLED = parseVoiceEnvBoolean(
   false,
 );
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN = 0.62;
+const HELIX_WORKSTATION_INTENT_CLASSIFIER_TIMEOUT_MS = 1800;
 const HELIX_EXTERNAL_PROMPT_CLAIM_TTL_MS = 120_000;
 const HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY = "__helixAskExternalPromptClaims";
+
+type WorkstationIntentClassificationOutcome =
+  | "command_parse"
+  | "classifier_match"
+  | "deterministic_match"
+  | "fallback_timeout_match"
+  | "fallback_classifier_error_match"
+  | "fallback_low_confidence_match"
+  | "no_match_timeout"
+  | "no_match_classifier_error"
+  | "no_match_low_confidence"
+  | "no_match_not_probed";
+
+type WorkstationIntentClassificationResult = {
+  action: HelixWorkstationAction | null;
+  outcome: WorkstationIntentClassificationOutcome;
+};
+
+function formatWorkstationIntentStageDetail(result: WorkstationIntentClassificationResult): string {
+  const prefix = result.action
+    ? "workstation_intent_stage | action_resolved"
+    : "workstation_intent_stage | no_action_match";
+  const outcomeLabelMap: Record<WorkstationIntentClassificationOutcome, string> = {
+    command_parse: "command_parse",
+    classifier_match: "classifier_match",
+    deterministic_match: "deterministic_match",
+    fallback_timeout_match: "timeout_fallback",
+    fallback_classifier_error_match: "classifier_error_fallback",
+    fallback_low_confidence_match: "low_confidence_fallback",
+    no_match_timeout: "timeout_fallback",
+    no_match_classifier_error: "classifier_error",
+    no_match_low_confidence: "low_confidence",
+    no_match_not_probed: "not_probed",
+  };
+  return `${prefix} | ${outcomeLabelMap[result.outcome]}`;
+}
 
 function parseVoiceEnvBoolean(key: string, fallback: boolean): boolean {
   const raw = String((import.meta as any)?.env?.[key] ?? "").trim().toLowerCase();
@@ -3015,6 +3052,62 @@ export function isStrongQuestionDispatchCandidate(transcript: string): boolean {
     );
   const hasTechnicalTopicCue = /\b(warp bubble|alcubierre|casimir|helix|retrieval)\b/.test(normalized);
   return hasCodebaseCue || hasTechnicalTopicCue;
+}
+
+function isSimpleDirectPromptLaneCandidate(transcript: string): boolean {
+  const text = String(transcript ?? "").trim().toLowerCase();
+  if (!text) return false;
+  if (text.length > 160) return false;
+  const titleCue =
+    /\b(?:title|name)\b/.test(text) &&
+    /\b(?:paper|doc|document)\b/.test(text);
+  const tinyDocCue =
+    /\b(?:what(?:'s| is)?|show|give|tell)\b/.test(text) &&
+    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
+    /\b(?:title|name|path)\b/.test(text);
+  const quickDocExplainCue =
+    /\b(?:what(?:'s| is)?|tell|give|explain|summar(?:y|ize))\b/.test(text) &&
+    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
+    /\b(?:about|summary|summar(?:y|ize)|explain|mean|contains)\b/.test(text);
+  const heavyReasoningCue =
+    /\b(?:derive|proof|equation|compare|tradeoff|audit|review|call chain|implementation|refactor|design|architecture)\b/
+      .test(text);
+  if (heavyReasoningCue) return false;
+  return titleCue || tinyDocCue || quickDocExplainCue;
+}
+
+function isSimpleTitleOrPathOnlyPrompt(transcript: string): boolean {
+  const text = String(transcript ?? "").trim().toLowerCase();
+  if (!text) return false;
+  const titleCue =
+    /\b(?:title|name)\b/.test(text) &&
+    /\b(?:paper|doc|document)\b/.test(text);
+  const pathCue =
+    /\b(?:what(?:'s| is)?|show|give|tell)\b/.test(text) &&
+    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
+    /\b(?:path)\b/.test(text);
+  const quickTitleCue =
+    /\b(?:what(?:'s| is)?|show|give|tell)\b/.test(text) &&
+    /\b(?:this|current)\s+(?:paper|doc|document)\b/.test(text) &&
+    /\b(?:title|name)\b/.test(text);
+  return titleCue || pathCue || quickTitleCue;
+}
+
+function shouldQueueWorkspaceBackgroundReasoning(args: {
+  transcript: string;
+  docsViewerAnchorPath?: string | null;
+}): boolean {
+  const text = String(args.transcript ?? "").trim().toLowerCase();
+  if (!text) return false;
+  if (isSimpleTitleOrPathOnlyPrompt(text)) return false;
+  const workspaceCue =
+    Boolean(args.docsViewerAnchorPath) ||
+    /\b(?:docs?\s+viewer|workspace|repo|repository|codebase|source|file|path|paper|doc|document)\b/.test(
+      text,
+    );
+  if (!workspaceCue) return false;
+  const explainCue = /\b(?:about|explain|summary|summarize|context|describe|mean|contains)\b/.test(text);
+  return explainCue || text.length >= 48;
 }
 
 export function shouldForceObserveDispatchFromSuppression(args: {
@@ -6538,6 +6631,53 @@ function readDocViewerDebugSnapshot(): Record<string, unknown> {
   };
 }
 
+const HELIX_DOC_VIEWER_DEICTIC_CUE_RE = /\b(?:this|current)\s+doc(?:ument)?\b/i;
+const HELIX_DOC_VIEWER_CONTEXT_CUE_RE = /\b(?:docs?|document)\s+viewer(?:\s+context)?\b/i;
+const HELIX_EXPLICIT_PATH_CUE_RE =
+  /(?:\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|json|md|mdx|txt|pdf|docx?|ya?ml|py|go|rs)\b|(?:^|[\s(])\/?(?:docs|client|server|modules|shared)\/[^\s)]+)/i;
+
+function normalizeDocsViewerAnchorPath(value: string): string {
+  const normalized = value.replace(/\\/g, "/").trim();
+  if (/^[a-z]:\//i.test(normalized)) return normalized;
+  return normalized.replace(/^\/+/, "");
+}
+
+function extractExplicitDocsViewerPath(question: string): string | null {
+  const lineMatch = question.match(/document path:\s*([^\n\r]+)/i);
+  const inlinePath = lineMatch?.[1]?.trim();
+  if (inlinePath) {
+    const normalized = normalizeDocsViewerAnchorPath(inlinePath);
+    if (normalized) return normalized;
+  }
+  const tokenMatch = question.match(
+    /\b([a-z0-9_./-]+\.(?:ts|tsx|js|jsx|json|md|mdx|txt|pdf|docx?|ya?ml|py|go|rs))\b/i,
+  );
+  const tokenPath = tokenMatch?.[1]?.trim();
+  if (tokenPath) {
+    const normalized = normalizeDocsViewerAnchorPath(tokenPath);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
+function resolveDocsViewerAnchorPathForQuestion(
+  question: string,
+  answerContract?: HelixAskAnswerContract,
+): string | null {
+  const docsCueDetected =
+    HELIX_DOC_VIEWER_DEICTIC_CUE_RE.test(question) ||
+    HELIX_DOC_VIEWER_CONTEXT_CUE_RE.test(question) ||
+    answerContract?.source === "docs_viewer";
+  if (!docsCueDetected) return null;
+  const explicitPath = extractExplicitDocsViewerPath(question);
+  if (explicitPath) return explicitPath;
+  if (HELIX_EXPLICIT_PATH_CUE_RE.test(question)) return null;
+  const currentPath = String(useDocViewerStore.getState().currentPath ?? "").trim();
+  if (!currentPath) return null;
+  const normalizedPath = normalizeDocsViewerAnchorPath(currentPath);
+  return normalizedPath.length > 0 ? normalizedPath : null;
+}
+
 function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
   const state = useWorkstationLayoutStore.getState();
   const groupCount = Object.keys(state.groups).length;
@@ -7456,6 +7596,8 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
     objective?: string;
     preferred_panels?: string[];
     max_steps?: number;
+    workflow?: "observable_research_pipeline";
+    workflow_args?: Record<string, unknown>;
   } => {
     const title = typeof payload.title === "string" ? payload.title.trim() : "";
     const objective = typeof payload.objective === "string" ? payload.objective.trim() : "";
@@ -7469,11 +7611,21 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
       typeof payload.max_steps === "number" && Number.isFinite(payload.max_steps)
         ? Math.max(1, Math.min(12, Math.floor(payload.max_steps)))
         : undefined;
+    const workflow =
+      typeof payload.workflow === "string" && payload.workflow.trim() === "observable_research_pipeline"
+        ? "observable_research_pipeline"
+        : undefined;
+    const workflowArgs =
+      payload.workflow_args && typeof payload.workflow_args === "object" && !Array.isArray(payload.workflow_args)
+        ? (payload.workflow_args as Record<string, unknown>)
+        : undefined;
     return {
       ...(title ? { title } : {}),
       ...(objective ? { objective } : {}),
       ...(preferredPanels.length > 0 ? { preferred_panels: preferredPanels } : {}),
       ...(typeof maxSteps === "number" ? { max_steps: maxSteps } : {}),
+      ...(workflow ? { workflow } : {}),
+      ...(workflowArgs ? { workflow_args: workflowArgs } : {}),
     };
   };
 
@@ -7484,12 +7636,16 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
     objective?: string;
     preferred_panels?: string[];
     max_steps?: number;
+    workflow?: "observable_research_pipeline";
+    workflow_args?: Record<string, unknown>;
   } => {
     const payload: {
       title?: string;
       objective?: string;
       preferred_panels?: string[];
       max_steps?: number;
+      workflow?: "observable_research_pipeline";
+      workflow_args?: Record<string, unknown>;
     } = {};
     const text = source.trim();
     const objectiveQuoted =
@@ -7530,14 +7686,55 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
         payload.max_steps = Math.max(1, Math.min(12, Math.floor(parsed)));
       }
     }
+
+    if (/\bobservable_research_pipeline\b/i.test(text)) {
+      payload.workflow = "observable_research_pipeline";
+    }
     return payload;
   };
 
-  const resolveDocPathFromPrompt = (source: string): string | null => {
+  const parseObservableResearchPipelineCommand = (
+    source: string,
+  ): {
+    topic: string;
+    note_title: string;
+    compare_instruction: string;
+  } | null => {
+    const normalized = source.trim();
+    if (!normalized) return null;
+    const hasCopySignal = /\b(?:copy|collect|grab)\b/i.test(normalized);
+    const hasDocsSignal = /\b(?:doc|docs|document|paper|section)\b/i.test(normalized);
+    const hasNoteSignal = /\b(?:note|notepad|notes)\b/i.test(normalized);
+    const hasCompareSignal = /\b(?:compare|explain|analysis|difference|overlap)\b/i.test(normalized);
+    if (!hasCopySignal || !hasDocsSignal || !hasNoteSignal || !hasCompareSignal) return null;
+
+    const topic =
+      normalized.match(/\b(?:about|on|for|regarding)\s+(.+?)(?=\s+(?:in|into|to)\s+(?:doc|docs|note|notes)|\s*(?:,|;|\.|$))/i)?.[1]?.trim() ??
+      normalized.match(/\btopic\s*[:=]?\s*["']?(.+?)["']?(?=\s*(?:,|;|\.|$))/i)?.[1]?.trim() ??
+      "requested topic";
+
+    const noteTitle =
+      normalized.match(/\bnotes?\s+([a-z0-9 _-]{2,80})/i)?.[1]?.trim() ??
+      `Topic note: ${topic}`;
+
+    const compareInstruction =
+      normalized.match(/\bcompare[\s\S]*$/i)?.[0]?.trim() ??
+      `Compare the collected sections about ${topic} and write a plain-language explanation.`;
+
+    return {
+      topic,
+      note_title: noteTitle,
+      compare_instruction: compareInstruction,
+    };
+  };
+
+  const resolveDocPathFromPrompt = (source: string, options?: { useTopicHints?: boolean }): string | null => {
     const explicitPath = source.match(/\b(docs\/[a-z0-9._/-]+\.(?:md|json))\b/i)?.[1]?.trim();
     if (explicitPath) return explicitPath;
-    for (const hint of HELIX_DOC_TOPIC_PATH_HINTS) {
-      if (hint.pattern.test(source)) return hint.path;
+    if (options?.useTopicHints !== false) {
+      for (const hint of HELIX_DOC_TOPIC_PATH_HINTS) {
+        if (hint.pattern.test(source)) return hint.path;
+      }
     }
     return null;
   };
@@ -7593,6 +7790,19 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
     };
   }
 
+  const observableWorkflow = parseObservableResearchPipelineCommand(conversationalCandidate);
+  if (observableWorkflow) {
+    return {
+      action: "run_job",
+      payload: {
+        title: `Observable research workflow: ${observableWorkflow.topic}`,
+        objective: `Copy relevant docs sections about ${observableWorkflow.topic}, build a note, and compare topics.`,
+        workflow: "observable_research_pipeline",
+        workflow_args: observableWorkflow,
+      },
+    };
+  }
+
   const conversationalOpenDocsMatch = conversationalCandidate.match(
     /^(?:(?:ok|okay)\s+)?(?:(?:can|could|would)\s+you\s+|please\s+)?(?:open(?:\s+up)?|show|pull\s+up|bring\s+up)\s+(?:(?:a|an|the)\s+)?(?:docs?|documentation|document|paper|report|publication|research)\b(?:\s+(?:about|for|on|regarding)\s+(.+?))?(?:\s+(?:and|then)\s+(.+))?[?.!]*$/i,
   );
@@ -7607,7 +7817,9 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
       continuation,
     );
     if (continuationWantsSummarize || continuationWantsExplain) {
-      const fallbackPath = topic ? (findRandomPaperForTopic(topic)?.route ?? "/docs/papers.md") : "";
+      const fallbackPath = topic
+        ? (findBestDocForTopic(topic)?.route ?? findRandomPaperForTopic(topic)?.route ?? "/docs/papers.md")
+        : "";
       const resolvedPath = path || fallbackPath;
       return {
         action: "run_panel_action",
@@ -7629,6 +7841,56 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
         panel_id: "docs-viewer",
         action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
         args: readAloudRequested ? { path, topic } : { path },
+      };
+    }
+    return {
+      action: "open_panel",
+      panel_id: "docs-viewer",
+    };
+  }
+
+  const conversationalOpenDocsDirectTopicMatch = conversationalCandidate.match(
+    /^(?:(?:ok|okay)\s+)?(?:(?:can|could|would)\s+you\s+|please\s+)?(?:open(?:\s+up)?|show|pull\s+up|bring\s+up)\s+(?:(?:a|an|the)\s+)?(?:docs?|documentation|document|doc|paper|report|publication|research)\b\s+(.+?)(?:\s+(?:and|then)\s+(.+))?[?.!]*$/i,
+  );
+  if (conversationalOpenDocsDirectTopicMatch) {
+    const topic = (conversationalOpenDocsDirectTopicMatch[1] ?? "")
+      .replace(/^["'`“”]+|["'`“”]+$/g, "")
+      .trim();
+    const continuation = conversationalOpenDocsDirectTopicMatch[2]?.trim() ?? "";
+    const hintedPath = resolveDocPathFromPrompt(topic || conversationalCandidate, {
+      useTopicHints: false,
+    });
+    const fallbackPath = topic
+      ? (findBestDocForTopic(topic)?.route ?? findRandomPaperForTopic(topic)?.route ?? "")
+      : "";
+    const resolvedPath = hintedPath || fallbackPath;
+    const continuationWantsSummarize = /\b(?:summari[sz]e|summary|tldr|tl;dr)\b/i.test(continuation);
+    const continuationWantsSectionSummary =
+      continuationWantsSummarize && /\b(?:section|this\s+section|current\s+section|part)\b/i.test(continuation);
+    const continuationWantsExplain = /\b(?:explain|break\s+down|walk\s+me\s+through|what\s+does)\b/i.test(
+      continuation,
+    );
+    if (continuationWantsSummarize || continuationWantsExplain) {
+      return {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: continuationWantsSectionSummary
+          ? "summarize_section"
+          : continuationWantsExplain
+            ? "explain_paper"
+            : "summarize_doc",
+        args: resolvedPath ? { path: resolvedPath } : undefined,
+      };
+    }
+    const readAloudRequested = /\b(?:read(?:\s+it)?(?:\s+out\s+loud|\s+aloud)?|out\s+loud|aloud|speak|narrate|voice)\b/i.test(
+      conversationalCandidate,
+    );
+    if (resolvedPath) {
+      return {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
+        args: readAloudRequested ? { path: resolvedPath, topic } : { path: resolvedPath },
       };
     }
     return {
@@ -7683,6 +7945,49 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
       panel_id: "docs-viewer",
       action_id: "explain_paper",
       args: path ? { path } : undefined,
+    };
+  }
+
+  const deicticCurrentDocReadRequested =
+    /\b(?:read|narrate|voice|aloud|out\s+loud)\b/i.test(conversationalCandidate) &&
+    (/\b(?:this|current)\s+(?:doc|document|paper)\b/i.test(conversationalCandidate) ||
+      (/\b(?:doc|document|paper)\b/i.test(conversationalCandidate) && /\bto\s+me\b/i.test(conversationalCandidate)));
+  if (deicticCurrentDocReadRequested) {
+    const hintedPath = resolveDocPathFromPrompt(conversationalCandidate);
+    const activeDocPath = String(useDocViewerStore.getState().currentPath ?? "").trim();
+    const resolvedPath = hintedPath || (activeDocPath ? normalizeDocsViewerAnchorPath(activeDocPath) : "");
+    if (resolvedPath) {
+      return {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc_and_read",
+        args: { path: resolvedPath },
+      };
+    }
+    return {
+      action: "open_panel",
+      panel_id: "docs-viewer",
+    };
+  }
+
+  const latestDocRequestMatch = conversationalCandidate.match(
+    /^(?:(?:ok|okay)\s+)?(?:(?:can|could|would)\s+you\s+|please\s+)?(?:pick|view|open|show|find|locate|pull\s+up|bring\s+up)\s+(?:(?:the|a|an)\s+)?(?:latest|newest|most\s+recent)\s+(.+?)\s+(?:doc|document|paper|report|publication)\b(?:\s+(?:from|for|on)\s+(?:today|this\s+week|this\s+month|\d{4}-\d{2}-\d{2}))?[?.!]*$/i,
+  );
+  if (latestDocRequestMatch) {
+    const topic = latestDocRequestMatch[1]?.trim() ?? "";
+    const best = topic ? (findBestDocForTopic(topic) ?? findRandomPaperForTopic(topic)) : null;
+    const readAloudRequested = /\b(?:read|narrate|voice|aloud|out\s+loud)\b/i.test(conversationalCandidate);
+    if (best?.route) {
+      return {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
+        args: readAloudRequested ? { path: best.route, topic } : { path: best.route },
+      };
+    }
+    return {
+      action: "open_panel",
+      panel_id: "docs-viewer",
     };
   }
 
@@ -9772,35 +10077,72 @@ export function HelixAskPill({
   );
 
   const classifyWorkstationActionIntent = useCallback(
-    async (question: string): Promise<HelixWorkstationAction | null> => {
+    async (question: string): Promise<WorkstationIntentClassificationResult> => {
       const deterministicDecision = inferDeterministicWorkstationIntentDecision(question);
       const deterministicAction = deterministicDecision
         ? coerceWorkstationActionFromIntentDecision(deterministicDecision)
         : null;
       const shouldProbeClassifier = shouldProbeWorkstationIntentClassifier(question);
-      if (!shouldProbeClassifier) return deterministicAction;
+      if (!shouldProbeClassifier) {
+        return {
+          action: deterministicAction,
+          outcome: deterministicAction ? "deterministic_match" : "no_match_not_probed",
+        };
+      }
       if (
         deterministicDecision &&
         deterministicDecision.confidence >= HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN &&
         deterministicAction
       ) {
-        return deterministicAction;
+        return {
+          action: deterministicAction,
+          outcome: "deterministic_match",
+        };
       }
       const classifierPrompt = buildWorkstationIntentClassifierPrompt(question);
-      const result = await askLocalWithPreflightScopeFallback(classifierPrompt, {
-        maxTokens: 220,
-        temperature: 0,
-        mode: "observe",
-        verbosity: "brief",
-      });
-      const rawDecision = parseWorkstationIntentDecision(result.response.text ?? "");
-      const decision = rawDecision
-        ? reconcileWorkstationIntentDecisionWithPrompt(question, rawDecision)
-        : null;
-      if (decision && decision.confidence >= HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN) {
-        return coerceWorkstationActionFromIntentDecision(decision);
+      let classifierTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+      try {
+        const classifierResult = await Promise.race([
+          askLocalWithPreflightScopeFallback(classifierPrompt, {
+            maxTokens: 220,
+            temperature: 0,
+            mode: "observe",
+            verbosity: "brief",
+          }).then((response) => ({ kind: "ok" as const, response })),
+          new Promise<{ kind: "timeout" }>((resolve) => {
+            classifierTimeoutHandle = setTimeout(() => resolve({ kind: "timeout" }), HELIX_WORKSTATION_INTENT_CLASSIFIER_TIMEOUT_MS);
+          }),
+        ]);
+        if (classifierResult.kind === "timeout") {
+          return {
+            action: deterministicAction,
+            outcome: deterministicAction ? "fallback_timeout_match" : "no_match_timeout",
+          };
+        }
+        const rawDecision = parseWorkstationIntentDecision(classifierResult.response.response.text ?? "");
+        const decision = rawDecision
+          ? reconcileWorkstationIntentDecisionWithPrompt(question, rawDecision)
+          : null;
+        if (decision && decision.confidence >= HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN) {
+          return {
+            action: coerceWorkstationActionFromIntentDecision(decision),
+            outcome: "classifier_match",
+          };
+        }
+        return {
+          action: deterministicAction,
+          outcome: deterministicAction ? "fallback_low_confidence_match" : "no_match_low_confidence",
+        };
+      } catch {
+        return {
+          action: deterministicAction,
+          outcome: deterministicAction ? "fallback_classifier_error_match" : "no_match_classifier_error",
+        };
+      } finally {
+        if (classifierTimeoutHandle) {
+          clearTimeout(classifierTimeoutHandle);
+        }
       }
-      return deterministicAction;
     },
     [],
   );
@@ -14942,13 +15284,14 @@ export function HelixAskPill({
           },
         });
         setAskStatus(getWorkstationInterpretingStatusText(workstationLanguageTag));
-        const workstationCommand =
-          parsedWorkstationCommand ??
-          (await classifyWorkstationActionIntent(transcript));
+        const workstationIntentResult = parsedWorkstationCommand
+          ? ({ action: parsedWorkstationCommand, outcome: "command_parse" } satisfies WorkstationIntentClassificationResult)
+          : await classifyWorkstationActionIntent(transcript);
+        const workstationCommand = workstationIntentResult.action;
         if (workstationCommand) {
           patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
             status: "done",
-            detail: "workstation_intent_stage | action_resolved",
+            detail: formatWorkstationIntentStageDetail(workstationIntentResult),
           });
           setAskStatus(getWorkstationExecutingStatusText(workstationLanguageTag));
           runWorkstationAction(workstationCommand);
@@ -14964,11 +15307,10 @@ export function HelixAskPill({
             traceId: input.traceId,
             meta: {
               dispatchHint: true,
-              classifierSource: parsedWorkstationCommand ? "fallback" : "llm",
-              classifierConfidence: parsedWorkstationCommand ? 1 : null,
-              classifierReason: parsedWorkstationCommand
-                ? "voice_workstation_command_parse"
-                : "voice_workstation_command_classify",
+              classifierSource:
+                workstationIntentResult.outcome === "classifier_match" ? "llm" : "fallback",
+              classifierConfidence: workstationIntentResult.outcome === "command_parse" ? 1 : null,
+              classifierReason: `voice_workstation_${workstationIntentResult.outcome}`,
               routeReasonCode: "dispatch:voice_workstation_fast_path",
               confidence: input.confidence,
               confidenceReason: input.confidenceReason,
@@ -14995,7 +15337,7 @@ export function HelixAskPill({
         }
         patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
           status: "suppressed",
-          detail: "workstation_intent_stage | no_action_match",
+          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
         });
       }
       let conversationMode: "observe" | "act" | "verify" | "clarify" | undefined;
@@ -18284,36 +18626,24 @@ export function HelixAskPill({
     [askLiveEvents],
   );
   const observerLaneEvents = useMemo(() => {
-    return askLiveEvents
-      .map((entry) => {
-        const meta = asObjectRecord(entry.meta ?? null);
-        const commentary = buildObserverCommentaryForRow({
-          tool: entry.tool ?? null,
-          text: entry.text,
-          detail: typeof meta?.kind === "string" ? meta.kind : null,
-        }, {
-          userPrompt: askActiveQuestion,
-        });
-        if (!commentary) return null;
-        return {
-          id: `observer:${entry.id}`,
-          text: commentary,
-          tsMs: resolveAskLiveEventTimestampMs(entry),
-          traceId: readEventMetaString(meta ?? undefined, ["traceId", "trace_id"]),
-        };
+    return [...helixTimeline]
+      .sort((left, right) => right.updatedAtMs - left.updatedAtMs)
+      .filter((entry) => {
+        const detail = (entry.detail ?? "").trim().toLowerCase();
+        return (
+          (entry.type === "action_receipt" && detail.includes("observer_lane_commentary")) ||
+          entry.type === "conversation_brief" ||
+          entry.type === "suppressed"
+        );
       })
-      .filter(
-        (
-          event,
-        ): event is {
-          id: string;
-          text: string;
-          tsMs: number | null;
-          traceId: string | null;
-        } => event !== null,
-      )
-      .slice(-12);
-  }, [askActiveQuestion, askLiveEvents]);
+      .map((entry) => ({
+        id: `observer:${entry.id}`,
+        text: clipText(entry.text, 320),
+        tsMs: Number.isFinite(entry.updatedAtMs) ? entry.updatedAtMs : entry.createdAtMs,
+        traceId: entry.traceId ?? null,
+      }))
+      .slice(0, 12);
+  }, [helixTimeline]);
 
   const buildConvergenceSnapshot = useCallback(
     (args: {
@@ -18633,13 +18963,14 @@ export function HelixAskPill({
           },
         });
         setAskStatus(getWorkstationInterpretingStatusText(typedPromptLanguageTag));
-        const workstationCommand =
-          parsedWorkstationCommand ??
-          (await classifyWorkstationActionIntent(trimmed));
+        const workstationIntentResult = parsedWorkstationCommand
+          ? ({ action: parsedWorkstationCommand, outcome: "command_parse" } satisfies WorkstationIntentClassificationResult)
+          : await classifyWorkstationActionIntent(trimmed);
+        const workstationCommand = workstationIntentResult.action;
         if (workstationCommand) {
           patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
             status: "done",
-            detail: "workstation_intent_stage | action_resolved",
+            detail: formatWorkstationIntentStageDetail(workstationIntentResult),
           });
           clearMoodTimer();
           cancelMoodHint();
@@ -18687,22 +19018,40 @@ export function HelixAskPill({
         }
         patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
           status: "suppressed",
-          detail: "workstation_intent_stage | no_action_match",
+          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
         });
       }
       const selectedCapsuleIds =
         Array.isArray(capsuleIds) && capsuleIds.length > 0
           ? capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
           : resolveSelectedContextCapsuleIds(trimmed, undefined, { source: "manual" });
+      const docsViewerAnchorPath = resolveDocsViewerAnchorPathForQuestion(
+        trimmed,
+        options?.answerContract,
+      );
+      const docsViewerWorkstationLane =
+        options?.answerContract?.source === "docs_viewer" && Boolean(docsViewerAnchorPath);
       const pinnedCapsuleCount = getPinnedContextCapsuleCount();
       const inferredMode = inferAskMode(trimmed);
+      const simpleDirectPromptLane =
+        docsViewerWorkstationLane ||
+        (options?.forceReasoningDispatch !== true &&
+          inferredMode === "read" &&
+          isSimpleDirectPromptLaneCandidate(trimmed));
+      const backgroundWorkspaceReasoningLane =
+        simpleDirectPromptLane &&
+        shouldQueueWorkspaceBackgroundReasoning({
+          transcript: trimmed,
+          docsViewerAnchorPath,
+        });
       const manualDispatchHint =
-        options?.forceReasoningDispatch === true ||
-        shouldDispatchReasoningAttempt(trimmed) ||
-        isStrongQuestionDispatchCandidate(trimmed);
-      const manualRouteReasonCode = manualDispatchHint
-        ? "dispatch:heuristic"
-        : "suppressed:heuristic_low_salience";
+        !simpleDirectPromptLane &&
+        (options?.forceReasoningDispatch === true || trimmed.length > 0);
+      const manualRouteReasonCode = simpleDirectPromptLane
+        ? docsViewerWorkstationLane
+          ? "dispatch:docs_viewer_direct_lane"
+          : "dispatch:direct_prompt_lane"
+        : "dispatch:manual_default";
       setAskBusy(true);
       setAskStatus("Interpreting prompt...");
       setAskError(null);
@@ -18745,27 +19094,64 @@ export function HelixAskPill({
           })
         : null;
       const manualTimelineEntryId = manualAttempt ? ensureReasoningTimelineEntry(manualAttempt, "running") : null;
+      const backgroundAttempt = !manualAttempt && backgroundWorkspaceReasoningLane
+        ? createReasoningAttempt({
+            prompt: trimmed,
+            contextCapsuleIds: selectedCapsuleIds,
+            contextCapsuleCount: selectedCapsuleIds.length,
+            contextCapsulePinnedCount: pinnedCapsuleCount,
+            source: "manual",
+            mode: "observe",
+            status: "queued",
+            traceId: `ask:${crypto.randomUUID()}`,
+            routeReasonCode: "dispatch:direct_prompt_lane_background_queue",
+            responseLanguage: preferredResponseLanguage ?? null,
+            preferredResponseLanguage: preferredResponseLanguage ?? null,
+            completionScore: conversationGovernor.completion_score.score,
+            floorOwner: conversationGovernor.floor_owner,
+          })
+        : null;
+      if (backgroundAttempt) {
+        ensureReasoningTimelineEntry(backgroundAttempt, "queued");
+        enqueueReasoningAttempt(backgroundAttempt.id);
+      }
       reasoningAttemptManualIdRef.current = manualAttempt?.id ?? null;
       const manualBriefTimelineEntry = addHelixTimelineEntry({
         type: "conversation_brief",
         source: "manual",
-        status: manualDispatchHint ? "queued" : "suppressed",
+        status: manualDispatchHint ? "queued" : simpleDirectPromptLane ? "done" : "suppressed",
         text: manualDispatchHint
           ? formatVoiceDecisionSentence({
               lifecycle: "queued",
               mode: normalizeConversationModeForDispatch(inferredMode) ?? "observe",
               routeReasonCode: manualRouteReasonCode,
             })
-          : "Quick reply mode: no background reasoning queued for this turn.",
+          : backgroundWorkspaceReasoningLane
+            ? "Direct reply mode: handling this request immediately while workspace reasoning continues in background."
+          : simpleDirectPromptLane
+            ? docsViewerWorkstationLane
+              ? "Docs viewer direct mode: reading the current document context immediately."
+              : "Direct reply mode: handling this request immediately."
+            : "Quick reply mode: no background reasoning queued for this turn.",
         detail: manualDispatchHint
           ? "manual dispatch queued"
-          : "manual dispatch suppressed (low salience prompt)",
+          : backgroundWorkspaceReasoningLane
+            ? "manual direct lane + background workspace reasoning queued"
+          : simpleDirectPromptLane
+            ? docsViewerWorkstationLane
+              ? "docs viewer direct lane (no queued reasoning)"
+              : "manual direct lane (no queued reasoning)"
+            : "manual dispatch suppressed (low salience prompt)",
         mode: inferredMode,
         traceId,
-        attemptId: manualAttempt?.id,
+        attemptId: manualAttempt?.id ?? backgroundAttempt?.id,
         meta: {
           dispatchHint: manualDispatchHint,
           routeReasonCode: manualRouteReasonCode,
+          directPromptLane: simpleDirectPromptLane,
+          docsViewerWorkstationLane,
+          backgroundWorkspaceReasoningLane,
+          backgroundAttemptId: backgroundAttempt?.id ?? null,
         },
       });
       setAskLiveSessionId(sessionId ?? null);
@@ -18801,6 +19187,7 @@ export function HelixAskPill({
             traceId,
             maxTokens: HELIX_ASK_OUTPUT_TOKENS,
             question: trimmed,
+            contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,
             responseLanguage: preferredResponseLanguage,
             preferredResponseLanguage: preferredResponseLanguage,
             lang_schema_version: "helix.lang.v1",
@@ -18822,6 +19209,11 @@ export function HelixAskPill({
               ? {
                   ...localResponse.debug,
                   ...(inferredMode ? { client_inferred_mode: inferredMode } : {}),
+                  ...(docsViewerAnchorPath
+                    ? {
+                        client_docs_viewer_anchor_path: docsViewerAnchorPath,
+                      }
+                    : {}),
                   ...(askResult.downgradedFromMode
                     ? {
                         client_mode_fallback: {
@@ -19092,6 +19484,7 @@ export function HelixAskPill({
       clearMoodTimer,
       classifyWorkstationActionIntent,
       ensureReasoningTimelineEntry,
+      enqueueReasoningAttempt,
       formatReasoningAttemptDetail,
       getHelixAskSessionId,
       getPinnedContextCapsuleCount,
@@ -19177,17 +19570,16 @@ export function HelixAskPill({
       if (stagedWorkstationIntentEntry) {
         setAskStatus(getWorkstationInterpretingStatusText(externalPromptLanguageTag));
       }
-      const workstationCommand =
-        parsedWorkstationCommand ??
-        (!explicitPanelCommand && !bypassWorkstationDispatch
+      const workstationIntentResult: WorkstationIntentClassificationResult = parsedWorkstationCommand
+        ? { action: parsedWorkstationCommand, outcome: "command_parse" }
+        : !explicitPanelCommand && !bypassWorkstationDispatch
           ? await classifyWorkstationActionIntent(question)
-          : null);
+          : { action: null, outcome: "no_match_not_probed" };
+      const workstationCommand = workstationIntentResult.action;
       if (stagedWorkstationIntentEntry) {
         patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
           status: workstationCommand ? "done" : "suppressed",
-          detail: workstationCommand
-            ? "workstation_intent_stage | action_resolved"
-            : "workstation_intent_stage | no_action_match",
+          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
         });
       }
       if (workstationCommand) {
@@ -19497,15 +19889,16 @@ export function HelixAskPill({
       if (stagedWorkstationIntentEntry) {
         setAskStatus(getWorkstationInterpretingStatusText(singleEntryLanguageTag));
       }
-      const workstationCommand =
-        parsedWorkstationCommand ??
-        (singleEntry && !explicitPanelCommand ? await classifyWorkstationActionIntent(singleEntry) : null);
+      const workstationIntentResult: WorkstationIntentClassificationResult = parsedWorkstationCommand
+        ? { action: parsedWorkstationCommand, outcome: "command_parse" }
+        : singleEntry && !explicitPanelCommand
+          ? await classifyWorkstationActionIntent(singleEntry)
+          : { action: null, outcome: "no_match_not_probed" };
+      const workstationCommand = workstationIntentResult.action;
       if (stagedWorkstationIntentEntry) {
         patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
           status: workstationCommand ? "done" : "suppressed",
-          detail: workstationCommand
-            ? "workstation_intent_stage | action_resolved"
-            : "workstation_intent_stage | no_action_match",
+          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
         });
       }
       if (workstationCommand) {
@@ -20482,6 +20875,35 @@ export function HelixAskPill({
                 <p className="mt-0.5 whitespace-pre-wrap text-cyan-100/90">{latestConversationBrief.text}</p>
               </div>
             ) : null}
+            {userSettings.showHelixAskObserverLane ? (
+              <div className="-mt-1 px-4 pb-2 text-[11px]">
+                <div className="rounded border border-cyan-400/25 bg-cyan-950/20 p-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Observer lane</p>
+                  {observerLaneEvents.length > 0 ? (
+                    <div className="mt-1 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] leading-5 text-cyan-50">
+                      {observerLaneEvents.map((event) => (
+                        <div key={event.id} className="rounded border border-cyan-400/20 bg-black/25 px-1.5 py-1">
+                          <p className="whitespace-pre-wrap break-words">{event.text}</p>
+                          <p className="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-cyan-200/80">
+                            {event.tsMs !== null
+                              ? new Date(event.tsMs).toLocaleTimeString([], {
+                                  hour12: false,
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                })
+                              : "--:--:--"}
+                            {event.traceId ? ` | ${clipText(event.traceId, 64)}` : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-cyan-100/75">Waiting for observer events...</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
             {contextMemoryStatusText ? (
               <div className="-mt-1 px-4 pb-2 text-[9px] uppercase tracking-[0.14em] text-emerald-200/85">
                 {contextMemoryStatusText}
@@ -20818,33 +21240,6 @@ export function HelixAskPill({
                     {"\n"}
                     {askLiveFallbackSignals.join(" | ")}
                   </p>
-                ) : null}
-                {userSettings.showHelixAskObserverLane ? (
-                  <div className="mt-2 rounded border border-cyan-400/25 bg-cyan-950/20 p-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Observer lane</p>
-                    {observerLaneEvents.length > 0 ? (
-                      <div className="mt-1 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] leading-5 text-cyan-50">
-                        {observerLaneEvents.map((event) => (
-                          <div key={event.id} className="rounded border border-cyan-400/20 bg-black/25 px-1.5 py-1">
-                            <p className="whitespace-pre-wrap break-words">{event.text}</p>
-                            <p className="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-cyan-200/80">
-                              {event.tsMs !== null
-                                ? new Date(event.tsMs).toLocaleTimeString([], {
-                                    hour12: false,
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                  })
-                                : "--:--:--"}
-                              {event.traceId ? ` | ${clipText(event.traceId, 64)}` : ""}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-[11px] text-cyan-100/75">Waiting for action interpretation events...</p>
-                    )}
-                  </div>
                 ) : null}
                 {askLiveEvents.length > 0 ? (
                   <div className="mt-2 max-h-44 overflow-y-auto rounded border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">

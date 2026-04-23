@@ -29,6 +29,8 @@ import {
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
 import { emitHelixWorkstationProceduralStep } from "@/lib/workstation/proceduralPlaybackContract";
+import { startWorkstationClipboardCapture } from "@/lib/workstation/workstationClipboard";
+import { startWorkstationTimelineCapture } from "@/lib/workstation/workstationTimelineCapture";
 import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
@@ -200,6 +202,8 @@ export default function DesktopPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const stopClipboardCapture = startWorkstationClipboardCapture();
+    const stopTimelineCapture = startWorkstationTimelineCapture();
     const handleWorkstationAction = (event: Event) => {
       const detail = (event as CustomEvent<unknown>)?.detail;
       const actions = coerceHelixWorkstationActions(detail);
@@ -573,6 +577,8 @@ export default function DesktopPage() {
         HELIX_WORKSTATION_ACTION_EVENT,
         handleWorkstationAction as EventListener,
       );
+      stopClipboardCapture();
+      stopTimelineCapture();
     };
   }, [openPanelUniversal, openSettings, workstationEnabled]);
 
