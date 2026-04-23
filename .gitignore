@@ -125,3 +125,6 @@ external/RayTracingMIS/
 .env
 .env.*
 !.env.example
+
+# Local Codex app metadata/secrets
+.codex/

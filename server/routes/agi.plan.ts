@@ -25972,12 +25972,16 @@ const buildHelixAskTurnContract = (args: {
     : plannerDocsSummarizeMismatch && docsSummarizeFamily
       ? docsSummarizeFamily
     : plannerFamily ?? fallbackFamily;
+  const effectiveFamily =
+    docsSummarizeFamily && family === "implementation_code_path"
+      ? docsSummarizeFamily
+      : family;
   const specificity = classifyHelixAskAnswerPlanSpecificity({
     question: args.question,
     queryConstraints: args.queryConstraints,
     equationPrompt: args.equationPrompt,
     equationIntentContract: args.equationIntentContract,
-    family,
+    family: effectiveFamily,
   });
   const defaultGroundingMode: HelixAskTurnContractGroundingMode =
     args.requiresRepoEvidence || args.intentDomain === "repo"
@@ -25995,7 +25999,7 @@ const buildHelixAskTurnContract = (args: {
   const researchObjectiveInputs = researchContract
     ? buildHelixAskPromptResearchObjectiveInputs({
         contract: researchContract,
-        family,
+        family: effectiveFamily,
         groundingMode,
       })
     : [];
@@ -26024,7 +26028,7 @@ const buildHelixAskTurnContract = (args: {
     .map((entry) => {
       const label = normalizeHelixAskTurnContractText(entry.label, 180);
       if (!label) return null;
-      const fallbackSlots = buildHelixAskTurnObjectiveSlots(label, family);
+      const fallbackSlots = buildHelixAskTurnObjectiveSlots(label, effectiveFamily);
       const requiredSlots = Array.from(
         new Set(
           [
@@ -26070,7 +26074,7 @@ const buildHelixAskTurnContract = (args: {
     const fallbackLabel = normalizeHelixAskTurnContractText(args.question, 180) || "Answer the current ask.";
     objectives.push({
       label: fallbackLabel,
-      required_slots: buildHelixAskTurnObjectiveSlots(fallbackLabel, family),
+      required_slots: buildHelixAskTurnObjectiveSlots(fallbackLabel, effectiveFamily),
       query_hints: buildHelixAskTurnObjectiveQueryHints(fallbackLabel, groundingMode),
     });
   }
@@ -26080,7 +26084,7 @@ const buildHelixAskTurnContract = (args: {
     normalizeHelixAskTurnContractText(args.question, 180) ||
     "Answer the current ask.";
   const requiredSlots = buildHelixAskTurnContractRequiredSlots({
-    family,
+    family: effectiveFamily,
     objectives,
     requiredSlots: args.plannerPass?.required_slots,
     docsSummaryContract: forceSingleDocsSummaryObjective,
@@ -26117,13 +26121,13 @@ const buildHelixAskTurnContract = (args: {
     ? researchContract
       ? buildHelixAskPromptResearchPlannerSections({
           contract: researchContract,
-          family,
+          family: effectiveFamily,
         })
       : args.plannerPass.sections
     : researchContract
       ? buildHelixAskPromptResearchPlannerSections({
           contract: researchContract,
-          family,
+          family: effectiveFamily,
         })
       : [];
   const plannerSections = plannerSectionSource.map((section) => ({
@@ -26138,7 +26142,7 @@ const buildHelixAskTurnContract = (args: {
   }));
   const obligations = buildHelixAskTurnContractObligations({
     question: args.question,
-    family,
+    family: effectiveFamily,
     objectives,
     requiredSlots,
     plannerSections,
@@ -26150,19 +26154,19 @@ const buildHelixAskTurnContract = (args: {
     objectives,
     obligations,
     grounding_mode: groundingMode,
-    output_family: family,
+    output_family: effectiveFamily,
     prompt_specificity: specificity,
     required_slots: requiredSlots,
     query_hints: queryHints,
     clarify_question: clarifyQuestion || null,
     risk_flags: riskFlags.slice(0, 8),
-    constraints: {
-      requires_repo_evidence: args.requiresRepoEvidence,
-      requires_citations: args.requiresRepoEvidence || groundingMode !== "open",
-      allow_open_world_bypass: !args.requiresRepoEvidence && groundingMode !== "repo",
-      clarify_allowed: family !== "equation_formalism" || specificity !== "specific",
-      tone_policy: "optimistic-but-honest",
-    },
+      constraints: {
+        requires_repo_evidence: args.requiresRepoEvidence,
+        requires_citations: args.requiresRepoEvidence || groundingMode !== "open",
+        allow_open_world_bypass: !args.requiresRepoEvidence && groundingMode !== "repo",
+        clarify_allowed: effectiveFamily !== "equation_formalism" || specificity !== "specific",
+        tone_policy: "optimistic-but-honest",
+      },
     planner: {
       mode: args.plannerMode,
       valid: args.plannerValid,
@@ -59284,6 +59288,14 @@ const executeHelixAsk = async ({
           plan: answerPlanShadow,
           renderedText: cleaned,
         });
+        const composerDocsSummaryContract =
+          evaluateHelixAskDocsSummaryRequest({
+            question: baseQuestion,
+            queryConstraints,
+          }).active &&
+          (answerPlanShadow.prompt_family === "mechanism_process" ||
+            answerPlanShadow.prompt_family === "definition_overview" ||
+            answerPlanShadow.prompt_family === "general_overview");
         const preserveDeterministicAnswerCandidate =
           shouldPreserveHelixAskDeterministicAnswerAcrossComposer({
             llmInvoked: debugPayload?.llm_invoke_attempted === true,
@@ -62016,8 +62028,9 @@ const executeHelixAsk = async ({
         roadmapMissingReasons: globalTerminalRoadmapMissingReasons,
       });
       if (globalTerminalDocsSummaryContract) {
+        // Keep docs-summary section obligations enforced; only relax sources-line cosmetics.
         globalTerminalValidatorReasons = globalTerminalValidatorReasons.filter(
-          (reason) => reason !== "required_sections_missing",
+          (reason) => reason !== "sources_missing",
         );
       }
       if (globalTerminalValidatorReasons.length > 0) {
@@ -62409,10 +62422,7 @@ const executeHelixAsk = async ({
         evaluateHelixAskDocsSummaryRequest({
           question: baseQuestion,
           queryConstraints,
-        }).active &&
-        (finalAnswerPlanShadow?.prompt_family === "mechanism_process" ||
-          finalAnswerPlanShadow?.prompt_family === "definition_overview" ||
-          finalAnswerPlanShadow?.prompt_family === "general_overview");
+        }).active;
       const finalModeGateApplyRepoContracts =
         finalModeGateRepoOrHybrid && !finalModeGateDocsSummaryContract;
       const finalModeGateRequireResearchOnUncertainty =
@@ -63401,9 +63411,48 @@ const executeHelixAsk = async ({
       attachContextCapsuleToResult: (target, finalTextRaw) =>
         attachContextCapsuleToResult(target as LocalAskResult, finalTextRaw),
     });
+    const finalSurfaceOriginalText =
+      typeof responsePayload.text === "string" ? responsePayload.text.trim() : "";
+    const HELIX_ASK_NON_DESTRUCTIVE_FINAL_SURFACE =
+      String(process.env.HELIX_ASK_NON_DESTRUCTIVE_FINAL_SURFACE ?? "1").trim() !== "0";
+    const isDestructiveFinalSurfaceMarker = (value: string): boolean => {
+      const markerValue = String(value ?? "").trim();
+      if (!markerValue) return false;
+      if (
+        markerValue === "finalSurface:machine_leak_scrub" ||
+        markerValue === "finalSurface:section_contract_reenforce"
+      ) {
+        return false;
+      }
+      return /\b(?:fallback|clarify|fail_closed|modegate|repair_after_surface|unknown)\b/i.test(
+        markerValue,
+      );
+    };
     const applyFinalPayloadText = (nextText: string, marker: string): void => {
       const normalized = String(nextText ?? "").trim();
       if (!normalized) return;
+      const currentText = String(responsePayload.text ?? "").trim();
+      if (
+        HELIX_ASK_NON_DESTRUCTIVE_FINAL_SURFACE &&
+        currentText.length > 0 &&
+        isDestructiveFinalSurfaceMarker(marker)
+      ) {
+        if (debugPayload && typeof debugPayload === "object") {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          const blockedMarkers = Array.isArray(debugRecord.final_surface_payload_write_blocked_markers)
+            ? (debugRecord.final_surface_payload_write_blocked_markers as unknown[])
+                .map((entry) => String(entry ?? "").trim())
+                .filter(Boolean)
+            : [];
+          blockedMarkers.push(marker);
+          debugRecord.final_surface_payload_write_blocked_markers = blockedMarkers;
+          debugRecord.final_surface_payload_preserved_by_policy = true;
+        }
+        if (answerPath) {
+          answerPath.push(`${marker}:skipped_payload_preserve`);
+        }
+        return;
+      }
       responsePayload.text = normalized;
       responsePayload.answer = normalized;
       result.text = normalized;
@@ -63560,13 +63609,58 @@ const executeHelixAsk = async ({
       question: baseQuestion,
       queryConstraints: null,
     });
-    const finalPromptFamily =
-      debugPayload && typeof debugPayload === "object"
-        ? String((debugPayload as Record<string, unknown>).prompt_family ?? "").trim()
-        : "";
-    const finalDocsSummaryContract =
-      finalDocsSummarySignal.active &&
-      (finalPromptFamily === "mechanism_process" || finalPromptFamily === "definition_overview");
+    const finalDocsSummaryContract = finalDocsSummarySignal.active;
+    const finalDocsSummaryRequiredSections = ["purpose", "findings", "caveats"] as const;
+    const collectMissingDocsSummarySections = (text: string): string[] =>
+      finalDocsSummaryRequiredSections.filter((section) => {
+        const headingPattern = new RegExp(`(^|\\n)\\s*${section}\\s*:`, "i");
+        return !headingPattern.test(text);
+      });
+    if (requestAnswerContract?.strictSections === true && typeof responsePayload.text === "string") {
+      const reenforcedSectionText = enforceHelixAskSectionContractFallback(
+        responsePayload.text,
+        requestAnswerContract,
+      );
+      if (reenforcedSectionText !== responsePayload.text) {
+        applyFinalPayloadText(reenforcedSectionText, "finalSurface:section_contract_reenforce");
+        if (debugPayload && typeof debugPayload === "object") {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.final_section_contract_reenforced = true;
+        }
+      }
+    }
+    const finalDocsSummaryMissingSections =
+      finalDocsSummaryContract && typeof responsePayload.text === "string"
+        ? collectMissingDocsSummarySections(responsePayload.text)
+        : [];
+    const originalDocsSummaryMissingSections =
+      finalDocsSummaryContract && finalSurfaceOriginalText.length > 0
+        ? collectMissingDocsSummarySections(finalSurfaceOriginalText)
+        : [];
+    if (
+      finalDocsSummaryContract &&
+      typeof responsePayload.text === "string" &&
+      finalDocsSummaryMissingSections.length > 0 &&
+      originalDocsSummaryMissingSections.length === 0 &&
+      finalSurfaceOriginalText.length > 0
+    ) {
+      applyFinalPayloadText(finalSurfaceOriginalText, "finalSurface:docs_summary_raw_restore");
+      if (debugPayload && typeof debugPayload === "object") {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.final_docs_summary_restore_applied = true;
+        debugRecord.final_docs_summary_restore_reason = "required_sections_regressed";
+        debugRecord.final_docs_summary_restore_missing_after_surface =
+          finalDocsSummaryMissingSections;
+      }
+    }
+    const finalPlanValidationFailures =
+      debugPayload &&
+      typeof debugPayload === "object" &&
+      Array.isArray((debugPayload as Record<string, unknown>).answer_validation_failures)
+        ? ((debugPayload as Record<string, unknown>).answer_validation_failures as unknown[])
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean)
+        : [];
     const finalSectionContractCoverage = evaluateHelixAskSectionContractCoverage(
       typeof responsePayload.text === "string" ? responsePayload.text : "",
       requestAnswerContract,
@@ -63579,9 +63673,11 @@ const executeHelixAsk = async ({
     );
     const finalObligationsMissingForValidation = deicticClarifyTerminalProfile
       ? []
-      : finalDocsSummaryContract
-        ? []
       : finalObligationsMissing;
+    const finalDocsSummaryMissingSectionsForValidation =
+      finalDocsSummaryContract && typeof responsePayload.text === "string"
+        ? collectMissingDocsSummarySections(responsePayload.text)
+        : [];
     const finalValidationReasons = [
       genericNonAnswerDetected ? "generic_non_answer" : "",
       deicticClarifyMissing ? "deictic_clarify_missing" : "",
@@ -63607,11 +63703,25 @@ const executeHelixAsk = async ({
         ? "uncertainty_missing_codex_clone_baseline"
         : "",
       finalSectionContractMissing ? "docs_section_contract_missing" : "",
+      finalDocsSummaryMissingSectionsForValidation.length > 0
+        ? "docs_summary_required_sections_missing"
+        : "",
+      finalPlanValidationFailures.includes("required_sections_missing")
+        ? "required_sections_missing"
+        : "",
+      finalPlanValidationFailures.includes("anchor_integrity_violation")
+        ? "anchor_integrity_violation"
+        : "",
     ].filter(Boolean);
     const finalValidationSoftReasonSet = new Set([
       "answer_obligations_missing",
       "preflight_evidence_missing",
     ]);
+    if (finalDocsSummaryContract) {
+      // For docs summaries, missing obligations/evidence should block instead of soft-passing.
+      finalValidationSoftReasonSet.delete("answer_obligations_missing");
+      finalValidationSoftReasonSet.delete("preflight_evidence_missing");
+    }
     const finalValidationSoftReasons = finalValidationReasons.filter((reason) =>
       finalValidationSoftReasonSet.has(reason)
     );
@@ -63625,19 +63735,12 @@ const executeHelixAsk = async ({
       responsePayload.text.trim().length > 0 &&
       (finalValidationReasons.length === 0 || finalValidationOnlySoftReasons);
     if (!finalAnswerValidated && !finalValidationOnlySoftReasons) {
-      const clarify = finalFocusGuardResult === "clarify"
-        ? buildHelixAskHumanClarifyFallback(baseQuestion)
-        : deicticQuestionWithoutAnchor
-        ? buildHelixAskHumanClarifyFallback(baseQuestion)
-        : finalRequiresUncertaintyResearch
-          ? finalCodexCloneSignalAvailable
-            ? "I do not have enough verifiable evidence to answer safely in this turn. I need repo-grounded support with codex-clone baseline citations."
-            : "I do not have enough verifiable evidence to answer safely in this turn. I need repo-grounded support with concrete codebase citations."
-          : buildHelixAskHumanClarifyFallback(baseQuestion);
-      applyFinalPayloadText(clarify, "finalSurface:final_answer_validator_fallback");
+      // Codex-clone-aligned behavior: preserve payload and emit validation status/metadata
+      // rather than overwriting the answer text with a fallback clarification line.
       if (debugPayload) {
         const debugRecord = debugPayload as Record<string, unknown>;
-        debugRecord.final_answer_validator_fallback_applied = true;
+        debugRecord.final_answer_validator_fallback_applied = false;
+        debugRecord.final_answer_validator_payload_preserved = true;
       }
     }
     if (!finalAnswerValidated && finalValidationOnlySoftReasons) {
@@ -63822,8 +63925,15 @@ const executeHelixAsk = async ({
       typeof responsePayload.text === "string" &&
       !answerPath.includes("finalSurface:final_answer_validator_fallback")
     ) {
-      const applyFinalRepoContractText = (nextText: string, marker: string): void =>
-        applyFinalPayloadText(nextText, marker);
+      const preservePayloadOnFinalSurfaceContracts = true;
+      const finalSurfaceContractMarkers: string[] = [];
+      const applyFinalRepoContractText = (nextText: string, marker: string): void => {
+        if (!nextText.trim()) return;
+        finalSurfaceContractMarkers.push(marker);
+        if (!preservePayloadOnFinalSurfaceContracts) {
+          applyFinalPayloadText(nextText, marker);
+        }
+      };
       const readFinalSurfaceDebugCitations = (key: string): string[] => {
         if (!debugPayload || typeof debugPayload !== "object") {
           return [];
@@ -63997,6 +64107,8 @@ const executeHelixAsk = async ({
       }
       if (debugPayload) {
         const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.final_surface_contract_payload_preserved = preservePayloadOnFinalSurfaceContracts;
+        debugRecord.final_surface_contract_markers = finalSurfaceContractMarkers;
         debugRecord.repo_fetch_contract_surface_guard_applied = true;
         debugRecord.repo_fetch_contract_pass = finalRepoContractEvaluation.pass;
         debugRecord.repo_fetch_contract_missing_reasons =
