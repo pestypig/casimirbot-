@@ -36,8 +36,11 @@ describe("helix ask prompt launch bridge", () => {
     }
 
     const stored = JSON.parse(window.localStorage.getItem(HELIX_PENDING_ASK_KEY) ?? "{}");
+    expect(typeof stored.promptId).toBe("string");
+    expect(stored.promptId.length).toBeGreaterThan(0);
     expect(stored.question).toBe("Explain nhm2.proof-guardrails and cite provenance.");
     expect(stored.blockId).toBe("nhm2.proof-guardrails");
+    expect(stored.bypassWorkstationDispatch).toBe(false);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith("/desktop?desktop=1");
   });
@@ -50,17 +53,24 @@ describe("helix ask prompt launch bridge", () => {
         autoSubmit: false,
         blockId: "nhm2.geometry-timing",
         panelId: "nhm2-solve-state",
+        bypassWorkstationDispatch: true,
         createdAt: 42,
       }),
     );
 
-    expect(consumePendingHelixAskPrompt()).toEqual({
-      question: "Show provenance for nhm2.geometry-timing.",
-      autoSubmit: false,
-      blockId: "nhm2.geometry-timing",
-      panelId: "nhm2-solve-state",
-      createdAt: 42,
-    });
+    const consumed = consumePendingHelixAskPrompt();
+    expect(consumed).toEqual(
+      expect.objectContaining({
+        question: "Show provenance for nhm2.geometry-timing.",
+        autoSubmit: false,
+        blockId: "nhm2.geometry-timing",
+        panelId: "nhm2-solve-state",
+        bypassWorkstationDispatch: true,
+        createdAt: 42,
+      }),
+    );
+    expect(typeof consumed?.promptId).toBe("string");
+    expect((consumed?.promptId ?? "").length).toBeGreaterThan(0);
     expect(window.localStorage.getItem(HELIX_PENDING_ASK_KEY)).toBeNull();
   });
 });

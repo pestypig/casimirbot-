@@ -1,5 +1,6 @@
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useDesktopStore } from "@/store/useDesktopStore";
+import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import {
   DOC_VIEWER_PANEL_ID,
   makeDocHref,
@@ -11,13 +12,21 @@ import {
 
 export function openDocPanel(target: DocLinkDescriptor) {
   const { path, anchor } = parseDocTarget(target);
-  const intent: DocViewerIntent = { mode: "doc", path, anchor };
+  const autoRead = typeof target === "object" && target?.autoRead === true;
+  const intent: DocViewerIntent = { mode: "doc", path, anchor, autoRead };
   const desktopState = useDesktopStore.getState();
-  const hasWindow = Boolean(desktopState.windows[DOC_VIEWER_PANEL_ID]);
+  const hasDesktopWindow = Boolean(desktopState.windows[DOC_VIEWER_PANEL_ID]);
+  const workstationState = useWorkstationLayoutStore.getState();
+  const hasWorkstationPanel = Object.values(workstationState.groups).some((group) =>
+    group.panelIds.includes(DOC_VIEWER_PANEL_ID),
+  );
+  const hasViewerInShell = hasDesktopWindow || hasWorkstationPanel;
 
-  if (hasWindow) {
+  if (hasViewerInShell) {
     useDocViewerStore.getState().applyIntent(intent);
-    desktopState.open(DOC_VIEWER_PANEL_ID);
+    if (hasDesktopWindow) {
+      desktopState.open(DOC_VIEWER_PANEL_ID);
+    }
     return;
   }
 

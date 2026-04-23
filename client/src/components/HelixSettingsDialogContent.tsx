@@ -73,6 +73,8 @@ export function HelixSettingsDialogContent({
     });
   }, []);
 
+  const helixAskUnifiedDebugEnabled = userSettings.showHelixAskDebug;
+
   return (
     <DialogContent className="max-h-[88vh] w-full max-w-[min(44rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 p-0 text-slate-100 shadow-xl">
       <div className="sticky top-0 z-10 border-b border-slate-700 bg-slate-950 px-4 py-3">
@@ -138,34 +140,26 @@ export function HelixSettingsDialogContent({
             />
             <PreferenceToggleRow
               id="helix-ask-debug"
-              label="Helix Ask debug context"
-              description="Show repo debug context with turn filter + copy export."
-              checked={userSettings.showHelixAskDebug}
+              label="Helix Ask unified debug"
+              description="Single toggle for Helix Ask + voice event timeline debug context, reasoning event log, and Unified Debug Copy surfaces."
+              checked={helixAskUnifiedDebugEnabled}
               onChange={(value) => updateSettings({ showHelixAskDebug: value })}
             />
-            {userSettings.showHelixAskDebug ? (
+            <PreferenceToggleRow
+              id="helix-ask-observer-lane"
+              label="Show Observer lane"
+              description="Render a live overseer interpretation lane in Helix Ask while actions run."
+              checked={userSettings.showHelixAskObserverLane}
+              onChange={(value) => updateSettings({ showHelixAskObserverLane: value })}
+            />
+            {helixAskUnifiedDebugEnabled ? (
               <>
                 <HelixAskDebugContextPanel snapshot={voiceDiagnostics} />
                 <HelixAskMathFormattingDebugPanel snapshot={voiceDiagnostics} />
+                <HelixAskReasoningEventLogPanel snapshot={voiceDiagnostics} />
+                <VoiceEventTimelineDebugPanel snapshot={voiceDiagnostics} />
               </>
             ) : null}
-            <PreferenceToggleRow
-              id="helix-ask-reasoning-event-log"
-              label="Helix Ask reasoning event log"
-              description="Show chronological turn steps for Helix Ask with turn filter + copy export."
-              checked={userSettings.showHelixAskReasoningEventLog}
-              onChange={(value) => updateSettings({ showHelixAskReasoningEventLog: value })}
-            />
-            {userSettings.showHelixAskReasoningEventLog ? (
-              <HelixAskReasoningEventLogPanel snapshot={voiceDiagnostics} />
-            ) : null}
-            <PreferenceToggleRow
-              id="helix-ask-master-event-clock"
-              label="Helix Ask master event clock"
-              description="Enable unified per-answer debug bundle copy (timeline + debug context + reasoning metadata)."
-              checked={userSettings.showHelixAskMasterEventClock}
-              onChange={(value) => updateSettings({ showHelixAskMasterEventClock: value })}
-            />
             <div
               className="rounded-md border border-cyan-400/30 bg-cyan-950/25 px-3 py-2"
               role="status"
@@ -195,16 +189,6 @@ export function HelixSettingsDialogContent({
             />
             {userSettings.showHelixVoiceCaptureDiagnostics ? (
               <VoiceCaptureDiagnosticsPanel snapshot={voiceDiagnostics} />
-            ) : null}
-            <PreferenceToggleRow
-              id="helix-voice-event-timeline-debug"
-              label="Voice lane event timeline debug"
-              description="Show prompt, brief, final, and chunk traffic events with copy export."
-              checked={userSettings.showHelixVoiceEventTimelineDebug}
-              onChange={(value) => updateSettings({ showHelixVoiceEventTimelineDebug: value })}
-            />
-            {userSettings.showHelixVoiceEventTimelineDebug ? (
-              <VoiceEventTimelineDebugPanel snapshot={voiceDiagnostics} />
             ) : null}
             <PreferenceToggleRow
               id="powershell-debug"

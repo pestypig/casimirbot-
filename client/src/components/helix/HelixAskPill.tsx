@@ -13,6 +13,7 @@ import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
 import { BrainCircuit, Mic, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
+import { findRandomPaperForTopic, parsePaperReadCommand } from "@/lib/docs/paperReadCommand";
 import {
   askLocal,
   askMoodHint,
@@ -24,6 +25,7 @@ import {
   speakVoice,
   subscribeToolLogs,
   transcribeVoice,
+  type HelixActionEnvelope,
   type AtomicViewerLaunch,
   type ConversationClarifierPolicy,
   type ConversationExplorationPacket,
@@ -44,6 +46,7 @@ import {
   HELIX_ASK_PROMPT_EVENT,
   clearPendingHelixAskPrompt,
   consumePendingHelixAskPrompt,
+  type HelixAskAnswerContract,
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
 import {
@@ -58,6 +61,14 @@ import {
   type HelixWorkstationAction,
 } from "@/lib/workstation/workstationActionContract";
 import {
+  buildWorkstationIntentClassifierPrompt,
+  coerceWorkstationActionFromIntentDecision,
+  inferDeterministicWorkstationIntentDecision,
+  parseWorkstationIntentDecision,
+  reconcileWorkstationIntentDecisionWithPrompt,
+  shouldProbeWorkstationIntentClassifier,
+} from "@/lib/workstation/intentClassifier";
+import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
   writeMissionContextControls,
@@ -70,7 +81,10 @@ import {
   type ReasoningTheaterFrontierAction,
 } from "@/lib/helix/reasoning-theater-config";
 import {
+  getVoiceCaptureDiagnosticsSnapshot,
   publishVoiceCaptureDiagnosticsSnapshot,
+  type VoiceCaptureDiagnosticsSnapshot,
+  type VoiceCaptureSegmentSnapshot,
   type VoiceLaneTimelineDebugEvent,
 } from "@/lib/helix/voice-capture-diagnostics";
 import {
@@ -112,6 +126,8 @@ import {
 } from "@shared/helix-context-capsule";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import { useDocViewerStore } from "@/store/useDocViewerStore";
+import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
@@ -197,6 +213,9 @@ const HELIX_VOICE_COMMAND_LANE_ENABLED = parseVoiceEnvBoolean(
   "VITE_HELIX_VOICE_COMMAND_LANE_ENABLED",
   false,
 );
+const HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN = 0.62;
+const HELIX_EXTERNAL_PROMPT_CLAIM_TTL_MS = 120_000;
+const HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY = "__helixAskExternalPromptClaims";
 
 function parseVoiceEnvBoolean(key: string, fallback: boolean): boolean {
   const raw = String((import.meta as any)?.env?.[key] ?? "").trim().toLowerCase();
@@ -212,6 +231,29 @@ function parseVoiceEnvPercent(key: string, fallback: number): number {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return Math.max(0, Math.min(100, fallback));
   return Math.max(0, Math.min(100, Math.round(parsed)));
+}
+
+function resolveExternalPromptClaimId(pending: PendingHelixAskPrompt | null, question: string): string {
+  const promptId = pending?.promptId?.trim();
+  if (promptId) return promptId;
+  const createdAt = typeof pending?.createdAt === "number" ? pending.createdAt : 0;
+  return `${createdAt}:${question.trim().toLowerCase()}`;
+}
+
+function claimExternalPromptSingleFlight(claimId: string): boolean {
+  if (typeof window === "undefined") return true;
+  const host = window as Window & {
+    [HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY]?: Map<string, number>;
+  };
+  const claims = host[HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY] ?? new Map<string, number>();
+  host[HELIX_EXTERNAL_PROMPT_CLAIMS_WINDOW_KEY] = claims;
+  const now = Date.now();
+  for (const [key, ts] of claims.entries()) {
+    if (now - ts > HELIX_EXTERNAL_PROMPT_CLAIM_TTL_MS) claims.delete(key);
+  }
+  if (claims.has(claimId)) return false;
+  claims.set(claimId, now);
+  return true;
 }
 
 export function shouldEnableVoiceRollout(args: {
@@ -1094,6 +1136,70 @@ const resolveVoiceResponseLanguage = (args: {
   const detected = normalizeVoiceLanguageTag(args.languageDetected);
   if (detected) return detected;
   return undefined;
+};
+
+const getWorkstationInterpretingStatusText = (languageTag: string | null | undefined): string => {
+  const normalized = normalizeVoiceLanguageTag(languageTag);
+  if (!normalized) return "Interpreting workstation request...";
+  if (normalized.startsWith("zh")) return "æ­£åœ¨è§£æžå·¥ä½œåŒºè¯·æ±‚...";
+  if (normalized.startsWith("ja")) return "ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹ã®ä¾é ¼ã‚’è§£æžä¸­ã§ã™...";
+  if (normalized.startsWith("ko")) return "ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìš”ì²­ì„ í•´ì„ ì¤‘ìž…ë‹ˆë‹¤...";
+  if (normalized.startsWith("ar")) return "Ø¬Ø§Ø±ÙŠ ØªÙØ³ÙŠØ± Ø·Ù„Ø¨ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„...";
+  if (normalized.startsWith("ru")) return "Ð Ð°Ð·Ð±Ð¸Ñ€Ð°ÑŽ Ð·Ð°Ð¿Ñ€Ð¾Ñ Ðº Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ¼Ñƒ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ñƒ...";
+  if (normalized.startsWith("es")) return "Interpretando solicitud del espacio de trabajo...";
+  if (normalized.startsWith("fr")) return "InterprÃ©tation de la demande de lâ€™espace de travail...";
+  if (normalized.startsWith("de")) return "Arbeitsbereich-Anfrage wird interpretiert...";
+  if (normalized.startsWith("pt")) return "Interpretando solicitaÃ§Ã£o do espaÃ§o de trabalho...";
+  if (normalized.startsWith("it")) return "Interpretazione della richiesta dell'area di lavoro...";
+  return "Interpreting workstation request...";
+};
+
+const getWorkstationExecutingStatusText = (languageTag: string | null | undefined): string => {
+  const normalized = normalizeVoiceLanguageTag(languageTag);
+  if (!normalized) return "Executing workstation action...";
+  if (normalized.startsWith("zh")) return "æ­£åœ¨æ‰§è¡Œå·¥ä½œåŒºæ“ä½œ...";
+  if (normalized.startsWith("ja")) return "ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹æ“ä½œã‚’å®Ÿè¡Œä¸­ã§ã™...";
+  if (normalized.startsWith("ko")) return "ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìž‘ì—…ì„ ì‹¤í–‰ ì¤‘ìž…ë‹ˆë‹¤...";
+  if (normalized.startsWith("ar")) return "Ø¬Ø§Ø±ÙŠ ØªÙ†ÙÙŠØ° Ø¥Ø¬Ø±Ø§Ø¡ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„...";
+  if (normalized.startsWith("ru")) return "Ð’Ñ‹Ð¿Ð¾Ð»Ð½ÑÑŽ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ³Ð¾ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ð°...";
+  if (normalized.startsWith("es")) return "Ejecutando acciÃ³n del espacio de trabajo...";
+  if (normalized.startsWith("fr")) return "ExÃ©cution de lâ€™action de lâ€™espace de travail...";
+  if (normalized.startsWith("de")) return "Arbeitsbereichsaktion wird ausgefÃ¼hrt...";
+  if (normalized.startsWith("pt")) return "Executando aÃ§Ã£o do espaÃ§o de trabalho...";
+  if (normalized.startsWith("it")) return "Esecuzione dell'azione dell'area di lavoro...";
+  return "Executing workstation action...";
+};
+
+const getWorkstationExecutedReplyText = (languageTag: string | null | undefined): string => {
+  const normalized = normalizeVoiceLanguageTag(languageTag);
+  if (!normalized) return "Executed workstation action.";
+  if (normalized.startsWith("zh")) return "å·²æ‰§è¡Œå·¥ä½œåŒºæ“ä½œã€‚";
+  if (normalized.startsWith("ja")) return "ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹æ“ä½œã‚’å®Ÿè¡Œã—ã¾ã—ãŸã€‚";
+  if (normalized.startsWith("ko")) return "ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìž‘ì—…ì„ ì‹¤í–‰í–ˆìŠµë‹ˆë‹¤.";
+  if (normalized.startsWith("ar")) return "ØªÙ… ØªÙ†ÙÙŠØ° Ø¥Ø¬Ø±Ø§Ø¡ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„.";
+  if (normalized.startsWith("ru")) return "Ð”ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ³Ð¾ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ð° Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¾.";
+  if (normalized.startsWith("es")) return "AcciÃ³n del espacio de trabajo ejecutada.";
+  if (normalized.startsWith("fr")) return "Action de lâ€™espace de travail exÃ©cutÃ©e.";
+  if (normalized.startsWith("de")) return "Arbeitsbereichsaktion ausgefÃ¼hrt.";
+  if (normalized.startsWith("pt")) return "AÃ§Ã£o do espaÃ§o de trabalho executada.";
+  if (normalized.startsWith("it")) return "Azione dell'area di lavoro eseguita.";
+  return "Executed workstation action.";
+};
+
+const buildWorkstationInterpretingReceiptText = (requestText: string, languageTag: string | null | undefined): string => {
+  const normalized = normalizeVoiceLanguageTag(languageTag);
+  if (!normalized) return `Interpreting workstation request: ${requestText}`;
+  if (normalized.startsWith("zh")) return `æ­£åœ¨è§£æžå·¥ä½œåŒºè¯·æ±‚ï¼š${requestText}`;
+  if (normalized.startsWith("ja")) return `ãƒ¯ãƒ¼ã‚¯ã‚¹ãƒšãƒ¼ã‚¹ã®ä¾é ¼ã‚’è§£æžä¸­: ${requestText}`;
+  if (normalized.startsWith("ko")) return `ì›Œí¬ìŠ¤íŽ˜ì´ìŠ¤ ìš”ì²­ í•´ì„ ì¤‘: ${requestText}`;
+  if (normalized.startsWith("ar")) return `Ø¬Ø§Ø±ÙŠ ØªÙØ³ÙŠØ± Ø·Ù„Ø¨ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„: ${requestText}`;
+  if (normalized.startsWith("ru")) return `Ð Ð°Ð·Ð±Ð¸Ñ€Ð°ÑŽ Ð·Ð°Ð¿Ñ€Ð¾Ñ Ðº Ñ€Ð°Ð±Ð¾Ñ‡ÐµÐ¼Ñƒ Ð¿Ñ€Ð¾ÑÑ‚Ñ€Ð°Ð½ÑÑ‚Ð²Ñƒ: ${requestText}`;
+  if (normalized.startsWith("es")) return `Interpretando solicitud del espacio de trabajo: ${requestText}`;
+  if (normalized.startsWith("fr")) return `InterprÃ©tation de la demande de lâ€™espace de travailÂ : ${requestText}`;
+  if (normalized.startsWith("de")) return `Arbeitsbereich-Anfrage wird interpretiert: ${requestText}`;
+  if (normalized.startsWith("pt")) return `Interpretando solicitaÃ§Ã£o do espaÃ§o de trabalho: ${requestText}`;
+  if (normalized.startsWith("it")) return `Interpretazione della richiesta dell'area di lavoro: ${requestText}`;
+  return `Interpreting workstation request: ${requestText}`;
 };
 
 function isHighRiskTranslationContext(args: {
@@ -2156,7 +2262,7 @@ export function deriveTranscriptConfidence(args: {
   if (text.length >= 56) score += 0.12;
   if (/[.!?]["')\]]?$/.test(text)) score += 0.08;
   if (/\b(and|but|or|because|so)\s*$/i.test(text)) score -= 0.08;
-  if (/[\u0000-\u001F�]/.test(text)) score -= 0.24;
+  if (/[\u0000-\u001Fï¿½]/.test(text)) score -= 0.24;
   const normalized = text.replace(/\s+/g, "");
   if (normalized.length > 0) {
     const alnum = (normalized.match(/[A-Za-z0-9]/g) ?? []).length;
@@ -3377,33 +3483,33 @@ function buildConversationFallbackBrief(args: {
   const snippet = clipText(args.transcript.trim().replace(/\?/g, "").replace(/\s+/g, " "), 180);
   if (languageTag?.startsWith("zh")) {
     if (args.clarifyNeeded || args.mode === "clarify") {
-      return `我听到的是“${snippet}”。请再补充一个具体细节，我就能更准确地继续。`;
+      return `æˆ‘å¬åˆ°çš„æ˜¯â€œ${snippet}â€ã€‚è¯·å†è¡¥å……ä¸€ä¸ªå…·ä½“ç»†èŠ‚ï¼Œæˆ‘å°±èƒ½æ›´å‡†ç¡®åœ°ç»§ç»­ã€‚`;
     }
     if (args.mode === "verify") {
-      return `我听到的是“${snippet}”。我会核验证据链并给出可验证的结论。`;
+      return `æˆ‘å¬åˆ°çš„æ˜¯â€œ${snippet}â€ã€‚æˆ‘ä¼šæ ¸éªŒè¯æ®é“¾å¹¶ç»™å‡ºå¯éªŒè¯çš„ç»“è®ºã€‚`;
     }
     if (args.mode === "act") {
-      return `我听到的是“${snippet}”。我会继续执行并给出下一步。`;
+      return `æˆ‘å¬åˆ°çš„æ˜¯â€œ${snippet}â€ã€‚æˆ‘ä¼šç»§ç»­æ‰§è¡Œå¹¶ç»™å‡ºä¸‹ä¸€æ­¥ã€‚`;
     }
     if (args.mode === "observe") {
-      return `我听到的是“${snippet}”。我会快速梳理现状并说明下一步重点。`;
+      return `æˆ‘å¬åˆ°çš„æ˜¯â€œ${snippet}â€ã€‚æˆ‘ä¼šå¿«é€Ÿæ¢³ç†çŽ°çŠ¶å¹¶è¯´æ˜Žä¸‹ä¸€æ­¥é‡ç‚¹ã€‚`;
     }
-    return `我听到的是“${snippet}”。我会在保持上下文的同时继续下一步。`;
+    return `æˆ‘å¬åˆ°çš„æ˜¯â€œ${snippet}â€ã€‚æˆ‘ä¼šåœ¨ä¿æŒä¸Šä¸‹æ–‡çš„åŒæ—¶ç»§ç»­ä¸‹ä¸€æ­¥ã€‚`;
   }
   if (languageTag?.startsWith("ja")) {
     if (args.clarifyNeeded || args.mode === "clarify") {
-      return `「${snippet}」と受け取りました。正確に進めるため、具体的な点を1つだけ補足してください。`;
+      return `ã€Œ${snippet}ã€ã¨å—ã‘å–ã‚Šã¾ã—ãŸã€‚æ­£ç¢ºã«é€²ã‚ã‚‹ãŸã‚ã€å…·ä½“çš„ãªç‚¹ã‚’1ã¤ã ã‘è£œè¶³ã—ã¦ãã ã•ã„ã€‚`;
     }
     if (args.mode === "verify") {
-      return `「${snippet}」と受け取りました。根拠を検証して結果を返します。`;
+      return `ã€Œ${snippet}ã€ã¨å—ã‘å–ã‚Šã¾ã—ãŸã€‚æ ¹æ‹ ã‚’æ¤œè¨¼ã—ã¦çµæžœã‚’è¿”ã—ã¾ã™ã€‚`;
     }
     if (args.mode === "act") {
-      return `「${snippet}」と受け取りました。次の実行ステップに進みます。`;
+      return `ã€Œ${snippet}ã€ã¨å—ã‘å–ã‚Šã¾ã—ãŸã€‚æ¬¡ã®å®Ÿè¡Œã‚¹ãƒ†ãƒƒãƒ—ã«é€²ã¿ã¾ã™ã€‚`;
     }
     if (args.mode === "observe") {
-      return `「${snippet}」と受け取りました。現状を整理して要点を返します。`;
+      return `ã€Œ${snippet}ã€ã¨å—ã‘å–ã‚Šã¾ã—ãŸã€‚ç¾çŠ¶ã‚’æ•´ç†ã—ã¦è¦ç‚¹ã‚’è¿”ã—ã¾ã™ã€‚`;
     }
-    return `「${snippet}」と受け取りました。文脈を保って次に進みます。`;
+    return `ã€Œ${snippet}ã€ã¨å—ã‘å–ã‚Šã¾ã—ãŸã€‚æ–‡è„ˆã‚’ä¿ã£ã¦æ¬¡ã«é€²ã¿ã¾ã™ã€‚`;
   }
   if (args.clarifyNeeded || args.mode === "clarify") {
     return `I heard: "${snippet}". One concrete detail will help me route this precisely while I keep this conversational.`;
@@ -6229,10 +6335,240 @@ function readEventMetaString(
   return null;
 }
 
+type UnifiedDebugEventRow = {
+  index: number;
+  channel: "ask_live" | "voice_timeline" | "observer_lane";
+  id: string;
+  tsMs: number | null;
+  tool: string | null;
+  traceId: string | null;
+  turnKey: string | null;
+  attemptId: string | null;
+  stage: string | null;
+  detail: string | null;
+  text: string;
+};
+
+type ObserverCommentaryOptions = {
+  userPrompt?: string | null;
+};
+
+function buildObserverUserRestatement(
+  rowText: string,
+  userPrompt: string | null | undefined,
+): string | null {
+  const normalizedPrompt = (userPrompt ?? "").replace(/\s+/g, " ").trim();
+  if (!normalizedPrompt) return null;
+  const promptSnippet =
+    normalizedPrompt.length > 96 ? `${normalizedPrompt.slice(0, 93).trimEnd()}...` : normalizedPrompt;
+  if (/summarizing current document/i.test(rowText)) {
+    return `From your request ("${promptSnippet}"), this means your current document will be summarized in plain language.`;
+  }
+  if (/opening selected document/i.test(rowText)) {
+    return `From your request ("${promptSnippet}"), this means Docs viewer is opening the selected source before explanation.`;
+  }
+  if (/closed active panel/i.test(rowText)) {
+    return `From your request ("${promptSnippet}"), this means the active panel you asked to close was removed.`;
+  }
+  if (/starting read-aloud/i.test(rowText)) {
+    return `From your request ("${promptSnippet}"), this means read-aloud is beginning for the active document context.`;
+  }
+  if (/^fail:/i.test(rowText)) {
+    return `From your request ("${promptSnippet}"), this means execution failed before the requested action completed.`;
+  }
+  return `From your request ("${promptSnippet}"), this is the current workstation step being executed.`;
+}
+
+export function buildObserverCommentaryForRow(
+  row: Pick<UnifiedDebugEventRow, "tool" | "text" | "detail">,
+  options: ObserverCommentaryOptions = {},
+): string | null {
+  const tool = (row.tool ?? "").trim().toLowerCase();
+  const text = (row.text ?? "").trim();
+  const detail = (row.detail ?? "").trim().toLowerCase();
+  const isWorkstationRow =
+    tool === "helix.ask.fast_path" ||
+    tool.startsWith("workstation.") ||
+    detail.startsWith("workstation_") ||
+    detail.startsWith("job_");
+  if (!isWorkstationRow || !text) return null;
+
+  const restatement = buildObserverUserRestatement(text, options.userPrompt);
+  const withRestatement = (technical: string): string =>
+    restatement ? `Observer: ${restatement} ${technical}` : `Observer: ${technical}`;
+
+  if (/focusing panel picker/i.test(text)) {
+    return withRestatement("Dispatcher acknowledged request and is moving focus to panel picker.");
+  }
+  if (/opening panel picker/i.test(text)) {
+    return withRestatement("UI control path opened panel picker for action routing.");
+  }
+  if (/targeting docs panel/i.test(text)) {
+    return withRestatement("Action router resolved Docs panel as active destination.");
+  }
+  if (/opening selected document/i.test(text)) {
+    return withRestatement("Selected document is now being opened in Docs viewer.");
+  }
+  if (/starting read-aloud/i.test(text)) {
+    return withRestatement("Read-aloud stage entered; playback dispatch is expected next.");
+  }
+  if (/summarizing current document/i.test(text)) {
+    return withRestatement("Summarize-doc action dispatched using current Docs viewer context.");
+  }
+  if (/closed active panel/i.test(text)) {
+    return withRestatement("Close-panel action completed and active workspace panel was removed.");
+  }
+  if (/workstation fast-path dispatched/i.test(text)) {
+    return withRestatement("Intent resolved to workstation fast-path and handed to action router.");
+  }
+  if (/^ok:/i.test(text)) {
+    return withRestatement(`Action receipt confirmed - ${text.replace(/^ok:\s*/i, "").trim()}`);
+  }
+  if (/^fail:/i.test(text)) {
+    return withRestatement(`Action failure detected - ${text.replace(/^fail:\s*/i, "").trim()}`);
+  }
+  return withRestatement(`Interpreted workstation event - ${text}`);
+}
+
+function summarizeVoiceSegments(segments: VoiceCaptureSegmentSnapshot[] | undefined): {
+  total: number;
+  dispatchCompleted: number;
+  dispatchQueued: number;
+  dispatchSuppressed: number;
+  sttErrors: number;
+} {
+  if (!Array.isArray(segments) || segments.length === 0) {
+    return {
+      total: 0,
+      dispatchCompleted: 0,
+      dispatchQueued: 0,
+      dispatchSuppressed: 0,
+      sttErrors: 0,
+    };
+  }
+  let dispatchCompleted = 0;
+  let dispatchQueued = 0;
+  let dispatchSuppressed = 0;
+  let sttErrors = 0;
+  segments.forEach((segment) => {
+    if (segment.dispatch === "completed") dispatchCompleted += 1;
+    if (segment.dispatch === "queued") dispatchQueued += 1;
+    if (segment.dispatch === "suppressed") dispatchSuppressed += 1;
+    if (segment.status === "stt_error") sttErrors += 1;
+  });
+  return {
+    total: segments.length,
+    dispatchCompleted,
+    dispatchQueued,
+    dispatchSuppressed,
+    sttErrors,
+  };
+}
+
+function sanitizeVoiceDiagnosticsForExport(
+  snapshot: VoiceCaptureDiagnosticsSnapshot | null,
+): Record<string, unknown> | null {
+  if (!snapshot) return null;
+  const timeline = Array.isArray(snapshot.timelineEvents) ? snapshot.timelineEvents.slice(-160) : [];
+  return {
+    updatedAtMs: snapshot.updatedAtMs,
+    micArmState: snapshot.micArmState,
+    voiceInputState: snapshot.voiceInputState,
+    voiceSignalState: snapshot.voiceSignalState,
+    warnings: [...snapshot.warnings],
+    monitor: {
+      level: Number(snapshot.voiceMonitorLevel.toFixed(6)),
+      threshold: Number(snapshot.voiceMonitorThreshold.toFixed(6)),
+      rmsDb: Number(snapshot.rmsDb.toFixed(3)),
+      chunksPerSecond: Number(snapshot.chunksPerSecond.toFixed(3)),
+      lastRoundtripMs: snapshot.lastRoundtripMs ?? null,
+    },
+    segments: summarizeVoiceSegments(snapshot.segments),
+    playback: snapshot.playback
+      ? {
+          utteranceId: snapshot.playback.utteranceId,
+          turnKey: snapshot.playback.turnKey,
+          kind: snapshot.playback.kind,
+          chunkCount: snapshot.playback.chunkCount,
+          enqueueToFirstAudioMs: snapshot.playback.enqueueToFirstAudioMs ?? null,
+          totalPlaybackMs: snapshot.playback.totalPlaybackMs ?? null,
+          cancelReason: snapshot.playback.cancelReason ?? null,
+          cacheHitCount: snapshot.playback.cacheHitCount,
+          cacheMissCount: snapshot.playback.cacheMissCount,
+          providerHeader: snapshot.playback.providerHeader ?? null,
+          profileHeader: snapshot.playback.profileHeader ?? null,
+        }
+      : null,
+    playbackOutput: snapshot.playbackOutput
+      ? {
+          expectedPath: snapshot.playbackOutput.expectedPath,
+          currentUtterancePath: snapshot.playbackOutput.currentUtterancePath ?? null,
+          currentUtteranceDirectFallback: snapshot.playbackOutput.currentUtteranceDirectFallback ?? null,
+          graphBypassActive: snapshot.playbackOutput.graphBypassActive ?? null,
+          graphFailureStreak: snapshot.playbackOutput.graphFailureStreak ?? null,
+          fallbackCount: snapshot.playbackOutput.fallbackCount ?? null,
+          lastFallbackReason: snapshot.playbackOutput.lastFallbackReason ?? null,
+          audioUnlocked: snapshot.playbackOutput.audioUnlocked,
+          audioGraphAttached: snapshot.playbackOutput.audioGraphAttached,
+        }
+      : null,
+    timelineEvents: timeline.map((event) => ({
+      id: event.id,
+      atMs: event.atMs,
+      source: event.source,
+      kind: event.kind,
+      status: event.status ?? null,
+      traceId: event.traceId ?? null,
+      turnKey: event.turnKey ?? null,
+      attemptId: event.attemptId ?? null,
+      detail: event.detail ?? null,
+      text: event.text ?? null,
+    })),
+  };
+}
+
+function readDocViewerDebugSnapshot(): Record<string, unknown> {
+  const state = useDocViewerStore.getState();
+  return {
+    mode: state.mode,
+    currentPath: state.currentPath ?? null,
+    anchor: state.anchor ?? null,
+    pendingAutoReadNonce: state.pendingAutoReadNonce ?? null,
+    recentCount: Array.isArray(state.recent) ? state.recent.length : 0,
+  };
+}
+
+function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
+  const state = useWorkstationLayoutStore.getState();
+  const groupCount = Object.keys(state.groups).length;
+  const panelIds = new Set<string>();
+  Object.values(state.groups).forEach((group) => {
+    group.panelIds.forEach((panelId) => panelIds.add(panelId));
+  });
+  return {
+    mode: state.mode,
+    activeGroupId: state.activeGroupId,
+    groupCount,
+    openPanels: [...panelIds].sort((a, b) => a.localeCompare(b)),
+    chatDock: {
+      collapsed: state.chatDock.collapsed,
+      widthPx: state.chatDock.widthPx,
+      side: state.chatDock.side,
+    },
+    mobileDrawer: {
+      open: state.mobileDrawer.open,
+      snap: state.mobileDrawer.snap,
+    },
+  };
+}
+
 function buildReplyMasterEventClockExport(args: {
   reply: HelixAskReply;
   events: AskLiveEventEntry[];
   debugContext: Record<string, unknown> | null;
+  voiceDiagnostics: VoiceCaptureDiagnosticsSnapshot | null;
+  docViewerState: Record<string, unknown>;
+  workstationLayoutState: Record<string, unknown>;
 }): string {
   const traceIds = new Set<string>();
   const turnKeys = new Set<string>();
@@ -6265,6 +6601,73 @@ function buildReplyMasterEventClockExport(args: {
       text: summarizeVoiceDebugText(event.text ?? "", 280),
     };
   });
+  const askRows: UnifiedDebugEventRow[] = timeline.map((row) => ({
+    index: row.index,
+    channel: "ask_live",
+    id: row.id,
+    tsMs: row.tsMs,
+    tool: row.tool,
+    traceId: row.traceId,
+    turnKey: row.turnKey,
+    attemptId: row.attemptId,
+    stage: row.stage,
+    detail: row.detail,
+    text: row.text,
+  }));
+  const voiceRows: UnifiedDebugEventRow[] = Array.isArray(args.voiceDiagnostics?.timelineEvents)
+    ? args.voiceDiagnostics.timelineEvents.slice(-160).map((event, idx) => {
+        if (event.traceId) traceIds.add(event.traceId);
+        if (event.turnKey) turnKeys.add(event.turnKey);
+        if (event.attemptId) attemptIds.add(event.attemptId);
+        return {
+          index: idx + 1,
+          channel: "voice_timeline" as const,
+          id: event.id,
+          tsMs: Number.isFinite(event.atMs) ? event.atMs : null,
+          tool: event.source,
+          traceId: event.traceId ?? null,
+          turnKey: event.turnKey ?? null,
+          attemptId: event.attemptId ?? null,
+          stage: event.kind ?? null,
+          detail: event.detail ?? null,
+          text: summarizeVoiceDebugText(event.text ?? event.detail ?? event.kind ?? "voice timeline event", 280),
+        };
+      })
+    : [];
+  const observerRows: UnifiedDebugEventRow[] = askRows
+    .map((row) => {
+      const commentary = buildObserverCommentaryForRow(row, {
+        userPrompt: args.reply.question ?? null,
+      });
+      if (!commentary) return null;
+      return {
+        index: row.index,
+        channel: "observer_lane" as const,
+        id: `observer:${row.id}`,
+        tsMs: row.tsMs,
+        tool: "helix.ask.observer",
+        traceId: row.traceId,
+        turnKey: row.turnKey,
+        attemptId: row.attemptId,
+        stage: "observer_commentary",
+        detail: row.detail,
+        text: commentary,
+      };
+    })
+    .filter((row): row is UnifiedDebugEventRow => row !== null)
+    .slice(-160);
+  const unifiedTimeline: UnifiedDebugEventRow[] = [...askRows, ...observerRows, ...voiceRows]
+    .sort((left, right) => {
+      const leftTs = left.tsMs ?? Number.MAX_SAFE_INTEGER;
+      const rightTs = right.tsMs ?? Number.MAX_SAFE_INTEGER;
+      if (leftTs !== rightTs) return leftTs - rightTs;
+      if (left.channel !== right.channel) return left.channel.localeCompare(right.channel);
+      return left.id.localeCompare(right.id);
+    })
+    .map((row, index) => ({
+      ...row,
+      index: index + 1,
+    }));
 
   const debugTraceId =
     (debugRecord && typeof debugRecord.trace_id === "string" && debugRecord.trace_id.trim()
@@ -6276,7 +6679,7 @@ function buildReplyMasterEventClockExport(args: {
   if (debugTraceId) traceIds.add(debugTraceId);
 
   const payload = {
-    schema: "helix.ask.master_event_clock.v1",
+    schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
     reply: {
       id: args.reply.id,
@@ -6287,6 +6690,10 @@ function buildReplyMasterEventClockExport(args: {
     counts: {
       events: args.events.length,
       timelineRows: timeline.length,
+      unifiedTimelineRows: unifiedTimeline.length,
+      askLiveRows: askRows.length,
+      observerRows: observerRows.length,
+      voiceTimelineRows: voiceRows.length,
       traceIds: traceIds.size,
       turnKeys: turnKeys.size,
       attemptIds: attemptIds.size,
@@ -6298,9 +6705,30 @@ function buildReplyMasterEventClockExport(args: {
     },
     debugContext: args.debugContext,
     debug: args.reply.debug ?? null,
+    channels: {
+      voice: sanitizeVoiceDiagnosticsForExport(args.voiceDiagnostics),
+      observer: {
+        rowCount: observerRows.length,
+        mode: "deterministic_commentary_v1",
+      },
+      docViewer: args.docViewerState,
+      workstationLayout: args.workstationLayoutState,
+    },
     timeline,
+    eventLog: unifiedTimeline,
   };
   return safeJsonStringify(payload);
+}
+
+function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
+  const tool = (entry.tool ?? "").trim().toLowerCase();
+  if (!tool) return false;
+  if (tool === "helix.ask.fast_path") return true;
+  if (tool.startsWith("workstation.")) return true;
+  const meta = asObjectRecord(entry.meta ?? null);
+  const kind = typeof meta?.kind === "string" ? meta.kind.trim().toLowerCase() : "";
+  if (!kind) return false;
+  return kind.startsWith("workstation_") || kind.startsWith("job_");
 }
 
 function stripContextCapsuleTokensFromText(value: string): string {
@@ -6900,6 +7328,22 @@ const HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID: PanelDefinition["id"] = "needle-mk
 
 const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
 const HELIX_ATOMIC_LAUNCH_STORAGE_KEY = "helix.atomic.launch.v1";
+const HELIX_DOCS_SUMMARY_REQUEST_RE =
+  /\b(?:summari[sz]e|summary|explain|describe|tldr|tl;dr)\b[\s\S]*\b(?:doc|docs|document|read(?:ing)?|current)\b/i;
+const HELIX_DOCS_VIEWER_CONTEXT_RE = /\bcurrent\s+docs?\s+viewer\s+context\b/i;
+const HELIX_DOCS_PATH_LITERAL_RE =
+  /\bdocument\s+path:\s*\/?docs\/[^\s]+|\/?docs\/[^\s]+\.(?:md|mdx|txt|rst|adoc)\b/i;
+
+const shouldSuppressAtomicViewerLaunch = (args: {
+  question?: string | null;
+  mode?: "read" | "observe" | "act" | "verify";
+}): boolean => {
+  const question = (args.question ?? "").trim();
+  if (!question) return false;
+  const docsSummaryCue = HELIX_DOCS_SUMMARY_REQUEST_RE.test(question);
+  if (!docsSummaryCue) return false;
+  return HELIX_DOCS_VIEWER_CONTEXT_RE.test(question) || HELIX_DOCS_PATH_LITERAL_RE.test(question);
+};
 
 function normalizePanelQuery(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -6946,16 +7390,64 @@ function parseOpenPanelCommand(value: string): PanelDefinition["id"] | null {
   const match = value.trim().match(/^(?:\/open|open|show|launch)\s+(.+)/i);
   if (!match) return null;
   const raw = match[1].replace(/^(the|panel|window)\s+/i, "").trim();
+  const lowerRaw = raw.toLowerCase();
+  const conversationalDocIntent =
+    /\b(?:doc|docs|documentation|paper|report|publication|research)\b/.test(lowerRaw) &&
+    /\b(?:about|for|on|regarding)\b/.test(lowerRaw);
+  const readAloudIntent = /\b(?:read|aloud|out loud|speak|narrate|voice)\b/.test(lowerRaw);
+  if (conversationalDocIntent || readAloudIntent) return null;
   return resolvePanelIdFromText(raw);
 }
 
-function parseWorkstationActionCommand(value: string): HelixWorkstationAction | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const conversationalCandidate = trimmed
+function restateWorkstationSubgoal(value: string): string {
+  const cleaned = value
+    .trim()
     .replace(/^["'\s]+|["'\s]+$/g, "")
     .replace(/^question\s*:\s*/i, "")
+    .replace(/^(?:hey|hi)\s+(?:helix|dottie)\s*,?\s*/i, "")
+    .replace(/^(?:can|could|would)\s+you\s+/i, "")
+    .replace(/^please\s+/i, "")
     .trim();
+  const summarizeOrExplainIntent =
+    /\b(?:summari[sz]e|summary|tldr|tl;dr|explain|break\s+down|walk\s+me\s+through|what\s+does)\b/i.test(
+      cleaned,
+    );
+  if (summarizeOrExplainIntent) {
+    return cleaned;
+  }
+  const paperReadTopic =
+    cleaned.match(
+      /\b(?:read|open|show|find|search|look|pick|bring|pull)\b[\s\S]*?\b(?:paper|papers|research|publication|report|doc|document)\b[\s\S]*?\b(?:about|on|for|regarding)\s+(.+?)(?:[.?!]|$)/i,
+    )?.[1]?.trim() ??
+    cleaned.match(/\b(?:paper|papers|doc|document)\s+(?:about|on|for|regarding)\s+(.+?)(?:[.?!]|$)/i)?.[1]?.trim();
+
+  if (paperReadTopic) {
+    return `find a paper about ${paperReadTopic} and open it and read it to me`;
+  }
+  return cleaned;
+}
+
+export function parseWorkstationActionCommand(value: string): HelixWorkstationAction | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const conversationalCandidate = restateWorkstationSubgoal(trimmed);
+  const conversationalCommand = conversationalCandidate
+    .replace(/[?.!,;:]+$/g, "")
+    .replace(/^["'`\s]+|["'`\s]+$/g, "")
+    .trim();
+  const deterministicFrameDecision = inferDeterministicWorkstationIntentDecision(conversationalCommand);
+  const deterministicFrameAction = deterministicFrameDecision
+    ? coerceWorkstationActionFromIntentDecision(deterministicFrameDecision)
+    : null;
+  if (
+    deterministicFrameAction &&
+    (deterministicFrameAction.action === "close_active_panel" ||
+      deterministicFrameAction.action === "focus_next_panel" ||
+      deterministicFrameAction.action === "focus_previous_panel" ||
+      deterministicFrameAction.action === "reopen_last_closed_panel")
+  ) {
+    return deterministicFrameAction;
+  }
 
   const parsePayloadToJob = (
     payload: Record<string, unknown>,
@@ -7102,22 +7594,109 @@ function parseWorkstationActionCommand(value: string): HelixWorkstationAction | 
   }
 
   const conversationalOpenDocsMatch = conversationalCandidate.match(
-    /^(?:(?:can|could|would)\s+you\s+|please\s+)?(?:open|show|pull\s+up|bring\s+up)\s+(?:(?:a|an|the)\s+)?(?:docs?|documentation)\b(?:\s+(?:about|for|on|regarding)\s+(.+?))?[?.!]*$/i,
+    /^(?:(?:ok|okay)\s+)?(?:(?:can|could|would)\s+you\s+|please\s+)?(?:open(?:\s+up)?|show|pull\s+up|bring\s+up)\s+(?:(?:a|an|the)\s+)?(?:docs?|documentation|document|paper|report|publication|research)\b(?:\s+(?:about|for|on|regarding)\s+(.+?))?(?:\s+(?:and|then)\s+(.+))?[?.!]*$/i,
   );
   if (conversationalOpenDocsMatch) {
     const topic = conversationalOpenDocsMatch[1]?.trim() ?? "";
+    const continuation = conversationalOpenDocsMatch[2]?.trim() ?? "";
     const path = resolveDocPathFromPrompt(topic || conversationalCandidate);
+    const continuationWantsSummarize = /\b(?:summari[sz]e|summary|tldr|tl;dr)\b/i.test(continuation);
+    const continuationWantsSectionSummary =
+      continuationWantsSummarize && /\b(?:section|this\s+section|current\s+section|part)\b/i.test(continuation);
+    const continuationWantsExplain = /\b(?:explain|break\s+down|walk\s+me\s+through|what\s+does)\b/i.test(
+      continuation,
+    );
+    if (continuationWantsSummarize || continuationWantsExplain) {
+      const fallbackPath = topic ? (findRandomPaperForTopic(topic)?.route ?? "/docs/papers.md") : "";
+      const resolvedPath = path || fallbackPath;
+      return {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: continuationWantsSectionSummary
+          ? "summarize_section"
+          : continuationWantsExplain
+            ? "explain_paper"
+            : "summarize_doc",
+        args: resolvedPath ? { path: resolvedPath } : undefined,
+      };
+    }
+    const readAloudRequested = /\b(?:read(?:\s+it)?(?:\s+out\s+loud|\s+aloud)?|out\s+loud|aloud|speak|narrate|voice)\b/i.test(
+      conversationalCandidate,
+    );
     if (path) {
       return {
         action: "run_panel_action",
         panel_id: "docs-viewer",
-        action_id: "open_doc",
-        args: { path },
+        action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
+        args: readAloudRequested ? { path, topic } : { path },
       };
     }
     return {
       action: "open_panel",
       panel_id: "docs-viewer",
+    };
+  }
+
+  const summarizeSectionRequested =
+    /\b(?:summari[sz]e|summary|tldr|tl;dr)\b[\s\S]*\b(?:section|this\s+section|current\s+section|part)\b/i.test(
+      conversationalCandidate,
+    );
+  if (summarizeSectionRequested) {
+    const path = resolveDocPathFromPrompt(conversationalCandidate);
+    return {
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "summarize_section",
+      args: path ? { path } : undefined,
+    };
+  }
+
+  const summarizeDocRequested =
+    /\b(?:summari[sz]e|summary|tldr|tl;dr)\b[\s\S]*\b(?:doc|document|paper|this\s+doc|this\s+document|this\s+paper|current\s+doc|current\s+document)\b/i.test(
+      conversationalCandidate,
+    );
+  if (summarizeDocRequested) {
+    const path = resolveDocPathFromPrompt(conversationalCandidate);
+    return {
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "summarize_doc",
+      args: path ? { path } : undefined,
+    };
+  }
+
+  const explainPaperRequested =
+    /\b(?:explain|break\s+down|walk\s+me\s+through)\b[\s\S]*\b(?:paper|doc|document|this\s+paper|this\s+doc|this\s+document)\b/i.test(
+      conversationalCandidate,
+    );
+  const docWhatIsRequested =
+    /\b(?:what\s+(?:does|is)|tell\s+me|describe)\b[\s\S]*\b(?:this\s+doc|this\s+document|this\s+paper|the\s+doc|the\s+document|the\s+paper|doc|document|paper)\b[\s\S]*\b(?:do|about|say|mean)\b/i.test(
+      conversationalCandidate,
+    ) ||
+    /\bwhat(?:'s|\s+is)\s+\b[\s\S]*\b(?:this\s+doc|this\s+document|this\s+paper)\b[\s\S]*\b(?:about)\b/i.test(
+      conversationalCandidate,
+    );
+  if (explainPaperRequested || docWhatIsRequested) {
+    const path = resolveDocPathFromPrompt(conversationalCandidate);
+    return {
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "explain_paper",
+      args: path ? { path } : undefined,
+    };
+  }
+
+  const conversationalPaperRead = parsePaperReadCommand(conversationalCandidate);
+  if (conversationalPaperRead) {
+    const match = findRandomPaperForTopic(conversationalPaperRead.topic);
+    return {
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "open_doc_and_read",
+      args: {
+        path: match?.route ?? "/docs/papers.md",
+        topic: conversationalPaperRead.topic,
+      },
     };
   }
 
@@ -7158,6 +7737,54 @@ function parseWorkstationActionCommand(value: string): HelixWorkstationAction | 
     } catch {
       // ignore malformed /panel-action JSON payloads
     }
+  }
+
+  const conversationalCloseCurrentPanel = new RegExp(
+    [
+      "^(?:",
+      "/close-active-panel",
+      "|/close-current-tab",
+      "|close\\s+(?:all\\s+)?(?:the\\s+)?(?:open\\s+)?(?:tabs|panels)",
+      "|close\\s+(?:my\\s+)?(?:tabs|panels)",
+      "|close\\s+panels?",
+      "|close\\s+(?:the\\s+)?(?:active|current|open)\\s+(?:tab|panel)",
+      "|close\\s+(?:tab|panel)",
+      "|close\\s+(?:the\\s+)?(?:doc|document|paper)(?:\\s+(?:for\\s+me|please))?",
+      "|close\\s+(?:this|that)\\s+(?:tab|panel)(?:\\s+(?:for\\s+me|please))?",
+      "|close\\s+(?:this|that|the\\s+current|current)\\s+(?:doc|document|paper)(?:\\s+(?:for\\s+me|please))?",
+      "|close\\s+(?:whatever|whichever)\\s+(?:tab|panel)(?:\\s+i(?:'?m)?\\s+on)?",
+      "|(?:shut|dismiss|remove|x\\s*out|get\\s+rid\\s+of)\\s+",
+      "(?:(?:the\\s+)?(?:active|current|open|this|that)\\s+)?(?:tab|panel)(?:\\s+(?:for\\s+me|please))?",
+      "|(?:shut|dismiss|remove|x\\s*out|get\\s+rid\\s+of)\\s+(?:(?:the\\s+)?(?:active|current|open|this|that)\\s+)?(?:doc|document|paper)(?:\\s+(?:for\\s+me|please))?",
+      "|(?:shut|dismiss|remove|x\\s*out|get\\s+rid\\s+of)\\s+this\\s+panel(?:\\s+for\\s+me)?",
+      ")$",
+    ].join(""),
+    "i",
+  );
+  if (conversationalCloseCurrentPanel.test(conversationalCommand)) {
+    return { action: "close_active_panel" };
+  }
+
+  if (
+    /^(?:\/next-tab|(?:go\s+to|switch\s+to|focus)?\s*next\s+(?:tab|panel))$/i.test(conversationalCommand)
+  ) {
+    return { action: "focus_next_panel" };
+  }
+
+  if (
+    /^(?:\/prev-tab|\/previous-tab|(?:go\s+to|switch\s+to|focus)?\s*(?:previous|prev)\s+(?:tab|panel))$/i.test(
+      conversationalCommand,
+    )
+  ) {
+    return { action: "focus_previous_panel" };
+  }
+
+  if (
+    /^(?:\/reopen-tab|reopen\s+(?:the\s+)?(?:last\s+)?closed\s+(?:tab|panel)|undo\s+close\s+(?:tab|panel))$/i.test(
+      conversationalCommand,
+    )
+  ) {
+    return { action: "reopen_last_closed_panel" };
   }
 
   const splitMatch = trimmed.match(/^(?:\/split|split)\s+(right|row|down|column)$/i);
@@ -7694,6 +8321,28 @@ export function HelixAskPill({
     [voiceNoisyEnvironmentMode],
   );
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
+  const appendWorkstationEventToLatestActReply = useCallback((entry: AskLiveEventEntry) => {
+    if (!isWorkstationLifecycleEvent(entry)) return;
+    setAskReplies((prev) => {
+      const targetIndex = prev.findIndex(
+        (reply) =>
+          reply.mode === "act" &&
+          Array.isArray(reply.liveEvents) &&
+          reply.liveEvents.some((event) => isWorkstationLifecycleEvent(event)),
+      );
+      if (targetIndex < 0) return prev;
+      const target = prev[targetIndex];
+      const existing = Array.isArray(target.liveEvents) ? target.liveEvents : [];
+      if (existing.some((event) => event.id === entry.id)) return prev;
+      const nextLiveEvents = [...existing, entry].slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+      const next = [...prev];
+      next[targetIndex] = {
+        ...target,
+        liveEvents: nextLiveEvents,
+      };
+      return next;
+    });
+  }, []);
   const [micArmState, setMicArmState] = useState<MicArmState>(() => {
     if (typeof window === "undefined") return "off";
     try {
@@ -9122,6 +9771,40 @@ export function HelixAskPill({
     [onRunWorkstationAction],
   );
 
+  const classifyWorkstationActionIntent = useCallback(
+    async (question: string): Promise<HelixWorkstationAction | null> => {
+      const deterministicDecision = inferDeterministicWorkstationIntentDecision(question);
+      const deterministicAction = deterministicDecision
+        ? coerceWorkstationActionFromIntentDecision(deterministicDecision)
+        : null;
+      const shouldProbeClassifier = shouldProbeWorkstationIntentClassifier(question);
+      if (!shouldProbeClassifier) return deterministicAction;
+      if (
+        deterministicDecision &&
+        deterministicDecision.confidence >= HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN &&
+        deterministicAction
+      ) {
+        return deterministicAction;
+      }
+      const classifierPrompt = buildWorkstationIntentClassifierPrompt(question);
+      const result = await askLocalWithPreflightScopeFallback(classifierPrompt, {
+        maxTokens: 220,
+        temperature: 0,
+        mode: "observe",
+        verbosity: "brief",
+      });
+      const rawDecision = parseWorkstationIntentDecision(result.response.text ?? "");
+      const decision = rawDecision
+        ? reconcileWorkstationIntentDecisionWithPrompt(question, rawDecision)
+        : null;
+      if (decision && decision.confidence >= HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN) {
+        return coerceWorkstationActionFromIntentDecision(decision);
+      }
+      return deterministicAction;
+    },
+    [],
+  );
+
   const applyWorkstationActionsFromPayload = useCallback(
     (...payloads: unknown[]) => {
       const resolved: HelixWorkstationAction[] = [];
@@ -9139,9 +9822,13 @@ export function HelixAskPill({
   );
 
   const launchAtomicViewer = useCallback(
-    (payload: AtomicViewerLaunch | undefined) => {
+    (
+      payload: AtomicViewerLaunch | undefined,
+      context?: { question?: string | null; mode?: "read" | "observe" | "act" | "verify" },
+    ) => {
       if (!payload) return;
       if (payload.viewer !== "atomic-orbital" || payload.panel_id !== "electron-orbital") return;
+      if (shouldSuppressAtomicViewerLaunch(context ?? {})) return;
       openPanelById(payload.panel_id);
       if (typeof window === "undefined") return;
       try {
@@ -9158,6 +9845,40 @@ export function HelixAskPill({
       }, 60);
     },
     [openPanelById],
+  );
+
+  const applyGovernedActionEnvelope = useCallback(
+    (
+      envelope: HelixActionEnvelope | undefined,
+      context?: { question?: string | null; mode?: "read" | "observe" | "act" | "verify" },
+    ): boolean => {
+      if (!envelope || envelope.schema !== "helix.ask.action_envelope.v1") {
+        return false;
+      }
+      const dispatch = envelope.governance?.dispatch ?? "allow";
+      const suppressed = dispatch === "suppress";
+      if (!suppressed) {
+        const candidates = coerceHelixWorkstationActions(envelope.workstation_actions ?? []);
+        const deduped: HelixWorkstationAction[] = [];
+        const seen = new Set<string>();
+        candidates.forEach((action) => {
+          const key = JSON.stringify(action);
+          if (seen.has(key)) return;
+          seen.add(key);
+          deduped.push(action);
+        });
+        if (deduped.length > 0) {
+          if (onRunWorkstationAction) {
+            deduped.forEach((action) => onRunWorkstationAction(action));
+          } else {
+            dispatchHelixWorkstationActions(deduped);
+          }
+        }
+        launchAtomicViewer(envelope.viewer_launch, context);
+      }
+      return true;
+    },
+    [launchAtomicViewer, onRunWorkstationAction],
   );
 
   const renderHelixAskTextWithPathLinks = useCallback(
@@ -11952,6 +12673,95 @@ export function HelixAskPill({
     );
   }, []);
 
+  const appendLiveEventToHelixTimeline = useCallback(
+    (entry: AskLiveEventEntry) => {
+      const meta = asObjectRecord(entry.meta);
+      const kind = typeof meta?.kind === "string" ? meta.kind.trim().toLowerCase() : "";
+      if (
+        kind !== "workstation_action_receipt" &&
+        kind !== "workstation_procedural_step" &&
+        kind !== "job_started" &&
+        kind !== "job_step_receipt" &&
+        kind !== "job_completed"
+      ) {
+        return;
+      }
+      const alreadyLogged = helixTimelineRef.current.some((timelineEntry) => {
+        const timelineMeta = asObjectRecord(timelineEntry.meta);
+        return timelineMeta?.live_event_id === entry.id;
+      });
+      if (alreadyLogged) return;
+      const ok = typeof meta?.ok === "boolean" ? meta.ok : null;
+      const status: HelixTimelineEntry["status"] =
+        kind === "job_started" || kind === "job_step_receipt" || kind === "workstation_procedural_step"
+          ? "running"
+          : ok === false
+            ? "failed"
+            : "done";
+      const detailParts: string[] = [kind];
+      if (typeof meta?.step === "number" && Number.isFinite(meta.step)) {
+        detailParts.push(`step:${Math.max(0, Math.floor(meta.step))}`);
+      }
+      const panelId = typeof meta?.panel_id === "string" ? meta.panel_id.trim() : "";
+      if (panelId) detailParts.push(`panel:${panelId}`);
+      const actionId = typeof meta?.action_id === "string" ? meta.action_id.trim() : "";
+      if (actionId) detailParts.push(`action:${actionId}`);
+      const traceIdFromMeta = typeof meta?.trace_id === "string" ? meta.trace_id.trim() : "";
+      const traceId =
+        traceIdFromMeta ||
+        (() => {
+          const boundary = entry.id.lastIndexOf(":");
+          if (boundary <= 0) return "";
+          const suffix = entry.id.slice(boundary + 1);
+          if (!/^\d+$/.test(suffix)) return "";
+          return entry.id.slice(0, boundary);
+        })();
+      addHelixTimelineEntry({
+        type: "action_receipt",
+        source: "manual",
+        status,
+        text: clipText(entry.text, 300),
+        detail: detailParts.join(" | "),
+        mode: "act",
+        traceId: traceId || undefined,
+        meta: {
+          ...(meta ?? {}),
+          live_event_id: entry.id,
+          live_event_tool: entry.tool ?? null,
+          live_event_ts: entry.ts ?? null,
+          live_event_ts_ms: entry.tsMs ?? null,
+        },
+      });
+      const observerCommentary = buildObserverCommentaryForRow({
+        tool: entry.tool ?? null,
+        text: entry.text,
+        detail: kind || null,
+      }, {
+        userPrompt: askActiveQuestion,
+      });
+      if (observerCommentary) {
+        addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "reasoning",
+          status,
+          text: clipText(observerCommentary, 300),
+          detail: "observer_lane_commentary",
+          mode: "act",
+          traceId: traceId || undefined,
+          meta: {
+            kind: "observer_lane_commentary",
+            observer_for_live_event_id: entry.id,
+            observer_for_live_event_kind: kind || null,
+            live_event_tool: entry.tool ?? null,
+            live_event_ts: entry.ts ?? null,
+            live_event_ts_ms: entry.tsMs ?? null,
+          },
+        });
+      }
+    },
+    [addHelixTimelineEntry, askActiveQuestion],
+  );
+
   const formatReasoningAttemptDetail = useCallback(
     (attempt: Pick<ReasoningAttempt, "mode">, fallback: string | null): string | null => {
       const parts: string[] = [];
@@ -14109,6 +14919,85 @@ export function HelixAskPill({
       const recentTurnsForTurn = conversationRecentTurnsRef.current.slice(-6);
       rememberConversationTurn(`user: ${recordedText}`);
       const sessionId = getHelixAskSessionId() ?? undefined;
+      const explicitPanelCommand = /^\s*\/open\b/i.test(transcript);
+      const parsedWorkstationCommand = !explicitPanelCommand
+        ? parseWorkstationActionCommand(transcript)
+        : null;
+      const shouldStageWorkstationIntent =
+        !explicitPanelCommand &&
+        (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(transcript));
+      if (shouldStageWorkstationIntent) {
+        const workstationLanguageTag = effectivePreferredResponseLanguage ?? inferLanguageTagFromSourceText(transcript);
+        const stagedWorkstationIntentEntry = addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "voice_auto",
+          status: "running",
+          text: clipText(buildWorkstationInterpretingReceiptText(transcript, workstationLanguageTag), 300),
+          detail: "workstation_intent_stage",
+          mode: "act",
+          traceId: input.traceId,
+          meta: {
+            kind: "workstation_intent_stage",
+            source: "voice_dispatch",
+          },
+        });
+        setAskStatus(getWorkstationInterpretingStatusText(workstationLanguageTag));
+        const workstationCommand =
+          parsedWorkstationCommand ??
+          (await classifyWorkstationActionIntent(transcript));
+        if (workstationCommand) {
+          patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+            status: "done",
+            detail: "workstation_intent_stage | action_resolved",
+          });
+          setAskStatus(getWorkstationExecutingStatusText(workstationLanguageTag));
+          runWorkstationAction(workstationCommand);
+          const transcriptRevision =
+            typeof authority?.transcriptRevision === "number" && Number.isFinite(authority.transcriptRevision)
+              ? Math.max(0, Math.floor(authority.transcriptRevision))
+              : null;
+          updateVoiceDecisionBrief({
+            baseBrief: "On it.",
+            lifecycle: "done",
+            mode: "act",
+            routeReasonCode: "dispatch:voice_workstation_fast_path",
+            traceId: input.traceId,
+            meta: {
+              dispatchHint: true,
+              classifierSource: parsedWorkstationCommand ? "fallback" : "llm",
+              classifierConfidence: parsedWorkstationCommand ? 1 : null,
+              classifierReason: parsedWorkstationCommand
+                ? "voice_workstation_command_parse"
+                : "voice_workstation_command_classify",
+              routeReasonCode: "dispatch:voice_workstation_fast_path",
+              confidence: input.confidence,
+              confidenceReason: input.confidenceReason,
+              transcript,
+              transcriptRevision,
+              briefSource: "none",
+            },
+          });
+          markVoiceCheckpoint(
+            "dispatch_completed",
+            "ok",
+            "Voice workstation command dispatched via fast-path.",
+          );
+          patchVoiceSegmentAttempt(input.segmentId, { dispatch: "completed" });
+          rememberConversationTurn("dottie: On it.");
+          if (sessionId) {
+            addMessage(sessionId, { role: "user", content: transcript });
+            addMessage(sessionId, {
+              role: "assistant",
+              content: getWorkstationExecutedReplyText(workstationLanguageTag),
+            });
+          }
+          return;
+        }
+        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+          status: "suppressed",
+          detail: "workstation_intent_stage | no_action_match",
+        });
+      }
       let conversationMode: "observe" | "act" | "verify" | "clarify" | undefined;
       let classifierConfidence: number | null = null;
       let classifierReason = "conversation_turn_fallback";
@@ -14406,7 +15295,10 @@ export function HelixAskPill({
       rememberConversationTurn(`dottie: ${briefText}`);
     },
     [
+      addHelixTimelineEntry,
+      addMessage,
       bumpVoiceTurnRevision,
+      classifyWorkstationActionIntent,
       contextId,
       createReasoningAttempt,
       enqueueReasoningAttempt,
@@ -14415,11 +15307,14 @@ export function HelixAskPill({
       getVoiceTurnAssemblerState,
       getPinnedContextCapsuleCount,
       markVoiceCheckpoint,
+      patchHelixTimelineEntry,
       patchVoiceSegmentAttempt,
       rememberConversationTurn,
       replaceVoiceConversationTimelineEntry,
       resolveSelectedContextCapsuleIds,
       runReasoningAttemptQueue,
+      runWorkstationAction,
+      setAskStatus,
       setIntentRevisionState,
       suppressSupersededVoiceAttemptsForNewTurn,
       updateReasoningAttempt,
@@ -17269,8 +18164,12 @@ export function HelixAskPill({
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
         askLiveEventsRef.current = clipped;
         const manualAttemptId = reasoningAttemptManualIdRef.current;
+        const appendedEvent = clipped[clipped.length - 1];
+        if (appendedEvent) {
+          appendLiveEventToHelixTimeline(appendedEvent);
+          appendWorkstationEventToLatestActReply(appendedEvent);
+        }
         if (manualAttemptId) {
-          const appendedEvent = clipped[clipped.length - 1];
           if (appendedEvent) {
             updateReasoningAttempt(manualAttemptId, (current) => ({
               ...current,
@@ -17291,6 +18190,8 @@ export function HelixAskPill({
     askBusy,
     askLiveSessionId,
     askLiveTraceId,
+    appendLiveEventToHelixTimeline,
+    appendWorkstationEventToLatestActReply,
     updateReasoningAttempt,
     scheduleLiveDraftFlush,
     updateReasoningTheaterEventClock,
@@ -17333,8 +18234,12 @@ export function HelixAskPill({
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
         askLiveEventsRef.current = clipped;
         const manualAttemptId = reasoningAttemptManualIdRef.current;
+        const appendedEvent = clipped[clipped.length - 1];
+        if (appendedEvent) {
+          appendLiveEventToHelixTimeline(appendedEvent);
+          appendWorkstationEventToLatestActReply(appendedEvent);
+        }
         if (manualAttemptId) {
-          const appendedEvent = clipped[clipped.length - 1];
           if (appendedEvent) {
             updateReasoningAttempt(manualAttemptId, (current) => ({
               ...current,
@@ -17349,7 +18254,7 @@ export function HelixAskPill({
     return () => {
       window.removeEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, handleExternalLiveEvent as EventListener);
     };
-  }, [contextId, updateReasoningAttempt]);
+  }, [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, contextId, updateReasoningAttempt]);
 
   const askLiveStatusText = useMemo(() => {
     const statusTrimmed = askStatus?.trim() ?? "";
@@ -17378,6 +18283,37 @@ export function HelixAskPill({
     () => collectAskLiveFallbackSignals(askLiveEvents),
     [askLiveEvents],
   );
+  const observerLaneEvents = useMemo(() => {
+    return askLiveEvents
+      .map((entry) => {
+        const meta = asObjectRecord(entry.meta ?? null);
+        const commentary = buildObserverCommentaryForRow({
+          tool: entry.tool ?? null,
+          text: entry.text,
+          detail: typeof meta?.kind === "string" ? meta.kind : null,
+        }, {
+          userPrompt: askActiveQuestion,
+        });
+        if (!commentary) return null;
+        return {
+          id: `observer:${entry.id}`,
+          text: commentary,
+          tsMs: resolveAskLiveEventTimestampMs(entry),
+          traceId: readEventMetaString(meta ?? undefined, ["traceId", "trace_id"]),
+        };
+      })
+      .filter(
+        (
+          event,
+        ): event is {
+          id: string;
+          text: string;
+          tsMs: number | null;
+          traceId: string | null;
+        } => event !== null,
+      )
+      .slice(-12);
+  }, [askActiveQuestion, askLiveEvents]);
 
   const buildConvergenceSnapshot = useCallback(
     (args: {
@@ -17522,6 +18458,7 @@ export function HelixAskPill({
         let responsePromptIngested: boolean | undefined;
         let responseEnvelope: HelixAskResponseEnvelope | undefined;
         let responseViewerLaunch: AtomicViewerLaunch | undefined;
+        let responseActionEnvelope: HelixActionEnvelope | undefined;
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
         let responseContextCapsule: ContextCapsuleSummary | undefined;
@@ -17537,6 +18474,7 @@ export function HelixAskPill({
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
+          responseActionEnvelope = localResponse.action_envelope;
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
@@ -17558,16 +18496,29 @@ export function HelixAskPill({
           }
           const actionBlock = extractHelixWorkstationActionBlocks(responseText);
           if (actionBlock.actions.length > 0) {
-            applyWorkstationActionsFromPayload(actionBlock.actions);
+            if (!responseActionEnvelope) {
+              applyWorkstationActionsFromPayload(actionBlock.actions);
+            }
             if (actionBlock.cleanedText) {
               responseText = actionBlock.cleanedText;
             }
           }
-          applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
+          const actionEnvelopeHandled = applyGovernedActionEnvelope(responseActionEnvelope, {
+            question: questionText,
+            mode: responseMode,
+          });
+          if (!actionEnvelopeHandled) {
+            applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
+          }
           if (responseContextCapsule) {
             upsertContextCapsuleSessionLedger(responseContextCapsule);
           }
-          launchAtomicViewer(responseViewerLaunch);
+          if (!actionEnvelopeHandled) {
+            launchAtomicViewer(responseViewerLaunch, {
+              question: questionText,
+              mode: responseMode,
+            });
+          }
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
@@ -17619,6 +18570,7 @@ export function HelixAskPill({
     },
     [
       addMessage,
+      applyGovernedActionEnvelope,
       applyWorkstationActionsFromPayload,
       buildConvergenceSnapshot,
       cancelMoodHint,
@@ -17644,9 +18596,100 @@ export function HelixAskPill({
   }, [askBusy, resumePendingAsk]);
 
   const runAsk = useCallback(
-    async (question: string, capsuleIds?: string[]) => {
+    async (
+      question: string,
+      capsuleIds?: string[],
+      options?: {
+        bypassWorkstationDispatch?: boolean;
+        forceReasoningDispatch?: boolean;
+        suppressWorkstationPayloadActions?: boolean;
+        answerContract?: HelixAskAnswerContract;
+      },
+    ) => {
       const trimmed = question.trim();
       if (!trimmed) return;
+      const explicitPanelCommand = /^\s*\/open\b/i.test(trimmed);
+      const bypassWorkstationDispatch = options?.bypassWorkstationDispatch === true;
+      const suppressWorkstationPayloadActions = options?.suppressWorkstationPayloadActions === true;
+      const parsedWorkstationCommand = !explicitPanelCommand && !bypassWorkstationDispatch
+        ? parseWorkstationActionCommand(trimmed)
+        : null;
+      const typedPromptLanguageTag = normalizeVoiceLanguageTag(preferredResponseLanguage) ?? inferLanguageTagFromSourceText(trimmed);
+      const shouldStageWorkstationIntent =
+        !bypassWorkstationDispatch &&
+        !explicitPanelCommand &&
+        (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(trimmed));
+      if (shouldStageWorkstationIntent) {
+        const stagedWorkstationIntentEntry = addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "manual",
+          status: "running",
+          text: clipText(buildWorkstationInterpretingReceiptText(trimmed, typedPromptLanguageTag), 300),
+          detail: "workstation_intent_stage",
+          mode: "act",
+          meta: {
+            kind: "workstation_intent_stage",
+            source: "run_ask",
+          },
+        });
+        setAskStatus(getWorkstationInterpretingStatusText(typedPromptLanguageTag));
+        const workstationCommand =
+          parsedWorkstationCommand ??
+          (await classifyWorkstationActionIntent(trimmed));
+        if (workstationCommand) {
+          patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+            status: "done",
+            detail: "workstation_intent_stage | action_resolved",
+          });
+          clearMoodTimer();
+          cancelMoodHint();
+          updateMoodFromText(trimmed);
+          requestMoodHint(trimmed, { force: true });
+          const sessionId = getHelixAskSessionId();
+          if (sessionId) {
+            setActive(sessionId);
+            addMessage(sessionId, { role: "user", content: trimmed });
+          }
+          setAskStatus(getWorkstationExecutingStatusText(typedPromptLanguageTag));
+          runWorkstationAction(workstationCommand);
+          const fastPathTs = new Date().toISOString();
+          const fastPathEvent: AskLiveEventEntry = {
+            id: `fastpath:${crypto.randomUUID()}`,
+            text: `ok: workstation fast-path dispatched (${workstationCommand.action})`,
+            tool: "helix.ask.fast_path",
+            ts: fastPathTs,
+            tsMs: Date.now(),
+            meta: {
+              kind: "workstation_action_receipt",
+              ok: true,
+              action: workstationCommand,
+              source: "run_ask",
+            },
+          };
+          const replyId = crypto.randomUUID();
+          const responseText = getWorkstationExecutedReplyText(typedPromptLanguageTag);
+          setAskReplies((prev) =>
+            [
+              {
+                id: replyId,
+                content: responseText,
+                question: trimmed,
+                mode: "act",
+                liveEvents: [fastPathEvent],
+              },
+              ...prev,
+            ].slice(0, 3),
+          );
+          if (sessionId) {
+            addMessage(sessionId, { role: "assistant", content: responseText });
+          }
+          return;
+        }
+        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+          status: "suppressed",
+          detail: "workstation_intent_stage | no_action_match",
+        });
+      }
       const selectedCapsuleIds =
         Array.isArray(capsuleIds) && capsuleIds.length > 0
           ? capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
@@ -17654,7 +18697,9 @@ export function HelixAskPill({
       const pinnedCapsuleCount = getPinnedContextCapsuleCount();
       const inferredMode = inferAskMode(trimmed);
       const manualDispatchHint =
-        shouldDispatchReasoningAttempt(trimmed) || isStrongQuestionDispatchCandidate(trimmed);
+        options?.forceReasoningDispatch === true ||
+        shouldDispatchReasoningAttempt(trimmed) ||
+        isStrongQuestionDispatchCandidate(trimmed);
       const manualRouteReasonCode = manualDispatchHint
         ? "dispatch:heuristic"
         : "suppressed:heuristic_low_salience";
@@ -17741,6 +18786,7 @@ export function HelixAskPill({
         let responsePromptIngested: boolean | undefined;
         let responseEnvelope: HelixAskResponseEnvelope | undefined;
         let responseViewerLaunch: AtomicViewerLaunch | undefined;
+        let responseActionEnvelope: HelixActionEnvelope | undefined;
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
         let responseContextCapsule: ContextCapsuleSummary | undefined;
@@ -17762,6 +18808,7 @@ export function HelixAskPill({
             signal: controller.signal,
             mode: askModeForRequest,
             capsuleIds: selectedCapsuleIds,
+            answerContract: options?.answerContract,
           });
           const localResponse = askResult.response;
           responseEnvelope = localResponse.envelope;
@@ -17795,6 +18842,7 @@ export function HelixAskPill({
           );
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
+          responseActionEnvelope = localResponse.action_envelope;
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
@@ -17863,16 +18911,40 @@ export function HelixAskPill({
           }
           const actionBlock = extractHelixWorkstationActionBlocks(responseText);
           if (actionBlock.actions.length > 0) {
-            applyWorkstationActionsFromPayload(actionBlock.actions);
+            if (!suppressWorkstationPayloadActions && !responseActionEnvelope) {
+              applyWorkstationActionsFromPayload(actionBlock.actions);
+            } else {
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: "manual",
+                status: "suppressed",
+                text: "Suppressed reentrant workstation action payload during turn transition.",
+                detail: "turnTransition: suppressed_reentrant_workstation_payload",
+                mode: inferredMode,
+                traceId,
+                attemptId: manualAttempt?.id,
+              });
+            }
             if (actionBlock.cleanedText) {
               responseText = actionBlock.cleanedText;
             }
           }
-          applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
+          const actionEnvelopeHandled = applyGovernedActionEnvelope(responseActionEnvelope, {
+            question: trimmed,
+            mode: responseMode,
+          });
+          if (!suppressWorkstationPayloadActions && !actionEnvelopeHandled) {
+            applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
+          }
           if (responseContextCapsule) {
             upsertContextCapsuleSessionLedger(responseContextCapsule);
           }
-          launchAtomicViewer(responseViewerLaunch);
+          if (!actionEnvelopeHandled) {
+            launchAtomicViewer(responseViewerLaunch, {
+              question: trimmed,
+              mode: responseMode,
+            });
+          }
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const responseDebugPayload = responseDebugWithClientMode ?? responseDebug;
@@ -18008,6 +19080,7 @@ export function HelixAskPill({
     [
       addHelixTimelineEntry,
       addMessage,
+      applyGovernedActionEnvelope,
       applyWorkstationActionsFromPayload,
       askBusy,
       conversationGovernor.completion_score.score,
@@ -18017,6 +19090,7 @@ export function HelixAskPill({
       cancelMoodHint,
       clearLiveDraftFlush,
       clearMoodTimer,
+      classifyWorkstationActionIntent,
       ensureReasoningTimelineEntry,
       formatReasoningAttemptDetail,
       getHelixAskSessionId,
@@ -18027,6 +19101,7 @@ export function HelixAskPill({
       resolveSelectedContextCapsuleIds,
       requestMoodHint,
       resizeTextarea,
+      runWorkstationAction,
       setActive,
       upsertContextCapsuleSessionLedger,
       updateReasoningAttempt,
@@ -18037,9 +19112,30 @@ export function HelixAskPill({
   );
 
   const executePendingExternalAskPrompt = useCallback(
-    (pending: PendingHelixAskPrompt | null) => {
+    async (pending: PendingHelixAskPrompt | null) => {
       const question = pending?.question?.trim() ?? "";
       if (!question) return;
+      const claimId = resolveExternalPromptClaimId(pending, question);
+      if (!claimExternalPromptSingleFlight(claimId)) {
+        addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "manual",
+          status: "suppressed",
+          text: clipText(`Interpreting workstation request: ${question}`, 300),
+          detail: "workstation_intent_stage | turnTransition_duplicate_prompt",
+          mode: "act",
+          meta: {
+            kind: "workstation_intent_stage",
+            source: "external_prompt",
+            turnTransition: true,
+          },
+        });
+        return;
+      }
+      const bypassWorkstationDispatch = pending?.bypassWorkstationDispatch === true;
+      const forceReasoningDispatch = pending?.forceReasoningDispatch === true;
+      const suppressWorkstationPayloadActions = pending?.suppressWorkstationPayloadActions === true;
+      const answerContract = pending?.answerContract;
       clearPendingHelixAskPrompt();
       if (askBusy) {
         pendingExternalAskPromptRef.current = pending;
@@ -18054,9 +19150,114 @@ export function HelixAskPill({
         }
         return;
       }
-      void runAsk(question);
+      const explicitPanelCommand = /^\s*\/open\b/i.test(question);
+      const parsedWorkstationCommand = !explicitPanelCommand && !bypassWorkstationDispatch
+        ? parseWorkstationActionCommand(question)
+        : null;
+      const externalPromptLanguageTag =
+        normalizeVoiceLanguageTag(preferredResponseLanguage) ?? inferLanguageTagFromSourceText(question);
+      const shouldStageWorkstationIntent =
+        !bypassWorkstationDispatch &&
+        !explicitPanelCommand &&
+        (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(question));
+      const stagedWorkstationIntentEntry = shouldStageWorkstationIntent
+        ? addHelixTimelineEntry({
+            type: "action_receipt",
+            source: "manual",
+            status: "running",
+            text: clipText(buildWorkstationInterpretingReceiptText(question, externalPromptLanguageTag), 300),
+            detail: "workstation_intent_stage",
+            mode: "act",
+            meta: {
+              kind: "workstation_intent_stage",
+              source: "external_prompt",
+            },
+          })
+        : null;
+      if (stagedWorkstationIntentEntry) {
+        setAskStatus(getWorkstationInterpretingStatusText(externalPromptLanguageTag));
+      }
+      const workstationCommand =
+        parsedWorkstationCommand ??
+        (!explicitPanelCommand && !bypassWorkstationDispatch
+          ? await classifyWorkstationActionIntent(question)
+          : null);
+      if (stagedWorkstationIntentEntry) {
+        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+          status: workstationCommand ? "done" : "suppressed",
+          detail: workstationCommand
+            ? "workstation_intent_stage | action_resolved"
+            : "workstation_intent_stage | no_action_match",
+        });
+      }
+      if (workstationCommand) {
+        clearMoodTimer();
+        cancelMoodHint();
+        updateMoodFromText(question);
+        requestMoodHint(question, { force: true });
+        const sessionId = getHelixAskSessionId();
+        if (sessionId) {
+          setActive(sessionId);
+          addMessage(sessionId, { role: "user", content: question });
+        }
+        setAskStatus(getWorkstationExecutingStatusText(externalPromptLanguageTag));
+        runWorkstationAction(workstationCommand);
+        const fastPathTs = new Date().toISOString();
+        const fastPathEvent: AskLiveEventEntry = {
+          id: `fastpath:${crypto.randomUUID()}`,
+          text: `ok: workstation fast-path dispatched (${workstationCommand.action})`,
+          tool: "helix.ask.fast_path",
+          ts: fastPathTs,
+          tsMs: Date.now(),
+          meta: {
+            kind: "workstation_action_receipt",
+            ok: true,
+            action: workstationCommand,
+            source: "external_prompt",
+          },
+        };
+        const replyId = crypto.randomUUID();
+        const responseText = getWorkstationExecutedReplyText(externalPromptLanguageTag);
+        setAskReplies((prev) =>
+          [
+            {
+              id: replyId,
+              content: responseText,
+              question,
+              mode: "act",
+              liveEvents: [fastPathEvent],
+            },
+            ...prev,
+          ].slice(0, 3),
+        );
+        if (sessionId) {
+          addMessage(sessionId, { role: "assistant", content: responseText });
+        }
+        return;
+      }
+      void runAsk(question, undefined, {
+        bypassWorkstationDispatch,
+        forceReasoningDispatch,
+        suppressWorkstationPayloadActions,
+        answerContract,
+      });
     },
-    [askBusy, resizeTextarea, runAsk],
+    [
+      addHelixTimelineEntry,
+      addMessage,
+      askBusy,
+      cancelMoodHint,
+      classifyWorkstationActionIntent,
+      clearMoodTimer,
+      getHelixAskSessionId,
+      patchHelixTimelineEntry,
+      requestMoodHint,
+      resizeTextarea,
+      runAsk,
+      runWorkstationAction,
+      setActive,
+      updateMoodFromText,
+    ],
   );
 
   useEffect(() => {
@@ -18064,19 +19265,19 @@ export function HelixAskPill({
     if (!pendingExternalAskPromptRef.current) return;
     const nextPrompt = pendingExternalAskPromptRef.current;
     pendingExternalAskPromptRef.current = null;
-    executePendingExternalAskPrompt(nextPrompt);
+    void executePendingExternalAskPrompt(nextPrompt);
   }, [askBusy, executePendingExternalAskPrompt]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const pending = consumePendingHelixAskPrompt();
     if (pending) {
-      executePendingExternalAskPrompt(pending);
+      void executePendingExternalAskPrompt(pending);
     }
     const handlePromptEvent = (event: Event) => {
       const detail = (event as CustomEvent<PendingHelixAskPrompt>)?.detail;
       if (!detail?.question?.trim()) return;
-      executePendingExternalAskPrompt(detail);
+      void executePendingExternalAskPrompt(detail);
     };
     window.addEventListener(HELIX_ASK_PROMPT_EVENT, handlePromptEvent as EventListener);
     return () => {
@@ -18269,8 +19470,96 @@ export function HelixAskPill({
         const stripped = stripContextCapsuleTokensFromText(entry);
         return stripped || entry.trim();
       });
-      const panelCommand =
-        normalizedEntries.length === 1 ? parseOpenPanelCommand(normalizedEntries[0]) : null;
+      const singleEntry = normalizedEntries.length === 1 ? normalizedEntries[0] : null;
+      const explicitPanelCommand = singleEntry && /^\s*\/open\b/i.test(singleEntry);
+      const parsedWorkstationCommand =
+        singleEntry && !explicitPanelCommand ? parseWorkstationActionCommand(singleEntry) : null;
+      const singleEntryLanguageTag =
+        normalizeVoiceLanguageTag(preferredResponseLanguage) ??
+        inferLanguageTagFromSourceText(singleEntry ?? "");
+      const shouldStageWorkstationIntent =
+        Boolean(singleEntry) &&
+        !explicitPanelCommand &&
+        (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(singleEntry));
+      const stagedWorkstationIntentEntry = shouldStageWorkstationIntent
+        ? addHelixTimelineEntry({
+            type: "action_receipt",
+            source: "manual",
+            status: "running",
+            text: clipText(buildWorkstationInterpretingReceiptText(singleEntry, singleEntryLanguageTag), 300),
+            detail: "workstation_intent_stage",
+            mode: "act",
+            meta: {
+              kind: "workstation_intent_stage",
+            },
+          })
+        : null;
+      if (stagedWorkstationIntentEntry) {
+        setAskStatus(getWorkstationInterpretingStatusText(singleEntryLanguageTag));
+      }
+      const workstationCommand =
+        parsedWorkstationCommand ??
+        (singleEntry && !explicitPanelCommand ? await classifyWorkstationActionIntent(singleEntry) : null);
+      if (stagedWorkstationIntentEntry) {
+        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+          status: workstationCommand ? "done" : "suppressed",
+          detail: workstationCommand
+            ? "workstation_intent_stage | action_resolved"
+            : "workstation_intent_stage | no_action_match",
+        });
+      }
+      if (workstationCommand) {
+        if (askInputRef.current) {
+          askInputRef.current.value = "";
+          resizeTextarea();
+        }
+        askDraftRef.current = "";
+        setContextCapsuleDetectedId(null);
+        clearMoodTimer();
+        cancelMoodHint();
+        updateMoodFromText(normalizedEntries[0] ?? entries[0] ?? "");
+        requestMoodHint(normalizedEntries[0] ?? entries[0] ?? "", { force: true });
+        const sessionId = getHelixAskSessionId();
+        if (sessionId) {
+          setActive(sessionId);
+          addMessage(sessionId, { role: "user", content: normalizedEntries[0] ?? entries[0] });
+        }
+        setAskStatus(getWorkstationExecutingStatusText(singleEntryLanguageTag));
+        runWorkstationAction(workstationCommand);
+        const fastPathTs = new Date().toISOString();
+        const fastPathEvent: AskLiveEventEntry = {
+          id: `fastpath:${crypto.randomUUID()}`,
+          text: `ok: workstation fast-path dispatched (${workstationCommand.action})`,
+          tool: "helix.ask.fast_path",
+          ts: fastPathTs,
+          tsMs: Date.now(),
+          meta: {
+            kind: "workstation_action_receipt",
+            ok: true,
+            action: workstationCommand,
+            source: "submit",
+          },
+        };
+        const replyId = crypto.randomUUID();
+        const responseText = getWorkstationExecutedReplyText(singleEntryLanguageTag);
+        setAskReplies((prev) =>
+          [
+            {
+              id: replyId,
+              content: responseText,
+              question: normalizedEntries[0] ?? entries[0],
+              mode: "act",
+              liveEvents: [fastPathEvent],
+            },
+            ...prev,
+          ].slice(0, 3),
+        );
+        if (sessionId) {
+          addMessage(sessionId, { role: "assistant", content: responseText });
+        }
+        return;
+      }
+      const panelCommand = singleEntry ? parseOpenPanelCommand(singleEntry) : null;
       if (panelCommand) {
         const panelDef = getPanelDef(panelCommand);
         if (askInputRef.current) {
@@ -18306,38 +19595,6 @@ export function HelixAskPill({
           if (sessionId) {
             addMessage(sessionId, { role: "assistant", content: "Error: Panel not found." });
           }
-        }
-        return;
-      }
-      const workstationCommand =
-        normalizedEntries.length === 1 ? parseWorkstationActionCommand(normalizedEntries[0]) : null;
-      if (workstationCommand) {
-        if (askInputRef.current) {
-          askInputRef.current.value = "";
-          resizeTextarea();
-        }
-        askDraftRef.current = "";
-        setContextCapsuleDetectedId(null);
-        clearMoodTimer();
-        cancelMoodHint();
-        updateMoodFromText(normalizedEntries[0] ?? entries[0] ?? "");
-        requestMoodHint(normalizedEntries[0] ?? entries[0] ?? "", { force: true });
-        const sessionId = getHelixAskSessionId();
-        if (sessionId) {
-          setActive(sessionId);
-          addMessage(sessionId, { role: "user", content: normalizedEntries[0] ?? entries[0] });
-        }
-        runWorkstationAction(workstationCommand);
-        const replyId = crypto.randomUUID();
-        const responseText = "Executed workstation action.";
-        setAskReplies((prev) =>
-          [
-            { id: replyId, content: responseText, question: normalizedEntries[0] ?? entries[0] },
-            ...prev,
-          ].slice(0, 3),
-        );
-        if (sessionId) {
-          addMessage(sessionId, { role: "assistant", content: responseText });
         }
         return;
       }
@@ -18380,6 +19637,9 @@ export function HelixAskPill({
       setActive,
       updateMoodFromText,
       runAsk,
+      classifyWorkstationActionIntent,
+      addHelixTimelineEntry,
+      patchHelixTimelineEntry,
       userSettings.showHelixAskDebug,
     ],
   );
@@ -18397,6 +19657,9 @@ export function HelixAskPill({
     voiceInputState,
     voiceInputError,
   );
+  const voiceDiagnosticsSnapshot = getVoiceCaptureDiagnosticsSnapshot();
+  const docViewerDebugSnapshot = readDocViewerDebugSnapshot();
+  const workstationLayoutDebugSnapshot = readWorkstationLayoutDebugSnapshot();
   const showTopInputLevelMonitor = micArmState === "on";
   const formMaxWidthStyle =
     maxWidthClassName !== undefined
@@ -19556,6 +20819,33 @@ export function HelixAskPill({
                     {askLiveFallbackSignals.join(" | ")}
                   </p>
                 ) : null}
+                {userSettings.showHelixAskObserverLane ? (
+                  <div className="mt-2 rounded border border-cyan-400/25 bg-cyan-950/20 p-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Observer lane</p>
+                    {observerLaneEvents.length > 0 ? (
+                      <div className="mt-1 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] leading-5 text-cyan-50">
+                        {observerLaneEvents.map((event) => (
+                          <div key={event.id} className="rounded border border-cyan-400/20 bg-black/25 px-1.5 py-1">
+                            <p className="whitespace-pre-wrap break-words">{event.text}</p>
+                            <p className="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-cyan-200/80">
+                              {event.tsMs !== null
+                                ? new Date(event.tsMs).toLocaleTimeString([], {
+                                    hour12: false,
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                  })
+                                : "--:--:--"}
+                              {event.traceId ? ` | ${clipText(event.traceId, 64)}` : ""}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-cyan-100/75">Waiting for action interpretation events...</p>
+                    )}
+                  </div>
+                ) : null}
                 {askLiveEvents.length > 0 ? (
                   <div className="mt-2 max-h-44 overflow-y-auto rounded border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
                     {askLiveEvents.map((entry) => {
@@ -19642,6 +20932,9 @@ export function HelixAskPill({
               reply,
               events: replyEventsChronological,
               debugContext: replyDebugContextSummary,
+              voiceDiagnostics: voiceDiagnosticsSnapshot,
+              docViewerState: docViewerDebugSnapshot,
+              workstationLayoutState: workstationLayoutDebugSnapshot,
             });
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const expanded = Boolean(askExpandedByReply[reply.id]);
@@ -19787,7 +21080,6 @@ export function HelixAskPill({
                 </div>
               ) : null}
               {userSettings.showHelixAskDebug &&
-              userSettings.showHelixAskReasoningEventLog &&
               (replyEventLogPreview.length > 0 || objectiveReasoningTrace.length > 0) ? (
                 <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
                   <div className="flex items-center justify-between gap-2">
@@ -19964,25 +21256,27 @@ export function HelixAskPill({
                   >
                     Copy
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyReplyMasterDebug(reply.id, replyMasterEventClockPayload)}
-                    disabled={
-                      !replyMasterEventClockPayload ||
-                      typeof navigator === "undefined" ||
-                      !navigator.clipboard?.writeText
-                    }
-                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                      replyMasterEventClockPayload &&
-                      typeof navigator !== "undefined" &&
-                      navigator.clipboard?.writeText
-                        ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
-                        : "border-slate-600 text-slate-500"
-                    }`}
-                    aria-label="Debug copy"
-                  >
-                    {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Debug Copy"}
-                  </button>
+                  {userSettings.showHelixAskDebug ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyReplyMasterDebug(reply.id, replyMasterEventClockPayload)}
+                      disabled={
+                        !replyMasterEventClockPayload ||
+                        typeof navigator === "undefined" ||
+                        !navigator.clipboard?.writeText
+                      }
+                      className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
+                        replyMasterEventClockPayload &&
+                        typeof navigator !== "undefined" &&
+                        navigator.clipboard?.writeText
+                          ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+                          : "border-slate-600 text-slate-500"
+                      }`}
+                      aria-label="Debug copy"
+                    >
+                      {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Unified Debug Copy"}
+                    </button>
+                  ) : null}
                   {reply.contextCapsule ? (
                     <button
                       type="button"

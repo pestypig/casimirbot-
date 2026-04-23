@@ -1463,6 +1463,9 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
     note: string | null;
   };
   runtimeApplication: Nhm2ObserverDecPhysicsRuntimeApplicationEvidence;
+  runtimeAttempted: boolean;
+  runtimeDecision: Nhm2ObserverDecPhysicsRuntimeApplicationStatus;
+  runtimeDecisionReasonCodes: Nhm2ObserverDecPhysicsSelectionReasonCode[];
   decRuntimeDecisionEvidence?: Nhm2ObserverDecRuntimeDecisionEvidence;
   refinementEvidence?: Nhm2ObserverDecRefinementEvidence;
   extensionTrancheId?: Nhm2ObserverDecExtensionTrancheId;
@@ -1485,6 +1488,7 @@ export type Nhm2ObserverDecPhysicsControlEvidence = {
   fluxShearExtensionEvidence?: Nhm2ObserverDecFluxShearExtensionEvidence;
   recommendation: Nhm2ObserverDecRecommendedPatchClass;
   uncertaintyTags: Nhm2ObserverDecPhysicsUncertaintyTag[];
+  researchCitations: string[];
   citationRefs: string[];
   derivationNotes: string[];
   uncertaintyNotes: string[];
@@ -2313,6 +2317,11 @@ export type BuildNhm2ObserverAuditArtifactInput = {
       note?: string | null;
       citationRefs?: string[] | null;
     } | null;
+    runtimeAttempted?: boolean | null;
+    runtimeDecision?: Nhm2ObserverDecPhysicsRuntimeApplicationStatus | null;
+    runtimeDecisionReasonCodes?:
+      | Nhm2ObserverDecPhysicsSelectionReasonCode[]
+      | null;
     decRuntimeDecisionEvidence?: {
       status?: Nhm2ObserverDecPhysicsRuntimeApplicationStatus | null;
       attempted?: boolean | null;
@@ -2554,6 +2563,7 @@ export type BuildNhm2ObserverAuditArtifactInput = {
     } | null;
     recommendation?: Nhm2ObserverDecRecommendedPatchClass | null;
     uncertaintyTags?: Nhm2ObserverDecPhysicsUncertaintyTag[] | null;
+    researchCitations?: string[] | null;
     citationRefs?: string[] | null;
     derivationNotes?: string[] | null;
     uncertaintyNotes?: string[] | null;
@@ -3678,6 +3688,29 @@ const normalizeObserverDecPhysicsControlEvidence = (
   const decRuntimeDecisionReasonCodes = normalizeDecPhysicsSelectionReasonCodes(
     decRuntimeDecisionInput.reasonCodes,
   );
+  const runtimeRollbackReasonCodes = normalizeDecPhysicsSelectionReasonCodes(
+    runtimeApplicationInput.rollbackReasonCodes,
+  );
+  const runtimeAttempted =
+    toNullableBoolean(value.runtimeAttempted) ??
+    toNullableBoolean(runtimeApplicationInput.attempted) ??
+    runtimeApplicationStatus !== "not_attempted";
+  const runtimeDecision = normalizeDecPhysicsRuntimeApplicationStatus(
+    value.runtimeDecision ??
+      decRuntimeDecisionInput.status ??
+      runtimeApplicationInput.status,
+  );
+  const runtimeDecisionReasonCodes = (() => {
+    const explicitCodes = normalizeDecPhysicsSelectionReasonCodes(
+      value.runtimeDecisionReasonCodes,
+    );
+    if (explicitCodes.length > 0) return explicitCodes;
+    if (decRuntimeDecisionReasonCodes.length > 0) return decRuntimeDecisionReasonCodes;
+    if (runtimeRollbackReasonCodes.length > 0) return runtimeRollbackReasonCodes;
+    return runtimeDecision === "applied"
+      ? (["selection_gate_pass"] as const)
+      : (["candidate_not_evaluated"] as const);
+  })();
   const decRuntimeDecisionAttributionInput = (decRuntimeDecisionInput.decAttribution ??
     {}) as Record<string, unknown>;
   const decRuntimeDecisionAttributionEvidence =
@@ -4024,6 +4057,11 @@ const normalizeObserverDecPhysicsControlEvidence = (
       {}) as Record<string, unknown>;
   const citationRefs = Array.isArray(value.citationRefs)
     ? value.citationRefs
+        .map((entry) => asText(entry))
+        .filter((entry): entry is string => entry != null)
+    : [];
+  const researchCitationsInput = Array.isArray(value.researchCitations)
+    ? value.researchCitations
         .map((entry) => asText(entry))
         .filter((entry): entry is string => entry != null)
     : [];
@@ -4753,9 +4791,7 @@ const normalizeObserverDecPhysicsControlEvidence = (
         pass: toNullableBoolean(runtimeComparabilityGateInput.pass) ?? false,
         note: asText(runtimeComparabilityGateInput.note),
       },
-      rollbackReasonCodes: normalizeDecPhysicsSelectionReasonCodes(
-        runtimeApplicationInput.rollbackReasonCodes,
-      ),
+      rollbackReasonCodes: runtimeRollbackReasonCodes,
       guardChecks: {
         metricWecNonRegression:
           toNullableBoolean(runtimeGuardChecksInput.metricWecNonRegression) ??
@@ -4853,6 +4889,9 @@ const normalizeObserverDecPhysicsControlEvidence = (
           )
         : [],
     },
+    runtimeAttempted,
+    runtimeDecision,
+    runtimeDecisionReasonCodes,
     decRuntimeDecisionEvidence,
     refinementEvidence,
     extensionTrancheId: extensionTrancheId ?? undefined,
@@ -4995,6 +5034,16 @@ const normalizeObserverDecPhysicsControlEvidence = (
     fluxShearExtensionEvidence,
     recommendation: normalizeDecRecommendedPatchClass(value.recommendation),
     uncertaintyTags,
+    researchCitations: unique([
+      ...researchCitationsInput,
+      ...citationRefs,
+      ...(Array.isArray(runtimeApplicationInput.citationRefs)
+        ? runtimeApplicationInput.citationRefs
+            .map((entry) => asText(entry))
+            .filter((entry): entry is string => entry != null)
+        : []),
+      ...decRuntimeDecisionCitationRefs,
+    ]),
     citationRefs: unique(citationRefs),
     derivationNotes,
     uncertaintyNotes,
@@ -7471,6 +7520,12 @@ const isObserverDecPhysicsControlEvidence = (
     runtimeApplication.rollbackReasonCodes.every((reason) =>
       isDecPhysicsSelectionReasonCode(reason),
     ) &&
+    typeof record.runtimeAttempted === "boolean" &&
+    isDecPhysicsRuntimeApplicationStatus(record.runtimeDecision) &&
+    Array.isArray(record.runtimeDecisionReasonCodes) &&
+    record.runtimeDecisionReasonCodes.every((reason) =>
+      isDecPhysicsSelectionReasonCode(reason),
+    ) &&
     runtimeGuardChecks != null &&
     (runtimeGuardChecks.metricWecNonRegression === null ||
       typeof runtimeGuardChecks.metricWecNonRegression === "boolean") &&
@@ -7933,6 +7988,8 @@ const isObserverDecPhysicsControlEvidence = (
     isDecRecommendedPatchClass(record.recommendation) &&
     Array.isArray(uncertaintyTags) &&
     uncertaintyTags.every((entry) => isDecPhysicsUncertaintyTag(entry)) &&
+    Array.isArray(record.researchCitations) &&
+    record.researchCitations.every((entry) => typeof entry === "string") &&
     Array.isArray(record.citationRefs) &&
     record.citationRefs.every((entry) => typeof entry === "string") &&
     Array.isArray(record.derivationNotes) &&

@@ -49,7 +49,7 @@ export const runHelixAskObjectiveRetrieveProposal = async (args: {
     dialogueProfile: string | null | undefined,
     baseQuestion: string,
   ) => string;
-  recordPromptRewriteStage: (
+  recordPromptRewriteStage?: (
     stage: "retrieve_proposal",
     rewrite: HelixAskObjectivePromptRewriteResult,
     budget?: number,
@@ -90,11 +90,13 @@ export const runHelixAskObjectiveRetrieveProposal = async (args: {
       mode: args.promptRewriteMode,
       responseLanguage: args.responseLanguage,
     });
-    args.recordPromptRewriteStage(
-      "retrieve_proposal",
-      proposalPromptRewrite,
-      args.proposalBudget,
-    );
+    if (typeof args.recordPromptRewriteStage === "function") {
+      args.recordPromptRewriteStage(
+        "retrieve_proposal",
+        proposalPromptRewrite,
+        args.proposalBudget,
+      );
+    }
     const proposalPrompt = proposalPromptRewrite.effectivePrompt;
     promptPreview = args.clipText(proposalPrompt, 1200);
     promptForTranscript = proposalPrompt;

@@ -24,6 +24,7 @@ import { useResonanceStore } from "@/store/useResonanceStore";
 import type { LumaMood } from "@/lib/luma-moods";
 import type { CollapseDecision, CollapseStrategyName } from "./orchestrator";
 import type { LocalCallSpec } from "@shared/local-call-spec";
+import type { HelixWorkstationAction } from "@/lib/workstation/workstationActionContract";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 
@@ -101,6 +102,38 @@ export type AtomicViewerLaunch = {
   tree_id: string;
   source_path?: string;
   params: AtomicViewerLaunchParams;
+};
+
+export type HelixActionEnvelope = {
+  schema: "helix.ask.action_envelope.v1";
+  mode: "read" | "observe" | "act" | "verify";
+  governance?: {
+    dispatch?: "allow" | "suppress";
+    reason_code?: string;
+    approval_state?: "not_required" | "required";
+    sandbox_profile?: "workstation_ui_only";
+  };
+  source?: "viewer_launch" | "actionability_plan" | "mixed";
+  subgoal?: string;
+  confidence?: number;
+  workstation_actions?: Array<HelixWorkstationAction | Record<string, unknown>>;
+  viewer_launch?: AtomicViewerLaunch;
+};
+
+export type HelixAskAnswerContractSection = {
+  id: string;
+  heading: string;
+  required?: boolean;
+  synonyms?: string[];
+};
+
+export type HelixAskAnswerContract = {
+  schema: "helix.ask.answer_contract.v1";
+  source: "docs_viewer";
+  mode: "summarize_doc" | "summarize_section" | "explain_paper";
+  strict_sections?: boolean;
+  sections?: HelixAskAnswerContractSection[];
+  min_tokens?: number;
 };
 
 export type LocalAskProof = {
@@ -203,6 +236,7 @@ export type LocalAskResponse = {
   proof?: LocalAskProof;
   envelope?: HelixAskResponseEnvelope;
   viewer_launch?: AtomicViewerLaunch;
+  action_envelope?: HelixActionEnvelope;
   model?: string;
   essence_id?: string;
   seed?: number;
@@ -1817,6 +1851,7 @@ export async function askLocal(
     mode?: "read" | "observe" | "act" | "verify";
     allowTools?: string[];
     requiredEvidence?: string[];
+    answerContract?: HelixAskAnswerContract;
     verify?: { mode?: "constraint-pack" | "agent-loop"; packId?: string };
     place?: HaloBankPlace;
     timestamp?: string | number;
@@ -1900,6 +1935,7 @@ export async function askLocal(
   if (options?.mode) body.mode = options.mode;
   if (options?.allowTools?.length) body.allowTools = options.allowTools;
   if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
+  if (options?.answerContract) body.answer_contract = options.answerContract;
   if (options?.verify) body.verify = options.verify;
   if (options?.place) body.place = options.place;
   if (options?.timestamp !== undefined) body.timestamp = options.timestamp;

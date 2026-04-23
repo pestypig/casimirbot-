@@ -9,10 +9,8 @@ export type StartSettings = {
   enableSplashCursor: boolean;
   voiceNoisyEnvironmentMode: boolean;
   showHelixAskDebug: boolean;
-  showHelixAskReasoningEventLog: boolean;
-  showHelixAskMasterEventClock: boolean;
+  showHelixAskObserverLane: boolean;
   showHelixVoiceCaptureDiagnostics: boolean;
-  showHelixVoiceEventTimelineDebug: boolean;
   showPowerShellDebug: boolean;
   showAlcubierreRenderDebugLog: boolean;
   powerShellScratch: string;
@@ -22,17 +20,15 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 7,
+  settingsVersion: 9,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
   enableSplashCursor: false,
   voiceNoisyEnvironmentMode: false,
   showHelixAskDebug: true,
-  showHelixAskReasoningEventLog: false,
-  showHelixAskMasterEventClock: false,
+  showHelixAskObserverLane: true,
   showHelixVoiceCaptureDiagnostics: false,
-  showHelixVoiceEventTimelineDebug: false,
   showPowerShellDebug: false,
   showAlcubierreRenderDebugLog: false,
   powerShellScratch: "",
@@ -52,14 +48,19 @@ export function useHelixStartSettings() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<StartSettings>;
       const merged: StartSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      if (typeof parsed.showHelixAskDebug !== "boolean") {
+        const legacyUnifiedPreference =
+          (parsed as Record<string, unknown>).showHelixAskReasoningEventLog ??
+          (parsed as Record<string, unknown>).showHelixAskMasterEventClock ??
+          (parsed as Record<string, unknown>).showHelixVoiceEventTimelineDebug;
+        if (typeof legacyUnifiedPreference === "boolean") {
+          merged.showHelixAskDebug = legacyUnifiedPreference;
+        }
+      }
       if (parsed.settingsVersion !== DEFAULT_SETTINGS.settingsVersion) {
         merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
         merged.voiceNoisyEnvironmentMode = DEFAULT_SETTINGS.voiceNoisyEnvironmentMode;
-        merged.showHelixAskDebug = DEFAULT_SETTINGS.showHelixAskDebug;
-        merged.showHelixAskReasoningEventLog = DEFAULT_SETTINGS.showHelixAskReasoningEventLog;
-        merged.showHelixAskMasterEventClock = DEFAULT_SETTINGS.showHelixAskMasterEventClock;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
-        merged.showHelixVoiceEventTimelineDebug = DEFAULT_SETTINGS.showHelixVoiceEventTimelineDebug;
         merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;
         merged.preferredResponseLanguage =
           typeof parsed.preferredResponseLanguage === "string" && parsed.preferredResponseLanguage.trim().length > 0

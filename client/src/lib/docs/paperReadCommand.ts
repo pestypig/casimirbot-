@@ -1,0 +1,138 @@
+import { DOC_MANIFEST, type DocManifestEntry } from "@/lib/docs/docManifest";
+
+const PAPER_KEYWORDS = /\b(paper|research|publication|brief|report|analysis|proof)\b/i;
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "about",
+  "on",
+  "for",
+  "regarding",
+  "topic",
+  "paper",
+  "papers",
+  "read",
+  "open",
+  "find",
+  "look",
+  "search",
+  "show",
+  "please",
+  "me",
+  "to",
+  "it",
+  "and",
+]);
+
+export type PaperReadCommand = {
+  topic: string;
+};
+
+export function parsePaperReadCommand(value: string): PaperReadCommand | null {
+  const trimmed = normalizeSpokenPrompt(value);
+  if (!trimmed) return null;
+  const normalized = trimmed.toLowerCase();
+  const hasReadLikeVerb = /\b(read|open|show|find|search|look|pick|bring|pull)\b/.test(normalized);
+  if (!hasReadLikeVerb) return null;
+  const hasDocLikeNoun = /\b(paper|papers|research|report|publication|document|doc)\b/.test(normalized);
+  const hasPanelTopicReadPattern =
+    /\b(?:open|show|bring|pull|launch)(?:\s+up)?\b/.test(normalized) &&
+    /\b(panel|tab|window)\b/.test(normalized) &&
+    /\b(about|on|for|regarding)\b/.test(normalized) &&
+    /\bread\b/.test(normalized);
+  if (!hasDocLikeNoun && !hasPanelTopicReadPattern) return null;
+  if (!/\bread\b/.test(normalized)) return null;
+  const topic = extractTopic(trimmed);
+  if (!topic) return null;
+  return { topic };
+}
+
+export function findRandomPaperForTopic(
+  topic: string,
+  options?: { entries?: DocManifestEntry[]; random?: () => number },
+): DocManifestEntry | null {
+  const entries = options?.entries ?? DOC_MANIFEST;
+  if (entries.length === 0) return null;
+  const random = options?.random ?? Math.random;
+  const tokens = tokenize(topic);
+  const candidates = entries.filter((entry) => PAPER_KEYWORDS.test(`${entry.title} ${entry.relativePath}`));
+  const searchPool = candidates.length > 0 ? candidates : entries;
+  const scored = searchPool
+    .map((entry) => ({ entry, score: scoreEntry(entry, tokens) }))
+    .filter((item) => item.score > 0);
+
+  const pool = scored.length > 0 ? scored : searchPool.map((entry) => ({ entry, score: 0 }));
+  const bestScore = Math.max(...pool.map((item) => item.score));
+  const best = pool.filter((item) => item.score === bestScore).map((item) => item.entry);
+  if (best.length === 0) return null;
+  const pick = Math.max(0, Math.min(best.length - 1, Math.floor(random() * best.length)));
+  return best[pick] ?? null;
+}
+
+function extractTopic(input: string): string | null {
+  const cleaned = normalizeSpokenPrompt(
+    input
+    .replace(/^["'\s]+|["'\s]+$/g, "")
+    .replace(/^question\s*:\s*/i, "")
+    .trim(),
+  );
+  const sep = String.raw`(?:\s|[,:;.!?])+`;
+  const match =
+    cleaned.match(new RegExp(String.raw`\b(?:about|on|for|regarding)${sep}(.+?)(?:${sep}(?:and|then)${sep}(?:open|read)\b|[.?!]|$)`, "i")) ??
+    cleaned.match(
+      new RegExp(
+        String.raw`\b(?:open|show|bring|pull|launch)(?:\s+up)?${sep}(?:a|an|the)?${sep}?(?:panel|tab|window)${sep}(?:about|on|for|regarding)${sep}(.+?)(?:${sep}(?:and|then)${sep}read\b|[.?!]|$)`,
+        "i",
+      ),
+    ) ??
+    cleaned.match(
+      new RegExp(
+        String.raw`\b(?:find|search|look|pick)${sep}(?:me${sep})?(?:a|an|any)?${sep}?(?:paper|papers|doc|document)${sep}(.+?)(?:[.?!]|$)`,
+        "i",
+      ),
+    ) ??
+    cleaned.match(
+      new RegExp(
+        String.raw`\b(?:read|open|show)${sep}(?:me${sep})?(?:a|an|any|the)?${sep}?(?:paper|papers|doc|document)(?:${sep}(?:about|on|for|regarding))?${sep}?(.+?)(?:${sep}(?:and|then)${sep}(?:open|read)\b|[.?!]|$)`,
+        "i",
+      ),
+    );
+  if (!match?.[1]) return null;
+  const topic = match[1]
+    .replace(/\b(?:open|read)\s+it\s+to\s+me\b.*$/i, "")
+    .replace(/^the\s+/i, "")
+    .trim();
+  return topic || null;
+}
+
+function normalizeSpokenPrompt(value: string): string {
+  return value
+    .replace(/\b(?:uh+|um+|erm+|ah+)\b/gi, " ")
+    .replace(/\b(?:you know|i mean|kinda|kind of|sort of|like)\b/gi, " ")
+    .replace(/\b(\w+)(?:[\s,.;:!?-]+\1\b)+/gi, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenize(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+
+function scoreEntry(entry: DocManifestEntry, tokens: string[]): number {
+  if (tokens.length === 0) return 0;
+  const haystack = `${entry.searchText} ${entry.relativePath.toLowerCase()} ${entry.title.toLowerCase()}`;
+  const title = entry.title.toLowerCase();
+  let score = 0;
+  for (const token of tokens) {
+    if (!haystack.includes(token)) continue;
+    score += 1;
+    if (title.includes(token)) score += 1;
+  }
+  return score;
+}

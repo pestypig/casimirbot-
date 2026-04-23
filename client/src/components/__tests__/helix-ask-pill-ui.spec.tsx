@@ -48,6 +48,8 @@ let normalizeVoiceCommandLaneEnvelope: typeof import("@/components/helix/HelixAs
 let resolveReasoningAttemptTimelineText: typeof import("@/components/helix/HelixAskPill").resolveReasoningAttemptTimelineText;
 let describeVoiceCommandAction: typeof import("@/components/helix/HelixAskPill").describeVoiceCommandAction;
 let shouldKeepHelixReplyInBriefLane: typeof import("@/components/helix/HelixAskPill").shouldKeepHelixReplyInBriefLane;
+let parseWorkstationActionCommand: typeof import("@/components/helix/HelixAskPill").parseWorkstationActionCommand;
+let buildObserverCommentaryForRow: typeof import("@/components/helix/HelixAskPill").buildObserverCommentaryForRow;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -98,6 +100,8 @@ beforeAll(async () => {
     resolveReasoningAttemptTimelineText,
     describeVoiceCommandAction,
     shouldKeepHelixReplyInBriefLane,
+    parseWorkstationActionCommand,
+    buildObserverCommentaryForRow,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -170,6 +174,81 @@ describe("HelixAskPill mic-first surface contract", () => {
 });
 
 describe("HelixAskPill mic helper behavior", () => {
+  it("parses close-this-panel phrasing into close_active_panel action", () => {
+    expect(parseWorkstationActionCommand("close this panel")).toEqual({ action: "close_active_panel" });
+    expect(parseWorkstationActionCommand("close doc")).toEqual({ action: "close_active_panel" });
+    expect(parseWorkstationActionCommand("can you close this panel for me")).toEqual({
+      action: "close_active_panel",
+    });
+    expect(parseWorkstationActionCommand("close this doc")).toEqual({ action: "close_active_panel" });
+    expect(parseWorkstationActionCommand("please close this document")).toEqual({
+      action: "close_active_panel",
+    });
+  });
+
+  it("routes doc intent questions to explain_paper workstation action", () => {
+    expect(parseWorkstationActionCommand("what does this doc do?")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "explain_paper",
+      args: undefined,
+    });
+  });
+
+  it("keeps summarize-doc prompts on summarize action (not read-aloud)", () => {
+    expect(parseWorkstationActionCommand("ok summarize a doc about the sun to me")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "summarize_doc",
+      args: undefined,
+    });
+  });
+
+  it("resolves open-doc plus summarize phrasing to docs summarize action", () => {
+    const action = parseWorkstationActionCommand("okay open up a doc about the sun and summarize what it means");
+    expect(action?.action).toBe("run_panel_action");
+    expect(action?.panel_id).toBe("docs-viewer");
+    expect(action?.action_id).toBe("summarize_doc");
+    expect((action as { args?: { path?: string } } | null)?.args?.path).toBeTruthy();
+  });
+
+  it("resolves open-paper plus summarize phrasing to docs summarize action", () => {
+    const action = parseWorkstationActionCommand(
+      "okay open up a paper about the sun and summarize what it means",
+    );
+    expect(action?.action).toBe("run_panel_action");
+    expect(action?.panel_id).toBe("docs-viewer");
+    expect(action?.action_id).toBe("summarize_doc");
+    expect((action as { args?: { path?: string } } | null)?.args?.path).toBeTruthy();
+  });
+
+  it("builds observer lane commentary with user-perspective restating", () => {
+    const commentary = buildObserverCommentaryForRow(
+      {
+        tool: "workstation.action",
+        text: "summarizing current document",
+        detail: "workstation_intent_stage",
+      },
+      {
+        userPrompt: "okay open up a doc about the sun and summarize what it means",
+      },
+    );
+    expect(commentary).toContain("From your request");
+    expect(commentary).toContain("summarized in plain language");
+    expect(commentary).toContain("Summarize-doc action dispatched");
+  });
+
+  it("keeps observer lane deterministic when no user prompt is available", () => {
+    const commentary = buildObserverCommentaryForRow({
+      tool: "workstation.action",
+      text: "closed active panel docs-viewer",
+      detail: "workstation_intent_stage",
+    });
+    expect(commentary).toBe(
+      "Observer: Close-panel action completed and active workspace panel was removed.",
+    );
+  });
+
   it("builds transient mic status labels", () => {
     expect(buildVoiceInputStatusLabel("off", "listening", null)).toBeNull();
     expect(buildVoiceInputStatusLabel("on", "listening", null)).toBe("Listening");

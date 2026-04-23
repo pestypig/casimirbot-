@@ -285,6 +285,36 @@ export default function MobileStartPage() {
             close(action.panel_id);
             publish({ ok: true });
             return;
+          case "close_active_panel": {
+            const mobileState = useMobileAppStore.getState();
+            if (!mobileState.activeId) {
+              publish({ ok: false, message: "No active panel to close." });
+              return;
+            }
+            close(mobileState.activeId);
+            publish({ ok: true, message: `Closed active panel ${mobileState.activeId}.` });
+            return;
+          }
+          case "focus_next_panel":
+          case "focus_previous_panel": {
+            const mobileState = useMobileAppStore.getState();
+            const panelIds = mobileState.stack.map((entry) => entry.panelId);
+            if (panelIds.length === 0) {
+              publish({ ok: false, message: "No open panels to focus." });
+              return;
+            }
+            const currentIndex = Math.max(0, mobileState.activeId ? panelIds.indexOf(mobileState.activeId) : 0);
+            const delta = action.action === "focus_previous_panel" ? -1 : 1;
+            const nextIndex = (currentIndex + delta + panelIds.length) % panelIds.length;
+            const panelId = panelIds[nextIndex] ?? panelIds[0];
+            if (!panelId) {
+              publish({ ok: false, message: "No open panels to focus." });
+              return;
+            }
+            activate(panelId);
+            publish({ ok: true, message: `Focused ${panelId}.` });
+            return;
+          }
           case "open_settings":
             openSettings(action.tab ?? "preferences");
             publish({ ok: true });
@@ -342,6 +372,7 @@ export default function MobileStartPage() {
             return;
           case "set_chat_dock":
           case "split_active_group":
+          case "reopen_last_closed_panel":
             publish({ ok: false, message: `${action.action} is not supported on mobile.` });
             return;
           default:

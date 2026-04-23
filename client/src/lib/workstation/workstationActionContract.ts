@@ -34,6 +34,22 @@ export type HelixWorkstationAction =
     }
   | {
       schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
+      action: "close_active_panel";
+    }
+  | {
+      schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
+      action: "focus_next_panel";
+    }
+  | {
+      schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
+      action: "focus_previous_panel";
+    }
+  | {
+      schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
+      action: "reopen_last_closed_panel";
+    }
+  | {
+      schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
       action: "split_active_group";
       direction: WorkstationSplitDirection;
     }
@@ -107,6 +123,18 @@ function coerceAction(value: unknown): HelixWorkstationAction | null {
       action,
       panel_id: panelId,
       group_id: groupId,
+    };
+  }
+
+  if (
+    action === "close_active_panel" ||
+    action === "focus_next_panel" ||
+    action === "focus_previous_panel" ||
+    action === "reopen_last_closed_panel"
+  ) {
+    return {
+      schema_version: HELIX_WORKSTATION_ACTION_SCHEMA_VERSION,
+      action,
     };
   }
 

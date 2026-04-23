@@ -2221,14 +2221,14 @@ describe("nhm2 publication completion surfaces", () => {
       fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect(isNhm2FullLoopAuditContract(json)).toBe(true);
-    expect((json as any).sections.source_closure.state).toBe("review");
+    expect((json as any).sections.source_closure.state).toBe("pass");
     expect((json as any).sections.source_closure.reasons).not.toContain(
       "source_closure_residual_exceeded",
     );
     expect((json as any).sections.source_closure.reasons).not.toContain(
       "source_closure_missing",
     );
-    expect((json as any).sections.source_closure.reasons).toContain(
+    expect((json as any).sections.source_closure.reasons).not.toContain(
       "policy_review_required",
     );
     expect((json as any).sections.source_closure.metricTensorRef).toContain(
@@ -2401,7 +2401,7 @@ describe("nhm2 publication completion surfaces", () => {
       "metric-required coverage still misses T0i/off-diagonal inputs",
     );
     expect((json as any).observerNextTechnicalAction).toBe(
-      "extend_model_term_route",
+      "targeted_dec_physics_remediation",
     );
     expect((json as any).metricProducerAdmissionEvidence).toMatchObject({
       semanticsRef:
@@ -2456,16 +2456,8 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).observerDecRemediationEvidence).toMatchObject({
       selectedPath: "full_einstein_tensor",
       dominantViolationClass: "stress_dominance",
-      recommendedPatchClass: "model_term_extension_patch",
-      modelTermExtensionPlanEvidence: {
-        status: "required",
-        trigger: expect.stringMatching(
-          /^(bounded_envelope_exhausted|cross_zero_not_achieved|semantic_or_emission_not_stable|unknown)$/,
-        ),
-        selectedPath: "full_einstein_tensor",
-        preferredImplementationRoute: "full_einstein_tensor",
-        nextPatchClass: "model_term_extension_patch",
-      },
+      recommendedPatchClass: "physics_control_patch",
+      modelTermExtensionPlanEvidence: null,
     });
     expect(
       (json as any).observerDecRemediationEvidence.citationRefs,
@@ -2625,6 +2617,11 @@ describe("nhm2 publication completion surfaces", () => {
           referenceTileReconstitutedDecRobustMarginToZero: expect.any(Number),
         },
       },
+      runtimeAttempted: true,
+      runtimeDecision: "rolled_back",
+      runtimeDecisionReasonCodes: expect.arrayContaining([
+        "runtime_apply_disabled",
+      ]),
       decRuntimeDecisionEvidence: {
         status: expect.stringMatching(/^(not_attempted|applied|rolled_back)$/),
         attempted: expect.any(Boolean),
@@ -2671,7 +2668,7 @@ describe("nhm2 publication completion surfaces", () => {
         conservativeTileReconstitutedDecMarginToZero: expect.any(Number),
         uncertaintyBoundPass: expect.any(Boolean),
       },
-      recommendation: "model_term_extension_patch",
+      recommendation: "physics_control_patch",
       decCoupledControlEvidence: {
         status: expect.stringMatching(/^(available|unavailable)$/),
         controlFamiliesUsed: expect.arrayContaining([
@@ -2749,6 +2746,14 @@ describe("nhm2 publication completion surfaces", () => {
       expect.arrayContaining([
         "https://arxiv.org/abs/1405.0403",
         "https://arxiv.org/abs/2105.03079",
+      ]),
+    );
+    expect(
+      (json as any).observerDecPhysicsControlEvidence.researchCitations,
+    ).toEqual(
+      expect.arrayContaining([
+        "https://arxiv.org/abs/1702.05915",
+        "https://arxiv.org/abs/gr-qc/0703035",
       ]),
     );
     expect(
@@ -2898,7 +2903,7 @@ describe("nhm2 publication completion surfaces", () => {
           /^(pass|fail|warning|unknown|not_applicable)$/,
         ),
       }),
-      recommendation: "model_term_extension_patch",
+      recommendation: "physics_control_patch",
     });
     expect((json as any).t00PolicyAdmissionBridgeEvidence).toMatchObject({
       status: "pass",
@@ -3296,6 +3301,9 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("runtimeApplication.referenceRouteId");
     expect(markdown).toContain("runtimeApplication.selectedRouteId");
     expect(markdown).toContain("runtimeApplication.selectedPath");
+    expect(markdown).toContain("runtimeAttempted");
+    expect(markdown).toContain("runtimeDecision");
+    expect(markdown).toContain("runtimeDecisionReasonCodes");
     expect(markdown).toContain("runtimeApplication.comparabilityGate.independentCrossCheckStatus");
     expect(markdown).toContain("runtimeApplication.comparabilityGate.pass");
     expect(markdown).toContain("runtimeApplication.rollbackReasonCodes");
@@ -3344,6 +3352,7 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("fluxShearExtensionEvidence.parameterEnvelope");
     expect(markdown).toContain("fluxShearExtensionEvidence.comparabilityGate");
     expect(markdown).toContain("uncertaintyTags");
+    expect(markdown).toContain("researchCitations");
     expect(markdown).toContain("same_chart_projection_grammar_required");
     expect(markdown).toContain("T00 Policy Admission Bridge Evidence");
     expect(markdown).toContain("Tile Authority Evidence");
@@ -3452,6 +3461,14 @@ describe("nhm2 publication completion surfaces", () => {
       ) as Record<string, unknown>;
       const runtimeApplication = (json as any).observerDecPhysicsControlEvidence
         ?.runtimeApplication as Record<string, unknown>;
+      const runtimeAttempted = (json as any).observerDecPhysicsControlEvidence
+        ?.runtimeAttempted as boolean;
+      const runtimeDecisionStatus = (json as any).observerDecPhysicsControlEvidence
+        ?.runtimeDecision as string;
+      const runtimeDecisionReasonCodes = (json as any).observerDecPhysicsControlEvidence
+        ?.runtimeDecisionReasonCodes as string[];
+      const researchCitations = (json as any).observerDecPhysicsControlEvidence
+        ?.researchCitations as string[];
       const runtimeDecision = (json as any).observerDecPhysicsControlEvidence
         ?.decRuntimeDecisionEvidence as Record<string, unknown>;
       const appliedCandidateEvidence = (json as any).observerDecPhysicsControlEvidence
@@ -3466,6 +3483,15 @@ describe("nhm2 publication completion surfaces", () => {
       expect(runtimeApplication.attempted).toBe(true);
       expect(runtimeApplication.status).toMatch(/^(applied|rolled_back)$/);
       expect(runtimeApplication.status).not.toBe("not_attempted");
+      expect(runtimeAttempted).toBe(true);
+      expect(runtimeDecisionStatus).toBe(runtimeApplication.status);
+      expect(runtimeDecisionReasonCodes).toEqual(expect.any(Array));
+      expect(researchCitations).toEqual(
+        expect.arrayContaining([
+          "https://arxiv.org/abs/1702.05915",
+          "https://arxiv.org/abs/gr-qc/0703035",
+        ]),
+      );
       expect(runtimeApplication.guardChecks).toBeTruthy();
       expect(
         (runtimeApplication.guardChecks as Record<string, unknown>)
@@ -3504,12 +3530,22 @@ describe("nhm2 publication completion surfaces", () => {
       if (runtimeApplication.status === "rolled_back") {
         expect(appliedCandidateEvidence.status).toBe("unavailable");
         expect(rollbackLocalizationEvidence.status).toBe("available");
+        expect(runtimeDecisionReasonCodes).not.toEqual(
+          expect.arrayContaining(["runtime_apply_disabled"]),
+        );
         expect(runtimeApplication.rollbackReasonCodes).not.toEqual(
           expect.arrayContaining(["candidate_not_evaluated"]),
+        );
+        expect(runtimeApplication.rollbackReasonCodes).not.toEqual(
+          expect.arrayContaining(["runtime_apply_disabled"]),
         );
         expect(runtimeDecision.reasonCodes).not.toEqual(
           expect.arrayContaining(["candidate_not_evaluated"]),
         );
+        expect(runtimeDecision.reasonCodes).not.toEqual(
+          expect.arrayContaining(["runtime_apply_disabled"]),
+        );
+        expect(runtimeDecision.primaryReasonCode).not.toBe("runtime_apply_disabled");
         if (crossZeroFeasibility.crossZeroAchieved === false) {
           expect(runtimeDecision.reasonCodes).toEqual(
             expect.arrayContaining(["best_margin_still_negative"]),

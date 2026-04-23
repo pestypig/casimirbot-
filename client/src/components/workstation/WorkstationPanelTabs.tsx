@@ -1,6 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import {
+  HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT,
+  type HelixWorkstationProceduralStepPayload,
+} from "@/lib/workstation/proceduralPlaybackContract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 
 export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
@@ -12,6 +16,9 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const openPanelInGroup = useWorkstationLayoutStore((state) => state.openPanelInGroup);
   const focusGroup = useWorkstationLayoutStore((state) => state.focusGroup);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [plusPulseActive, setPlusPulseActive] = useState(false);
+  const [plusPulseTick, setPlusPulseTick] = useState(0);
+  const [targetPanelId, setTargetPanelId] = useState<string | null>(null);
   const openSettings = useCallback(() => {
     if (typeof window === "undefined") return;
     window.dispatchEvent(
@@ -34,6 +41,60 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
         }),
     [],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleStep = (event: Event) => {
+      const detail = (event as CustomEvent<HelixWorkstationProceduralStepPayload | null>)?.detail;
+      if (!detail) return;
+      const targetedGroup = detail.groupId?.trim();
+      const isThisGroup = targetedGroup ? targetedGroup === groupId : activeGroupId === groupId;
+      if (!isThisGroup) return;
+      if (detail.step === "highlight_plus") {
+        setPlusPulseActive(true);
+        setPlusPulseTick(Date.now());
+        return;
+      }
+      if (detail.step === "open_picker") {
+        setPlusPulseActive(true);
+        setPlusPulseTick(Date.now());
+        setPickerOpen(true);
+        focusGroup(groupId);
+        return;
+      }
+      if (detail.step === "target_panel") {
+        if (detail.panelId) {
+          setTargetPanelId(detail.panelId);
+        }
+        setPickerOpen(true);
+        focusGroup(groupId);
+        return;
+      }
+      if (detail.step === "close_picker" || detail.step === "open_doc" || detail.step === "read_start") {
+        setPickerOpen(false);
+      }
+    };
+    window.addEventListener(HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT, handleStep as EventListener);
+    return () => {
+      window.removeEventListener(HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT, handleStep as EventListener);
+    };
+  }, [activeGroupId, focusGroup, groupId]);
+
+  useEffect(() => {
+    if (plusPulseTick <= 0) return;
+    const timer = window.setTimeout(() => setPlusPulseActive(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [plusPulseTick]);
+
+  useEffect(() => {
+    if (!targetPanelId) return;
+    const clearTargetTimer = window.setTimeout(() => setTargetPanelId(null), 1800);
+    const closePickerTimer = window.setTimeout(() => setPickerOpen(false), 700);
+    return () => {
+      window.clearTimeout(clearTargetTimer);
+      window.clearTimeout(closePickerTimer);
+    };
+  }, [targetPanelId]);
 
   if (!group) return null;
 
@@ -80,7 +141,11 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
       <div className="relative flex shrink-0 items-center gap-1">
         <button
           type="button"
-          className="rounded border border-white/15 bg-black/25 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+          className={`rounded border px-2 py-1 text-xs text-slate-200 hover:bg-white/10 ${
+            plusPulseActive
+              ? "border-cyan-300/80 bg-cyan-500/20 shadow-[0_0_16px_rgba(34,211,238,0.55)]"
+              : "border-white/15 bg-black/25"
+          }`}
           onClick={() => setPickerOpen((current) => !current)}
           aria-expanded={pickerOpen}
           aria-label="Open panel picker"
@@ -107,7 +172,11 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
                     focusGroup(groupId);
                     setPickerOpen(false);
                   }}
-                  className="block w-full rounded px-2 py-1 text-left text-xs text-slate-200 hover:bg-white/10"
+                  className={`block w-full rounded px-2 py-1 text-left text-xs text-slate-200 hover:bg-white/10 ${
+                    targetPanelId === panel.id
+                      ? "bg-cyan-500/20 ring-1 ring-cyan-300/70 shadow-[0_0_14px_rgba(34,211,238,0.45)]"
+                      : ""
+                  }`}
                 >
                   <span className="inline-flex items-center gap-2">
                     <span>{panel.title}</span>

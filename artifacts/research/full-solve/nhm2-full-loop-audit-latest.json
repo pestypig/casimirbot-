@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-22T03:01:06.459Z",
+  "generatedAt": "2026-04-22T21:36:23.470Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -177,10 +177,8 @@
     },
     "source_closure": {
       "sectionId": "source_closure",
-      "state": "review",
-      "reasons": [
-        "policy_review_required"
-      ],
+      "state": "pass",
+      "reasons": [],
       "artifactRefs": [
         {
           "artifactId": "nhm2_source_closure",
@@ -255,31 +253,28 @@
     },
     "observer_audit": {
       "sectionId": "observer_audit",
-      "state": "fail",
-      "reasons": [
-        "observer_blocking_violation",
-        "policy_review_required"
-      ],
+      "state": "pass",
+      "reasons": [],
       "artifactRefs": [
         {
           "artifactId": "nhm2_observer_audit",
           "path": "artifacts/research/full-solve/nhm2-observer-audit-latest.json",
           "contractVersion": "nhm2_observer_audit/v1",
-          "status": "fail"
+          "status": "pass"
         }
       ],
-      "observerBlockingAssessmentStatus": "policy_review_only",
-      "observerBlockingAssessmentNote": "Current observer conditions do not emit a confirmed same-surface blocker, but surrogate-model limitations still require policy review.",
-      "observerPromotionBlockingSurface": "none",
+      "observerBlockingAssessmentStatus": "unknown",
+      "observerBlockingAssessmentNote": "Observer blocking assessment could not be resolved from current runtime evidence.",
+      "observerPromotionBlockingSurface": "unknown",
       "observerPromotionBlockingCondition": "unknown",
-      "observerMetricPrimaryDriver": "dec",
-      "observerTilePrimaryDriver": "dec",
-      "observerPrimaryDriverAgreement": "aligned",
-      "observerPrimaryDriverNote": "metric_required first localizes to DEC (robust_only) at metric_required.conditions.dec. DEC is Eulerian-clean on the emitted sample but turns negative under the robust observer search. tile_effective first localizes to DEC (robust_only) at tile_effective.conditions.dec. DEC is Eulerian-clean on the emitted sample but turns negative under the robust observer search.",
-      "observerMetricFirstInspectionTarget": "metric_required.conditions.dec",
-      "observerTileFirstInspectionTarget": "tile_effective.conditions.dec",
-      "observerSharedRootDriverStatus": "mixed",
-      "observerSharedRootDriverNote": "At least one emitted observer surface still presents mixed independent blockers, so a single shared remediation path is not yet justified.",
+      "observerMetricPrimaryDriver": "unknown",
+      "observerTilePrimaryDriver": "unknown",
+      "observerPrimaryDriverAgreement": "unknown",
+      "observerPrimaryDriverNote": null,
+      "observerMetricFirstInspectionTarget": null,
+      "observerTileFirstInspectionTarget": null,
+      "observerSharedRootDriverStatus": "unknown",
+      "observerSharedRootDriverNote": null,
       "observerSharedUpstreamDriverStatus": "unknown",
       "observerSharedUpstreamDriverNote": null,
       "observerWecPropagationStatus": "unknown",
@@ -306,12 +301,12 @@
       "observerTileAuthorityNote": "Tile-effective observer authority is admitted via the same-chart Einstein projection route with pass-level route admission, full-tensor component coverage, comparability, and citation checks.",
       "observerLeadReadinessWorkstream": "observer_completeness_and_authority",
       "observerLeadReadinessReason": "Observer completeness and tile authority are admitted on the selected route; certificate/policy readiness remains the parallel full-loop lane.",
-      "observerNextTechnicalAction": "extend_model_term_route",
+      "observerNextTechnicalAction": "targeted_dec_physics_remediation",
       "metric": {
-        "state": "fail",
-        "wecMinOverAllTimelike": 0,
-        "necMinOverAllNull": 58267450.989558905,
-        "decStatus": "fail",
+        "state": "pass",
+        "wecMinOverAllTimelike": 29133725.494779453,
+        "necMinOverAllNull": 61581412.26459007,
+        "decStatus": "pass",
         "secStatus": "pass",
         "observerWorstCaseLocation": "algebraic_type_i",
         "typeIFraction": 1,
@@ -319,10 +314,10 @@
         "maxRobustMinusEulerian": 0
       },
       "tile": {
-        "state": "fail",
-        "wecMinOverAllTimelike": 0,
-        "necMinOverAllNull": 58267450.989558905,
-        "decStatus": "fail",
+        "state": "pass",
+        "wecMinOverAllTimelike": 29133725.494779453,
+        "necMinOverAllNull": 61581412.26459007,
+        "decStatus": "pass",
         "secStatus": "pass",
         "observerWorstCaseLocation": "algebraic_type_i",
         "typeIFraction": 1,
@@ -469,10 +464,8 @@
     },
     "uncertainty_perturbation_reproducibility": {
       "sectionId": "uncertainty_perturbation_reproducibility",
-      "state": "review",
-      "reasons": [
-        "policy_review_required"
-      ],
+      "state": "pass",
+      "reasons": [],
       "artifactRefs": [
         {
           "artifactId": "nhm2_envelope_perturbation_suite_root",
@@ -583,7 +576,7 @@
     },
     "reduced-order": {
       "tier": "reduced-order",
-      "state": "fail",
+      "state": "review",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -601,17 +594,19 @@
         "claim_tier",
         "lapse_provenance",
         "strict_signal_readiness",
+        "source_closure",
+        "observer_audit",
         "mission_time_outputs",
-        "shift_vs_lapse_decomposition"
+        "shift_vs_lapse_decomposition",
+        "uncertainty_perturbation_reproducibility"
       ],
       "blockingReasons": [
-        "observer_blocking_violation",
         "policy_review_required"
       ]
     },
     "certified": {
       "tier": "certified",
-      "state": "fail",
+      "state": "review",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -630,12 +625,14 @@
         "claim_tier",
         "lapse_provenance",
         "strict_signal_readiness",
+        "source_closure",
+        "observer_audit",
         "mission_time_outputs",
         "shift_vs_lapse_decomposition",
+        "uncertainty_perturbation_reproducibility",
         "certificate_policy_result"
       ],
       "blockingReasons": [
-        "observer_blocking_violation",
         "policy_review_required"
       ]
     }
@@ -643,9 +640,8 @@
   "currentClaimTier": "diagnostic",
   "maximumClaimTier": "reduced-order",
   "highestPassingClaimTier": "diagnostic",
-  "overallState": "fail",
+  "overallState": "review",
   "blockingReasons": [
-    "observer_blocking_violation",
     "policy_review_required"
   ]
 }

@@ -190,7 +190,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "scientific figure",
     "g4 calculator"
   ],
-  "shell-outline": ["shell outline", "hull trace", "hull shell", "outline view", "needle shell"],
+  "shell-outline": ["shell outline", "hull trace", "hull shell", "outline view"],
   "shift-vector": ["shift vector", "beta^i", "lapse shift", "ADM shift", "beta_i"],
   "curvature-slice": ["curvature slice", "R_ab", "Ricci slice", "scalar curvature", "curvature cut"],
   "curvature-ledger": ["curvature ledger", "Weyl bands", "tensor ledger", "Riemann register", "ledger trace"],

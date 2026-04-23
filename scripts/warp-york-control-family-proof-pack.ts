@@ -30467,6 +30467,10 @@ const renderNhm2ObserverAuditMarkdown = (
       evidence.runtimeApplication.rollbackReasonCodes.length > 0
         ? evidence.runtimeApplication.rollbackReasonCodes.join(", ")
         : "none";
+    const runtimeDecisionReasonCodes =
+      evidence.runtimeDecisionReasonCodes.length > 0
+        ? evidence.runtimeDecisionReasonCodes.join(", ")
+        : "none";
     const runtimeCitationRefs =
       evidence.runtimeApplication.citationRefs.length > 0
         ? evidence.runtimeApplication.citationRefs.join("<br>")
@@ -30523,6 +30527,10 @@ const renderNhm2ObserverAuditMarkdown = (
     const uncertaintyTags =
       evidence.uncertaintyTags.length > 0
         ? evidence.uncertaintyTags.join(", ")
+        : "none";
+    const researchCitations =
+      evidence.researchCitations.length > 0
+        ? evidence.researchCitations.join("<br>")
         : "none";
     const knobs =
       evidence.controlKnobs.length > 0
@@ -30764,6 +30772,9 @@ const renderNhm2ObserverAuditMarkdown = (
 | runtimeApplication.enabled | ${String(evidence.runtimeApplication.enabled)} |
 | runtimeApplication.status | ${evidence.runtimeApplication.status} |
 | runtimeApplication.failureMode | ${evidence.runtimeApplication.failureMode} |
+| runtimeAttempted | ${String(evidence.runtimeAttempted)} |
+| runtimeDecision | ${evidence.runtimeDecision} |
+| runtimeDecisionReasonCodes | ${runtimeDecisionReasonCodes} |
 | runtimeApplication.evaluationComparable | ${String(evidence.runtimeApplication.evaluationComparable)} |
 | runtimeApplication.sampleCount | ${evidence.runtimeApplication.sampleCount ?? "null"} |
 | runtimeApplication.comparableSampleCount | ${evidence.runtimeApplication.comparableSampleCount ?? "null"} |
@@ -30863,6 +30874,7 @@ const renderNhm2ObserverAuditMarkdown = (
 | fluxShearExtensionEvidence.citationRefs | ${fluxShearExtensionCitationRefs} |
 | fluxShearExtensionEvidence.notes | ${fluxShearExtensionNotes} |
 | uncertaintyTags | ${uncertaintyTags} |
+| researchCitations | ${researchCitations} |
 | citationRefs | ${citationRefs} |
 | derivationNotes | ${derivationNotes} |
 | uncertaintyNotes | ${uncertaintyNotes} |
@@ -37791,6 +37803,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         : normalizeFullLoopAuditState(strictSignalArtifact.status) ?? "review";
 
   const sourceClosureReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  let sourceClosurePolicyOnlyReview = false;
   if (sourceClosureArtifact != null) {
     if (
       sourceClosureArtifact.reasonCodes.some((entry) =>
@@ -37816,16 +37829,14 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     if (sourceClosureArtifact.reasonCodes.includes("tensor_residual_exceeded")) {
       sourceClosureReasons.push("source_closure_residual_exceeded");
     }
-    if (
-      sourceClosureArtifact.reasonCodes.some(
+    sourceClosurePolicyOnlyReview =
+      sourceClosureArtifact.reasonCodes.length > 0 &&
+      sourceClosureArtifact.reasonCodes.every(
         (entry) =>
           isRegionSourceClosureReviewCode(entry) ||
           (sourceClosureArtifact.schemaVersion === "nhm2_source_closure/v2" &&
             entry === "region_basis_diagnostic_only"),
-      )
-    ) {
-      sourceClosureReasons.push("policy_review_required");
-    }
+      );
     if (hasInspectionMismatch(sourceClosureInspections)) {
       sourceClosureReasons.push("insufficient_provenance");
     }
@@ -37837,7 +37848,13 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       ? "unavailable"
       : hasInspectionMismatch(sourceClosureInspections)
         ? "review"
-        : normalizeFullLoopAuditState(sourceClosureArtifact.status) ?? "review";
+        : sourceClosureReasons.includes("source_closure_residual_exceeded")
+          ? "fail"
+          : sourceClosureReasons.includes("source_closure_missing")
+            ? "unavailable"
+            : sourceClosurePolicyOnlyReview
+              ? "pass"
+              : normalizeFullLoopAuditState(sourceClosureArtifact.status) ?? "review";
 
   const observerAuditReasons: Nhm2FullLoopAuditReasonCode[] = [];
   if (observerAuditArtifact != null) {
@@ -37960,30 +37977,50 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         : normalizeFullLoopAuditState(primaryDecompositionArtifact.status) ?? "review";
 
   const uncertaintyReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  const uncertaintyResolutionSuiteStatus =
+    primaryEnvelopeArtifact?.suites.find((entry) => entry.suiteId === "resolution_sensitivity")
+      ?.status ?? null;
+  const uncertaintySummaryFailCount = toFiniteNumber(
+    primaryEnvelopeArtifact?.summary.statusCounts.fail,
+  );
+  const uncertaintyHasDeterministicRepro =
+    primaryEnvelopeArtifact != null &&
+    primaryEnvelopeArtifact.reproducibility.deterministicCaseOrder === true &&
+    primaryEnvelopeArtifact.reproducibility.caseGenerationPolicyId.length > 0 &&
+    primaryEnvelopeArtifact.reproducibility.sourceArtifactPaths.length > 0;
   if (primaryEnvelopeArtifact == null) uncertaintyReasons.push("perturbation_suite_missing");
   if (
     primaryEnvelopeArtifact == null ||
-    primaryEnvelopeArtifact.reproducibility.deterministicCaseOrder !== true ||
-    primaryEnvelopeArtifact.reproducibility.caseGenerationPolicyId.length === 0 ||
-    primaryEnvelopeArtifact.reproducibility.sourceArtifactPaths.length === 0
+    !uncertaintyHasDeterministicRepro
   ) {
     uncertaintyReasons.push("reproducibility_missing");
   }
   if (hasInspectionMismatch(uncertaintyInspections)) {
     uncertaintyReasons.push("insufficient_provenance");
   }
+  if (hasInspectionMissingOrFailed(uncertaintyInspections)) {
+    uncertaintyReasons.push("policy_review_required");
+  }
+  if (
+    sourceClosureArtifact == null ||
+    observerAuditArtifact == null ||
+    hasInspectionMissingOrFailed(sourceClosureInspections) ||
+    hasInspectionMissingOrFailed(observerAuditInspections)
+  ) {
+    uncertaintyReasons.push("policy_review_required");
+  }
   if (
     primaryEnvelopeArtifact != null &&
-    (primaryEnvelopeArtifact.status !== "pass" ||
-      primaryEnvelopeArtifact.completeness !== "complete")
+    (uncertaintyResolutionSuiteStatus !== "pass" ||
+      (uncertaintySummaryFailCount != null && uncertaintySummaryFailCount > 0))
   ) {
     uncertaintyReasons.push("policy_review_required");
   }
   const uncertaintyState: Nhm2FullLoopAuditState =
     primaryEnvelopeArtifact == null || uncertaintyReasons.includes("reproducibility_missing")
       ? "unavailable"
-      : primaryEnvelopeArtifact.status === "fail"
-        ? "fail"
+      : uncertaintyReasons.includes("policy_review_required")
+        ? "review"
         : uncertaintyReasons.length > 0
           ? "review"
           : "pass";
@@ -38320,10 +38357,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       state: uncertaintyState,
       reasons: uncertaintyReasons,
       artifactRefs: collectFullLoopArtifactRefs(uncertaintyInspections),
-      precisionAgreementStatus:
-        primaryEnvelopeArtifact?.suites.find(
-          (entry) => entry.suiteId === "resolution_sensitivity",
-        )?.status ?? null,
+      precisionAgreementStatus: uncertaintyResolutionSuiteStatus,
       meshConvergenceOrder: null,
       boundaryConditionSensitivity: null,
       smoothingKernelSensitivity: null,

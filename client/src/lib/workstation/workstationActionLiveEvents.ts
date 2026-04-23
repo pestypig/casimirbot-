@@ -14,6 +14,14 @@ function summarizeAction(action: HelixWorkstationAction): string {
       return `focus panel ${action.panel_id}`;
     case "close_panel":
       return `close panel ${action.panel_id}`;
+    case "close_active_panel":
+      return "close active panel";
+    case "focus_next_panel":
+      return "focus next panel";
+    case "focus_previous_panel":
+      return "focus previous panel";
+    case "reopen_last_closed_panel":
+      return "reopen last closed panel";
     case "split_active_group":
       return `split active group ${action.direction}`;
     case "open_settings":
@@ -36,6 +44,7 @@ export function emitWorkstationActionLiveEvent(args: {
   traceId: string;
   action: HelixWorkstationAction;
   ok: boolean;
+  kind?: "workstation_action_receipt" | "workstation_procedural_step";
   message?: string;
   durationMs?: number;
   artifact?: Record<string, unknown> | null;
@@ -52,7 +61,7 @@ export function emitWorkstationActionLiveEvent(args: {
       ts: new Date().toISOString(),
       durationMs: args.durationMs,
       meta: {
-        kind: "workstation_action_receipt",
+        kind: args.kind ?? "workstation_action_receipt",
         ok: args.ok,
         action: args.action,
         message: args.message ?? null,

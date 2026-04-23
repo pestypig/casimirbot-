@@ -23,6 +23,12 @@ export type WorkstationLayoutNode =
       children: [WorkstationLayoutNode, WorkstationLayoutNode];
     };
 
+type WorkstationClosedPanelEntry = {
+  panelId: string;
+  groupId: string;
+  closedAtMs: number;
+};
+
 type WorkstationLayoutState = {
   mode: WorkstationLayoutMode;
   chatDock: {
@@ -33,6 +39,7 @@ type WorkstationLayoutState = {
   activeGroupId: string;
   groups: Record<string, WorkstationPanelGroup>;
   root: WorkstationLayoutNode;
+  recentlyClosedPanels: WorkstationClosedPanelEntry[];
   mobileDrawer: {
     open: boolean;
     snap: "peek" | "half" | "full";
@@ -44,6 +51,9 @@ type WorkstationLayoutState = {
   openPanelInGroup: (groupId: string, panelId: string) => void;
   setActivePanel: (groupId: string, panelId: string) => void;
   closePanelFromGroup: (groupId: string, panelId: string) => void;
+  closeActivePanel: () => WorkstationClosedPanelEntry | null;
+  focusAdjacentPanel: (direction: "next" | "previous") => { groupId: string; panelId: string } | null;
+  reopenLastClosedPanel: () => WorkstationClosedPanelEntry | null;
   splitActiveGroup: (direction: "row" | "column") => void;
   focusGroup: (groupId: string) => void;
   setMobileDrawerOpen: (open: boolean) => void;
@@ -56,6 +66,7 @@ const PRIMARY_GROUP_ID = "group-primary";
 const DOCK_MIN_WIDTH = 320;
 const DOCK_MAX_WIDTH = 760;
 const DEFAULT_DOCK_WIDTH = 420;
+const MAX_RECENTLY_CLOSED_PANELS = 32;
 
 const createGroup = (id: string, title?: string): WorkstationPanelGroup => ({
   id,
@@ -126,6 +137,7 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
         type: "group",
         groupId: PRIMARY_GROUP_ID,
       },
+      recentlyClosedPanels: [],
       mobileDrawer: {
         open: false,
         snap: "half",
@@ -199,8 +211,63 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
                 activePanelId: nextActive,
               },
             },
+            recentlyClosedPanels: [
+              ...state.recentlyClosedPanels,
+              { panelId, groupId, closedAtMs: Date.now() },
+            ].slice(-MAX_RECENTLY_CLOSED_PANELS),
           };
         }),
+      closeActivePanel: () => {
+        const state = get();
+        const groupId = state.activeGroupId;
+        const group = state.groups[groupId];
+        const panelId = group?.activePanelId;
+        if (!groupId || !group || !panelId) return null;
+        get().closePanelFromGroup(groupId, panelId);
+        return { panelId, groupId, closedAtMs: Date.now() };
+      },
+      focusAdjacentPanel: (direction) => {
+        const state = get();
+        const groupId = state.activeGroupId;
+        const group = state.groups[groupId];
+        if (!group || group.panelIds.length === 0) return null;
+        const panelCount = group.panelIds.length;
+        const activeIndex = Math.max(
+          0,
+          group.activePanelId ? group.panelIds.indexOf(group.activePanelId) : 0,
+        );
+        const delta = direction === "previous" ? -1 : 1;
+        const nextIndex = (activeIndex + delta + panelCount) % panelCount;
+        const panelId = group.panelIds[nextIndex] ?? null;
+        if (!panelId) return null;
+        get().setActivePanel(groupId, panelId);
+        return { groupId, panelId };
+      },
+      reopenLastClosedPanel: () => {
+        const state = get();
+        const lastClosed = state.recentlyClosedPanels[state.recentlyClosedPanels.length - 1];
+        if (!lastClosed) return null;
+        set((current) => {
+          const groupId = lastClosed.groupId;
+          const group = current.groups[groupId] ?? createGroup(groupId);
+          const panelIds = group.panelIds.includes(lastClosed.panelId)
+            ? group.panelIds
+            : [...group.panelIds, lastClosed.panelId];
+          return {
+            groups: {
+              ...current.groups,
+              [groupId]: {
+                ...group,
+                panelIds,
+                activePanelId: lastClosed.panelId,
+              },
+            },
+            activeGroupId: groupId,
+            recentlyClosedPanels: current.recentlyClosedPanels.slice(0, -1),
+          };
+        });
+        return lastClosed;
+      },
       splitActiveGroup: (direction) =>
         set((state) => {
           const activeGroupId = state.activeGroupId || PRIMARY_GROUP_ID;
@@ -269,6 +336,7 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
         activeGroupId: state.activeGroupId,
         groups: state.groups,
         root: state.root,
+        recentlyClosedPanels: state.recentlyClosedPanels,
         mobileDrawer: state.mobileDrawer,
       }),
       merge: (persisted, current) => {
@@ -281,6 +349,18 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
           activeGroupId,
           groups,
           root: ensureRoot(source.root, activeGroupId),
+          recentlyClosedPanels: Array.isArray(source.recentlyClosedPanels)
+            ? source.recentlyClosedPanels.filter(
+                (entry): entry is WorkstationClosedPanelEntry =>
+                  Boolean(
+                    entry &&
+                      typeof entry === "object" &&
+                      typeof (entry as WorkstationClosedPanelEntry).panelId === "string" &&
+                      typeof (entry as WorkstationClosedPanelEntry).groupId === "string" &&
+                      Number.isFinite((entry as WorkstationClosedPanelEntry).closedAtMs),
+                  ),
+              )
+            : current.recentlyClosedPanels,
           mobileDrawer: {
             ...current.mobileDrawer,
             ...(source.mobileDrawer ?? {}),

@@ -5,7 +5,7 @@ export const DOC_VIEWER_PANEL_ID = "docs-viewer";
 
 export type DocViewerIntent =
   | { mode: "directory" }
-  | { mode: "doc"; path: string; anchor?: string };
+  | { mode: "doc"; path: string; anchor?: string; autoRead?: boolean };
 
 export type DocLinkDescriptor =
   | string
@@ -13,6 +13,7 @@ export type DocLinkDescriptor =
       href?: string;
       path?: string;
       anchor?: string;
+      autoRead?: boolean;
     };
 
 export function normalizeDocPath(input: string | undefined | null): string {
@@ -88,6 +89,7 @@ export function consumeDocViewerIntent(): DocViewerIntent | null {
           mode: "doc",
           path: normalizeDocPath(parsed.path),
           anchor: typeof parsed.anchor === "string" ? parsed.anchor : undefined,
+          autoRead: parsed.autoRead === true,
         };
       }
     }

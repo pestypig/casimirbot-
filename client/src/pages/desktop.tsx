@@ -28,6 +28,7 @@ import {
 } from "@/lib/workstation/workstationActionContract";
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
+import { emitHelixWorkstationProceduralStep } from "@/lib/workstation/proceduralPlaybackContract";
 import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
@@ -39,6 +40,13 @@ const PENDING_PANEL_KEY = "helix:pending-panel";
 const NOISE_GENS_PANEL_ID = "helix-noise-gens";
 const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
 const NOISE_GENS_AUTO_OPEN_SUPPRESS = new Set([ESSENCE_CONSOLE_PANEL_ID]);
+const WORKSTATION_PROCEDURAL_STEP_DELAY_MS = 220;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, Math.max(0, ms));
+  });
+}
 function collectPanelIdsFromStructure(
   input: unknown,
   target: Set<string>,
@@ -197,11 +205,12 @@ export default function DesktopPage() {
       const actions = coerceHelixWorkstationActions(detail);
       if (actions.length === 0) return;
       const store = useWorkstationLayoutStore.getState();
-      const runAction = (action: HelixWorkstationAction) => {
+      const runAction = async (action: HelixWorkstationAction) => {
         const traceId = createWorkstationActionTraceId(action.action);
         const startedAtMs = Date.now();
         const publish = (args: {
           ok: boolean;
+          kind?: "workstation_action_receipt" | "workstation_procedural_step";
           message?: string;
           artifact?: Record<string, unknown> | null;
         }) => {
@@ -210,6 +219,7 @@ export default function DesktopPage() {
             traceId,
             action,
             ok: args.ok,
+            kind: args.kind,
             message: args.message,
             artifact: args.artifact ?? null,
             durationMs: Math.max(0, Date.now() - startedAtMs),
@@ -266,6 +276,58 @@ export default function DesktopPage() {
             publish({ ok: true });
             return;
           }
+          case "close_active_panel": {
+            if (!workstationEnabled) {
+              publish({ ok: false, message: "Close active panel ignored outside workstation mode." });
+              return;
+            }
+            const closed = store.closeActivePanel();
+            if (!closed) {
+              publish({ ok: false, message: "No active panel to close." });
+              return;
+            }
+            publish({ ok: true, message: `Closed active panel ${closed.panelId}.` });
+            return;
+          }
+          case "focus_next_panel": {
+            if (!workstationEnabled) {
+              publish({ ok: false, message: "Focus next panel ignored outside workstation mode." });
+              return;
+            }
+            const focused = store.focusAdjacentPanel("next");
+            if (!focused) {
+              publish({ ok: false, message: "No panel available to focus next." });
+              return;
+            }
+            publish({ ok: true, message: `Focused ${focused.panelId}.` });
+            return;
+          }
+          case "focus_previous_panel": {
+            if (!workstationEnabled) {
+              publish({ ok: false, message: "Focus previous panel ignored outside workstation mode." });
+              return;
+            }
+            const focused = store.focusAdjacentPanel("previous");
+            if (!focused) {
+              publish({ ok: false, message: "No panel available to focus previous." });
+              return;
+            }
+            publish({ ok: true, message: `Focused ${focused.panelId}.` });
+            return;
+          }
+          case "reopen_last_closed_panel": {
+            if (!workstationEnabled) {
+              publish({ ok: false, message: "Reopen panel ignored outside workstation mode." });
+              return;
+            }
+            const reopened = store.reopenLastClosedPanel();
+            if (!reopened) {
+              publish({ ok: false, message: "No recently closed panel to reopen." });
+              return;
+            }
+            publish({ ok: true, message: `Reopened ${reopened.panelId}.` });
+            return;
+          }
           case "split_active_group":
             if (workstationEnabled) {
               store.splitActiveGroup(action.direction);
@@ -295,6 +357,58 @@ export default function DesktopPage() {
             publish({ ok: true });
             return;
           case "run_panel_action": {
+            const actionId = action.action_id.trim().toLowerCase();
+            const isProceduralDocsAction =
+              workstationEnabled &&
+              action.panel_id === "docs-viewer" &&
+              (actionId === "open_doc" || actionId === "open_doc_and_read");
+            const targetGroupId =
+              store.activeGroupId ??
+              Object.values(store.groups).find((group) => group.panelIds.includes("docs-viewer"))?.id;
+            if (isProceduralDocsAction) {
+              emitHelixWorkstationProceduralStep({
+                traceId,
+                step: "highlight_plus",
+                groupId: targetGroupId,
+                panelId: "docs-viewer",
+              });
+              publish({
+                ok: true,
+                kind: "workstation_procedural_step",
+                message: "Step: focusing panel picker (+).",
+                artifact: { phase: "highlight_plus" },
+              });
+              await sleep(WORKSTATION_PROCEDURAL_STEP_DELAY_MS);
+
+              emitHelixWorkstationProceduralStep({
+                traceId,
+                step: "open_picker",
+                groupId: targetGroupId,
+                panelId: "docs-viewer",
+              });
+              publish({
+                ok: true,
+                kind: "workstation_procedural_step",
+                message: "Step: opening panel picker.",
+                artifact: { phase: "open_picker" },
+              });
+              await sleep(WORKSTATION_PROCEDURAL_STEP_DELAY_MS);
+
+              emitHelixWorkstationProceduralStep({
+                traceId,
+                step: "target_panel",
+                groupId: targetGroupId,
+                panelId: "docs-viewer",
+              });
+              publish({
+                ok: true,
+                kind: "workstation_procedural_step",
+                message: "Step: targeting Docs panel.",
+                artifact: { phase: "target_panel", panel_id: "docs-viewer" },
+              });
+              await sleep(WORKSTATION_PROCEDURAL_STEP_DELAY_MS + 80);
+            }
+
             const result = executeHelixPanelAction(
               {
                 panel_id: action.panel_id,
@@ -342,6 +456,51 @@ export default function DesktopPage() {
                 openSettings: (tab) => openSettings(tab ?? "preferences"),
               },
             );
+            if (result.ok && isProceduralDocsAction) {
+              const path =
+                result.artifact && typeof result.artifact.path === "string"
+                  ? result.artifact.path
+                  : undefined;
+              emitHelixWorkstationProceduralStep({
+                traceId,
+                step: "open_doc",
+                groupId: targetGroupId,
+                panelId: "docs-viewer",
+                docPath: path,
+              });
+              publish({
+                ok: true,
+                message: "Step: opening selected document in Docs panel.",
+                artifact: { phase: "open_doc", path: path ?? null },
+              });
+              if (actionId === "open_doc_and_read") {
+                emitHelixWorkstationProceduralStep({
+                  traceId,
+                  step: "read_start",
+                  groupId: targetGroupId,
+                  panelId: "docs-viewer",
+                  docPath: path,
+                });
+                publish({
+                  ok: true,
+                  message: "Step: starting read-aloud.",
+                  artifact: { phase: "read_start", path: path ?? null },
+                });
+              }
+              emitHelixWorkstationProceduralStep({
+                traceId,
+                step: "close_picker",
+                groupId: targetGroupId,
+                panelId: "docs-viewer",
+                docPath: path,
+              });
+              publish({
+                ok: true,
+                kind: "workstation_procedural_step",
+                message: "Step: closing panel picker.",
+                artifact: { phase: "close_picker", path: path ?? null },
+              });
+            }
             publish({
               ok: result.ok,
               message: result.message,
@@ -404,7 +563,9 @@ export default function DesktopPage() {
             return;
         }
       };
-      actions.forEach(runAction);
+      for (const action of actions) {
+        void runAction(action);
+      }
     };
     window.addEventListener(HELIX_WORKSTATION_ACTION_EVENT, handleWorkstationAction as EventListener);
     return () => {

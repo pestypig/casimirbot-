@@ -1166,6 +1166,29 @@ describe("helix ask universal answer plan shadow", () => {
     expect(envelope.allow_two_pass).toBe(false);
   });
 
+  it("keeps docs-only explain requests out of implementation code-path family", () => {
+    const question = "Summarize what docs/warp-console-architecture.md means in the current doc.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus: false,
+      queryConstraints: constraints,
+    });
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    expect(family).toBe("mechanism_process");
+    expect(envelope.prompt_family).toBe("mechanism_process");
+    expect(envelope.requires_code_floor).toBe(false);
+  });
+
   it("marks specific equation asks as lock-required and suppresses pre-lock clarify", () => {
     const question =
       "From shared/collapse-benchmark.ts, quote rho_eff_kg_m3 and kappa_collapse_m2 equations and explain each term.";
@@ -2198,6 +2221,36 @@ describe("helix ask universal answer plan shadow", () => {
       },
     });
     expect(contract.output_family).toBe("mechanism_process");
+  });
+
+  it("overrides planner implementation family for docs-viewer summarize prompts with docs-only anchors", () => {
+    const question =
+      "Summarize this document from the current docs viewer context. Start with one sentence on what this document is for, then key findings and caveats. Document path: /docs/audits/research/granular-tidal-sunquake-source-check-2026-03-25.md";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      plannerMode: "llm",
+      plannerValid: true,
+      plannerSource: "planner_single_llm",
+      plannerPass: {
+        goal: question,
+        grounding_mode: "repo",
+        output_family: "implementation_code_path",
+        objectives: [{ label: question }],
+      },
+    });
+    expect(contract.output_family).toBe("mechanism_process");
+    expect(contract.objectives).toHaveLength(1);
+    expect(contract.required_slots).toEqual(
+      expect.arrayContaining(["summarize", "document", "findings", "caveats"]),
+    );
+    expect(contract.required_slots).not.toContain("security-controls");
+    expect(contract.required_slots).not.toContain("context-persistence");
   });
 
   it("builds turn-contract objective support from covered slots", () => {
