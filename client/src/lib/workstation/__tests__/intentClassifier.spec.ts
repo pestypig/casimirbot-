@@ -14,6 +14,7 @@ describe("intentClassifier", () => {
     expect(shouldProbeWorkstationIntentClassifier("summarize this section")).toBe(true);
     expect(shouldProbeWorkstationIntentClassifier("can you shut this panel for me")).toBe(true);
     expect(shouldProbeWorkstationIntentClassifier("get rid of the current tab")).toBe(true);
+    expect(shouldProbeWorkstationIntentClassifier("open the scientific calculator")).toBe(true);
     expect(shouldProbeWorkstationIntentClassifier("what is entropy")).toBe(false);
   });
 
@@ -105,6 +106,59 @@ describe("intentClassifier", () => {
       panel_id: "docs-viewer",
       action_id: "explain_paper",
       args: { selected_text: "Abstract content" },
+    });
+  });
+
+  it("maps calculator intents into deterministic calculator actions", () => {
+    expect(
+      coerceWorkstationActionFromIntentDecision({
+        intent: "calculator_open",
+        confidence: 0.9,
+        subgoal: "open scientific calculator",
+      }),
+    ).toEqual({
+      action: "open_panel",
+      panel_id: "scientific-calculator",
+    });
+
+    expect(
+      coerceWorkstationActionFromIntentDecision({
+        intent: "calculator_solve",
+        confidence: 0.8,
+        subgoal: "solve expression",
+        args: { latex: "x^2-4=0" },
+      }),
+    ).toEqual({
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "solve_expression",
+      args: { latex: "x^2-4=0" },
+    });
+
+    expect(
+      coerceWorkstationActionFromIntentDecision({
+        intent: "calculator_solve_steps",
+        confidence: 0.8,
+        subgoal: "solve expression with steps",
+      }),
+    ).toEqual({
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "solve_with_steps",
+      args: {},
+    });
+
+    expect(
+      coerceWorkstationActionFromIntentDecision({
+        intent: "calculator_ingest_clipboard",
+        confidence: 0.8,
+        subgoal: "paste clipboard into calculator",
+      }),
+    ).toEqual({
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "ingest_latex",
+      args: { latex: "$clipboard", source_path: "clipboard" },
     });
   });
 

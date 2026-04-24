@@ -190,6 +190,13 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "scientific figure",
     "g4 calculator"
   ],
+  "scientific-calculator": [
+    "scientific calculator",
+    "latex solver",
+    "equation solver",
+    "step solver",
+    "math workspace",
+  ],
   "shell-outline": ["shell outline", "hull trace", "hull shell", "outline view"],
   "shift-vector": ["shift vector", "beta^i", "lapse shift", "ADM shift", "beta_i"],
   "curvature-slice": ["curvature slice", "R_ab", "Ricci slice", "scalar curvature", "curvature cut"],
@@ -653,6 +660,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultPosition: { x: 260, y: 120 },
     mobileReady: true,
     endpoints: [API.pipelineGet, API.stressEnergyBrick, API.warpCalculator]
+  },
+  {
+    id: "scientific-calculator",
+    title: "Scientific Calculator",
+    icon: Calculator,
+    loader: lazyPanel(() => import("@/components/panels/ScientificCalculatorPanel")),
+    defaultSize: { w: 900, h: 700 },
+    defaultPosition: { x: 300, y: 140 },
+    mobileReady: true,
+    keywords: PANEL_KEYWORDS["scientific-calculator"],
   },
   {
     id: "shell-outline",

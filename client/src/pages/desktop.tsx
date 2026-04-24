@@ -514,9 +514,12 @@ export default function DesktopPage() {
           }
           case "run_job":
             publish({ ok: true, message: "Delegated to workstation job executor." });
+            const payloadWithJobId = action.payload.job_id
+              ? action.payload
+              : { ...action.payload, job_id: traceId };
             void runWorkstationJob({
               contextId: HELIX_ASK_CONTEXT_ID.desktop,
-              payload: action.payload,
+              payload: payloadWithJobId,
               executionContext: {
                 openPanel: (panelId, groupId) => {
                   if (groupId && workstationEnabled) {

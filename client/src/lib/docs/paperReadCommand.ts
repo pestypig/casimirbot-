@@ -29,6 +29,15 @@ export type PaperReadCommand = {
   topic: string;
 };
 
+export type DocTopicResolutionStatus = "strong" | "weak" | "ambiguous" | "none";
+
+export type DocTopicResolution = {
+  status: DocTopicResolutionStatus;
+  best: DocManifestEntry | null;
+  candidates: DocManifestEntry[];
+  confidence: number;
+};
+
 export function parsePaperReadCommand(value: string): PaperReadCommand | null {
   const trimmed = normalizeSpokenPrompt(value);
   if (!trimmed) return null;
@@ -74,14 +83,43 @@ export function findBestDocForTopic(
   topic: string,
   options?: { entries?: DocManifestEntry[] },
 ): DocManifestEntry | null {
+  const resolution = resolveDocTopic(topic, options);
+  return resolution.best;
+}
+
+export function resolveDocTopic(
+  topic: string,
+  options?: { entries?: DocManifestEntry[] },
+): DocTopicResolution {
   const entries = options?.entries ?? DOC_MANIFEST;
-  if (entries.length === 0) return null;
+  if (entries.length === 0) {
+    return {
+      status: "none",
+      best: null,
+      candidates: [],
+      confidence: 0,
+    };
+  }
   const cleanedTopic = normalizeSpokenPrompt(String(topic ?? "").replace(/^["'`\s]+|["'`\s]+$/g, ""));
-  if (!cleanedTopic) return null;
+  if (!cleanedTopic) {
+    return {
+      status: "none",
+      best: null,
+      candidates: [],
+      confidence: 0,
+    };
+  }
   const normalizedTopic = normalizeLookup(cleanedTopic);
   const tokens = tokenize(cleanedTopic);
   const queryVersionTokens = normalizedTopic.match(/\bv\d+\b/g) ?? [];
-  if (!normalizedTopic && tokens.length === 0) return null;
+  if (!normalizedTopic && tokens.length === 0) {
+    return {
+      status: "none",
+      best: null,
+      candidates: [],
+      confidence: 0,
+    };
+  }
   const ranked = entries
     .map((entry) => {
       const title = entry.title.toLowerCase();
@@ -147,14 +185,44 @@ export function findBestDocForTopic(
     })
     .filter((item) => item.score > 0);
 
-  if (ranked.length === 0) return null;
+  if (ranked.length === 0) {
+    return {
+      status: "none",
+      best: null,
+      candidates: [],
+      confidence: 0,
+    };
+  }
   ranked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.tokenHits !== a.tokenHits) return b.tokenHits - a.tokenHits;
     if (a.lengthDelta !== b.lengthDelta) return a.lengthDelta - b.lengthDelta;
     return a.entry.title.localeCompare(b.entry.title);
   });
-  return ranked[0]?.entry ?? null;
+  const top = ranked[0] ?? null;
+  const second = ranked[1] ?? null;
+  const candidates = ranked.slice(0, 3).map((item) => item.entry);
+  const gap = top && second ? top.score - second.score : top?.score ?? 0;
+  const scoreBase = Math.max(1, (top?.score ?? 0) + (second?.score ?? 0) + 60);
+  const confidence = top ? Math.max(0, Math.min(1, ((top.score + gap) / scoreBase))) : 0;
+  let status: DocTopicResolutionStatus = "weak";
+  if (!top) {
+    status = "none";
+  } else if (second && gap < 20) {
+    status = "ambiguous";
+  } else if (top.score >= 180 && top.tokenHits >= 1 && (!second || gap >= 35)) {
+    status = "strong";
+  } else if (top.score < 80 || top.tokenHits === 0) {
+    status = "weak";
+  } else {
+    status = second && gap < 28 ? "ambiguous" : "weak";
+  }
+  return {
+    status,
+    best: top?.entry ?? null,
+    candidates,
+    confidence,
+  };
 }
 
 function extractTopic(input: string): string | null {

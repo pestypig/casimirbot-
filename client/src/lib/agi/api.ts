@@ -427,6 +427,7 @@ export type LocalAskResponse = {
     fail_class?: string | null;
     helix_ask_fail_reason?: string | null;
     helix_ask_fail_class?: string | null;
+    [key: string]: unknown;
   };
 };
 
@@ -1391,6 +1392,84 @@ export async function runConversationTurn(
   return asJson<ConversationTurnResponse>(response);
 }
 
+export async function runAskTurn(payload: {
+  question: string;
+  sessionId?: string;
+  traceId?: string;
+  turnId?: string;
+  personaId?: string;
+  sourceLanguage?: string;
+  languageDetected?: string;
+  languageConfidence?: number;
+  codeMixed?: boolean;
+  pivotConfidence?: number;
+  responseLanguage?: string;
+  preferredResponseLanguage?: string;
+  interpreter?: HelixInterpreterArtifact;
+  interpreter_schema_version?: "helix.interpreter.v1" | string;
+  multilangConfirm?: boolean;
+  lang_schema_version?: "helix.lang.v1" | string;
+  translated?: boolean;
+  maxTokens?: number;
+  mode?: "read" | "observe" | "act" | "verify";
+  contextFiles?: string[];
+  debug?: boolean;
+  capsuleIds?: string[];
+  answerContract?: HelixAskAnswerContract;
+  signal?: AbortSignal;
+}): Promise<LocalAskResponse> {
+  const body: Record<string, unknown> = {
+    question: payload.question,
+  };
+  if (payload.sessionId?.trim()) body.sessionId = payload.sessionId.trim();
+  if (payload.traceId?.trim()) body.traceId = payload.traceId.trim();
+  if (payload.turnId?.trim()) body.turnId = payload.turnId.trim();
+  if (payload.personaId?.trim()) body.personaId = payload.personaId.trim();
+  if (payload.sourceLanguage?.trim()) body.sourceLanguage = payload.sourceLanguage.trim();
+  if (payload.languageDetected?.trim()) body.languageDetected = payload.languageDetected.trim();
+  if (typeof payload.languageConfidence === "number" && Number.isFinite(payload.languageConfidence)) {
+    body.languageConfidence = payload.languageConfidence;
+  }
+  if (typeof payload.codeMixed === "boolean") body.codeMixed = payload.codeMixed;
+  if (typeof payload.pivotConfidence === "number" && Number.isFinite(payload.pivotConfidence)) {
+    body.pivotConfidence = payload.pivotConfidence;
+  }
+  if (payload.responseLanguage?.trim()) body.responseLanguage = payload.responseLanguage.trim();
+  if (payload.preferredResponseLanguage?.trim()) {
+    body.preferredResponseLanguage = payload.preferredResponseLanguage.trim();
+  }
+  if (payload.interpreter) body.interpreter = payload.interpreter;
+  if (payload.interpreter_schema_version?.trim()) {
+    body.interpreter_schema_version = payload.interpreter_schema_version.trim();
+  }
+  if (typeof payload.multilangConfirm === "boolean") body.multilangConfirm = payload.multilangConfirm;
+  if (payload.lang_schema_version?.trim()) body.lang_schema_version = payload.lang_schema_version.trim();
+  if (typeof payload.translated === "boolean") body.translated = payload.translated;
+  if (typeof payload.maxTokens === "number") body.max_tokens = payload.maxTokens;
+  if (payload.mode) body.mode = payload.mode;
+  if (typeof payload.debug === "boolean") body.debug = payload.debug;
+  if (Array.isArray(payload.contextFiles) && payload.contextFiles.length > 0) {
+    body.contextFiles = payload.contextFiles
+      .map((entry) => String(entry ?? "").trim())
+      .filter((entry) => entry.length > 0)
+      .slice(0, 48);
+  }
+  if (Array.isArray(payload.capsuleIds) && payload.capsuleIds.length > 0) {
+    body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
+  }
+  if (payload.answerContract) body.answer_contract = payload.answerContract;
+  const response = await fetch("/api/agi/ask/turn", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: payload.signal,
+  });
+  return normalizeLocalAskResponse(await asJson<unknown>(response));
+}
+
 export type PlanRequestOptions = {
   desktopId?: string;
   includeTelemetry?: boolean;
@@ -1617,7 +1696,11 @@ const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
       failClass === "multilang_confidence_gate" ||
       /^HELIX_(?:INTERPRETER|MULTILANG)_/.test(failReason));
   const fallbackText = message || interpreterConfirmPrompt || (blockedByGate ? "Confirmation is required." : "");
-  const text = rawText || fallbackText || "No final answer returned.";
+  const invalidRawText = /^no final answer returned\.?$/i.test(rawText);
+  const text =
+    (rawText && !invalidRawText ? rawText : "") ||
+    fallbackText ||
+    "I couldn't produce a final answer for that turn. Please retry once.";
   return {
     ...(record as LocalAskResponse),
     text,

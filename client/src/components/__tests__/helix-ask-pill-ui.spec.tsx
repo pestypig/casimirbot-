@@ -51,6 +51,25 @@ let describeVoiceCommandAction: typeof import("@/components/helix/HelixAskPill")
 let shouldKeepHelixReplyInBriefLane: typeof import("@/components/helix/HelixAskPill").shouldKeepHelixReplyInBriefLane;
 let parseWorkstationActionCommand: typeof import("@/components/helix/HelixAskPill").parseWorkstationActionCommand;
 let buildObserverCommentaryForRow: typeof import("@/components/helix/HelixAskPill").buildObserverCommentaryForRow;
+let deriveObserverDispatchPlan: typeof import("@/components/helix/HelixAskPill").deriveObserverDispatchPlan;
+let deriveHelixPlannerContract: typeof import("@/components/helix/HelixAskPill").deriveHelixPlannerContract;
+let resolveHelixDispatchPolicyAtTurnStart: typeof import("@/components/helix/HelixAskPill").resolveHelixDispatchPolicyAtTurnStart;
+let classifyHelixReasoningIntent: typeof import("@/components/helix/HelixAskPill").classifyHelixReasoningIntent;
+let isSimpleConversationTurnCandidate: typeof import("@/components/helix/HelixAskPill").isSimpleConversationTurnCandidate;
+let buildObserverPlanDeltaEvent: typeof import("@/components/helix/HelixAskPill").buildObserverPlanDeltaEvent;
+let buildObserverPlanItemCompletedEvent: typeof import("@/components/helix/HelixAskPill").buildObserverPlanItemCompletedEvent;
+let buildObserverFinalizationEvent: typeof import("@/components/helix/HelixAskPill").buildObserverFinalizationEvent;
+let buildObserverHandoffEvent: typeof import("@/components/helix/HelixAskPill").buildObserverHandoffEvent;
+let buildWorkstationUserInputRequest: typeof import("@/components/helix/HelixAskPill").buildWorkstationUserInputRequest;
+let resolvePendingWorkstationUserInput: typeof import("@/components/helix/HelixAskPill").resolvePendingWorkstationUserInput;
+let isWorkstationTurnTransitionPendingRequest: typeof import("@/components/helix/HelixAskPill").isWorkstationTurnTransitionPendingRequest;
+let normalizeTerminalAnswerText: typeof import("@/components/helix/HelixAskPill").normalizeTerminalAnswerText;
+let isInvalidTerminalAnswerText: typeof import("@/components/helix/HelixAskPill").isInvalidTerminalAnswerText;
+let registerTurnTerminalOutcome: typeof import("@/components/helix/HelixAskPill").registerTurnTerminalOutcome;
+let parseWorkstationActionChainCommand: typeof import("@/components/helix/HelixAskPill").parseWorkstationActionChainCommand;
+let buildWorkstationProceduralStepEvent: typeof import("@/components/helix/HelixAskPill").buildWorkstationProceduralStepEvent;
+let evaluateEvidenceFinalizationGate: typeof import("@/components/helix/HelixAskPill").evaluateEvidenceFinalizationGate;
+let buildNeedsRetrievalPlanEvent: typeof import("@/components/helix/HelixAskPill").buildNeedsRetrievalPlanEvent;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -103,6 +122,25 @@ beforeAll(async () => {
     shouldKeepHelixReplyInBriefLane,
     parseWorkstationActionCommand,
     buildObserverCommentaryForRow,
+    deriveObserverDispatchPlan,
+    deriveHelixPlannerContract,
+    resolveHelixDispatchPolicyAtTurnStart,
+    classifyHelixReasoningIntent,
+    isSimpleConversationTurnCandidate,
+    buildObserverPlanDeltaEvent,
+    buildObserverPlanItemCompletedEvent,
+    buildObserverFinalizationEvent,
+    buildObserverHandoffEvent,
+    buildWorkstationUserInputRequest,
+    resolvePendingWorkstationUserInput,
+    isWorkstationTurnTransitionPendingRequest,
+    normalizeTerminalAnswerText,
+    isInvalidTerminalAnswerText,
+    registerTurnTerminalOutcome,
+    parseWorkstationActionChainCommand,
+    buildWorkstationProceduralStepEvent,
+    evaluateEvidenceFinalizationGate,
+    buildNeedsRetrievalPlanEvent,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -153,6 +191,21 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('fetch("/version"');
     expect(source).toContain('source: "system"');
     expect(source).toContain('kind: "build_info"');
+  });
+
+  it("requires explicit S2 planning artifacts before reasoning execution", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("S2_PLANNING");
+    expect(source).toContain("explicit_reasoning_plan");
+    expect(source).toContain("ensureExplicitReasoningPlan");
+    expect(source).toMatch(/attempt = ensureExplicitReasoningPlan\(attempt\)/);
+    expect(source).toContain("RF_EMPTY_TERMINAL");
+  });
+
+  it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("voice normal turn lane (no queued reasoning)");
+    expect(source).toContain("dispatch:simple_conversation_turn");
   });
 
   it("exposes command-lane confirmation UX with deterministic countdown", () => {
@@ -210,9 +263,37 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(String(workflowArgs.compare_instruction ?? "").toLowerCase()).toContain("compare");
   });
 
+  it("builds deterministic two-step workstation chains for copy-then-compare prompts", () => {
+    const chain = parseWorkstationActionChainCommand(
+      "copy this abstract to a note pad called Mission Notes and compare with current doc",
+    );
+    expect(chain).not.toBeNull();
+    expect(Array.isArray(chain)).toBe(true);
+    if (!Array.isArray(chain)) return;
+    expect(chain).toHaveLength(2);
+    expect(chain[0]?.action).toBe("run_panel_action");
+    if (chain[0]?.action === "run_panel_action") {
+      expect(chain[0].panel_id).toBe("workstation-clipboard-history");
+      expect(chain[0].action_id).toBe("copy_selection_to_note");
+    }
+    expect(chain[1]?.action).toBe("run_job");
+    if (chain[1]?.action === "run_job") {
+      expect(chain[1].payload.workflow).toBe("observable_research_pipeline");
+      const workflowArgs = (chain[1].payload.workflow_args ?? {}) as Record<string, unknown>;
+      expect(String(workflowArgs.chain_signature ?? "")).toContain("copy_selection_to_note");
+      expect(String(workflowArgs.compare_basis ?? "")).toBe("current_doc");
+    }
+  });
+
   it("routes deictic read-this-doc prompts to open_doc_and_read using active docs context", () => {
     useDocViewerStore.getState().viewDoc("/docs/papers.md");
     expect(parseWorkstationActionCommand("ok read this doc to me")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "open_doc_and_read",
+      args: { path: "docs/papers.md" },
+    });
+    expect(parseWorkstationActionCommand("ok read this file to me")).toEqual({
       action: "run_panel_action",
       panel_id: "docs-viewer",
       action_id: "open_doc_and_read",
@@ -241,6 +322,261 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(pullLatestToday.panel_id).toBe("docs-viewer");
     expect(pullLatestToday.action_id).toBe("open_doc");
     expect((pullLatestToday.args as { path?: string } | undefined)?.path).toBeTruthy();
+
+    const popLatestToday = parseWorkstationActionCommand("Ok pop open the latest NHM2 document from today");
+    expect(popLatestToday?.action).toBe("run_panel_action");
+    if (popLatestToday?.action !== "run_panel_action") return;
+    expect(popLatestToday.panel_id).toBe("docs-viewer");
+    expect(popLatestToday.action_id).toBe("open_doc");
+    expect((popLatestToday.args as { path?: string } | undefined)?.path).toBeTruthy();
+  });
+
+  it("maps notes lexicon utterances to deterministic panel actions", () => {
+    expect(parseWorkstationActionCommand("create a note called Warp Notes")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: { title: "Warp Notes", topic: "Warp Notes" },
+    });
+    expect(parseWorkstationActionCommand("new note Casimir capture")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: { title: "Casimir capture", topic: "Casimir capture" },
+    });
+    expect(parseWorkstationActionCommand("add to note Mission Log: Track quantum inequality bounds")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: { title: "Mission Log", text: "Track quantum inequality bounds" },
+    });
+    expect(parseWorkstationActionCommand("rename note Mission Log to Mission Log v2")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "rename_note",
+      args: { from_title: "Mission Log", title: "Mission Log v2" },
+    });
+    expect(parseWorkstationActionCommand("delete note Mission Log v2")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "delete_note",
+      args: { title: "Mission Log v2" },
+    });
+    expect(parseWorkstationActionCommand("list my notes")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "list_notes",
+      args: undefined,
+    });
+    expect(parseWorkstationActionCommand("Ok can you copy this abstract to a note pad")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-clipboard-history",
+      action_id: "copy_selection_to_note",
+      args: { note_title: undefined },
+    });
+  });
+
+  it("maps clipboard lexicon utterances to deterministic panel actions", () => {
+    expect(parseWorkstationActionCommand("read clipboard")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-clipboard-history",
+      action_id: "read_clipboard",
+      args: undefined,
+    });
+    expect(parseWorkstationActionCommand("copy this to clipboard: NHM2 complete")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-clipboard-history",
+      action_id: "write_clipboard",
+      args: { text: "NHM2 complete" },
+    });
+    expect(parseWorkstationActionCommand("clear clipboard history")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-clipboard-history",
+      action_id: "clear_history",
+      args: undefined,
+    });
+    expect(parseWorkstationActionCommand("copy latest clipboard entry to note Mission Notes")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-clipboard-history",
+      action_id: "copy_receipt_to_note",
+      args: { note_title: "Mission Notes" },
+    });
+  });
+
+  it("resolves capability alias actions with no required args", () => {
+    expect(parseWorkstationActionCommand("show docs directory")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "open_directory",
+      args: undefined,
+    });
+    expect(parseWorkstationActionCommand("view clipboard history")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-clipboard-history",
+      action_id: "open",
+      args: undefined,
+    });
+  });
+
+  it("does not map ambiguous note phrasing into mutating lexicon actions", () => {
+    expect(parseWorkstationActionCommand("note this might be useful later")).toBeNull();
+    expect(parseWorkstationActionCommand("clipboard maybe has something")).toBeNull();
+  });
+
+  it("derives observer dispatch plans for chat/workspace/reasoning combinations", () => {
+    expect(
+      deriveObserverDispatchPlan({
+        question: "close the docs",
+        workstationAction: { action: "close_active_panel" },
+      }),
+    ).toMatchObject({
+      intent_type: "chat_plus_workspace",
+      dispatch_plan: "workspace",
+      should_dispatch_workspace: true,
+      should_dispatch_reasoning: false,
+      should_stay_conversational: true,
+    });
+    expect(
+      deriveObserverDispatchPlan({
+        question: "open the latest nhm2 doc and explain it in plain language",
+        workstationAction: {
+          action: "run_panel_action",
+          panel_id: "docs-viewer",
+          action_id: "open_doc",
+        },
+      }),
+    ).toMatchObject({
+      intent_type: "chat_plus_workspace_plus_reasoning",
+      dispatch_plan: "workspace+reasoning",
+      should_dispatch_workspace: true,
+      should_dispatch_reasoning: true,
+    });
+    expect(
+      deriveObserverDispatchPlan({
+        question: "explain this section in simpler terms",
+        workstationAction: null,
+      }),
+    ).toMatchObject({
+      intent_type: "chat_plus_reasoning",
+      dispatch_plan: "reasoning",
+      should_dispatch_workspace: false,
+      should_dispatch_reasoning: true,
+    });
+  });
+
+  it("planner contract blocks accidental docs explain actionization on pasted abstract prompts", () => {
+    const contract = deriveHelixPlannerContract({
+      question:
+        "In this paper we analyze quantum horizon structure across multiple manifolds.\nThe abstract derives a constrained variance regime with nontrivial curvature transport.\nWhat does this abstract mean in plain language?",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "explain_paper",
+      },
+    });
+    expect(contract.planner_blocked_workstation).toBe(true);
+    expect(contract.workstation_action).toBeNull();
+    expect(contract.dispatch_plan.dispatch_plan).toBe("reasoning");
+    expect(contract.intent_kind).toBe("conversational_explain");
+  });
+
+  it("planner contract keeps explicit workstation commands actionable", () => {
+    const contract = deriveHelixPlannerContract({
+      question: "Open the docs and explain this paper",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "explain_paper",
+      },
+    });
+    expect(contract.planner_blocked_workstation).toBe(false);
+    expect(contract.workstation_action).not.toBeNull();
+    expect(contract.dispatch_plan.should_dispatch_workspace).toBe(true);
+  });
+
+  it("planner contract keeps docs explain prompts workspace-owned even with hard reasoning cues", () => {
+    const workspaceOwned = deriveHelixPlannerContract({
+      question: "what does the abstract of this paper mean?",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "explain_paper",
+      },
+    });
+    expect(workspaceOwned.dispatch_plan.dispatch_plan).toBe("workspace");
+    expect(workspaceOwned.reasoning_required).toBe("none");
+
+    const hardReasoning = deriveHelixPlannerContract({
+      question: "verify and compare what this paper claims",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "explain_paper",
+      },
+    });
+    expect(hardReasoning.dispatch_plan.should_dispatch_reasoning).toBe(false);
+    expect(hardReasoning.reasoning_required).toBe("none");
+  });
+
+  it("freezes workspace_only dispatch policy unless explicit workspace_then_reasoning cue exists", () => {
+    const workspaceOnly = resolveHelixDispatchPolicyAtTurnStart({
+      question: "open the latest nhm2 doc and explain it",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+      },
+    });
+    expect(workspaceOnly).toBe("workspace_only");
+    const contract = deriveHelixPlannerContract({
+      question: "open the latest nhm2 doc and explain it",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+      },
+      dispatchPolicy: workspaceOnly,
+    });
+    expect(contract.dispatch_plan.dispatch_plan).toBe("workspace");
+    expect(contract.dispatch_plan.should_dispatch_reasoning).toBe(false);
+
+    const explicitHybrid = resolveHelixDispatchPolicyAtTurnStart({
+      question: "open the latest nhm2 doc and then explain it in the background",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+      },
+    });
+    expect(explicitHybrid).toBe("workspace_then_reasoning");
+    const hybridContract = deriveHelixPlannerContract({
+      question: "open the latest nhm2 doc and then explain it in the background",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+      },
+      dispatchPolicy: explicitHybrid,
+    });
+    expect(hybridContract.dispatch_plan.dispatch_plan).toBe("workspace+reasoning");
+  });
+
+  it("classifies reasoning intent with typed classes for deterministic routing", () => {
+    expect(classifyHelixReasoningIntent("verify these claims against evidence").intent_class).toBe(
+      "hard_reasoning",
+    );
+    expect(classifyHelixReasoningIntent("explain the theory behind this result").intent_class).toBe(
+      "research_synthesis",
+    );
+    expect(classifyHelixReasoningIntent("open the docs viewer").intent_class).toBe("simple_workspace_query");
+    expect(classifyHelixReasoningIntent("hello").intent_class).toBe("simple_conversation");
+  });
+
+  it("marks lite social prompts as normal-turn conversation candidates", () => {
+    expect(isSimpleConversationTurnCandidate("hello")).toBe(true);
+    expect(isSimpleConversationTurnCandidate("thanks!")).toBe(true);
+    expect(isSimpleConversationTurnCandidate("open the docs")).toBe(false);
+    expect(isSimpleConversationTurnCandidate("compare these two docs")).toBe(false);
   });
 
   it("keeps summarize-doc prompts on summarize action (not read-aloud)", () => {
@@ -298,6 +634,387 @@ describe("HelixAskPill mic helper behavior", () => {
     expect((action.args as { path?: string } | undefined)?.path).toContain(
       "/docs/research/nhm2-full-solve-overview-v2-2026-04-23.md",
     );
+  });
+
+  it("builds deterministic observer plan delta events", () => {
+    const dispatchPlan = deriveObserverDispatchPlan({
+      question: "open the latest NHM2 doc and explain it",
+      workstationAction: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+      },
+      forceReasoningDispatch: true,
+    });
+    const event = buildObserverPlanDeltaEvent({
+      source: "run_ask",
+      dispatchPlan,
+      question: "open the latest NHM2 doc and explain it",
+    });
+    expect(event.tool).toBe("helix.observer.plan");
+    expect(event.text).toContain("observer plan update");
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("observer_plan_delta");
+    expect(meta.dispatch_plan).toBe("workspace+reasoning");
+    expect(meta.intent_type).toBe("chat_plus_workspace_plus_reasoning");
+    expect(meta.source).toBe("run_ask");
+  });
+
+  it("builds deterministic observer plan item-completed events", () => {
+    const dispatchPlan = deriveObserverDispatchPlan({
+      question: "close the docs",
+      workstationAction: { action: "close_active_panel" },
+    });
+    const event = buildObserverPlanItemCompletedEvent({
+      source: "submit",
+      dispatchPlan,
+      item: "workspace_dispatched",
+      question: "close the docs",
+      action: { action: "close_active_panel" },
+    });
+    expect(event.tool).toBe("helix.observer.plan");
+    expect(event.text).toContain("observer plan step complete");
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("observer_plan_item_completed");
+    expect(meta.item).toBe("workspace_dispatched");
+    expect(meta.dispatch_plan).toBe("workspace");
+    expect(meta.source).toBe("submit");
+  });
+
+  it("builds deterministic observer finalization events", () => {
+    const event = buildObserverFinalizationEvent({
+      source: "run_ask",
+      question: "compare the two docs and explain the difference",
+      mode: "observe",
+      certaintyClass: "reasoned",
+      evidence_refs: ["docs/NHM2.md"],
+      needs_retrieval: false,
+      final_source: "normal_reasoning",
+      answer_id: "answer-123",
+      attempt_id: "attempt-123",
+      traceId: "ask:trace-123",
+      live_event_count: 7,
+      debug_context: { policyPromptFamily: "general_overview" },
+    });
+    expect(event.tool).toBe("helix.observer.finalization");
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("observer_finalization");
+    expect(meta.mode).toBe("observe");
+    expect(meta.certainty_class).toBe("reasoned");
+    expect(meta.answer_id).toBe("answer-123");
+    expect(meta.live_event_count).toBe(7);
+  });
+
+  it("builds deterministic observer handoff events for retrieval-blocked claims", () => {
+    const event = buildObserverHandoffEvent({
+      source: "run_ask",
+      question: "prove this from the docs",
+      mode: "verify",
+      certaintyClass: "unknown",
+      evidence_refs: [],
+      needs_retrieval: true,
+      answer_id: "answer-234",
+      attempt_id: "attempt-234",
+      traceId: "ask:trace-234",
+    });
+    expect(event.tool).toBe("helix.observer.handoff");
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("observer_handoff");
+    expect(meta.needs_retrieval).toBe(true);
+    const actions = (meta.recommended_workspace_actions ?? []) as Array<Record<string, unknown>>;
+    expect(actions.length).toBeGreaterThan(0);
+    expect(actions.some((entry) => entry.action_id === "open_doc")).toBe(true);
+  });
+
+  it("builds deterministic observer handoff events for grounded answers", () => {
+    const event = buildObserverHandoffEvent({
+      source: "voice_dispatch",
+      question: "summarize this and align claims",
+      mode: "observe",
+      certaintyClass: "reasoned",
+      evidence_refs: ["docs/NHM2.md", "docs/NHM2-appendix.md"],
+      needs_retrieval: false,
+      answer_id: "answer-345",
+      attempt_id: "attempt-345",
+      traceId: "ask:trace-345",
+    });
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("observer_handoff");
+    const actions = (meta.recommended_workspace_actions ?? []) as Array<Record<string, unknown>>;
+    expect(actions.some((entry) => entry.action_id === "append_to_note")).toBe(true);
+    const followups = (meta.reasoning_followups ?? []) as string[];
+    expect(followups.some((item) => /citation alignment/i.test(item))).toBe(true);
+  });
+
+  it("builds deterministic workstation procedural-step events", () => {
+    const event = buildWorkstationProceduralStepEvent({
+      source: "run_ask",
+      step: 2,
+      total: 2,
+      action: {
+        action: "run_job",
+        payload: {
+          workflow: "observable_research_pipeline",
+        },
+      },
+      question: "copy this abstract to note and compare it",
+    });
+    expect(event.tool).toBe("helix.workstation.chain");
+    expect(event.text).toContain("workstation step 2/2");
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("workstation_procedural_step");
+    expect(meta.step).toBe(2);
+    expect(meta.total_steps).toBe(2);
+    expect(meta.source).toBe("run_ask");
+  });
+
+  it("builds workstation request_user_input prompt for missing required args", () => {
+    const pending = buildWorkstationUserInputRequest({
+      source: "submit",
+      turn_id: "turn:submit:1",
+      question: "append this to note mission",
+      action: {
+        action: "run_panel_action",
+        panel_id: "workstation-notes",
+        action_id: "append_to_note",
+        args: { title: "mission" },
+      },
+    });
+    expect(pending).not.toBeNull();
+    expect(pending?.turn_id).toBe("turn:submit:1");
+    expect(pending?.reason).toBe("missing_args");
+    expect(pending?.missing_args).toContain("text");
+    expect(pending?.prompt.toLowerCase()).toContain("i need text");
+  });
+
+  it("builds workstation request_user_input prompt for confirmation-required actions", () => {
+    const pending = buildWorkstationUserInputRequest({
+      source: "run_ask",
+      question: "delete note mission log",
+      action: {
+        action: "run_panel_action",
+        panel_id: "workstation-notes",
+        action_id: "delete_note",
+        args: { title: "Mission Log" },
+      },
+    });
+    expect(pending).not.toBeNull();
+    expect(pending?.reason).toBe("confirmation_required");
+    expect(pending?.prompt.toLowerCase()).toContain("reply yes");
+  });
+
+  it("requests clarification for ambiguous doc-topic resolution even when required args are present", () => {
+    const pending = buildWorkstationUserInputRequest({
+      source: "submit",
+      question: "open docs about foc",
+      action: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+        args: {
+          path: "/docs/research/focus-overview.md",
+          _doc_resolution_status: "ambiguous",
+          _doc_resolution_confidence: 0.31,
+          _doc_resolution_topic: "foc",
+          _doc_resolution_candidates: ["/docs/research/focus-overview.md", "/docs/research/foc-appendix.md"],
+        },
+      },
+    });
+    expect(pending).not.toBeNull();
+    expect(pending?.reason).toBe("missing_args");
+    expect(pending?.router_fail_id).toBe("RF_AMBIGUOUS_DOC_TOPIC");
+    expect(pending?.missing_args).toContain("path");
+    expect(pending?.doc_topic).toBe("foc");
+    expect(pending?.doc_candidates).toEqual(["/docs/research/focus-overview.md", "/docs/research/foc-appendix.md"]);
+    expect(pending?.prompt.toLowerCase()).toContain("multiple docs");
+  });
+
+  it("requests clarification for weak doc-topic resolution even when confidence appears high", () => {
+    const pending = buildWorkstationUserInputRequest({
+      source: "submit",
+      question: "open docs about foc",
+      action: {
+        action: "run_panel_action",
+        panel_id: "docs-viewer",
+        action_id: "open_doc",
+        args: {
+          path: "/docs/research/focus-overview.md",
+          _doc_resolution_status: "weak",
+          _doc_resolution_confidence: 0.91,
+          _doc_resolution_topic: "foc",
+          _doc_resolution_candidates: ["/docs/research/focus-overview.md"],
+        },
+      },
+    });
+    expect(pending).not.toBeNull();
+    expect(pending?.reason).toBe("missing_args");
+    expect(pending?.router_fail_id).toBe("RF_LOW_CONFIDENCE_DOC_RESOLUTION");
+    expect(pending?.missing_args).toContain("path");
+    expect(pending?.doc_topic).toBe("foc");
+    expect(pending?.doc_candidates).toEqual(["/docs/research/focus-overview.md"]);
+    expect(pending?.prompt.toLowerCase()).toContain("could not confidently resolve");
+  });
+
+  it("resolves pending workstation missing-arg requests from user reply", () => {
+    const pending = buildWorkstationUserInputRequest({
+      source: "submit",
+      question: "append to note mission",
+      action: {
+        action: "run_panel_action",
+        panel_id: "workstation-notes",
+        action_id: "append_to_note",
+        args: { title: "Mission" },
+      },
+    });
+    expect(pending).not.toBeNull();
+    if (!pending) return;
+    const resolved = resolvePendingWorkstationUserInput({
+      pending,
+      reply: "Track the NHM2 checkpoints",
+    });
+    expect(resolved.status).toBe("resolved");
+    if (resolved.status !== "resolved") return;
+    expect(resolved.action.action).toBe("run_panel_action");
+    if (resolved.action.action !== "run_panel_action") return;
+    expect((resolved.action.args ?? {}).text).toBe("Track the NHM2 checkpoints");
+  });
+
+  it("resolves confirmation requests deterministically from yes/no replies", () => {
+    const pending = buildWorkstationUserInputRequest({
+      source: "submit",
+      question: "clear clipboard history",
+      action: {
+        action: "run_panel_action",
+        panel_id: "workstation-clipboard-history",
+        action_id: "clear_history",
+      },
+    });
+    expect(pending).not.toBeNull();
+    if (!pending) return;
+    const cancelled = resolvePendingWorkstationUserInput({
+      pending,
+      reply: "no",
+    });
+    expect(cancelled.status).toBe("cancelled");
+    const confirmed = resolvePendingWorkstationUserInput({
+      pending,
+      reply: "yes",
+    });
+    expect(confirmed.status).toBe("resolved");
+    if (confirmed.status !== "resolved") return;
+    expect(confirmed.action.action).toBe("run_panel_action");
+    if (confirmed.action.action !== "run_panel_action") return;
+    expect((confirmed.action.args ?? {}).confirmed).toBe(true);
+  });
+
+  it("detects pending request turn transitions deterministically", () => {
+    expect(
+      isWorkstationTurnTransitionPendingRequest({
+        pending_turn_id: "ask:turn_a",
+        current_turn_id: "ask:turn_b",
+      }),
+    ).toBe(true);
+    expect(
+      isWorkstationTurnTransitionPendingRequest({
+        pending_turn_id: "ask:turn_a",
+        current_turn_id: "ask:turn_a",
+      }),
+    ).toBe(false);
+    expect(
+      isWorkstationTurnTransitionPendingRequest({
+        pending_turn_id: "",
+        current_turn_id: "ask:turn_b",
+      }),
+    ).toBe(false);
+  });
+
+  it("normalizes and rejects invalid terminal answer text", () => {
+    expect(normalizeTerminalAnswerText(" \u00a0No final answer returned.  ")).toBe("No final answer returned.");
+    expect(isInvalidTerminalAnswerText("")).toBe(true);
+    expect(isInvalidTerminalAnswerText("No final answer returned.")).toBe(true);
+    expect(isInvalidTerminalAnswerText("  grounded answer ready  ")).toBe(false);
+  });
+
+  it("registers exactly one terminal outcome per turn", () => {
+    const registry: Record<string, "final_answer" | "final_failure"> = {};
+    const first = registerTurnTerminalOutcome({
+      registry,
+      turn_id: "ask:turn_terminal_1",
+      outcome: "final_answer",
+    });
+    const second = registerTurnTerminalOutcome({
+      registry,
+      turn_id: "ask:turn_terminal_1",
+      outcome: "final_failure",
+    });
+    const missing = registerTurnTerminalOutcome({
+      registry,
+      turn_id: "",
+      outcome: "final_answer",
+    });
+    expect(first.accepted).toBe(true);
+    expect(first.existing).toBeNull();
+    expect(second.accepted).toBe(false);
+    expect(second.existing).toBe("final_answer");
+    expect(missing.accepted).toBe(false);
+    expect(missing.turn_id).toBeNull();
+  });
+
+  it("blocks hard-claim finalization when no evidence refs are present", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question: "compare these docs and prove which claim is correct",
+      mode: "observe",
+      debug: {},
+      proof: undefined,
+    });
+    expect(decision.blocked).toBe(true);
+    expect(decision.reason).toBe("hard_claim_without_evidence_refs");
+    expect(decision.evidence_refs).toEqual([]);
+  });
+
+  it("blocks hard-claim finalization when evidence gate is not satisfied", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question: "verify this theory against the current docs",
+      mode: "verify",
+      debug: {
+        context_files: ["docs/NHM2.md"],
+        evidence_gate_ok: false,
+      },
+      proof: undefined,
+    });
+    expect(decision.blocked).toBe(true);
+    expect(decision.reason).toBe("hard_claim_evidence_gate_not_ok");
+    expect(decision.evidence_refs).toEqual(["docs/NHM2.md"]);
+  });
+
+  it("allows hard-claim finalization when evidence refs and evidence gate are both present", () => {
+    const decision = evaluateEvidenceFinalizationGate({
+      question: "synthesize and compare both documents",
+      mode: "observe",
+      debug: {
+        context_files: ["docs/NHM2.md"],
+        evidence_gate_ok: true,
+      },
+      proof: undefined,
+    });
+    expect(decision.blocked).toBe(false);
+    expect(decision.reason).toBeNull();
+    expect(decision.evidence_refs).toEqual(["docs/NHM2.md"]);
+  });
+
+  it("builds deterministic needs-retrieval observer plan events", () => {
+    const event = buildNeedsRetrievalPlanEvent({
+      source: "run_ask",
+      question: "prove the claim from the docs",
+      reason: "hard_claim_without_evidence_refs",
+      evidence_refs: [],
+      traceId: "ask:trace-123",
+    });
+    expect(event.tool).toBe("helix.observer.plan");
+    const meta = (event.meta ?? {}) as Record<string, unknown>;
+    expect(meta.kind).toBe("observer_plan_delta");
+    expect(meta.plan_step).toBe("needs_retrieval");
+    expect(meta.reason).toBe("hard_claim_without_evidence_refs");
   });
 
   it("builds observer lane commentary with user-perspective restating", () => {

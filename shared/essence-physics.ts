@@ -283,9 +283,9 @@ export const CurvatureSummary = z.object({
           units.system === SI_UNITS.system &&
           units.length === SI_UNITS.length &&
           units.time === SI_UNITS.time &&
-          units.mass === SI_UNITS.mass &&
-          units.energy === SI_UNITS.energy &&
-          units.density === SI_UNITS.density
+          units.mass_density === SI_UNITS.mass_density &&
+          units.energy_density === SI_UNITS.energy_density &&
+          units.power_flux === SI_UNITS.power_flux
         );
       }, "stress-energy bridge requires SI unit lock"),
       provenance: z.object({

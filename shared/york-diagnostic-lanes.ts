@@ -503,23 +503,35 @@ export const computeYorkDiagnosticLaneField = (
     };
   }
 
+  const kTrace = args.kTrace as Float32Array;
+  const betaX = args.betaX as Float32Array;
+  const betaY = args.betaY as Float32Array;
+  const betaZ = args.betaZ as Float32Array;
+  const alpha = args.alpha as Float32Array;
+  const gammaXX = args.gammaXX as Float32Array;
+  const gammaXY = args.gammaXY as Float32Array;
+  const gammaXZ = args.gammaXZ as Float32Array;
+  const gammaYY = args.gammaYY as Float32Array;
+  const gammaYZ = args.gammaYZ as Float32Array;
+  const gammaZZ = args.gammaZZ as Float32Array;
+
   const divergence = buildShiftDriftDivergence({
     dims: args.dims,
     voxelSizeM: args.voxelSizeM,
-    betaX: args.betaX,
-    betaY: args.betaY,
-    betaZ: args.betaZ,
-    alpha: args.alpha,
-    gammaXX: args.gammaXX,
-    gammaXY: args.gammaXY,
-    gammaXZ: args.gammaXZ,
-    gammaYY: args.gammaYY,
-    gammaYZ: args.gammaYZ,
-    gammaZZ: args.gammaZZ,
+    betaX,
+    betaY,
+    betaZ,
+    alpha,
+    gammaXX,
+    gammaXY,
+    gammaXZ,
+    gammaYY,
+    gammaYZ,
+    gammaZZ,
   });
   const thetaLane = new Float32Array(total);
   for (let i = 0; i < total; i += 1) {
-    thetaLane[i] = -finiteOrZero(args.kTrace[i]) + finiteOrZero(divergence[i]);
+    thetaLane[i] = -finiteOrZero(kTrace[i]) + finiteOrZero(divergence[i]);
   }
   return {
     ok: true,

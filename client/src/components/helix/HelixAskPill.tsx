@@ -13,13 +13,19 @@ import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
 import { BrainCircuit, Mic, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
-import { findBestDocForTopic, findRandomPaperForTopic, parsePaperReadCommand } from "@/lib/docs/paperReadCommand";
+import {
+  findBestDocForTopic,
+  findRandomPaperForTopic,
+  parsePaperReadCommand,
+  resolveDocTopic,
+} from "@/lib/docs/paperReadCommand";
 import {
   askLocal,
   askMoodHint,
   getContextCapsule,
   getReasoningTheaterConfig,
   getPendingHelixAskJob,
+  runAskTurn,
   runConversationTurn,
   resumeHelixAskJob,
   speakVoice,
@@ -60,6 +66,11 @@ import {
   extractHelixWorkstationActionBlocks,
   type HelixWorkstationAction,
 } from "@/lib/workstation/workstationActionContract";
+import {
+  getWorkstationPanelCapabilities,
+  WORKSTATION_V1_PANEL_CAPABILITIES,
+  type WorkstationPanelActionDefinition,
+} from "@/lib/workstation/panelCapabilities";
 import {
   buildWorkstationIntentClassifierPrompt,
   coerceWorkstationActionFromIntentDecision,
@@ -235,6 +246,992 @@ type WorkstationIntentClassificationResult = {
   outcome: WorkstationIntentClassificationOutcome;
 };
 
+export type ObserverIntentType =
+  | "chat_only"
+  | "chat_plus_workspace"
+  | "chat_plus_reasoning"
+  | "chat_plus_workspace_plus_reasoning";
+
+export type ObserverDispatchPlan = {
+  intent_type: ObserverIntentType;
+  should_dispatch_workspace: boolean;
+  should_dispatch_reasoning: boolean;
+  should_stay_conversational: boolean;
+  dispatch_plan: "chat_only" | "workspace" | "reasoning" | "workspace+reasoning";
+  observer_ack: string;
+};
+
+export type ObserverPlanEventSource = "run_ask" | "external_prompt" | "submit" | "voice_dispatch";
+export type ObserverPlanItemKey = "workspace_dispatched" | "reasoning_queued";
+export type WorkstationUserInputRequestReason = "missing_args" | "confirmation_required";
+export type WorkstationRequestSource = ObserverPlanEventSource;
+export type ObserverFinalizationMode = "read" | "observe" | "act" | "verify";
+export type ObserverFinalizationCertainty = "confirmed" | "reasoned" | "hypothesis" | "unknown";
+export type HelixPlannerIntentKind = "conversational_explain" | "workstation_command" | "hybrid";
+export type HelixDispatchPolicy = "workspace_only" | "reasoning_only" | "workspace_then_reasoning";
+export type HelixReasoningIntentClass =
+  | "none"
+  | "simple_conversation"
+  | "simple_workspace_query"
+  | "research_synthesis"
+  | "hard_reasoning";
+
+export type HelixPlannerContract = {
+  intent_kind: HelixPlannerIntentKind;
+  workstation_action: HelixWorkstationAction | null;
+  dispatch_plan: ObserverDispatchPlan;
+  reasoning_required: "none" | "soft" | "hard";
+  evidence_requirement: "none" | "soft" | "hard";
+  planner_blocked_workstation: boolean;
+};
+
+const HELIX_EXPLICIT_WORKSTATION_VERB_RE =
+  /\b(?:open|close|copy|append|create|delete|rename|list|switch|set|focus|clear|read|view|show|pull\s+up|bring\s+up)\b/i;
+const HELIX_HARD_EVIDENCE_REQUIREMENT_RE =
+  /\b(?:verify|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|integrity|evidence|claim)\b/i;
+const HELIX_DOCS_EXPLAIN_ACTION_IDS = new Set<string>(["explain_paper", "summarize_doc", "summarize_section"]);
+const HELIX_STRONG_REASONING_REQUEST_RE =
+  /\b(?:verify|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|integrity|evidence|claim|why|how|step[-\s]?by[-\s]?step|deep(?:er)?\b|detailed)\b/i;
+const HELIX_SIMPLE_CONVERSATION_RE =
+  /^(?:hi|hello|hey|yo|sup|howdy|good morning|good afternoon|good evening|thanks|thank you|thx|ok|okay|cool|sounds good|great|awesome|nice|how are you|what's up|whats up|all good)(?:[.!?]+)?$/i;
+export const HELIX_E1_SINGLE_TURN_CONTRACT_FLAG =
+  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E1_SINGLE_TURN_CONTRACT ?? "1")
+    .trim()
+    .toLowerCase() !== "0";
+export const HELIX_E2_TRANSITION_ERRORS_FLAG =
+  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E2_TRANSITION_ERRORS ?? "0")
+    .trim()
+    .toLowerCase() === "1";
+export const HELIX_E3_TERMINAL_GUARANTEE_FLAG =
+  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E3_TERMINAL_GUARANTEE ?? "0")
+    .trim()
+    .toLowerCase() === "1";
+export const HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG =
+  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E6_ASK_TURN_MANUAL_CANARY ?? "1")
+    .trim()
+    .toLowerCase() !== "0";
+export const HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG =
+  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E6_ASK_TURN_VOICE_PARITY ?? "1")
+    .trim()
+    .toLowerCase() !== "0";
+
+function hasExplicitWorkspaceThenReasoningCue(question: string): boolean {
+  const text = question.trim().toLowerCase();
+  if (!text) return false;
+  if (/\b(?:in the background|while you continue|while we continue)\b/.test(text)) return true;
+  return /\b(?:and then|then|after that|after you|while)\b[\s\S]*\b(?:explain|compare|verify|analy[sz]e|reason|synthesi[sz]e|cross[-\s]?check)\b/.test(
+    text,
+  );
+}
+
+function hasExplicitReasoningOnlyCue(question: string): boolean {
+  const text = question.trim().toLowerCase();
+  if (!text) return false;
+  return /\b(?:reason(?:ing)? only|analysis only|just reason|no workspace action)\b/.test(text);
+}
+
+export function classifyHelixReasoningIntent(question: string): {
+  intent_class: HelixReasoningIntentClass;
+  reasons: string[];
+} {
+  const text = question.trim().toLowerCase();
+  const reasons: string[] = [];
+  if (!text) return { intent_class: "none", reasons };
+  const hasHardCue =
+    /\b(?:verify|prove|proof|audit|compare|contrast|difference|tradeoff|integrity|evidence|claim|cross[-\s]?check)\b/.test(
+      text,
+    );
+  const hasResearchCue =
+    /\b(?:explain|synthesi[sz]e|summari[sz]e|what does|what is|why|how|walk me through|break down)\b/.test(text);
+  const hasWorkspaceActionCue =
+    /\b(?:open|close|copy|append|create|delete|rename|list|switch|set|focus|clear|read|view|show|pull up|bring up)\b/.test(
+      text,
+    );
+  const hasSimpleConversationCue = HELIX_SIMPLE_CONVERSATION_RE.test(text);
+  if (hasHardCue) reasons.push("hard_reasoning_cue");
+  if (hasResearchCue) reasons.push("research_synthesis_cue");
+  if (hasWorkspaceActionCue) reasons.push("workspace_action_cue");
+  if (hasSimpleConversationCue) reasons.push("simple_conversation_cue");
+  if (hasSimpleConversationCue && !hasWorkspaceActionCue && !hasHardCue && !hasResearchCue) {
+    return { intent_class: "simple_conversation", reasons };
+  }
+  if (hasHardCue) return { intent_class: "hard_reasoning", reasons };
+  if (hasResearchCue && !hasWorkspaceActionCue) return { intent_class: "research_synthesis", reasons };
+  if (hasWorkspaceActionCue && !hasResearchCue) return { intent_class: "simple_workspace_query", reasons };
+  if (hasResearchCue) return { intent_class: "research_synthesis", reasons };
+  return { intent_class: "none", reasons };
+}
+
+export function isSimpleConversationTurnCandidate(transcript: string): boolean {
+  const text = String(transcript ?? "").trim().toLowerCase();
+  if (!text) return false;
+  if (text.length > 80) return false;
+  if (HELIX_EXPLICIT_WORKSTATION_VERB_RE.test(text)) return false;
+  if (HELIX_HARD_EVIDENCE_REQUIREMENT_RE.test(text)) return false;
+  if (/\b(?:doc|document|paper|file|repo|repository|codebase|workspace|panel|note|clipboard)\b/.test(text)) {
+    return false;
+  }
+  return HELIX_SIMPLE_CONVERSATION_RE.test(text);
+}
+
+export function resolveHelixDispatchPolicyAtTurnStart(args: {
+  question: string;
+  workstationAction: HelixWorkstationAction | null;
+  explicitPanelCommand?: boolean;
+  forceReasoningDispatch?: boolean;
+}): HelixDispatchPolicy | null {
+  if (!HELIX_E1_SINGLE_TURN_CONTRACT_FLAG) return null;
+  const question = args.question.trim();
+  if (!question) return null;
+  if (hasExplicitReasoningOnlyCue(question)) {
+    return "reasoning_only";
+  }
+  if (args.workstationAction || args.explicitPanelCommand === true) {
+    return hasExplicitWorkspaceThenReasoningCue(question) ? "workspace_then_reasoning" : "workspace_only";
+  }
+  if (args.forceReasoningDispatch === true) {
+    return "reasoning_only";
+  }
+  const reasoningIntent = classifyHelixReasoningIntent(question).intent_class;
+  if (reasoningIntent === "hard_reasoning" || reasoningIntent === "research_synthesis") {
+    return "reasoning_only";
+  }
+  return null;
+}
+
+function looksLikePastedResearchExcerpt(question: string): boolean {
+  const text = question.trim();
+  if (!text) return false;
+  const lineCount = text.split(/\r?\n/).length;
+  const sentenceCount = (text.match(/[.!?](?:\s|$)/g) ?? []).length;
+  return (lineCount >= 2 && text.length >= 140) || (sentenceCount >= 4 && text.length >= 260);
+}
+
+export function deriveHelixPlannerContract(args: {
+  question: string;
+  workstationAction: HelixWorkstationAction | null;
+  forceReasoningDispatch?: boolean;
+  explicitPanelCommand?: boolean;
+  dispatchPolicy?: HelixDispatchPolicy | null;
+}): HelixPlannerContract {
+  const question = args.question.trim();
+  const isExplainPaperAction =
+    args.workstationAction?.action === "run_panel_action" &&
+    args.workstationAction.panel_id === "docs-viewer" &&
+    args.workstationAction.action_id === "explain_paper";
+  const shouldPreferConversationalExplain =
+    isExplainPaperAction &&
+    looksLikePastedResearchExcerpt(question) &&
+    !HELIX_EXPLICIT_WORKSTATION_VERB_RE.test(question) &&
+    args.explicitPanelCommand !== true;
+  const gatedWorkstationAction = shouldPreferConversationalExplain ? null : args.workstationAction;
+  const strongReasoningRequest = HELIX_STRONG_REASONING_REQUEST_RE.test(question);
+  const dispatchPolicy =
+    args.dispatchPolicy ??
+    resolveHelixDispatchPolicyAtTurnStart({
+      question,
+      workstationAction: gatedWorkstationAction,
+      explicitPanelCommand: args.explicitPanelCommand,
+      forceReasoningDispatch: args.forceReasoningDispatch === true,
+    });
+  let dispatchPlan = deriveObserverDispatchPlan({
+    question,
+    workstationAction: gatedWorkstationAction,
+    forceReasoningDispatch: args.forceReasoningDispatch === true || shouldPreferConversationalExplain,
+  });
+  if (HELIX_E1_SINGLE_TURN_CONTRACT_FLAG && dispatchPolicy) {
+    if (dispatchPolicy === "workspace_only") {
+      dispatchPlan = gatedWorkstationAction
+        ? {
+            intent_type: "chat_plus_workspace",
+            should_dispatch_workspace: true,
+            should_dispatch_reasoning: false,
+            should_stay_conversational: true,
+            dispatch_plan: "workspace",
+            observer_ack: "I will run that workspace action now.",
+          }
+        : {
+            intent_type: "chat_only",
+            should_dispatch_workspace: false,
+            should_dispatch_reasoning: false,
+            should_stay_conversational: true,
+            dispatch_plan: "chat_only",
+            observer_ack: "I am here with you.",
+          };
+    } else if (dispatchPolicy === "reasoning_only") {
+      dispatchPlan = deriveObserverDispatchPlan({
+        question,
+        workstationAction: null,
+        forceReasoningDispatch: true,
+      });
+    } else if (dispatchPolicy === "workspace_then_reasoning") {
+      dispatchPlan = deriveObserverDispatchPlan({
+        question,
+        workstationAction: gatedWorkstationAction,
+        forceReasoningDispatch: true,
+      });
+    }
+  }
+  const docsExplainOwnedByWorkspace =
+    gatedWorkstationAction?.action === "run_panel_action" &&
+    gatedWorkstationAction.panel_id === "docs-viewer" &&
+    HELIX_DOCS_EXPLAIN_ACTION_IDS.has(gatedWorkstationAction.action_id) &&
+    args.forceReasoningDispatch !== true &&
+    !strongReasoningRequest;
+  if (docsExplainOwnedByWorkspace) {
+    dispatchPlan = {
+      intent_type: "chat_plus_workspace",
+      should_dispatch_workspace: true,
+      should_dispatch_reasoning: false,
+      should_stay_conversational: true,
+      dispatch_plan: "workspace",
+      observer_ack: "I will run that workspace action now.",
+    };
+  }
+  const reasoningRequired: "none" | "soft" | "hard" = dispatchPlan.should_dispatch_reasoning
+    ? args.forceReasoningDispatch === true ||
+      strongReasoningRequest ||
+      (HELIX_E1_SINGLE_TURN_CONTRACT_FLAG && dispatchPolicy === "workspace_then_reasoning")
+      ? "hard"
+      : "soft"
+    : "none";
+  const evidenceRequirement: "none" | "soft" | "hard" = dispatchPlan.should_dispatch_reasoning
+    ? HELIX_HARD_EVIDENCE_REQUIREMENT_RE.test(question)
+      ? "hard"
+      : "soft"
+    : "none";
+  const intent_kind: HelixPlannerIntentKind =
+    gatedWorkstationAction && dispatchPlan.should_dispatch_reasoning
+      ? "hybrid"
+      : gatedWorkstationAction
+        ? "workstation_command"
+        : "conversational_explain";
+  return {
+    intent_kind,
+    workstation_action: gatedWorkstationAction,
+    dispatch_plan: dispatchPlan,
+    reasoning_required: reasoningRequired,
+    evidence_requirement: evidenceRequirement,
+    planner_blocked_workstation: shouldPreferConversationalExplain,
+  };
+}
+
+export type PendingWorkstationUserInputRequest = {
+  request_id: string;
+  turn_id: string;
+  source: WorkstationRequestSource;
+  action: HelixWorkstationAction;
+  panel_id: string;
+  action_id: string;
+  reason: WorkstationUserInputRequestReason;
+  missing_args: string[];
+  prompt: string;
+  original_question: string;
+  created_at_ms: number;
+  router_fail_id?: string | null;
+  doc_candidates?: string[];
+  doc_topic?: string | null;
+};
+
+export type HelixTurnTerminalOutcome = "final_answer" | "final_failure";
+
+export function isWorkstationTurnTransitionPendingRequest(args: {
+  pending_turn_id: string | null | undefined;
+  current_turn_id: string | null | undefined;
+}): boolean {
+  const pendingTurnId = String(args.pending_turn_id ?? "").trim();
+  const currentTurnId = String(args.current_turn_id ?? "").trim();
+  if (!pendingTurnId || !currentTurnId) return false;
+  return pendingTurnId !== currentTurnId;
+}
+
+export function normalizeTerminalAnswerText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .trim();
+}
+
+export function isInvalidTerminalAnswerText(value: string | null | undefined): boolean {
+  const normalized = normalizeTerminalAnswerText(value);
+  if (!normalized) return true;
+  return /^no final answer returned\.?$/i.test(normalized);
+}
+
+export function registerTurnTerminalOutcome(args: {
+  registry: Record<string, HelixTurnTerminalOutcome>;
+  turn_id: string | null | undefined;
+  outcome: HelixTurnTerminalOutcome;
+}): { accepted: boolean; existing: HelixTurnTerminalOutcome | null; turn_id: string | null } {
+  const turnId = String(args.turn_id ?? "").trim();
+  if (!turnId) {
+    return { accepted: false, existing: null, turn_id: null };
+  }
+  const existing = args.registry[turnId];
+  if (existing) {
+    return { accepted: false, existing, turn_id: turnId };
+  }
+  args.registry[turnId] = args.outcome;
+  return { accepted: true, existing: null, turn_id: turnId };
+}
+
+type WorkstationUserInputResolution =
+  | { status: "resolved"; action: HelixWorkstationAction }
+  | { status: "pending"; pending: PendingWorkstationUserInputRequest }
+  | { status: "cancelled" };
+
+export function deriveObserverDispatchPlan(args: {
+  question: string;
+  workstationAction: HelixWorkstationAction | null;
+  forceReasoningDispatch?: boolean;
+}): ObserverDispatchPlan {
+  const trimmed = args.question.trim();
+  const shouldDispatchWorkspace = Boolean(args.workstationAction);
+  const shouldDispatchReasoning =
+    args.forceReasoningDispatch === true || shouldDispatchReasoningAttempt(trimmed);
+  const intentType: ObserverIntentType = shouldDispatchWorkspace
+    ? shouldDispatchReasoning
+      ? "chat_plus_workspace_plus_reasoning"
+      : "chat_plus_workspace"
+    : shouldDispatchReasoning
+      ? "chat_plus_reasoning"
+      : "chat_only";
+  switch (intentType) {
+    case "chat_plus_workspace_plus_reasoning":
+      return {
+        intent_type: intentType,
+        should_dispatch_workspace: true,
+        should_dispatch_reasoning: true,
+        should_stay_conversational: true,
+        dispatch_plan: "workspace+reasoning",
+        observer_ack: "I will run the workspace action now and continue reasoning in the background.",
+      };
+    case "chat_plus_workspace":
+      return {
+        intent_type: intentType,
+        should_dispatch_workspace: true,
+        should_dispatch_reasoning: false,
+        should_stay_conversational: true,
+        dispatch_plan: "workspace",
+        observer_ack: "I will run that workspace action now.",
+      };
+    case "chat_plus_reasoning":
+      return {
+        intent_type: intentType,
+        should_dispatch_workspace: false,
+        should_dispatch_reasoning: true,
+        should_stay_conversational: true,
+        dispatch_plan: "reasoning",
+        observer_ack: "I will reason through this and keep you updated.",
+      };
+    default:
+      return {
+        intent_type: "chat_only",
+        should_dispatch_workspace: false,
+        should_dispatch_reasoning: false,
+        should_stay_conversational: true,
+        dispatch_plan: "chat_only",
+        observer_ack: "I am here with you.",
+      };
+  }
+}
+
+export function buildObserverPlanDeltaEvent(args: {
+  source: ObserverPlanEventSource;
+  dispatchPlan: ObserverDispatchPlan;
+  question: string;
+  traceId?: string | null;
+}): AskLiveEventEntry {
+  const tsMs = Date.now();
+  return {
+    id: `observer-plan-delta:${crypto.randomUUID()}`,
+    text: `observer plan update: ${args.dispatchPlan.dispatch_plan}`,
+    tool: "helix.observer.plan",
+    ts: new Date(tsMs).toISOString(),
+    tsMs,
+    meta: {
+      kind: "observer_plan_delta",
+      source: args.source,
+      intent_type: args.dispatchPlan.intent_type,
+      dispatch_plan: args.dispatchPlan.dispatch_plan,
+      question: clipText(args.question.trim(), 220),
+      trace_id: args.traceId ?? null,
+    },
+  };
+}
+
+export function buildObserverPlanItemCompletedEvent(args: {
+  source: ObserverPlanEventSource;
+  dispatchPlan: ObserverDispatchPlan;
+  item: ObserverPlanItemKey;
+  question: string;
+  action?: HelixWorkstationAction | null;
+  traceId?: string | null;
+}): AskLiveEventEntry {
+  const tsMs = Date.now();
+  const itemLabel = args.item === "workspace_dispatched" ? "workspace dispatched" : "reasoning queued";
+  return {
+    id: `observer-plan-item-completed:${crypto.randomUUID()}`,
+    text: `observer plan step complete: ${itemLabel}`,
+    tool: "helix.observer.plan",
+    ts: new Date(tsMs).toISOString(),
+    tsMs,
+    meta: {
+      kind: "observer_plan_item_completed",
+      item: args.item,
+      source: args.source,
+      intent_type: args.dispatchPlan.intent_type,
+      dispatch_plan: args.dispatchPlan.dispatch_plan,
+      question: clipText(args.question.trim(), 220),
+      action: args.action ?? null,
+      trace_id: args.traceId ?? null,
+    },
+  };
+}
+
+export function buildObserverFinalizationEvent(args: {
+  source: ObserverPlanEventSource;
+  question: string;
+  mode: ObserverFinalizationMode;
+  certaintyClass: ObserverFinalizationCertainty;
+  evidence_refs: string[];
+  needs_retrieval: boolean;
+  final_source: "normal_reasoning" | "strict_gate_override";
+  answer_id: string;
+  attempt_id?: string | null;
+  traceId?: string | null;
+  live_event_count?: number;
+  debug_context?: Record<string, unknown> | null;
+  pending_server_requests?: number;
+  turn_id?: string | null;
+}): AskLiveEventEntry {
+  // Codex-clone parity: explicit typed completion artifact (plan/item lifecycle over prose-only status).
+  const tsMs = Date.now();
+  return {
+    id: `observer-finalization:${crypto.randomUUID()}`,
+    text: `observer finalization: ${args.mode} (${args.certaintyClass})`,
+    tool: "helix.observer.finalization",
+    ts: new Date(tsMs).toISOString(),
+    tsMs,
+    meta: {
+      kind: "observer_finalization",
+      source: args.source,
+      question: clipText(args.question.trim(), 220),
+      mode: args.mode,
+      certainty_class: args.certaintyClass,
+      needs_retrieval: args.needs_retrieval,
+      evidence_refs: args.evidence_refs.slice(0, 16),
+      final_source: args.final_source,
+      answer_id: args.answer_id,
+      attempt_id: args.attempt_id ?? null,
+      trace_id: args.traceId ?? null,
+      turn_id: args.turn_id ?? args.traceId ?? null,
+      pending_server_requests:
+        typeof args.pending_server_requests === "number" && Number.isFinite(args.pending_server_requests)
+          ? Math.max(0, Math.floor(args.pending_server_requests))
+          : 0,
+      live_event_count:
+        typeof args.live_event_count === "number" && Number.isFinite(args.live_event_count)
+          ? Math.max(0, Math.floor(args.live_event_count))
+          : 0,
+      debug_context: args.debug_context ?? null,
+    },
+  };
+}
+
+type ObserverHandoffRecommendation = {
+  panel_id: string;
+  action_id: string;
+  rationale: string;
+};
+
+function deriveObserverHandoffRecommendations(input: {
+  mode: ObserverFinalizationMode;
+  certaintyClass: ObserverFinalizationCertainty;
+  needsRetrieval: boolean;
+  evidenceRefs: string[];
+}): { recommended_workspace_actions: ObserverHandoffRecommendation[]; reasoning_followups: string[] } {
+  const workspaceActions: ObserverHandoffRecommendation[] = [];
+  const reasoningFollowups: string[] = [];
+  if (input.needsRetrieval) {
+    workspaceActions.push({
+      panel_id: "docs-viewer",
+      action_id: "open_doc",
+      rationale: "Reopen source docs and gather grounded passages for the blocked claim.",
+    });
+    workspaceActions.push({
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      rationale: "Capture unresolved claim text in notes before continuing retrieval.",
+    });
+    reasoningFollowups.push("Run retrieval pass for explicit evidence refs before final claim.");
+  } else {
+    workspaceActions.push({
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      rationale: "Capture final answer and key takeaways in note workspace.",
+    });
+    workspaceActions.push({
+      panel_id: "workstation-clipboard-history",
+      action_id: "copy_receipt_to_clipboard",
+      rationale: "Copy completion receipt for reuse in follow-up prompts.",
+    });
+    if (input.mode === "observe" || input.mode === "verify") {
+      workspaceActions.push({
+        panel_id: "docs-viewer",
+        action_id: "summarize_doc",
+        rationale: "Generate condensed doc summary aligned with the finalized response.",
+      });
+    }
+    if (input.certaintyClass !== "confirmed") {
+      reasoningFollowups.push("Queue verify lane follow-up to increase certainty class.");
+    }
+    if (input.evidenceRefs.length > 0) {
+      reasoningFollowups.push("Cross-check evidence refs against the final answer for citation alignment.");
+    }
+  }
+  return {
+    recommended_workspace_actions: workspaceActions.slice(0, 4),
+    reasoning_followups: reasoningFollowups.slice(0, 4),
+  };
+}
+
+export function buildObserverHandoffEvent(args: {
+  source: ObserverPlanEventSource;
+  question: string;
+  mode: ObserverFinalizationMode;
+  certaintyClass: ObserverFinalizationCertainty;
+  evidence_refs: string[];
+  needs_retrieval: boolean;
+  answer_id: string;
+  attempt_id?: string | null;
+  traceId?: string | null;
+}): AskLiveEventEntry {
+  // Codex-clone parity: deterministic post-completion handoff contract for next-step orchestration.
+  const tsMs = Date.now();
+  const handoff = deriveObserverHandoffRecommendations({
+    mode: args.mode,
+    certaintyClass: args.certaintyClass,
+    needsRetrieval: args.needs_retrieval,
+    evidenceRefs: args.evidence_refs,
+  });
+  return {
+    id: `observer-handoff:${crypto.randomUUID()}`,
+    text: `observer handoff: ${handoff.recommended_workspace_actions.length} workspace actions, ${handoff.reasoning_followups.length} reasoning follow-ups`,
+    tool: "helix.observer.handoff",
+    ts: new Date(tsMs).toISOString(),
+    tsMs,
+    meta: {
+      kind: "observer_handoff",
+      source: args.source,
+      question: clipText(args.question.trim(), 220),
+      mode: args.mode,
+      certainty_class: args.certaintyClass,
+      needs_retrieval: args.needs_retrieval,
+      answer_id: args.answer_id,
+      attempt_id: args.attempt_id ?? null,
+      trace_id: args.traceId ?? null,
+      recommended_workspace_actions: handoff.recommended_workspace_actions,
+      reasoning_followups: handoff.reasoning_followups,
+    },
+  };
+}
+
+function summarizeWorkstationActionForStep(action: HelixWorkstationAction): string {
+  if (action.action === "run_panel_action") {
+    return `${action.panel_id}.${action.action_id}`;
+  }
+  if (action.action === "run_job") {
+    return `run_job:${action.payload.workflow ?? "custom"}`;
+  }
+  return action.action;
+}
+
+export function buildWorkstationProceduralStepEvent(args: {
+  source: ObserverPlanEventSource;
+  step: number;
+  total: number;
+  action: HelixWorkstationAction;
+  question: string;
+  traceId?: string | null;
+}): AskLiveEventEntry {
+  const tsMs = Date.now();
+  return {
+    id: `workstation-procedural-step:${crypto.randomUUID()}`,
+    text: `workstation step ${args.step}/${args.total}: ${summarizeWorkstationActionForStep(args.action)}`,
+    tool: "helix.workstation.chain",
+    ts: new Date(tsMs).toISOString(),
+    tsMs,
+    meta: {
+      kind: "workstation_procedural_step",
+      source: args.source,
+      step: args.step,
+      total_steps: args.total,
+      action: args.action,
+      question: clipText(args.question.trim(), 220),
+      trace_id: args.traceId ?? null,
+    },
+  };
+}
+
+const HELIX_EVIDENCE_GATE_HARD_CLAIM_RE =
+  /\b(?:verify|verification|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|explain|why|how|pass\/?fail|integrity|evidence|claim)\b/i;
+
+type EvidenceFinalizationGateDecision = {
+  blocked: boolean;
+  hard_claim: boolean;
+  evidence_refs: string[];
+  reason: "hard_claim_without_evidence_refs" | "hard_claim_evidence_gate_not_ok" | null;
+  safe_text?: string;
+};
+
+function collectEvidenceRefsForGate(input: {
+  debug?: HelixAskReply["debug"] | null;
+  proof?: HelixAskReply["proof"] | null;
+}): string[] {
+  const refs = new Set<string>();
+  const push = (value: unknown) => {
+    if (typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    refs.add(trimmed);
+  };
+  (input.debug?.context_files ?? []).forEach(push);
+  (input.debug?.prompt_context_files ?? []).forEach(push);
+  (input.proof?.artifacts ?? []).forEach((artifact) => push(artifact?.ref));
+  return [...refs];
+}
+
+export function evaluateEvidenceFinalizationGate(input: {
+  question: string;
+  mode?: "read" | "observe" | "act" | "verify" | null;
+  debug?: HelixAskReply["debug"] | null;
+  proof?: HelixAskReply["proof"] | null;
+}): EvidenceFinalizationGateDecision {
+  const normalizedQuestion = input.question.trim();
+  const hardClaim =
+    input.mode === "verify" ||
+    HELIX_EVIDENCE_GATE_HARD_CLAIM_RE.test(normalizedQuestion) ||
+    HELIX_ASK_COMPARE_TRIGGER.test(normalizedQuestion);
+  const evidenceRefs = collectEvidenceRefsForGate({
+    debug: input.debug,
+    proof: input.proof,
+  });
+  const evidenceGateOk =
+    input.debug?.evidence_gate_ok === true || input.debug?.evidence_claim_gate_ok === true;
+  if (!hardClaim) {
+    return {
+      blocked: false,
+      hard_claim: false,
+      evidence_refs: evidenceRefs,
+      reason: null,
+    };
+  }
+  if (evidenceRefs.length <= 0) {
+    return {
+      blocked: true,
+      hard_claim: true,
+      evidence_refs: evidenceRefs,
+      reason: "hard_claim_without_evidence_refs",
+      safe_text:
+        "I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it.",
+    };
+  }
+  if (!evidenceGateOk) {
+    return {
+      blocked: true,
+      hard_claim: true,
+      evidence_refs: evidenceRefs,
+      reason: "hard_claim_evidence_gate_not_ok",
+      safe_text:
+        "I need one more retrieval pass before finalizing this claim. Current evidence references are not yet sufficient for a grounded conclusion.",
+    };
+  }
+  return {
+    blocked: false,
+    hard_claim: true,
+    evidence_refs: evidenceRefs,
+    reason: null,
+  };
+}
+
+export function buildNeedsRetrievalPlanEvent(args: {
+  source: ObserverPlanEventSource;
+  question: string;
+  reason: string;
+  evidence_refs: string[];
+  traceId?: string | null;
+}): AskLiveEventEntry {
+  const tsMs = Date.now();
+  return {
+    id: `observer-plan-needs-retrieval:${crypto.randomUUID()}`,
+    text: "observer plan update: needs_retrieval",
+    tool: "helix.observer.plan",
+    ts: new Date(tsMs).toISOString(),
+    tsMs,
+    meta: {
+      kind: "observer_plan_delta",
+      source: args.source,
+      dispatch_plan: "reasoning",
+      intent_type: "chat_plus_reasoning",
+      plan_step: "needs_retrieval",
+      reason: args.reason,
+      evidence_refs: args.evidence_refs,
+      question: clipText(args.question.trim(), 220),
+      trace_id: args.traceId ?? null,
+    },
+  };
+}
+
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function asNonEmptyArgString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function resolvePanelActionDefinition(action: HelixWorkstationAction): {
+  panel_id: string;
+  action_id: string;
+  definition: WorkstationPanelActionDefinition;
+} | null {
+  if (action.action !== "run_panel_action") return null;
+  const panelId = action.panel_id.trim();
+  const actionId = action.action_id.trim();
+  if (!panelId || !actionId) return null;
+  const capabilities = getWorkstationPanelCapabilities(panelId);
+  const definition = capabilities?.actions.find((candidate) => candidate.id === actionId);
+  if (!definition) return null;
+  return { panel_id: panelId, action_id: actionId, definition };
+}
+
+function parseWorkstationConfirmationReply(reply: string): boolean | null {
+  const normalized = reply.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "true" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "0") return false;
+  if (/^(?:yes|y|confirm|confirmed|proceed|do it|go ahead|ok|okay|sure)\b/.test(normalized)) return true;
+  if (/^(?:no|n|cancel|stop|don'?t|do not)\b/.test(normalized)) return false;
+  return null;
+}
+
+function extractPendingArgFromReply(arg: string, reply: string): string | null {
+  const trimmed = reply.trim();
+  if (!trimmed) return null;
+  const quoted = trimmed.match(/"([^"]+)"/) ?? trimmed.match(/'([^']+)'/);
+  switch (arg) {
+    case "text":
+      return trimmed;
+    case "path": {
+      const pathLike = trimmed.match(/([A-Za-z]:\\[^\s]+|\/[^\s]+|(?:docs|client|server)\/[^\s]+|[^\s]+\.md)\b/);
+      return pathLike?.[1]?.trim() ?? null;
+    }
+    default:
+      return (quoted?.[1] ?? trimmed).trim() || null;
+  }
+}
+
+function cloneRunPanelActionWithArgs(
+  action: HelixWorkstationAction,
+  args: Record<string, unknown>,
+): HelixWorkstationAction {
+  if (action.action !== "run_panel_action") return action;
+  return {
+    ...action,
+    args,
+  };
+}
+
+type PendingDocTopicResolutionMeta = {
+  status: "weak" | "ambiguous";
+  confidence: number;
+  topic: string | null;
+  candidates: string[];
+};
+
+function readDocTopicResolutionMeta(action: HelixWorkstationAction): PendingDocTopicResolutionMeta | null {
+  if (action.action !== "run_panel_action" || action.panel_id !== "docs-viewer") return null;
+  const actionArgs = asPlainRecord(action.args) ?? {};
+  const statusRaw = String(actionArgs._doc_resolution_status ?? "").trim().toLowerCase();
+  const status = statusRaw === "ambiguous" || statusRaw === "weak" ? statusRaw : null;
+  if (!status) return null;
+  const confidenceRaw = Number(actionArgs._doc_resolution_confidence);
+  const confidence = Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(1, confidenceRaw)) : 0;
+  const topic = asNonEmptyArgString(actionArgs._doc_resolution_topic);
+  const candidates = Array.isArray(actionArgs._doc_resolution_candidates)
+    ? actionArgs._doc_resolution_candidates
+        .map((candidate) => (typeof candidate === "string" ? candidate.trim() : ""))
+        .filter((candidate) => candidate.length > 0)
+        .slice(0, 3)
+    : [];
+  return {
+    status,
+    confidence,
+    topic,
+    candidates,
+  };
+}
+
+function stripDocTopicResolutionMetaFromArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const nextArgs = { ...args };
+  delete nextArgs._doc_resolution_status;
+  delete nextArgs._doc_resolution_confidence;
+  delete nextArgs._doc_resolution_topic;
+  delete nextArgs._doc_resolution_candidates;
+  return nextArgs;
+}
+
+export function buildWorkstationUserInputRequest(args: {
+  source: WorkstationRequestSource;
+  action: HelixWorkstationAction;
+  question: string;
+  turn_id?: string | null;
+}): PendingWorkstationUserInputRequest | null {
+  const resolved = resolvePanelActionDefinition(args.action);
+  if (!resolved) return null;
+  const actionArgs = asPlainRecord(args.action.action === "run_panel_action" ? args.action.args : null) ?? {};
+  const docResolutionMeta = readDocTopicResolutionMeta(args.action);
+  const requiredArgs = Array.isArray(resolved.definition.required_args) ? resolved.definition.required_args : [];
+  const missingArgs = requiredArgs.filter((requiredArg) => {
+    const value = actionArgs[requiredArg];
+    if (typeof value === "string") return value.trim().length === 0;
+    return value === null || value === undefined;
+  });
+  const shouldRequestDocClarification =
+    docResolutionMeta?.status === "ambiguous" || docResolutionMeta?.status === "weak";
+  const missingArgsForRequest = shouldRequestDocClarification
+    ? [...new Set([...missingArgs, "path"])]
+    : missingArgs;
+  const requiresConfirmation = resolved.definition.requires_confirmation === true;
+  const confirmed = parseWorkstationConfirmationReply(String(actionArgs.confirmed ?? "")) === true;
+
+  if (missingArgsForRequest.length === 0 && (!requiresConfirmation || confirmed)) {
+    return null;
+  }
+
+  const reason: WorkstationUserInputRequestReason =
+    missingArgsForRequest.length > 0 ? "missing_args" : "confirmation_required";
+  const routerFailId =
+    docResolutionMeta?.status === "ambiguous"
+      ? "RF_AMBIGUOUS_DOC_TOPIC"
+      : docResolutionMeta?.status === "weak"
+        ? "RF_LOW_CONFIDENCE_DOC_RESOLUTION"
+        : reason === "confirmation_required"
+          ? "RF_CONFIRMATION_REQUIRED"
+          : "RF_MISSING_REQUIRED_ARGS";
+  let prompt =
+    reason === "confirmation_required"
+      ? `I need confirmation before running ${resolved.panel_id}.${resolved.action_id}. Reply yes to continue or no to cancel.`
+      : `I need ${missingArgsForRequest.join(", ")} before running ${resolved.panel_id}.${resolved.action_id}.`;
+  if (docResolutionMeta) {
+    const topicLabel = docResolutionMeta.topic ? `"${docResolutionMeta.topic}"` : "that topic";
+    if (docResolutionMeta.status === "ambiguous" && docResolutionMeta.candidates.length > 0) {
+      const options = docResolutionMeta.candidates.map((candidate, index) => `${index + 1}) ${candidate}`).join("; ");
+      prompt = `I found multiple docs for ${topicLabel}. Reply with a number (${options}) or provide a doc path.`;
+    } else if (docResolutionMeta.status === "weak") {
+      prompt = `I could not confidently resolve ${topicLabel} to one doc (confidence ${docResolutionMeta.confidence.toFixed(2)}). Reply with the doc path or a clearer topic.`;
+    }
+  }
+  return {
+    // E2 ownership: pending request is attached to one turn id and must not survive turn transitions.
+    turn_id: String(args.turn_id ?? "").trim() || `turn:${crypto.randomUUID()}`,
+    request_id: `workstation-request:${crypto.randomUUID()}`,
+    source: args.source,
+    action: args.action,
+    panel_id: resolved.panel_id,
+    action_id: resolved.action_id,
+    reason,
+    missing_args: missingArgsForRequest,
+    prompt,
+    original_question: args.question.trim(),
+    created_at_ms: Date.now(),
+    router_fail_id: routerFailId,
+    doc_candidates: docResolutionMeta?.candidates ?? [],
+    doc_topic: docResolutionMeta?.topic ?? null,
+  };
+}
+
+export function resolvePendingWorkstationUserInput(args: {
+  pending: PendingWorkstationUserInputRequest;
+  reply: string;
+}): WorkstationUserInputResolution {
+  const reply = args.reply.trim();
+  if (!reply) return { status: "pending", pending: args.pending };
+  if (/^(?:cancel|never mind|nevermind|stop)\b/i.test(reply)) {
+    return { status: "cancelled" };
+  }
+  if (args.pending.action.action !== "run_panel_action") {
+    return { status: "cancelled" };
+  }
+  const baseArgs = asPlainRecord(args.pending.action.args) ?? {};
+
+  if (args.pending.reason === "confirmation_required") {
+    const confirmation = parseWorkstationConfirmationReply(reply);
+    if (confirmation === false) return { status: "cancelled" };
+    if (confirmation !== true) return { status: "pending", pending: args.pending };
+    return {
+      status: "resolved",
+      action: cloneRunPanelActionWithArgs(args.pending.action, {
+        ...baseArgs,
+        confirmed: true,
+      }),
+    };
+  }
+
+  const nextArgs: Record<string, unknown> = stripDocTopicResolutionMetaFromArgs(baseArgs);
+  if (
+    (args.pending.router_fail_id === "RF_AMBIGUOUS_DOC_TOPIC" ||
+      args.pending.router_fail_id === "RF_LOW_CONFIDENCE_DOC_RESOLUTION") &&
+    args.pending.missing_args.includes("path")
+  ) {
+    delete nextArgs.path;
+  }
+  if (args.pending.doc_candidates && args.pending.doc_candidates.length > 0) {
+    const numericChoice = Number(reply);
+    if (Number.isFinite(numericChoice) && Number.isInteger(numericChoice)) {
+      const candidateIndex = numericChoice - 1;
+      if (candidateIndex >= 0 && candidateIndex < args.pending.doc_candidates.length) {
+        nextArgs.path = args.pending.doc_candidates[candidateIndex];
+      }
+    }
+  }
+  args.pending.missing_args.forEach((arg) => {
+    if (nextArgs[arg] !== undefined && nextArgs[arg] !== null && String(nextArgs[arg]).trim()) return;
+    const extracted = extractPendingArgFromReply(arg, reply);
+    if (extracted) {
+      nextArgs[arg] = extracted;
+    }
+  });
+  const remainingMissing = args.pending.missing_args.filter((arg) => {
+    const value = nextArgs[arg];
+    if (typeof value === "string") return value.trim().length === 0;
+    return value === null || value === undefined;
+  });
+  if (remainingMissing.length > 0) {
+    const candidatePrompt =
+      args.pending.doc_candidates && args.pending.doc_candidates.length > 0
+        ? `Still need ${remainingMissing.join(", ")}. Reply with a number (${args.pending.doc_candidates
+            .map((candidate, index) => `${index + 1}) ${candidate}`)
+            .join("; ")}) or provide a doc path.`
+        : `Still need ${remainingMissing.join(", ")} before running ${args.pending.panel_id}.${args.pending.action_id}.`;
+    return {
+      status: "pending",
+      pending: {
+        ...args.pending,
+        missing_args: remainingMissing,
+        prompt: candidatePrompt,
+      },
+    };
+  }
+  return {
+    status: "resolved",
+    action: cloneRunPanelActionWithArgs(args.pending.action, nextArgs),
+  };
+}
+
 function formatWorkstationIntentStageDetail(result: WorkstationIntentClassificationResult): string {
   const prefix = result.action
     ? "workstation_intent_stage | action_resolved"
@@ -252,6 +1249,24 @@ function formatWorkstationIntentStageDetail(result: WorkstationIntentClassificat
     no_match_not_probed: "not_probed",
   };
   return `${prefix} | ${outcomeLabelMap[result.outcome]}`;
+}
+
+function resolveWorkstationRouterFailId(
+  result: WorkstationIntentClassificationResult,
+): "RF_NO_ACTION_NOT_PROBED" | "RF_CLASSIFIER_TIMEOUT" | "RF_CLASSIFIER_ERROR" | "RF_LOW_CONFIDENCE" | null {
+  if (result.action) return null;
+  switch (result.outcome) {
+    case "no_match_not_probed":
+      return "RF_NO_ACTION_NOT_PROBED";
+    case "no_match_timeout":
+      return "RF_CLASSIFIER_TIMEOUT";
+    case "no_match_classifier_error":
+      return "RF_CLASSIFIER_ERROR";
+    case "no_match_low_confidence":
+      return "RF_LOW_CONFIDENCE";
+    default:
+      return null;
+  }
 }
 
 function parseVoiceEnvBoolean(key: string, fallback: boolean): boolean {
@@ -736,6 +1751,8 @@ export type ReasoningAttempt = {
   evidenceRefs?: string[];
   conversationBriefBase?: string;
   conversationBriefSource?: "llm" | "none";
+  explicitPlanEmitted?: boolean;
+  explicitPlanAtMs?: number;
   partial: string;
   finalAnswer?: string;
   events: AskLiveEventEntry[];
@@ -3100,14 +4117,18 @@ function shouldQueueWorkspaceBackgroundReasoning(args: {
   const text = String(args.transcript ?? "").trim().toLowerCase();
   if (!text) return false;
   if (isSimpleTitleOrPathOnlyPrompt(text)) return false;
+  if (/\b(?:background|in the background|while you continue)\b/.test(text)) return true;
   const workspaceCue =
     Boolean(args.docsViewerAnchorPath) ||
     /\b(?:docs?\s+viewer|workspace|repo|repository|codebase|source|file|path|paper|doc|document)\b/.test(
       text,
     );
   if (!workspaceCue) return false;
-  const explainCue = /\b(?:about|explain|summary|summarize|context|describe|mean|contains)\b/.test(text);
-  return explainCue || text.length >= 48;
+  const hardReasoningCue =
+    /\b(?:verify|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|integrity|evidence|claim|cross[-\s]?check)\b/.test(
+      text,
+    );
+  return hardReasoningCue;
 }
 
 export function shouldForceObserveDispatchFromSuppression(args: {
@@ -4405,6 +5426,7 @@ type HelixAskReply = {
     format?: "steps" | "compare" | "brief";
     stage_tags?: boolean;
     verbosity?: "brief" | "normal" | "extended";
+    [key: string]: unknown;
   };
 };
 
@@ -5110,7 +6132,7 @@ function buildHelixAskDebugContextSummary(
       }
     : null;
   const debugRecord = asObjectRecord(debug as unknown);
-  const normalizeReasonList = (value: string[] | string | undefined): string[] => {
+  const normalizeReasonList = (value: unknown): string[] => {
     if (Array.isArray(value)) {
       return value
         .filter((entry) => typeof entry === "string")
@@ -6481,9 +7503,11 @@ export function buildObserverCommentaryForRow(
   const detail = (row.detail ?? "").trim().toLowerCase();
   const isWorkstationRow =
     tool === "helix.ask.fast_path" ||
+    tool === "helix.observer.plan" ||
     tool.startsWith("workstation.") ||
     detail.startsWith("workstation_") ||
-    detail.startsWith("job_");
+    detail.startsWith("job_") ||
+    detail.startsWith("observer_plan_");
   if (!isWorkstationRow || !text) return null;
 
   const restatement = buildObserverUserRestatement(text, options.userPrompt);
@@ -6513,6 +7537,18 @@ export function buildObserverCommentaryForRow(
   }
   if (/workstation fast-path dispatched/i.test(text)) {
     return withRestatement("Intent resolved to workstation fast-path and handed to action router.");
+  }
+  if (/request_user_input:/i.test(text)) {
+    return withRestatement("Action routing paused because required inputs are missing and were requested.");
+  }
+  if (/request_user_input resolved:/i.test(text)) {
+    return withRestatement("Requested workstation input was resolved and routing resumed.");
+  }
+  if (/observer plan update:/i.test(text)) {
+    return withRestatement("Observer updated the workspace/reasoning execution plan.");
+  }
+  if (/observer plan step complete:/i.test(text)) {
+    return withRestatement("Observer marked a planned execution step as complete.");
   }
   if (/^ok:/i.test(text)) {
     return withRestatement(`Action receipt confirmed - ${text.replace(/^ok:\s*/i, "").trim()}`);
@@ -6864,11 +7900,12 @@ function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
   const tool = (entry.tool ?? "").trim().toLowerCase();
   if (!tool) return false;
   if (tool === "helix.ask.fast_path") return true;
+  if (tool === "helix.observer.plan") return true;
   if (tool.startsWith("workstation.")) return true;
   const meta = asObjectRecord(entry.meta ?? null);
   const kind = typeof meta?.kind === "string" ? meta.kind.trim().toLowerCase() : "";
   if (!kind) return false;
-  return kind.startsWith("workstation_") || kind.startsWith("job_");
+  return kind.startsWith("workstation_") || kind.startsWith("job_") || kind.startsWith("observer_plan_");
 }
 
 function stripContextCapsuleTokensFromText(value: string): string {
@@ -7464,7 +8501,7 @@ const HELIX_DOC_TOPIC_PATH_HINTS: Array<{ pattern: RegExp; path: string }> = [
     path: "docs/needle-hull-mainframe.md",
   },
 ];
-const HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID: PanelDefinition["id"] = "needle-mk2-calculator";
+const HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID: PanelDefinition["id"] = "scientific-calculator";
 
 const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
 const HELIX_ATOMIC_LAUNCH_STORAGE_KEY = "helix.atomic.launch.v1";
@@ -7567,8 +8604,261 @@ function restateWorkstationSubgoal(value: string): string {
   return cleaned;
 }
 
+function normalizeWorkstationCommandText(value: string): string {
+  const normalizedQuotes = value.replace(/[“”]/g, "\"").replace(/[‘’]/g, "'");
+  const collapsedWhitespace = normalizedQuotes.replace(/\s+/g, " ").trim();
+  if (!collapsedWhitespace) return "";
+  return collapsedWhitespace
+    .replace(/\b(?:pull|bring)\s+up\b/gi, "open")
+    .replace(/\bpop\s+open\b/gi, "open")
+    .replace(/\bopen\s+up\b/gi, "open")
+    .replace(/\bread\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
+      return `read ${referent.toLowerCase()} doc to me`;
+    })
+    .replace(/\bnarrate\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
+      return `read ${referent.toLowerCase()} doc to me`;
+    })
+    .replace(/\b(this|current)\s+file\b/gi, (_match, referent: string) => {
+      return `${referent.toLowerCase()} doc`;
+    })
+    .replace(/\bnote\s*pad\b/gi, "note")
+    .replace(/\bnotepad\b/gi, "note")
+    .replace(/\bclip\s*board\b/gi, "clipboard")
+    .replace(/\bcopy\s+that\s+to\s+clipboard\b/gi, "copy this to clipboard")
+    .replace(/\bcopy\s+it\s+to\s+clipboard\b/gi, "copy this to clipboard")
+    .replace(/\bappend\s+that\s+to\s+my\s+note\b/gi, "append this to my note")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function supportsPanelAction(panelId: string, actionId: string): boolean {
+  const capabilities = getWorkstationPanelCapabilities(panelId);
+  if (!capabilities) return false;
+  return capabilities.actions.some((action) => action.id === actionId);
+}
+
+function buildLexiconPanelAction(
+  panelId: string,
+  actionId: string,
+  args?: Record<string, unknown>,
+): HelixWorkstationAction | null {
+  if (!supportsPanelAction(panelId, actionId)) return null;
+  return {
+    action: "run_panel_action",
+    panel_id: panelId,
+    action_id: actionId,
+    args,
+  };
+}
+
+function normalizeLexiconAlias(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\bopen\s+up\b/g, "open")
+    .replace(
+      /^(?:ok|okay|please|pls|can\s+you|could\s+you|would\s+you|will\s+you|let'?s|kindly)\b[\s,.-]*/g,
+      "",
+    )
+    .replace(/\b(?:the|my)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function resolveCapabilityAliasPanelAction(source: string): HelixWorkstationAction | null {
+  const normalizedSource = normalizeLexiconAlias(source);
+  if (!normalizedSource) return null;
+  for (const [panelId, capabilities] of Object.entries(WORKSTATION_V1_PANEL_CAPABILITIES)) {
+    for (const action of capabilities.actions) {
+      const aliases = Array.isArray(action.aliases) ? action.aliases : [];
+      const requiresArgs = Array.isArray(action.required_args) && action.required_args.length > 0;
+      if (requiresArgs) continue;
+      for (const alias of aliases) {
+        const normalizedAlias = normalizeLexiconAlias(alias);
+        if (!normalizedAlias) continue;
+        if (
+          normalizedAlias === normalizedSource ||
+          normalizedSource === `${normalizedAlias} now` ||
+          normalizedSource.startsWith(`${normalizedAlias} please`) ||
+          normalizedSource.startsWith(`${normalizedAlias} for me`)
+        ) {
+          return {
+            action: "run_panel_action",
+            panel_id: panelId,
+            action_id: action.id,
+            args: undefined,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function parseWorkstationLexiconAction(
+  source: string,
+  conversationalCandidate: string,
+): HelixWorkstationAction | null {
+  const normalized = source.toLowerCase();
+
+  if (/^(?:ok|okay|please\s+)?(?:list|show)\s+(?:my\s+)?notes\b/i.test(conversationalCandidate)) {
+    return buildLexiconPanelAction("workstation-notes", "list_notes");
+  }
+
+  const createNoteMatch =
+    conversationalCandidate.match(/\bcreate\s+(?:a\s+)?note\s+(?:called|named|titled)\s+(.+)$/i) ??
+    conversationalCandidate.match(/\bnew\s+note\s+(.+)$/i) ??
+    conversationalCandidate.match(/\bstart\s+note\s+(?:about|on|for)\s+(.+)$/i);
+  if (createNoteMatch) {
+    const title = createNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    if (title) {
+      return buildLexiconPanelAction("workstation-notes", "create_note", { title, topic: title });
+    }
+  }
+
+  const appendToMyNoteMatch =
+    conversationalCandidate.match(/\bappend\s+this\s+to\s+my\s+note\b[:\s-]*(.+)$/i) ??
+    conversationalCandidate.match(/\bappend\s+to\s+my\s+note\b[:\s-]*(.+)$/i);
+  if (appendToMyNoteMatch) {
+    const text = appendToMyNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    if (text) {
+      return buildLexiconPanelAction("workstation-notes", "append_to_note", { text });
+    }
+  }
+
+  const appendNamedMatch = conversationalCandidate.match(/\badd\s+to\s+note\s+(.+?)\s*:\s*(.+)$/i);
+  if (appendNamedMatch) {
+    const title = appendNamedMatch[1]?.trim();
+    const text = appendNamedMatch[2]?.trim();
+    if (title && text) {
+      return buildLexiconPanelAction("workstation-notes", "append_to_note", { title, text });
+    }
+  }
+
+  const activateNoteMatch = conversationalCandidate.match(/\b(?:open|switch\s+to|select)\s+note\s+(.+)$/i);
+  if (activateNoteMatch) {
+    const title = activateNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    if (title) {
+      return buildLexiconPanelAction("workstation-notes", "set_active_note", { title });
+    }
+  }
+
+  const renameNoteMatch = conversationalCandidate.match(/\brename\s+note\s+(.+?)\s+to\s+(.+)$/i);
+  if (renameNoteMatch) {
+    const fromTitle = renameNoteMatch[1]?.trim();
+    const title = renameNoteMatch[2]?.replace(/[?.!]+$/g, "").trim();
+    if (fromTitle && title) {
+      return buildLexiconPanelAction("workstation-notes", "rename_note", {
+        from_title: fromTitle,
+        title,
+      });
+    }
+  }
+
+  const deleteNoteMatch = conversationalCandidate.match(/\bdelete\s+note\s+(.+)$/i);
+  if (deleteNoteMatch) {
+    const title = deleteNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    if (title) {
+      return buildLexiconPanelAction("workstation-notes", "delete_note", { title });
+    }
+  }
+
+  const deicticCopyToNoteMatch = conversationalCandidate.match(
+    /\bcopy\s+(?:this|that|current)\s+(?:abstract|section|excerpt|snippet|selection|text|content)\s+to\s+(?:a\s+)?(?:note|notes|note\s+pad)(?:\s+(?:called|named|titled)\s+(.+))?$/i,
+  );
+  if (deicticCopyToNoteMatch) {
+    const noteTitle = deicticCopyToNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    return buildLexiconPanelAction("workstation-clipboard-history", "copy_selection_to_note", {
+      note_title: noteTitle || undefined,
+    });
+  }
+
+  if (/\bread\s+clipboard\b/i.test(normalized)) {
+    return buildLexiconPanelAction("workstation-clipboard-history", "read_clipboard");
+  }
+
+  const copyToClipboardMatch = conversationalCandidate.match(
+    /\bcopy\s+this\s+to\s+clipboard\b[:\s-]*(.+)?$/i,
+  );
+  if (copyToClipboardMatch) {
+    const text = copyToClipboardMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    if (text) {
+      return buildLexiconPanelAction("workstation-clipboard-history", "write_clipboard", { text });
+    }
+  }
+
+  if (/\bclear\s+clipboard\s+history\b/i.test(normalized) || /\bclear\s+clipboard\b/i.test(normalized)) {
+    return buildLexiconPanelAction("workstation-clipboard-history", "clear_history");
+  }
+
+  const copyReceiptToNoteMatch = conversationalCandidate.match(
+    /\bcopy\s+(?:latest\s+)?clipboard\s+entry\s+to\s+note\s+(.+)$/i,
+  );
+  if (copyReceiptToNoteMatch) {
+    const noteTitle = copyReceiptToNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    return buildLexiconPanelAction("workstation-clipboard-history", "copy_receipt_to_note", {
+      note_title: noteTitle || undefined,
+    });
+  }
+
+  if (
+    /\bcopy\s+(?:latest\s+)?clipboard\s+entry\s+to\s+clipboard\b/i.test(normalized) ||
+    /\bcopy\s+receipt\s+to\s+clipboard\b/i.test(normalized)
+  ) {
+    return buildLexiconPanelAction("workstation-clipboard-history", "copy_receipt_to_clipboard");
+  }
+
+  const capabilityAliasMatch = resolveCapabilityAliasPanelAction(conversationalCandidate);
+  if (capabilityAliasMatch) return capabilityAliasMatch;
+
+  return null;
+}
+
+export function parseWorkstationActionChainCommand(value: string): HelixWorkstationAction[] | null {
+  const trimmed = normalizeWorkstationCommandText(value);
+  if (!trimmed) return null;
+  const conversationalCandidate = restateWorkstationSubgoal(trimmed);
+  const normalized = conversationalCandidate.toLowerCase();
+  const hasCopySelectionSignal = /\bcopy\s+(?:this|that|current)\s+(?:abstract|section|excerpt|snippet|selection|text|content)\b/i.test(
+    normalized,
+  );
+  const hasNoteSignal = /\b(?:to\s+(?:a\s+)?note|to\s+notes?)\b/i.test(normalized);
+  const hasCompareSignal = /\b(?:compare|contrast|difference|overlap|synthesi[sz]e|explain)\b/i.test(normalized);
+  if (!(hasCopySelectionSignal && hasNoteSignal && hasCompareSignal)) return null;
+
+  const noteTitle =
+    conversationalCandidate.match(/\bto\s+(?:a\s+)?note\s+(?:called|named|titled)\s+(.+?)(?:\s+(?:and|then)\b|$)/i)?.[1]?.trim() ??
+    conversationalCandidate.match(/\bto\s+note\s+(.+?)(?:\s+(?:and|then)\b|$)/i)?.[1]?.trim() ??
+    undefined;
+  const compareInstruction =
+    conversationalCandidate.match(/\b(?:and|then)\s+(compare[\s\S]*)$/i)?.[1]?.trim() ??
+    "Compare the note with the current docs context and explain the key differences.";
+  const copySelectionAction = buildLexiconPanelAction("workstation-clipboard-history", "copy_selection_to_note", {
+    note_title: noteTitle,
+  });
+  if (!copySelectionAction) return null;
+
+  const compareJobAction: HelixWorkstationAction = {
+    action: "run_job",
+    payload: {
+      workflow: "observable_research_pipeline",
+      title: noteTitle ? `Compare note ${noteTitle} with current doc` : "Compare copied selection with current doc",
+      objective:
+        "Compose a comparison between the copied selection note and current docs-viewer context, then explain it plainly.",
+      preferred_panels: ["workstation-notes", "docs-viewer", "workstation-workflow-timeline"],
+      max_steps: 5,
+      workflow_args: {
+        note_title: noteTitle,
+        compare_instruction: compareInstruction,
+        compare_basis: "current_doc",
+        chain_signature: "copy_selection_to_note -> compare_note_with_doc",
+      },
+    },
+  };
+  return [copySelectionAction, compareJobAction];
+}
+
 export function parseWorkstationActionCommand(value: string): HelixWorkstationAction | null {
-  const trimmed = value.trim();
+  const trimmed = normalizeWorkstationCommandText(value);
   if (!trimmed) return null;
   const conversationalCandidate = restateWorkstationSubgoal(trimmed);
   const conversationalCommand = conversationalCandidate
@@ -7588,6 +8878,8 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
   ) {
     return deterministicFrameAction;
   }
+  const lexiconAction = parseWorkstationLexiconAction(trimmed, conversationalCandidate);
+  if (lexiconAction) return lexiconAction;
 
   const parsePayloadToJob = (
     payload: Record<string, unknown>,
@@ -7739,6 +9031,37 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
     return null;
   };
 
+  const resolveDocOpenArgs = (
+    topic: string,
+    hintedPath: string,
+  ): {
+    path: string;
+    meta?: {
+      status: "weak" | "ambiguous";
+      confidence: number;
+      topic: string | null;
+      candidates: string[];
+    };
+  } | null => {
+    if (hintedPath) return { path: hintedPath };
+    const cleanedTopic = topic.trim();
+    if (!cleanedTopic) return null;
+    const resolution = resolveDocTopic(cleanedTopic);
+    if (!resolution.best?.route) return null;
+    if (resolution.status === "strong") {
+      return { path: resolution.best.route };
+    }
+    return {
+      path: resolution.best.route,
+      meta: {
+        status: resolution.status === "ambiguous" ? "ambiguous" : "weak",
+        confidence: resolution.confidence,
+        topic: cleanedTopic,
+        candidates: resolution.candidates.map((candidate) => candidate.route).filter((candidate) => Boolean(candidate)),
+      },
+    };
+  };
+
   const jsonActionMatch = trimmed.match(
     /^(?:\/(?:workstation|action)|workstation|action)\s*:?\s*(\{[\s\S]+\})$/i,
   );
@@ -7809,7 +9132,9 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
   if (conversationalOpenDocsMatch) {
     const topic = conversationalOpenDocsMatch[1]?.trim() ?? "";
     const continuation = conversationalOpenDocsMatch[2]?.trim() ?? "";
-    const path = resolveDocPathFromPrompt(topic || conversationalCandidate);
+    const hintedPath = resolveDocPathFromPrompt(topic || conversationalCandidate);
+    const resolvedDoc = resolveDocOpenArgs(topic, hintedPath ?? "");
+    const path = resolvedDoc?.path ?? "";
     const continuationWantsSummarize = /\b(?:summari[sz]e|summary|tldr|tl;dr)\b/i.test(continuation);
     const continuationWantsSectionSummary =
       continuationWantsSummarize && /\b(?:section|this\s+section|current\s+section|part)\b/i.test(continuation);
@@ -7817,10 +9142,19 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
       continuation,
     );
     if (continuationWantsSummarize || continuationWantsExplain) {
-      const fallbackPath = topic
+      const fallbackPath = !path && topic
         ? (findBestDocForTopic(topic)?.route ?? findRandomPaperForTopic(topic)?.route ?? "/docs/papers.md")
         : "";
       const resolvedPath = path || fallbackPath;
+      const resolutionArgs =
+        resolvedDoc?.meta && resolvedPath
+          ? {
+              _doc_resolution_status: resolvedDoc.meta.status,
+              _doc_resolution_confidence: resolvedDoc.meta.confidence,
+              _doc_resolution_topic: resolvedDoc.meta.topic,
+              _doc_resolution_candidates: resolvedDoc.meta.candidates,
+            }
+          : undefined;
       return {
         action: "run_panel_action",
         panel_id: "docs-viewer",
@@ -7829,18 +9163,34 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
           : continuationWantsExplain
             ? "explain_paper"
             : "summarize_doc",
-        args: resolvedPath ? { path: resolvedPath } : undefined,
+        args: resolvedPath
+          ? {
+              path: resolvedPath,
+              ...(resolutionArgs ?? {}),
+            }
+          : undefined,
       };
     }
     const readAloudRequested = /\b(?:read(?:\s+it)?(?:\s+out\s+loud|\s+aloud)?|out\s+loud|aloud|speak|narrate|voice)\b/i.test(
       conversationalCandidate,
     );
     if (path) {
+      const resolutionArgs =
+        resolvedDoc?.meta
+          ? {
+              _doc_resolution_status: resolvedDoc.meta.status,
+              _doc_resolution_confidence: resolvedDoc.meta.confidence,
+              _doc_resolution_topic: resolvedDoc.meta.topic,
+              _doc_resolution_candidates: resolvedDoc.meta.candidates,
+            }
+          : undefined;
       return {
         action: "run_panel_action",
         panel_id: "docs-viewer",
         action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
-        args: readAloudRequested ? { path, topic } : { path },
+        args: readAloudRequested
+          ? { path, topic, ...(resolutionArgs ?? {}) }
+          : { path, ...(resolutionArgs ?? {}) },
       };
     }
     return {
@@ -7860,10 +9210,20 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
     const hintedPath = resolveDocPathFromPrompt(topic || conversationalCandidate, {
       useTopicHints: false,
     });
-    const fallbackPath = topic
+    const resolvedDoc = resolveDocOpenArgs(topic, hintedPath ?? "");
+    const fallbackPath = !resolvedDoc?.path && topic
       ? (findBestDocForTopic(topic)?.route ?? findRandomPaperForTopic(topic)?.route ?? "")
       : "";
-    const resolvedPath = hintedPath || fallbackPath;
+    const resolvedPath = resolvedDoc?.path || fallbackPath;
+    const resolutionArgs =
+      resolvedDoc?.meta && resolvedPath
+        ? {
+            _doc_resolution_status: resolvedDoc.meta.status,
+            _doc_resolution_confidence: resolvedDoc.meta.confidence,
+            _doc_resolution_topic: resolvedDoc.meta.topic,
+            _doc_resolution_candidates: resolvedDoc.meta.candidates,
+          }
+        : undefined;
     const continuationWantsSummarize = /\b(?:summari[sz]e|summary|tldr|tl;dr)\b/i.test(continuation);
     const continuationWantsSectionSummary =
       continuationWantsSummarize && /\b(?:section|this\s+section|current\s+section|part)\b/i.test(continuation);
@@ -7879,7 +9239,12 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
           : continuationWantsExplain
             ? "explain_paper"
             : "summarize_doc",
-        args: resolvedPath ? { path: resolvedPath } : undefined,
+        args: resolvedPath
+          ? {
+              path: resolvedPath,
+              ...(resolutionArgs ?? {}),
+            }
+          : undefined,
       };
     }
     const readAloudRequested = /\b(?:read(?:\s+it)?(?:\s+out\s+loud|\s+aloud)?|out\s+loud|aloud|speak|narrate|voice)\b/i.test(
@@ -7890,7 +9255,9 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
         action: "run_panel_action",
         panel_id: "docs-viewer",
         action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
-        args: readAloudRequested ? { path: resolvedPath, topic } : { path: resolvedPath },
+        args: readAloudRequested
+          ? { path: resolvedPath, topic, ...(resolutionArgs ?? {}) }
+          : { path: resolvedPath, ...(resolutionArgs ?? {}) },
       };
     }
     return {
@@ -7975,14 +9342,26 @@ export function parseWorkstationActionCommand(value: string): HelixWorkstationAc
   );
   if (latestDocRequestMatch) {
     const topic = latestDocRequestMatch[1]?.trim() ?? "";
-    const best = topic ? (findBestDocForTopic(topic) ?? findRandomPaperForTopic(topic)) : null;
+    const resolution = topic ? resolveDocTopic(topic) : null;
+    const best = resolution?.best ?? (topic ? findRandomPaperForTopic(topic) : null);
+    const resolutionArgs =
+      resolution && (resolution.status === "weak" || resolution.status === "ambiguous")
+        ? {
+            _doc_resolution_status: resolution.status,
+            _doc_resolution_confidence: resolution.confidence,
+            _doc_resolution_topic: topic || null,
+            _doc_resolution_candidates: resolution.candidates.map((candidate) => candidate.route).filter((candidate) => Boolean(candidate)),
+          }
+        : undefined;
     const readAloudRequested = /\b(?:read|narrate|voice|aloud|out\s+loud)\b/i.test(conversationalCandidate);
     if (best?.route) {
       return {
         action: "run_panel_action",
         panel_id: "docs-viewer",
         action_id: readAloudRequested ? "open_doc_and_read" : "open_doc",
-        args: readAloudRequested ? { path: best.route, topic } : { path: best.route },
+        args: readAloudRequested
+          ? { path: best.route, topic, ...(resolutionArgs ?? {}) }
+          : { path: best.route, ...(resolutionArgs ?? {}) },
       };
     }
     return {
@@ -8558,6 +9937,11 @@ export function HelixAskPill({
   );
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
   const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
+  const [pendingWorkstationUserInput, setPendingWorkstationUserInput] =
+    useState<PendingWorkstationUserInputRequest | null>(null);
+  const pendingWorkstationUserInputRef = useRef<PendingWorkstationUserInputRequest | null>(null);
+  const pendingWorkstationRequestByTurnIdRef = useRef<Record<string, string>>({});
+  const terminalOutcomeByTurnIdRef = useRef<Record<string, HelixTurnTerminalOutcome>>({});
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
@@ -8626,6 +10010,10 @@ export function HelixAskPill({
     [voiceNoisyEnvironmentMode],
   );
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    pendingWorkstationUserInputRef.current = pendingWorkstationUserInput;
+  }, [pendingWorkstationUserInput]);
   const appendWorkstationEventToLatestActReply = useCallback((entry: AskLiveEventEntry) => {
     if (!isWorkstationLifecycleEvent(entry)) return;
     setAskReplies((prev) => {
@@ -13022,9 +14410,13 @@ export function HelixAskPill({
       if (
         kind !== "workstation_action_receipt" &&
         kind !== "workstation_procedural_step" &&
+        kind !== "workstation_request_user_input" &&
+        kind !== "workstation_request_resolved" &&
         kind !== "job_started" &&
         kind !== "job_step_receipt" &&
-        kind !== "job_completed"
+        kind !== "job_completed" &&
+        kind !== "observer_plan_delta" &&
+        kind !== "observer_plan_item_completed"
       ) {
         return;
       }
@@ -13034,9 +14426,16 @@ export function HelixAskPill({
       });
       if (alreadyLogged) return;
       const ok = typeof meta?.ok === "boolean" ? meta.ok : null;
+      const cancelled = meta?.cancelled === true;
       const status: HelixTimelineEntry["status"] =
-        kind === "job_started" || kind === "job_step_receipt" || kind === "workstation_procedural_step"
+        kind === "job_started" ||
+        kind === "job_step_receipt" ||
+        kind === "workstation_procedural_step" ||
+        kind === "workstation_request_user_input" ||
+        kind === "observer_plan_delta"
           ? "running"
+          : cancelled
+            ? "suppressed"
           : ok === false
             ? "failed"
             : "done";
@@ -13048,6 +14447,8 @@ export function HelixAskPill({
       if (panelId) detailParts.push(`panel:${panelId}`);
       const actionId = typeof meta?.action_id === "string" ? meta.action_id.trim() : "";
       if (actionId) detailParts.push(`action:${actionId}`);
+      const item = typeof meta?.item === "string" ? meta.item.trim() : "";
+      if (item) detailParts.push(`item:${item}`);
       const traceIdFromMeta = typeof meta?.trace_id === "string" ? meta.trace_id.trim() : "";
       const traceId =
         traceIdFromMeta ||
@@ -13205,9 +14606,428 @@ export function HelixAskPill({
     [],
   );
 
+  const appendSyntheticLiveEvent = useCallback(
+    (entry: AskLiveEventEntry) => {
+      if (!entry?.id?.trim()) return;
+      setAskLiveEvents((prev) => {
+        if (prev.some((liveEvent) => liveEvent.id === entry.id)) return prev;
+        const next = [...prev, entry];
+        const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+        askLiveEventsRef.current = clipped;
+        const appendedEvent = clipped[clipped.length - 1];
+        if (appendedEvent) {
+          appendLiveEventToHelixTimeline(appendedEvent);
+          appendWorkstationEventToLatestActReply(appendedEvent);
+        }
+        const manualAttemptId = reasoningAttemptManualIdRef.current;
+        if (manualAttemptId && appendedEvent) {
+          updateReasoningAttempt(manualAttemptId, (current) => ({
+            ...current,
+            events: [...current.events, appendedEvent].slice(-HELIX_ASK_LIVE_EVENT_LIMIT),
+          }));
+        }
+        return clipped;
+      });
+    },
+    [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
+  );
+
+  const dispatchWorkstationActionSequence = useCallback(
+    (input: {
+      source: ObserverPlanEventSource;
+      question: string;
+      actions: HelixWorkstationAction[];
+      traceId?: string | null;
+    }) => {
+      const total = input.actions.length;
+      input.actions.forEach((action, index) => {
+        const step = index + 1;
+        appendSyntheticLiveEvent(
+          buildWorkstationProceduralStepEvent({
+            source: input.source,
+            step,
+            total,
+            action,
+            question: input.question,
+            traceId: input.traceId,
+          }),
+        );
+        runWorkstationAction(action);
+      });
+    },
+    [appendSyntheticLiveEvent, runWorkstationAction],
+  );
+
+  const trackPendingWorkstationRequestOwnership = useCallback((pending: PendingWorkstationUserInputRequest) => {
+    const turnId = String(pending.turn_id ?? "").trim();
+    const requestId = String(pending.request_id ?? "").trim();
+    if (!turnId || !requestId) return;
+    pendingWorkstationRequestByTurnIdRef.current[turnId] = requestId;
+  }, []);
+
+  const clearPendingWorkstationRequestOwnership = useCallback((pending: PendingWorkstationUserInputRequest) => {
+    const turnId = String(pending.turn_id ?? "").trim();
+    if (!turnId) return;
+    const ownedRequestId = pendingWorkstationRequestByTurnIdRef.current[turnId];
+    if (!ownedRequestId || ownedRequestId === pending.request_id) {
+      delete pendingWorkstationRequestByTurnIdRef.current[turnId];
+    }
+  }, []);
+
+  const unresolvedPendingRequestCountForTurn = useCallback((turnId: string | null | undefined): number => {
+    const normalizedTurnId = String(turnId ?? "").trim();
+    if (!normalizedTurnId) return 0;
+    return pendingWorkstationRequestByTurnIdRef.current[normalizedTurnId] ? 1 : 0;
+  }, []);
+
+  const canFinalizeTurn = useCallback(
+    (turnId: string | null | undefined) => unresolvedPendingRequestCountForTurn(turnId) === 0,
+    [unresolvedPendingRequestCountForTurn],
+  );
+
+  const canEmitTurnTerminalOutcome = useCallback(
+    (
+      turnId: string | null | undefined,
+      outcome: HelixTurnTerminalOutcome,
+    ): { accepted: boolean; existing: HelixTurnTerminalOutcome | null; turn_id: string | null } => {
+      return registerTurnTerminalOutcome({
+        registry: terminalOutcomeByTurnIdRef.current,
+        turn_id: turnId,
+        outcome,
+      });
+    },
+    [],
+  );
+
+  const buildWorkstationRequestUserInputEvent = useCallback(
+    (pending: PendingWorkstationUserInputRequest): AskLiveEventEntry => {
+      const tsMs = Date.now();
+      return {
+        id: `workstation-request-user-input:${crypto.randomUUID()}`,
+        text: `request_user_input: ${pending.prompt}`,
+        tool: "helix.workstation.request_user_input",
+        ts: new Date(tsMs).toISOString(),
+        tsMs,
+        meta: {
+          kind: "workstation_request_user_input",
+          request_id: pending.request_id,
+          turn_id: pending.turn_id,
+          panel_id: pending.panel_id,
+          action_id: pending.action_id,
+          reason: pending.reason,
+          missing_args: pending.missing_args,
+          pending_server_request: true,
+          router_state: "S3_WORKSTATION_REQUEST_USER_INPUT",
+          router_fail_id: pending.router_fail_id ?? "RF_MISSING_REQUIRED_ARGS",
+          source: pending.source,
+        },
+      };
+    },
+    [],
+  );
+
+  const buildWorkstationRequestResolvedEvent = useCallback(
+    (input: {
+      source: WorkstationRequestSource;
+      pending: PendingWorkstationUserInputRequest;
+      resolved: boolean;
+      cancelled?: boolean;
+      turn_transition?: boolean;
+      router_fail_id?: string | null;
+    }): AskLiveEventEntry => {
+      const tsMs = Date.now();
+      return {
+        id: `workstation-request-resolved:${crypto.randomUUID()}`,
+        text: input.cancelled
+          ? "request_user_input resolved: cancelled"
+          : input.resolved
+            ? "request_user_input resolved: action ready"
+            : "request_user_input resolved: pending",
+        tool: "helix.workstation.request_user_input",
+        ts: new Date(tsMs).toISOString(),
+        tsMs,
+        meta: {
+          kind: "workstation_request_resolved",
+          request_id: input.pending.request_id,
+          turn_id: input.pending.turn_id,
+          panel_id: input.pending.panel_id,
+          action_id: input.pending.action_id,
+          resolved: input.resolved,
+          cancelled: input.cancelled === true,
+          turn_transition: input.turn_transition === true,
+          pending_server_request: !input.resolved && input.cancelled !== true,
+          pending_server_requests: input.resolved || input.cancelled === true ? 0 : 1,
+          router_state:
+            input.cancelled === true
+              ? "S4_WORKSTATION_RESOLVE"
+              : input.resolved
+                ? "S5_WORKSTATION_EXECUTE"
+                : "S3_WORKSTATION_REQUEST_USER_INPUT",
+          router_fail_id:
+            input.router_fail_id ??
+            (input.turn_transition === true
+              ? "RF_TURN_TRANSITION_PENDING_REQUEST"
+              : input.cancelled === true
+                ? "RF_USER_CANCELLED"
+                : null),
+          source: input.source,
+        },
+      };
+    },
+    [],
+  );
+
+  const cancelPendingWorkstationRequestForTurnTransition = useCallback(
+    (input: {
+      source: WorkstationRequestSource;
+      turn_id: string;
+      reason?: string;
+    }): boolean => {
+      if (!HELIX_E2_TRANSITION_ERRORS_FLAG) return false;
+      const pending = pendingWorkstationUserInputRef.current;
+      if (!pending) return false;
+      if (!isWorkstationTurnTransitionPendingRequest({ pending_turn_id: pending.turn_id, current_turn_id: input.turn_id })) {
+        return false;
+      }
+      setPendingWorkstationUserInput(null);
+      clearPendingWorkstationRequestOwnership(pending);
+      appendSyntheticLiveEvent(
+        buildWorkstationRequestResolvedEvent({
+          source: input.source,
+          pending,
+          resolved: false,
+          cancelled: true,
+          turn_transition: true,
+          router_fail_id: "RF_TURN_TRANSITION_PENDING_REQUEST",
+        }),
+      );
+      addHelixTimelineEntry({
+        type: "action_receipt",
+        source: "manual",
+        status: "suppressed",
+        text: "Pending workstation request was cancelled due to turn transition.",
+        detail: `turnTransition:${input.reason ?? "superseded"}`,
+        mode: "observe",
+        meta: {
+          kind: "workstation_request_resolved",
+          request_id: pending.request_id,
+          turn_id: pending.turn_id,
+          turn_transition: true,
+          router_state: "S4_WORKSTATION_RESOLVE",
+          router_fail_id: "RF_TURN_TRANSITION_PENDING_REQUEST",
+          source: input.source,
+        },
+      });
+      return true;
+    },
+    [addHelixTimelineEntry, appendSyntheticLiveEvent, buildWorkstationRequestResolvedEvent, clearPendingWorkstationRequestOwnership],
+  );
+
+  const resolveWorkstationActionFromPendingInput = useCallback(
+    (
+      question: string,
+      source: WorkstationRequestSource,
+      turn_id?: string | null,
+    ): { handled: true; action: HelixWorkstationAction | null } | { handled: false } => {
+      const pending = pendingWorkstationUserInputRef.current;
+      if (!pending) return { handled: false };
+      if (
+        HELIX_E2_TRANSITION_ERRORS_FLAG &&
+        isWorkstationTurnTransitionPendingRequest({
+          pending_turn_id: pending.turn_id,
+          current_turn_id: turn_id,
+        })
+      ) {
+        cancelPendingWorkstationRequestForTurnTransition({
+          source,
+          turn_id: String(turn_id ?? ""),
+          reason: "pending_response_turn_mismatch",
+        });
+        return { handled: false };
+      }
+      const resolution = resolvePendingWorkstationUserInput({
+        pending,
+        reply: question,
+      });
+      if (resolution.status === "cancelled") {
+        setPendingWorkstationUserInput(null);
+        clearPendingWorkstationRequestOwnership(pending);
+        appendSyntheticLiveEvent(
+          buildWorkstationRequestResolvedEvent({
+            source,
+            pending,
+            resolved: false,
+            cancelled: true,
+          }),
+        );
+        addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "manual",
+          status: "suppressed",
+          text: "Cancelled pending workstation request.",
+          detail: "workstation_request_user_input | cancelled",
+          mode: "observe",
+          meta: {
+            kind: "workstation_request_resolved",
+            request_id: pending.request_id,
+            router_state: "S4_WORKSTATION_RESOLVE",
+            router_fail_id: "RF_USER_CANCELLED",
+            source,
+          },
+        });
+        return { handled: true, action: null };
+      }
+      if (resolution.status === "pending") {
+        setPendingWorkstationUserInput(resolution.pending);
+        trackPendingWorkstationRequestOwnership(resolution.pending);
+        appendSyntheticLiveEvent(buildWorkstationRequestUserInputEvent(resolution.pending));
+        return { handled: true, action: null };
+      }
+      setPendingWorkstationUserInput(null);
+      clearPendingWorkstationRequestOwnership(pending);
+      appendSyntheticLiveEvent(
+        buildWorkstationRequestResolvedEvent({
+          source,
+          pending,
+          resolved: true,
+          router_fail_id: null,
+        }),
+      );
+      return { handled: true, action: resolution.action };
+    },
+    [
+      addHelixTimelineEntry,
+      appendSyntheticLiveEvent,
+      cancelPendingWorkstationRequestForTurnTransition,
+      buildWorkstationRequestResolvedEvent,
+      buildWorkstationRequestUserInputEvent,
+      clearPendingWorkstationRequestOwnership,
+      trackPendingWorkstationRequestOwnership,
+    ],
+  );
+
+  const resolveWorkstationUserInputGate = useCallback(
+    (input: {
+      source: WorkstationRequestSource;
+      question: string;
+      action: HelixWorkstationAction | null;
+      turn_id?: string | null;
+    }): { action: HelixWorkstationAction | null; blocked: boolean; router_fail_id: string | null } => {
+      if (input.action) {
+        const pendingRequest = buildWorkstationUserInputRequest({
+          source: input.source,
+          action: input.action,
+          question: input.question,
+          turn_id: input.turn_id,
+        });
+        if (!pendingRequest) {
+          return { action: input.action, blocked: false, router_fail_id: null };
+        }
+        setPendingWorkstationUserInput(pendingRequest);
+        trackPendingWorkstationRequestOwnership(pendingRequest);
+        appendSyntheticLiveEvent(buildWorkstationRequestUserInputEvent(pendingRequest));
+        addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "manual",
+          status: "queued",
+          text: pendingRequest.prompt,
+          detail: "workstation_request_user_input | pending_server_request",
+          mode: "observe",
+          meta: {
+            kind: "workstation_request_user_input",
+            request_id: pendingRequest.request_id,
+            turn_id: pendingRequest.turn_id,
+            router_state: "S3_WORKSTATION_REQUEST_USER_INPUT",
+            router_fail_id: pendingRequest.router_fail_id ?? "RF_MISSING_REQUIRED_ARGS",
+            pending_server_requests: 1,
+            source: input.source,
+            panel_id: pendingRequest.panel_id,
+            action_id: pendingRequest.action_id,
+            missing_args: pendingRequest.missing_args,
+          },
+        });
+        return {
+          action: null,
+          blocked: true,
+          router_fail_id: pendingRequest.router_fail_id ?? "RF_MISSING_REQUIRED_ARGS",
+        };
+      }
+      return { action: null, blocked: false, router_fail_id: null };
+    },
+    [addHelixTimelineEntry, appendSyntheticLiveEvent, buildWorkstationRequestUserInputEvent, trackPendingWorkstationRequestOwnership],
+  );
+
   const enqueueReasoningAttempt = useCallback((attemptId: string) => {
     reasoningAttemptQueueRef.current.push(attemptId);
   }, []);
+
+  const ensureExplicitReasoningPlan = useCallback(
+    (attempt: ReasoningAttempt): ReasoningAttempt => {
+      if (attempt.explicitPlanEmitted) return attempt;
+      const source: ObserverPlanEventSource = attempt.source === "voice_auto" ? "voice_dispatch" : "run_ask";
+      const question = (attempt.recordedText ?? attempt.prompt).trim();
+      const dispatchPlan = deriveObserverDispatchPlan({
+        question,
+        workstationAction: null,
+        forceReasoningDispatch: true,
+      });
+      appendSyntheticLiveEvent(
+        buildObserverPlanDeltaEvent({
+          source,
+          dispatchPlan,
+          question,
+          traceId: attempt.traceId,
+        }),
+      );
+      appendSyntheticLiveEvent(
+        buildObserverPlanItemCompletedEvent({
+          source,
+          dispatchPlan,
+          item: "reasoning_queued",
+          question,
+          traceId: attempt.traceId,
+        }),
+      );
+      addHelixTimelineEntry({
+        type: "conversation_brief",
+        source: attempt.source,
+        status: "queued",
+        text: "Planning reasoning turn before execution.",
+        detail: "observer_lane_orchestrator | explicit_reasoning_plan",
+        mode: "observe",
+        traceId: attempt.traceId,
+        attemptId: attempt.id,
+        meta: {
+          kind: "observer_lane_orchestrator",
+          source,
+          intent_type: dispatchPlan.intent_type,
+          dispatch_plan: dispatchPlan.dispatch_plan,
+          router_state: "S2_PLANNING",
+          router_fail_id: null,
+          explicit_plan_required: true,
+        },
+      });
+      const now = Date.now();
+      let updatedAttempt = attempt;
+      updateReasoningAttempt(attempt.id, (current) => {
+        updatedAttempt = {
+          ...current,
+          explicitPlanEmitted: true,
+          explicitPlanAtMs: now,
+        };
+        return updatedAttempt;
+      });
+      return updatedAttempt;
+    },
+    [
+      addHelixTimelineEntry,
+      appendSyntheticLiveEvent,
+      buildObserverPlanDeltaEvent,
+      buildObserverPlanItemCompletedEvent,
+      deriveObserverDispatchPlan,
+      updateReasoningAttempt,
+    ],
+  );
 
   const suppressSupersededVoiceAttemptsForNewTurn = useCallback(
     (newTraceId: string | null | undefined) => {
@@ -13385,6 +15205,8 @@ export function HelixAskPill({
       interpreterTermIds?: string[];
       interpreterConceptIds?: string[];
       translated?: boolean;
+      explicitPlanEmitted?: boolean;
+      explicitPlanAtMs?: number;
     }): ReasoningAttempt => {
       const now = Date.now();
       const attempt: ReasoningAttempt = {
@@ -13433,6 +15255,8 @@ export function HelixAskPill({
         translated: input.translated,
         conversationBriefBase: input.conversationBriefBase,
         conversationBriefSource: input.conversationBriefSource ?? "none",
+        explicitPlanEmitted: input.explicitPlanEmitted ?? false,
+        explicitPlanAtMs: input.explicitPlanAtMs ?? undefined,
         partial: "",
         events: [],
         createdAtMs: now,
@@ -13508,10 +15332,11 @@ export function HelixAskPill({
           reasoningAttemptQueueRef.current.unshift(nextAttemptId);
           break;
         }
-        const attempt = reasoningAttemptsRef.current.find((entry) => entry.id === nextAttemptId);
+        let attempt = reasoningAttemptsRef.current.find((entry) => entry.id === nextAttemptId);
         if (!attempt || attempt.status === "cancelled" || attempt.status === "suppressed") {
           continue;
         }
+        attempt = ensureExplicitReasoningPlan(attempt);
         if (attempt.source === "voice_auto") {
           const assemblerState = getVoiceTurnAssemblerState(attempt.traceId);
           const preflightAuthority = evaluateVoiceReasoningResponseAuthority({
@@ -14212,6 +16037,90 @@ export function HelixAskPill({
           const finalText = (streamedFinalText || envelopeFinalText || strictGateFallbackText || "").trim();
           const finalSource: "normal_reasoning" | "strict_gate_override" =
             streamedFinalText && !strictGateOverrideResponse ? "normal_reasoning" : "strict_gate_override";
+          const emptyTerminalResponse =
+            !streamedFinalText && !envelopeFinalText && !strictGateFallbackText && !strictGateOverrideResponse;
+          if (emptyTerminalResponse) {
+            if (HELIX_E3_TERMINAL_GUARANTEE_FLAG) {
+              const terminalGate = canEmitTurnTerminalOutcome(attempt.traceId, "final_failure");
+              if (!terminalGate.accepted) {
+                addHelixTimelineEntry({
+                  type: "suppressed",
+                  source: attempt.source,
+                  status: "suppressed",
+                  text: "Suppressed duplicate terminal event for this turn.",
+                  detail: "RF_DUPLICATE_TERMINAL_EVENT",
+                  mode: modeForTimeline,
+                  traceId: attempt.traceId,
+                  attemptId: attempt.id,
+                  meta: buildReasoningTimelineMeta(attempt, {
+                    suppressionCause: "turn_transition",
+                    authorityRejectStage: "final",
+                    failReasonRaw: "RF_DUPLICATE_TERMINAL_EVENT",
+                    turn_id: terminalGate.turn_id ?? attempt.traceId,
+                    causalRefId: primaryTimelineEntryId,
+                  }),
+                });
+                continue;
+              }
+            }
+            updateReasoningAttempt(attempt.id, (current) => ({
+              ...current,
+              status: "failed",
+              mode: modeForAttempt,
+              suppression_reason: "RF_EMPTY_TERMINAL",
+              completedAtMs: Date.now(),
+            }));
+            patchHelixTimelineEntry(primaryTimelineEntryId, {
+              status: "failed",
+              detail: "RF_EMPTY_TERMINAL",
+              mode: modeForTimeline,
+              meta: buildReasoningTimelineMeta(attempt, {
+                suppressionCause: "reasoning_failed",
+                authorityRejectStage: "final",
+                failReasonRaw: "RF_EMPTY_TERMINAL",
+                causalRefId: primaryTimelineEntryId,
+              }),
+            });
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: attempt.source,
+              status: "suppressed",
+              text: "Reasoning queue returned empty terminal output.",
+              detail: "RF_EMPTY_TERMINAL",
+              mode: modeForTimeline,
+              traceId: attempt.traceId,
+              attemptId: attempt.id,
+              meta: buildReasoningTimelineMeta(attempt, {
+                suppressionCause: "reasoning_failed",
+                authorityRejectStage: "final",
+                failReasonRaw: "RF_EMPTY_TERMINAL",
+                causalRefId: primaryTimelineEntryId,
+              }),
+            });
+            const staleStreamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+            if (staleStreamEntryId) {
+              patchHelixTimelineEntry(staleStreamEntryId, {
+                status: "suppressed",
+                detail: "RF_EMPTY_TERMINAL",
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "reasoning_failed",
+                  authorityRejectStage: "stream",
+                  failReasonRaw: "RF_EMPTY_TERMINAL",
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+            }
+            if (attempt.source === "voice_auto") {
+              markVoiceCheckpoint("dispatch_suppressed", "warn", "Reasoning attempt produced empty terminal output.");
+              const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              if (segmentId) {
+                patchVoiceSegmentAttempt(segmentId, { dispatch: "suppressed" });
+                delete voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              }
+            }
+            continue;
+          }
           const rawOutputText = finalText ||
             (strictGateOverrideResponse
               ? strictGateFallbackText || "Confirmation is required before retrieval can continue."
@@ -14219,7 +16128,7 @@ export function HelixAskPill({
           const artifactDominated = isArtifactDominatedReasoningText(rawOutputText);
           const sanitizedOutputText = sanitizeReasoningOutputText(rawOutputText);
           const displayOutputText = cleanReasoningDisplayArtifacts(rawOutputText);
-          const outputText =
+          let outputText =
             artifactDominated && sanitizedOutputText.length < 72
               ? "I could not produce a readable grounded answer for this turn. Please restate it and I will retry with stricter grounding."
               : displayOutputText || rawOutputText;
@@ -14246,11 +16155,30 @@ export function HelixAskPill({
               failClass: typeof response.fail_class === "string" ? response.fail_class : null,
             },
           );
-          const evidenceRefs = response.debug?.context_files ?? response.debug?.prompt_context_files ?? [];
-          const certaintyClass =
-            ((response.envelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
-              ?.certainty_class) ??
-            (response.debug?.evidence_gate_ok ? "reasoned" : "unknown");
+          const evidenceGateDecision = evaluateEvidenceFinalizationGate({
+            question: attempt.recordedText ?? attempt.prompt,
+            mode: modeForAttempt,
+            debug: responseDebugWithClientMode ?? response.debug,
+            proof: response.proof,
+          });
+          if (evidenceGateDecision.blocked) {
+            appendSyntheticLiveEvent(
+              buildNeedsRetrievalPlanEvent({
+                source: attempt.source === "voice_auto" ? "voice_dispatch" : "run_ask",
+                question: attempt.recordedText ?? attempt.prompt,
+                reason: evidenceGateDecision.reason ?? "needs_retrieval",
+                evidence_refs: evidenceGateDecision.evidence_refs,
+                traceId: attempt.traceId,
+              }),
+            );
+            outputText = evidenceGateDecision.safe_text ?? outputText;
+          }
+          const evidenceRefs = evidenceGateDecision.evidence_refs;
+          const certaintyClass = evidenceGateDecision.blocked
+            ? "unknown"
+            : ((response.envelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
+                ?.certainty_class) ??
+              ((responseDebugWithClientMode ?? response.debug)?.evidence_gate_ok ? "reasoned" : "unknown");
           const ladderDecision =
             attempt.source === "voice_auto" && attempt.explorationTurn
                 ? decideExplorationLadderAction({
@@ -14671,6 +16599,193 @@ export function HelixAskPill({
               }
             }
           } else {
+            const unresolvedPendingForTurn = unresolvedPendingRequestCountForTurn(attempt.traceId);
+            if (
+              (HELIX_E2_TRANSITION_ERRORS_FLAG || HELIX_E3_TERMINAL_GUARANTEE_FLAG) &&
+              unresolvedPendingForTurn > 0 &&
+              !canFinalizeTurn(attempt.traceId)
+            ) {
+              updateReasoningAttempt(attempt.id, (current) => ({
+                ...current,
+                status: "suppressed",
+                mode: modeForAttempt,
+                suppression_reason: "RF_PENDING_REQUEST_NOT_RESOLVED",
+                completedAtMs: Date.now(),
+              }));
+              patchHelixTimelineEntry(primaryTimelineEntryId, {
+                status: "suppressed",
+                detail: "turnTransition: pending_request_unresolved",
+                mode: modeForTimeline,
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "turn_transition",
+                  authorityRejectStage: "final",
+                  failReasonRaw: "RF_PENDING_REQUEST_NOT_RESOLVED",
+                  pending_server_requests: unresolvedPendingForTurn,
+                  turn_id: attempt.traceId,
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: attempt.source,
+                status: "suppressed",
+                text: "Turn completion blocked until pending workstation request is resolved.",
+                detail: "turnTransition: pending_request_unresolved",
+                mode: modeForTimeline,
+                traceId: attempt.traceId,
+                attemptId: attempt.id,
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "turn_transition",
+                  authorityRejectStage: "final",
+                  failReasonRaw: "RF_PENDING_REQUEST_NOT_RESOLVED",
+                  pending_server_requests: unresolvedPendingForTurn,
+                  turn_id: attempt.traceId,
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              continue;
+            }
+            if (HELIX_E3_TERMINAL_GUARANTEE_FLAG && !attempt.explicitPlanEmitted) {
+              updateReasoningAttempt(attempt.id, (current) => ({
+                ...current,
+                status: "suppressed",
+                mode: modeForAttempt,
+                suppression_reason: "RF_PLAN_REQUIRED_BEFORE_FINALIZE",
+                completedAtMs: Date.now(),
+              }));
+              patchHelixTimelineEntry(primaryTimelineEntryId, {
+                status: "suppressed",
+                detail: "RF_PLAN_REQUIRED_BEFORE_FINALIZE",
+                mode: modeForTimeline,
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "turn_transition",
+                  authorityRejectStage: "final",
+                  failReasonRaw: "RF_PLAN_REQUIRED_BEFORE_FINALIZE",
+                  turn_id: attempt.traceId,
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: attempt.source,
+                status: "suppressed",
+                text: "Suppressed terminal finalize until explicit plan is emitted.",
+                detail: "RF_PLAN_REQUIRED_BEFORE_FINALIZE",
+                mode: modeForTimeline,
+                traceId: attempt.traceId,
+                attemptId: attempt.id,
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "turn_transition",
+                  authorityRejectStage: "final",
+                  failReasonRaw: "RF_PLAN_REQUIRED_BEFORE_FINALIZE",
+                  turn_id: attempt.traceId,
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              continue;
+            }
+            if (HELIX_E3_TERMINAL_GUARANTEE_FLAG && isInvalidTerminalAnswerText(outputText)) {
+              const terminalGate = canEmitTurnTerminalOutcome(attempt.traceId, "final_failure");
+              if (!terminalGate.accepted) {
+                addHelixTimelineEntry({
+                  type: "suppressed",
+                  source: attempt.source,
+                  status: "suppressed",
+                  text: "Suppressed duplicate terminal event for this turn.",
+                  detail: "RF_DUPLICATE_TERMINAL_EVENT",
+                  mode: modeForTimeline,
+                  traceId: attempt.traceId,
+                  attemptId: attempt.id,
+                  meta: buildReasoningTimelineMeta(attempt, {
+                    suppressionCause: "turn_transition",
+                    authorityRejectStage: "final",
+                    failReasonRaw: "RF_DUPLICATE_TERMINAL_EVENT",
+                    turn_id: terminalGate.turn_id ?? attempt.traceId,
+                    causalRefId: primaryTimelineEntryId,
+                  }),
+                });
+                continue;
+              }
+              updateReasoningAttempt(attempt.id, (current) => ({
+                ...current,
+                status: "failed",
+                mode: modeForAttempt,
+                suppression_reason: "RF_EMPTY_TERMINAL",
+                completedAtMs: Date.now(),
+              }));
+              patchHelixTimelineEntry(primaryTimelineEntryId, {
+                status: "failed",
+                detail: "RF_EMPTY_TERMINAL",
+                mode: modeForTimeline,
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "reasoning_failed",
+                  authorityRejectStage: "final",
+                  failReasonRaw: "RF_EMPTY_TERMINAL",
+                  turn_id: terminalGate.turn_id ?? attempt.traceId,
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: attempt.source,
+                status: "suppressed",
+                text: "Terminal output was empty and was rejected by E3 terminal guarantee.",
+                detail: "RF_EMPTY_TERMINAL",
+                mode: modeForTimeline,
+                traceId: attempt.traceId,
+                attemptId: attempt.id,
+                meta: buildReasoningTimelineMeta(attempt, {
+                  suppressionCause: "reasoning_failed",
+                  authorityRejectStage: "final",
+                  failReasonRaw: "RF_EMPTY_TERMINAL",
+                  turn_id: terminalGate.turn_id ?? attempt.traceId,
+                  causalRefId: primaryTimelineEntryId,
+                }),
+              });
+              continue;
+            }
+            if (HELIX_E3_TERMINAL_GUARANTEE_FLAG) {
+              const terminalGate = canEmitTurnTerminalOutcome(attempt.traceId, "final_answer");
+              if (!terminalGate.accepted) {
+                updateReasoningAttempt(attempt.id, (current) => ({
+                  ...current,
+                  status: "suppressed",
+                  mode: modeForAttempt,
+                  suppression_reason: "RF_DUPLICATE_TERMINAL_EVENT",
+                  completedAtMs: Date.now(),
+                }));
+                patchHelixTimelineEntry(primaryTimelineEntryId, {
+                  status: "suppressed",
+                  detail: "RF_DUPLICATE_TERMINAL_EVENT",
+                  mode: modeForTimeline,
+                  meta: buildReasoningTimelineMeta(attempt, {
+                    suppressionCause: "turn_transition",
+                    authorityRejectStage: "final",
+                    failReasonRaw: "RF_DUPLICATE_TERMINAL_EVENT",
+                    turn_id: terminalGate.turn_id ?? attempt.traceId,
+                    causalRefId: primaryTimelineEntryId,
+                  }),
+                });
+                addHelixTimelineEntry({
+                  type: "suppressed",
+                  source: attempt.source,
+                  status: "suppressed",
+                  text: "Suppressed duplicate terminal event for this turn.",
+                  detail: "RF_DUPLICATE_TERMINAL_EVENT",
+                  mode: modeForTimeline,
+                  traceId: attempt.traceId,
+                  attemptId: attempt.id,
+                  meta: buildReasoningTimelineMeta(attempt, {
+                    suppressionCause: "turn_transition",
+                    authorityRejectStage: "final",
+                    failReasonRaw: "RF_DUPLICATE_TERMINAL_EVENT",
+                    turn_id: terminalGate.turn_id ?? attempt.traceId,
+                    causalRefId: primaryTimelineEntryId,
+                  }),
+                });
+                continue;
+              }
+            }
             const capsuleAuthoritative =
               attempt.source !== "voice_auto" ||
               (() => {
@@ -14711,6 +16826,7 @@ export function HelixAskPill({
               meta: buildReasoningTimelineMeta(attempt, {
                 certaintyClass,
                 evidenceRefs,
+                needsRetrieval: evidenceGateDecision.blocked,
                 finalSource,
                 ...(timelineDebugContext ? { helixDebugContext: timelineDebugContext } : {}),
               }),
@@ -14773,6 +16889,37 @@ export function HelixAskPill({
                 ...prev,
               ].slice(0, 3),
             );
+            appendSyntheticLiveEvent(
+              buildObserverFinalizationEvent({
+                source: attempt.source === "voice_auto" ? "voice_dispatch" : "run_ask",
+                question: attempt.recordedText ?? attempt.prompt,
+                mode: modeForTimeline,
+                certaintyClass,
+                evidence_refs: evidenceRefs,
+                needs_retrieval: evidenceGateDecision.blocked,
+                final_source: finalSource,
+                answer_id: replyId,
+                attempt_id: attempt.id,
+                traceId: attempt.traceId,
+                turn_id: attempt.traceId,
+                pending_server_requests: unresolvedPendingRequestCountForTurn(attempt.traceId),
+                live_event_count: liveEventsSnapshot.length,
+                debug_context: timelineDebugContext,
+              }),
+            );
+            appendSyntheticLiveEvent(
+              buildObserverHandoffEvent({
+                source: attempt.source === "voice_auto" ? "voice_dispatch" : "run_ask",
+                question: attempt.recordedText ?? attempt.prompt,
+                mode: modeForTimeline,
+                certaintyClass,
+                evidence_refs: evidenceRefs,
+                needs_retrieval: evidenceGateDecision.blocked,
+                answer_id: replyId,
+                attempt_id: attempt.id,
+                traceId: attempt.traceId,
+              }),
+            );
             if (sessionId) {
               addMessage(sessionId, { role: "assistant", content: outputText });
             }
@@ -14800,6 +16947,7 @@ export function HelixAskPill({
                   attemptId: attempt.id,
                   certaintyClass,
                   evidenceRefs,
+                  needsRetrieval: evidenceGateDecision.blocked,
                   finalSource,
                   briefSource: attempt.conversationBriefSource ?? "none",
                 },
@@ -15048,11 +17196,13 @@ export function HelixAskPill({
   }, [
     addMessage,
     addHelixTimelineEntry,
+    appendSyntheticLiveEvent,
     askBusy,
     bumpVoiceTurnRevision,
     buildReasoningTimelineMeta,
     clearLiveDraftFlush,
     createReasoningAttempt,
+    ensureExplicitReasoningPlan,
     enqueueReasoningAttempt,
     enqueueVoiceAutoSpeakTask,
     ensureReasoningTimelineEntry,
@@ -15062,10 +17212,13 @@ export function HelixAskPill({
     markVoiceCheckpoint,
     patchHelixTimelineEntry,
     patchVoiceSegmentAttempt,
+    canEmitTurnTerminalOutcome,
+    canFinalizeTurn,
     rememberConversationTurn,
     resetReasoningTheaterEventClock,
     resolveSelectedContextCapsuleIds,
     setActive,
+    unresolvedPendingRequestCountForTurn,
     upsertContextCapsuleSessionLedger,
     updateVoiceTurnAssemblerState,
     updateVoiceDecisionBrief,
@@ -15203,6 +17356,19 @@ export function HelixAskPill({
     [clearHeldTranscriptState, clearVoiceSealPollTimer],
   );
 
+  const runAskRef = useRef<
+    ((
+      question: string,
+      capsuleIds?: string[],
+      options?: {
+        bypassWorkstationDispatch?: boolean;
+        forceReasoningDispatch?: boolean;
+        suppressWorkstationPayloadActions?: boolean;
+        answerContract?: HelixAskAnswerContract;
+      },
+    ) => Promise<void>) | null
+  >(null);
+
   const dispatchConfirmedVoiceTranscript = useCallback(
     async (
       input: VoiceConfirmedTurn,
@@ -15261,10 +17427,80 @@ export function HelixAskPill({
       const recentTurnsForTurn = conversationRecentTurnsRef.current.slice(-6);
       rememberConversationTurn(`user: ${recordedText}`);
       const sessionId = getHelixAskSessionId() ?? undefined;
+      const runAskUnified = runAskRef.current;
+      if (HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG && runAskUnified) {
+        updateVoiceDecisionBrief({
+          baseBrief: "Planning this turn through the unified ask lane.",
+          lifecycle: "queued",
+          mode: "observe",
+          routeReasonCode: "dispatch:voice_run_ask_parity",
+          traceId: input.traceId,
+          meta: {
+            dispatchHint: true,
+            classifierSource: "fallback",
+            classifierConfidence: null,
+            classifierReason: "voice_unified_dispatch",
+            routeReasonCode: "dispatch:voice_run_ask_parity",
+            confidence: input.confidence,
+            confidenceReason: input.confidenceReason,
+            transcript,
+            briefSource: "none",
+          },
+        });
+        markVoiceCheckpoint(
+          "dispatch_queued",
+          "ok",
+          "Voice turn delegated to the unified ask/turn lane.",
+        );
+        patchVoiceSegmentAttempt(input.segmentId, { dispatch: "queued" });
+        void runAskUnified(transcript);
+        return;
+      }
       const explicitPanelCommand = /^\s*\/open\b/i.test(transcript);
-      const parsedWorkstationCommand = !explicitPanelCommand
-        ? parseWorkstationActionCommand(transcript)
-        : null;
+      const voiceTurnId = input.traceId;
+      cancelPendingWorkstationRequestForTurnTransition({
+        source: "voice_dispatch",
+        turn_id: voiceTurnId,
+        reason: "voice_turn_superseded",
+      });
+      const normalizedWorkstationTranscript = normalizeWorkstationCommandText(transcript);
+      let parsedWorkstationFollowupActions: HelixWorkstationAction[] = [];
+      let parsedWorkstationCommand: HelixWorkstationAction | null = null;
+      const pendingResolution = resolveWorkstationActionFromPendingInput(transcript, "voice_dispatch", voiceTurnId);
+      if (pendingResolution.handled) {
+        if (!pendingResolution.action) {
+          markVoiceCheckpoint(
+            "dispatch_suppressed",
+            "warn",
+            pendingWorkstationUserInputRef.current?.prompt ?? "Waiting for workstation input.",
+          );
+          return;
+        }
+        parsedWorkstationCommand = pendingResolution.action;
+      }
+      if (!parsedWorkstationCommand && !explicitPanelCommand) {
+        const parsedChain = parseWorkstationActionChainCommand(normalizedWorkstationTranscript);
+        if (Array.isArray(parsedChain) && parsedChain.length > 0) {
+          parsedWorkstationCommand = parsedChain[0] ?? null;
+          parsedWorkstationFollowupActions = parsedChain.slice(1);
+        } else {
+          parsedWorkstationCommand = parseWorkstationActionCommand(normalizedWorkstationTranscript);
+        }
+      }
+      const frozenVoiceDispatchPolicy = resolveHelixDispatchPolicyAtTurnStart({
+        question: transcript,
+        workstationAction: parsedWorkstationCommand,
+        explicitPanelCommand,
+      });
+      const preliminaryVoicePlannerContract = deriveHelixPlannerContract({
+        question: transcript,
+        workstationAction: parsedWorkstationCommand,
+        explicitPanelCommand,
+        dispatchPolicy: frozenVoiceDispatchPolicy,
+      });
+      parsedWorkstationCommand = preliminaryVoicePlannerContract.workstation_action;
+      const preliminaryVoiceDispatchPlan = preliminaryVoicePlannerContract.dispatch_plan;
+      let forceReasoningAfterWorkstation = false;
       const shouldStageWorkstationIntent =
         !explicitPanelCommand &&
         (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(transcript));
@@ -15281,20 +17517,93 @@ export function HelixAskPill({
           meta: {
             kind: "workstation_intent_stage",
             source: "voice_dispatch",
+            router_state: "S1_WORKSTATION_GATING",
+            router_fail_id: null,
+            intent_type: preliminaryVoiceDispatchPlan.intent_type,
+            dispatch_plan: preliminaryVoiceDispatchPlan.dispatch_plan,
           },
         });
         setAskStatus(getWorkstationInterpretingStatusText(workstationLanguageTag));
         const workstationIntentResult = parsedWorkstationCommand
           ? ({ action: parsedWorkstationCommand, outcome: "command_parse" } satisfies WorkstationIntentClassificationResult)
           : await classifyWorkstationActionIntent(transcript);
-        const workstationCommand = workstationIntentResult.action;
+        let workstationCommand = workstationIntentResult.action;
+        let voiceIntentPlannerContract = deriveHelixPlannerContract({
+          question: transcript,
+          workstationAction: workstationCommand,
+          explicitPanelCommand,
+          dispatchPolicy: frozenVoiceDispatchPolicy,
+        });
+        workstationCommand = voiceIntentPlannerContract.workstation_action;
+        const userInputGate = resolveWorkstationUserInputGate({
+          source: "voice_dispatch",
+          question: transcript,
+          action: workstationCommand,
+          turn_id: voiceTurnId,
+        });
+        if (userInputGate.blocked) {
+          patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+            status: "queued",
+            detail: "workstation_request_user_input | pending_server_request",
+            meta: {
+              router_state: "S3_WORKSTATION_REQUEST_USER_INPUT",
+              router_fail_id: userInputGate.router_fail_id ?? "RF_MISSING_REQUIRED_ARGS",
+              pending_server_requests: 1,
+            },
+          });
+          markVoiceCheckpoint(
+            "dispatch_suppressed",
+            "warn",
+            pendingWorkstationUserInputRef.current?.prompt ?? "Waiting for workstation input.",
+          );
+          return;
+        }
+        workstationCommand = userInputGate.action;
         if (workstationCommand) {
+          const resolvedVoicePlannerContract = deriveHelixPlannerContract({
+            question: transcript,
+            workstationAction: workstationCommand,
+            explicitPanelCommand,
+            dispatchPolicy: frozenVoiceDispatchPolicy,
+          });
+          voiceIntentPlannerContract = resolvedVoicePlannerContract;
+          const resolvedVoiceDispatchPlan = resolvedVoicePlannerContract.dispatch_plan;
           patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
             status: "done",
             detail: formatWorkstationIntentStageDetail(workstationIntentResult),
+            meta: {
+              router_state: "S5_WORKSTATION_EXECUTE",
+              router_fail_id: null,
+              router_outcome: workstationIntentResult.outcome,
+              intent_type: resolvedVoiceDispatchPlan.intent_type,
+              dispatch_plan: resolvedVoiceDispatchPlan.dispatch_plan,
+            },
           });
           setAskStatus(getWorkstationExecutingStatusText(workstationLanguageTag));
-          runWorkstationAction(workstationCommand);
+          dispatchWorkstationActionSequence({
+            source: "voice_dispatch",
+            question: transcript,
+            actions: [workstationCommand, ...parsedWorkstationFollowupActions],
+            traceId: input.traceId,
+          });
+          appendSyntheticLiveEvent(
+            buildObserverPlanDeltaEvent({
+              source: "voice_dispatch",
+              dispatchPlan: resolvedVoiceDispatchPlan,
+              question: transcript,
+              traceId: input.traceId,
+            }),
+          );
+          appendSyntheticLiveEvent(
+            buildObserverPlanItemCompletedEvent({
+              source: "voice_dispatch",
+              dispatchPlan: resolvedVoiceDispatchPlan,
+              item: "workspace_dispatched",
+              question: transcript,
+              action: workstationCommand,
+              traceId: input.traceId,
+            }),
+          );
           const transcriptRevision =
             typeof authority?.transcriptRevision === "number" && Number.isFinite(authority.transcriptRevision)
               ? Math.max(0, Math.floor(authority.transcriptRevision))
@@ -15317,6 +17626,8 @@ export function HelixAskPill({
               transcript,
               transcriptRevision,
               briefSource: "none",
+              intent_type: resolvedVoiceDispatchPlan.intent_type,
+              dispatch_plan: resolvedVoiceDispatchPlan.dispatch_plan,
             },
           });
           markVoiceCheckpoint(
@@ -15325,27 +17636,76 @@ export function HelixAskPill({
             "Voice workstation command dispatched via fast-path.",
           );
           patchVoiceSegmentAttempt(input.segmentId, { dispatch: "completed" });
-          rememberConversationTurn("dottie: On it.");
+          if (!resolvedVoiceDispatchPlan.should_dispatch_reasoning) {
+            rememberConversationTurn("dottie: On it.");
+            if (sessionId) {
+              addMessage(sessionId, { role: "user", content: transcript });
+              addMessage(sessionId, {
+                role: "assistant",
+                content: getWorkstationExecutedReplyText(workstationLanguageTag),
+              });
+            }
+            return;
+          }
+          forceReasoningAfterWorkstation = true;
+          addHelixTimelineEntry({
+            type: "conversation_brief",
+            source: "voice_auto",
+            status: "queued",
+            text: resolvedVoiceDispatchPlan.observer_ack,
+            detail: "observer_lane_orchestrator | workspace_plus_reasoning",
+            mode: "observe",
+            traceId: input.traceId,
+            meta: {
+              kind: "observer_lane_orchestrator",
+              source: "voice_dispatch",
+              intent_type: resolvedVoiceDispatchPlan.intent_type,
+              dispatch_plan: resolvedVoiceDispatchPlan.dispatch_plan,
+            },
+          });
+          appendSyntheticLiveEvent(
+            buildObserverPlanItemCompletedEvent({
+              source: "voice_dispatch",
+              dispatchPlan: resolvedVoiceDispatchPlan,
+              item: "reasoning_queued",
+              question: transcript,
+              action: workstationCommand,
+              traceId: input.traceId,
+            }),
+          );
           if (sessionId) {
             addMessage(sessionId, { role: "user", content: transcript });
-            addMessage(sessionId, {
-              role: "assistant",
-              content: getWorkstationExecutedReplyText(workstationLanguageTag),
-            });
+            addMessage(sessionId, { role: "assistant", content: resolvedVoiceDispatchPlan.observer_ack });
           }
-          return;
         }
-        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
-          status: "suppressed",
-          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
-        });
+        if (!workstationCommand) {
+          patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+            status: "suppressed",
+            detail: formatWorkstationIntentStageDetail(workstationIntentResult),
+            meta: {
+              router_state: voiceIntentPlannerContract.planner_blocked_workstation
+                ? "S2_PLANNING"
+                : "S4_WORKSTATION_RESOLVE",
+              router_fail_id: voiceIntentPlannerContract.planner_blocked_workstation
+                ? "RF_PLANNER_CONTRACT_BLOCKED_WORKSTATION"
+                : resolveWorkstationRouterFailId(workstationIntentResult),
+              router_outcome: workstationIntentResult.outcome,
+              intent_type: voiceIntentPlannerContract.dispatch_plan.intent_type,
+              dispatch_plan: voiceIntentPlannerContract.dispatch_plan.dispatch_plan,
+            },
+          });
+        }
       }
       let conversationMode: "observe" | "act" | "verify" | "clarify" | undefined;
       let classifierConfidence: number | null = null;
       let classifierReason = "conversation_turn_fallback";
       let classifierSource: "llm" | "fallback" = "fallback";
-      let dispatchHint = shouldDispatchReasoningAttempt(transcript);
-      let dispatchReason = dispatchHint ? "dispatch:heuristic" : "suppressed:heuristic_low_salience";
+      let dispatchHint = forceReasoningAfterWorkstation ? true : shouldDispatchReasoningAttempt(transcript);
+      let dispatchReason = dispatchHint
+        ? forceReasoningAfterWorkstation
+          ? "dispatch:voice_workspace_plus_reasoning"
+          : "dispatch:heuristic"
+        : "suppressed:heuristic_low_salience";
       let routeReasonCode = dispatchReason;
       let explorationTurn = false;
       let clarifierPolicy: ConversationClarifierPolicy = "after_first_attempt";
@@ -15476,6 +17836,50 @@ export function HelixAskPill({
         dispatchReason = routeReasonCode;
       }
       briefText = sanitizeConversationBriefTextForVoice(briefText, 520);
+      const simpleConversationTurnLane =
+        isSimpleConversationTurnCandidate(transcript) && !forceReasoningAfterWorkstation;
+      if (simpleConversationTurnLane) {
+        const directReply = briefText || "I am here with you.";
+        updateVoiceDecisionBrief({
+          baseBrief: directReply,
+          lifecycle: "done",
+          mode: conversationMode ?? "observe",
+          routeReasonCode: "dispatch:simple_conversation_turn",
+          traceId: input.traceId,
+          meta: {
+            dispatchHint: false,
+            classifierSource,
+            classifierConfidence,
+            classifierReason,
+            routeReasonCode: "dispatch:simple_conversation_turn",
+            confidence: input.confidence,
+            confidenceReason: input.confidenceReason,
+            transcript,
+            briefSource: briefSource === "llm" ? "llm" : "none",
+          },
+        });
+        addHelixTimelineEntry({
+          type: "conversation_brief",
+          source: "voice_auto",
+          status: "done",
+          text: clipText(directReply, 320),
+          detail: "voice normal turn lane (no queued reasoning)",
+          mode: "observe",
+          traceId: input.traceId,
+          meta: {
+            kind: "voice_normal_turn",
+            routeReasonCode: "dispatch:simple_conversation_turn",
+          },
+        });
+        markVoiceCheckpoint("dispatch_completed", "ok", "Voice normal-turn response completed.");
+        patchVoiceSegmentAttempt(input.segmentId, { dispatch: "completed" });
+        rememberConversationTurn(`dottie: ${directReply}`);
+        if (sessionId) {
+          addMessage(sessionId, { role: "user", content: transcript });
+          addMessage(sessionId, { role: "assistant", content: directReply });
+        }
+        return;
+      }
       if (!dispatchHint) {
         const rescuedTranscript = resolveSuppressedDispatchRescueTranscript({
           dispatchHint,
@@ -15639,10 +18043,13 @@ export function HelixAskPill({
     [
       addHelixTimelineEntry,
       addMessage,
+      appendSyntheticLiveEvent,
       bumpVoiceTurnRevision,
+      cancelPendingWorkstationRequestForTurnTransition,
       classifyWorkstationActionIntent,
       contextId,
       createReasoningAttempt,
+      dispatchWorkstationActionSequence,
       enqueueReasoningAttempt,
       ensureReasoningTimelineEntry,
       getHelixAskSessionId,
@@ -15653,7 +18060,9 @@ export function HelixAskPill({
       patchVoiceSegmentAttempt,
       rememberConversationTurn,
       replaceVoiceConversationTimelineEntry,
+      resolveWorkstationActionFromPendingInput,
       resolveSelectedContextCapsuleIds,
+      resolveWorkstationUserInputGate,
       runReasoningAttemptQueue,
       runWorkstationAction,
       setAskStatus,
@@ -18938,17 +21347,128 @@ export function HelixAskPill({
     ) => {
       const trimmed = question.trim();
       if (!trimmed) return;
+      const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const explicitPanelCommand = /^\s*\/open\b/i.test(trimmed);
       const bypassWorkstationDispatch = options?.bypassWorkstationDispatch === true;
       const suppressWorkstationPayloadActions = options?.suppressWorkstationPayloadActions === true;
-      const parsedWorkstationCommand = !explicitPanelCommand && !bypassWorkstationDispatch
-        ? parseWorkstationActionCommand(trimmed)
-        : null;
+      if (!bypassWorkstationDispatch) {
+        cancelPendingWorkstationRequestForTurnTransition({
+          source: "run_ask",
+          turn_id: runAskTurnId,
+          reason: "manual_turn_superseded",
+        });
+      }
+      const normalizedWorkstationQuestion = normalizeWorkstationCommandText(trimmed);
+      let parsedWorkstationFollowupActions: HelixWorkstationAction[] = [];
+      let parsedWorkstationCommand: HelixWorkstationAction | null = null;
+      let reasoningPlanPreEmitted = false;
+      if (!bypassWorkstationDispatch) {
+        const pendingResolution = resolveWorkstationActionFromPendingInput(trimmed, "run_ask", runAskTurnId);
+        if (pendingResolution.handled) {
+          if (!pendingResolution.action) {
+            const prompt =
+              pendingWorkstationUserInputRef.current?.prompt ??
+              "I still need one detail before I can run that workspace action.";
+            setAskStatus("Waiting for required input...");
+            setAskReplies((prev) =>
+              [
+                {
+                  id: crypto.randomUUID(),
+                  content: prompt,
+                  question: trimmed,
+                  mode: "observe",
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+            return;
+          }
+          parsedWorkstationCommand = pendingResolution.action;
+        }
+      }
+      if (!parsedWorkstationCommand && !explicitPanelCommand && !bypassWorkstationDispatch) {
+        const parsedChain = parseWorkstationActionChainCommand(normalizedWorkstationQuestion);
+        if (Array.isArray(parsedChain) && parsedChain.length > 0) {
+          parsedWorkstationCommand = parsedChain[0] ?? null;
+          parsedWorkstationFollowupActions = parsedChain.slice(1);
+        } else {
+          parsedWorkstationCommand = parseWorkstationActionCommand(normalizedWorkstationQuestion);
+        }
+      }
+      const frozenRunAskDispatchPolicy = resolveHelixDispatchPolicyAtTurnStart({
+        question: trimmed,
+        workstationAction: parsedWorkstationCommand,
+        explicitPanelCommand,
+        forceReasoningDispatch: options?.forceReasoningDispatch === true,
+      });
+      const preliminaryPlannerContract = deriveHelixPlannerContract({
+        question: trimmed,
+        workstationAction: parsedWorkstationCommand,
+        forceReasoningDispatch: options?.forceReasoningDispatch === true,
+        explicitPanelCommand,
+        dispatchPolicy: frozenRunAskDispatchPolicy,
+      });
+      parsedWorkstationCommand = preliminaryPlannerContract.workstation_action;
+      const preliminaryDispatchPlan = preliminaryPlannerContract.dispatch_plan;
+      let userMessageCommitted = false;
       const typedPromptLanguageTag = normalizeVoiceLanguageTag(preferredResponseLanguage) ?? inferLanguageTagFromSourceText(trimmed);
       const shouldStageWorkstationIntent =
         !bypassWorkstationDispatch &&
         !explicitPanelCommand &&
         (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(trimmed));
+      if (shouldStageWorkstationIntent && !parsedWorkstationCommand) {
+        try {
+          const routerSessionId = getHelixAskSessionId();
+          const conversationPreflight = await runConversationTurn({
+            transcript: trimmed,
+            sessionId: routerSessionId ?? undefined,
+            traceId: runAskTurnId,
+            missionId: contextId,
+            responseLanguage: preferredResponseLanguage,
+            preferredResponseLanguage: preferredResponseLanguage,
+          });
+          const routeReasonCode = String(conversationPreflight.route_reason_code ?? "").trim();
+          if (routeReasonCode.startsWith("clarify:")) {
+            const clarifyText =
+              conversationPreflight.pending_server_request?.prompt?.trim() ||
+              conversationPreflight.brief?.text?.trim() ||
+              "I need one detail before I can run that workspace action.";
+            setAskStatus("Waiting for required input...");
+            setAskReplies((prev) =>
+              [
+                {
+                  id: crypto.randomUUID(),
+                  content: clarifyText,
+                  question: trimmed,
+                  mode: "observe",
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+            if (routerSessionId) {
+              setActive(routerSessionId);
+              addMessage(routerSessionId, { role: "user", content: trimmed });
+              addMessage(routerSessionId, { role: "assistant", content: clarifyText });
+            }
+            addHelixTimelineEntry({
+              type: "conversation_brief",
+              source: "manual",
+              status: "done",
+              text: clipText(clarifyText, 320),
+              detail: "conversation-turn preflight clarify gate",
+              mode: "observe",
+              traceId: runAskTurnId,
+              meta: {
+                kind: "conversation_turn_preflight",
+                routeReasonCode,
+              },
+            });
+            return;
+          }
+        } catch {
+          // Ignore preflight failures and continue local deterministic routing.
+        }
+      }
       if (shouldStageWorkstationIntent) {
         const stagedWorkstationIntentEntry = addHelixTimelineEntry({
           type: "action_receipt",
@@ -18960,17 +21480,78 @@ export function HelixAskPill({
           meta: {
             kind: "workstation_intent_stage",
             source: "run_ask",
+            router_state: "S1_WORKSTATION_GATING",
+            router_fail_id: null,
+            intent_type: preliminaryDispatchPlan.intent_type,
+            dispatch_plan: preliminaryDispatchPlan.dispatch_plan,
           },
         });
         setAskStatus(getWorkstationInterpretingStatusText(typedPromptLanguageTag));
         const workstationIntentResult = parsedWorkstationCommand
           ? ({ action: parsedWorkstationCommand, outcome: "command_parse" } satisfies WorkstationIntentClassificationResult)
           : await classifyWorkstationActionIntent(trimmed);
-        const workstationCommand = workstationIntentResult.action;
+        let workstationCommand = workstationIntentResult.action;
+        const intentPlannerContract = deriveHelixPlannerContract({
+          question: trimmed,
+          workstationAction: workstationCommand,
+          forceReasoningDispatch: options?.forceReasoningDispatch === true,
+          explicitPanelCommand,
+          dispatchPolicy: frozenRunAskDispatchPolicy,
+        });
+        workstationCommand = intentPlannerContract.workstation_action;
+        const userInputGate = resolveWorkstationUserInputGate({
+          source: "run_ask",
+          question: trimmed,
+          action: workstationCommand,
+          turn_id: runAskTurnId,
+        });
+        if (userInputGate.blocked) {
+          patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
+            status: "queued",
+            detail: "workstation_request_user_input | pending_server_request",
+            meta: {
+              router_state: "S3_WORKSTATION_REQUEST_USER_INPUT",
+              router_fail_id: userInputGate.router_fail_id ?? "RF_MISSING_REQUIRED_ARGS",
+              pending_server_requests: 1,
+            },
+          });
+          const prompt =
+            pendingWorkstationUserInputRef.current?.prompt ??
+            "I still need one detail before I can run that workspace action.";
+          setAskStatus("Waiting for required input...");
+          setAskReplies((prev) =>
+            [
+              {
+                id: crypto.randomUUID(),
+                content: prompt,
+                question: trimmed,
+                mode: "observe",
+              },
+              ...prev,
+            ].slice(0, 3),
+          );
+          return;
+        }
+        workstationCommand = userInputGate.action;
         if (workstationCommand) {
+          const resolvedPlannerContract = deriveHelixPlannerContract({
+            question: trimmed,
+            workstationAction: workstationCommand,
+            forceReasoningDispatch: options?.forceReasoningDispatch === true,
+            explicitPanelCommand,
+            dispatchPolicy: frozenRunAskDispatchPolicy,
+          });
+          const resolvedDispatchPlan = resolvedPlannerContract.dispatch_plan;
           patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
             status: "done",
             detail: formatWorkstationIntentStageDetail(workstationIntentResult),
+            meta: {
+              router_state: "S5_WORKSTATION_EXECUTE",
+              router_fail_id: null,
+              router_outcome: workstationIntentResult.outcome,
+              intent_type: resolvedDispatchPlan.intent_type,
+              dispatch_plan: resolvedDispatchPlan.dispatch_plan,
+            },
           });
           clearMoodTimer();
           cancelMoodHint();
@@ -18980,9 +21561,31 @@ export function HelixAskPill({
           if (sessionId) {
             setActive(sessionId);
             addMessage(sessionId, { role: "user", content: trimmed });
+            userMessageCommitted = true;
           }
           setAskStatus(getWorkstationExecutingStatusText(typedPromptLanguageTag));
-          runWorkstationAction(workstationCommand);
+          const dispatchSequence = [workstationCommand, ...parsedWorkstationFollowupActions];
+          dispatchWorkstationActionSequence({
+            source: "run_ask",
+            question: trimmed,
+            actions: dispatchSequence,
+          });
+          appendSyntheticLiveEvent(
+            buildObserverPlanDeltaEvent({
+              source: "run_ask",
+              dispatchPlan: resolvedDispatchPlan,
+              question: trimmed,
+            }),
+          );
+          appendSyntheticLiveEvent(
+            buildObserverPlanItemCompletedEvent({
+              source: "run_ask",
+              dispatchPlan: resolvedDispatchPlan,
+              item: "workspace_dispatched",
+              question: trimmed,
+              action: workstationCommand,
+            }),
+          );
           const fastPathTs = new Date().toISOString();
           const fastPathEvent: AskLiveEventEntry = {
             id: `fastpath:${crypto.randomUUID()}`,
@@ -18997,28 +21600,66 @@ export function HelixAskPill({
               source: "run_ask",
             },
           };
-          const replyId = crypto.randomUUID();
-          const responseText = getWorkstationExecutedReplyText(typedPromptLanguageTag);
-          setAskReplies((prev) =>
-            [
-              {
-                id: replyId,
-                content: responseText,
-                question: trimmed,
-                mode: "act",
-                liveEvents: [fastPathEvent],
-              },
-              ...prev,
-            ].slice(0, 3),
-          );
-          if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: responseText });
+          if (!resolvedDispatchPlan.should_dispatch_reasoning) {
+            const replyId = crypto.randomUUID();
+            const responseText = getWorkstationExecutedReplyText(typedPromptLanguageTag);
+            setAskReplies((prev) =>
+              [
+                {
+                  id: replyId,
+                  content: responseText,
+                  question: trimmed,
+                  mode: "act",
+                  liveEvents: [fastPathEvent],
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+            if (sessionId) {
+              addMessage(sessionId, { role: "assistant", content: responseText });
+            }
+            return;
           }
-          return;
+          addHelixTimelineEntry({
+            type: "conversation_brief",
+            source: "manual",
+            status: "queued",
+            text: resolvedDispatchPlan.observer_ack,
+            detail: "observer_lane_orchestrator | workspace_plus_reasoning",
+            mode: "observe",
+            meta: {
+              kind: "observer_lane_orchestrator",
+              intent_type: resolvedDispatchPlan.intent_type,
+              dispatch_plan: resolvedDispatchPlan.dispatch_plan,
+              source: "run_ask",
+            },
+          });
+          appendSyntheticLiveEvent(
+            buildObserverPlanItemCompletedEvent({
+              source: "run_ask",
+              dispatchPlan: resolvedDispatchPlan,
+              item: "reasoning_queued",
+              question: trimmed,
+              action: workstationCommand,
+            }),
+          );
+          reasoningPlanPreEmitted = true;
+          if (sessionId) {
+            addMessage(sessionId, { role: "assistant", content: resolvedDispatchPlan.observer_ack });
+          }
         }
         patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
           status: "suppressed",
           detail: formatWorkstationIntentStageDetail(workstationIntentResult),
+          meta: {
+            router_state: intentPlannerContract.planner_blocked_workstation
+              ? "S2_PLANNING"
+              : "S4_WORKSTATION_RESOLVE",
+            router_fail_id: intentPlannerContract.planner_blocked_workstation
+              ? "RF_PLANNER_CONTRACT_BLOCKED_WORKSTATION"
+              : resolveWorkstationRouterFailId(workstationIntentResult),
+            router_outcome: workstationIntentResult.outcome,
+          },
         });
       }
       const selectedCapsuleIds =
@@ -19033,23 +21674,37 @@ export function HelixAskPill({
         options?.answerContract?.source === "docs_viewer" && Boolean(docsViewerAnchorPath);
       const pinnedCapsuleCount = getPinnedContextCapsuleCount();
       const inferredMode = inferAskMode(trimmed);
+      const simpleConversationTurnLane = isSimpleConversationTurnCandidate(trimmed);
       const simpleDirectPromptLane =
         docsViewerWorkstationLane ||
+        simpleConversationTurnLane ||
         (options?.forceReasoningDispatch !== true &&
           inferredMode === "read" &&
           isSimpleDirectPromptLaneCandidate(trimmed));
+      const allowBackgroundReasoningLane =
+        !HELIX_E1_SINGLE_TURN_CONTRACT_FLAG || frozenRunAskDispatchPolicy === "workspace_then_reasoning";
       const backgroundWorkspaceReasoningLane =
         simpleDirectPromptLane &&
+        allowBackgroundReasoningLane &&
         shouldQueueWorkspaceBackgroundReasoning({
           transcript: trimmed,
           docsViewerAnchorPath,
-        });
+        }) &&
+        deriveHelixPlannerContract({
+          question: trimmed,
+          workstationAction: null,
+          forceReasoningDispatch: options?.forceReasoningDispatch === true,
+          explicitPanelCommand,
+          dispatchPolicy: frozenRunAskDispatchPolicy,
+        }).reasoning_required === "hard";
       const manualDispatchHint =
         !simpleDirectPromptLane &&
         (options?.forceReasoningDispatch === true || trimmed.length > 0);
       const manualRouteReasonCode = simpleDirectPromptLane
         ? docsViewerWorkstationLane
           ? "dispatch:docs_viewer_direct_lane"
+          : simpleConversationTurnLane
+            ? "dispatch:simple_conversation_turn"
           : "dispatch:direct_prompt_lane"
         : "dispatch:manual_default";
       setAskBusy(true);
@@ -19076,7 +21731,7 @@ export function HelixAskPill({
       updateMoodFromText(trimmed);
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
-      const traceId = `ask:${crypto.randomUUID()}`;
+      const traceId = runAskTurnId;
       const manualAttempt = manualDispatchHint
         ? createReasoningAttempt({
             prompt: trimmed,
@@ -19091,6 +21746,8 @@ export function HelixAskPill({
             preferredResponseLanguage: preferredResponseLanguage ?? null,
             completionScore: conversationGovernor.completion_score.score,
             floorOwner: conversationGovernor.floor_owner,
+            explicitPlanEmitted: reasoningPlanPreEmitted,
+            explicitPlanAtMs: reasoningPlanPreEmitted ? Date.now() : undefined,
           })
         : null;
       const manualTimelineEntryId = manualAttempt ? ensureReasoningTimelineEntry(manualAttempt, "running") : null;
@@ -19109,13 +21766,16 @@ export function HelixAskPill({
             preferredResponseLanguage: preferredResponseLanguage ?? null,
             completionScore: conversationGovernor.completion_score.score,
             floorOwner: conversationGovernor.floor_owner,
+            explicitPlanEmitted: reasoningPlanPreEmitted,
+            explicitPlanAtMs: reasoningPlanPreEmitted ? Date.now() : undefined,
           })
         : null;
+      const plannedManualAttempt = manualAttempt ? ensureExplicitReasoningPlan(manualAttempt) : null;
       if (backgroundAttempt) {
         ensureReasoningTimelineEntry(backgroundAttempt, "queued");
         enqueueReasoningAttempt(backgroundAttempt.id);
       }
-      reasoningAttemptManualIdRef.current = manualAttempt?.id ?? null;
+      reasoningAttemptManualIdRef.current = plannedManualAttempt?.id ?? null;
       const manualBriefTimelineEntry = addHelixTimelineEntry({
         type: "conversation_brief",
         source: "manual",
@@ -19131,6 +21791,8 @@ export function HelixAskPill({
           : simpleDirectPromptLane
             ? docsViewerWorkstationLane
               ? "Docs viewer direct mode: reading the current document context immediately."
+              : simpleConversationTurnLane
+                ? "Normal turn mode: responding directly without queued reasoning."
               : "Direct reply mode: handling this request immediately."
             : "Quick reply mode: no background reasoning queued for this turn.",
         detail: manualDispatchHint
@@ -19140,15 +21802,18 @@ export function HelixAskPill({
           : simpleDirectPromptLane
             ? docsViewerWorkstationLane
               ? "docs viewer direct lane (no queued reasoning)"
+              : simpleConversationTurnLane
+                ? "simple conversation lane (normal turn, no queued reasoning)"
               : "manual direct lane (no queued reasoning)"
             : "manual dispatch suppressed (low salience prompt)",
         mode: inferredMode,
         traceId,
-        attemptId: manualAttempt?.id ?? backgroundAttempt?.id,
+        attemptId: plannedManualAttempt?.id ?? backgroundAttempt?.id,
         meta: {
           dispatchHint: manualDispatchHint,
           routeReasonCode: manualRouteReasonCode,
           directPromptLane: simpleDirectPromptLane,
+          simpleConversationTurnLane,
           docsViewerWorkstationLane,
           backgroundWorkspaceReasoningLane,
           backgroundAttemptId: backgroundAttempt?.id ?? null,
@@ -19158,7 +21823,9 @@ export function HelixAskPill({
       setAskLiveTraceId(traceId);
       if (sessionId) {
         setActive(sessionId);
-        addMessage(sessionId, { role: "user", content: trimmed });
+        if (!userMessageCommitted) {
+          addMessage(sessionId, { role: "user", content: trimmed });
+        }
       }
 
       const controller = new AbortController();
@@ -19182,22 +21849,43 @@ export function HelixAskPill({
         try {
           const askModeForRequest =
             !manualDispatchHint || inferredMode === "observe" ? undefined : inferredMode;
-          const askResult = await askLocalWithPreflightScopeFallback(undefined, {
-            sessionId: sessionId ?? undefined,
-            traceId,
-            maxTokens: HELIX_ASK_OUTPUT_TOKENS,
-            question: trimmed,
-            contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,
-            responseLanguage: preferredResponseLanguage,
-            preferredResponseLanguage: preferredResponseLanguage,
-            lang_schema_version: "helix.lang.v1",
-            debug: userSettings.showHelixAskDebug,
-            signal: controller.signal,
-            mode: askModeForRequest,
-            capsuleIds: selectedCapsuleIds,
-            answerContract: options?.answerContract,
-          });
-          const localResponse = askResult.response;
+          let localResponse: AskLocalResult;
+          let downgradedFromMode: AskLocalMode | undefined;
+          if (HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
+            localResponse = await runAskTurn({
+              sessionId: sessionId ?? undefined,
+              traceId,
+              maxTokens: HELIX_ASK_OUTPUT_TOKENS,
+              question: trimmed,
+              contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,
+              responseLanguage: preferredResponseLanguage,
+              preferredResponseLanguage: preferredResponseLanguage,
+              lang_schema_version: "helix.lang.v1",
+              debug: userSettings.showHelixAskDebug,
+              signal: controller.signal,
+              mode: askModeForRequest,
+              capsuleIds: selectedCapsuleIds,
+              answerContract: options?.answerContract,
+            });
+          } else {
+            const askResult = await askLocalWithPreflightScopeFallback(undefined, {
+              sessionId: sessionId ?? undefined,
+              traceId,
+              maxTokens: HELIX_ASK_OUTPUT_TOKENS,
+              question: trimmed,
+              contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,
+              responseLanguage: preferredResponseLanguage,
+              preferredResponseLanguage: preferredResponseLanguage,
+              lang_schema_version: "helix.lang.v1",
+              debug: userSettings.showHelixAskDebug,
+              signal: controller.signal,
+              mode: askModeForRequest,
+              capsuleIds: selectedCapsuleIds,
+              answerContract: options?.answerContract,
+            });
+            localResponse = askResult.response;
+            downgradedFromMode = askResult.downgradedFromMode;
+          }
           responseEnvelope = localResponse.envelope;
           const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
           responseText = envelopeAnswer
@@ -19214,10 +21902,10 @@ export function HelixAskPill({
                         client_docs_viewer_anchor_path: docsViewerAnchorPath,
                       }
                     : {}),
-                  ...(askResult.downgradedFromMode
+                  ...(downgradedFromMode
                     ? {
                         client_mode_fallback: {
-                          from: askResult.downgradedFromMode,
+                          from: downgradedFromMode,
                           to: localResponse.mode ?? "read",
                           reason: "preflight_scope_required",
                         },
@@ -19340,6 +22028,39 @@ export function HelixAskPill({
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const responseDebugPayload = responseDebugWithClientMode ?? responseDebug;
+          const evidenceGateDecision = evaluateEvidenceFinalizationGate({
+            question: trimmed,
+            mode: responseMode ?? inferredMode,
+            debug: responseDebugPayload,
+            proof: responseProof,
+          });
+          if (evidenceGateDecision.blocked) {
+            appendSyntheticLiveEvent(
+              buildNeedsRetrievalPlanEvent({
+                source: "run_ask",
+                question: trimmed,
+                reason: evidenceGateDecision.reason ?? "needs_retrieval",
+                evidence_refs: evidenceGateDecision.evidence_refs,
+                traceId,
+              }),
+            );
+            addHelixTimelineEntry({
+              type: "conversation_brief",
+              source: "manual",
+              status: "queued",
+              text: "Needs retrieval: deferring final claim until grounded evidence references are available.",
+              detail: "observer_lane_orchestrator | needs_retrieval",
+              mode: "observe",
+              traceId,
+              meta: {
+                kind: "observer_lane_orchestrator",
+                plan_step: "needs_retrieval",
+                reason: evidenceGateDecision.reason,
+                evidence_refs: evidenceGateDecision.evidence_refs,
+              },
+            });
+            responseText = evidenceGateDecision.safe_text ?? responseText;
+          }
           const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugPayload);
           const liveEventsSnapshot = [...askLiveEventsRef.current];
           const convergenceSnapshot = buildConvergenceSnapshot({
@@ -19394,19 +22115,106 @@ export function HelixAskPill({
                 : responseMode === "read"
                   ? "observe"
                   : inferredMode;
+            const manualCertaintyClass: ObserverFinalizationCertainty = evidenceGateDecision.blocked
+              ? "unknown"
+              :
+              ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
+                ?.certainty_class) ??
+              ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown");
+            const unresolvedPendingForTurn = unresolvedPendingRequestCountForTurn(traceId);
+            if ((HELIX_E2_TRANSITION_ERRORS_FLAG || HELIX_E3_TERMINAL_GUARANTEE_FLAG) && unresolvedPendingForTurn > 0) {
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: "manual",
+                status: "suppressed",
+                text: "Turn completion blocked until pending workstation request is resolved.",
+                detail: "turnTransition: pending_request_unresolved",
+                mode: responseMode ?? inferredMode,
+                traceId,
+                attemptId: manualAttempt.id,
+                meta: {
+                  router_state: "S4_WORKSTATION_RESOLVE",
+                  router_fail_id: "RF_PENDING_REQUEST_NOT_RESOLVED",
+                  pending_server_requests: unresolvedPendingForTurn,
+                  turn_id: traceId,
+                },
+              });
+              setAskStatus("Waiting for required input...");
+              skipReply = true;
+              return;
+            }
+            if (HELIX_E3_TERMINAL_GUARANTEE_FLAG && isInvalidTerminalAnswerText(responseText)) {
+              const terminalGate = canEmitTurnTerminalOutcome(traceId, "final_failure");
+              if (!terminalGate.accepted) {
+                addHelixTimelineEntry({
+                  type: "suppressed",
+                  source: "manual",
+                  status: "suppressed",
+                  text: "Suppressed duplicate terminal event for this turn.",
+                  detail: "RF_DUPLICATE_TERMINAL_EVENT",
+                  mode: responseMode ?? inferredMode,
+                  traceId,
+                  attemptId: manualAttempt.id,
+                  meta: {
+                    router_state: "S4_WORKSTATION_RESOLVE",
+                    router_fail_id: "RF_DUPLICATE_TERMINAL_EVENT",
+                    turn_id: terminalGate.turn_id ?? traceId,
+                    pending_server_requests: unresolvedPendingForTurn,
+                  },
+                });
+                skipReply = true;
+                return;
+              }
+              addHelixTimelineEntry({
+                type: "suppressed",
+                source: "manual",
+                status: "suppressed",
+                text: "Terminal output was empty and was rejected by E3 terminal guarantee.",
+                detail: "RF_EMPTY_TERMINAL",
+                mode: responseMode ?? inferredMode,
+                traceId,
+                attemptId: manualAttempt.id,
+                meta: {
+                  router_state: "S4_WORKSTATION_RESOLVE",
+                  router_fail_id: "RF_EMPTY_TERMINAL",
+                  turn_id: terminalGate.turn_id ?? traceId,
+                  pending_server_requests: unresolvedPendingForTurn,
+                },
+              });
+              setAskStatus("I could not produce a final answer for that turn.");
+              skipReply = true;
+              return;
+            }
+            if (HELIX_E3_TERMINAL_GUARANTEE_FLAG) {
+              const terminalGate = canEmitTurnTerminalOutcome(traceId, "final_answer");
+              if (!terminalGate.accepted) {
+                addHelixTimelineEntry({
+                  type: "suppressed",
+                  source: "manual",
+                  status: "suppressed",
+                  text: "Suppressed duplicate terminal event for this turn.",
+                  detail: "RF_DUPLICATE_TERMINAL_EVENT",
+                  mode: responseMode ?? inferredMode,
+                  traceId,
+                  attemptId: manualAttempt.id,
+                  meta: {
+                    router_state: "S4_WORKSTATION_RESOLVE",
+                    router_fail_id: "RF_DUPLICATE_TERMINAL_EVENT",
+                    turn_id: terminalGate.turn_id ?? traceId,
+                    pending_server_requests: unresolvedPendingForTurn,
+                  },
+                });
+                skipReply = true;
+                return;
+              }
+            }
             updateReasoningAttempt(manualAttempt.id, (current) => ({
               ...current,
               status: "done",
               partial: askLiveDraftRef.current || responseText,
               finalAnswer: responseText,
-              certaintyClass:
-                ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
-                  ?.certainty_class) ??
-                ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
-              evidenceRefs:
-                (responseDebugWithClientMode ?? responseDebug)?.context_files ??
-                (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
-                [],
+              certaintyClass: manualCertaintyClass,
+              evidenceRefs: evidenceGateDecision.evidence_refs,
               completedAtMs: Date.now(),
             }));
             if (manualTimelineEntryId) {
@@ -19436,17 +22244,44 @@ export function HelixAskPill({
               traceId,
               attemptId: manualAttempt.id,
               meta: buildReasoningTimelineMeta(manualAttempt, {
-                certaintyClass:
-                  ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
-                    ?.certainty_class) ??
-                  ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
-                contextFiles:
-                  (responseDebugWithClientMode ?? responseDebug)?.context_files ??
-                  (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
-                  [],
+                certaintyClass: manualCertaintyClass,
+                contextFiles: evidenceGateDecision.evidence_refs,
+                needsRetrieval: evidenceGateDecision.blocked,
                 ...(timelineDebugContext ? { helixDebugContext: timelineDebugContext } : {}),
               }),
             });
+            const manualAnswerId = crypto.randomUUID();
+            appendSyntheticLiveEvent(
+              buildObserverFinalizationEvent({
+                source: "run_ask",
+                question: trimmed,
+                mode: detailMode,
+                certaintyClass: manualCertaintyClass,
+                evidence_refs: evidenceGateDecision.evidence_refs,
+                needs_retrieval: evidenceGateDecision.blocked,
+                final_source: "normal_reasoning",
+                answer_id: manualAnswerId,
+                attempt_id: manualAttempt.id,
+                traceId,
+                turn_id: traceId,
+                pending_server_requests: unresolvedPendingRequestCountForTurn(traceId),
+                live_event_count: liveEventsSnapshot.length,
+                debug_context: timelineDebugContext,
+              }),
+            );
+            appendSyntheticLiveEvent(
+              buildObserverHandoffEvent({
+                source: "run_ask",
+                question: trimmed,
+                mode: detailMode,
+                certaintyClass: manualCertaintyClass,
+                evidence_refs: evidenceGateDecision.evidence_refs,
+                needs_retrieval: evidenceGateDecision.blocked,
+                answer_id: manualAnswerId,
+                attempt_id: manualAttempt.id,
+                traceId,
+              }),
+            );
           }
         }
       } finally {
@@ -19474,6 +22309,7 @@ export function HelixAskPill({
       addMessage,
       applyGovernedActionEnvelope,
       applyWorkstationActionsFromPayload,
+      appendSyntheticLiveEvent,
       askBusy,
       conversationGovernor.completion_score.score,
       conversationGovernor.floor_owner,
@@ -19483,7 +22319,9 @@ export function HelixAskPill({
       clearLiveDraftFlush,
       clearMoodTimer,
       classifyWorkstationActionIntent,
+      canEmitTurnTerminalOutcome,
       ensureReasoningTimelineEntry,
+      ensureExplicitReasoningPlan,
       enqueueReasoningAttempt,
       formatReasoningAttemptDetail,
       getHelixAskSessionId,
@@ -19491,7 +22329,11 @@ export function HelixAskPill({
       launchAtomicViewer,
       patchHelixTimelineEntry,
       resetReasoningTheaterEventClock,
+      resolveWorkstationActionFromPendingInput,
       resolveSelectedContextCapsuleIds,
+      resolveWorkstationUserInputGate,
+      cancelPendingWorkstationRequestForTurnTransition,
+      dispatchWorkstationActionSequence,
       requestMoodHint,
       resizeTextarea,
       runWorkstationAction,
@@ -19499,10 +22341,12 @@ export function HelixAskPill({
       upsertContextCapsuleSessionLedger,
       updateReasoningAttempt,
       updateMoodFromText,
+      unresolvedPendingRequestCountForTurn,
       preferredResponseLanguage,
       userSettings.showHelixAskDebug,
     ],
   );
+  runAskRef.current = runAsk;
 
   const executePendingExternalAskPrompt = useCallback(
     async (pending: PendingHelixAskPrompt | null) => {
@@ -19521,6 +22365,8 @@ export function HelixAskPill({
             kind: "workstation_intent_stage",
             source: "external_prompt",
             turnTransition: true,
+            router_state: "S1_WORKSTATION_GATING",
+            router_fail_id: "RF_DUPLICATE_EXTERNAL_PROMPT",
           },
         });
         return;
@@ -19529,6 +22375,8 @@ export function HelixAskPill({
       const forceReasoningDispatch = pending?.forceReasoningDispatch === true;
       const suppressWorkstationPayloadActions = pending?.suppressWorkstationPayloadActions === true;
       const answerContract = pending?.answerContract;
+      const externalTurnId =
+        String(pending?.traceId ?? "").trim() || `external:${claimId}`;
       clearPendingHelixAskPrompt();
       if (askBusy) {
         pendingExternalAskPromptRef.current = pending;
@@ -19543,89 +22391,12 @@ export function HelixAskPill({
         }
         return;
       }
-      const explicitPanelCommand = /^\s*\/open\b/i.test(question);
-      const parsedWorkstationCommand = !explicitPanelCommand && !bypassWorkstationDispatch
-        ? parseWorkstationActionCommand(question)
-        : null;
-      const externalPromptLanguageTag =
-        normalizeVoiceLanguageTag(preferredResponseLanguage) ?? inferLanguageTagFromSourceText(question);
-      const shouldStageWorkstationIntent =
-        !bypassWorkstationDispatch &&
-        !explicitPanelCommand &&
-        (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(question));
-      const stagedWorkstationIntentEntry = shouldStageWorkstationIntent
-        ? addHelixTimelineEntry({
-            type: "action_receipt",
-            source: "manual",
-            status: "running",
-            text: clipText(buildWorkstationInterpretingReceiptText(question, externalPromptLanguageTag), 300),
-            detail: "workstation_intent_stage",
-            mode: "act",
-            meta: {
-              kind: "workstation_intent_stage",
-              source: "external_prompt",
-            },
-          })
-        : null;
-      if (stagedWorkstationIntentEntry) {
-        setAskStatus(getWorkstationInterpretingStatusText(externalPromptLanguageTag));
-      }
-      const workstationIntentResult: WorkstationIntentClassificationResult = parsedWorkstationCommand
-        ? { action: parsedWorkstationCommand, outcome: "command_parse" }
-        : !explicitPanelCommand && !bypassWorkstationDispatch
-          ? await classifyWorkstationActionIntent(question)
-          : { action: null, outcome: "no_match_not_probed" };
-      const workstationCommand = workstationIntentResult.action;
-      if (stagedWorkstationIntentEntry) {
-        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
-          status: workstationCommand ? "done" : "suppressed",
-          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
+      if (!bypassWorkstationDispatch) {
+        cancelPendingWorkstationRequestForTurnTransition({
+          source: "external_prompt",
+          turn_id: externalTurnId,
+          reason: "external_prompt_turn_superseded",
         });
-      }
-      if (workstationCommand) {
-        clearMoodTimer();
-        cancelMoodHint();
-        updateMoodFromText(question);
-        requestMoodHint(question, { force: true });
-        const sessionId = getHelixAskSessionId();
-        if (sessionId) {
-          setActive(sessionId);
-          addMessage(sessionId, { role: "user", content: question });
-        }
-        setAskStatus(getWorkstationExecutingStatusText(externalPromptLanguageTag));
-        runWorkstationAction(workstationCommand);
-        const fastPathTs = new Date().toISOString();
-        const fastPathEvent: AskLiveEventEntry = {
-          id: `fastpath:${crypto.randomUUID()}`,
-          text: `ok: workstation fast-path dispatched (${workstationCommand.action})`,
-          tool: "helix.ask.fast_path",
-          ts: fastPathTs,
-          tsMs: Date.now(),
-          meta: {
-            kind: "workstation_action_receipt",
-            ok: true,
-            action: workstationCommand,
-            source: "external_prompt",
-          },
-        };
-        const replyId = crypto.randomUUID();
-        const responseText = getWorkstationExecutedReplyText(externalPromptLanguageTag);
-        setAskReplies((prev) =>
-          [
-            {
-              id: replyId,
-              content: responseText,
-              question,
-              mode: "act",
-              liveEvents: [fastPathEvent],
-            },
-            ...prev,
-          ].slice(0, 3),
-        );
-        if (sessionId) {
-          addMessage(sessionId, { role: "assistant", content: responseText });
-        }
-        return;
       }
       void runAsk(question, undefined, {
         bypassWorkstationDispatch,
@@ -19636,19 +22407,10 @@ export function HelixAskPill({
     },
     [
       addHelixTimelineEntry,
-      addMessage,
       askBusy,
-      cancelMoodHint,
-      classifyWorkstationActionIntent,
-      clearMoodTimer,
-      getHelixAskSessionId,
-      patchHelixTimelineEntry,
-      requestMoodHint,
+      cancelPendingWorkstationRequestForTurnTransition,
       resizeTextarea,
       runAsk,
-      runWorkstationAction,
-      setActive,
-      updateMoodFromText,
     ],
   );
 
@@ -19863,94 +22625,41 @@ export function HelixAskPill({
         return stripped || entry.trim();
       });
       const singleEntry = normalizedEntries.length === 1 ? normalizedEntries[0] : null;
-      const explicitPanelCommand = singleEntry && /^\s*\/open\b/i.test(singleEntry);
-      const parsedWorkstationCommand =
-        singleEntry && !explicitPanelCommand ? parseWorkstationActionCommand(singleEntry) : null;
-      const singleEntryLanguageTag =
-        normalizeVoiceLanguageTag(preferredResponseLanguage) ??
-        inferLanguageTagFromSourceText(singleEntry ?? "");
-      const shouldStageWorkstationIntent =
-        Boolean(singleEntry) &&
-        !explicitPanelCommand &&
-        (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(singleEntry));
-      const stagedWorkstationIntentEntry = shouldStageWorkstationIntent
-        ? addHelixTimelineEntry({
-            type: "action_receipt",
-            source: "manual",
-            status: "running",
-            text: clipText(buildWorkstationInterpretingReceiptText(singleEntry, singleEntryLanguageTag), 300),
-            detail: "workstation_intent_stage",
-            mode: "act",
-            meta: {
-              kind: "workstation_intent_stage",
-            },
-          })
-        : null;
-      if (stagedWorkstationIntentEntry) {
-        setAskStatus(getWorkstationInterpretingStatusText(singleEntryLanguageTag));
-      }
-      const workstationIntentResult: WorkstationIntentClassificationResult = parsedWorkstationCommand
-        ? { action: parsedWorkstationCommand, outcome: "command_parse" }
-        : singleEntry && !explicitPanelCommand
-          ? await classifyWorkstationActionIntent(singleEntry)
-          : { action: null, outcome: "no_match_not_probed" };
-      const workstationCommand = workstationIntentResult.action;
-      if (stagedWorkstationIntentEntry) {
-        patchHelixTimelineEntry(stagedWorkstationIntentEntry.id, {
-          status: workstationCommand ? "done" : "suppressed",
-          detail: formatWorkstationIntentStageDetail(workstationIntentResult),
+      const submitTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `submit:${crypto.randomUUID()}`;
+      if (singleEntry) {
+        cancelPendingWorkstationRequestForTurnTransition({
+          source: "submit",
+          turn_id: submitTurnId,
+          reason: "submit_turn_superseded",
         });
       }
-      if (workstationCommand) {
-        if (askInputRef.current) {
-          askInputRef.current.value = "";
-          resizeTextarea();
+      if (singleEntry) {
+        const pendingResolution = resolveWorkstationActionFromPendingInput(singleEntry, "submit", submitTurnId);
+        if (pendingResolution.handled) {
+          if (!pendingResolution.action) {
+            const prompt =
+              pendingWorkstationUserInputRef.current?.prompt ??
+              "I still need one detail before I can run that workspace action.";
+            setAskStatus("Waiting for required input...");
+            setAskReplies((prev) =>
+              [
+                {
+                  id: crypto.randomUUID(),
+                  content: prompt,
+                  question: singleEntry,
+                  mode: "observe",
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+            if (askInputRef.current) {
+              askInputRef.current.value = "";
+              resizeTextarea();
+            }
+            askDraftRef.current = "";
+            return;
+          }
         }
-        askDraftRef.current = "";
-        setContextCapsuleDetectedId(null);
-        clearMoodTimer();
-        cancelMoodHint();
-        updateMoodFromText(normalizedEntries[0] ?? entries[0] ?? "");
-        requestMoodHint(normalizedEntries[0] ?? entries[0] ?? "", { force: true });
-        const sessionId = getHelixAskSessionId();
-        if (sessionId) {
-          setActive(sessionId);
-          addMessage(sessionId, { role: "user", content: normalizedEntries[0] ?? entries[0] });
-        }
-        setAskStatus(getWorkstationExecutingStatusText(singleEntryLanguageTag));
-        runWorkstationAction(workstationCommand);
-        const fastPathTs = new Date().toISOString();
-        const fastPathEvent: AskLiveEventEntry = {
-          id: `fastpath:${crypto.randomUUID()}`,
-          text: `ok: workstation fast-path dispatched (${workstationCommand.action})`,
-          tool: "helix.ask.fast_path",
-          ts: fastPathTs,
-          tsMs: Date.now(),
-          meta: {
-            kind: "workstation_action_receipt",
-            ok: true,
-            action: workstationCommand,
-            source: "submit",
-          },
-        };
-        const replyId = crypto.randomUUID();
-        const responseText = getWorkstationExecutedReplyText(singleEntryLanguageTag);
-        setAskReplies((prev) =>
-          [
-            {
-              id: replyId,
-              content: responseText,
-              question: normalizedEntries[0] ?? entries[0],
-              mode: "act",
-              liveEvents: [fastPathEvent],
-            },
-            ...prev,
-          ].slice(0, 3),
-        );
-        if (sessionId) {
-          addMessage(sessionId, { role: "assistant", content: responseText });
-        }
-        return;
       }
       const panelCommand = singleEntry ? parseOpenPanelCommand(singleEntry) : null;
       if (panelCommand) {
@@ -20018,22 +22727,22 @@ export function HelixAskPill({
     [
       addMessage,
       cancelMoodHint,
+      cancelPendingWorkstationRequestForTurnTransition,
       clearMoodTimer,
       getHelixAskSessionId,
+      getPanelDef,
       openPanelById,
       parseQueuedQuestions,
+      parseOpenPanelCommand,
       primeVoiceAudioPlayback,
       resolveSelectedContextCapsuleIds,
+      resolveWorkstationActionFromPendingInput,
       requestMoodHint,
       resizeTextarea,
-      runWorkstationAction,
       setActive,
       updateMoodFromText,
       runAsk,
-      classifyWorkstationActionIntent,
-      addHelixTimelineEntry,
-      patchHelixTimelineEntry,
-      userSettings.showHelixAskDebug,
+      askBusy,
     ],
   );
 
@@ -20228,10 +22937,20 @@ export function HelixAskPill({
         });
         const inferredSuppressionCause = suppressionMeta.suppressionCause;
         const inferredAuthorityRejectStage = suppressionMeta.authorityRejectStage;
-        const source =
+        const metaKind = typeof meta.kind === "string" ? meta.kind.trim() : "";
+        const detailText = String(entry.detail ?? "").trim();
+        const source: VoiceLaneTimelineDebugEvent["source"] =
           entry.type === "conversation_recorded" || entry.type === "conversation_brief"
             ? "conversation"
-            : "reasoning";
+            : entry.type === "action_receipt" &&
+                (metaKind.startsWith("observer_") || detailText.includes("observer_"))
+              ? "observer"
+              : entry.type === "action_receipt" &&
+                  (metaKind.startsWith("workstation_") ||
+                    metaKind.startsWith("job_") ||
+                    detailText.includes("workstation_"))
+                ? "workstation"
+                : "reasoning";
         const kind: VoiceLaneTimelineDebugEvent["kind"] =
           entry.type === "conversation_recorded"
             ? "prompt_recorded"

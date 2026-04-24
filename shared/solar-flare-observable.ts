@@ -213,9 +213,8 @@ export type SolarFlareSpectralObservable = z.infer<
   typeof solarFlareSpectralObservableSchema
 >;
 
-export type RawMaskSemantics = z.infer<
-  z.ZodEnum<typeof SHARED_OBSERVABLE_RAW_MASK_SEMANTICS_VALUES>
->;
+export type RawMaskSemantics =
+  (typeof SHARED_OBSERVABLE_RAW_MASK_SEMANTICS_VALUES)[number];
 
 export function normalizeValidMask(
   rawMask: ArrayLike<number | boolean>,

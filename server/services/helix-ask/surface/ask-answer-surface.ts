@@ -104,7 +104,7 @@ const resolveGroundedAnswerCompletionFloor = (
   preferRepoDebugFallback: boolean,
 ): {
   text: string;
-  source: "debug_answer_text" | "envelope_answer" | "envelope_sections" | "memory_citation";
+  source: "debug_answer_text" | "envelope_answer" | "envelope_sections" | "memory_citation" | "safety_fallback";
 } | null => {
   if (preferRelationFallback && question) {
     const relationFallback = renderRelationAssemblyConversationalFallback(
@@ -177,7 +177,12 @@ const resolveGroundedAnswerCompletionFloor = (
     }
   }
 
-  return null;
+  // Ensure non-empty visible output for successful responses, even when upstream
+  // synthesis/assembly produced no direct answer text.
+  return {
+    text: "I could not assemble a complete grounded answer for this turn, but I can retry with stricter grounding.",
+    source: "safety_fallback",
+  };
 };
 
 export const applyHelixAskSuccessSurface = (

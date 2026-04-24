@@ -129,7 +129,7 @@ function parseObservableResearchWorkflowArgs(
   objective: string,
   value: Record<string, unknown> | undefined,
 ): ObservableResearchWorkflowArgs {
-  const topic = asNonEmptyString(value?.topic) ?? objective || "current research topic";
+  const topic = (asNonEmptyString(value?.topic) ?? objective) || "current research topic";
   const noteTitle = asNonEmptyString(value?.note_title) ?? `Topic note: ${topic}`;
   const compareInstruction =
     asNonEmptyString(value?.compare_instruction) ??
@@ -547,7 +547,7 @@ export async function runWorkstationJob(args: {
   const jobId = args.payload.job_id?.trim() || `job:${crypto.randomUUID()}`;
   const title = args.payload.title?.trim() || "Workstation Job";
   const objective = args.payload.objective?.trim() || "Execute job-ready panel actions.";
-  const traceId = `workstation-job:${jobId}`;
+  const traceId = /^workstation-action:/i.test(jobId) ? jobId : `workstation-job:${jobId}`;
 
   emitJobLiveEvent({
     contextId: args.contextId,

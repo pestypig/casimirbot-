@@ -1,5 +1,7 @@
 import React from "react";
 import { marked, type MarkedOptions } from "marked";
+import { renderToString as renderKatexToString } from "katex";
+import "katex/dist/katex.min.css";
 import { BookOpen, Folder, Link2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +15,36 @@ import {
 } from "@/lib/workstation/proceduralPlaybackContract";
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
+
+export type DocMathPickContext = {
+  latex: string;
+  currentPath?: string;
+  anchor?: string;
+  clipboardWrite?: ((text: string) => Promise<void>) | null;
+  dispatchEvent?: ((detail: { latex: string; sourcePath: string | null; anchor: string | null }) => void) | null;
+};
+
+export function handleDocMathPick(context: DocMathPickContext): void {
+  const latex = context.latex.trim();
+  if (!latex) return;
+  const detail = {
+    latex,
+    sourcePath: context.currentPath ?? null,
+    anchor: context.anchor ?? null,
+  };
+  const customDispatch = context.dispatchEvent;
+  if (customDispatch) {
+    customDispatch(detail);
+  } else {
+    dispatchScientificCalculatorMathPicked(detail);
+  }
+  const clipboardWrite = context.clipboardWrite;
+  if (clipboardWrite) {
+    void clipboardWrite(latex).catch(() => undefined);
+  }
+}
 
 const DOC_MARKED_OPTIONS: MarkedOptions & { mangle?: boolean; headerIds?: boolean } = {
   gfm: true,
@@ -23,6 +54,62 @@ const DOC_MARKED_OPTIONS: MarkedOptions & { mangle?: boolean; headerIds?: boolea
 };
 
 marked.setOptions(DOC_MARKED_OPTIONS);
+marked.use({
+  extensions: [
+    {
+      name: "docMathBlock",
+      level: "block",
+      start(src: string) {
+        const bracketStart = src.indexOf("\\[");
+        const dollarStart = src.indexOf("$$");
+        if (bracketStart === -1) return dollarStart;
+        if (dollarStart === -1) return bracketStart;
+        return Math.min(bracketStart, dollarStart);
+      },
+      tokenizer(src: string) {
+        const bracketMatch = src.match(/^\\\[\n?([\s\S]+?)\n?\\\](?:\n|$)/);
+        if (bracketMatch) {
+          return {
+            type: "docMathBlock",
+            raw: bracketMatch[0],
+            text: bracketMatch[1].trim(),
+          };
+        }
+        const dollarMatch = src.match(/^\$\$\n?([\s\S]+?)\n?\$\$(?:\n|$)/);
+        if (dollarMatch) {
+          return {
+            type: "docMathBlock",
+            raw: dollarMatch[0],
+            text: dollarMatch[1].trim(),
+          };
+        }
+        return undefined;
+      },
+      renderer(token: { text?: string }) {
+        return renderDocMath(token.text ?? "", true);
+      },
+    },
+    {
+      name: "docMathInline",
+      level: "inline",
+      start(src: string) {
+        return src.indexOf("\\(");
+      },
+      tokenizer(src: string) {
+        const inlineMatch = src.match(/^\\\((.+?)\\\)/);
+        if (!inlineMatch) return undefined;
+        return {
+          type: "docMathInline",
+          raw: inlineMatch[0],
+          text: inlineMatch[1].trim(),
+        };
+      },
+      renderer(token: { text?: string }) {
+        return renderDocMath(token.text ?? "", false);
+      },
+    },
+  ],
+});
 
 const DOC_AUTO_READ_PROVIDER = "elevenlabs";
 const DOC_AUTO_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
@@ -119,8 +206,9 @@ export function DocViewerPanel() {
       .then((raw) => {
         if (canceled) return;
         setRawMarkdown(raw);
-        const rendered = marked.parse(raw);
-        setHtml(typeof rendered === "string" ? rendered : String(rendered));
+        const rendered = marked.parse(renderMathMarkdown(raw));
+        const renderedHtml = typeof rendered === "string" ? rendered : String(rendered);
+        setHtml(renderMathInRenderedHtml(renderedHtml));
         setLoadedDocId(currentEntry.id);
       })
       .catch((err) => {
@@ -396,6 +484,29 @@ export function DocViewerPanel() {
     [recent],
   );
 
+  const handleDocMathClick = React.useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const source = target.closest("[data-doc-math-latex]") as HTMLElement | null;
+      if (!source) return;
+      const latex = source.dataset.docMathLatex?.trim();
+      if (!latex) return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleDocMathPick({
+        latex,
+        currentPath,
+        anchor,
+        clipboardWrite:
+          typeof navigator !== "undefined" && navigator.clipboard?.writeText
+            ? navigator.clipboard.writeText.bind(navigator.clipboard)
+            : null,
+      });
+    },
+    [anchor, currentPath],
+  );
+
   return (
     <div className="flex h-full w-full bg-slate-950/90 text-slate-100">
       <DirectoryRail
@@ -445,6 +556,7 @@ export function DocViewerPanel() {
           ) : currentEntry ? (
             <article
               className="prose prose-invert max-w-none px-6 py-6"
+              onClick={handleDocMathClick}
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ) : (
@@ -791,6 +903,96 @@ function cssEscape(value: string) {
     return CSS.escape(value);
   }
   return value.replace(/"/g, '\\"');
+}
+
+function renderDocMath(expression: string, displayMode: boolean): string {
+  if (!expression.trim()) return "";
+  try {
+    const rendered = renderKatexToString(expression, {
+      displayMode,
+      throwOnError: false,
+      strict: "ignore",
+      trust: false,
+    });
+    const escapedExpression = escapeHtml(expression);
+    const className = displayMode
+      ? "doc-math-clickable doc-math-clickable-display"
+      : "doc-math-clickable doc-math-clickable-inline";
+    if (displayMode) {
+      return `<div class="${className}" data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${rendered}</div>`;
+    }
+    return `<span class="${className}" data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${rendered}</span>`;
+  } catch {
+    return `<code>${escapeHtml(expression)}</code>`;
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderMathMarkdown(markdown: string): string {
+  if (!markdown) return markdown;
+  const FENCE_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~)/g;
+  let output = "";
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = FENCE_RE.exec(markdown)) !== null) {
+    output += renderMathInNonCodeMarkdown(markdown.slice(cursor, match.index));
+    output += renderMathFenceBlock(match[0]) ?? match[0];
+    cursor = match.index + match[0].length;
+  }
+  output += renderMathInNonCodeMarkdown(markdown.slice(cursor));
+  return output;
+}
+
+function renderMathInNonCodeMarkdown(segment: string): string {
+  const INLINE_CODE_RE = /`[^`\n]*`/g;
+  let output = "";
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = INLINE_CODE_RE.exec(segment)) !== null) {
+    output += renderMathExpressions(segment.slice(cursor, match.index));
+    output += match[0];
+    cursor = match.index + match[0].length;
+  }
+  output += renderMathExpressions(segment.slice(cursor));
+  return output;
+}
+
+function renderMathExpressions(source: string): string {
+  return source
+    .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_full, expr: string) => renderDocMath(expr, true))
+    .replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_full, expr: string) => renderDocMath(expr, true))
+    .replace(/\\\((.+?)\\\)/g, (_full, expr: string) => renderDocMath(expr, false));
+}
+
+function renderMathFenceBlock(fence: string): string | null {
+  const match = fence.match(/^(?:```|~~~)\s*math\s*\r?\n([\s\S]*?)\r?\n(?:```|~~~)\s*$/i);
+  if (!match) return null;
+  const expr = match[1].trim();
+  if (!expr) return "";
+  return renderDocMath(expr, true);
+}
+
+function renderMathInRenderedHtml(html: string): string {
+  if (!html) return html;
+  const CODE_BLOCK_RE = /(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi;
+  let output = "";
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = CODE_BLOCK_RE.exec(html)) !== null) {
+    output += renderMathExpressions(html.slice(cursor, match.index));
+    output += match[0];
+    cursor = match.index + match[0].length;
+  }
+  output += renderMathExpressions(html.slice(cursor));
+  return output;
 }
 
 export default DocViewerPanel;

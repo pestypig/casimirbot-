@@ -126,10 +126,19 @@ const toFinite = (value: unknown): number | null => {
   return Number.isFinite(n) ? Number(n) : null;
 };
 
+const REASON_CODE_SET = new Set<string>(
+  NHM2_SHIFT_VS_LAPSE_DECOMPOSITION_REASON_CODES,
+);
+
+const isShiftVsLapseReasonCode = (
+  value: string,
+): value is Nhm2ShiftVsLapseDecompositionReasonCode =>
+  REASON_CODE_SET.has(value);
+
 const toReasonCodeSet = (
-  values: Iterable<Nhm2ShiftVsLapseDecompositionReasonCode>,
+  values: Iterable<string>,
 ): Nhm2ShiftVsLapseDecompositionReasonCode[] =>
-  [...new Set(values)].sort();
+  [...new Set(Array.from(values).filter(isShiftVsLapseReasonCode))].sort();
 
 const resolveProjection = (args: {
   centerlineAlpha: number | null;
@@ -233,7 +242,7 @@ export const buildNhm2ShiftVsLapseDecompositionArtifact = (
       Math.max(residualToleranceSeconds, 0)
       ? ["residual_exceeds_tolerance"]
       : []),
-  ] satisfies Nhm2ShiftVsLapseDecompositionReasonCode[]);
+  ]);
 
   const completeness =
     reasonCodes.includes("shift_transport_time_missing") ||

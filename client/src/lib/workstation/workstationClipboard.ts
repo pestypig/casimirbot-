@@ -1,4 +1,6 @@
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
+import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
+import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 
 function textFromClipboardEvent(event: ClipboardEvent): string {
   const fromEvent = event.clipboardData?.getData("text/plain") ?? "";
@@ -21,6 +23,24 @@ export function recordClipboardReceipt(args: {
     source: args.source,
     trace_id: args.traceId,
     meta: args.meta,
+  });
+  const traceId = args.traceId?.trim() || `workstation-clipboard:${args.direction}:${Date.now()}`;
+  emitHelixAskLiveEvent({
+    contextId: HELIX_ASK_CONTEXT_ID.desktop,
+    traceId,
+    entry: {
+      id: `workstation-clipboard:${args.direction}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`,
+      text: `clipboard ${args.direction}: ${args.text.replace(/\s+/g, " ").trim().slice(0, 140) || "(empty)"}`,
+      tool: "workstation.clipboard",
+      ts: new Date().toISOString(),
+      meta: {
+        kind: "workstation_clipboard_receipt",
+        direction: args.direction,
+        source: args.source,
+        trace_id: traceId,
+        meta: args.meta ?? null,
+      },
+    },
   });
 }
 

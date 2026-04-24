@@ -121,6 +121,8 @@ export type VoicePlaybackOutputDiagnosticsSnapshot = {
 export type VoiceLaneTimelineDebugSource =
   | "voice_capture"
   | "conversation"
+  | "workstation"
+  | "observer"
   | "reasoning"
   | "chunk_playback"
   | "system";

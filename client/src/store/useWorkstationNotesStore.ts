@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { recordWorkstationTimelineEntry } from "@/store/useWorkstationWorkflowTimelineStore";
+import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
+import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 
 const WORKSTATION_NOTES_STORAGE_KEY = "workstation-notes:v1";
 
@@ -80,6 +82,25 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
           detail: `topic=${note.topic} snippets=${note.snippets.length} citations=${note.citations.length}`,
           traceId: note.trace_id,
           panelId: "workstation-notes",
+        });
+        const traceId = note.trace_id?.trim() || `workstation-notes:${note.id}`;
+        emitHelixAskLiveEvent({
+          contextId: HELIX_ASK_CONTEXT_ID.desktop,
+          traceId,
+          entry: {
+            id: `workstation-note-saved:${note.id}:${Date.now()}`,
+            text: `saved note "${note.title}" with ${note.snippets.length} snippet(s) and ${note.citations.length} citation(s)`,
+            tool: "workstation.notes",
+            ts: new Date().toISOString(),
+            meta: {
+              kind: "workstation_note_saved",
+              note_id: note.id,
+              topic: note.topic,
+              snippets_count: note.snippets.length,
+              citations_count: note.citations.length,
+              trace_id: traceId,
+            },
+          },
         });
         return note;
       },

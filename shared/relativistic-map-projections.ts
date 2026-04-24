@@ -179,7 +179,7 @@ const baseProjectionShape = (
   args: {
     observerFamily: RelativisticMapObserverFamily;
     semantics: RelativisticMapSemantics;
-    provenance_class: "proxy" | "inferred";
+    provenance_class: "proxy" | "inferred" | "solve_backed";
     projection_contract: string;
     claim_boundary: string;
   },
@@ -270,6 +270,8 @@ const buildSunCenteredAccessibilityMap = (
       claim_boundary:
         "This accessibility map is a reachability reprojection, not a resolved warp metric, ADM field, or Lane A proof surface.",
     }),
+    projectionKind: "sun_centered_accessibility",
+    status: "computed",
     entries,
     metadata: {
       trajectory_model: "flat_sr_constant_proper_acceleration_flip_burn",
@@ -331,6 +333,8 @@ const buildInstantaneousShipViewMap = (
       claim_boundary:
         "This map is an instantaneous comoving projection under a declared control law. It is not a stitched global Euclidean atlas and not a warp-derived geometry claim.",
     }),
+    projectionKind: "instantaneous_ship_view",
+    status: "computed",
     entries,
     metadata: {
       trajectory_model: "flat_sr_constant_proper_acceleration",
@@ -527,6 +531,8 @@ const buildWarpLocalComovingProjection = (
       claim_boundary:
         "This is a bounded local-comoving projection from a certified representative warp worldline sample within the shell-cross family. It is not a route-time map, mission-time estimator, speed certificate, cruise envelope, or Lane A proof surface.",
     }),
+    projectionKind: "instantaneous_ship_view",
+    status: "computed",
     entries,
     metadata: {
       trajectory_model: "warp_worldline_bounded_local_comoving",

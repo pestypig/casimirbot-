@@ -12,7 +12,8 @@ export type DocManifestEntry = {
 };
 
 const docModules = import.meta.glob("../../../../docs/**/*.md", {
-  as: "raw",
+  query: "?raw",
+  import: "default",
 }) as Record<string, () => Promise<string>>;
 
 const DOC_PATH_PATTERN = /docs[\\/]/i;

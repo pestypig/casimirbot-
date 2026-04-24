@@ -7,6 +7,10 @@ export type WorkstationIntentDecision = {
     | "docs_summarize_doc"
     | "docs_summarize_section"
     | "docs_explain_paper"
+    | "calculator_open"
+    | "calculator_solve"
+    | "calculator_solve_steps"
+    | "calculator_ingest_clipboard"
     | "open_panel"
     | "run_panel_action"
     | "close_active_panel"
@@ -27,9 +31,13 @@ const EXPLAIN_WORDS = /\b(?:explain|break\s+down|walk\s+me\s+through|what\s+does
 const DOC_WORDS = /\b(?:doc|document|paper|this\s+doc|this\s+document|this\s+paper)\b/i;
 const READ_ALOUD_WORDS =
   /\b(?:read(?:\s+it)?(?:\s+out\s+loud|\s+aloud)?|out\s+loud|aloud|narrate|voice)\b/i;
+const CALCULATOR_WORDS = /\b(?:calculator|equation|latex|formula|solve|evaluate|compute)\b/i;
+const CALCULATOR_OPEN_WORDS = /\b(?:open|show|launch)\b[\s\S]*\b(?:calculator)\b/i;
+const CALCULATOR_STEP_WORDS = /\b(?:step|steps|step-by-step|work)\b/i;
+const CLIPBOARD_WORDS = /\b(?:clipboard|paste)\b/i;
 
 const WORKSTATION_INTENT_WORDS =
-  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|split|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section)\b/i;
+  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|split|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|clipboard|paste)\b/i;
 const CLOSE_VERB_WORDS = /\b(?:close|shut|dismiss|remove|x\s*out|get\s+rid\s+of)\b/i;
 const PANEL_TARGET_WORDS =
   /\b(?:tab|tabs|panel|panels|doc|docs|document|documents|paper|papers|window|windows)\b/i;
@@ -53,6 +61,35 @@ export function inferDeterministicWorkstationIntentDecision(prompt: string): Wor
     .replace(/[?.!,;:]+$/g, "")
     .trim();
   if (!normalized) return null;
+
+  if (CALCULATOR_OPEN_WORDS.test(normalized)) {
+    return {
+      intent: "calculator_open",
+      confidence: 0.9,
+      subgoal: "Open the scientific calculator panel.",
+      reason: "deterministic_intent_frame:calculator_open",
+    };
+  }
+  if (CLIPBOARD_WORDS.test(normalized) && CALCULATOR_WORDS.test(normalized)) {
+    return {
+      intent: "calculator_ingest_clipboard",
+      confidence: 0.84,
+      subgoal: "Ingest clipboard equation text into the scientific calculator.",
+      reason: "deterministic_intent_frame:calculator_ingest_clipboard",
+    };
+  }
+  if (CALCULATOR_WORDS.test(normalized) && /\b(?:solve|evaluate|compute|calculate)\b/.test(normalized)) {
+    return {
+      intent: CALCULATOR_STEP_WORDS.test(normalized) ? "calculator_solve_steps" : "calculator_solve",
+      confidence: 0.82,
+      subgoal: CALCULATOR_STEP_WORDS.test(normalized)
+        ? "Solve the calculator equation and return step trace."
+        : "Solve the calculator equation.",
+      reason: CALCULATOR_STEP_WORDS.test(normalized)
+        ? "deterministic_intent_frame:calculator_solve_steps"
+        : "deterministic_intent_frame:calculator_solve",
+    };
+  }
 
   if (NEXT_PANEL_WORDS.test(normalized)) {
     return {
@@ -103,7 +140,7 @@ export function buildWorkstationIntentClassifierPrompt(prompt: string): string {
     "The user prompt may be non-English. Translate internally to English for intent selection.",
     'The "subgoal" field MUST be English machine language, even when the input is in another language.',
     "Return ONLY JSON with schema:",
-    `{"intent":"docs_read_paper|docs_summarize_doc|docs_summarize_section|docs_explain_paper|open_panel|run_panel_action|close_active_panel|focus_next_panel|focus_previous_panel|reopen_last_closed_panel|none","confidence":0..1,"subgoal":"...","args":{...},"reason":"..."}`,
+    `{"intent":"docs_read_paper|docs_summarize_doc|docs_summarize_section|docs_explain_paper|calculator_open|calculator_solve|calculator_solve_steps|calculator_ingest_clipboard|open_panel|run_panel_action|close_active_panel|focus_next_panel|focus_previous_panel|reopen_last_closed_panel|none","confidence":0..1,"subgoal":"...","args":{...},"reason":"..."}`,
     'Use intent="docs_read_paper" when the request asks to find/open/read a paper/document on a topic.',
     'Also use intent="docs_read_paper" for phrasing like "open a panel about the sun and read it".',
     'Priority rule: when summarize/explain wording is present, prefer docs_summarize_doc/docs_summarize_section/docs_explain_paper over docs_read_paper.',
@@ -113,6 +150,11 @@ export function buildWorkstationIntentClassifierPrompt(prompt: string): string {
     'Use intent="docs_summarize_section" for prompts like "summarize this section".',
     'Use intent="docs_explain_paper" for prompts like "explain this paper".',
     "For docs_summarize_doc/docs_summarize_section/docs_explain_paper, include optional args.path or args.anchor when the user specifies a document or section.",
+    'Use intent="calculator_open" for prompts asking to open/show calculator.',
+    'Use intent="calculator_solve" to solve/evaluate an equation without requiring a step trace.',
+    'Use intent="calculator_solve_steps" when user asks for solved steps/work shown.',
+    'Use intent="calculator_ingest_clipboard" to paste clipboard text into calculator.',
+    "For calculator_solve/calculator_solve_steps, include args.latex when equation text is present.",
     'Use close_active_panel, focus_next_panel, focus_previous_panel, or reopen_last_closed_panel for generic tab/panel navigation requests.',
     'Examples for close_active_panel: "get rid of the current tab", "can you shut this panel for me", "close whatever tab I am on".',
     'Use intent="none" when uncertain. Never invent unsupported panel actions.',
@@ -133,6 +175,10 @@ export function parseWorkstationIntentDecision(raw: string): WorkstationIntentDe
       intentRaw === "docs_summarize_doc" ||
       intentRaw === "docs_summarize_section" ||
       intentRaw === "docs_explain_paper" ||
+      intentRaw === "calculator_open" ||
+      intentRaw === "calculator_solve" ||
+      intentRaw === "calculator_solve_steps" ||
+      intentRaw === "calculator_ingest_clipboard" ||
       intentRaw === "open_panel" ||
       intentRaw === "run_panel_action" ||
       intentRaw === "close_active_panel" ||
@@ -201,6 +247,31 @@ export function coerceWorkstationActionFromIntentDecision(
         ...(path ? { path } : {}),
         ...(anchor ? { anchor } : {}),
         ...(selectedText ? { selected_text: selectedText } : {}),
+      },
+    };
+  }
+  if (decision.intent === "calculator_open") {
+    return {
+      action: "open_panel",
+      panel_id: "scientific-calculator",
+    };
+  }
+  if (decision.intent === "calculator_ingest_clipboard") {
+    return {
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "ingest_latex",
+      args: { latex: "$clipboard", source_path: "clipboard" },
+    };
+  }
+  if (decision.intent === "calculator_solve" || decision.intent === "calculator_solve_steps") {
+    const latex = typeof decision.args?.latex === "string" ? decision.args.latex.trim() : "";
+    return {
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: decision.intent === "calculator_solve_steps" ? "solve_with_steps" : "solve_expression",
+      args: {
+        ...(latex ? { latex } : {}),
       },
     };
   }

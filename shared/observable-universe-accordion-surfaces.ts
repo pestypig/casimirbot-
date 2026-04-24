@@ -359,6 +359,7 @@ export const buildObservableUniverseAccordionEtaSurface = (args: {
         hiddenAnchorsUsed: args.hiddenAnchorsUsed,
         frameLayer: args.frameLayer,
       }),
+      status: "unavailable",
       fail_id: "NHM2_EXPLICIT_CONTRACT_MISSING",
       reason:
         "The explicit NHM2 catalog ETA contract is missing or invalid, so the product layer stays fail-closed and no SR fallback is allowed.",
@@ -382,6 +383,7 @@ export const buildObservableUniverseAccordionEtaSurface = (args: {
         hiddenAnchorsUsed: args.hiddenAnchorsUsed,
         frameLayer: args.frameLayer,
       }),
+      status: "unavailable",
       fail_id: "NHM2_REQUESTED_MODE_UNSUPPORTED",
       reason:
         "The requested bounded trip-estimate mode is not present in the explicit NHM2 contract, so the surface stays fail-closed.",
@@ -404,6 +406,7 @@ export const buildObservableUniverseAccordionEtaSurface = (args: {
         hiddenAnchorsUsed: args.hiddenAnchorsUsed,
         frameLayer: args.frameLayer,
       }),
+      status: "unavailable",
       fail_id: "NHM2_TARGET_NOT_IN_EXPLICIT_CONTRACT",
       reason:
         "The explicit NHM2 contract is target-coupled and only covers the declared supported catalog target. Requests outside that contract stay fail-closed.",
