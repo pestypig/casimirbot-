@@ -71,7 +71,7 @@ describe("helix ask turn e7 canary contract", () => {
     expect(String(response.body?.text ?? "").toLowerCase()).toContain("workspace action");
   });
 
-  it("surfaces invalid capability candidate when workspace phrase cannot be mapped", async () => {
+  it("repairs workspace navigation phrase to a capability-grounded panel action", async () => {
     const app = createApp();
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -83,8 +83,10 @@ describe("helix ask turn e7 canary contract", () => {
       .expect(200);
 
     expect(response.body?.planner_contract?.dispatch_policy).toBe("workspace_only");
-    expect(response.body?.planner_contract?.selection_valid).toBe(false);
-    expect(response.body?.planner_contract?.selection_fail_reason).toBe("invalid_action_candidate");
+    expect(response.body?.planner_contract?.selection_valid).toBe(true);
+    expect(response.body?.planner_contract?.selected_action?.panel_id).toBe("workstation-clipboard-history");
+    expect(response.body?.planner_contract?.selected_action?.action_id).toBe("open");
+    expect(response.body?.planner_contract?.planner_repair_attempted).toBe(true);
   });
 
   it("requests missing required args instead of executing workspace action", async () => {
@@ -160,5 +162,67 @@ describe("helix ask turn e7 canary contract", () => {
     expect(followup.body?.route_reason_code).toBe("clarify:confirmation_required");
     expect(followup.body?.pending_server_request?.kind).toBe("confirm");
     expect(String(followup.body?.text ?? "").toLowerCase()).toContain("please confirm");
+  });
+
+  it("maps create note phrasing to workstation-notes.create_note", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "create a note called NHM2 summary",
+        mode: "read",
+        sessionId: "e7-create-note",
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.planner_contract?.selected_action?.panel_id).toBe("workstation-notes");
+    expect(response.body?.planner_contract?.selected_action?.action_id).toBe("create_note");
+    expect(response.body?.planner_contract?.selected_action?.args?.title).toBe("NHM2 summary");
+    expect(String(response.body?.text ?? "").toLowerCase()).toContain("workspace action");
+  });
+
+  it("maps copy latest clipboard entry to note phrasing", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "copy latest clipboard entry to note NHM2 summary",
+        mode: "read",
+        sessionId: "e7-copy-latest-clipboard-to-note",
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.planner_contract?.selected_action?.panel_id).toBe("workstation-clipboard-history");
+    expect(response.body?.planner_contract?.selected_action?.action_id).toBe("copy_receipt_to_note");
+    expect(response.body?.planner_contract?.selected_action?.args?.note_title).toBe("NHM2 summary");
+    expect(String(response.body?.text ?? "").toLowerCase()).toContain("workspace action");
+  });
+
+  it("uses hybrid compare planning for doc-vs-notes prompts", async () => {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "compare this doc with my notes and tell me differences",
+        mode: "read",
+        sessionId: "e7-hybrid-compare-doc-notes",
+      })
+      .expect(200);
+
+      expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.planner_contract?.selected_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.planner_contract?.selected_action?.action_id).toBe("summarize_doc");
+    expect(response.body?.planner_contract?.plan_items?.[0]?.lane).toBe("workspace");
+    expect(response.body?.planner_contract?.plan_items?.[1]?.lane).toBe("reasoning");
+    expect(response.body?.turn_contract?.lane).toBe("reasoning");
+    expect(response.body?.needs_retrieval).toBe(true);
+    expect(Array.isArray(response.body?.execution_trace)).toBe(true);
+    const hasNeedsRetrievalTrace = (response.body?.execution_trace ?? []).some(
+      (step: { id?: string }) => step?.id === "needs_retrieval",
+    );
+    expect(hasNeedsRetrievalTrace).toBe(true);
+    expect(String(response.body?.text ?? "").toLowerCase()).toContain("needs retrieval");
   });
 });

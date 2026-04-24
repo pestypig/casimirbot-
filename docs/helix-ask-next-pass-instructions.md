@@ -1,107 +1,114 @@
-# Helix Ask Next Pass Instructions (Codex-Aligned)
+# Helix Ask Next Patch Instructions (E8 Roadmap, Codex-Cited)
 
-Last updated: 2026-04-23  
-Status baseline: Pass A and Pass B landed; next execution step is E3 terminal guarantee hardening.
+Last updated: 2026-04-24
 
-## Purpose
-This is the implementation handoff for the next patch pass. It keeps Helix Ask decisions anchored to codex-clone patterns that are already proven in production-style agent loops.
+## Objective
+Patch Helix Ask so each turn behaves like codex-style agent loops: explicit plan artifact first, deterministic execution lifecycle, typed pending-input roundtrip, and one valid terminal outcome.
 
-## Codex Clone Methods To Reuse
-Use these as behavioral references, not just inspiration:
+## Codex Clone Claims (Cited)
+Use these as implementation contracts:
 
-1. Plan as first-class stream item (before execution):
-- `external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs`
+1. Plan is first-class and streamed before turn completion.
+- Plan deltas and plan items are asserted in tests:
+  - `item/plan/delta`, `item/completed`, `turn/completed`
+  - [`external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:196`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:196)
+  - [`external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:203`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:203)
+  - [`external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:210`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:210)
 
-2. Request-user-input as formal roundtrip with explicit resolve:
-- `external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs`
+2. `request_user_input` is a formal server request/resolve protocol.
+- Turn emits `ToolRequestUserInput`, then `serverRequest/resolved`, then `turn/completed`.
+  - [`external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:83`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:83)
+  - [`external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:109`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:109)
+  - [`external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:120`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:120)
 
-3. Typed transition and server request error semantics:
-- `external/openai-codex/codex-rs/app-server/src/server_request_error.rs`
+3. Turn-transition failures are typed, not ad-hoc strings.
+- `reason = "turnTransition"` detection contract:
+  - [`external/openai-codex/codex-rs/app-server/src/server_request_error.rs:3`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/server_request_error.rs:3)
+  - [`external/openai-codex/codex-rs/app-server/src/server_request_error.rs:5`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/server_request_error.rs:5)
 
-4. Deterministic lifecycle notifications and turn closure:
-- `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs`
+4. Lifecycle is deterministic: started/completed notifications + turn closure.
+- Turn start/complete and pending-request abort behavior:
+  - [`external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:274`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:274)
+  - [`external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:298`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:298)
+  - [`external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:552`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:552)
+  - [`external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:983`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:983)
+  - [`external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:1956`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:1956)
 
-## Immediate Next Step: E3 Terminal Guarantee
-Implement a hard terminal contract so every turn ends in exactly one typed terminal outcome and never "success with empty answer."
+## Roadmap
+1. **E8.1 Planner-before-route (critical)**
+- Move planner contract generation to turn intake in `/api/agi/ask/turn`.
+- Freeze `dispatch_policy` at turn start.
+- Route execution from planner policy, not regex heuristics.
+- Keep deterministic fallback if planner fails.
 
-### Scope
-Primary file:
-- `client/src/components/helix/HelixAskPill.tsx`
+2. **E8.2 Capability-grounded planner**
+- Planner must choose only valid actions from panel capabilities.
+- Add action candidates from `panelCapabilities` as planner input.
+- For navigation (`go to docs`), planner maps to canonical workspace action.
 
-Tests:
-- `client/src/components/__tests__/helix-ask-pill-ui.spec.tsx`
+3. **E8.3 Multi-step plan execution**
+- Support ordered plan items (`workspace -> reasoning`, `workspace -> workspace`).
+- Enforce item lifecycle events (`started/completed/failed/suppressed`) per step.
 
-## Required Behavior Changes
-1. Exactly one terminal event per turn:
-- Permit only one of:
-  - `final_answer`
-  - `final_failure` (typed fail id)
-- Reject duplicate terminal emission in the same turn.
+4. **E8.4 First-class `request_user_input` protocol**
+- Pending requests become typed server artifacts with `request_id`, `turn_id`, `required_fields`.
+- Next turn resolves pending first; no new plan until resolved/canceled.
 
-2. Empty success is invalid:
-- Any terminal finalize path with empty/whitespace answer must emit failure:
-  - `router_fail_id = RF_EMPTY_TERMINAL`
-  - `router_outcome = failed`
-- Do not emit "done" with empty text.
+5. **E8.5 Strong turn terminal contract**
+- Exactly one terminal event per turn.
+- Success requires non-empty assistant text.
+- Empty/invalid model output auto-converts to typed failure or deterministic fallback text.
 
-3. Pending request blocking invariant:
-- If unresolved pending request exists for the same `turn_id`, block terminalization and emit:
-  - `router_fail_id = RF_PENDING_REQUEST_NOT_RESOLVED`
-  - deterministic suppression event
+6. **E8.6 Cross-lane unification**
+- Manual/voice/external/submit all use same `/ask/turn` state machine.
+- Same input => same planner policy => same terminal behavior.
 
-4. Turn-transition invariant:
-- If turn superseded and pending request belongs to previous turn, emit transition cancellation and prevent stale finalize.
+7. **E8.7 Evidence-gated reasoning finalization**
+- For verify/compare/synthesis, require evidence refs before final answer.
+- If evidence missing: emit `needs_retrieval` plan item, not confident prose.
 
-5. Planner-before-execute invariant for reasoning turns:
-- For reasoning-required turns, assert a plan artifact was emitted before execution/finalization.
+8. **E8.8 Observability + CI invariants**
+- Runtime assertions:
+  - no execute before plan
+  - no item completed without item started
+  - exactly one terminal per turn
+  - no unresolved pending request at completion
+- CI fixtures for known failures (`go to docs`, destructive confirm roundtrip, hello fast-path).
 
-## Feature Flags (Rollout Safety)
-Keep behavior behind flags for staged rollout and bisect:
+## Suggested Rollout Order
+1. E8.1 planner-before-route + policy freeze
+2. E8.2 capability-grounded dispatch
+3. E8.4 request_user_input protocol hardening
+4. E8.3 multi-step execution
+5. E8.5 terminal guarantees hard enforcement
+6. E8.6 lane parity
+7. E8.7 evidence gates
+8. E8.8 invariant gates in CI
 
-1. `HELIX_E1_SINGLE_TURN_CONTRACT`
-2. `HELIX_E2_TRANSITION_ERRORS`
-3. `HELIX_E3_TERMINAL_GUARANTEE`
+## Next Patch Scope (Immediate)
+Implement E8.3 completion semantics in `/api/agi/ask/turn`:
 
-Execution rule:
-- If E3 flag is off, preserve legacy behavior.
-- If E3 flag is on, enforce hard terminal guarantees.
+1. Execute full `plan_items` order for hybrid turns, not first-step-only behavior.
+- Current gap is from single-step suppression in execution trace logic:
+  - [`server/routes/agi.plan.ts:21151`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/server/routes/agi.plan.ts:21151)
+  - [`server/routes/agi.plan.ts:21169`](C:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/server/routes/agi.plan.ts:21169)
 
-## Acceptance Criteria (Must Pass)
-1. No "No final answer returned" with success status in timeline.
-2. No duplicate terminal events for same turn id.
-3. No terminal event when same-turn pending request remains unresolved.
-4. Empty terminal attempts are converted to `RF_EMPTY_TERMINAL`.
-5. Same prompt across manual/voice/external/submit yields identical dispatch policy and terminal type.
+2. Keep workspace-first for `dispatch:act`, then execute reasoning step when planned.
+- Final response must be the reasoning terminal output when reasoning step is present.
 
-## Test Matrix To Add/Update
-1. Terminal uniqueness:
-- one turn -> one terminal notification only.
+3. Emit step lifecycle transitions deterministically (`planned -> started -> completed` or `failed/suppressed`) per step.
 
-2. Empty terminal rejection:
-- simulated empty reasoning final -> failure with `RF_EMPTY_TERMINAL`.
+4. Preserve one-terminal contract for the whole turn.
+- No intermediate pseudo-terminal for workspace step if reasoning step remains.
 
-3. Pending unresolved block:
-- unresolved request + finalize attempt -> suppressed finalize + fail id.
+## Acceptance Criteria For Immediate Patch
+1. `compare this doc with my notes and tell me differences` produces:
+- `plan_items`: workspace then reasoning
+- lifecycle events for both steps
+- final terminal answer from reasoning step (non-empty)
 
-4. Turn supersession:
-- pending request on old turn + new turn starts -> old pending is canceled and cannot finalize.
+2. `open docs and then explain key claim` follows same two-step completion.
 
-5. Cross-lane parity:
-- run same intent through manual/voice/external/submit and assert same contract outcome.
+3. Existing fast workspace prompts (`open notes`, `go to docs`) remain single-step workspace terminals.
 
-## Telemetry Fields Required On Every Terminal
-1. `turn_id`
-2. `router_state`
-3. `router_outcome`
-4. `router_fail_id` (nullable only on successful final_answer)
-5. `pending_server_requests`
-6. `dispatch_policy`
-
-## Why This Matches Codex Methodology
-Codex clone keeps turn state explicit and typed:
-- structured lifecycle notifications,
-- explicit request resolution before turn completion,
-- typed errors for transition/failure.
-
-E3 is the Helix equivalent of that same reliability contract: deterministic close semantics with no ambiguous "completed but empty" state.
-
+4. No regression in pending-input confirm/clarify flows.

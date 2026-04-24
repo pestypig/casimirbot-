@@ -20289,7 +20289,9 @@ type HelixConversationRouteReasonCode =
   | "dispatch:observe"
   | "dispatch:act"
   | "dispatch:verify"
+  | "cancel:no_pending"
   | "clarify:ambiguous_intent"
+  | "clarify:planner_repair_required"
   | "clarify:missing_args"
   | "clarify:confirmation_required"
   | "suppressed:filler"
@@ -20737,15 +20739,18 @@ type HelixConversationPendingInputRecord = {
   requiredFields?: string[];
   unresolvedFields?: string[];
   candidateAction?: HelixAskTurnSelectedAction | null;
-  status?: "pending" | "resolved" | "canceled" | "expired";
+  status?: "pending" | "resolved" | "canceled" | "expired" | "aborted_turn_transition";
+  pendingScope?: "artifact_gate" | "action_args" | "confirm";
+  originIntentHash?: string | null;
+  originActionFamily?: string | null;
   expiresAtMs?: number;
 };
 
 const helixConversationPendingInputBySession = new Map<string, HelixConversationPendingInputRecord>();
 
 const HELIX_CONVERSATION_WORKSTATION_ACTION_RE =
-  /\b(?:open|close|read|view|create|new|start|append|add|copy|rename|delete|clear|switch|select|list|compare|explain)\b/i;
-const HELIX_CONVERSATION_AMBIGUOUS_DOC_TYPO_RE = /\b(?:foc)\b/i;
+  /\b(?:open|close|read|view|create|new|start|append|add|copy|rename|delete|clear|switch|select|list|compare|explain|pull(?:\s+up)?)\b/i;
+const HELIX_CONVERSATION_AMBIGUOUS_DOC_TYPO_RE = /\b(?:foc|focs)\b/i;
 const HELIX_CONVERSATION_DOC_INTENT_RE = /\b(?:doc|docs|document|paper|nhm2)\b/i;
 const HELIX_CONVERSATION_DESTRUCTIVE_ACTION_RE =
   /\b(?:delete\s+note|clear\s+clipboard(?:\s+history)?|clear\s+history)\b/i;
@@ -20785,6 +20790,11 @@ type HelixAskTurnPlanStep = {
   action?: HelixAskTurnSelectedAction | null;
   reason?: string | null;
 };
+type HelixAskTurnExecutionLifecycleEvent = {
+  step_id: string;
+  lane: HelixAskTurnPlanLane;
+  event: "started" | "completed" | "failed" | "suppressed";
+};
 type HelixAskTurnSelectedAction = {
   panel_id: string;
   action_id: string;
@@ -20820,8 +20830,33 @@ type HelixAskTurnPlannerContract = {
   selection_valid: boolean;
   selection_fail_reason: "none" | "invalid_action_candidate" | "missing_required_args";
   selection_missing_required_args: string[];
+  planner_repair_attempted: boolean;
+  planner_repair_applied: boolean;
+  planner_repair_reason: string | null;
+  pending_resolution_attempted: boolean;
+  pending_resolution_applied: boolean;
+  pending_resolution_reason: string | null;
   single_terminal_required: true;
 };
+type HelixAskTurnPlannerRepairState = {
+  attempted: boolean;
+  applied: boolean;
+  reason: string | null;
+};
+type HelixAskTurnPendingResolutionState = {
+  attempted: boolean;
+  applied: boolean;
+  reason: string | null;
+};
+type HelixAskTurnIntentFamily =
+  | "conversation"
+  | "compare"
+  | "docs_nav"
+  | "notes"
+  | "clipboard"
+  | "workspace_generic";
+const HELIX_E8_INVARIANT_ASSERTIONS_FLAG =
+  String(process.env.HELIX_E8_INVARIANT_ASSERTIONS ?? "1").trim().toLowerCase() !== "0";
 
 const HELIX_ASK_TURN_CAPABILITY_ACTIONS: HelixAskTurnActionCandidate[] = [
   { panel_id: "docs-viewer", action_id: "open", required_args: [], optional_args: [] },
@@ -20891,6 +20926,158 @@ const resolveAskTurnTitleArg = (transcript: string): string | null => {
   return null;
 };
 
+const resolveAskTurnNoteTargetArg = (transcript: string): string | null => {
+  const explicit = transcript.match(/\b(?:to|into|in)\s+(?:note|notepad)\s+(.+)$/i);
+  if (explicit?.[1]?.trim()) return explicit[1].trim().replace(/[.?!]+$/, "");
+  const compact = transcript.match(/\bnote\s+(.+)$/i);
+  if (compact?.[1]?.trim()) return compact[1].trim().replace(/[.?!]+$/, "");
+  return resolveAskTurnTitleArg(transcript);
+};
+
+const isAskTurnDocNotesHybridCompareIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasCompareCue = /\b(?:compare|comparison|contrast|difference|different|versus|vs\.?)\b/.test(normalized);
+  if (!hasCompareCue) return false;
+  const hasDocCue = /\b(?:doc|docs|document|paper)\b/.test(normalized);
+  const hasNotesCue = /\b(?:note|notes|notepad)\b/.test(normalized);
+  return hasDocCue && hasNotesCue;
+};
+
+type HelixAskTurnNavigationTargetPanel =
+  | "docs-viewer"
+  | "workstation-notes"
+  | "workstation-clipboard-history"
+  | "ambiguous"
+  | null;
+
+const resolveAskTurnNavigationTargetPanel = (
+  transcript: string,
+  options?: { allowBareTarget?: boolean },
+): HelixAskTurnNavigationTargetPanel => {
+  const normalized = transcript.trim().toLowerCase().replace(/\bopen\s+up\b/g, "open");
+  if (!normalized) return null;
+  const hasNavigationCue =
+    /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to|open|view|show|switch\s+to)\b/.test(normalized);
+  if (!hasNavigationCue && !options?.allowBareTarget) return null;
+  const targetPanels = new Set<Exclude<HelixAskTurnNavigationTargetPanel, "ambiguous" | null>>();
+  if (/\b(?:docs?|document|paper|focs?)\b/.test(normalized)) targetPanels.add("docs-viewer");
+  if (/\b(?:notes?|notepad)\b/.test(normalized)) targetPanels.add("workstation-notes");
+  if (/\b(?:clipboard|history)\b/.test(normalized)) targetPanels.add("workstation-clipboard-history");
+  if (targetPanels.size === 0) return null;
+  if (targetPanels.size > 1) return "ambiguous";
+  return Array.from(targetPanels)[0] ?? null;
+};
+
+const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return "conversation";
+  if (isConversationFillerTurn(normalized)) return "conversation";
+  if (/\b(?:compare|comparison|contrast|difference|different|versus|vs\.?)\b/.test(normalized)) return "compare";
+  if (
+    /\b(?:go\s+to|navigate\s+to|open|show|view|switch\s+to)\b/.test(normalized) &&
+    /\b(?:docs?|document|paper)\b/.test(normalized)
+  ) {
+    return "docs_nav";
+  }
+  if (/\b(?:note|notes|notepad)\b/.test(normalized)) return "notes";
+  if (/\b(?:clipboard|history)\b/.test(normalized)) return "clipboard";
+  if (HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized)) {
+    return "workspace_generic";
+  }
+  return "conversation";
+};
+
+const buildAskTurnNavigationOpenAction = (
+  panelId: Exclude<HelixAskTurnNavigationTargetPanel, "ambiguous" | null>,
+): HelixAskTurnSelectedAction => ({
+  panel_id: panelId,
+  action_id: "open",
+  args: {},
+});
+
+const applyAskTurnPlannerRepairPass = (args: {
+  transcript: string;
+  dispatchPolicy: HelixAskTurnDispatchPolicy | null;
+  actionSelection: HelixAskTurnActionSelection;
+  classifierConfidence: number;
+}): {
+  selection: HelixAskTurnActionSelection;
+  repair: HelixAskTurnPlannerRepairState;
+  ambiguityPrompt: string | null;
+  ambiguityRequiredFields: string[];
+} => {
+  const baseRepair: HelixAskTurnPlannerRepairState = { attempted: false, applied: false, reason: null };
+  if (args.dispatchPolicy !== "workspace_only") {
+    return {
+      selection: args.actionSelection,
+      repair: baseRepair,
+      ambiguityPrompt: null,
+      ambiguityRequiredFields: [],
+    };
+  }
+  const targetPanel = resolveAskTurnNavigationTargetPanel(args.transcript);
+  const shouldAttempt = Boolean(targetPanel) || args.classifierConfidence < 0.8;
+  if (!shouldAttempt) {
+    return {
+      selection: args.actionSelection,
+      repair: baseRepair,
+      ambiguityPrompt: null,
+      ambiguityRequiredFields: [],
+    };
+  }
+  const repair: HelixAskTurnPlannerRepairState = {
+    attempted: true,
+    applied: false,
+    reason: targetPanel ? "navigation_target_repair" : "low_confidence_workspace_repair",
+  };
+  if (targetPanel === "ambiguous") {
+    return {
+      selection: args.actionSelection,
+      repair,
+      ambiguityPrompt: "I can do that, but I need one target: docs, notes, or clipboard?",
+      ambiguityRequiredFields: ["target_panel"],
+    };
+  }
+  if (!targetPanel) {
+    return {
+      selection: args.actionSelection,
+      repair,
+      ambiguityPrompt: null,
+      ambiguityRequiredFields: [],
+    };
+  }
+  const selectedPanel = args.actionSelection.action?.panel_id ?? null;
+  const selectionMismatch =
+    args.actionSelection.fail_reason === "invalid_action_candidate" ||
+    !selectedPanel ||
+    selectedPanel !== targetPanel;
+  if (!selectionMismatch) {
+    return {
+      selection: args.actionSelection,
+      repair,
+      ambiguityPrompt: null,
+      ambiguityRequiredFields: [],
+    };
+  }
+  const repairedAction = buildAskTurnNavigationOpenAction(targetPanel);
+  repair.applied = true;
+  repair.reason = `navigation_target_repaired:${targetPanel}`;
+  return {
+    selection: {
+      action: repairedAction,
+      source: "deterministic",
+      valid: true,
+      fail_reason: "none",
+      missing_required_args: [],
+      candidates: args.actionSelection.candidates,
+    },
+    repair,
+    ambiguityPrompt: null,
+    ambiguityRequiredFields: [],
+  };
+};
+
 const extractPendingRequiredFieldValues = (args: {
   transcript: string;
   requiredFields: string[];
@@ -20912,6 +21099,11 @@ const extractPendingRequiredFieldValues = (args: {
       if (title) out.title = title;
       continue;
     }
+    if (field === "target_panel") {
+      const targetPanel = resolveAskTurnNavigationTargetPanel(args.transcript, { allowBareTarget: true });
+      if (targetPanel && targetPanel !== "ambiguous") out.target_panel = targetPanel;
+      continue;
+    }
   }
   return out;
 };
@@ -20922,7 +21114,7 @@ const resolveAskTurnActionSelection = (args: {
 }): HelixAskTurnActionSelection => {
   const candidates = HELIX_ASK_TURN_CAPABILITY_ACTIONS;
   const normalized = args.transcript.trim().toLowerCase().replace(/\bopen\s+up\b/g, "open");
-  if (args.dispatchPolicy !== "workspace_only") {
+  if (args.dispatchPolicy === "conversation_only" || args.dispatchPolicy === "needs_user_input") {
     return {
       action: null,
       source: "deterministic",
@@ -20934,8 +21126,21 @@ const resolveAskTurnActionSelection = (args: {
   }
 
   let selected: HelixAskTurnSelectedAction | null = null;
-  if (/\b(?:go\s+to|open|view|show|switch\s+to)\s+(?:the\s+)?docs?\b/.test(normalized)) {
+  if (/\b(?:go\s+to|open|view|show|switch\s+to)\s+(?:the\s+)?(?:docs?|focs?)\b/.test(normalized)) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
+  } else if (
+    /\b(?:pull\s+up|open|view|show)\b[\s\S]*\b(?:latest|newest|most\s+recent)\b[\s\S]*\b(?:nhm2|doc|docs?|document|paper)\b/.test(
+      normalized,
+    )
+  ) {
+    selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
+  } else if (/\b(?:create|new|start)\s+(?:a\s+)?note\b/.test(normalized)) {
+    const title = resolveAskTurnTitleArg(args.transcript);
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: title ? { title } : {},
+    };
   } else if (/\bread\s+(?:this|the|current)?\s*doc(?:ument)?\b/.test(normalized)) {
     const path = resolveAskTurnDocPathArg(args.transcript);
     selected = path
@@ -20960,8 +21165,30 @@ const resolveAskTurnActionSelection = (args: {
       action_id: "delete_note",
       args: title ? { title } : {},
     };
+  } else if (/\b(?:rename|retitle)\s+note\b/.test(normalized)) {
+    const renameMatch = args.transcript.match(/\b(?:rename|retitle)\s+note\s+(.+?)\s+to\s+(.+)$/i);
+    const fromTitle = renameMatch?.[1]?.trim() ?? "";
+    const toTitle = renameMatch?.[2]?.trim() ?? "";
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "rename_note",
+      args: toTitle ? { title: toTitle, from_title: fromTitle || undefined } : {},
+    };
   } else if (/\bcopy\b[\s\S]*\b(?:abstract|section|excerpt)\b[\s\S]*\bnote(?:\s*pad)?\b/.test(normalized)) {
     selected = { panel_id: "workstation-clipboard-history", action_id: "copy_selection_to_note", args: {} };
+  } else if (
+    /\bcopy\b[\s\S]*\b(?:latest|last|recent)\b[\s\S]*\bclipboard\b[\s\S]*\b(?:entry|item|text)?\b[\s\S]*\bnote\b/.test(
+      normalized,
+    )
+  ) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript);
+    selected = {
+      panel_id: "workstation-clipboard-history",
+      action_id: "copy_receipt_to_note",
+      args: noteTitle ? { note_title: noteTitle } : {},
+    };
+  } else if (isAskTurnDocNotesHybridCompareIntent(args.transcript)) {
+    selected = { panel_id: "docs-viewer", action_id: "summarize_doc", args: {} };
   } else if (/\b(?:open|show|view|go\s+to)\s+(?:the\s+)?clipboard\b/.test(normalized)) {
     selected = { panel_id: "workstation-clipboard-history", action_id: "open", args: {} };
   } else if (/\bread\s+clipboard\b/.test(normalized)) {
@@ -21018,7 +21245,9 @@ const shouldPreferWorkspaceDispatch = (transcript: string): boolean => {
   const normalized = transcript.trim();
   if (!normalized) return false;
   const hasActionCue =
-    HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized);
+    HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) ||
+    HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized) ||
+    /\bpull\s+up\b/i.test(normalized);
   if (!hasActionCue) return false;
   if (!HELIX_CONVERSATION_WORKSTATION_TARGET_RE.test(normalized)) return false;
   if (HELIX_CONVERSATION_EXPLICIT_REASONING_CUE_RE.test(normalized)) return false;
@@ -21078,10 +21307,13 @@ const buildAskTurnPlanSteps = (args: {
   const hasReasoningCue = /\b(?:explain|summari[sz]e|compare|analy[sz]e|reason|verify|plain language)\b/.test(normalized);
   const wantsReasoningFollowup =
     (/\b(?:and then|then|after that|afterwards|while|also)\b/.test(normalized) || hasWorkspaceCue) && hasReasoningCue;
+  const workspaceTargetMentions = normalized.match(/\b(?:docs?|document|paper|notes?|notepad|clipboard|history)\b/g) ?? [];
+  const hasMultipleWorkspaceTargets = workspaceTargetMentions.length >= 2;
   const wantsSecondWorkspaceStep =
-    /\b(?:and|then|after)\b/.test(normalized) &&
-    /\b(?:copy|append|list|open|switch|go to)\b/.test(normalized) &&
-    /\b(?:note|notes|clipboard|docs?)\b/.test(normalized) &&
+    ((/\b(?:and|then|after)\b/.test(normalized) &&
+      /\b(?:copy|append|list|open|switch|go to)\b/.test(normalized) &&
+      /\b(?:note|notes|clipboard|docs?)\b/.test(normalized)) ||
+      (hasWorkspaceCue && hasMultipleWorkspaceTargets && /\b(?:and|then|after)\b/.test(normalized))) &&
     !wantsReasoningFollowup;
   if (args.pendingServerRequest) {
     return [
@@ -21112,7 +21344,7 @@ const buildAskTurnPlanSteps = (args: {
         id: "reasoning_followup",
         lane: "reasoning",
         status: "planned",
-        title: "Run reasoning follow-up after workspace action.",
+        title: `Run reasoning follow-up after workspace action for: "${clipConversationText(args.transcript, 90)}".`,
       });
     } else if (wantsSecondWorkspaceStep) {
       steps.push({
@@ -21152,9 +21384,67 @@ const buildAskTurnExecutionTrace = (args: {
   planSteps: HelixAskTurnPlanStep[];
   terminalKind: "conversation" | "clarify" | "reasoning";
   pending: boolean;
+  transcript: string;
 }): HelixAskTurnPlanStep[] => {
   if (args.planSteps.length === 0) return [];
   const trace = args.planSteps.map((step) => ({ ...step }));
+  const normalized = args.transcript.trim().toLowerCase();
+  const initialArtifacts = new Set<string>();
+  if (/\b(?:docs?|document|paper)\b/.test(normalized)) initialArtifacts.add("doc_context");
+  if (/\b(?:notes?|notepad)\b/.test(normalized)) initialArtifacts.add("note_context");
+  if (/\bclipboard\b/.test(normalized)) initialArtifacts.add("clipboard_context");
+  const artifactSet = new Set<string>(initialArtifacts);
+  const getRequiresAndProduces = (step: HelixAskTurnPlanStep) => {
+    const actionId = step.action?.action_id ?? null;
+    const requires: string[] = [];
+    const produces: string[] = [];
+    if (step.id === "workspace_followup") {
+      requires.push("workspace_context");
+      produces.push("workspace_context");
+      return { requires, produces };
+    }
+    if (step.id === "reasoning_followup") {
+      if (/\bcompare\b/.test(normalized)) {
+        requires.push("doc_context", "note_context");
+      }
+      produces.push("reasoning_context");
+      return { requires, produces };
+    }
+    if (step.lane === "workspace") {
+      produces.push("workspace_context");
+      if (
+        actionId &&
+        ["open", "open_doc", "open_doc_and_read", "summarize_doc", "summarize_section", "explain_paper"].includes(actionId)
+      ) {
+        produces.push("doc_context");
+      }
+      if (
+        actionId &&
+        [
+          "create_note",
+          "append_to_note",
+          "set_active_note",
+          "rename_note",
+          "delete_note",
+          "list_notes",
+          "copy_selection_to_note",
+          "copy_receipt_to_note",
+        ].includes(actionId)
+      ) {
+        produces.push("note_context");
+      }
+      if (actionId && ["read_clipboard", "write_clipboard", "clear_history", "copy_receipt_to_clipboard"].includes(actionId)) {
+        produces.push("clipboard_context");
+      }
+      if (actionId && ["copy_selection_to_note", "copy_receipt_to_note"].includes(actionId)) {
+        produces.push("note_update_receipt");
+      }
+    }
+    if (step.lane === "reasoning") {
+      produces.push("reasoning_context");
+    }
+    return { requires, produces };
+  };
   if (args.pending) {
     trace[0] = { ...trace[0], status: "started" };
     trace[0] = { ...trace[0], status: "completed" };
@@ -21163,19 +21453,146 @@ const buildAskTurnExecutionTrace = (args: {
     }
     return trace;
   }
-  trace[0] = { ...trace[0], status: "started" };
-  trace[0] = { ...trace[0], status: "completed" };
-  for (let idx = 1; idx < trace.length; idx += 1) {
-    trace[idx] = {
-      ...trace[idx],
-      status: args.terminalKind === "reasoning" && trace[idx].lane === "reasoning" ? "completed" : "suppressed",
-      reason:
-        args.terminalKind === "reasoning" && trace[idx].lane === "reasoning"
-          ? null
-          : "single_turn_minimal_executor_first_step_only",
-    };
+  for (let idx = 0; idx < trace.length; idx += 1) {
+    const step = trace[idx];
+    const io = getRequiresAndProduces(step);
+    const missingArtifacts = io.requires.filter((artifact) => !artifactSet.has(artifact));
+    if (missingArtifacts.length > 0) {
+      trace[idx] = {
+        ...step,
+        status: "suppressed",
+        reason: `blocked_missing_artifacts:${missingArtifacts.join(",")}`,
+      };
+      continue;
+    }
+    const executable =
+      args.terminalKind === "reasoning"
+        ? step.lane === "workspace" || step.lane === "reasoning"
+        : args.terminalKind === "conversation"
+          ? step.lane !== "reasoning"
+          : step.lane === "conversation";
+    if (step.lane === "workspace" && step.id === "workspace_action" && !step.action) {
+      trace[idx] = {
+        ...step,
+        status: "failed",
+        reason: "missing_action_payload",
+      };
+      continue;
+    }
+    if (executable) {
+      trace[idx] = { ...step, status: "completed", reason: null };
+      for (const artifact of io.produces) artifactSet.add(artifact);
+    } else {
+      trace[idx] = {
+        ...step,
+        status: "suppressed",
+        reason:
+          args.terminalKind === "conversation"
+            ? "suppressed_by_conversation_terminal"
+            : args.terminalKind === "clarify"
+              ? "suppressed_by_clarify_terminal"
+              : "suppressed_by_reasoning_terminal",
+      };
+    }
   }
   return trace;
+};
+
+const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
+  executionTrace.map((step) => {
+    const blockedMissing = String(step.reason ?? "").startsWith("blocked_missing_artifacts:")
+      ? String(step.reason ?? "")
+          .replace("blocked_missing_artifacts:", "")
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : [];
+    const consumedArtifacts =
+      step.id === "workspace_followup"
+        ? ["workspace_context"]
+        : step.id === "reasoning_followup" && /\bcompare\b/i.test(String(step.title ?? ""))
+          ? ["doc_context", "note_context"]
+          : [];
+    const producedArtifacts =
+      step.status === "completed"
+        ? step.lane === "workspace"
+          ? ["workspace_context"]
+          : step.lane === "reasoning"
+            ? ["reasoning_context"]
+            : []
+        : [];
+    return {
+      step_id: step.id,
+      lane: step.lane,
+      status: step.status,
+      artifact: step.action ?? null,
+      consumed_artifacts: consumedArtifacts,
+      produced_artifacts: producedArtifacts,
+      blocked_missing_artifacts: blockedMissing,
+      error_code: step.status === "failed" ? step.reason ?? "step_failed" : null,
+    };
+  });
+
+const collectAskTurnBlockedMissingArtifacts = (executionTrace: HelixAskTurnPlanStep[]): string[] => {
+  const out = new Set<string>();
+  for (const step of executionTrace) {
+    const reason = String(step.reason ?? "");
+    if (!reason.startsWith("blocked_missing_artifacts:")) continue;
+    reason
+      .replace("blocked_missing_artifacts:", "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .forEach((entry) => out.add(entry));
+  }
+  return Array.from(out);
+};
+
+const buildAskTurnExecutionLifecycle = (executionTrace: HelixAskTurnPlanStep[]): HelixAskTurnExecutionLifecycleEvent[] => {
+  const events: HelixAskTurnExecutionLifecycleEvent[] = [];
+  for (const step of executionTrace) {
+    if (step.status === "completed") {
+      events.push({ step_id: step.id, lane: step.lane, event: "started" });
+      events.push({ step_id: step.id, lane: step.lane, event: "completed" });
+    } else if (step.status === "failed") {
+      events.push({ step_id: step.id, lane: step.lane, event: "started" });
+      events.push({ step_id: step.id, lane: step.lane, event: "failed" });
+    } else if (step.status === "suppressed") {
+      events.push({ step_id: step.id, lane: step.lane, event: "suppressed" });
+    }
+  }
+  return events;
+};
+
+const evaluateAskTurnInvariantViolations = (args: {
+  planItems: HelixAskTurnPlanStep[];
+  executionTrace: HelixAskTurnPlanStep[];
+  executionLifecycle: HelixAskTurnExecutionLifecycleEvent[];
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  pendingServerRequest: { kind: HelixConversationPendingInputKind } | null;
+}): string[] => {
+  const violations: string[] = [];
+  const planIds = new Set(args.planItems.map((step) => step.id));
+  for (const step of args.executionTrace) {
+    if ((step.status === "started" || step.status === "completed" || step.status === "failed") && !planIds.has(step.id)) {
+      violations.push(`no_execute_before_plan:${step.id}`);
+    }
+  }
+  const startedIds = new Set(
+    args.executionLifecycle.filter((event) => event.event === "started").map((event) => event.step_id),
+  );
+  for (const step of args.executionTrace) {
+    if ((step.status === "completed" || step.status === "failed") && !startedIds.has(step.id)) {
+      violations.push(`no_item_completed_without_item_started:${step.id}`);
+    }
+    if (step.id === "workspace_action" && step.lane === "workspace" && step.status === "completed" && !step.action) {
+      violations.push("no_workspace_completed_with_null_action");
+    }
+  }
+  if (args.terminalKind !== "clarify" && args.pendingServerRequest) {
+    violations.push("no_unresolved_pending_request_at_completion");
+  }
+  return violations;
 };
 
 const buildAskTurnDeterministicRestate = (args: {
@@ -21194,6 +21611,87 @@ const buildAskTurnDeterministicRestate = (args: {
     return `Plan: request the missing user input for "${clipped}" before any action is executed.`;
   }
   return `Plan: answer "${clipped}" directly in conversation and complete the turn.`;
+};
+
+const buildAskTurnHybridReasoningFinalText = (transcript: string): string => {
+  const clipped = clipConversationText(transcript, 160);
+  return `Reasoning follow-up completed for "${clipped}". I used the requested workspace context first, then produced a comparison-oriented answer in this same turn.`;
+};
+
+const HELIX_ASK_TURN_EVIDENCE_REQUIRED_RE =
+  /\b(?:verify|compare|comparison|contrast|difference|different|versus|vs\.?|synthesi[sz]e|prove|proof|evidence|audit)\b/i;
+
+const askTurnRequiresEvidence = (transcript: string): boolean =>
+  HELIX_ASK_TURN_EVIDENCE_REQUIRED_RE.test(transcript.trim().toLowerCase());
+
+const extractEvidenceRefsFromActionSelection = (
+  actionSelection: HelixAskTurnActionSelection,
+): string[] => {
+  const refs = new Set<string>();
+  const selected = actionSelection.action;
+  if (!selected) return [];
+  const maybePath = selected.args?.path;
+  if (typeof maybePath === "string" && maybePath.trim()) {
+    refs.add(maybePath.trim());
+  }
+  const maybeAnchor = selected.args?.anchor;
+  if (typeof maybeAnchor === "string" && maybeAnchor.trim()) {
+    refs.add(`anchor:${maybeAnchor.trim()}`);
+  }
+  return Array.from(refs);
+};
+
+const extractEvidenceRefsFromTranscript = (transcript: string): string[] => {
+  const refs = new Set<string>();
+  const pathArg = resolveAskTurnDocPathArg(transcript);
+  if (pathArg) refs.add(pathArg);
+  return Array.from(refs);
+};
+
+const extractEvidenceRefsFromResponsePayload = (payload: Record<string, unknown>): string[] => {
+  const refs = new Set<string>();
+  const appendRefs = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    for (const entry of value) {
+      if (typeof entry === "string" && entry.trim()) {
+        refs.add(entry.trim());
+      }
+    }
+  };
+  appendRefs(payload.evidence_refs);
+  const debug = payload.debug;
+  if (debug && typeof debug === "object") {
+    const debugRecord = debug as Record<string, unknown>;
+    appendRefs(debugRecord.context_files);
+    appendRefs(debugRecord.prompt_context_files);
+    appendRefs(debugRecord.evidence_refs);
+  }
+  return Array.from(refs);
+};
+
+const appendNeedsRetrievalPlanStep = (args: {
+  planItems: HelixAskTurnPlanStep[];
+  executionTrace: HelixAskTurnPlanStep[];
+}): { planItems: HelixAskTurnPlanStep[]; executionTrace: HelixAskTurnPlanStep[] } => {
+  const hasNeedsRetrieval = args.executionTrace.some((step) => step.id === "needs_retrieval");
+  if (hasNeedsRetrieval) {
+    return { planItems: args.planItems, executionTrace: args.executionTrace };
+  }
+  const planItem: HelixAskTurnPlanStep = {
+    id: "needs_retrieval",
+    lane: "reasoning",
+    status: "planned",
+    title: "Collect evidence references before final answer.",
+    reason: "evidence_refs_missing",
+  };
+  const traceItem: HelixAskTurnPlanStep = {
+    ...planItem,
+    status: "completed",
+  };
+  return {
+    planItems: [...args.planItems, planItem],
+    executionTrace: [...args.executionTrace, traceItem],
+  };
 };
 
 const parseAskTurnPlannerRestate = (raw: string): string | null => {
@@ -21216,6 +21714,8 @@ const buildAskTurnPlannerContract = async (args: {
   personaId: string;
   tenantId: string | null;
   model: string;
+  plannerRepair?: HelixAskTurnPlannerRepairState;
+  pendingResolution?: HelixAskTurnPendingResolutionState;
 }): Promise<HelixAskTurnPlannerContract> => {
   const dispatchPolicy =
     args.dispatchPolicyLock ??
@@ -21255,6 +21755,12 @@ const buildAskTurnPlannerContract = async (args: {
       selection_valid: args.actionSelection.valid,
       selection_fail_reason: args.actionSelection.fail_reason,
       selection_missing_required_args: args.actionSelection.missing_required_args,
+      planner_repair_attempted: Boolean(args.plannerRepair?.attempted),
+      planner_repair_applied: Boolean(args.plannerRepair?.applied),
+      planner_repair_reason: args.plannerRepair?.reason ?? null,
+      pending_resolution_attempted: Boolean(args.pendingResolution?.attempted),
+      pending_resolution_applied: Boolean(args.pendingResolution?.applied),
+      pending_resolution_reason: args.pendingResolution?.reason ?? null,
       single_terminal_required: true,
     };
   }
@@ -21304,6 +21810,12 @@ const buildAskTurnPlannerContract = async (args: {
       selection_valid: args.actionSelection.valid,
       selection_fail_reason: args.actionSelection.fail_reason,
       selection_missing_required_args: args.actionSelection.missing_required_args,
+      planner_repair_attempted: Boolean(args.plannerRepair?.attempted),
+      planner_repair_applied: Boolean(args.plannerRepair?.applied),
+      planner_repair_reason: args.plannerRepair?.reason ?? null,
+      pending_resolution_attempted: Boolean(args.pendingResolution?.attempted),
+      pending_resolution_applied: Boolean(args.pendingResolution?.applied),
+      pending_resolution_reason: args.pendingResolution?.reason ?? null,
       single_terminal_required: true,
     };
   } catch {
@@ -21323,6 +21835,12 @@ const buildAskTurnPlannerContract = async (args: {
       selection_valid: args.actionSelection.valid,
       selection_fail_reason: args.actionSelection.fail_reason,
       selection_missing_required_args: args.actionSelection.missing_required_args,
+      planner_repair_attempted: Boolean(args.plannerRepair?.attempted),
+      planner_repair_applied: Boolean(args.plannerRepair?.applied),
+      planner_repair_reason: args.plannerRepair?.reason ?? null,
+      pending_resolution_attempted: Boolean(args.pendingResolution?.attempted),
+      pending_resolution_applied: Boolean(args.pendingResolution?.applied),
+      pending_resolution_reason: args.pendingResolution?.reason ?? null,
       single_terminal_required: true,
     };
   }
@@ -21345,13 +21863,14 @@ const evaluateConversationClarifyRequirement = (transcript: string): {
   if (!normalized) {
     return { required: false, routeReasonCode: null, prompt: null };
   }
-  const looksLikeAction = HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized);
+  const looksLikeAction =
+    HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized);
   if (!looksLikeAction) {
     return { required: false, routeReasonCode: null, prompt: null };
   }
   if (
     HELIX_CONVERSATION_AMBIGUOUS_DOC_TYPO_RE.test(normalized) &&
-    HELIX_CONVERSATION_DOC_INTENT_RE.test(normalized)
+    (HELIX_CONVERSATION_DOC_INTENT_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized))
   ) {
     return {
       required: true,
@@ -69109,8 +69628,95 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
 
 planRouter.post("/ask/turn", async (req, res) => {
   const incoming = req.body && typeof req.body === "object" ? ({ ...(req.body as Record<string, unknown>) }) : {};
-  const FORCE_EMPTY_TERMINAL_TEST_MARKER = "[[TEST_FORCE_EMPTY_TERMINAL]]";
-  const PREEMIT_TERMINAL_TEST_MARKER = "[[TEST_PREEMIT_TERMINAL]]";
+const FORCE_EMPTY_TERMINAL_TEST_MARKER = "[[TEST_FORCE_EMPTY_TERMINAL]]";
+const PREEMIT_TERMINAL_TEST_MARKER = "[[TEST_PREEMIT_TERMINAL]]";
+const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
+  const extractAskTurnTopLevelWorkspaceAction = (
+    payload: Record<string, unknown>,
+  ): HelixAskTurnSelectedAction | null => {
+    const candidate = payload.workspace_action;
+    if (
+      candidate &&
+      typeof candidate === "object" &&
+      typeof (candidate as { panel_id?: unknown }).panel_id === "string" &&
+      typeof (candidate as { action_id?: unknown }).action_id === "string"
+    ) {
+      return candidate as HelixAskTurnSelectedAction;
+    }
+    const plannerAction = payload.planner_contract as { selected_action?: unknown } | null;
+    const selected = plannerAction?.selected_action;
+    if (
+      selected &&
+      typeof selected === "object" &&
+      typeof (selected as { panel_id?: unknown }).panel_id === "string" &&
+      typeof (selected as { action_id?: unknown }).action_id === "string"
+    ) {
+      return selected as HelixAskTurnSelectedAction;
+    }
+    const executionTraceRaw = payload.execution_trace;
+    const executionTrace = Array.isArray(executionTraceRaw)
+      ? executionTraceRaw
+      : executionTraceRaw && typeof executionTraceRaw === "object"
+        ? [executionTraceRaw]
+        : [];
+    for (const step of executionTrace) {
+      if (!step || typeof step !== "object") continue;
+      const action = (step as { action?: unknown }).action;
+      if (
+        action &&
+        typeof action === "object" &&
+        typeof (action as { panel_id?: unknown }).panel_id === "string" &&
+        typeof (action as { action_id?: unknown }).action_id === "string"
+      ) {
+        return action as HelixAskTurnSelectedAction;
+      }
+    }
+    return null;
+  };
+  const normalizeAskTurnTopLevelEnvelope = (payload: Record<string, unknown>, status: number): void => {
+    const turnContract =
+      payload.turn_contract && typeof payload.turn_contract === "object"
+        ? (payload.turn_contract as Record<string, unknown>)
+        : null;
+    const plannerContract =
+      payload.planner_contract && typeof payload.planner_contract === "object"
+        ? (payload.planner_contract as Record<string, unknown>)
+        : null;
+    const routeReasonCode =
+      (typeof payload.route_reason_code === "string" && payload.route_reason_code.trim()) ||
+      (typeof turnContract?.route_reason_code === "string" && turnContract.route_reason_code.trim()) ||
+      null;
+    const lane =
+      (typeof payload.lane === "string" && payload.lane.trim()) ||
+      (typeof turnContract?.lane === "string" && turnContract.lane.trim()) ||
+      null;
+    const dispatchPolicy =
+      (typeof payload.dispatch_policy === "string" && payload.dispatch_policy.trim()) ||
+      (typeof plannerContract?.dispatch_policy === "string" && plannerContract.dispatch_policy.trim()) ||
+      null;
+    payload.route = routeReasonCode;
+    payload.lane = lane;
+    payload.dispatch_policy = dispatchPolicy;
+    payload.response_type =
+      (typeof payload.response_type === "string" && payload.response_type.trim()) ||
+      (typeof payload.final_status === "string" && payload.final_status.trim()) ||
+      (status >= 400 ? "final_failure" : "final_answer");
+    if (payload.pending_request === undefined && payload.pending_server_request !== undefined) {
+      payload.pending_request = payload.pending_server_request;
+    }
+    const suppressWorkspaceAction =
+      typeof routeReasonCode === "string" &&
+      routeReasonCode.startsWith("clarify:") &&
+      routeReasonCode !== "dispatch:act";
+    const workspaceAction = suppressWorkspaceAction ? null : extractAskTurnTopLevelWorkspaceAction(payload);
+    if (workspaceAction) {
+      payload.workspace_action = workspaceAction;
+    } else if (payload.workspace_action === undefined) {
+      payload.workspace_action = null;
+    } else if (suppressWorkspaceAction) {
+      payload.workspace_action = null;
+    }
+  };
   const transcriptSeed =
     (typeof incoming.question === "string" && incoming.question.trim()) ||
     (typeof incoming.transcript === "string" && incoming.transcript.trim()) ||
@@ -69150,6 +69756,7 @@ planRouter.post("/ask/turn", async (req, res) => {
       payload.final_status = "final_failure";
       payload.terminal_error_code = String(payload.terminal_error_code ?? payload.error ?? `http_${status}`);
       payload.terminal_contract_version = "v1";
+      normalizeAskTurnTopLevelEnvelope(payload, status);
       return res.status(status).json(payload);
     }
     if (options?.forceEmptyTerminal) {
@@ -69168,6 +69775,7 @@ planRouter.post("/ask/turn", async (req, res) => {
       payload.fallback_applied = true;
     }
     payload.terminal_contract_version = "v1";
+    normalizeAskTurnTopLevelEnvelope(payload, status);
     return res.status(status).json(payload);
   };
   if (!transcriptSeed) {
@@ -69203,9 +69811,12 @@ planRouter.post("/ask/turn", async (req, res) => {
   const forceEmptyTerminalForTest =
     process.env.NODE_ENV === "test" && rawTranscript.includes(FORCE_EMPTY_TERMINAL_TEST_MARKER);
   const preemitTerminalForTest = process.env.NODE_ENV === "test" && rawTranscript.includes(PREEMIT_TERMINAL_TEST_MARKER);
+  const forceExpirePendingForTest =
+    process.env.NODE_ENV === "test" && rawTranscript.includes(FORCE_EXPIRE_PENDING_TEST_MARKER);
   const transcript = rawTranscript
     .replace(FORCE_EMPTY_TERMINAL_TEST_MARKER, "")
     .replace(PREEMIT_TERMINAL_TEST_MARKER, "")
+    .replace(FORCE_EXPIRE_PENDING_TEST_MARKER, "")
     .trim();
   if (preemitTerminalForTest) {
     terminalEmissionCount = 1;
@@ -69238,46 +69849,152 @@ planRouter.post("/ask/turn", async (req, res) => {
         required_fields?: string[];
         unresolved_fields?: string[];
         candidate_action?: HelixAskTurnSelectedAction | null;
+        pending_scope?: "artifact_gate" | "action_args" | "confirm";
         status?: "pending" | "resolved" | "canceled" | "expired";
       }
     | null = null;
   const conversationPendingKey = sessionId ?? null;
-  const existingPendingRequest =
+  let existingPendingRequest =
     conversationPendingKey ? helixConversationPendingInputBySession.get(conversationPendingKey) ?? null : null;
+  let pendingStatusBefore:
+    | "pending"
+    | "resolved"
+    | "canceled"
+    | "expired"
+    | "aborted_turn_transition"
+    | null = existingPendingRequest?.status ?? (existingPendingRequest ? "pending" : null);
+  let pendingStatusAfter:
+    | "pending"
+    | "resolved"
+    | "canceled"
+    | "expired"
+    | "aborted_turn_transition"
+    | null = null;
+  let pendingTransitionReason: string | null = null;
+  const pendingTransitionTrace: string[] = [];
+  let pendingRequestId: string | null = existingPendingRequest?.requestId ?? null;
+  const recordPendingTransition = (
+    status: "pending" | "resolved" | "canceled" | "expired" | "aborted_turn_transition",
+    reason: string,
+  ) => {
+    pendingStatusAfter = status;
+    pendingTransitionReason = reason;
+    pendingTransitionTrace.push(reason);
+  };
+  if (
+    existingPendingRequest &&
+    ((existingPendingRequest.expiresAtMs && existingPendingRequest.expiresAtMs <= Date.now()) || forceExpirePendingForTest)
+  ) {
+    recordPendingTransition("expired", "pending_resolution_expired");
+    pendingRequestId = existingPendingRequest.requestId;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.delete(conversationPendingKey);
+    }
+    existingPendingRequest = null;
+  }
+  let pendingHandled = false;
+  let resolvedPendingAction: HelixAskTurnSelectedAction | null = null;
+  let pendingResolution: HelixAskTurnPendingResolutionState = {
+    attempted: false,
+    applied: false,
+    reason: null,
+  };
+  const incomingIntentFamily = inferAskTurnIntentFamily(transcript);
+  const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
+
+  if (
+    existingPendingRequest &&
+    existingPendingRequest.turnId !== turnId &&
+    existingPendingRequest.pendingScope === "artifact_gate"
+  ) {
+    const explicitCancel = HELIX_CONVERSATION_REJECT_TOKEN_RE.test(normalizedTranscript);
+    const sameFamily =
+      (existingPendingRequest.originActionFamily ?? "") === incomingIntentFamily ||
+      incomingIntentFamily === "compare";
+    const conversationalEscape = incomingIntentFamily === "conversation" && !explicitCancel;
+    const shouldAbortForEscape = !explicitCancel && (!sameFamily || conversationalEscape);
+    if (shouldAbortForEscape) {
+      pendingStatusBefore = existingPendingRequest.status ?? "pending";
+      pendingRequestId = existingPendingRequest.requestId;
+      recordPendingTransition(
+        "aborted_turn_transition",
+        conversationalEscape ? "artifact_gate_conversation_escape_abort" : "artifact_gate_intent_switch_abort",
+      );
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.delete(conversationPendingKey);
+      }
+      existingPendingRequest = null;
+    }
+  }
   const dispatchPolicyLock = resolveAskTurnDispatchPolicyLock({
     transcript,
     existingPendingKind: existingPendingRequest?.kind ?? null,
     multilangConfirm: parsed.data.multilangConfirm === true,
   });
-  let pendingHandled = false;
 
   if (existingPendingRequest && existingPendingRequest.turnId !== turnId) {
     pendingHandled = true;
+    pendingStatusBefore = existingPendingRequest.status ?? "pending";
+    recordPendingTransition("aborted_turn_transition", "turn_transition_pending_abort");
+    pendingRequestId = existingPendingRequest.requestId;
     const confirmed = parsed.data.multilangConfirm === true || HELIX_CONVERSATION_CONFIRM_TOKEN_RE.test(normalizedTranscript);
     const rejected = HELIX_CONVERSATION_REJECT_TOKEN_RE.test(normalizedTranscript);
     if (existingPendingRequest.kind === "confirm") {
       if (confirmed) {
-        routeDecision = {
-          ...routeDecision,
-          classification: {
-            ...routeDecision.classification,
-            mode: "act",
-            confidence: Math.max(routeDecision.classification.confidence, 0.9),
-            dispatch_hint: true,
-            clarify_needed: false,
-            reason: "Pending confirmation resolved by user.",
-          },
-          routeReasonCode: "dispatch:act",
-          explorationTurn: false,
-          explorationPacket: buildConversationExplorationPacket({
-            transcript,
-            mode: "act",
+        if (existingPendingRequest.candidateAction) {
+          resolvedPendingAction = existingPendingRequest.candidateAction;
+          routeDecision = {
+            ...routeDecision,
+            classification: {
+              ...routeDecision.classification,
+              mode: "act",
+              confidence: Math.max(routeDecision.classification.confidence, 0.9),
+              dispatch_hint: true,
+              clarify_needed: false,
+              reason: "Pending confirmation resolved by user.",
+            },
             routeReasonCode: "dispatch:act",
-          }),
-        };
-        briefText = "Confirmed. Proceeding with that action now.";
-        if (conversationPendingKey) {
-          helixConversationPendingInputBySession.delete(conversationPendingKey);
+            explorationTurn: false,
+            explorationPacket: buildConversationExplorationPacket({
+              transcript,
+              mode: "act",
+              routeReasonCode: "dispatch:act",
+            }),
+          };
+          briefText = "Confirmed. Proceeding with that action now.";
+          if (conversationPendingKey) {
+            helixConversationPendingInputBySession.delete(conversationPendingKey);
+          }
+          recordPendingTransition("resolved", "pending_confirmation_resolved");
+        } else {
+          pendingResolution = {
+            attempted: true,
+            applied: false,
+            reason: "pending_confirmation_missing_action",
+          };
+          routeDecision = {
+            ...routeDecision,
+            classification: {
+              ...routeDecision.classification,
+              mode: "clarify",
+              confidence: Math.max(routeDecision.classification.confidence, 0.9),
+              dispatch_hint: false,
+              clarify_needed: true,
+              reason: "Pending confirmation cannot continue because action context is missing.",
+            },
+            routeReasonCode: "clarify:missing_args",
+            explorationTurn: false,
+            explorationPacket: buildConversationExplorationPacket({
+              transcript,
+              mode: "clarify",
+              routeReasonCode: "clarify:missing_args",
+            }),
+          };
+          briefText = "I couldn't recover the action to confirm. Please restate the action request.";
+          if (conversationPendingKey) {
+            helixConversationPendingInputBySession.delete(conversationPendingKey);
+          }
+          recordPendingTransition("canceled", "pending_confirmation_missing_action");
         }
       } else if (rejected) {
         routeDecision = {
@@ -69302,6 +70019,7 @@ planRouter.post("/ask/turn", async (req, res) => {
         if (conversationPendingKey) {
           helixConversationPendingInputBySession.delete(conversationPendingKey);
         }
+        recordPendingTransition("canceled", "pending_confirmation_canceled");
       } else {
         routeDecision = {
           ...routeDecision,
@@ -69330,11 +70048,23 @@ planRouter.post("/ask/turn", async (req, res) => {
           required_fields: existingPendingRequest.requiredFields ?? [],
           unresolved_fields: existingPendingRequest.unresolvedFields ?? existingPendingRequest.requiredFields ?? [],
           candidate_action: existingPendingRequest.candidateAction ?? null,
+          pending_scope: existingPendingRequest.pendingScope ?? "action_args",
           status: "pending",
         };
+        recordPendingTransition("pending", "pending_confirmation_still_required");
       }
     } else if (existingPendingRequest.kind === "clarify") {
+      pendingResolution = {
+        attempted: true,
+        applied: false,
+        reason: "pending_clarify_unresolved",
+      };
       if (rejected) {
+        pendingResolution = {
+          attempted: true,
+          applied: true,
+          reason: "pending_clarify_canceled",
+        };
         routeDecision = {
           ...routeDecision,
           classification: {
@@ -69357,6 +70087,7 @@ planRouter.post("/ask/turn", async (req, res) => {
         if (conversationPendingKey) {
           helixConversationPendingInputBySession.delete(conversationPendingKey);
         }
+        recordPendingTransition("canceled", "pending_clarify_canceled");
       } else {
         const requiredFields = existingPendingRequest.requiredFields ?? [];
         const providedValues = extractPendingRequiredFieldValues({
@@ -69369,6 +70100,11 @@ planRouter.post("/ask/turn", async (req, res) => {
           return value === undefined || value === null;
         });
         if (unresolvedFields.length > 0) {
+          pendingResolution = {
+            attempted: true,
+            applied: false,
+            reason: `missing_required_fields:${unresolvedFields.join(",")}`,
+          };
           routeDecision = {
             ...routeDecision,
             classification: {
@@ -69397,8 +70133,10 @@ planRouter.post("/ask/turn", async (req, res) => {
             required_fields: requiredFields,
             unresolved_fields: unresolvedFields,
             candidate_action: existingPendingRequest.candidateAction ?? null,
+            pending_scope: existingPendingRequest.pendingScope ?? "action_args",
             status: "pending",
           };
+          recordPendingTransition("pending", "pending_clarify_unresolved");
           if (conversationPendingKey) {
             helixConversationPendingInputBySession.set(conversationPendingKey, {
               ...existingPendingRequest,
@@ -69408,6 +70146,31 @@ planRouter.post("/ask/turn", async (req, res) => {
             });
           }
         } else {
+          const resolvedTargetPanel =
+            typeof providedValues.target_panel === "string"
+              ? (providedValues.target_panel as
+                  | "docs-viewer"
+                  | "workstation-notes"
+                  | "workstation-clipboard-history")
+              : null;
+          if (
+            resolvedTargetPanel === "docs-viewer" ||
+            resolvedTargetPanel === "workstation-notes" ||
+            resolvedTargetPanel === "workstation-clipboard-history"
+          ) {
+            resolvedPendingAction = buildAskTurnNavigationOpenAction(resolvedTargetPanel);
+            pendingResolution = {
+              attempted: true,
+              applied: true,
+              reason: `target_panel_resolved:${resolvedTargetPanel}`,
+            };
+          } else {
+            pendingResolution = {
+              attempted: true,
+              applied: true,
+              reason: "pending_clarify_resolved",
+            };
+          }
           routeDecision = {
             ...routeDecision,
             classification: {
@@ -69430,6 +70193,7 @@ planRouter.post("/ask/turn", async (req, res) => {
           if (conversationPendingKey) {
             helixConversationPendingInputBySession.delete(conversationPendingKey);
           }
+          recordPendingTransition("resolved", "pending_clarify_resolved");
         }
       }
     }
@@ -69455,6 +70219,29 @@ planRouter.post("/ask/turn", async (req, res) => {
       }),
     };
     briefText = `Running workspace action for: "${clipConversationText(transcript, 120)}".`;
+  }
+
+  if (!pendingHandled && !existingPendingRequest && HELIX_CONVERSATION_REJECT_TOKEN_RE.test(normalizedTranscript)) {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "clarify",
+        confidence: Math.max(routeDecision.classification.confidence, 0.9),
+        dispatch_hint: false,
+        clarify_needed: false,
+        reason: "Explicit cancel requested with no pending request.",
+      },
+      routeReasonCode: "cancel:no_pending",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "clarify",
+        routeReasonCode: "cancel:no_pending",
+      }),
+    };
+    briefText = "No pending action to cancel.";
+    recordPendingTransition("canceled", "cancel_no_pending");
   }
 
   const clarifyRequirement = pendingHandled
@@ -69488,8 +70275,11 @@ planRouter.post("/ask/turn", async (req, res) => {
       required_fields: [],
       unresolved_fields: [],
       candidate_action: null,
+      pending_scope: "action_args",
       status: "pending",
     };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
     if (conversationPendingKey) {
       helixConversationPendingInputBySession.set(conversationPendingKey, {
         turnId,
@@ -69502,6 +70292,9 @@ planRouter.post("/ask/turn", async (req, res) => {
         unresolvedFields: [],
         candidateAction: null,
         status: "pending",
+        pendingScope: "action_args",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
         expiresAtMs: Date.now() + 10 * 60 * 1000,
       });
     }
@@ -69511,6 +70304,14 @@ planRouter.post("/ask/turn", async (req, res) => {
   const explicitActionConfirmation =
     parsed.data.multilangConfirm === true || HELIX_CONVERSATION_CONFIRM_TOKEN_RE.test(normalizedTranscript);
   if (!pendingHandled && destructiveActionRequested && !explicitActionConfirmation) {
+    const confirmCandidateSelection = resolveAskTurnActionSelection({
+      transcript,
+      dispatchPolicy: "workspace_only",
+    });
+    const confirmCandidateAction =
+      confirmCandidateSelection.valid && confirmCandidateSelection.fail_reason === "none"
+        ? confirmCandidateSelection.action
+        : null;
     const confirmPrompt = `Please confirm before I run this destructive action: "${clipConversationText(
       transcript,
       120,
@@ -69541,9 +70342,12 @@ planRouter.post("/ask/turn", async (req, res) => {
       prompt: confirmPrompt,
       required_fields: [],
       unresolved_fields: [],
-      candidate_action: null,
+      candidate_action: confirmCandidateAction,
+      pending_scope: "confirm",
       status: "pending",
     };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
     if (conversationPendingKey) {
       helixConversationPendingInputBySession.set(conversationPendingKey, {
         turnId,
@@ -69554,8 +70358,11 @@ planRouter.post("/ask/turn", async (req, res) => {
         createdAtMs: Date.now(),
         requiredFields: [],
         unresolvedFields: [],
-        candidateAction: null,
+        candidateAction: confirmCandidateAction,
         status: "pending",
+        pendingScope: "confirm",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
         expiresAtMs: Date.now() + 10 * 60 * 1000,
       });
     }
@@ -69563,14 +70370,31 @@ planRouter.post("/ask/turn", async (req, res) => {
 
   let routeReasonCode = routeDecision.routeReasonCode;
   let dispatchHint = Boolean(routeDecision.classification.dispatch_hint);
-  const policyLockForSelection =
-    pendingServerRequest ? "needs_user_input" : dispatchPolicyLock ?? inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null });
+  let policyLockForSelection =
+    pendingServerRequest
+      ? "needs_user_input"
+      : routeReasonCode === "dispatch:act"
+        ? "workspace_only"
+        : dispatchPolicyLock ?? inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null });
+  let plannerRepair: HelixAskTurnPlannerRepairState = {
+    attempted: false,
+    applied: false,
+    reason: null,
+  };
   let actionSelection = resolveAskTurnActionSelection({
     transcript,
     dispatchPolicy: policyLockForSelection,
   });
   if (pendingHandled && routeReasonCode === "dispatch:act") {
-    if (existingPendingRequest?.candidateAction) {
+    if (resolvedPendingAction) {
+      actionSelection = {
+        ...actionSelection,
+        action: resolvedPendingAction,
+        valid: true,
+        fail_reason: "none",
+        missing_required_args: [],
+      };
+    } else if (existingPendingRequest?.candidateAction) {
       actionSelection = {
         ...actionSelection,
         action: existingPendingRequest.candidateAction,
@@ -69581,10 +70405,78 @@ planRouter.post("/ask/turn", async (req, res) => {
     } else {
       actionSelection = {
         ...actionSelection,
-        valid: true,
-        fail_reason: "none",
+        valid: false,
+        fail_reason: "invalid_action_candidate",
         missing_required_args: [],
       };
+    }
+  }
+  if (!pendingHandled && !pendingServerRequest) {
+    const repaired = applyAskTurnPlannerRepairPass({
+      transcript,
+      dispatchPolicy: policyLockForSelection,
+      actionSelection,
+      classifierConfidence: routeDecision.classification.confidence,
+    });
+    plannerRepair = repaired.repair;
+    if (repaired.ambiguityPrompt) {
+      routeDecision = {
+        ...routeDecision,
+        classification: {
+          ...routeDecision.classification,
+          mode: "clarify",
+          confidence: Math.max(routeDecision.classification.confidence, 0.88),
+          dispatch_hint: false,
+          clarify_needed: true,
+          reason: "Planner repair requires explicit workspace target disambiguation.",
+        },
+        routeReasonCode: "clarify:planner_repair_required",
+        explorationTurn: false,
+        explorationPacket: buildConversationExplorationPacket({
+          transcript,
+          mode: "clarify",
+          routeReasonCode: "clarify:planner_repair_required",
+        }),
+      };
+      routeReasonCode = "clarify:planner_repair_required";
+      dispatchHint = false;
+      briefText = repaired.ambiguityPrompt;
+      pendingServerRequest = {
+        request_id: `pending:${crypto.randomUUID()}`,
+        kind: "clarify",
+        reason: "clarify:planner_repair_required",
+        prompt: repaired.ambiguityPrompt,
+        required_fields: repaired.ambiguityRequiredFields,
+        unresolved_fields: repaired.ambiguityRequiredFields,
+        candidate_action: null,
+        pending_scope: "action_args",
+        status: "pending",
+      };
+      recordPendingTransition("pending", "pending_request_created");
+      pendingRequestId = pendingServerRequest.request_id;
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.set(conversationPendingKey, {
+          turnId,
+          requestId: pendingServerRequest.request_id,
+          kind: pendingServerRequest.kind,
+          reason: pendingServerRequest.reason,
+          prompt: pendingServerRequest.prompt,
+          createdAtMs: Date.now(),
+          requiredFields: repaired.ambiguityRequiredFields,
+          unresolvedFields: repaired.ambiguityRequiredFields,
+          candidateAction: null,
+          status: "pending",
+          pendingScope: "action_args",
+          originIntentHash: incomingIntentHash,
+          originActionFamily: incomingIntentFamily,
+          expiresAtMs: Date.now() + 10 * 60 * 1000,
+        });
+      }
+    } else {
+      actionSelection = repaired.selection;
+      if (plannerRepair.applied && actionSelection.action) {
+        briefText = `Planner repair mapped the request to ${actionSelection.action.panel_id}.${actionSelection.action.action_id}.`;
+      }
     }
   }
   if (!pendingHandled && !pendingServerRequest && policyLockForSelection === "workspace_only") {
@@ -69618,8 +70510,11 @@ planRouter.post("/ask/turn", async (req, res) => {
         required_fields: actionSelection.missing_required_args,
         unresolved_fields: actionSelection.missing_required_args,
         candidate_action: actionSelection.action ?? null,
+        pending_scope: "action_args",
         status: "pending",
       };
+      recordPendingTransition("pending", "pending_request_created");
+      pendingRequestId = pendingServerRequest.request_id;
       if (conversationPendingKey) {
         helixConversationPendingInputBySession.set(conversationPendingKey, {
           turnId,
@@ -69632,6 +70527,9 @@ planRouter.post("/ask/turn", async (req, res) => {
           unresolvedFields: actionSelection.missing_required_args,
           candidateAction: actionSelection.action ?? null,
           status: "pending",
+          pendingScope: "action_args",
+          originIntentHash: incomingIntentHash,
+          originActionFamily: incomingIntentFamily,
           expiresAtMs: Date.now() + 10 * 60 * 1000,
         });
       }
@@ -69639,41 +70537,161 @@ planRouter.post("/ask/turn", async (req, res) => {
       briefText = "I could not map that workspace command to a known capability. Please rephrase the target action.";
     }
   }
+  if (!pendingServerRequest && isAskTurnDocNotesHybridCompareIntent(transcript)) {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: "Hybrid compare intent: prepare workspace context and reasoning follow-up.",
+      },
+    };
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+    policyLockForSelection = "workspace_only";
+  }
+  if (!pendingServerRequest && pendingStatusAfter === null && pendingStatusBefore) {
+    recordPendingTransition("resolved", "pending_cleared_for_turn_completion");
+  }
   const needsConfirmation = Boolean(pendingServerRequest && pendingServerRequest.kind === "confirm");
-  const isClarifyTerminal = routeReasonCode.startsWith("clarify:") || needsConfirmation || Boolean(pendingServerRequest);
-  const isSuppressedTerminal = routeReasonCode.startsWith("suppressed:") && !dispatchHint;
-  const isActTerminal = routeReasonCode === "dispatch:act" && dispatchHint;
-  const precomputedPlanSteps = buildAskTurnPlanSteps({
+  let isClarifyTerminal = routeReasonCode.startsWith("clarify:") || needsConfirmation || Boolean(pendingServerRequest);
+  let isSuppressedTerminal = routeReasonCode.startsWith("suppressed:") && !dispatchHint;
+  let isControlConversationTerminal = routeReasonCode === "cancel:no_pending";
+  let precomputedPlanSteps = buildAskTurnPlanSteps({
     routeReasonCode,
     pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
     transcript,
     selectedAction: actionSelection.action,
   });
-  const executionTrace = buildAskTurnExecutionTrace({
+  let hasReasoningPlanStep = precomputedPlanSteps.some((step) => step.lane === "reasoning");
+  let isHybridReasoningTerminal =
+    !isClarifyTerminal &&
+    !isSuppressedTerminal &&
+    !isControlConversationTerminal &&
+    routeReasonCode === "dispatch:act" &&
+    dispatchHint &&
+    hasReasoningPlanStep;
+  let isActTerminal =
+    routeReasonCode === "dispatch:act" && dispatchHint && !isHybridReasoningTerminal;
+  let executionTerminalKind: "conversation" | "clarify" | "reasoning" = isClarifyTerminal
+    ? "clarify"
+    : isSuppressedTerminal || isActTerminal || isControlConversationTerminal
+      ? "conversation"
+      : "reasoning";
+  let executionTrace = buildAskTurnExecutionTrace({
     planSteps: precomputedPlanSteps,
-    terminalKind: isClarifyTerminal || isSuppressedTerminal || isActTerminal ? "conversation" : "reasoning",
+    terminalKind: executionTerminalKind,
     pending: Boolean(pendingServerRequest),
+    transcript,
   });
+  const blockedMissingArtifacts = collectAskTurnBlockedMissingArtifacts(executionTrace);
+  if (!pendingServerRequest && blockedMissingArtifacts.length > 0) {
+    routeReasonCode = "clarify:missing_args";
+    dispatchHint = false;
+    isClarifyTerminal = true;
+    isSuppressedTerminal = false;
+    isControlConversationTerminal = false;
+    isHybridReasoningTerminal = false;
+    isActTerminal = false;
+    executionTerminalKind = "clarify";
+    briefText = `I need ${blockedMissingArtifacts.join(", ")} before I can run that multi-step request.`;
+    pendingServerRequest = {
+      request_id: `pending:${crypto.randomUUID()}`,
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: briefText,
+      required_fields: blockedMissingArtifacts,
+      unresolved_fields: blockedMissingArtifacts,
+      candidate_action: actionSelection.action ?? null,
+      pending_scope: "artifact_gate",
+      status: "pending",
+    };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: pendingServerRequest.request_id,
+        kind: pendingServerRequest.kind,
+        reason: pendingServerRequest.reason,
+        prompt: pendingServerRequest.prompt,
+        createdAtMs: Date.now(),
+        requiredFields: blockedMissingArtifacts,
+        unresolvedFields: blockedMissingArtifacts,
+        candidateAction: actionSelection.action ?? null,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
+    precomputedPlanSteps = buildAskTurnPlanSteps({
+      routeReasonCode,
+      pendingServerRequest: { kind: pendingServerRequest.kind },
+      transcript,
+      selectedAction: actionSelection.action,
+    });
+    hasReasoningPlanStep = precomputedPlanSteps.some((step) => step.lane === "reasoning");
+    executionTrace = buildAskTurnExecutionTrace({
+      planSteps: precomputedPlanSteps,
+      terminalKind: executionTerminalKind,
+      pending: Boolean(pendingServerRequest),
+      transcript,
+    });
+  }
   const tenantId =
     req.tenantId ??
     req.get("x-tenant-id") ??
     req.get("x-customer-id") ??
     req.get("x-org-id") ??
     null;
-  const plannerContract = await buildAskTurnPlannerContract({
+  let plannerContract = await buildAskTurnPlannerContract({
     transcript,
     routeReasonCode,
     pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
     actionSelection,
     executionTrace,
-    dispatchPolicyLock: pendingServerRequest ? null : dispatchPolicyLock,
+    dispatchPolicyLock: pendingServerRequest ? null : policyLockForSelection,
     sessionId,
     traceId,
     personaId,
     tenantId,
     model: parsed.data.model ?? "gpt-5.4-mini",
+    plannerRepair,
+    pendingResolution,
   });
-  if (isClarifyTerminal || isSuppressedTerminal || isActTerminal) {
+  let executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
+  let stepResults = buildAskTurnStepResults(executionTrace);
+  let invariantViolations = evaluateAskTurnInvariantViolations({
+    planItems: plannerContract.plan_items,
+    executionTrace,
+    executionLifecycle,
+    terminalKind: executionTerminalKind,
+    pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
+  });
+  if (HELIX_E8_INVARIANT_ASSERTIONS_FLAG && invariantViolations.length > 0) {
+    return respondAskTurn(500, {
+      ok: false,
+      error: "ask_turn_invariant_violation",
+      terminal_error_code: "ask_turn_invariant_violation",
+      invariant_violations: invariantViolations,
+      planner_contract: plannerContract,
+      execution_trace: executionTrace,
+      step_results: stepResults,
+      execution_lifecycle: executionLifecycle,
+      route_reason_code: routeReasonCode,
+    });
+  }
+  const pendingTerminalErrorCode =
+    pendingTransitionReason === "pending_resolution_expired"
+      ? "pending_resolution_expired"
+      : pendingResolution.attempted && !pendingResolution.applied && pendingStatusAfter !== "pending"
+          ? "pending_resolution_invalid_state"
+          : null;
+  if (isClarifyTerminal || isSuppressedTerminal || isActTerminal || isControlConversationTerminal) {
     return respondAskTurn(
       200,
       {
@@ -69693,12 +70711,27 @@ planRouter.post("/ask/turn", async (req, res) => {
       },
       route_reason_code: routeReasonCode,
       needs_confirmation: needsConfirmation,
+      terminal_error_code:
+        routeReasonCode === "clarify:planner_repair_required"
+          ? "planner_repair_required"
+          : (pendingTerminalErrorCode ?? undefined),
+      pending_resolution_attempted: pendingResolution.attempted,
+      pending_resolution_applied: pendingResolution.applied,
+      pending_resolution_reason: pendingResolution.reason,
+      pending_status_before: pendingStatusBefore,
+      pending_status_after: pendingStatusAfter,
+      pending_transition_reason: pendingTransitionReason,
+      pending_transition_trace: pendingTransitionTrace,
+      pending_request_id: pendingRequestId,
       brief: {
         text: briefText,
         source: "none",
       },
       planner_contract: plannerContract,
       execution_trace: executionTrace,
+      step_results: stepResults,
+      execution_lifecycle: executionLifecycle,
+      invariant_violations: invariantViolations,
       pending_server_request: pendingServerRequest,
       turn_contract: {
         lane: "conversation",
@@ -69707,6 +70740,103 @@ planRouter.post("/ask/turn", async (req, res) => {
         dispatch_hint: dispatchHint,
         single_terminal_required: true,
       },
+      },
+      {
+        questionSeed: transcript,
+        forceEmptyTerminal: forceEmptyTerminalForTest,
+      },
+    );
+  }
+  if (isHybridReasoningTerminal) {
+    const requiresEvidence = askTurnRequiresEvidence(transcript);
+    const evidenceRefs = Array.from(
+      new Set<string>([
+        ...extractEvidenceRefsFromActionSelection(actionSelection),
+        ...extractEvidenceRefsFromTranscript(transcript),
+      ]),
+    );
+    const needsRetrieval = requiresEvidence && evidenceRefs.length === 0;
+    if (needsRetrieval) {
+      const gated = appendNeedsRetrievalPlanStep({
+        planItems: plannerContract.plan_items,
+        executionTrace,
+      });
+      executionTrace = gated.executionTrace;
+      plannerContract = {
+        ...plannerContract,
+        plan_items: gated.planItems,
+        plan_steps: executionTrace,
+        executed_step_count: executionTrace.filter((step) => step.status === "completed").length,
+        failed_step_count: executionTrace.filter((step) => step.status === "failed").length,
+        suppressed_step_count: executionTrace.filter((step) => step.status === "suppressed").length,
+      };
+      executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
+      stepResults = buildAskTurnStepResults(executionTrace);
+    }
+    invariantViolations = evaluateAskTurnInvariantViolations({
+      planItems: plannerContract.plan_items,
+      executionTrace,
+      executionLifecycle,
+      terminalKind: "reasoning",
+      pendingServerRequest: null,
+    });
+    if (HELIX_E8_INVARIANT_ASSERTIONS_FLAG && invariantViolations.length > 0) {
+      return respondAskTurn(500, {
+        ok: false,
+        error: "ask_turn_invariant_violation",
+        terminal_error_code: "ask_turn_invariant_violation",
+        invariant_violations: invariantViolations,
+        planner_contract: plannerContract,
+        execution_trace: executionTrace,
+        step_results: stepResults,
+        execution_lifecycle: executionLifecycle,
+        route_reason_code: routeReasonCode,
+      });
+    }
+    const hybridText = needsRetrieval
+      ? "Needs retrieval before final comparison: I need concrete evidence references from docs/notes context."
+      : buildAskTurnHybridReasoningFinalText(transcript);
+    return respondAskTurn(
+      200,
+      {
+        ok: true,
+        text: hybridText,
+        answer: hybridText,
+        mode: "observe",
+        trace_id: traceId,
+        turn_id: turnId,
+        dispatch: {
+          dispatch_hint: true,
+          reason: routeReasonCode,
+        },
+        route_reason_code: routeReasonCode,
+        needs_confirmation: false,
+        brief: {
+          text: needsRetrieval
+            ? "Added needs_retrieval step because evidence references are missing."
+            : "Completed workspace step and reasoning follow-up in this turn.",
+          source: "none",
+        },
+        evidence_refs: evidenceRefs,
+        needs_retrieval: needsRetrieval,
+        pending_status_before: pendingStatusBefore,
+        pending_status_after: pendingStatusAfter,
+        pending_transition_reason: pendingTransitionReason,
+        pending_transition_trace: pendingTransitionTrace,
+        pending_request_id: pendingRequestId,
+        planner_contract: plannerContract,
+        execution_trace: executionTrace,
+        step_results: stepResults,
+        execution_lifecycle: executionLifecycle,
+        invariant_violations: invariantViolations,
+        pending_server_request: null,
+        turn_contract: {
+          lane: "reasoning",
+          terminal_kind: "reasoning",
+          route_reason_code: routeReasonCode,
+          dispatch_hint: true,
+          single_terminal_required: true,
+        },
       },
       {
         questionSeed: transcript,
@@ -69759,6 +70889,55 @@ planRouter.post("/ask/turn", async (req, res) => {
     capturedPayload && typeof capturedPayload === "object"
       ? ({ ...(capturedPayload as Record<string, unknown>) } as Record<string, unknown>)
       : ({} as Record<string, unknown>);
+  const requiresEvidence = askTurnRequiresEvidence(transcript);
+  const evidenceRefs = Array.from(
+    new Set<string>([
+      ...extractEvidenceRefsFromActionSelection(actionSelection),
+      ...extractEvidenceRefsFromTranscript(transcript),
+      ...extractEvidenceRefsFromResponsePayload(responsePayload),
+    ]),
+  );
+  const needsRetrieval = requiresEvidence && evidenceRefs.length === 0;
+  if (needsRetrieval) {
+    const gated = appendNeedsRetrievalPlanStep({
+      planItems: plannerContract.plan_items,
+      executionTrace,
+    });
+    executionTrace = gated.executionTrace;
+    plannerContract = {
+      ...plannerContract,
+      plan_items: gated.planItems,
+      plan_steps: executionTrace,
+      executed_step_count: executionTrace.filter((step) => step.status === "completed").length,
+      failed_step_count: executionTrace.filter((step) => step.status === "failed").length,
+      suppressed_step_count: executionTrace.filter((step) => step.status === "suppressed").length,
+    };
+    executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
+    stepResults = buildAskTurnStepResults(executionTrace);
+    responsePayload.text =
+      "Needs retrieval before final synthesis: evidence references are missing for this reasoning turn.";
+    responsePayload.answer = responsePayload.text;
+  }
+  invariantViolations = evaluateAskTurnInvariantViolations({
+    planItems: plannerContract.plan_items,
+    executionTrace,
+    executionLifecycle,
+    terminalKind: "reasoning",
+    pendingServerRequest: null,
+  });
+  if (HELIX_E8_INVARIANT_ASSERTIONS_FLAG && invariantViolations.length > 0) {
+    return respondAskTurn(500, {
+      ok: false,
+      error: "ask_turn_invariant_violation",
+      terminal_error_code: "ask_turn_invariant_violation",
+      invariant_violations: invariantViolations,
+      planner_contract: plannerContract,
+      execution_trace: executionTrace,
+      step_results: stepResults,
+      execution_lifecycle: executionLifecycle,
+      route_reason_code: routeReasonCode,
+    });
+  }
   const responseText = ensureAskTurnTerminalText(extractHelixAskResponseTextForHistory(responsePayload) ?? briefText, transcript);
   responsePayload.text = responseText;
   if (typeof responsePayload.answer !== "string" || !responsePayload.answer.trim()) {
@@ -69771,11 +70950,23 @@ planRouter.post("/ask/turn", async (req, res) => {
   };
   responsePayload.needs_confirmation = false;
   responsePayload.brief = {
-    text: ensureAskTurnTerminalText(briefText, transcript),
+    text: needsRetrieval
+      ? "Added needs_retrieval step because evidence references are missing."
+      : ensureAskTurnTerminalText(briefText, transcript),
     source: "none",
   };
+  responsePayload.evidence_refs = evidenceRefs;
+  responsePayload.needs_retrieval = needsRetrieval;
+  responsePayload.pending_status_before = pendingStatusBefore;
+  responsePayload.pending_status_after = pendingStatusAfter;
+  responsePayload.pending_transition_reason = pendingTransitionReason;
+  responsePayload.pending_transition_trace = pendingTransitionTrace;
+  responsePayload.pending_request_id = pendingRequestId;
   responsePayload.planner_contract = plannerContract;
   responsePayload.execution_trace = executionTrace;
+  responsePayload.step_results = stepResults;
+  responsePayload.execution_lifecycle = executionLifecycle;
+  responsePayload.invariant_violations = invariantViolations;
   responsePayload.turn_contract = {
     lane: "reasoning",
     terminal_kind: "reasoning",

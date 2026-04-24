@@ -1,0 +1,113 @@
+{
+  "manifestType": "research_citation_patch_checklist/v1",
+  "generatedOn": "2026-04-24",
+  "policy": {
+    "citationRequiredStatuses": [
+      "measured",
+      "derived"
+    ],
+    "minSourcesPerClaim": 1,
+    "requireGithubCloneForMeasured": true,
+    "requireCompletedChecklistItems": true
+  },
+  "checklist": [
+    {
+      "id": "physical-axis-preservation",
+      "title": "Map render coordinates from brick physical bounds and preserve NHM2 axis proportions",
+      "status": "done",
+      "evidenceRef": "scripts/render-spacetime-grid-overlay.ts"
+    },
+    {
+      "id": "inside-outside-grid-separation",
+      "title": "Render separate inside_only, outside_only, combined spacetime-grid overlays aligned to existing camera conventions",
+      "status": "done",
+      "evidenceRef": "artifacts/research/full-solve/rendered/scientific_3p1_field/2026-04-24/nhm2_spacetime_grid_overlay-*.gif"
+    },
+    {
+      "id": "solve-derived-driver-fields",
+      "title": "Drive deformation from NHM2 solve channels alpha, beta_i, hull_sdf and record uncertainty for non-unique embedding map",
+      "status": "done",
+      "evidenceRef": "artifacts/research/full-solve/rendered/scientific_3p1_field/2026-04-24/nhm2_spacetime_grid_overlay-metadata.json"
+    }
+  ],
+  "sources": [
+    {
+      "id": "casimirbot_repo_clone_6baffda",
+      "type": "github_clone",
+      "title": "CasimirBot local evidence clone",
+      "repoUrl": "https://github.com/pestypig/casimirbot-.git",
+      "commitSha": "6baffda05f9d9e0aedb783f9cfd1169af84a59b4",
+      "clonePath": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot"
+    },
+    {
+      "id": "nhm2_full_solve_overview_v2_repo",
+      "type": "web",
+      "title": "NHM2 full-solve overview v2 (in-repo reference)",
+      "url": "https://github.com/pestypig/casimirbot-/blob/6baffda05f9d9e0aedb783f9cfd1169af84a59b4/docs/research/nhm2-full-solve-overview-v2-2026-04-23.md"
+    },
+    {
+      "id": "springer_natario_zero_expansion_2024",
+      "type": "paper",
+      "title": "A Closer Look at Natario's Zero-Expansion Warp Drive",
+      "url": "https://link.springer.com/article/10.1007/s10773-024-05700-0",
+      "doi": "10.1007/s10773-024-05700-0"
+    },
+    {
+      "id": "gw170817_prl_2017",
+      "type": "paper",
+      "title": "GW170817: Observation of Gravitational Waves from a Binary Neutron Star Inspiral",
+      "url": "https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.119.161101",
+      "doi": "10.1103/PhysRevLett.119.161101"
+    },
+    {
+      "id": "ligo_technology_reference",
+      "type": "web",
+      "title": "LIGO Technology (interferometric strain measurement context)",
+      "url": "https://www.ligo.caltech.edu/LA/page/ligo-technology"
+    }
+  ],
+  "claims": [
+    {
+      "claimId": "claim_nhm2_grid_overlay_is_solve_derived",
+      "claimText": "The spacetime-grid overlay is computed from NHM2 brick channels alpha, beta_x, beta_y, beta_z, and hull_sdf in physical brick bounds, then rendered as inside/outside/combined layers.",
+      "status": "measured",
+      "artifactPaths": [
+        "scripts/render-spacetime-grid-overlay.ts",
+        "artifacts/research/full-solve/triage-brick-48.raw",
+        "artifacts/research/full-solve/rendered/scientific_3p1_field/2026-04-24/nhm2_spacetime_grid_overlay-metadata.json"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda",
+        "nhm2_full_solve_overview_v2_repo"
+      ]
+    },
+    {
+      "claimId": "claim_observation_vs_model_lane_separation",
+      "claimText": "GW observations and NHM2 grid/invariant overlays should be presented as separate lanes: detector strain is observational, while NHM2 overlays are model-derived GR diagnostics.",
+      "status": "derived",
+      "artifactPaths": [
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-24.md"
+      ],
+      "sourceIds": [
+        "gw170817_prl_2017",
+        "ligo_technology_reference",
+        "springer_natario_zero_expansion_2024"
+      ]
+    },
+    {
+      "claimId": "claim_deformation_map_not_unique_embedding",
+      "claimText": "The grid deformation map is a visualization embedding of 3+1 solved fields and is not a unique physical reconstruction of full 4D spacetime geometry.",
+      "status": "hypothesis",
+      "artifactPaths": [
+        "scripts/render-spacetime-grid-overlay.ts",
+        "artifacts/research/full-solve/rendered/scientific_3p1_field/2026-04-24/nhm2_spacetime_grid_overlay-metadata.json"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda",
+        "springer_natario_zero_expansion_2024"
+      ],
+      "uncertaintyNote": "The mapping from shift/lapse fields to visual lattice displacement is chosen for interpretability and axis-faithful comparison; alternative physically motivated embeddings can differ."
+    }
+  ]
+}
+

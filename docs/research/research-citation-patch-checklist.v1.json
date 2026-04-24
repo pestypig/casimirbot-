@@ -1,0 +1,100 @@
+{
+  "manifestType": "research_citation_patch_checklist/v1",
+  "generatedOn": "2026-04-24",
+  "policy": {
+    "citationRequiredStatuses": [
+      "measured",
+      "derived"
+    ],
+    "minSourcesPerClaim": 1,
+    "requireGithubCloneForMeasured": false,
+    "requireCompletedChecklistItems": true
+  },
+  "checklist": [
+    {
+      "id": "render-separation-signal-context",
+      "title": "Separate signal, context, and composite render outputs for secondary curvature frames",
+      "status": "done",
+      "evidenceRef": "scripts/warp-york-control-family-proof-pack.ts"
+    },
+    {
+      "id": "zero-state-labeling",
+      "title": "Render explicit zero-state context for identically zero fields instead of implicit black frames",
+      "status": "done",
+      "evidenceRef": "scripts/warp-york-control-family-proof-pack.ts"
+    },
+    {
+      "id": "citation-gate-enforcement",
+      "title": "Block publish-invariant-latest when citation manifest validation fails",
+      "status": "done",
+      "evidenceRef": "scripts/lib/research-citation-gate.ts"
+    },
+    {
+      "id": "claim-ledger-maintenance",
+      "title": "Maintain claim-to-source mapping with uncertainty notes for hypothesis claims",
+      "status": "done",
+      "evidenceRef": "docs/research/research-citation-patch-checklist.v1.json"
+    }
+  ],
+  "sources": [
+    {
+      "id": "springer_natario_zero_expansion_2024",
+      "type": "paper",
+      "title": "A Closer Look at Natario's Zero-Expansion Warp Drive",
+      "url": "https://link.springer.com/article/10.1007/s10773-024-05700-0",
+      "doi": "10.1007/s10773-024-05700-0"
+    },
+    {
+      "id": "ligo_technology_reference",
+      "type": "web",
+      "title": "LIGO Technology (detector measurement context)",
+      "url": "https://www.ligo.caltech.edu/LA/page/ligo-technology"
+    },
+    {
+      "id": "casimirbot_repo_clone_6baffda",
+      "type": "github_clone",
+      "title": "CasimirBot local evidence clone",
+      "repoUrl": "https://github.com/pestypig/casimirbot-.git",
+      "commitSha": "6baffda05f9d9e0aedb783f9cfd1169af84a59b4",
+      "clonePath": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot"
+    }
+  ],
+  "claims": [
+    {
+      "claimId": "claim_observed_vs_theoretical_lane_separation",
+      "claimText": "Observed gravitational-wave products and theoretical curvature-invariant plots must be rendered as separate lanes.",
+      "status": "derived",
+      "artifactPaths": [
+        "docs/research/nhm2-york-paper-comparison-memo-2026-04-02.md"
+      ],
+      "sourceIds": [
+        "springer_natario_zero_expansion_2024",
+        "ligo_technology_reference"
+      ]
+    },
+    {
+      "claimId": "claim_nhm2_secondary_curvature_rendering",
+      "claimText": "NHM2 curvature invariant frames in this pipeline are secondary solve-backed visualization artifacts, not primary proof surfaces.",
+      "status": "measured",
+      "artifactPaths": [
+        "scripts/warp-york-control-family-proof-pack.ts",
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda"
+      ]
+    },
+    {
+      "claimId": "claim_future_mechanism_closure_hypothesis",
+      "claimText": "Future NHM2 mechanism closure may enable stronger physically interpretable volumetric curvature signatures.",
+      "status": "hypothesis",
+      "artifactPaths": [
+        "docs/research/nhm2-current-status-memo-2026-04-03.md"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda"
+      ],
+      "uncertaintyNote": "Predictive projection only; not validated by present bounded-stack evidence."
+    }
+  ]
+}

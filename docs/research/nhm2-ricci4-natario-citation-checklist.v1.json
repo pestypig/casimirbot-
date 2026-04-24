@@ -1,0 +1,108 @@
+{
+  "manifestType": "research_citation_patch_checklist/v1",
+  "generatedOn": "2026-04-24",
+  "policy": {
+    "citationRequiredStatuses": [
+      "measured",
+      "derived"
+    ],
+    "minSourcesPerClaim": 1,
+    "requireGithubCloneForMeasured": true,
+    "requireCompletedChecklistItems": false
+  },
+  "checklist": [
+    {
+      "id": "brick-source-integrity",
+      "title": "Use canonical raw brick source and enforce channel decode/header consistency checks",
+      "status": "pending",
+      "evidenceRef": "scripts/render-rodal-3d-turntable.ts"
+    },
+    {
+      "id": "axis-faithful-coordinate-policy",
+      "title": "Record and enforce x_ship/y_port/z_zenith axis convention in render metadata",
+      "status": "pending",
+      "evidenceRef": "scripts/render-rodal-3d-turntable.ts"
+    },
+    {
+      "id": "natario-shell-iso-band",
+      "title": "Implement shell-constrained dense ricci4 iso-band rendering with interpolated contours",
+      "status": "pending",
+      "evidenceRef": "scripts/render-rodal-3d-turntable.ts"
+    },
+    {
+      "id": "separate-overlay-exports",
+      "title": "Export ricci4-only, shell-only, and optional combined diagnostic assets as separate files",
+      "status": "pending",
+      "evidenceRef": "artifacts/research/full-solve/rendered/scientific_3p1_field/"
+    },
+    {
+      "id": "provenance-sidecar",
+      "title": "Emit reproducibility sidecar including hashes, bounds, camera, iso thresholds, and shell bands",
+      "status": "pending",
+      "evidenceRef": "artifacts/research/full-solve/rendered/scientific_3p1_field/*-metadata.json"
+    }
+  ],
+  "sources": [
+    {
+      "id": "springer_natario_zero_expansion_2024",
+      "type": "paper",
+      "title": "A Closer Look at Natario's Zero-Expansion Warp Drive",
+      "url": "https://link.springer.com/article/10.1007/s10773-024-05700-0",
+      "doi": "10.1007/s10773-024-05700-0"
+    },
+    {
+      "id": "natario_zero_expansion_2002",
+      "type": "paper",
+      "title": "Warp drive with zero expansion",
+      "doi": "10.1088/0264-9381/19/6/308",
+      "url": "https://doi.org/10.1088/0264-9381/19/6/308"
+    },
+    {
+      "id": "casimirbot_repo_clone_6baffda",
+      "type": "github_clone",
+      "title": "CasimirBot local evidence clone",
+      "repoUrl": "https://github.com/pestypig/casimirbot-.git",
+      "commitSha": "6baffda05f9d9e0aedb783f9cfd1169af84a59b4",
+      "clonePath": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot"
+    }
+  ],
+  "claims": [
+    {
+      "claimId": "claim_ricci4_turntable_math_first_from_brick_fields",
+      "claimText": "The NHM2 ricci4 turntable is derived from decoded brick field values and hull_sdf shell masks, not from image recognition.",
+      "status": "measured",
+      "artifactPaths": [
+        "scripts/render-rodal-3d-turntable.ts",
+        "artifacts/research/full-solve/triage-brick-48.raw"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda"
+      ]
+    },
+    {
+      "claimId": "claim_natario_alignment_requires_invariant_shell_localization",
+      "claimText": "Natario-style progression should emphasize curvature-invariant shell localization in a 3+1 context instead of arbitrary point clouds.",
+      "status": "derived",
+      "artifactPaths": [
+        "docs/research/nhm2-ricci4-natario-followup-patch-checklist-2026-04-24.md"
+      ],
+      "sourceIds": [
+        "springer_natario_zero_expansion_2024",
+        "natario_zero_expansion_2002"
+      ]
+    },
+    {
+      "claimId": "claim_future_higher_res_shell_refinement",
+      "claimText": "Higher lattice resolution may improve shell continuity and contour stability in future render passes.",
+      "status": "hypothesis",
+      "artifactPaths": [
+        "docs/research/nhm2-ricci4-natario-followup-patch-checklist-2026-04-24.md"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda"
+      ],
+      "uncertaintyNote": "Projection based on renderer behavior and voxel discretization; not yet validated by new 64^3/96^3 comparative outputs."
+    }
+  ]
+}
+

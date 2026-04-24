@@ -160,6 +160,7 @@ import {
   type WarpMetricFamilyAuthorityStatus,
   type WarpMetricTransportCertificationStatus,
 } from "../modules/warp/warp-metric-adapter";
+import { enforceResearchCitationGate } from "./lib/research-citation-gate";
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
 const REQUESTED_REPORT_DATE_STAMP = "2026-03-31";
@@ -188,6 +189,11 @@ const DEFAULT_OUT_MD = path.join(
 const DEFAULT_LATEST_JSON = path.join(
   FULL_SOLVE_DIR,
   "warp-york-control-family-proof-pack-latest.json",
+);
+const DEFAULT_RESEARCH_CITATION_CHECKLIST_PATH = path.join(
+  "docs",
+  "research",
+  "research-citation-patch-checklist.v1.json",
 );
 const DEFAULT_RODC_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
@@ -2474,6 +2480,8 @@ type RenderTaxonomyFieldId =
   | "comparison_card"
   | "comparison_overview";
 
+type RenderFramePresetId = "rodal_natario_secondary_v1";
+
 type RenderBaseImagePolicy =
   | "native_renderer_output"
   | "neutral_field_canvas"
@@ -2508,6 +2516,7 @@ type RenderFrameLabelMetadata = {
   displayTransform: string | null;
   colormapFamily: string | null;
   cameraPoseId: string | null;
+  framePresetId: RenderFramePresetId | null;
   orientationConventionId: RenderOrientationConventionId;
   axisLabels: {
     x: string;
@@ -2530,6 +2539,7 @@ type RenderTaxonomyEntryMetadata = {
   baseImageSource: RenderBaseImageSource;
   inheritsTransportContext: boolean;
   contextCompositionMode: RenderContextCompositionMode;
+  framePresetId: RenderFramePresetId | null;
   frameLabel: RenderFrameLabelMetadata;
 };
 
@@ -2652,6 +2662,7 @@ type ShiftGeometryRenderEntry = {
   baseImageSource: RenderBaseImageSource;
   inheritsTransportContext: boolean;
   contextCompositionMode: RenderContextCompositionMode;
+  framePresetId: RenderFramePresetId | null;
   imagePath: string | null;
   imageHash: string | null;
   metricVolumeHash: string | null;
@@ -2682,6 +2693,7 @@ type Nhm2ShiftGeometryVisualizationArtifact = {
   canonicalCalibrationArtifactPath: string;
   optixRenderArtifactPath: string;
   shiftGeometryStatus: ShiftGeometryStatus;
+  framePresetId: RenderFramePresetId;
   caseSet: CalibrationPanelCaseId[];
   shiftConvention: {
     storedShiftComponent: "beta^i";
@@ -2724,6 +2736,7 @@ type CurvatureInvariantFieldSummary = {
   displayTransform: YorkOptixPresentationDisplayTransform | null;
   colormapFamily: YorkOptixPresentationColormapFamily | null;
   mainRender: CanonicalVisualComparisonFieldSummary | null;
+  volumetricCompanion: RenderTaxonomyEntryMetadata | null;
   xzSliceCompanion: RenderTaxonomyEntryMetadata | null;
   notes: string[];
 };
@@ -2759,6 +2772,7 @@ type CurvatureInvariantRenderEntry = {
   baseImageSource: RenderBaseImageSource;
   inheritsTransportContext: boolean;
   contextCompositionMode: RenderContextCompositionMode;
+  framePresetId: RenderFramePresetId | null;
   imagePath: string | null;
   imageHash: string | null;
   metricVolumeHash: string | null;
@@ -2785,11 +2799,13 @@ type Nhm2CurvatureInvariantVisualizationArtifact = {
   caseId: Extract<CalibrationPanelCaseId, "nhm2_certified">;
   caseLabel: string;
   suiteStatus: "available" | "degraded" | "missing";
+  framePresetId: RenderFramePresetId;
   observer: string;
   foliation: string;
   laneId: string;
   signConvention: string;
   styleReference: {
+    presetId: RenderFramePresetId;
     inspiration: string;
     usagePolicy: string;
     notes: string[];
@@ -3636,6 +3652,7 @@ type RenderTaxonomyManifestEntry = {
   baseImageSource: RenderBaseImageSource;
   inheritsTransportContext: boolean;
   contextCompositionMode: RenderContextCompositionMode;
+  framePresetId: RenderFramePresetId | null;
   title: string;
   subtitle: string;
   quantitySymbol: string;
@@ -8052,6 +8069,30 @@ const buildRenderSubtitle = (args: {
     `transform=${args.displayTransform ?? "identity"}`,
   ].join(" | ");
 
+const RODAL_NATARIO_SECONDARY_FIELD_IDS = new Set<RenderTaxonomyFieldId>([
+  "beta_magnitude",
+  "beta_x",
+  "beta_direction_xz",
+  "kretschmann",
+  "ricci4",
+  "ricci2",
+  "weylI",
+]);
+
+const resolveRenderFramePresetId = (args: {
+  renderCategory: RenderTaxonomyCategory;
+  fieldId: RenderTaxonomyFieldId;
+}): RenderFramePresetId | null => {
+  if (
+    (args.renderCategory === "scientific_3p1_field" ||
+      args.renderCategory === "mechanism_overlay") &&
+    RODAL_NATARIO_SECONDARY_FIELD_IDS.has(args.fieldId)
+  ) {
+    return "rodal_natario_secondary_v1";
+  }
+  return null;
+};
+
 const createRenderTaxonomyMetadata = (args: {
   generatedOn: string;
   caseId: string;
@@ -8078,6 +8119,7 @@ const createRenderTaxonomyMetadata = (args: {
   inheritsTransportContext: boolean;
   contextCompositionMode: RenderContextCompositionMode;
   titlePrefix?: string | null;
+  framePresetId?: RenderFramePresetId | null;
 }): RenderTaxonomyEntryMetadata => {
   const fieldFamily = resolveRenderFieldFamilyDefinition(args.fieldId);
   const canonicalPath = buildCanonicalRenderAliasPath({
@@ -8088,6 +8130,12 @@ const createRenderTaxonomyMetadata = (args: {
     variant: args.variant,
   });
   const title = `${args.titlePrefix ?? fieldFamily?.label ?? args.fieldId} - ${args.caseLabel}`;
+  const framePresetId =
+    args.framePresetId ??
+    resolveRenderFramePresetId({
+      renderCategory: args.renderCategory,
+      fieldId: args.fieldId,
+    });
   return {
     renderId: `${args.caseId}:${args.renderCategory}:${args.fieldId}:${sanitizeRenderVariantSegment(args.variant)}`,
     renderCategory: args.renderCategory,
@@ -8102,6 +8150,7 @@ const createRenderTaxonomyMetadata = (args: {
     baseImageSource: args.baseImageSource,
     inheritsTransportContext: args.inheritsTransportContext,
     contextCompositionMode: args.contextCompositionMode,
+    framePresetId,
     frameLabel: {
       title,
       subtitle: buildRenderSubtitle({
@@ -8123,6 +8172,7 @@ const createRenderTaxonomyMetadata = (args: {
       displayTransform: args.displayTransform,
       colormapFamily: args.colormapFamily,
       cameraPoseId: args.cameraPoseId,
+      framePresetId,
       orientationConventionId: RENDER_ORIENTATION_CONVENTION.orientationConventionId,
       axisLabels: { ...RENDER_ORIENTATION_CONVENTION.axisLabels },
     },
@@ -8147,6 +8197,7 @@ const toRenderTaxonomyManifestEntry = (
   baseImageSource: metadata.baseImageSource,
   inheritsTransportContext: metadata.inheritsTransportContext,
   contextCompositionMode: metadata.contextCompositionMode,
+  framePresetId: metadata.framePresetId,
   title: metadata.frameLabel.title,
   subtitle: metadata.frameLabel.subtitle,
   quantitySymbol: metadata.frameLabel.quantitySymbol,
@@ -22512,6 +22563,7 @@ const renderYorkOptixFieldOverlay = (args: {
   width: number;
   height: number;
   includeHullOverlay: boolean;
+  hullOverlayStrength?: number;
 }): Uint8ClampedArray => {
   const rgba = new Uint8ClampedArray(args.width * args.height * 4);
   const { data } = args.field;
@@ -22578,7 +22630,8 @@ const renderYorkOptixFieldOverlay = (args: {
       }
     }
   }
-  if (args.includeHullOverlay) {
+  const hullOverlayStrength = clamp01(args.hullOverlayStrength ?? 0.55);
+  if (args.includeHullOverlay && hullOverlayStrength > 0) {
     for (const voxelIndex of args.geometry.depthOrder) {
       const support = args.geometry.supportMask?.[voxelIndex] ?? 0;
       const hullSdf = Math.abs(Number(args.geometry.hullSdf?.[voxelIndex] ?? Number.NaN));
@@ -22587,10 +22640,10 @@ const renderYorkOptixFieldOverlay = (args: {
       const y = Math.round(args.geometry.screenY[voxelIndex]);
       if (x < 0 || y < 0 || x >= args.width || y >= args.height) continue;
       const idx = (y * args.width + x) * 4;
-      rgba[idx] = lerpByte(rgba[idx], 214, 0.55);
-      rgba[idx + 1] = lerpByte(rgba[idx + 1], 239, 0.55);
-      rgba[idx + 2] = lerpByte(rgba[idx + 2], 255, 0.55);
-      rgba[idx + 3] = Math.max(rgba[idx + 3], 148);
+      rgba[idx] = lerpByte(rgba[idx], 214, hullOverlayStrength);
+      rgba[idx + 1] = lerpByte(rgba[idx + 1], 239, hullOverlayStrength);
+      rgba[idx + 2] = lerpByte(rgba[idx + 2], 255, hullOverlayStrength);
+      rgba[idx + 3] = Math.max(rgba[idx + 3], Math.round(92 + 112 * hullOverlayStrength));
     }
   }
   return rgba;
@@ -24097,10 +24150,14 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
               field: derivedField,
             })
           : null;
-      const variants = isCurvatureInvariantFieldId(descriptor.presentationFieldId)
-        ? (["main"] as const)
-        : (["main", "hull-overlay"] as const);
+      const variants = ["main", "hull-overlay"] as const;
       for (const variant of variants) {
+        const includeZeroFieldContext =
+          variant === "main" && (derivedField?.fieldAbsMax ?? 0) <= 0;
+        const resolvedContextCompositionMode =
+          variant === "hull-overlay" || includeZeroFieldContext ? "hull_overlay" : "none";
+        const includeHullOverlay = resolvedContextCompositionMode === "hull_overlay";
+        const hullOverlayStrength = variant === "hull-overlay" ? 0.55 : 0.28;
         const requestHash = sha256Hex(
           stableStringify({
             caseId: spec.case_id,
@@ -24114,7 +24171,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             baseImagePolicy: "neutral_field_canvas",
             baseImageSource: "none",
             inheritsTransportContext: false,
-            contextCompositionMode: variant === "hull-overlay" ? "hull_overlay" : "none",
+            contextCompositionMode: resolvedContextCompositionMode,
             metricVolumeHash: metricBinding.metricVolumeHash,
             laneAFieldHash: metricBinding.laneAFieldHash,
             presentationFieldHash: derivedField?.fieldHash ?? null,
@@ -24140,7 +24197,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             baseImagePolicy: "neutral_field_canvas",
             baseImageSource: "none",
             inheritsTransportContext: false,
-            contextCompositionMode: variant === "hull-overlay" ? "hull_overlay" : "none",
+            contextCompositionMode: resolvedContextCompositionMode,
             authoritativeSource:
               derivedField?.authoritativeSource ?? "presentation_field_unavailable",
             presentationFieldSelector:
@@ -24209,7 +24266,8 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           geometry: projectionGeometry,
           width: geometryWidth,
           height: geometryHeight,
-          includeHullOverlay: variant === "hull-overlay",
+          includeHullOverlay,
+          hullOverlayStrength,
         });
         const composed = await compositeYorkOptixPresentationLayers({
           basePng: neutralFieldCanvas,
@@ -24248,7 +24306,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           baseImagePolicy: "neutral_field_canvas",
           baseImageSource: "none",
           inheritsTransportContext: false,
-          contextCompositionMode: variant === "hull-overlay" ? "hull_overlay" : "none",
+          contextCompositionMode: resolvedContextCompositionMode,
           authoritativeSource: derivedField.authoritativeSource,
           presentationFieldSelector: derivedField.selector,
           presentationFieldSelectorHash: derivedField.selectorHash,
@@ -24291,6 +24349,8 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           note:
             variant === "hull-overlay"
               ? `${derivedField.note} Rendered on a neutral field canvas with an explicit hull/support overlay.`
+              : includeZeroFieldContext
+                ? `${derivedField.note} The underlying field is identically zero in this snapshot, so a low-opacity hull/support context overlay is added to make the zero-state spatial domain explicit rather than emitting an all-black frame.`
               : `${derivedField.note} Rendered on a neutral field canvas with no inherited transport background.`,
           renderTaxonomy: null,
           ok: true,
@@ -24877,6 +24937,7 @@ const createShiftGeometryRenderEntry = (args: {
     colormapFamily: renderTaxonomy.frameLabel.colormapFamily,
     cameraPoseId: renderTaxonomy.frameLabel.cameraPoseId,
     orientationConventionId: renderTaxonomy.frameLabel.orientationConventionId,
+    framePresetId: renderTaxonomy.frameLabel.framePresetId,
     baseImagePolicy: args.baseImagePolicy,
     baseImageSource: args.baseImageSource,
     inheritsTransportContext: args.inheritsTransportContext,
@@ -25341,6 +25402,7 @@ export const buildNhm2ShiftGeometryVisualizationArtifact = async (args: {
       laneId: args.diagnosticLane.lane_id,
       signConvention,
     },
+    framePresetId: "rodal_natario_secondary_v1",
     renderEntries,
     fieldSummaries,
     residualSummaries,
@@ -25384,7 +25446,7 @@ export const renderNhm2ShiftGeometryVisualizationMarkdown = (
   const renderRows = payload.renderEntries
     .map(
       (entry) =>
-        `| ${entry.caseId} | ${entry.referenceCaseId ?? "null"} | ${entry.fieldId} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.directionOverlayStatus ?? "null"} | ${(entry.directionOverlayWarnings ?? []).join(",") || "none"} | ${entry.presentationScalarFieldHash ?? "null"} | ${entry.directionVectorFieldHash ?? "null"} | ${entry.streamSeedHash ?? "null"} | ${entry.streamGeometryHash ?? "null"} | ${entry.directionOverlayHash ?? "null"} | ${entry.fieldAbsMax ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
+        `| ${entry.caseId} | ${entry.referenceCaseId ?? "null"} | ${entry.fieldId} | ${entry.framePresetId ?? "null"} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.directionOverlayStatus ?? "null"} | ${(entry.directionOverlayWarnings ?? []).join(",") || "none"} | ${entry.presentationScalarFieldHash ?? "null"} | ${entry.directionVectorFieldHash ?? "null"} | ${entry.streamSeedHash ?? "null"} | ${entry.streamGeometryHash ?? "null"} | ${entry.directionOverlayHash ?? "null"} | ${entry.fieldAbsMax ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
     )
     .join("\n");
   const fieldSummaryRows = payload.fieldSummaries
@@ -25421,6 +25483,7 @@ export const renderNhm2ShiftGeometryVisualizationMarkdown = (
 | observer | ${payload.shiftConvention.observer} |
 | foliation | ${payload.shiftConvention.foliation} |
 | laneId | ${payload.shiftConvention.laneId} |
+| framePresetId | ${payload.framePresetId} |
 | directionOverlayStatus | ${payload.directionOverlayStatus} |
 | directionOverlayCaseDistinctness | ${payload.directionOverlayCaseDistinctness} |
 | directionOverlayInterpretationPolicy | ${payload.directionOverlayInterpretationPolicy} |
@@ -25450,8 +25513,8 @@ ${residualRows}
 ${pairwiseRows}
 
 ## Render Entries
-| caseId | referenceCaseId | fieldId | variant | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | directionOverlayStatus | directionOverlayWarnings | presentationScalarFieldHash | directionVectorFieldHash | streamSeedHash | streamGeometryHash | directionOverlayHash | fieldAbsMax | displayPolicyId | displayTransform | imagePath | imageHash |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|---|
+| caseId | referenceCaseId | fieldId | framePresetId | variant | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | directionOverlayStatus | directionOverlayWarnings | presentationScalarFieldHash | directionVectorFieldHash | streamSeedHash | streamGeometryHash | directionOverlayHash | fieldAbsMax | displayPolicyId | displayTransform | imagePath | imageHash |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|---|
 ${renderRows}
 
 ## Recommended Interpretation Order
@@ -25558,6 +25621,7 @@ const createCurvatureInvariantRenderEntry = (args: {
     colormapFamily: renderTaxonomy.frameLabel.colormapFamily,
     cameraPoseId: renderTaxonomy.frameLabel.cameraPoseId,
     orientationConventionId: renderTaxonomy.frameLabel.orientationConventionId,
+    framePresetId: renderTaxonomy.frameLabel.framePresetId,
     baseImagePolicy: args.baseImagePolicy,
     baseImageSource: args.baseImageSource,
     inheritsTransportContext: args.inheritsTransportContext,
@@ -25582,7 +25646,10 @@ const summarizeCurvatureInvariantSuiteStatus = (
   fieldSummaries: CurvatureInvariantFieldSummary[],
 ): "available" | "degraded" | "missing" => {
   const realizedCount = fieldSummaries.filter(
-    (entry) => entry.mainRender != null && entry.xzSliceCompanion != null,
+    (entry) =>
+      entry.mainRender != null &&
+      entry.volumetricCompanion != null &&
+      entry.xzSliceCompanion != null,
   ).length;
   if (realizedCount <= 0) return "missing";
   return realizedCount === fieldSummaries.length ? "available" : "degraded";
@@ -25646,9 +25713,72 @@ export const buildNhm2CurvatureInvariantVisualizationArtifact = async (args: {
             field: derivedField,
           })
         : null;
-    const mainRender = nhm2OptixCase
-      ? toShiftGeometryFieldSummary(findOptixFieldRender(nhm2OptixCase, fieldId, "main"))
+    const optixMainRenderEntry = nhm2OptixCase
+      ? findOptixFieldRender(nhm2OptixCase, fieldId, "main")
       : null;
+    const optixHullOverlayRenderEntry = nhm2OptixCase
+      ? findOptixFieldRender(nhm2OptixCase, fieldId, "hull-overlay")
+      : null;
+    const mainRender = toShiftGeometryFieldSummary(optixMainRenderEntry);
+    let volumetricCompanion: CurvatureInvariantRenderEntry | null = null;
+    const volumetricSourceCandidates = [optixMainRenderEntry, optixHullOverlayRenderEntry].filter(
+      (entry): entry is YorkOptixPresentationFieldRenderEntry =>
+        entry != null && entry.ok && typeof entry.imagePath === "string" && entry.imagePath.length > 0,
+    );
+    const volumetricSource = volumetricSourceCandidates.sort((lhs, rhs) => {
+      const lhsNearUniform = lhs.warnings.includes("presentation_image_near_uniform");
+      const rhsNearUniform = rhs.warnings.includes("presentation_image_near_uniform");
+      if (lhsNearUniform !== rhsNearUniform) return lhsNearUniform ? 1 : -1;
+      const lhsScore =
+        (lhs.nonBackgroundPixelFraction ?? 0) * 100 + (lhs.contrastStdDev ?? 0) * 10_000;
+      const rhsScore =
+        (rhs.nonBackgroundPixelFraction ?? 0) * 100 + (rhs.contrastStdDev ?? 0) * 10_000;
+      return rhsScore - lhsScore;
+    })[0] ?? null;
+    if (volumetricSource?.imagePath) {
+      volumetricCompanion = createCurvatureInvariantRenderEntry({
+        generatedOn: args.generatedOn,
+        caseId: "nhm2_certified",
+        caseLabel: nhm2Case.label,
+        renderCategory: "scientific_3p1_field",
+        renderRole: "presentation",
+        authoritativeStatus: "secondary_solve_backed",
+        primaryScientificQuestion:
+          resolveRenderFieldFamilyDefinition(fieldId)?.primaryScientificQuestion ??
+          `How should ${fieldId} be interpreted for this solved case?`,
+        fieldId,
+        variant: "volumetric_companion",
+        imagePath: normalizePath(volumetricSource.imagePath),
+        imageHash: volumetricSource.presentationProjectionImageHash ?? null,
+        observer,
+        foliation,
+        signConvention,
+        laneId: volumetricSource.laneId ?? args.diagnosticLane.lane_id,
+        displayPolicyId: volumetricSource.displayPolicyId,
+        displayRangeMin: volumetricSource.displayRangeMin,
+        displayRangeMax: volumetricSource.displayRangeMax,
+        displayTransform: volumetricSource.displayTransform,
+        colormapFamily: volumetricSource.colormapFamily,
+        cameraPoseId: "transport-3p1",
+        baseImagePolicy: volumetricSource.baseImagePolicy,
+        baseImageSource: volumetricSource.baseImageSource,
+        inheritsTransportContext: volumetricSource.inheritsTransportContext,
+        contextCompositionMode: volumetricSource.contextCompositionMode,
+        metricVolumeHash: volumetricSource.metricVolumeHash,
+        thetaHash: volumetricSource.thetaHash,
+        kTraceHash: volumetricSource.kTraceHash,
+        laneAFieldHash: volumetricSource.laneAFieldHash,
+        presentationScalarFieldHash: volumetricSource.presentationScalarFieldHash,
+        fieldMin: volumetricSource.fieldMin,
+        fieldMax: volumetricSource.fieldMax,
+        fieldAbsMax: volumetricSource.fieldAbsMax,
+        warnings: volumetricSource.warnings,
+        note:
+          `Solve-backed volumetric companion from the OptiX 3+1 transport context view using ${volumetricSource.variant}; secondary scientific presentation only and not an authoritative proof surface.`,
+        titlePrefix: `${descriptor.label} Volume`,
+      });
+      renderEntries.push(volumetricCompanion);
+    }
     let xzSliceCompanion: CurvatureInvariantRenderEntry | null = null;
     if (derivedField && displayPolicy) {
       const slice = extractYorkNumericSliceForView(
@@ -25723,7 +25853,7 @@ export const buildNhm2CurvatureInvariantVisualizationArtifact = async (args: {
     }
     const family = resolveRenderFieldFamilyDefinition(fieldId);
     fieldSummaries.push({
-      fieldId,
+      presentationFieldId: fieldId,
       label: descriptor.label,
       quantitySymbol: family?.quantitySymbol ?? descriptor.formula,
       quantityUnits: family?.quantityUnits ?? "mixed",
@@ -25736,10 +25866,12 @@ export const buildNhm2CurvatureInvariantVisualizationArtifact = async (args: {
         displayPolicy?.displayTransform ?? mainRender?.displayTransform ?? null,
       colormapFamily: displayPolicy?.colormapFamily ?? mainRender?.colormapFamily ?? null,
       mainRender,
+      volumetricCompanion: volumetricCompanion?.renderTaxonomy ?? null,
       xzSliceCompanion: xzSliceCompanion?.renderTaxonomy ?? null,
       notes: [
         "brick-native invariant channel",
         "secondary scientific presentation only",
+        "includes a solve-backed volumetric companion alongside the x-z slice companion",
         "not a morphology verdict surface",
         "not a Rodal-spherical coordinate clone",
         "display normalization uses a per-case robust range without cross-case matched vertical scale",
@@ -25766,7 +25898,9 @@ export const buildNhm2CurvatureInvariantVisualizationArtifact = async (args: {
     foliation,
     laneId: args.diagnosticLane.lane_id,
     signConvention,
+    framePresetId: "rodal_natario_secondary_v1",
     styleReference: {
+      presetId: "rodal_natario_secondary_v1",
       inspiration: "Jose Rodal (2024) invariant visual language",
       usagePolicy:
         "Use Rodal only as visualization/style inspiration. Do not relabel repo proof surfaces, do not imply literature authority, and do not clone spherical chart conventions.",
@@ -25784,6 +25918,7 @@ export const buildNhm2CurvatureInvariantVisualizationArtifact = async (args: {
       "diagnostic_lane_a_remains_primary=true",
       "curvature_invariant_suite_secondary_scientific=true",
       "main invariant renders stay solve-backed and secondary to Lane A diagnostics",
+      "volumetric companions reuse solve-backed OptiX transport-3p1 views as secondary scientific context",
       "x-z slice companions use explicit hull/support overlays instead of transport-context inheritance",
       "invariant_crosscheck remains empty until explicit comparison or residual products are added",
       "brick channels Sx,Sy,Sz exist but momentum-density render families are deferred pending a clean display policy and first-class taxonomy contract",
@@ -25801,13 +25936,13 @@ export const renderNhm2CurvatureInvariantVisualizationMarkdown = (
   const fieldRows = payload.fieldSummaries
     .map(
       (entry) =>
-        `| ${entry.fieldId} | ${entry.label} | ${entry.brickNative} | ${entry.solveBackedSecondary} | ${entry.crosscheckOnly} | ${entry.displayNormalization} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.colormapFamily ?? "null"} | ${entry.mainRender?.imagePath ?? "null"} | ${entry.xzSliceCompanion?.canonicalPath ?? "null"} | ${entry.notes.join("; ")} |`,
+        `| ${entry.fieldId} | ${entry.label} | ${entry.brickNative} | ${entry.solveBackedSecondary} | ${entry.crosscheckOnly} | ${entry.displayNormalization} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.colormapFamily ?? "null"} | ${entry.mainRender?.imagePath ?? "null"} | ${entry.volumetricCompanion?.canonicalPath ?? "null"} | ${entry.xzSliceCompanion?.canonicalPath ?? "null"} | ${entry.notes.join("; ")} |`,
     )
     .join("\n");
   const renderRows = payload.renderEntries
     .map(
       (entry) =>
-        `| ${entry.fieldId} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
+        `| ${entry.fieldId} | ${entry.framePresetId ?? "null"} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
     )
     .join("\n");
   const styleNotes = payload.styleReference.notes.map((entry) => `- ${entry}`).join("\n");
@@ -25824,23 +25959,25 @@ export const renderNhm2CurvatureInvariantVisualizationMarkdown = (
 | observer | ${payload.observer} |
 | foliation | ${payload.foliation} |
 | laneId | ${payload.laneId} |
+| framePresetId | ${payload.framePresetId} |
 | signConvention | ${payload.signConvention} |
 | invariantCrosscheckStatus | ${payload.invariantCrosscheckStatus} |
 | momentumDensityStatus | ${payload.momentumDensityStatus} |
 
 ## Style Reference Policy
+- presetId: ${payload.styleReference.presetId}
 - inspiration: ${payload.styleReference.inspiration}
 - usagePolicy: ${payload.styleReference.usagePolicy}
 ${styleNotes}
 
 ## Field Summaries
-| fieldId | label | brickNative | solveBackedSecondary | crosscheckOnly | displayNormalization | displayPolicyId | displayTransform | colormapFamily | mainRender | xzSliceCompanion | notes |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+| fieldId | label | brickNative | solveBackedSecondary | crosscheckOnly | displayNormalization | displayPolicyId | displayTransform | colormapFamily | mainRender | volumetricCompanion | xzSliceCompanion | notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${fieldRows}
 
 ## Render Entries
-| fieldId | variant | renderCategory | renderRole | authoritativeStatus | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | displayPolicyId | displayTransform | imagePath | imageHash |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| fieldId | framePresetId | variant | renderCategory | renderRole | authoritativeStatus | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | displayPolicyId | displayTransform | imagePath | imageHash |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${renderRows}
 
 ## Notes
@@ -25889,6 +26026,7 @@ export const enrichCurvatureInvariantRenderTaxonomy = (args: {
     entry.quantitySymbol = entry.renderTaxonomy.frameLabel.quantitySymbol;
     entry.quantityUnits = entry.renderTaxonomy.frameLabel.quantityUnits;
     entry.orientationConventionId = entry.renderTaxonomy.frameLabel.orientationConventionId;
+    entry.framePresetId = entry.renderTaxonomy.frameLabel.framePresetId;
   }
 };
 
@@ -39929,6 +40067,7 @@ export const enrichShiftGeometryRenderTaxonomy = (args: {
     entry.quantitySymbol = entry.renderTaxonomy.frameLabel.quantitySymbol;
     entry.quantityUnits = entry.renderTaxonomy.frameLabel.quantityUnits;
     entry.orientationConventionId = entry.renderTaxonomy.frameLabel.orientationConventionId;
+    entry.framePresetId = entry.renderTaxonomy.frameLabel.framePresetId;
   }
 };
 
@@ -40694,6 +40833,7 @@ export const buildRenderTaxonomyArtifact = (args: {
       "diagnostic_lane_a remains the proof surface for class decisions.",
       "transport_context remains a separate solve-backed context family and is not a dedicated field frame.",
       "scientific_3p1_field remains solve-backed but secondary presentation only, including brick-native curvature invariants when surfaced as NHM2 scientific frames.",
+      "rodal_natario_secondary_v1 frame preset is restricted to secondary scientific_3p1_field and mechanism_overlay lanes and never marks a primary authoritative proof surface.",
       "shift_geometry suites remain solve-backed but interpretive and cannot outrun the authoritative Lane A diagnostic surface.",
       "comparison_panel outputs are communication/review surfaces, not proof surfaces.",
       "mechanism_overlay outputs remain interpretive and secondary to both diagnostics and single-field presentation renders.",
@@ -40726,7 +40866,7 @@ export const renderRenderTaxonomyAuditMarkdown = (
   const renderRows = payload.renderEntries
     .map(
       (entry) =>
-        `| ${entry.renderId} | ${entry.caseId} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.fieldId} | ${entry.variant} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.canonicalPath ?? "null"} | ${entry.legacyPath ?? "null"} | ${entry.laneId ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.cameraPoseId ?? "null"} |`,
+        `| ${entry.renderId} | ${entry.caseId} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.fieldId} | ${entry.framePresetId ?? "null"} | ${entry.variant} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.canonicalPath ?? "null"} | ${entry.legacyPath ?? "null"} | ${entry.laneId ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.cameraPoseId ?? "null"} |`,
     )
     .join("\n");
   const notes = payload.notes.map((entry) => `- ${entry}`).join("\n");
@@ -40757,8 +40897,8 @@ ${categoryRows}
 ${fieldRows}
 
 ## Manifest
-| renderId | caseId | renderCategory | renderRole | authoritativeStatus | fieldId | variant | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | canonicalPath | legacyPath | laneId | displayPolicyId | cameraPoseId |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| renderId | caseId | renderCategory | renderRole | authoritativeStatus | fieldId | framePresetId | variant | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | canonicalPath | legacyPath | laneId | displayPolicyId | cameraPoseId |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${renderRows}
 
 ## Notes
@@ -40803,6 +40943,7 @@ Every render entry in the manifest now carries:
 - displayTransform
 - colormapFamily
 - cameraPoseId
+- framePresetId
 - baseImagePolicy
 - baseImageSource
 - inheritsTransportContext
@@ -48471,6 +48612,10 @@ export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
   yorkCanonicalCalibrationLatestJsonPath?: string;
   solveAuthorityLatestJsonPath?: string;
   publicationLockPath?: string;
+  citationChecklistPath?: string;
+  skipCitationGate?: boolean;
+  citationGateRequireGithubCloneForMeasured?: boolean;
+  citationGateRequireCompleteChecklist?: boolean;
 }): Promise<{
   outJsonPath: string;
   outMdPath: string;
@@ -48495,6 +48640,21 @@ export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
   curvatureInvariantVisualizationArtifact: Nhm2CurvatureInvariantVisualizationArtifact;
   renderTaxonomyArtifact: RenderTaxonomyArtifact;
 }> => {
+  if (!options?.skipCitationGate) {
+    const citationSummary = enforceResearchCitationGate({
+      manifestPath:
+        options?.citationChecklistPath ?? DEFAULT_RESEARCH_CITATION_CHECKLIST_PATH,
+      requireGithubCloneForMeasured:
+        options?.citationGateRequireGithubCloneForMeasured ?? false,
+      requireCompletedChecklistItems:
+        options?.citationGateRequireCompleteChecklist ?? true,
+    });
+    process.stderr.write(
+      `[warp-york-control-family-proof-pack] citation_gate=passed checklist=${normalizePath(
+        citationSummary.manifestPath,
+      )} claims=${citationSummary.claimCount} requiredClaims=${citationSummary.requiredClaimCount}\n`,
+    );
+  }
   return withProofSurfacePublicationLock({
     lockPath: options?.publicationLockPath,
     operation: "publish-invariant-latest",
@@ -52593,6 +52753,16 @@ if (isEntryPoint) {
     publicationRequireNhm2CongruentFullSolve: parseBooleanArg(
       readArgValue("--publication-require-nhm2-congruent-full-solve", argv),
       false,
+    ),
+    citationChecklistPath: readArgValue("--citation-checklist", argv),
+    skipCitationGate: parseBooleanArg(readArgValue("--skip-citation-gate", argv), false),
+    citationGateRequireGithubCloneForMeasured: parseBooleanArg(
+      readArgValue("--citation-gate-require-github-clone-for-measured", argv),
+      false,
+    ),
+    citationGateRequireCompleteChecklist: parseBooleanArg(
+      readArgValue("--citation-gate-require-complete-checklist", argv),
+      true,
     ),
     reuseExistingSelectedShiftLapseArtifacts: parseBooleanArg(
       readArgValue("--reuse-existing-selected-shift-lapse-artifacts", argv),
