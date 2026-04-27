@@ -21723,11 +21723,30 @@ const shouldStoreAskTurnLatestResultArtifact = (payload: Record<string, unknown>
 
 const resolveAskTurnCreateNoteTitleArg = (transcript: string): string | null => {
   const createMatch = transcript.match(
-    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note(?:\s+(?:called|named|titled?)\s+)?(.+?)(?:\s*,|\s+\band then\b|\s+\bthen\b|\s+\bafter that\b|\s+\bwhile\b|\s+\balso\b|$)/i,
+    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note(?:\s+(?:called|named|titled?)\s+)?(.+?)(?:\s*,|\s+\band\s+(?:then|put|add|save|write|copy|store|append)\b|\s+\bthen\b|\s+\bafter that\b|\s+\bwhile\b|\s+\balso\b|$)/i,
   );
   const value = trimAskTurnActionArgBoundaries(createMatch?.[1] ?? "");
   if (value) return value;
   return resolveAskTurnTitleArg(transcript);
+};
+
+const isAskTurnArtifactCarryoverToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnArtifactReferenceIntent(normalized)) return false;
+  if (/\b(?:summari[sz]e|explain|compare|contrast|look|search|find|scan)\b/.test(normalized)) return false;
+  return (
+    /\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?:it|that\s+note|the\s+note|my\s+note|notes?|notepad)\b/.test(normalized) ||
+    /\b(?:put|add|append|save|store|copy|write|place)\b[\s\S]*\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:it|note|notes|notepad)\b/.test(normalized)
+  );
+};
+
+const isAskTurnSafeDefaultPreserveToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  return (
+    /\b(?:preserve|save|store|capture|keep|record)\b/.test(normalized) &&
+    /\b(?:somewhere\s+useful|decide\s+whether|you\s+decide|wherever\s+is\s+best|best\s+place)\b/.test(normalized) &&
+    /\b(?:note|notes|clipboard|notepad|somewhere)\b/.test(normalized)
+  );
 };
 
 const resolveAskTurnAppendNoteTextArg = (transcript: string): string | null => {
@@ -22243,9 +22262,26 @@ const extractPendingRequiredFieldValues = (args: {
       if (title) out.title = title;
       continue;
     }
+    if (field === "action_command") {
+      const targetPanel = resolveAskTurnNavigationTargetPanel(args.transcript, { allowBareTarget: true });
+      if (targetPanel && targetPanel !== "ambiguous") {
+        out.action_command = args.transcript.trim();
+        out.target_panel = targetPanel;
+      } else if (args.transcript.trim()) {
+        out.action_command = args.transcript.trim();
+      }
+      continue;
+    }
     if (field === "target_panel") {
       const targetPanel = resolveAskTurnNavigationTargetPanel(args.transcript, { allowBareTarget: true });
-      if (targetPanel && targetPanel !== "ambiguous") out.target_panel = targetPanel;
+      if (targetPanel && targetPanel !== "ambiguous") {
+        out.target_panel = targetPanel;
+      } else {
+        const bare = args.transcript.trim().toLowerCase();
+        if (/^(?:docs?|documents?|papers?|docs?\s+viewer)$/.test(bare)) out.target_panel = "docs-viewer";
+        if (/^(?:notes?|notepad|notebook)$/.test(bare)) out.target_panel = "workstation-notes";
+        if (/^(?:clipboard|clipboard\s+history)$/.test(bare)) out.target_panel = "workstation-clipboard-history";
+      }
       continue;
     }
     if (field === "doc_reference") {
@@ -22396,7 +22432,7 @@ const resolveAskTurnActionSelection = (args: {
         ...(path ? { path } : {}),
       },
     };
-  } else if (/\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+viewer)?\b/.test(normalized)) {
+  } else if (/\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:me\s+)?(?:over\s+)?to|move\s+me\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+(?:viewer|panel))?\b/.test(normalized)) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
   } else if (/\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/.test(normalized)) {
     const title = resolveAskTurnCreateNoteTitleArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
@@ -24565,19 +24601,21 @@ const selectAskTurnRuntimeCapabilityStep = (args: {
 
 const selectAskTurnInitialCapabilityPlan = (args: {
   transcript: string;
+  sessionId?: string | null;
   workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
   selectedAction?: HelixAskTurnSelectedAction | null;
 }): HelixAskTurnInitialCapabilityPlan | null => {
   if (!HELIX_E10_13_REGISTRY_INITIAL_PLAN_FLAG) return null;
   const normalized = args.transcript.trim().toLowerCase();
   const wantsNotes = /\b(?:open|go\s+to|switch\s+(?:over\s+)?to|show)\s+(?:up\s+)?(?:my\s+)?(?:notes?|notepad)\b/i.test(normalized);
-  const wantsDocs = /\b(?:open|go\s+to|switch\s+to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+viewer)\b/i.test(normalized);
+  const wantsDocs = /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
   const wantsClipboard = /\b(?:read|open|show|check)\s+(?:the\s+)?clipboard\b/i.test(normalized);
   const wantsLocate = isAskTurnDocLocateIntent(args.transcript);
   const wantsLocateToNote = isAskTurnDocLocateToNoteIntent(args.transcript);
   const wantsDocNotesCompare = isAskTurnDocNotesHybridCompareIntent(args.transcript);
   const wantsDocsRetrievalToNote = isAskTurnDocsRetrievalToNoteIntent(args.transcript);
   const wantsCreateNote = /\b(?:create|make|new|start)\s+(?:a\s+)?note\b/i.test(normalized);
+  const wantsArtifactCarryoverToNote = isAskTurnArtifactCarryoverToNoteIntent(args.transcript) || isAskTurnSafeDefaultPreserveToNoteIntent(args.transcript);
   const wantsAppendNote =
     /\b(?:append|add|put|save|write)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized) &&
     !isAskTurnArtifactToNoteIntent(args.transcript);
@@ -24601,6 +24639,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     !wantsDocNotesCompare &&
     !wantsDocsRetrievalToNote &&
     !wantsCreateNote &&
+    !wantsArtifactCarryoverToNote &&
     !wantsAppendNote &&
     !wantsListNotes &&
     !wantsSetActiveNote &&
@@ -24626,7 +24665,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     ...(args.workspaceSnapshot?.hasNoteContext ? { note_context: args.workspaceSnapshot } : {}),
     ...(args.workspaceSnapshot?.hasClipboardContext ? { clipboard_context: args.workspaceSnapshot } : {}),
     workspace_context: args.workspaceSnapshot ?? { ok: true },
-    turn_final_text: { ok: true },
+    turn_final_text: readAskTurnLatestResultArtifactText(args.sessionId) ?? { ok: true },
   });
   const selectForArtifact = (artifact: string): HelixAskTurnRuntimeStepProposal | null => {
     const selection = selectAskTurnRuntimeCapabilityStep({
@@ -24688,7 +24727,11 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       workspaceSnapshot: args.workspaceSnapshot,
       missingArtifacts: [capability.produces[0] ?? "workspace_context"],
     }).proposal;
-    if (selected?.step.action?.action_id === resolved.action?.action_id && selected.step.action?.panel_id === resolved.action?.panel_id) {
+    if (
+      selected &&
+      selected.step.action?.action_id === resolved.action?.action_id &&
+      selected.step.action?.panel_id === resolved.action?.panel_id
+    ) {
       return { ...selected, capability_trace: [trace] };
     }
     return {
@@ -24745,6 +24788,92 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     });
   }
   if (wantsCreateNote) pushCapability("workstation-notes.create_note");
+  if (wantsArtifactCarryoverToNote) {
+    const title =
+      resolveAskTurnCreateNoteTitleArg(args.transcript) ??
+      resolveAskTurnAnyNoteSinkArg(args.transcript) ??
+      (typeof args.workspaceSnapshot?.activeNoteTitle === "string" ? args.workspaceSnapshot.activeNoteTitle : null);
+    const latestText = readAskTurnLatestResultArtifactText(args.sessionId);
+    if (latestText && !isAskTurnSafeDefaultPreserveToNoteIntent(args.transcript)) {
+      planItems.push({
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_append_latest_result"),
+        lane: "workspace",
+        status: "planned",
+        title: `Append latest result artifact to note "${clipConversationText(title ?? "active note", 80)}".`,
+        action: {
+          panel_id: "workstation-notes",
+          action_id: "append_to_note",
+          args: {
+            text: latestText,
+            text_kind: "latest_result_artifact",
+            ...(title ? { title } : {}),
+          },
+        },
+        required_artifacts: ["note_update_receipt"],
+        reason: null,
+      });
+      capabilitySelectionTrace.push({
+        missing_artifact: "note_update_receipt",
+        candidate_capabilities: ["workstation-notes.append_to_note"],
+        selected_capability: "workstation-notes.append_to_note",
+        reject_reasons: [],
+      });
+    } else {
+      const query = /\bfalsifier\b/i.test(normalized)
+        ? "falsifier condition"
+        : resolveAskTurnDocLocateQuery(args.transcript) ?? "key condition";
+      const path = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+      planItems.push(
+        {
+          id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_locate_preserve_target"),
+          lane: "workspace",
+          status: "planned",
+          title: `Locate "${clipConversationText(query, 80)}" in the active document before preserving it.`,
+          action: {
+            panel_id: "docs-viewer",
+            action_id: "locate_in_doc",
+            args: {
+              query,
+              ...(path ? { path } : {}),
+            },
+          },
+          required_artifacts: ["doc_location_matches"],
+          reason: null,
+        },
+        {
+          id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_append_preserved_location"),
+          lane: "workspace",
+          status: "planned",
+          title: `Append preserved document location to note "${clipConversationText(title ?? "active note", 80)}".`,
+          action: {
+            panel_id: "workstation-notes",
+            action_id: "append_to_note",
+            args: {
+              text: HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER,
+              text_kind: "doc_location_reminder",
+              ...(title ? { title } : {}),
+            },
+          },
+          required_artifacts: ["doc_location_matches", "note_update_receipt"],
+          reason: null,
+        },
+      );
+      capabilitySelectionTrace.push(
+        {
+          missing_artifact: "doc_location_matches",
+          candidate_capabilities: ["docs-viewer.locate_in_doc"],
+          selected_capability: "docs-viewer.locate_in_doc",
+          reject_reasons: [],
+        },
+        {
+          missing_artifact: "note_update_receipt",
+          candidate_capabilities: ["workstation-notes.append_to_note"],
+          selected_capability: "workstation-notes.append_to_note",
+          reject_reasons: [],
+        },
+      );
+    }
+  }
   if (wantsAppendNote && !wantsLocateToNote) pushCapability("workstation-notes.append_to_note");
   if (wantsListNotes) pushCapability("workstation-notes.list_notes");
   if (wantsSetActiveNote) pushCapability("workstation-notes.set_active_note");
@@ -76010,7 +76139,52 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       suppressWorkspaceAction ||
       routeReasonCode === "clarify:missing_args" ||
       routeReasonCode === "clarify:confirmation_required";
-    const workspaceActions = shouldSuppressEnvelopeDispatch ? [] : collectAskTurnWorkspaceActionsInOrder(payload);
+    let workspaceActions = shouldSuppressEnvelopeDispatch ? [] : collectAskTurnWorkspaceActionsInOrder(payload);
+    workspaceActions = (() => {
+      const bestDocReminderByTarget = new Map<string, HelixAskTurnSelectedAction>();
+      for (const action of workspaceActions) {
+        if (action.panel_id !== "workstation-notes" || action.action_id !== "append_to_note") continue;
+        const args = action.args && typeof action.args === "object" ? action.args : {};
+        const text = typeof args.text === "string" ? args.text.trim() : "";
+        const target = String(args.title ?? args.note_title ?? args.note_id ?? "active-note").trim().toLowerCase();
+        const isReminder =
+          args.text_kind === "doc_location_reminder" ||
+          /^Reminder:\s+Review\b/i.test(text) ||
+          /\bL\d+(?:-L\d+)?\b/.test(text);
+        if (!isReminder) continue;
+        const existing = bestDocReminderByTarget.get(target);
+        if (!existing) {
+          bestDocReminderByTarget.set(target, action);
+          continue;
+        }
+        const existingText = typeof existing.args?.text === "string" ? existing.args.text.trim() : "";
+        const score = (args.text_kind === "doc_location_reminder" ? 4 : 0) + (/\bL\d+(?:-L\d+)?\b/.test(text) ? 2 : 0) + Math.min(text.length, 500) / 1000;
+        const existingScore =
+          (existing.args?.text_kind === "doc_location_reminder" ? 4 : 0) +
+          (/\bL\d+(?:-L\d+)?\b/.test(existingText) ? 2 : 0) +
+          Math.min(existingText.length, 500) / 1000;
+        if (score > existingScore) bestDocReminderByTarget.set(target, action);
+      }
+      if (bestDocReminderByTarget.size === 0) return workspaceActions;
+      const seenReminderTargets = new Set<string>();
+      return workspaceActions.filter((action: HelixAskTurnSelectedAction) => {
+        if (action.panel_id !== "workstation-notes" || action.action_id !== "append_to_note") return true;
+        const args = action.args && typeof action.args === "object" ? action.args : {};
+        const text = typeof args.text === "string" ? args.text.trim() : "";
+        const target = String(args.title ?? args.note_title ?? args.note_id ?? "active-note").trim().toLowerCase();
+        const preferred = bestDocReminderByTarget.get(target);
+        if (!preferred) return true;
+        const isReminder =
+          args.text_kind === "doc_location_reminder" ||
+          /^Reminder:\s+Review\b/i.test(text) ||
+          /\bL\d+(?:-L\d+)?\b/.test(text);
+        if (!isReminder) return true;
+        if (action !== preferred) return false;
+        if (seenReminderTargets.has(target)) return false;
+        seenReminderTargets.add(target);
+        return true;
+      });
+    })();
     const actionEnvelope =
       payload.action_envelope && typeof payload.action_envelope === "object"
         ? ({ ...(payload.action_envelope as Record<string, unknown>) } as Record<string, unknown>)
@@ -77403,10 +77577,28 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       sessionId,
       workspaceSnapshot: workspaceSessionSnapshot,
     });
+    const pendingRequiredFields = existingPendingRequest.requiredFields ?? [];
+    const pendingProvidedValues =
+      existingPendingRequest.kind === "clarify"
+        ? extractPendingRequiredFieldValues({
+            transcript,
+            requiredFields: pendingRequiredFields,
+          })
+        : {};
+    const pendingUnresolvedFields = pendingRequiredFields.filter((field) => {
+      const value = pendingProvidedValues[field];
+      if (typeof value === "string") return value.trim().length === 0;
+      return value === undefined || value === null;
+    });
+    const pendingAnswerLooksResolvable =
+      existingPendingRequest.kind === "clarify" &&
+      pendingRequiredFields.length > 0 &&
+      pendingUnresolvedFields.length === 0;
     const incomingConversationOnly =
       incomingIntentFamily === "conversation" &&
       !confirmed &&
       !rejected &&
+      !pendingAnswerLooksResolvable &&
       !shouldPreferWorkspaceDispatch(transcript) &&
       !HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalizedTranscript) &&
       !HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalizedTranscript);
@@ -77419,6 +77611,7 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       existingPendingRequest.kind === "clarify" &&
       !confirmed &&
       !rejected &&
+      !pendingAnswerLooksResolvable &&
       existingPendingRequest.pendingScope !== "confirm" &&
       (newPromptIsExecutableGoal ||
         (!HELIX_E9_4_STRICT_PENDING_OWNERSHIP_FLAG &&
@@ -77663,6 +77856,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
                   | "docs-viewer"
                   | "workstation-notes"
                   | "workstation-clipboard-history")
+              : typeof providedValues.action_command === "string"
+                ? resolveAskTurnNavigationTargetPanel(providedValues.action_command, { allowBareTarget: true })
               : null;
           if (
             resolvedTargetPanel === "docs-viewer" ||
@@ -77863,6 +78058,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
 
   const clarifyRequirement = pendingHandled
     ? { required: false, routeReasonCode: null, prompt: null }
+    : isAskTurnSafeDefaultPreserveToNoteIntent(transcript)
+      ? { required: false, routeReasonCode: null, prompt: null }
     : evaluateConversationClarifyRequirement(transcript);
   if (clarifyRequirement.required && clarifyRequirement.routeReasonCode && clarifyRequirement.prompt) {
     const clarifyRequiredFields =
@@ -78144,6 +78341,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       isAskTurnSummarizeAndAddToNoteIntent(transcript) ||
       isAskTurnCompareCopyResultToClipboardIntent(transcript) ||
       isAskTurnDocsRetrievalToNoteIntent(transcript) ||
+      isAskTurnArtifactCarryoverToNoteIntent(transcript) ||
+      isAskTurnSafeDefaultPreserveToNoteIntent(transcript) ||
       isAskTurnDocLocateIntent(transcript));
   if (forceDeterministicActContextReasoning) {
     routeDecision = {
@@ -78212,7 +78411,12 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     dispatchHint = true;
     policyLockForSelection = needsReasoningFollowupForAction ? "workspace_context_reasoning" : "workspace_only";
   }
-  if (!pendingHandled && !pendingServerRequest) {
+  if (
+    !pendingHandled &&
+    !pendingServerRequest &&
+    !isAskTurnArtifactCarryoverToNoteIntent(transcript) &&
+    !isAskTurnSafeDefaultPreserveToNoteIntent(transcript)
+  ) {
     const repaired = applyAskTurnPlannerRepairPass({
       transcript,
       dispatchPolicy: policyLockForSelection,
@@ -78423,6 +78627,7 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     !pendingServerRequest && !isClarifyTerminal && !isSuppressedTerminal && !isControlConversationTerminal
       ? selectAskTurnInitialCapabilityPlan({
           transcript,
+          sessionId,
           workspaceSnapshot: workspaceSessionSnapshot,
           selectedAction: actionSelection.action,
         })

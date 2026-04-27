@@ -198,11 +198,17 @@ describe("helix ask turn e12 observation-driven continuation", () => {
     const stepResults = response.body?.step_results ?? [];
     const locateStep = executionTrace.find((step: any) => step?.action?.action_id === "locate_in_doc");
     const appendStep = executionTrace.find((step: any) => step?.action?.action_id === "append_to_note");
+    const envelopeActions = response.body?.action_envelope?.workstation_actions ?? [];
+    const envelopeAppendActions = envelopeActions.filter((action: any) => action?.panel_id === "workstation-notes" && action?.action_id === "append_to_note");
     expect(locateStep?.action?.args?.query).toBe("falsifier conditions");
     expect(appendStep?.action?.args?.title).toBe("UI flow scratch");
     expect(appendStep?.action?.args?.text).toMatch(/Falsifier Conditions/i);
     expect(appendStep?.action?.args?.text).toMatch(/L\d+/i);
     expect(appendStep?.action?.args?.text).not.toContain("{{");
+    expect((appendStep?.action?.args?.text.match(/Reminder:/g) ?? [])).toHaveLength(1);
+    expect(envelopeAppendActions).toHaveLength(1);
+    expect((String(envelopeAppendActions[0]?.args?.text ?? "").match(/Reminder:/g) ?? [])).toHaveLength(1);
+    expect(String(envelopeAppendActions[0]?.args?.text ?? "")).toMatch(/L\d+/i);
     expect(JSON.stringify(stepResults)).not.toContain("doc_location_reminder_text");
     expect(stepResults.some((step: any) => step?.actual_artifacts?.includes("doc_location_matches"))).toBe(true);
     expect(stepResults.some((step: any) => step?.actual_artifacts?.includes("note_update_receipt"))).toBe(true);

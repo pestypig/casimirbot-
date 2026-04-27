@@ -25013,13 +25013,40 @@ export function HelixAskPill({
               docViewerState: docViewerDebugSnapshot,
               workstationLayoutState: workstationLayoutDebugSnapshot,
             });
-            const agentLoopAudit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
-            const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
-            const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
-            const pendingAgentRequest = readAgentLoopAuditRecord(reply.debug?.pending_request);
+            const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
+            const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
+            const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
+            const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
+            const pendingAgentRequest = readAgentLoopAuditRecord(replyDebugRecord?.pending_request);
+            const finalComposerConsumedArtifacts = Array.isArray(replyDebugRecord?.final_composer_consumed_artifacts)
+              ? replyDebugRecord.final_composer_consumed_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+              : [];
+            const visibleDebugActionIds = Array.isArray(replyDebugRecord?.execution_trace)
+              ? replyDebugRecord.execution_trace
+                  .map((step) => {
+                    const record = readAgentLoopAuditRecord(step);
+                    const action = readAgentLoopAuditRecord(record?.action);
+                    return action?.panel_id && action?.action_id
+                      ? `${String(action.panel_id)}.${String(action.action_id)}`
+                      : null;
+                  })
+                  .filter((entry): entry is string => Boolean(entry))
+              : [];
+            const visibleDebugActualArtifacts = Array.isArray(replyDebugRecord?.step_results)
+              ? Array.from(
+                  new Set(
+                    replyDebugRecord.step_results.flatMap((step) => {
+                      const record = readAgentLoopAuditRecord(step);
+                      return Array.isArray(record?.actual_artifacts)
+                        ? record.actual_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+                        : [];
+                    }),
+                  ),
+                )
+              : [];
             const selectedAgentAction =
               readAgentLoopAuditRecord(agentLoopAudit?.selected_action) ??
-              readAgentLoopAuditRecord(reply.debug?.server_selected_action);
+              readAgentLoopAuditRecord(replyDebugRecord?.server_selected_action);
             const agentPlanItems = Array.isArray(plannerContract?.plan_items)
               ? plannerContract?.plan_items
               : [];
@@ -25098,7 +25125,7 @@ export function HelixAskPill({
                           {turnTranscriptRows.length} events
                         </span>
                         <span className="rounded border border-sky-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-sky-100">
-                          {String(reply.debug?.turn_transcript_source ?? reply.debug?.runtime_loop_mode ?? "runtime")}
+                          {String(replyDebugRecord?.turn_transcript_source ?? replyDebugRecord?.runtime_loop_mode ?? "runtime")}
                         </span>
                       </summary>
                       <div className="mt-2 space-y-1.5">
@@ -25161,6 +25188,36 @@ export function HelixAskPill({
                     Debug trace
                   </summary>
                   <div className="mt-2">
+                    {replyDebugRecord &&
+                    (replyDebugRecord.final_composer_source ||
+                      visibleDebugActionIds.length > 0 ||
+                      visibleDebugActualArtifacts.length > 0) ? (
+                      <div className="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-950/15 px-3 py-2 text-xs text-emerald-50">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                          Turn verification summary
+                        </p>
+                        <p className="mt-1">
+                          Composer: {String(replyDebugRecord.final_composer_source ?? "n/a")} | Contract:{" "}
+                          {replyDebugRecord.final_composer_contract_pass === false ? "fail" : "pass"}
+                          {replyDebugRecord.final_composer_fail_reason
+                            ? ` (${String(replyDebugRecord.final_composer_fail_reason)})`
+                            : ""}
+                        </p>
+                        {finalComposerConsumedArtifacts.length > 0 ? (
+                          <p className="mt-1">
+                            Consumed artifacts: {finalComposerConsumedArtifacts.slice(0, 8).join(", ")}
+                          </p>
+                        ) : null}
+                        {visibleDebugActionIds.length > 0 ? (
+                          <p className="mt-1">Actions: {visibleDebugActionIds.slice(0, 8).join(" -> ")}</p>
+                        ) : null}
+                        {visibleDebugActualArtifacts.length > 0 ? (
+                          <p className="mt-1">
+                            Actual artifacts: {visibleDebugActualArtifacts.slice(0, 10).join(", ")}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                 {(() => {
                   const objectiveSignals = extractObjectiveSignals(replyEvents);
                   if (!objectiveSignals.objective && objectiveSignals.gaps.length === 0 && !objectiveSignals.suppression) return null;
