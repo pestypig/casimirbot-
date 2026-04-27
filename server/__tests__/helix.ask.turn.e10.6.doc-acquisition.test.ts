@@ -89,6 +89,48 @@ describe("helix ask turn e10.6 doc acquisition", () => {
     expect(response.body?.route_reason_code).toBe("dispatch:act");
   });
 
+  it("maps go-to latest topic-qualified doc prompts without clarifying", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Go to the latest NHM2 doc about expected clocking targets for the mission.",
+        mode: "read",
+        sessionId: `e106-topic-qualified-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.dispatch_policy).toBe("workspace_only");
+    expect(response.body?.pending_server_request).toBeFalsy();
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(["open_latest_doc_by_topic", "search_docs"]).toContain(response.body?.workspace_action?.action_id);
+    const args = response.body?.workspace_action?.args ?? {};
+    const topicOrQuery = String(args.topic ?? args.query ?? "");
+    expect(topicOrQuery).toMatch(/NHM2/i);
+    expect(topicOrQuery).toMatch(/clocking/i);
+    expect(topicOrQuery).toMatch(/mission/i);
+  });
+
+  it("falls back to docs search for unresolved topic-qualified latest-doc prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Go to the latest NHM2 doc about zzzquartz nonexistent mission clocking target.",
+        mode: "read",
+        sessionId: `e106-topic-search-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.pending_server_request).toBeFalsy();
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.workspace_action?.action_id).toBe("search_docs");
+    expect(response.body?.workspace_action?.args?.query).toMatch(/NHM2/i);
+    expect(response.body?.workspace_action?.args?.query).toMatch(/zzzquartz/i);
+  });
+
   it("lets obvious new workspace goals supersede stale clarify pending state", async () => {
     const app = createApp();
     const sessionId = `e106-pending-supersede-${Date.now()}`;

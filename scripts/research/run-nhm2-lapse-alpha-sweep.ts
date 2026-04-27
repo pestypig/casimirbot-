@@ -153,7 +153,13 @@ type SweepRow = {
     | "selected_transport_timeout"
     | "selected_transport_stall"
     | "selected_transport_lock_contention"
-    | "selected_transport_error"
+    | "selected_transport_process_error"
+    | "selected_transport_missing_artifact"
+    | "selected_transport_invalid_json"
+    | "selected_transport_profile_mismatch"
+    | "selected_transport_gate_fail"
+    | "selected_transport_stale_artifact"
+    | "selected_transport_unknown_error"
     | null;
   stageDetailFreshness?: {
     allFresh: boolean;
@@ -469,6 +475,14 @@ export const readPositiveIntFromEnv = (
   return parsed;
 };
 
+const readRequiredEnv = (envName: string): string => {
+  const raw = process.env[envName];
+  if (raw == null || raw.trim().length <= 0) {
+    throw new Error(`Missing required env var: ${envName}`);
+  }
+  return raw.trim();
+};
+
 const runWithTimeout = async <T>(args: {
   timeoutMs: number;
   operation: () => Promise<T>;
@@ -571,7 +585,13 @@ type SelectedTransportRuntimeReason =
   | "selected_transport_timeout"
   | "selected_transport_stall"
   | "selected_transport_lock_contention"
-  | "selected_transport_error";
+  | "selected_transport_process_error"
+  | "selected_transport_missing_artifact"
+  | "selected_transport_invalid_json"
+  | "selected_transport_profile_mismatch"
+  | "selected_transport_gate_fail"
+  | "selected_transport_stale_artifact"
+  | "selected_transport_unknown_error";
 
 type SelectedTransportRuntimeAttempt = {
   attempt: number;
@@ -586,6 +606,9 @@ type SelectedTransportRuntimeAttempt = {
   outcome: "success" | "timeout" | "stall" | "error";
   runtimeReason: SelectedTransportRuntimeReason | null;
   error: string | null;
+  attemptArtifactRoot: string;
+  attemptAuditRoot: string;
+  killedProcessTree: boolean;
   selectedTransportRuntimeDiagnostics?: {
     startedAt: string;
     completedAt: string;
@@ -599,11 +622,118 @@ type SelectedTransportRuntimeAttempt = {
   } | null;
 };
 
-const inferSelectedTransportRuntimeReason = (errorText: string): SelectedTransportRuntimeReason => {
+type LadderState =
+  | "planned"
+  | "completed_pass"
+  | "completed_gate_fail"
+  | "blocked_runtime"
+  | "blocked_timeout"
+  | "blocked_transport_error"
+  | "skipped_after_blocker";
+
+type LadderProgressRow = {
+  profileId: string;
+  tag: string;
+  centerlineAlpha: number;
+  bracket: SweepBracket;
+  ladderState: LadderState;
+  blockedBy: string | null;
+  overallState: string | null;
+  runtimeBlockingReason: SweepRow["runtimeBlockingReason"] | null;
+  fullLoopStateRaw: string | null;
+};
+
+type LadderProgressSummary = {
+  generatedAt: string;
+  rows: LadderProgressRow[];
+  frontier: {
+    lowestPassingAlpha: number | null;
+    lowestPassingProfileId: string | null;
+    firstBlockedAlpha: number | null;
+    firstBlockedProfileId: string | null;
+    blockingReason: string | null;
+    promotionState: "open" | "blocked";
+  };
+};
+
+export const inferSelectedTransportRuntimeReason = (errorText: string): SelectedTransportRuntimeReason => {
   if (/proof_surface_publication_locked|selected-family-bounded-stack\.lock/i.test(errorText)) {
     return "selected_transport_lock_contention";
   }
-  return "selected_transport_error";
+  if (/selected_transport_missing_artifact/i.test(errorText)) {
+    return "selected_transport_missing_artifact";
+  }
+  if (/selected_transport_invalid_json/i.test(errorText)) {
+    return "selected_transport_invalid_json";
+  }
+  if (/selected_transport_profile_mismatch/i.test(errorText)) {
+    return "selected_transport_profile_mismatch";
+  }
+  if (/selected_transport_gate_fail/i.test(errorText)) {
+    return "selected_transport_gate_fail";
+  }
+  if (/selected_transport_stale_artifact/i.test(errorText)) {
+    return "selected_transport_stale_artifact";
+  }
+  if (/spawn|exit code|terminated|process/i.test(errorText)) {
+    return "selected_transport_process_error";
+  }
+  return "selected_transport_unknown_error";
+};
+
+export const resolveSelectedTransportOnlyContract = (env: NodeJS.ProcessEnv): {
+  profileId: string;
+  profileTag: string;
+  alpha: number;
+  dtau: number;
+  outputDir: string;
+} => {
+  const profileId = (env.NHM2_PROFILE_ID ?? "").trim();
+  if (!profileId) {
+    throw new Error("Missing required env var: NHM2_PROFILE_ID");
+  }
+  const profileTag = (env.NHM2_PROFILE_TAG ?? "").trim() || inferTagFromProfileId(profileId) || "";
+  if (!profileTag) {
+    throw new Error(
+      `Selected-transport-only mode requires NHM2_PROFILE_TAG or stage1_centerline_alpha_<tag>_v1 profile id. Got ${profileId}`,
+    );
+  }
+  const alphaRaw = (env.NHM2_CENTERLINE_ALPHA ?? "").trim();
+  const dtauRaw = (env.NHM2_CENTERLINE_DTAU_DT ?? "").trim();
+  if (!alphaRaw) throw new Error("Missing required env var: NHM2_CENTERLINE_ALPHA");
+  if (!dtauRaw) throw new Error("Missing required env var: NHM2_CENTERLINE_DTAU_DT");
+  const alpha = Number(alphaRaw);
+  const dtau = Number(dtauRaw);
+  if (!Number.isFinite(alpha)) {
+    throw new Error(`Invalid numeric env var: NHM2_CENTERLINE_ALPHA=${alphaRaw}`);
+  }
+  if (!Number.isFinite(dtau)) {
+    throw new Error(`Invalid numeric env var: NHM2_CENTERLINE_DTAU_DT=${dtauRaw}`);
+  }
+  if (alpha <= 0 || alpha > 1) {
+    throw new Error(`Invalid NHM2_CENTERLINE_ALPHA=${alpha}; expected 0 < alpha <= 1`);
+  }
+  if (Math.abs(alpha - dtau) > 1e-15) {
+    throw new Error(
+      `Bounded-lapse mode requires NHM2_CENTERLINE_ALPHA==NHM2_CENTERLINE_DTAU_DT; got ${alpha} vs ${dtau}`,
+    );
+  }
+  if (inferProfileId(profileTag) !== profileId) {
+    throw new Error(
+      `Profile/tag mismatch in selected-transport-only mode: NHM2_PROFILE_ID=${profileId}, NHM2_PROFILE_TAG=${profileTag}`,
+    );
+  }
+  const outputDir = (env.NHM2_OUTPUT_DIR ?? "").trim();
+  if (!outputDir) {
+    throw new Error("Missing required env var: NHM2_OUTPUT_DIR");
+  }
+  return {
+    profileId,
+    profileTag,
+    alpha,
+    dtau,
+    outputDir,
+  };
 };
 
 const getNextActionForRuntimeReason = (reason: SweepRow["runtimeBlockingReason"]): string | null => {
@@ -616,7 +746,25 @@ const getNextActionForRuntimeReason = (reason: SweepRow["runtimeBlockingReason"]
   if (reason === "selected_transport_lock_contention") {
     return "Clear stale selected-family lock, verify no active competing publisher, then rerun profile.";
   }
-  if (reason === "selected_transport_error") {
+  if (reason === "selected_transport_process_error") {
+    return "Inspect selected transport process failure and worker stderr, then rerun profile.";
+  }
+  if (reason === "selected_transport_missing_artifact") {
+    return "Inspect selected transport attempt artifact root and patch missing required artifact publication.";
+  }
+  if (reason === "selected_transport_invalid_json") {
+    return "Inspect selected transport artifact JSON write path and patch invalid/truncated writer.";
+  }
+  if (reason === "selected_transport_profile_mismatch") {
+    return "Inspect selected transport profile resolution and enforce profile/alpha coherence.";
+  }
+  if (reason === "selected_transport_gate_fail") {
+    return "Inspect selected transport gate result and treat as gate fail, not runtime pass.";
+  }
+  if (reason === "selected_transport_stale_artifact") {
+    return "Inspect stale selected transport artifact timestamps and rerun with clean attempt directory.";
+  }
+  if (reason === "selected_transport_unknown_error") {
     return "Inspect selected transport error and stack trace, patch failing step, and rerun profile.";
   }
   return null;
@@ -627,8 +775,151 @@ export const writeHeartbeatSnapshot = (args: {
   payload: Nhm2RunHeartbeatPayload;
 }): string => {
   const outPath = path.join(args.profileArtifactRoot, "nhm2-run-heartbeat-latest.json");
-  fs.writeFileSync(outPath, `${JSON.stringify(args.payload, null, 2)}\n`);
+  writeJsonAtomic(outPath, args.payload);
   return outPath;
+};
+
+const writeJsonAtomic = (filePath: string, payload: unknown): void => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmpPath, `${JSON.stringify(payload, null, 2)}\n`);
+  fs.renameSync(tmpPath, filePath);
+};
+
+const killPotentialSelectedTransportProcessTree = (profileId: string): boolean => {
+  try {
+    if (process.platform !== "win32") return false;
+    const script = [
+      `$self=${process.pid};`,
+      `$killed=0;`,
+      "$targets = Get-CimInstance Win32_Process | Where-Object {",
+      "  $_.ProcessId -ne $self -and $_.CommandLine -and (",
+      `    $_.CommandLine -like '*${profileId}*' -or`,
+      "    $_.CommandLine -like '*warp-york-control-family-proof-pack*' -or",
+      "    $_.CommandLine -like '*run-nhm2-lapse-alpha-sweep*'",
+      "  )",
+      "};",
+      "foreach ($t in $targets) {",
+      "  try {",
+      "    taskkill /PID $t.ProcessId /T /F | Out-Null;",
+      "    $killed += 1;",
+      "  } catch {}",
+      "}",
+      "Write-Output $killed;",
+    ].join(" ");
+    const out = execFileSync(
+      "powershell",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+      { encoding: "utf8" },
+    );
+    return Number(out.trim()) > 0;
+  } catch {
+    return false;
+  }
+};
+
+const parseJsonOrThrow = <T>(filePath: string): T => {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+  } catch (error) {
+    throw new Error(`selected_transport_invalid_json:${filePath}:${String(error)}`);
+  }
+};
+
+const validateSelectedTransportAttemptOutputs = (args: {
+  attemptArtifactRoot: string;
+  expectedProfileId: string;
+  expectedAlpha: number;
+}): void => {
+  const transportPath = path.join(
+    args.attemptArtifactRoot,
+    "nhm2-shift-lapse-transport-result-latest.json",
+  );
+  const worldlinePath = path.join(
+    args.attemptArtifactRoot,
+    "nhm2-warp-worldline-proof-latest.json",
+  );
+  for (const requiredPath of [transportPath, worldlinePath]) {
+    if (!fs.existsSync(requiredPath)) {
+      throw new Error(`selected_transport_missing_artifact:${requiredPath}`);
+    }
+  }
+  const transport = parseJsonOrThrow<Record<string, unknown>>(transportPath);
+  const profileId = String(
+    (transport.selectedFamily as any)?.shiftLapseProfileId ??
+      (transport.profile as any)?.profileId ??
+      "",
+  );
+  if (profileId.trim().length > 0 && profileId !== args.expectedProfileId) {
+    throw new Error(
+      `selected_transport_profile_mismatch:expected=${args.expectedProfileId}:actual=${profileId}`,
+    );
+  }
+  const alpha = Number((transport as any).centerlineAlpha);
+  if (Number.isFinite(alpha) && Math.abs(alpha - args.expectedAlpha) > 1e-12) {
+    throw new Error(
+      `selected_transport_profile_mismatch:alpha_expected=${args.expectedAlpha}:alpha_actual=${alpha}`,
+    );
+  }
+};
+
+const prepareCleanDir = (dirPath: string): void => {
+  fs.rmSync(dirPath, { recursive: true, force: true });
+  fs.mkdirSync(dirPath, { recursive: true });
+};
+
+const copyDirectoryContents = (sourceDir: string, targetDir: string): void => {
+  if (!fs.existsSync(sourceDir)) return;
+  fs.mkdirSync(targetDir, { recursive: true });
+  const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
+    } else {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+  }
+};
+
+const writeProfileResolutionArtifact = (args: {
+  profileArtifactRoot: string;
+  profileId: string;
+  profileTag: string;
+  centerlineAlpha: number;
+  centerlineDtauDt: number;
+  outputDir: string;
+}): string => {
+  const outPath = path.join(args.profileArtifactRoot, "nhm2-profile-resolution-latest.json");
+  writeJsonAtomic(outPath, {
+    profileId: args.profileId,
+    profileTag: args.profileTag,
+    family: "nhm2-shift-lapse",
+    clockingMode: "bounded-lapse",
+    centerlineAlpha: args.centerlineAlpha,
+    centerlineDtauDt: args.centerlineDtauDt,
+    preserveTransportSchedule: true,
+    resolvedFrom: {
+      NHM2_PROFILE_ID: process.env.NHM2_PROFILE_ID ?? args.profileId,
+      NHM2_PROFILE_TAG: process.env.NHM2_PROFILE_TAG ?? args.profileTag,
+      NHM2_CENTERLINE_ALPHA: process.env.NHM2_CENTERLINE_ALPHA ?? String(args.centerlineAlpha),
+      NHM2_CENTERLINE_DTAU_DT: process.env.NHM2_CENTERLINE_DTAU_DT ?? String(args.centerlineDtauDt),
+      NHM2_OUTPUT_DIR: process.env.NHM2_OUTPUT_DIR ?? args.outputDir,
+    },
+    generatedAt: new Date().toISOString(),
+  });
+  return outPath;
+};
+
+const promoteAttemptOutputs = (args: {
+  attemptArtifactRoot: string;
+  attemptAuditRoot: string;
+  profileArtifactRoot: string;
+  profileAuditRoot: string;
+}): void => {
+  copyDirectoryContents(args.attemptArtifactRoot, args.profileArtifactRoot);
+  copyDirectoryContents(args.attemptAuditRoot, args.profileAuditRoot);
 };
 
 const startHeartbeatController = (args: {
@@ -1208,6 +1499,10 @@ export const assertClaimEvidenceSufficiency = (args: {
 };
 
 const inferProfileId = (tag: string): string => `stage1_centerline_alpha_${tag}_v1`;
+const inferTagFromProfileId = (profileId: string): string | null => {
+  const match = profileId.match(/^stage1_centerline_alpha_([0-9]+p[0-9]+)_v1$/i);
+  return match?.[1] ?? null;
+};
 
 const splitCsv = (raw: string): string[] =>
   raw
@@ -1878,7 +2173,104 @@ export const deriveSweepFailureSummary = (args: {
   };
 };
 
+const buildLadderProgressSummary = (args: {
+  allSpecs: SweepSpec[];
+  rows: SweepRow[];
+}): LadderProgressSummary => {
+  const rowByProfileId = new Map(args.rows.map((row) => [row.profileId, row]));
+  const ladderRows: LadderProgressRow[] = [];
+  let blockedBy: string | null = null;
+  for (const spec of args.allSpecs) {
+    const profileId = inferProfileId(spec.tag);
+    const row = rowByProfileId.get(profileId) ?? null;
+    if (row == null) {
+      ladderRows.push({
+        profileId,
+        tag: spec.tag,
+        centerlineAlpha: spec.alpha,
+        bracket: spec.bracket,
+        ladderState: blockedBy == null ? "planned" : "skipped_after_blocker",
+        blockedBy,
+        overallState: null,
+        runtimeBlockingReason: null,
+        fullLoopStateRaw: null,
+      });
+      continue;
+    }
+    let ladderState: LadderState;
+    if (row.overallState === "pass") {
+      ladderState = "completed_pass";
+    } else if (row.runtimeBlockingReason === "selected_transport_timeout") {
+      ladderState = "blocked_timeout";
+    } else if (
+      row.runtimeBlockingReason === "selected_transport_process_error" ||
+      row.runtimeBlockingReason === "selected_transport_missing_artifact" ||
+      row.runtimeBlockingReason === "selected_transport_invalid_json" ||
+      row.runtimeBlockingReason === "selected_transport_profile_mismatch" ||
+      row.runtimeBlockingReason === "selected_transport_gate_fail" ||
+      row.runtimeBlockingReason === "selected_transport_stale_artifact" ||
+      row.runtimeBlockingReason === "selected_transport_unknown_error"
+    ) {
+      ladderState = "blocked_transport_error";
+    } else if (row.runtimeBlockingReason != null) {
+      ladderState = "blocked_runtime";
+    } else {
+      ladderState = "completed_gate_fail";
+    }
+    ladderRows.push({
+      profileId,
+      tag: spec.tag,
+      centerlineAlpha: spec.alpha,
+      bracket: spec.bracket,
+      ladderState,
+      blockedBy,
+      overallState: row.overallState,
+      runtimeBlockingReason: row.runtimeBlockingReason ?? null,
+      fullLoopStateRaw: row.fullLoopStateRaw ?? null,
+    });
+    if (
+      blockedBy == null &&
+      (ladderState === "blocked_runtime" ||
+        ladderState === "blocked_timeout" ||
+        ladderState === "blocked_transport_error" ||
+        ladderState === "completed_gate_fail")
+    ) {
+      blockedBy = profileId;
+    }
+  }
+  const passingRows = ladderRows.filter((row) => row.ladderState === "completed_pass");
+  const firstBlocked =
+    ladderRows.find(
+      (row) =>
+        row.ladderState === "blocked_runtime" ||
+        row.ladderState === "blocked_timeout" ||
+        row.ladderState === "blocked_transport_error" ||
+        row.ladderState === "completed_gate_fail",
+    ) ?? null;
+  const lowestPassing = passingRows.length > 0 ? passingRows[passingRows.length - 1] : null;
+  return {
+    generatedAt: new Date().toISOString(),
+    rows: ladderRows,
+    frontier: {
+      lowestPassingAlpha: lowestPassing?.centerlineAlpha ?? null,
+      lowestPassingProfileId: lowestPassing?.profileId ?? null,
+      firstBlockedAlpha: firstBlocked?.centerlineAlpha ?? null,
+      firstBlockedProfileId: firstBlocked?.profileId ?? null,
+      blockingReason:
+        firstBlocked?.runtimeBlockingReason ??
+        (firstBlocked == null ? null : firstBlocked.ladderState),
+      promotionState: firstBlocked == null ? "open" : "blocked",
+    },
+  };
+};
+
 export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
+  const runModeRaw = (process.env.NHM2_SWEEP_MODE ?? "full").trim().toLowerCase();
+  const selectedTransportOnly =
+    process.env.NHM2_SELECTED_TRANSPORT_ONLY === "1" || runModeRaw === "selected-transport-only";
+  const runFullLoop = selectedTransportOnly
+    ? false
+    : process.env.NHM2_ALPHA_SWEEP_RUN_FULL_LOOP !== "0";
   const configText = fs.readFileSync(configPath, "utf8");
   const config = assertValidSweepConfig(JSON.parse(configText));
   const configChecksum = checksum(configText);
@@ -1894,7 +2286,6 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     requiredPaperIds: citationRegistry.papers.map((paper) => paper.id),
   });
   const gitSha = getGitSha();
-  const runFullLoop = process.env.NHM2_ALPHA_SWEEP_RUN_FULL_LOOP !== "0";
   const fullLoopTimeoutMs = readPositiveTimeoutMsFromEnv(
     "NHM2_FULL_LOOP_TIMEOUT_S",
     defaultFullLoopTimeoutS,
@@ -1932,20 +2323,28 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
   const solverCommand =
     process.env.NHM2_SOLVER_COMMAND ??
     "publishNhm2ShiftLapseSelectedTransportBundle + publishNhm2ShiftLapseFullLoopAudit";
-  const onlyTags = process.env.NHM2_ALPHA_SWEEP_ONLY_TAGS
+  let onlyTags = process.env.NHM2_ALPHA_SWEEP_ONLY_TAGS
     ? splitCsv(process.env.NHM2_ALPHA_SWEEP_ONLY_TAGS)
     : null;
+  const selectedTransportOnlyContract = selectedTransportOnly
+    ? resolveSelectedTransportOnlyContract(process.env)
+    : null;
+  if (selectedTransportOnly) {
+    onlyTags = [selectedTransportOnlyContract.profileTag];
+  }
   const requirePreviousExploratoryFullLoop =
     process.env.NHM2_ALPHA_SWEEP_REQUIRE_PREVIOUS_FULL_LOOP !== "0";
   const selectedSpecs = selectSweepSpecs({
     allSpecs: config.alphas,
     onlyTags,
   });
-  assertControlledSingleProfileContract({
-    onlyTags,
-    selectedSpecs,
-    runFullLoop,
-  });
+  if (!selectedTransportOnly) {
+    assertControlledSingleProfileContract({
+      onlyTags,
+      selectedSpecs,
+      runFullLoop,
+    });
+  }
   const registryCitations: CitationSpec[] = citationRegistry.papers.map((paper) => ({
     id: paper.id,
     type: "paper",
@@ -2006,11 +2405,33 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
         `Profile alpha mismatch for ${profileId}: config=${spec.alpha}, profile=${resolvedAlpha}`,
       );
     }
+    if (
+      selectedTransportOnlyContract != null &&
+      (selectedTransportOnlyContract.profileId !== profileId ||
+        Math.abs(selectedTransportOnlyContract.alpha - spec.alpha) > 1e-12 ||
+        Math.abs(selectedTransportOnlyContract.dtau - spec.alpha) > 1e-12)
+    ) {
+      throw new Error(
+        `selected_transport_profile_mismatch:selected_only_contract profile=${selectedTransportOnlyContract.profileId} alpha=${selectedTransportOnlyContract.alpha} dtau=${selectedTransportOnlyContract.dtau}; sweep profile=${profileId} alpha=${spec.alpha}`,
+      );
+    }
 
-    const profileArtifactRoot = path.join(sweepRoot, profileId);
-    const profileAuditRoot = path.join(sweepAuditRoot, profileId);
+    const profileArtifactRoot = selectedTransportOnly
+      ? selectedTransportOnlyContract?.outputDir ?? readRequiredEnv("NHM2_OUTPUT_DIR")
+      : path.join(sweepRoot, profileId);
+    const profileAuditRoot = selectedTransportOnly
+      ? path.join(profileArtifactRoot, "audit")
+      : path.join(sweepAuditRoot, profileId);
     fs.mkdirSync(profileArtifactRoot, { recursive: true });
     fs.mkdirSync(profileAuditRoot, { recursive: true });
+    writeProfileResolutionArtifact({
+      profileArtifactRoot,
+      profileId,
+      profileTag: spec.tag,
+      centerlineAlpha: spec.alpha,
+      centerlineDtauDt: spec.alpha,
+      outputDir: profileArtifactRoot,
+    });
     const heartbeat = startHeartbeatController({
       profileArtifactRoot,
       profileId,
@@ -2019,7 +2440,6 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     let rowWritten = false;
 
     try {
-    const publicationLockPath = path.join(profileArtifactRoot, ".nhm2-selected-family-bounded-stack.lock");
     const selectedTransportRuntimeDiagnosticsPath = path.join(
       profileArtifactRoot,
       "nhm2-selected-transport-runtime-diagnostics-latest.json",
@@ -2031,6 +2451,15 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     let selectedTransportRuntimeReason: SelectedTransportRuntimeReason | null = null;
 
     for (let attempt = 1; attempt <= selectedTransportRetryMax + 1; attempt += 1) {
+      const attemptLabel = `attempt-${String(attempt).padStart(3, "0")}`;
+      const attemptArtifactRoot = path.join(profileArtifactRoot, "attempts", attemptLabel);
+      const attemptAuditRoot = path.join(profileAuditRoot, "attempts", attemptLabel);
+      prepareCleanDir(attemptArtifactRoot);
+      prepareCleanDir(attemptAuditRoot);
+      const publicationLockPath = path.join(
+        attemptArtifactRoot,
+        ".nhm2-selected-family-bounded-stack.lock",
+      );
       const lockExists = fs.existsSync(publicationLockPath);
       const lockStat = lockExists ? fs.statSync(publicationLockPath) : null;
       const lockMtimeMs = lockStat?.mtimeMs ?? null;
@@ -2052,8 +2481,8 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           operation: async () =>
             publishNhm2ShiftLapseSelectedTransportBundle({
               shiftLapseProfileId: profileId,
-              artifactRootDir: profileArtifactRoot,
-              auditRootDir: profileAuditRoot,
+              artifactRootDir: attemptArtifactRoot,
+              auditRootDir: attemptAuditRoot,
               publicationLockPath,
             }),
         });
@@ -2063,6 +2492,10 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           selectedTransportResult.stalled ||
           selectedTransportResult.value == null
         ) {
+          const killedProcessTree =
+            selectedTransportResult.timedOut || selectedTransportResult.stalled
+              ? killPotentialSelectedTransportProcessTree(profileId)
+              : false;
           const runtimeReason: SelectedTransportRuntimeReason = selectedTransportResult.stalled
             ? "selected_transport_stall"
             : "selected_transport_timeout";
@@ -2079,6 +2512,9 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
             outcome: selectedTransportResult.stalled ? "stall" : "timeout",
             runtimeReason,
             error: null,
+            attemptArtifactRoot,
+            attemptAuditRoot,
+            killedProcessTree,
             selectedTransportRuntimeDiagnostics: null,
           });
           selectedTransportRuntimeReason = runtimeReason;
@@ -2086,6 +2522,22 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           if (attempt <= selectedTransportRetryMax) continue;
           break;
         }
+        const transportGateStatus =
+          selectedTransportResult.value.transportResult.artifact.promotionGateStatus;
+        if (transportGateStatus === "fail") {
+          throw new Error(`selected_transport_gate_fail:${profileId}`);
+        }
+        validateSelectedTransportAttemptOutputs({
+          attemptArtifactRoot,
+          expectedProfileId: profileId,
+          expectedAlpha: spec.alpha,
+        });
+        promoteAttemptOutputs({
+          attemptArtifactRoot,
+          attemptAuditRoot,
+          profileArtifactRoot,
+          profileAuditRoot,
+        });
         selectedTransportAttempts.push({
           attempt,
           startedAt: new Date(attemptStartedMs).toISOString(),
@@ -2099,6 +2551,9 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           outcome: "success",
           runtimeReason: null,
           error: null,
+          attemptArtifactRoot,
+          attemptAuditRoot,
+          killedProcessTree: false,
           selectedTransportRuntimeDiagnostics:
             selectedTransportResult.value.runtimeDiagnostics ?? null,
         });
@@ -2122,6 +2577,9 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           outcome: "error",
           runtimeReason,
           error: errorText,
+          attemptArtifactRoot,
+          attemptAuditRoot,
+          killedProcessTree: false,
           selectedTransportRuntimeDiagnostics: null,
         });
         selectedTransportRuntimeReason = runtimeReason;
@@ -2133,26 +2591,19 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
       }
     }
 
-    fs.writeFileSync(
-      selectedTransportRuntimeDiagnosticsPath,
-      `${JSON.stringify(
-        {
-          generatedAt: new Date().toISOString(),
-          profileId,
-          timeoutMsRequested: selectedTransportTimeoutMs,
-          timeoutMsCap: selectedTransportTimeoutMaxMs,
-          timeoutMsEffective: selectedTransportTimeoutEffectiveMs,
-          retryMax: selectedTransportRetryMax,
-          attempts: selectedTransportAttempts,
-          finalOutcome: selectedTransport == null ? "failed" : "success",
-          finalRuntimeReason: selectedTransportRuntimeReason,
-          finalSelectedTransportRuntimeDiagnostics:
-            selectedTransport?.runtimeDiagnostics ?? null,
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    writeJsonAtomic(selectedTransportRuntimeDiagnosticsPath, {
+      generatedAt: new Date().toISOString(),
+      profileId,
+      timeoutMsRequested: selectedTransportTimeoutMs,
+      timeoutMsCap: selectedTransportTimeoutMaxMs,
+      timeoutMsEffective: selectedTransportTimeoutEffectiveMs,
+      retryMax: selectedTransportRetryMax,
+      attempts: selectedTransportAttempts,
+      finalOutcome: selectedTransport == null ? "failed" : "success",
+      finalRuntimeReason: selectedTransportRuntimeReason,
+      finalSelectedTransportRuntimeDiagnostics:
+        selectedTransport?.runtimeDiagnostics ?? null,
+    });
 
     if (selectedTransport == null) {
       const fullLoopStateRaw = "unavailable";
@@ -2222,7 +2673,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           "Selected transport did not complete within runtime constraints; treat as diagnostic runtime blocker.",
         uncertainty: {
           category: "runtime_blocker",
-          blockers: [selectedTransportRuntimeReason ?? "selected_transport_error"],
+          blockers: [selectedTransportRuntimeReason ?? "selected_transport_unknown_error"],
           nextMeasurement:
             "Inspect nhm2-selected-transport-runtime-diagnostics-latest.json and heartbeat, then rerun controlled single-profile loop.",
           note: "Runtime blocker occurred before selected transport publication completed.",
@@ -2814,6 +3265,10 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     rows,
     sweepName: config.sweepName,
   });
+  const ladderProgress = buildLadderProgressSummary({
+    allSpecs: config.alphas,
+    rows,
+  });
 
   const summary = {
     sweepName: config.sweepName,
@@ -2835,6 +3290,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     firstFailureProfileId: failureSummary.firstFailureProfileId,
     strongestPassingProfileId: failureSummary.strongestPassingProfileId,
     dominantFailureGate: failureSummary.dominantFailureGate,
+    ladder: ladderProgress,
     rows,
   };
   const claimPromotionReport: SweepClaimPromotionReport = {
@@ -2922,7 +3378,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
   };
 
   const summaryPath = path.join(sweepRoot, "nhm2-lapse-alpha-sweep-latest.json");
-  fs.writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+  writeJsonAtomic(summaryPath, summary);
   const claimsWithUncertainty = claims.map((claim) => {
     const row = claim.profileId
       ? rows.find((entry) => entry.profileId === claim.profileId) ?? null
@@ -2960,40 +3416,33 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     };
   });
   const claimsPath = path.join(sweepRoot, "nhm2-lapse-alpha-sweep-claims-latest.json");
-  fs.writeFileSync(
-    claimsPath,
-    `${JSON.stringify(
+  writeJsonAtomic(claimsPath, {
+    sweepName: config.sweepName,
+    generatedAt: new Date().toISOString(),
+    sourceConfigPath: configPath,
+    sourceConfigChecksum: configChecksum,
+    citationRegistryPath: resolvedCitationRegistryPath,
+    citationRegistryChecksum: registryChecksum,
+    researchLockPath,
+    researchLockChecksum,
+    citationGateSummary,
+    sources: [
+      ...effectiveCitations,
       {
-        sweepName: config.sweepName,
-        generatedAt: new Date().toISOString(),
-        sourceConfigPath: configPath,
-        sourceConfigChecksum: configChecksum,
-        citationRegistryPath: resolvedCitationRegistryPath,
-        citationRegistryChecksum: registryChecksum,
-        researchLockPath,
-        researchLockChecksum,
-        citationGateSummary,
-        sources: [
-          ...effectiveCitations,
-          {
-            id: repoSourceId,
-            type: "github_clone",
-            title: "CasimirBot local runtime repository",
-            repoUrl: "local-workspace",
-            commitSha: gitSha,
-            clonePath: repoRoot,
-          },
-        ],
-        claims: claimsWithUncertainty,
+        id: repoSourceId,
+        type: "github_clone",
+        title: "CasimirBot local runtime repository",
+        repoUrl: "local-workspace",
+        commitSha: gitSha,
+        clonePath: repoRoot,
       },
-      null,
-      2,
-    )}\n`,
-  );
+    ],
+    claims: claimsWithUncertainty,
+  });
   const failuresPath = path.join(sweepRoot, "nhm2-lapse-alpha-sweep-failures-latest.json");
-  fs.writeFileSync(failuresPath, `${JSON.stringify(failureSummary, null, 2)}\n`);
+  writeJsonAtomic(failuresPath, failureSummary);
   const promotionReportPath = path.join(sweepRoot, "nhm2-claim-promotion-report-latest.json");
-  fs.writeFileSync(promotionReportPath, `${JSON.stringify(claimPromotionReport, null, 2)}\n`);
+  writeJsonAtomic(promotionReportPath, claimPromotionReport);
   const blockerTrendPath = path.join(sweepRoot, "nhm2-blocker-trend-latest.json");
   const previousTrend =
     readJsonMaybe<{
@@ -3028,7 +3477,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     history: [...previousTrend.history, ...currentEntries].slice(-500),
     latest: currentEntries,
   };
-  fs.writeFileSync(blockerTrendPath, `${JSON.stringify(trend, null, 2)}\n`);
+  writeJsonAtomic(blockerTrendPath, trend);
   const statusMemoPath = path.join(
     repoRoot,
     "docs",

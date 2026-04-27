@@ -33,6 +33,15 @@ type SweepSummary = {
   rows: SweepRow[];
 };
 
+type LadderState =
+  | "planned"
+  | "completed_pass"
+  | "completed_gate_fail"
+  | "blocked_runtime"
+  | "blocked_timeout"
+  | "blocked_transport_error"
+  | "skipped_after_blocker";
+
 const repoRoot = process.cwd();
 const exploratoryTags = ["0p7000", "0p6500", "0p6000", "0p5500", "0p5000"] as const;
 const sweepSummaryPath = path.join(
@@ -176,24 +185,89 @@ const runControlledLadder = (): void => {
     fullLoopAudit: "pass" | "fail" | null;
     evidenceLedger: "pass" | "fail" | null;
   }> = [];
+  const ladderRows: Array<{
+    tag: string;
+    profileId: string;
+    ladderState: LadderState;
+    blockedBy: string | null;
+    runHealth: string | null;
+    fullLoopStateRaw: string | null;
+    fullLoopStateNormalized: "pass" | "fail" | null;
+    runtimeBlockingReason: string | null;
+  }> = [];
+  let blockedBy: string | null = null;
 
   for (const tag of exploratoryTags) {
+    const profileId = profileIdFromTag(tag);
+    if (blockedBy != null) {
+      ladderRows.push({
+        tag,
+        profileId,
+        ladderState: "skipped_after_blocker",
+        blockedBy,
+        runHealth: null,
+        fullLoopStateRaw: null,
+        fullLoopStateNormalized: null,
+        runtimeBlockingReason: null,
+      });
+      process.stdout.write(`[NHM2 ladder] Skipping ${tag} after blocker ${blockedBy}\n`);
+      continue;
+    }
     process.stdout.write(`[NHM2 ladder] Running controlled full-loop for ${tag}\n`);
-    runSweepForTag(tag);
-    const row = assertFreshFullLoopForTag(tag);
-    completed.push({
-      tag,
-      profileId: row.profileId,
-      runHealth: row.runHealth ?? null,
-      fullLoopStateRaw: row.fullLoopStateRaw ?? null,
-      fullLoopStateNormalized: row.fullLoopStateNormalized ?? null,
-      freshnessDecision: row.stageDetailFreshness?.freshnessDecision ?? null,
-      promotionEligible: row.gates?.promotionEligible ?? null,
-      invariantGate: row.gates?.invariantGate ?? null,
-      fullLoopAudit: row.gates?.fullLoopAudit ?? null,
-      evidenceLedger: row.gates?.evidenceLedger ?? null,
-    });
-    process.stdout.write(`[NHM2 ladder] ${tag} completed with fresh full-loop artifacts\n`);
+    try {
+      runSweepForTag(tag);
+      const row = assertFreshFullLoopForTag(tag);
+      completed.push({
+        tag,
+        profileId: row.profileId,
+        runHealth: row.runHealth ?? null,
+        fullLoopStateRaw: row.fullLoopStateRaw ?? null,
+        fullLoopStateNormalized: row.fullLoopStateNormalized ?? null,
+        freshnessDecision: row.stageDetailFreshness?.freshnessDecision ?? null,
+        promotionEligible: row.gates?.promotionEligible ?? null,
+        invariantGate: row.gates?.invariantGate ?? null,
+        fullLoopAudit: row.gates?.fullLoopAudit ?? null,
+        evidenceLedger: row.gates?.evidenceLedger ?? null,
+      });
+      ladderRows.push({
+        tag,
+        profileId: row.profileId,
+        ladderState: row.fullLoopStateNormalized === "pass" ? "completed_pass" : "completed_gate_fail",
+        blockedBy: null,
+        runHealth: row.runHealth ?? null,
+        fullLoopStateRaw: row.fullLoopStateRaw ?? null,
+        fullLoopStateNormalized: row.fullLoopStateNormalized ?? null,
+        runtimeBlockingReason: null,
+      });
+      if (row.fullLoopStateNormalized !== "pass") {
+        blockedBy = row.profileId;
+      }
+      process.stdout.write(`[NHM2 ladder] ${tag} completed with fresh full-loop artifacts\n`);
+    } catch (error) {
+      const reason = String(error);
+      const runtimeBlockingReason = /timeout/i.test(reason)
+        ? "selected_transport_timeout"
+        : /selected_transport_(process_error|missing_artifact|invalid_json|profile_mismatch|gate_fail|stale_artifact|unknown_error)|error/i.test(reason)
+          ? "selected_transport_process_error"
+          : "selected_transport_runtime";
+      ladderRows.push({
+        tag,
+        profileId,
+        ladderState:
+          runtimeBlockingReason === "selected_transport_timeout"
+            ? "blocked_timeout"
+            : runtimeBlockingReason === "selected_transport_process_error"
+              ? "blocked_transport_error"
+              : "blocked_runtime",
+        blockedBy: null,
+        runHealth: "failed",
+        fullLoopStateRaw: "unavailable",
+        fullLoopStateNormalized: "fail",
+        runtimeBlockingReason,
+      });
+      blockedBy = profileId;
+      process.stderr.write(`[NHM2 ladder] Blocked at ${tag}: ${reason}\n`);
+    }
   }
 
   const payload = {
@@ -212,6 +286,19 @@ const runControlledLadder = (): void => {
     },
     tags: [...exploratoryTags],
     completed,
+    ladderRows,
+    frontier: {
+      lowestPassingProfileId:
+        ladderRows.filter((row) => row.ladderState === "completed_pass").slice(-1)[0]?.profileId ?? null,
+      firstBlockedProfileId:
+        ladderRows.find((row) =>
+          row.ladderState === "blocked_runtime" ||
+          row.ladderState === "blocked_timeout" ||
+          row.ladderState === "blocked_transport_error" ||
+          row.ladderState === "completed_gate_fail",
+        )?.profileId ?? null,
+      promotionState: blockedBy == null ? "open" : "blocked",
+    },
   };
 
   fs.writeFileSync(ladderStatusPath, `${JSON.stringify(payload, null, 2)}\n`);

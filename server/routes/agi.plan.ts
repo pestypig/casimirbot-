@@ -20978,8 +20978,10 @@ const HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG =
   String(process.env.HELIX_E10_27_INCREMENTAL_TURN_RUNTIME ?? "1").trim().toLowerCase() !== "0";
 const HELIX_E11_ASYNC_STEP_EXECUTOR_FLAG =
   String(process.env.HELIX_E11_ASYNC_STEP_EXECUTOR ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E14_GENERAL_OBSERVATION_LOOP_FLAG =
+  String(process.env.HELIX_E14_GENERAL_OBSERVATION_LOOP ?? "1").trim().toLowerCase() !== "0";
 const HELIX_E11_MODEL_DECISION_LLM_FLAG = (() => {
-  const raw = process.env.HELIX_E11_MODEL_DECISION_LLM;
+  const raw = process.env.HELIX_E14_OBSERVATION_MODEL_DECISION ?? process.env.HELIX_E11_MODEL_DECISION_LLM;
   if (typeof raw === "string" && raw.trim().length > 0) return raw.trim().toLowerCase() !== "0";
   return Boolean(process.env.OPENAI_API_KEY) && process.env.NODE_ENV !== "test";
 })();
@@ -21191,6 +21193,9 @@ type HelixAskTurnModelDecisionAudit = {
   next_capability?: string | null;
   next_args?: Record<string, unknown> | null;
   required_artifacts?: string[];
+  satisfied_artifacts?: string[];
+  missing_artifacts?: string[];
+  decision_source?: "deterministic" | "model";
   next_step_id?: string | null;
   operational_step_appended?: boolean;
   error_code?: string | null;
@@ -21335,24 +21340,86 @@ const tokenizeAskTurnDocTopic = (value: string): string[] =>
     .replace(/[^a-z0-9]+/g, " ")
     .split(/\s+/)
     .map((token) => token.trim())
-    .filter((token) => token.length >= 2 && !["the", "doc", "docs", "document", "paper", "latest", "newest", "recent"].includes(token));
+    .filter(
+      (token) =>
+        token.length >= 2 &&
+        ![
+          "the",
+          "doc",
+          "docs",
+          "document",
+          "paper",
+          "latest",
+          "newest",
+          "recent",
+          "about",
+          "regarding",
+          "for",
+        ].includes(token),
+    );
+
+const normalizeAskTurnLatestDocTopicText = (value: string): string | null => {
+  const cleaned = value
+    .replace(/[?!.;,:"'`]+/g, " ")
+    .replace(
+      /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to|pull\s+up|open|view|show|pick|grab|read|the|a|an|latest|newest|most\s+recent|recent|doc|docs|document|paper|about|on|regarding|for)\b/gi,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return null;
+  return cleaned
+    .split(/\s+/)
+    .map((token) => (/^nhm2$/i.test(token) ? "NHM2" : token))
+    .join(" ");
+};
 
 const resolveAskTurnLatestDocTopicArg = (transcript: string): string | null => {
   const normalized = transcript.trim();
   if (!normalized) return null;
+  const topicQualifiedMatch = normalized.match(
+    /\b(?:latest|newest|most\s+recent|recent)\s+(.+?)\s+(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+  );
+  if (topicQualifiedMatch?.[1] || topicQualifiedMatch?.[2]) {
+    const topic = normalizeAskTurnLatestDocTopicText(`${topicQualifiedMatch?.[1] ?? ""} ${topicQualifiedMatch?.[2] ?? ""}`);
+    if (topic) return topic;
+  }
+  const docAboutMatch = normalized.match(
+    /\b(?:latest|newest|most\s+recent|recent)\s+(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+  );
+  if (docAboutMatch?.[1]) {
+    const prefixTopic = /\bnhm2\b/i.test(normalized) ? "NHM2 " : "";
+    const topic = normalizeAskTurnLatestDocTopicText(`${prefixTopic}${docAboutMatch[1]}`);
+    if (topic) return topic;
+  }
   const patterns = [
     /\b(?:latest|newest|most\s+recent|recent)\s+(.+?)\s+(?:doc|docs|document|paper)\b/i,
-    /\b(?:open|view|show|pull\s+up|pick|grab)\s+(?:the\s+)?(?:latest|newest|most\s+recent|recent)\s+(.+)$/i,
+    /\b(?:open|view|show|pull\s+up|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\s+(?:the\s+)?(?:latest|newest|most\s+recent|recent)\s+(.+)$/i,
   ];
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
     const topic = match?.[1]?.trim();
-    if (topic) return topic.replace(/\b(?:doc|docs|document|paper)\b/gi, "").trim();
+    const cleaned = topic ? normalizeAskTurnLatestDocTopicText(topic) : null;
+    if (cleaned) return cleaned;
   }
   if (/\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized) && /\bnhm2\b/i.test(normalized)) {
     return "NHM2";
   }
   return null;
+};
+
+const isAskTurnTopicQualifiedLatestDocIntent = (transcript: string): boolean =>
+  /\b(?:latest|newest|most\s+recent|recent)\b[\s\S]*\b(?:doc|docs|document|paper)\b[\s\S]*\b(?:about|on|regarding|for)\b/i.test(
+    transcript,
+  );
+
+const isAskTurnLatestDocPathSpecificEnough = (topic: string, docPath: string | null): boolean => {
+  if (!docPath) return false;
+  const specificTokens = tokenizeAskTurnDocTopic(topic).filter((token) => token !== "nhm2");
+  if (specificTokens.length === 0) return true;
+  const haystack = docPath.toLowerCase();
+  const hitCount = specificTokens.filter((token) => haystack.includes(token)).length;
+  return hitCount >= Math.min(2, specificTokens.length);
 };
 
 const resolveAskTurnLatestDocPathByTopic = (topic: string | null): string | null => {
@@ -21396,6 +21463,30 @@ const resolveAskTurnLatestDocPathByTopic = (topic: string | null): string | null
   visit(docsRoot);
   candidates.sort((a, b) => b.score - a.score || b.mtimeMs - a.mtimeMs || a.route.localeCompare(b.route));
   return candidates[0]?.route ?? null;
+};
+
+const buildAskTurnLatestDocAcquisitionAction = (transcript: string): HelixAskTurnSelectedAction | null => {
+  const topic = resolveAskTurnLatestDocTopicArg(transcript);
+  if (!topic) return null;
+  const path = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG ? resolveAskTurnLatestDocPathByTopic(topic) : null;
+  if (
+    isAskTurnTopicQualifiedLatestDocIntent(transcript) &&
+    !isAskTurnLatestDocPathSpecificEnough(topic, path)
+  ) {
+    return {
+      panel_id: "docs-viewer",
+      action_id: "search_docs",
+      args: { query: topic, limit: 5 },
+    };
+  }
+  return {
+    panel_id: "docs-viewer",
+    action_id: "open_latest_doc_by_topic",
+    args: {
+      topic,
+      ...(path ? { path } : {}),
+    },
+  };
 };
 
 const resolveAskTurnDocLocateQuery = (transcript: string): string | null => {
@@ -21889,7 +21980,9 @@ const HELIX_ASK_TURN_COMPARE_CUE_RE =
 const isAskTurnOpenLatestDocIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
-  const hasOpenCue = /\b(?:open|view|show|pull\s+up|pick|grab|read)\b/.test(normalized);
+  const hasOpenCue =
+    /\b(?:open|view|show|pull\s+up|pick|grab|read)\b/.test(normalized) ||
+    /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\b/.test(normalized);
   const hasLatestCue = /\b(?:latest|newest|most\s+recent|recent)\b/.test(normalized);
   const hasDocCue = /\b(?:doc|docs|document|paper)\b/.test(normalized);
   return hasOpenCue && hasLatestCue && hasDocCue;
@@ -22418,20 +22511,11 @@ const resolveAskTurnActionSelection = (args: {
     selected = { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: path ? { path } : {} };
   } else if (
     HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG &&
-    /\b(?:pull\s+up|open|view|show|pick|grab)\b[\s\S]*\b(?:latest|newest|most\s+recent|recent)\b[\s\S]*\b(?:nhm2|doc|docs?|document|paper)\b/.test(
+    /\b(?:pull\s+up|open|view|show|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\b[\s\S]*\b(?:latest|newest|most\s+recent|recent)\b[\s\S]*\b(?:nhm2|doc|docs?|document|paper)\b/.test(
       normalized,
     )
   ) {
-    const topic = resolveAskTurnLatestDocTopicArg(args.transcript) ?? "document";
-    const path = resolveAskTurnLatestDocPathByTopic(topic);
-    selected = {
-      panel_id: "docs-viewer",
-      action_id: "open_latest_doc_by_topic",
-      args: {
-        topic,
-        ...(path ? { path } : {}),
-      },
-    };
+    selected = buildAskTurnLatestDocAcquisitionAction(args.transcript);
   } else if (/\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:me\s+)?(?:over\s+)?to|move\s+me\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+(?:viewer|panel))?\b/.test(normalized)) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
   } else if (/\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/.test(normalized)) {
@@ -23878,6 +23962,24 @@ const collectAskTurnUnsatisfiedResultArtifacts = (stepResults: ReturnType<typeof
   return Array.from(out);
 };
 
+const hasCompletedAskTurnDocSearchStep = (executionTrace: HelixAskTurnPlanStep[]): boolean =>
+  executionTrace.some(
+    (step) =>
+      step.status === "completed" &&
+      step.lane === "workspace" &&
+      step.action?.panel_id === "docs-viewer" &&
+      step.action?.action_id === "search_docs",
+  );
+
+const filterAskTurnLatestDocSearchFallbackMissingArtifacts = (args: {
+  transcript: string;
+  missingArtifacts: string[];
+  hasDocSearchResults: boolean;
+}): string[] => {
+  if (!args.hasDocSearchResults || !isAskTurnOpenLatestDocIntent(args.transcript)) return args.missingArtifacts;
+  return args.missingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context");
+};
+
 const buildAskTurnExecutionLifecycle = (executionTrace: HelixAskTurnPlanStep[]): HelixAskTurnExecutionLifecycleEvent[] => {
   const events: HelixAskTurnExecutionLifecycleEvent[] = [];
   for (const step of executionTrace) {
@@ -24261,17 +24363,11 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
     arg_resolver: ({ transcript, workspaceSnapshot }) => {
       const explicitPath = resolveAskTurnDocPathArg(transcript);
       const latestTopic = resolveAskTurnLatestDocTopicArg(transcript);
-      const latestPath = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG
-        ? resolveAskTurnLatestDocPathByTopic(latestTopic)
-        : null;
+      const latestDocAction = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG ? buildAskTurnLatestDocAcquisitionAction(transcript) : null;
       const action: HelixAskTurnSelectedAction = explicitPath
         ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
         : latestTopic
-          ? {
-              panel_id: "docs-viewer",
-              action_id: "open_latest_doc_by_topic",
-              args: { topic: latestTopic, ...(latestPath ? { path: latestPath } : {}) },
-            }
+          ? latestDocAction ?? { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", args: { topic: latestTopic } }
           : hasValidAskTurnDocContext(workspaceSnapshot)
             ? { panel_id: "docs-viewer", action_id: "verify_active_doc", args: { path: workspaceSnapshot?.activeDocPath } }
             : { panel_id: "docs-viewer", action_id: "open", args: {} };
@@ -25086,20 +25182,13 @@ const proposeAskTurnRuntimeNextStep = (args: {
   if (args.missingArtifacts.includes("doc_context") || (args.missingArtifacts.includes("workspace_context") && hasDocCue)) {
     const explicitPath = resolveAskTurnDocPathArg(args.transcript);
     const latestTopic = resolveAskTurnLatestDocTopicArg(args.transcript);
-    const latestPath = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG
-      ? resolveAskTurnLatestDocPathByTopic(latestTopic)
+    const latestDocAction = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG
+      ? buildAskTurnLatestDocAcquisitionAction(args.transcript)
       : null;
     const action: HelixAskTurnSelectedAction = explicitPath
       ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
       : latestTopic
-        ? {
-            panel_id: "docs-viewer",
-            action_id: "open_latest_doc_by_topic",
-            args: {
-              topic: latestTopic,
-              ...(latestPath ? { path: latestPath } : {}),
-            },
-          }
+        ? latestDocAction ?? { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", args: { topic: latestTopic } }
         : hasValidAskTurnDocContext(args.workspaceSnapshot)
           ? { panel_id: "docs-viewer", action_id: "verify_active_doc", args: { path: args.workspaceSnapshot?.activeDocPath } }
           : { panel_id: "docs-viewer", action_id: "open", args: {} };
@@ -26036,7 +26125,7 @@ const executeAskTurnIncrementalRuntimeLoop = (args: {
       at_ms: Date.now(),
       step_id: null,
       phase: "composer",
-      summary: decision.text,
+      summary: "text" in decision ? decision.text : "Completed runtime decision.",
     });
     emitTurnEvent({ type: "decision_delta", at_ms: Date.now(), decision });
   }
@@ -26066,6 +26155,7 @@ const shouldUseAskTurnModelDecisionLlm = (args: {
   terminalKind: "conversation" | "clarify" | "reasoning";
   plannedSteps: HelixAskTurnPlanStep[];
 }): boolean => {
+  if (!HELIX_E14_GENERAL_OBSERVATION_LOOP_FLAG) return false;
   if (!HELIX_E11_MODEL_DECISION_LLM_FLAG) return false;
   const normalized = args.transcript.trim();
   if (!normalized) return false;
@@ -26088,17 +26178,17 @@ const parseAskTurnModelDecisionJson = (
   const jsonText = trimmed.match(/\{[\s\S]*\}/)?.[0] ?? trimmed;
   try {
     const parsed = JSON.parse(jsonText) as Record<string, unknown>;
-    const actionRaw = String(parsed.action ?? "").trim().toLowerCase();
+    const actionRaw = String(parsed.decision ?? parsed.action ?? "").trim().toLowerCase();
     const action =
-      actionRaw === "continue"
+      actionRaw === "continue" || actionRaw === "continue_with_tool" || actionRaw === "continue_with_model"
         ? "continue"
-        : actionRaw === "finalize"
+        : actionRaw === "finalize" || actionRaw === "final" || actionRaw === "final_answer"
           ? "finalize"
-          : actionRaw === "request_user_input"
-            ? "request_user_input"
-            : actionRaw === "typed_failure"
-              ? "typed_failure"
-              : "noop";
+        : actionRaw === "request_user_input"
+          ? "request_user_input"
+          : actionRaw === "typed_failure" || actionRaw === "fail_typed" || actionRaw === "final_failure"
+            ? "typed_failure"
+          : "noop";
     const summary = String(parsed.summary ?? parsed.reason ?? "").trim();
     if (!summary) return null;
     const nextCapability = typeof parsed.next_capability === "string" && parsed.next_capability.trim()
@@ -26145,7 +26235,8 @@ const invokeAskTurnModelDecisionLlm = async (args: {
   const prompt = [
     "You are the Helix Ask agent loop decision function.",
     "Use the observation to decide the next agent state. Return ONLY JSON.",
-    'Schema: {"action":"continue|finalize|request_user_input|typed_failure|noop","summary":"one concise user-visible decision sentence","next_capability":"one allowed capability or null","next_args":{},"required_artifacts":["artifact_name"]}',
+    'Schema: {"decision":"continue_with_tool|continue_with_model|request_user_input|finalize|fail_typed","summary":"one concise user-visible decision sentence","next_capability":"one allowed capability or null","next_args":{},"required_artifacts":["artifact_name"]}',
+    'Backward-compatible "action":"continue|finalize|request_user_input|typed_failure|noop" is also accepted, but prefer "decision".',
     `Allowed next_capability values: ${allowedCapabilities.join(", ")}.`,
     "If action is continue, next_capability MUST be one allowed value and next_args MUST include required arguments for that capability.",
     "Use continue when the user goal still requires a workspace write/copy/save step and the observation has not produced note_update_receipt or clipboard_context.",
@@ -26183,6 +26274,7 @@ const invokeAskTurnModelDecisionLlm = async (args: {
         step_id: args.step?.id ?? null,
         phase: args.phase,
         used_llm: false,
+        decision_source: "deterministic",
         action: "noop",
         summary: "Model decision output was invalid; kept deterministic runtime decision.",
         error_code: "invalid_model_decision_json",
@@ -26193,6 +26285,7 @@ const invokeAskTurnModelDecisionLlm = async (args: {
       step_id: args.step?.id ?? null,
       phase: args.phase,
       used_llm: true,
+      decision_source: "model",
       action: parsed.action,
       summary: parsed.summary,
       next_capability: parsed.next_capability,
@@ -26206,6 +26299,7 @@ const invokeAskTurnModelDecisionLlm = async (args: {
       step_id: args.step?.id ?? null,
       phase: args.phase,
       used_llm: false,
+      decision_source: "deterministic",
       action: "noop",
       summary: "Model decision call failed; kept deterministic runtime decision.",
       error_code: error instanceof Error && error.message ? error.message.slice(0, 120) : "model_decision_call_failed",
@@ -26349,6 +26443,7 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
         observation,
         availableArtifacts: Array.from(availableArtifacts),
       });
+      audit.satisfied_artifacts = Array.from(availableArtifacts).sort();
       if (Array.isArray(audit.required_artifacts) && audit.required_artifacts.length > 0) {
         result.runtime = {
           ...result.runtime,
@@ -26361,6 +26456,7 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
         };
       }
       const missingBeforeModelStep = collectAskTurnMissingRequiredArtifacts(result.runtime);
+      audit.missing_artifacts = missingBeforeModelStep;
       if (
         audit.action === "continue" &&
         missingBeforeModelStep.includes("doc_location_matches") &&
@@ -26536,6 +26632,12 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
       observation: result.stepResults,
       availableArtifacts: Array.from(availableArtifacts),
     });
+    composerAudit.satisfied_artifacts = Array.from(availableArtifacts).sort();
+    composerAudit.missing_artifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+      transcript: args.transcript,
+      missingArtifacts: collectAskTurnMissingRequiredArtifacts(result.runtime),
+      hasDocSearchResults: availableArtifacts.has("doc_search_results") || "doc_search_results" in result.runtime.artifact_store,
+    });
     modelDecisionAudits.push(composerAudit);
     const composerDone: HelixAskTurnEvent = {
       type: "model_decision_completed",
@@ -26547,7 +26649,15 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
     result.turnEvents.push(composerDone);
     args.eventSink?.emit(composerDone);
   }
-  const missingRequiredArtifacts = collectAskTurnMissingRequiredArtifacts(result.runtime);
+  const finalAvailableArtifacts = new Set(result.runtime.satisfied_artifacts ?? []);
+  for (const key of Object.keys(result.runtime.artifact_store ?? {})) {
+    finalAvailableArtifacts.add(key);
+  }
+  const missingRequiredArtifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+    transcript: args.transcript,
+    missingArtifacts: collectAskTurnMissingRequiredArtifacts(result.runtime),
+    hasDocSearchResults: finalAvailableArtifacts.has("doc_search_results"),
+  });
   if (missingRequiredArtifacts.length > 0 && result.runtime.terminal.kind !== "pending_input") {
     const docLocateVariantExhausted =
       missingRequiredArtifacts.includes("doc_location_matches") &&
@@ -78797,9 +78907,14 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
     stepResults = buildAskTurnStepResults(executionTrace);
   }
-  const blockedMissingArtifacts = Array.from(
+  const rawBlockedMissingArtifacts = Array.from(
     new Set([...collectAskTurnBlockedMissingArtifacts(executionTrace), ...collectAskTurnUnsatisfiedResultArtifacts(stepResults)]),
   );
+  const completedDocSearchFallback =
+    isAskTurnOpenLatestDocIntent(transcript) && hasCompletedAskTurnDocSearchStep(executionTrace);
+  const blockedMissingArtifacts = completedDocSearchFallback
+    ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context")
+    : rawBlockedMissingArtifacts;
   const artifactContinuationExhausted =
     blockedMissingArtifacts.includes("doc_location_matches") &&
     precomputedPlanSteps.some(

@@ -1,6 +1,6 @@
 # NHM2 Lapse Alpha Sweep Status
 
-- generatedAt: 2026-04-27T06:17:37.572Z
+- generatedAt: 2026-04-27T14:06:02.583Z
 - sweepName: nhm2-centerline-lapse-efficiency-sweep-v1
 - firstFailureProfileId: stage1_centerline_alpha_0p7000_v1
 - strongestPassingProfileId: null
@@ -13,7 +13,7 @@
 ## Gate Table
 | profileId | alpha | overallState | runHealth | progressionClass | claimClass | supportTier | uncertaintyCategory | promotionEligible | baselineInvariance | clockingConsistency | antiSrSafety | decompositionConsistency | invariantGate | fullLoopStateRaw | fullLoopStateNormalized | fullLoopAudit | evidenceLedger | evidenceLedgerReason | stageDetailFreshness |
 |---|---:|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| stage1_centerline_alpha_0p7000_v1 | 0.7 | fail | failed_timeout | diagnostic_fail | not_validated | repo_plus_literature | runtime_blocker | fail | fail | fail | fail | fail | fail | unavailable | fail | fail | fail | full_loop_unavailable | timeout:selected_transport_error |
+| stage1_centerline_alpha_0p7000_v1 | 0.7 | fail | failed_timeout | diagnostic_fail | not_validated | repo_plus_literature | runtime_blocker | fail | fail | fail | fail | fail | fail | unavailable | fail | fail | fail | full_loop_unavailable | timeout:selected_transport_timeout |
 
 ## Claim-Safety Templates
 - repo_measured: `This profile is observed in this repository under the current NHM2 full-loop gates.`
@@ -53,7 +53,7 @@
 - stage1_centerline_alpha_0p7000_v1: allowed=This profile is a diagnostic/literature-context result bounded by current NHM2 gates and evidence policy.; unsupported=experimental validation, engineering feasibility, theorem-level proof, promoted reduced-order transport; citations=pfenning-ford-1997-grqc9702026, fewster-roman-2003-prd-doi, natario-closer-look-2024-springer
 
 ## Why Blocked Now
-- stage1_centerline_alpha_0p7000_v1: health=failed_timeout, raw=unavailable, normalized=fail, evidence=full_loop_unavailable, firstBlockingGate=baselineInvariance, firstBlockingReason=runtime_blocker:selected_transport_error, nextAction=Inspect selected transport error and stack trace, patch failing step, and rerun profile., stageDetail=all_stage_surfaces_available, freshness=timeout(selected_transport_error), topReason=full_loop_state_normalized:fail
+- stage1_centerline_alpha_0p7000_v1: health=failed_timeout, raw=unavailable, normalized=fail, evidence=full_loop_unavailable, firstBlockingGate=baselineInvariance, firstBlockingReason=runtime_blocker:selected_transport_timeout, nextAction=Increase NHM2_SELECTED_TRANSPORT_TIMEOUT_S within cap and rerun controlled single-profile loop., stageDetail=all_stage_surfaces_available, freshness=timeout(selected_transport_timeout), topReason=full_loop_state_normalized:fail
 
 ## Operator Playbook
 - If runHealth is `failed_stall`: inspect heartbeat and solver logs, then adjust `NHM2_STALL_MAX_NO_PROGRESS_S` / `NHM2_STALL_MIN_HEARTBEATS` only after confirming real progress is absent.
@@ -61,7 +61,7 @@
 - If runHealth is `healthy_fresh` but promotion is blocked: treat as physics/gate blocker (not runtime blocker) and remediate by firstBlockingGate.
 
 ## Citation-Backed Uncertainty
-- stage1_centerline_alpha_0p7000_v1: category=runtime_blocker, blockers=baselineInvariance,clockingConsistency,antiSrSafety,decompositionConsistency,invariantGate,fullLoopAudit,evidenceLedger,selected_transport_error, nextMeasurement=Inspect heartbeat + full-loop logs, then rerun controlled single-profile loop.. Literature references provide theoretical context only; this is not experimental validation of this profile. Note: Literature context is non-proof and cannot replace fresh repository-measured full-loop evidence. Paper refs: pfenning-ford-1997-grqc9702026 (https://arxiv.org/abs/gr-qc/9702026), fewster-roman-2003-prd-doi (https://doi.org/10.1103/PhysRevD.67.044003), natario-closer-look-2024-springer (https://link.springer.com/article/10.1007/s10773-024-05700-0).
+- stage1_centerline_alpha_0p7000_v1: category=runtime_blocker, blockers=baselineInvariance,clockingConsistency,antiSrSafety,decompositionConsistency,invariantGate,fullLoopAudit,evidenceLedger,selected_transport_timeout, nextMeasurement=Inspect heartbeat + full-loop logs, then rerun controlled single-profile loop.. Literature references provide theoretical context only; this is not experimental validation of this profile. Note: Literature context is non-proof and cannot replace fresh repository-measured full-loop evidence. Paper refs: pfenning-ford-1997-grqc9702026 (https://arxiv.org/abs/gr-qc/9702026), fewster-roman-2003-prd-doi (https://doi.org/10.1103/PhysRevD.67.044003), natario-closer-look-2024-springer (https://link.springer.com/article/10.1007/s10773-024-05700-0).
 
 ## Uncertainty Boundary
 - Literature citations are interpretive context and do not replace repository-measured full-loop evidence.

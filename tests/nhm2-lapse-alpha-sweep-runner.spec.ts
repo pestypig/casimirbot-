@@ -13,11 +13,13 @@ import {
   deriveResearchConfidenceTier,
   deriveEvidenceLedgerReason,
   deriveSweepFailureSummary,
+  inferSelectedTransportRuntimeReason,
   getFirstBlockingReason,
   isStalledByHeartbeat,
   normalizeFullLoopState,
   readPositiveIntFromEnv,
   readPositiveTimeoutMsFromEnv,
+  resolveSelectedTransportOnlyContract,
   resolveCitationRegistryPath,
   selectSweepSpecs,
   validateClaimsLedger,
@@ -773,5 +775,39 @@ describe("nhm2 lapse alpha sweep runner helpers", () => {
     expect(resolved.endsWith(path.join("docs", "research", "nhm2-alpha-sweep-citation-registry.v1.json"))).toBe(
       true,
     );
+  });
+
+  it("classifies selected transport error taxonomy from tagged error strings", () => {
+    expect(inferSelectedTransportRuntimeReason("selected_transport_invalid_json:foo")).toBe(
+      "selected_transport_invalid_json",
+    );
+    expect(inferSelectedTransportRuntimeReason("selected_transport_missing_artifact:bar")).toBe(
+      "selected_transport_missing_artifact",
+    );
+    expect(inferSelectedTransportRuntimeReason("selected_transport_profile_mismatch:baz")).toBe(
+      "selected_transport_profile_mismatch",
+    );
+  });
+
+  it("enforces selected-transport-only env contract", () => {
+    expect(() =>
+      resolveSelectedTransportOnlyContract({
+        NHM2_SWEEP_MODE: "selected-transport-only",
+        NHM2_PROFILE_ID: "stage1_centerline_alpha_0p7000_v1",
+        NHM2_CENTERLINE_ALPHA: "0.7",
+        NHM2_CENTERLINE_DTAU_DT: "0.7",
+      }),
+    ).toThrow(/NHM2_OUTPUT_DIR/i);
+
+    expect(() =>
+      resolveSelectedTransportOnlyContract({
+        NHM2_SWEEP_MODE: "selected-transport-only",
+        NHM2_PROFILE_ID: "stage1_centerline_alpha_0p7000_v1",
+        NHM2_PROFILE_TAG: "0p7000",
+        NHM2_CENTERLINE_ALPHA: "0.7",
+        NHM2_CENTERLINE_DTAU_DT: "0.7",
+        NHM2_OUTPUT_DIR: "out",
+      }),
+    ).not.toThrow();
   });
 });

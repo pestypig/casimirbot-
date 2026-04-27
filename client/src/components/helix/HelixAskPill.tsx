@@ -8041,11 +8041,29 @@ function sanitizeVoiceDiagnosticsForExport(
   };
 }
 
+let helixAskLastKnownDocViewerPath: string | null = null;
+
+function normalizeDocViewerPathForAskSnapshot(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\\/g, "/");
+  return normalized.length > 0 ? normalized : null;
+}
+
+function rememberDocViewerPathForAskSnapshot(value: unknown): string | null {
+  const normalized = normalizeDocViewerPathForAskSnapshot(value);
+  if (normalized) {
+    helixAskLastKnownDocViewerPath = normalized;
+    return normalized;
+  }
+  return helixAskLastKnownDocViewerPath;
+}
+
 function readDocViewerDebugSnapshot(): Record<string, unknown> {
   const state = useDocViewerStore.getState();
+  const currentPath = rememberDocViewerPathForAskSnapshot(state.currentPath);
   return {
     mode: state.mode,
-    currentPath: state.currentPath ?? null,
+    currentPath,
     anchor: state.anchor ?? null,
     pendingAutoReadNonce: state.pendingAutoReadNonce ?? null,
     recentCount: Array.isArray(state.recent) ? state.recent.length : 0,
@@ -8106,6 +8124,7 @@ export function syncDocViewerStateFromWorkstationAction(action: HelixWorkstation
   const path = readWorkstationActionArgString(action, ["path", "doc_path", "target"]);
   if (!path) return false;
   const anchor = readWorkstationActionArgString(action, ["anchor"]) ?? undefined;
+  rememberDocViewerPathForAskSnapshot(path);
   useDocViewerStore.getState().viewDoc(path, anchor);
   return true;
 }
@@ -8122,7 +8141,7 @@ function resolveDocsViewerAnchorPathForQuestion(
   const explicitPath = extractExplicitDocsViewerPath(question);
   if (explicitPath) return explicitPath;
   if (HELIX_EXPLICIT_PATH_CUE_RE.test(question)) return null;
-  const currentPath = String(useDocViewerStore.getState().currentPath ?? "").trim();
+  const currentPath = rememberDocViewerPathForAskSnapshot(useDocViewerStore.getState().currentPath) ?? "";
   if (!currentPath) return null;
   const normalizedPath = normalizeDocsViewerAnchorPath(currentPath);
   return normalizedPath.length > 0 ? normalizedPath : null;
@@ -8157,9 +8176,7 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
   const layoutState = useWorkstationLayoutStore.getState();
   const activeGroup = layoutState.groups[layoutState.activeGroupId] ?? null;
   const activePanel = activeGroup?.activePanelId ?? null;
-  const currentPath = typeof docState.currentPath === "string" && docState.currentPath.trim()
-    ? docState.currentPath.trim().replace(/\\/g, "/")
-    : null;
+  const currentPath = rememberDocViewerPathForAskSnapshot(docState.currentPath);
   return {
     sessionId: sessionId ?? "helix-ui",
     activePanel,

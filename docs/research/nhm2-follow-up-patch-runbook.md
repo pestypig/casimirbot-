@@ -27,6 +27,19 @@ npm test -- nhm2-lapse-alpha-sweep-runner.spec.ts research-citation-gate.spec.ts
 npm run research:citation:gate
 ```
 
+Selected-transport-only smoke mode:
+
+```powershell
+$env:NHM2_SWEEP_MODE = "selected-transport-only"
+$env:NHM2_SELECTED_TRANSPORT_ONLY = "1"
+$env:NHM2_PROFILE_ID = "stage1_centerline_alpha_0p7000_v1"
+$env:NHM2_PROFILE_TAG = "0p7000"
+$env:NHM2_CENTERLINE_ALPHA = "0.7"
+$env:NHM2_CENTERLINE_DTAU_DT = "0.7"
+$env:NHM2_OUTPUT_DIR = "artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\stage1_centerline_alpha_0p7000_v1\debug-selected-transport"
+npm run warp:full-solve:nhm2-shift-lapse:alpha-sweep
+```
+
 ## Freshness Gate (must pass before next alpha)
 - `stageDetailFreshness.allFresh == true`
 - `fullLoopStateRaw != null && fullLoopStateRaw != "unavailable"`
@@ -73,3 +86,7 @@ Never claim experimental validation from literature citations alone.
   - `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-exploratory-controlled-ladder-latest.json`
 - Status memo:
   - `docs/research/nhm2-lapse-alpha-sweep-status-latest.md`
+- Profile coherence:
+  - `nhm2-profile-resolution-latest.json` (per profile root)
+- Runtime attempts:
+  - `attempts/attempt-###/` (selected transport artifact isolation)
