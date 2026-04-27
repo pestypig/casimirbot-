@@ -220,6 +220,8 @@ export type HaloBankActionOutput = {
 
 export type LocalAskResponse = {
   text: string;
+  assistant_answer?: string;
+  agent_loop_summary?: string;
   ok?: boolean;
   turn_id?: string | null;
   answer_surface_mode?: "conversational" | "structured_report" | "fail_closed";
@@ -237,6 +239,41 @@ export type LocalAskResponse = {
   envelope?: HelixAskResponseEnvelope;
   viewer_launch?: AtomicViewerLaunch;
   action_envelope?: HelixActionEnvelope;
+  agent_loop_audit?: Record<string, unknown>;
+  turn_truth_table?: Record<string, unknown>;
+  planner_contract?: Record<string, unknown>;
+  execution_trace?: unknown[];
+  execution_lifecycle?: unknown[];
+  step_results?: unknown[];
+  turn_events?: unknown[];
+  turn_transcript_events?: unknown[];
+  turn_transcript_event_count?: number;
+  turn_transcript_source?: string | null;
+  runtime_event_count?: number;
+  runtime_loop_mode?: string | null;
+  async_executor_used?: boolean;
+  async_step_count?: number;
+  async_total_duration_ms?: number;
+  async_step_durations?: unknown[];
+  model_decision_llm_used?: boolean;
+  model_decision_count?: number;
+  model_decision_audits?: unknown[];
+  turn_runtime?: Record<string, unknown>;
+  workspace_context_snapshot?: Record<string, unknown>;
+  turn_contract?: Record<string, unknown>;
+  invariant_violations?: unknown[];
+  latest_result_artifact?: Record<string, unknown>;
+  route_reason_code?: string | null;
+  dispatch_policy?: string | null;
+  pending_request?: Record<string, unknown> | null;
+  pending_server_request?: Record<string, unknown> | null;
+  pending_intercepted_turn?: boolean;
+  pending_interception_reason?: string | null;
+  pending_resolution_reason?: string | null;
+  pending_status_before?: string | null;
+  pending_status_after?: string | null;
+  pending_transition_reason?: string | null;
+  pending_transition_trace?: unknown[];
   model?: string;
   essence_id?: string;
   seed?: number;
@@ -429,6 +466,40 @@ export type LocalAskResponse = {
     helix_ask_fail_class?: string | null;
     [key: string]: unknown;
   };
+};
+
+export type HelixAskTurnStreamEvent = {
+  event: "turn_transcript_event" | "turn_final" | "turn_error" | string;
+  data: unknown;
+};
+
+type RunAskTurnPayload = {
+  question: string;
+  sessionId?: string;
+  traceId?: string;
+  turnId?: string;
+  personaId?: string;
+  sourceLanguage?: string;
+  languageDetected?: string;
+  languageConfidence?: number;
+  codeMixed?: boolean;
+  pivotConfidence?: number;
+  responseLanguage?: string;
+  preferredResponseLanguage?: string;
+  interpreter?: HelixInterpreterArtifact;
+  interpreter_schema_version?: "helix.interpreter.v1" | string;
+  multilangConfirm?: boolean;
+  lang_schema_version?: "helix.lang.v1" | string;
+  translated?: boolean;
+  maxTokens?: number;
+  mode?: "read" | "observe" | "act" | "verify";
+  contextMode?: "attached" | "isolated";
+  contextFiles?: string[];
+  workspaceContextSnapshot?: Record<string, unknown>;
+  debug?: boolean;
+  capsuleIds?: string[];
+  answerContract?: HelixAskAnswerContract;
+  signal?: AbortSignal;
 };
 
 export type HelixAskReasoningTheaterPhase =
@@ -1392,32 +1463,7 @@ export async function runConversationTurn(
   return asJson<ConversationTurnResponse>(response);
 }
 
-export async function runAskTurn(payload: {
-  question: string;
-  sessionId?: string;
-  traceId?: string;
-  turnId?: string;
-  personaId?: string;
-  sourceLanguage?: string;
-  languageDetected?: string;
-  languageConfidence?: number;
-  codeMixed?: boolean;
-  pivotConfidence?: number;
-  responseLanguage?: string;
-  preferredResponseLanguage?: string;
-  interpreter?: HelixInterpreterArtifact;
-  interpreter_schema_version?: "helix.interpreter.v1" | string;
-  multilangConfirm?: boolean;
-  lang_schema_version?: "helix.lang.v1" | string;
-  translated?: boolean;
-  maxTokens?: number;
-  mode?: "read" | "observe" | "act" | "verify";
-  contextFiles?: string[];
-  debug?: boolean;
-  capsuleIds?: string[];
-  answerContract?: HelixAskAnswerContract;
-  signal?: AbortSignal;
-}): Promise<LocalAskResponse> {
+const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown> => {
   const body: Record<string, unknown> = {
     question: payload.question,
   };
@@ -1447,6 +1493,10 @@ export async function runAskTurn(payload: {
   if (typeof payload.translated === "boolean") body.translated = payload.translated;
   if (typeof payload.maxTokens === "number") body.max_tokens = payload.maxTokens;
   if (payload.mode) body.mode = payload.mode;
+  if (payload.contextMode) body.context_mode = payload.contextMode;
+  if (payload.workspaceContextSnapshot && typeof payload.workspaceContextSnapshot === "object") {
+    body.workspace_context_snapshot = payload.workspaceContextSnapshot;
+  }
   if (typeof payload.debug === "boolean") body.debug = payload.debug;
   if (Array.isArray(payload.contextFiles) && payload.contextFiles.length > 0) {
     body.contextFiles = payload.contextFiles
@@ -1458,6 +1508,11 @@ export async function runAskTurn(payload: {
     body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
   }
   if (payload.answerContract) body.answer_contract = payload.answerContract;
+  return body;
+};
+
+export async function runAskTurn(payload: RunAskTurnPayload): Promise<LocalAskResponse> {
+  const body = buildRunAskTurnBody(payload);
   const response = await fetch("/api/agi/ask/turn", {
     method: "POST",
     headers: {
@@ -1468,6 +1523,69 @@ export async function runAskTurn(payload: {
     signal: payload.signal,
   });
   return normalizeLocalAskResponse(await asJson<unknown>(response));
+}
+
+export async function runAskTurnStream(
+  payload: RunAskTurnPayload,
+  onEvent?: (event: HelixAskTurnStreamEvent) => void,
+): Promise<LocalAskResponse> {
+  const response = await fetch("/api/agi/ask/turn/stream", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(buildRunAskTurnBody(payload)),
+    signal: payload.signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`ask_turn_stream_unavailable:${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalPayload: unknown = null;
+  const flushBlock = (block: string): void => {
+    const lines = block.split(/\r?\n/);
+    const eventLine = lines.find((line) => line.startsWith("event:"));
+    const dataLines = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart());
+    if (!eventLine || dataLines.length === 0) return;
+    const event = eventLine.slice(6).trim();
+    const rawData = dataLines.join("\n");
+    let data: unknown = rawData;
+    try {
+      data = JSON.parse(rawData);
+    } catch {
+      data = rawData;
+    }
+    const packet: HelixAskTurnStreamEvent = { event, data };
+    onEvent?.(packet);
+    if (event === "turn_final") finalPayload = data;
+    if (event === "turn_error" && finalPayload === null) finalPayload = data;
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value) {
+      buffer += decoder.decode(value, { stream: !done });
+      let delimiter = buffer.match(/\r?\n\r?\n/);
+      while (delimiter && typeof delimiter.index === "number") {
+        const block = buffer.slice(0, delimiter.index);
+        buffer = buffer.slice(delimiter.index + delimiter[0].length);
+        flushBlock(block);
+        delimiter = buffer.match(/\r?\n\r?\n/);
+      }
+    }
+    if (done) break;
+  }
+  if (buffer.trim()) flushBlock(buffer.trim());
+  if (!finalPayload) throw new Error("ask_turn_stream_missing_final");
+  const normalized = normalizeLocalAskResponse(finalPayload);
+  normalized.debug = {
+    ...(normalized.debug ?? {}),
+    stream_used: true,
+    stream_fallback_reason: null,
+  };
+  return normalized;
 }
 
 export type PlanRequestOptions = {
@@ -1569,6 +1687,17 @@ const HELIX_ASK_JOB_POLL_INTERVAL_MS = 1000;
 const HELIX_ASK_JOB_MAX_CONSECUTIVE_ERRORS = 12;
 const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
+const readBooleanEnv = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return fallback;
+    if (["0", "false", "off", "no"].includes(normalized)) return false;
+    if (["1", "true", "on", "yes"].includes(normalized)) return true;
+  }
+  return fallback;
+};
 const readNumberEnv = (value: unknown, fallback: number) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -1582,6 +1711,11 @@ const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
   30_000,
   30 * 60_000,
 );
+const isHelixE814LaneParityEnabled = (): boolean =>
+  readBooleanEnv(
+    (globalThis as Record<string, unknown>).__HELIX_E8_14_LANE_PARITY__,
+    true,
+  );
 
 const isHelixAskJobUnsupported = (error: unknown): boolean =>
   Boolean(
@@ -1683,6 +1817,7 @@ const isInterruptedJobFallbackResponse = (response: LocalAskResponse | null | un
 
 const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const assistantAnswer = typeof record.assistant_answer === "string" ? record.assistant_answer.trim() : "";
   const rawText = typeof record.text === "string" ? record.text.trim() : "";
   const message = typeof record.message === "string" ? record.message.trim() : "";
   const interpreterConfirmPrompt =
@@ -1698,6 +1833,7 @@ const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   const fallbackText = message || interpreterConfirmPrompt || (blockedByGate ? "Confirmation is required." : "");
   const invalidRawText = /^no final answer returned\.?$/i.test(rawText);
   const text =
+    assistantAnswer ||
     (rawText && !invalidRawText ? rawText : "") ||
     fallbackText ||
     "I couldn't produce a final answer for that turn. Please retry once.";
@@ -1711,8 +1847,9 @@ const askLocalDirect = async (
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<LocalAskResponse> => {
+  const endpoint = isHelixE814LaneParityEnabled() ? "/api/agi/ask/turn" : "/api/agi/ask";
   const payload = await asJson<unknown>(
-    await fetch("/api/agi/ask", {
+    await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -2039,6 +2176,12 @@ export async function askLocal(
     body.dialogue_profile = options.dialogue_profile;
   }
   const signal = options?.signal;
+  if (isHelixE814LaneParityEnabled()) {
+    if (isNavigatorOffline()) {
+      await waitForOnline(signal);
+    }
+    return await askLocalDirect(body, signal);
+  }
   if (isNavigatorOffline()) {
     await waitForOnline(signal);
   }

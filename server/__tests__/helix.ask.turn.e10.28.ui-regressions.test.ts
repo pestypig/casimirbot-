@@ -1,0 +1,252 @@
+import express from "express";
+import request from "supertest";
+import { describe, expect, it } from "vitest";
+
+import { planRouter } from "../routes/agi.plan";
+
+const createApp = (): express.Express => {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+const answerText = (body: any): string => String(body?.assistant_answer ?? body?.answer ?? body?.text ?? "");
+
+describe("helix ask turn e10.28 ui regressions", () => {
+  it("streams turn transcript events and a final ask turn payload", async () => {
+    const app = createApp();
+    const sessionId = `e1028-stream-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: "what is this doc about?",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/example.md",
+          hasDocContext: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.headers["content-type"]).toMatch(/text\/event-stream/);
+    const text = response.text ?? "";
+    expect(text).toContain("event: turn_transcript_event");
+    expect(text).toContain("event: turn_final");
+    expect(text).toContain("\"type\":\"plan\"");
+    expect(text).toContain("\"type\":\"model_decision\"");
+    expect(text).toContain("\"type\":\"tool_result\"");
+    expect(text).toContain("\"stream_used\":true");
+    expect(text).toContain("\"stream_mode\":\"live_runtime\"");
+    expect(text).toContain("\"stream_replay\":false");
+    expect(text).toContain("\"runtime_loop_mode\":\"async_incremental\"");
+    expect(text).toContain("\"async_executor_used\":true");
+    expect(text).toContain("\"async_step_durations\"");
+    expect(text.indexOf("event: turn_transcript_event")).toBeLessThan(text.indexOf("event: turn_final"));
+  });
+
+  it("maps conversational notes navigation variants to the notes panel", async () => {
+    const app = createApp();
+    const sessionId = `e1028-switch-notes-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "switch over to notes",
+        mode: "read",
+        sessionId,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.workspace_action?.panel_id).toBe("workstation-notes");
+    expect(response.body?.workspace_action?.action_id).toBe("open");
+    expect(answerText(response.body)).toMatch(/Executed workstation-notes\.open|notes/i);
+  });
+
+  it("maps jump-over docs navigation to the docs viewer instead of reasoning fallback", async () => {
+    const app = createApp();
+    const sessionId = `e1028-jump-docs-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "jump over to the docs viewer",
+        mode: "read",
+        sessionId,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.dispatch_policy).toBe("workspace_only");
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.workspace_action?.action_id).toBe("open");
+    expect(answerText(response.body)).toMatch(/Executed docs-viewer\.open|docs/i);
+  });
+
+  it("treats 'what is this doc about' as summarize/explain, not identity", async () => {
+    const app = createApp();
+    const sessionId = `e1028-doc-about-${Date.now()}`;
+    const path = "/docs/research/example.md";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "what is this doc about?",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: path,
+          hasDocContext: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.workspace_action?.action_id).toBe("summarize_doc");
+    expect(response.body?.dispatch_policy).toBe("workspace_context_reasoning");
+    expect(response.body?.planner_contract?.plan_items?.some((step: any) => step?.lane === "reasoning")).toBe(true);
+    expect(response.body?.turn_transcript_source).toMatch(/runtime|reconstructed/);
+    expect(response.body?.turn_transcript_events?.some((event: any) => event?.type === "plan")).toBe(true);
+    expect(response.body?.turn_transcript_events?.some((event: any) => event?.type === "model_decision")).toBe(true);
+    expect(response.body?.turn_transcript_events?.some((event: any) => event?.type === "tool_result")).toBe(true);
+    expect(response.body?.turn_truth_table?.event_audit?.visible_event_count).toBe(
+      response.body?.turn_transcript_events?.length,
+    );
+    expect(answerText(response.body)).not.toMatch(/^You are viewing:/i);
+  });
+
+  it("answers visible current-document phrasing from active workspace context", async () => {
+    const app = createApp();
+    const sessionId = `e1028-doc-showing-${Date.now()}`;
+    const path = "/docs/research/example.md";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "which document is on screen now?",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: path,
+          hasDocContext: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.dispatch_policy).toBe("workspace_only");
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.workspace_action?.action_id).toBe("identify_current_doc");
+    expect(answerText(response.body)).toContain(path);
+    expect(answerText(response.body)).not.toMatch(/active_doc_path|missing user input|before any action/i);
+  });
+
+  it("keeps clarify pending text as the terminal answer instead of stale workspace receipts", async () => {
+    const app = createApp();
+    const sessionId = `e1028-clarify-terminal-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "compare what this doc says about alpha centerline with my notes and tell me the difference",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/example.md",
+          hasDocContext: true,
+          hasNoteContext: false,
+        },
+      })
+      .expect(200);
+
+    if (String(response.body?.route_reason_code ?? "").startsWith("clarify:")) {
+      expect(response.body?.pending_server_request?.kind).toBe("clarify");
+      expect(answerText(response.body)).toMatch(/note|evidence|missing|specify|need/i);
+      expect(answerText(response.body)).not.toMatch(/^Opened document:/i);
+    } else {
+      expect(response.body?.route_reason_code).toBe("dispatch:act");
+      expect(response.body?.dispatch_policy).toBe("workspace_context_reasoning");
+    }
+  });
+
+  it("preserves prior active doc context when the current visible panel is notes", async () => {
+    const app = createApp();
+    const sessionId = `e1028-merged-workspace-context-${Date.now()}`;
+
+    const openDocResponse = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "open the latest NHM2 doc",
+        mode: "read",
+        sessionId,
+      })
+      .expect(200);
+    const openedPath = openDocResponse.body?.workspace_action?.args?.path;
+    expect(openedPath).toMatch(/docs\//);
+
+    await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "switch over to notes",
+        mode: "read",
+        sessionId,
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "compare this doc with my notes and tell me the difference",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "workstation-notes",
+          activeDocPath: null,
+          hasDocContext: false,
+          hasNoteContext: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.workspace_context_snapshot?.activeDocPath).toBe(openedPath);
+    expect(response.body?.workspace_context_snapshot?.hasNoteContext).toBe(true);
+    expect(response.body?.route_reason_code).not.toBe("clarify:missing_args");
+    expect(answerText(response.body)).not.toMatch(/I need active_doc_path/i);
+  });
+
+  it("does not stop hybrid open-and-explain prompts at the open-doc receipt", async () => {
+    const app = createApp();
+    const sessionId = `e1028-open-explain-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "open the latest NHM2 doc and explain what the main comparison is",
+        mode: "read",
+        sessionId,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.dispatch_policy).toBe("workspace_context_reasoning");
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.workspace_action?.action_id).toBe("open_latest_doc_by_topic");
+    expect(response.body?.planner_contract?.plan_items?.some((step: any) => step?.lane === "reasoning")).toBe(true);
+    expect(answerText(response.body)).toMatch(/^Explained /i);
+    expect(answerText(response.body)).toMatch(/Key claim:/i);
+    expect(answerText(response.body)).toMatch(/Main comparison:/i);
+    expect(answerText(response.body)).not.toMatch(/^Opened latest /i);
+  });
+});

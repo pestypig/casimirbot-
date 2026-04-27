@@ -1985,6 +1985,271 @@
         }
       ],
       "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_period_period_derivative_state_point",
+      "name": "Pulsar state point (P, Pdot)",
+      "category": "compact_star_limit_observables",
+      "expression": "x_state = (P, Pdot)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "P",
+          "quantity": "spin period",
+          "units": "s"
+        },
+        {
+          "symbol": "Pdot",
+          "quantity": "period derivative",
+          "units": "s/s"
+        },
+        {
+          "symbol": "x_state",
+          "quantity": "state-point tuple used by limit classifiers",
+          "units": "mixed"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_spin_down_power_definition",
+      "name": "Pulsar spin-down power definition",
+      "category": "compact_star_limit_observables",
+      "expression": "Edot = 4 * pi^2 * I * Pdot / P^3",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Edot",
+          "quantity": "spin-down power",
+          "units": "W"
+        },
+        {
+          "symbol": "I",
+          "quantity": "moment of inertia",
+          "units": "kg*m^2"
+        },
+        {
+          "symbol": "P",
+          "quantity": "spin period",
+          "units": "s"
+        },
+        {
+          "symbol": "Pdot",
+          "quantity": "period derivative",
+          "units": "s/s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_death_line_limit_classifier",
+      "name": "Pulsar death-line limit classifier",
+      "category": "compact_star_limit_observables",
+      "expression": "status = classify_limit(P, Pdot, death_line_model, bridge_case_rule)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "status",
+          "quantity": "limit status classifier output",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "P",
+          "quantity": "spin period",
+          "units": "s"
+        },
+        {
+          "symbol": "Pdot",
+          "quantity": "period derivative",
+          "units": "s/s"
+        },
+        {
+          "symbol": "death_line_model",
+          "quantity": "declared death-line closure model",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_vacuum_gap_potential_definition",
+      "name": "Pulsar vacuum-gap potential descriptor",
+      "category": "compact_star_limit_observables",
+      "expression": "DeltaV_gap = f_gap(P, Pdot, B, geometry, closure)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "DeltaV_gap",
+          "quantity": "effective vacuum-gap potential",
+          "units": "V"
+        },
+        {
+          "symbol": "B",
+          "quantity": "surface magnetic field proxy",
+          "units": "T"
+        },
+        {
+          "symbol": "geometry",
+          "quantity": "polar-cap and field geometry descriptor",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "closure",
+          "quantity": "declared vacuum-gap closure model",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_pair_cascade_threshold_descriptor",
+      "name": "Pulsar pair-cascade threshold descriptor",
+      "category": "compact_star_limit_observables",
+      "expression": "pair_status = g_pair(DeltaV_gap, B, n_plasma, model_params)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "pair_status",
+          "quantity": "pair-cascade threshold classification",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "DeltaV_gap",
+          "quantity": "effective vacuum-gap potential",
+          "units": "V"
+        },
+        {
+          "symbol": "n_plasma",
+          "quantity": "plasma density proxy",
+          "units": "1/m^3"
+        },
+        {
+          "symbol": "model_params",
+          "quantity": "pair-cascade closure parameters",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_surface_mountain_gap_enhancement_descriptor",
+      "name": "Pulsar surface-mountain gap enhancement descriptor",
+      "category": "compact_star_limit_observables",
+      "expression": "eta_mountain = h_mountain(surface_topography, rigidity, B, closure)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "eta_mountain",
+          "quantity": "dimensionless enhancement proxy for local gap driving",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "surface_topography",
+          "quantity": "surface shape descriptor",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "rigidity",
+          "quantity": "effective surface rigidity proxy",
+          "units": "Pa"
+        },
+        {
+          "symbol": "closure",
+          "quantity": "declared mountain-enhancement closure assumptions",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "pulsar_diffraction_band_spacing_observable",
+      "name": "Pulsar diffraction band-spacing observable",
+      "category": "compact_star_limit_observables",
+      "expression": "Deltaf_obs = transfer_diffraction(frequency, geometry, plasma_screen, ray_family)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Deltaf_obs",
+          "quantity": "observed dynamic-spectrum band spacing",
+          "units": "Hz"
+        },
+        {
+          "symbol": "frequency",
+          "quantity": "observation frequency",
+          "units": "Hz"
+        },
+        {
+          "symbol": "plasma_screen",
+          "quantity": "magnetospheric transfer screen descriptor",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "ray_family",
+          "quantity": "effective ray-path family for interference mapping",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "compact_star_matter_hypothesis_envelope",
+      "name": "Compact-star matter hypothesis envelope",
+      "category": "compact_star_limit_observables",
+      "expression": "H_matter = {model_i, status_i, evidence_i}",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "H_matter",
+          "quantity": "set of compact-star matter hypotheses",
+          "units": "set"
+        },
+        {
+          "symbol": "model_i",
+          "quantity": "matter-model label for hypothesis i",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "status_i",
+          "quantity": "hypothesis status label for i",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "evidence_i",
+          "quantity": "supporting or contradicting observable references",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "compact_star_micro_macro_bridge_descriptor",
+      "name": "Compact-star micro-macro bridge descriptor",
+      "category": "compact_star_limit_observables",
+      "expression": "B_mm = map(quantum_refs, classical_refs, bridge_status)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "B_mm",
+          "quantity": "micro-to-observable bridge descriptor record",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "quantum_refs",
+          "quantity": "microphysics-side references",
+          "units": "set"
+        },
+        {
+          "symbol": "classical_refs",
+          "quantity": "observable-side references",
+          "units": "set"
+        },
+        {
+          "symbol": "bridge_status",
+          "quantity": "bridge maturity status",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
     }
   ]
 }

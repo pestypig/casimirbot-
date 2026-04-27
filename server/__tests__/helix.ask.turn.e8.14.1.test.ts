@@ -12,7 +12,7 @@ const createApp = (): express.Express => {
 };
 
 describe("helix ask turn e8.14.1 artifact-gate pending escape", () => {
-  it("aborts artifact-gate pending on intent switch and routes new request normally", async () => {
+  it("keeps artifact-gate pending on intent switch until resolved/canceled", async () => {
     const app = createApp();
     const sessionId = "e8141-intent-switch";
     await request(app)
@@ -33,11 +33,14 @@ describe("helix ask turn e8.14.1 artifact-gate pending escape", () => {
       })
       .expect(200);
 
-    expect(switched.body?.route_reason_code).toBe("clarify:planner_repair_required");
-    expect(switched.body?.pending_transition_trace).toContain("artifact_gate_intent_switch_abort");
+    expect(["clarify:missing_args", "clarify:planner_repair_required"]).toContain(
+      switched.body?.route_reason_code,
+    );
+    expect(switched.body?.pending_server_request?.kind).toBe("clarify");
+    expect(switched.body?.pending_transition_trace).not.toContain("artifact_gate_intent_switch_abort");
   });
 
-  it("clears artifact-gate pending for chitchat turns", async () => {
+  it("keeps artifact-gate pending for chitchat turns", async () => {
     const app = createApp();
     const sessionId = "e8141-chitchat";
     await request(app)
@@ -58,9 +61,9 @@ describe("helix ask turn e8.14.1 artifact-gate pending escape", () => {
       })
       .expect(200);
 
-    expect(hello.body?.route_reason_code).toBe("suppressed:filler");
-    expect(hello.body?.pending_transition_trace).toContain("artifact_gate_conversation_escape_abort");
-    expect(hello.body?.pending_server_request ?? null).toBeNull();
+    expect(hello.body?.route_reason_code).toBe("clarify:missing_args");
+    expect(hello.body?.pending_server_request?.kind).toBe("clarify");
+    expect(hello.body?.pending_transition_trace).not.toContain("artifact_gate_conversation_escape_abort");
   });
 
   it("keeps artifact-gate pending active for same compare intent family", async () => {

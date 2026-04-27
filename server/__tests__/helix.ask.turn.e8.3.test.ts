@@ -29,6 +29,11 @@ describe("helix ask turn e8.3 multi-step plan execution", () => {
     expect(steps[0]?.lane).toBe("workspace");
     expect(steps[1]?.lane).toBe("reasoning");
     expect(Array.isArray(response.body?.execution_trace)).toBe(true);
+    expect(response.body?.action_envelope?.schema).toBe("helix.ask.action_envelope.v1");
+    expect(Array.isArray(response.body?.action_envelope?.workstation_actions)).toBe(true);
+    expect(response.body?.action_envelope?.workstation_actions?.length ?? 0).toBeGreaterThan(0);
+    expect(typeof response.body?.action_envelope?.workstation_actions?.[0]?.panel_id).toBe("string");
+    expect(typeof response.body?.action_envelope?.workstation_actions?.[0]?.action_id).toBe("string");
   });
 
   it("suppresses downstream step when pending user input blocks execution", async () => {

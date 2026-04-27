@@ -26,6 +26,7 @@ import {
   getReasoningTheaterConfig,
   getPendingHelixAskJob,
   runAskTurn,
+  runAskTurnStream,
   runConversationTurn,
   resumeHelixAskJob,
   speakVoice,
@@ -4786,6 +4787,22 @@ type AskLocalWithFallbackResult = {
   bypassedMultilangGate?: boolean;
 };
 
+type RunAskOptions = {
+  bypassWorkstationDispatch?: boolean;
+  forceReasoningDispatch?: boolean;
+  suppressWorkstationPayloadActions?: boolean;
+  answerContract?: HelixAskAnswerContract;
+  contextMode?: "attached" | "isolated";
+  skipContextChooser?: boolean;
+};
+
+type AskContextChooserState = {
+  id: string;
+  question: string;
+  capsuleIds?: string[];
+  options?: RunAskOptions;
+};
+
 function isMultilangConfidenceGateResponse(response: AskLocalResult): boolean {
   const failReason = String(response.fail_reason ?? "").trim();
   const failClass = String(response.fail_class ?? "").trim();
@@ -5542,6 +5559,336 @@ function coerceText(value: unknown): string {
   } catch {
     return "";
   }
+}
+
+function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+type HelixAskVisibleTerminalResolution = {
+  text: string;
+  source: string;
+  backendTerminalText: string | null;
+};
+
+function readHelixAskTerminalText(record: Record<string, unknown> | null | undefined): string | null {
+  if (!record) return null;
+  const text = typeof record.text === "string" ? record.text.trim() : "";
+  return text.length > 0 ? text : null;
+}
+
+function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
+  const record = readAgentLoopAuditRecord(value);
+  const debugRecord = readAgentLoopAuditRecord(record?.debug);
+  const envelopeRecord = readAgentLoopAuditRecord(record?.envelope);
+  const agentLoopAudit = readAgentLoopAuditRecord(record?.agent_loop_audit ?? debugRecord?.agent_loop_audit);
+  const turnTruthTable = readAgentLoopAuditRecord(record?.turn_truth_table ?? debugRecord?.turn_truth_table);
+  const truthTerminal = readAgentLoopAuditRecord(turnTruthTable?.terminal);
+  const runtimeSummary = readAgentLoopAuditRecord(record?.turn_runtime ?? debugRecord?.turn_runtime ?? agentLoopAudit?.runtime_summary);
+  const runtimeTerminal = readAgentLoopAuditRecord(runtimeSummary?.terminal);
+  const terminalArtifact = readAgentLoopAuditRecord(
+    record?.terminal_artifact ??
+      debugRecord?.terminal_artifact ??
+      record?.latest_result_artifact ??
+      debugRecord?.latest_result_artifact ??
+      agentLoopAudit?.latest_result_artifact,
+  );
+  const turnContract = readAgentLoopAuditRecord(record?.turn_contract ?? debugRecord?.turn_contract ?? agentLoopAudit?.terminal_contract);
+  const candidates: Array<{ source: string; text: string | null }> = [
+    {
+      source: "terminal_artifact",
+      text: readHelixAskTerminalText(terminalArtifact),
+    },
+    {
+      source: "turn_contract.terminal_text",
+      text: typeof turnContract?.terminal_text === "string" ? turnContract.terminal_text.trim() : null,
+    },
+    {
+      source: "runtime_terminal",
+      text: readHelixAskTerminalText(runtimeTerminal),
+    },
+    {
+      source: "turn_truth_table.terminal",
+      text: readHelixAskTerminalText(truthTerminal),
+    },
+    {
+      source: "assistant_answer",
+      text: typeof record?.assistant_answer === "string" ? record.assistant_answer.trim() : null,
+    },
+    {
+      source: "envelope.assistant_answer",
+      text: typeof envelopeRecord?.assistant_answer === "string" ? envelopeRecord.assistant_answer.trim() : null,
+    },
+    {
+      source: "envelope.answer",
+      text: typeof envelopeRecord?.answer === "string" ? envelopeRecord.answer.trim() : null,
+    },
+    {
+      source: "text",
+      text: typeof record?.text === "string" ? record.text.trim() : null,
+    },
+    {
+      source: "answer",
+      text: typeof record?.answer === "string" ? record.answer.trim() : null,
+    },
+    {
+      source: "content",
+      text: typeof record?.content === "string" ? record.content.trim() : null,
+    },
+    {
+      source: "fallback_content",
+      text: typeof fallbackContent === "string" ? fallbackContent.trim() : null,
+    },
+  ];
+  const selected = candidates.find((candidate: { source: string; text: string | null }) =>
+    Boolean(candidate.text && !isInvalidTerminalAnswerText(candidate.text)),
+  );
+  const backendTerminalText =
+    readHelixAskTerminalText(terminalArtifact) ??
+    (typeof turnContract?.terminal_text === "string" && turnContract.terminal_text.trim()
+      ? turnContract.terminal_text.trim()
+      : null) ??
+    readHelixAskTerminalText(runtimeTerminal) ??
+    readHelixAskTerminalText(truthTerminal);
+  return {
+    text: selected?.text ?? "",
+    source: selected?.source ?? "empty",
+    backendTerminalText,
+  };
+}
+
+function readAgentLoopAuditArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function readProceduralActionLabel(value: unknown): string {
+  const action = readAgentLoopAuditRecord(value);
+  if (!action) return "model step";
+  const panelId = typeof action.panel_id === "string" && action.panel_id.trim() ? action.panel_id.trim() : "";
+  const actionId = typeof action.action_id === "string" && action.action_id.trim() ? action.action_id.trim() : "";
+  if (panelId && actionId) return `${panelId}.${actionId}`;
+  if (actionId) return actionId;
+  return "model step";
+}
+
+function readProceduralStatusClass(status: string): string {
+  if (status === "completed") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-50";
+  if (status === "running") return "animate-pulse border-sky-300/35 bg-sky-400/10 text-sky-50";
+  if (status === "suppressed") return "border-amber-300/35 bg-amber-400/10 text-amber-50";
+  if (status === "failed") return "border-rose-300/35 bg-rose-400/10 text-rose-50";
+  if (status === "pending_input") return "border-blue-300/35 bg-blue-400/10 text-blue-50";
+  if (status === "planned") return "border-white/10 bg-white/5 text-slate-300";
+  return "border-white/10 bg-white/5 text-slate-300";
+}
+
+function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
+  const truthTable = readAgentLoopAuditRecord(reply.debug?.turn_truth_table);
+  const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
+  const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
+  const agentLoopAudit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
+  const planItems = readAgentLoopAuditArray(truthTable?.plan_items ?? plannerContract?.plan_items);
+  const observations = readAgentLoopAuditArray(truthTable?.runtime_observations ?? runtimeSummary?.observations);
+  const appendedSteps = readAgentLoopAuditArray(runtimeSummary?.appended_steps);
+  const terminal = readAgentLoopAuditRecord(truthTable?.terminal ?? runtimeSummary?.terminal);
+  const selectedTool = readAgentLoopAuditRecord(truthTable?.selected_tool ?? agentLoopAudit?.selected_action);
+  const route = String(truthTable?.route_reason_code ?? agentLoopAudit?.route_reason_code ?? reply.debug?.server_route_reason_code ?? "n/a");
+  const policy = String(truthTable?.dispatch_policy ?? agentLoopAudit?.dispatch_policy ?? reply.debug?.server_dispatch_policy ?? "n/a");
+  const visibleAnswer = typeof truthTable?.visible_answer_text === "string" ? truthTable.visible_answer_text : reply.content;
+  const terminalText = typeof terminal?.text === "string" ? terminal.text : "";
+  const truthMatchesVisible = Boolean(terminalText && visibleAnswer && terminalText.trim() === visibleAnswer.trim());
+
+  if (!truthTable && planItems.length === 0 && observations.length === 0 && !terminal) {
+    return null;
+  }
+
+  const rows: Array<{
+    key: string;
+    label: string;
+    detail: string;
+    status: string;
+  }> = [];
+
+  planItems.slice(0, 8).forEach((item, index) => {
+    const record = readAgentLoopAuditRecord(item);
+    const actionLabel = readProceduralActionLabel(record?.action);
+    const lane = String(record?.lane ?? "step");
+    rows.push({
+      key: `plan-${index}`,
+      label: `Plan ${index + 1}: ${lane}`,
+      detail: actionLabel !== "model step" ? actionLabel : clipText(String(record?.title ?? record?.id ?? "planned step"), 140),
+      status: String(record?.status ?? "planned"),
+    });
+  });
+
+  appendedSteps.slice(0, 6).forEach((item, index) => {
+    const record = readAgentLoopAuditRecord(item);
+    rows.push({
+      key: `append-${index}`,
+      label: `Appended step: ${String(record?.step_id ?? "next_step")}`,
+      detail: `because ${String(record?.reason ?? "the previous observation needed another tool")}`,
+      status: "running",
+    });
+  });
+
+  observations.slice(-10).forEach((item, index) => {
+    const record = readAgentLoopAuditRecord(item);
+    const artifact = readAgentLoopAuditRecord(record?.artifact);
+    const actionLabel = readProceduralActionLabel(artifact);
+    const actualArtifacts = Array.isArray(record?.actual_artifacts)
+      ? (record?.actual_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
+      : "";
+    const blockedArtifacts = Array.isArray(record?.blocked_missing_artifacts)
+      ? (record?.blocked_missing_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
+      : "";
+    const detail =
+      blockedArtifacts
+        ? `blocked: missing ${blockedArtifacts}`
+        : actualArtifacts
+          ? `observed: ${actualArtifacts}`
+          : actionLabel !== "model step"
+            ? actionLabel
+            : String(record?.step_id ?? "observation");
+    rows.push({
+      key: `observe-${index}`,
+      label: `Observed: ${String(record?.step_id ?? "step")}`,
+      detail,
+      status: String(record?.status ?? "completed"),
+    });
+  });
+
+  if (terminal) {
+    rows.push({
+      key: "terminal",
+      label: `Terminal: ${String(terminal.kind ?? "final_answer")}`,
+      detail: clipText(String(terminal.text ?? visibleAnswer ?? "turn completed"), 160),
+      status: String(terminal.kind ?? "completed") === "pending_input" ? "pending_input" : "completed",
+    });
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-50">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Procedural workspace timeline</p>
+        <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-100/70">
+          Truth: {truthMatchesVisible ? "backend terminal == visible answer" : "backend terminal != visible answer"}
+        </p>
+      </div>
+      <p className="mt-1 text-[11px] text-cyan-100/80">
+        Route: {policy} / {route}
+        {selectedTool ? ` | Tool: ${readProceduralActionLabel(selectedTool)}` : ""}
+      </p>
+      <div className="mt-2 space-y-1.5">
+        {rows.slice(0, 18).map((row, index) => (
+          <div key={row.key} className={`rounded-lg border px-2 py-1.5 ${readProceduralStatusClass(row.status)}`}>
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] tabular-nums">
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium">{row.label}</p>
+                <p className="mt-0.5 break-words text-[11px] opacity-80">
+                  {row.detail} [{row.status}]
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function resolveHelixTurnTranscriptEvents(reply: HelixAskReply): Record<string, unknown>[] {
+  const directEvents = Array.isArray(reply.debug?.turn_transcript_events)
+    ? reply.debug.turn_transcript_events
+    : [];
+  if (directEvents.length > 0) {
+    return directEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  }
+  const audit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
+  const auditEvents = Array.isArray(audit?.turn_transcript_events) ? audit.turn_transcript_events : [];
+  return auditEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+}
+
+function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
+  key: string;
+  role: string;
+  label: string;
+  text: string;
+  meta: string;
+  status: string;
+}> {
+  const transcriptEvents = resolveHelixTurnTranscriptEvents(reply);
+  if (transcriptEvents.length > 0) {
+    return transcriptEvents
+      .filter((event) => {
+        const type = String(event.type ?? "");
+        return type !== "question" && type !== "turn_completed";
+      })
+      .slice(-14)
+      .map((event, index) => {
+        const role = String(event.role ?? "agent");
+        const type = String(event.type ?? "event");
+        const status = String(event.status ?? "");
+        const label =
+          type === "plan"
+            ? "Plan"
+            : type === "model_decision"
+              ? status === "running"
+                ? "Thinking"
+                : "Decision"
+            : type === "step_started"
+              ? "Working"
+              : type === "tool_result"
+                ? "Observation"
+                : type === "observation"
+                  ? "Recorded"
+                  : type === "decision"
+                    ? "Decision"
+                    : type === "final_answer"
+                      ? "Final"
+                      : "Agent";
+        return {
+          key: `${reply.id}-transcript-event-${index}`,
+          role,
+          label,
+          text: String(event.text ?? ""),
+          meta: [String(event.lane ?? ""), String(event.step_id ?? ""), status].filter(Boolean).join(" | "),
+          status,
+        };
+      });
+  }
+  const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
+  const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
+  const planItems = Array.isArray(plannerContract?.plan_items) ? plannerContract.plan_items : [];
+  const observations = Array.isArray(runtimeSummary?.observations) ? runtimeSummary.observations : [];
+  const rows: Array<{ key: string; role: string; label: string; text: string; meta: string; status: string }> = [];
+  planItems.slice(0, 4).forEach((item, index) => {
+    const record = readAgentLoopAuditRecord(item);
+    rows.push({
+      key: `${reply.id}-fallback-plan-${index}`,
+      role: "agent",
+      label: "Plan",
+      text: String(record?.title ?? record?.id ?? "planned step"),
+      meta: `${String(record?.lane ?? "step")} | ${String(record?.status ?? "planned")}`,
+      status: String(record?.status ?? "planned"),
+    });
+  });
+  observations.slice(-6).forEach((item, index) => {
+    const record = readAgentLoopAuditRecord(item);
+    const actualArtifacts = Array.isArray(record?.actual_artifacts)
+      ? (record.actual_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
+      : "";
+    rows.push({
+      key: `${reply.id}-fallback-observation-${index}`,
+      role: "tool",
+      label: "Observation",
+      text: actualArtifacts || String(record?.step_id ?? "step result"),
+      meta: `${String(record?.lane ?? "step")} | ${String(record?.status ?? "completed")}`,
+      status: String(record?.status ?? "completed"),
+    });
+  });
+  return rows;
 }
 
 function normalizeCitations(value: unknown): string[] {
@@ -6525,6 +6872,39 @@ function buildHelixAskDebugContextSummary(
       typeof debug?.composer_v2_best_attempt_stage === "string"
         ? debug?.composer_v2_best_attempt_stage
         : null,
+    agent_loop_audit: asObjectRecord(debug?.agent_loop_audit ?? null),
+    planner_contract: asObjectRecord(debug?.planner_contract ?? null),
+    execution_trace: Array.isArray(debug?.execution_trace) ? debug?.execution_trace : [],
+    execution_lifecycle: Array.isArray(debug?.execution_lifecycle) ? debug?.execution_lifecycle : [],
+    step_results: Array.isArray(debug?.step_results) ? debug?.step_results : [],
+    turn_events: Array.isArray(debug?.turn_events) ? debug.turn_events : [],
+    runtime_loop_mode: typeof debug?.runtime_loop_mode === "string" ? debug.runtime_loop_mode : null,
+    runtime_event_count:
+      typeof debug?.runtime_event_count === "number" && Number.isFinite(debug.runtime_event_count)
+        ? debug.runtime_event_count
+        : null,
+    turn_runtime: asObjectRecord(debug?.turn_runtime ?? null),
+    pending_request: asObjectRecord(debug?.pending_request ?? null),
+    pending_intercepted_turn: debug?.pending_intercepted_turn === true,
+    pending_interception_reason:
+      typeof debug?.pending_interception_reason === "string" ? debug.pending_interception_reason : null,
+    pending_resolution_reason:
+      typeof debug?.pending_resolution_reason === "string" ? debug.pending_resolution_reason : null,
+    pending_status_before: typeof debug?.pending_status_before === "string" ? debug.pending_status_before : null,
+    pending_status_after: typeof debug?.pending_status_after === "string" ? debug.pending_status_after : null,
+    pending_transition_reason:
+      typeof debug?.pending_transition_reason === "string" ? debug.pending_transition_reason : null,
+    pending_transition_trace: Array.isArray(debug?.pending_transition_trace) ? debug.pending_transition_trace : [],
+    workspace_context_snapshot: asObjectRecord(debug?.workspace_context_snapshot ?? null),
+    action_envelope: asObjectRecord(debug?.action_envelope ?? null),
+    turn_contract: asObjectRecord(debug?.turn_contract ?? null),
+    invariant_violations: Array.isArray(debug?.invariant_violations) ? debug?.invariant_violations : [],
+    latest_result_artifact: asObjectRecord(debug?.latest_result_artifact ?? null),
+    server_route_reason_code:
+      typeof debug?.server_route_reason_code === "string" ? debug.server_route_reason_code : null,
+    server_dispatch_policy:
+      typeof debug?.server_dispatch_policy === "string" ? debug.server_dispatch_policy : null,
+    server_selected_action: asObjectRecord(debug?.server_selected_action ?? null),
   };
   return summary;
 }
@@ -6553,20 +6933,25 @@ function hasLongText(value: unknown, limit: number): boolean {
 }
 
 function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
+  const normalize = (input: unknown, stack: WeakSet<object>): unknown => {
+    if (typeof input === "bigint") return input.toString();
+    if (!input || typeof input !== "object") return input;
+    if (stack.has(input)) return "[Circular]";
+    stack.add(input);
+    if (Array.isArray(input)) {
+      const out = input.map((entry) => normalize(entry, stack));
+      stack.delete(input);
+      return out;
+    }
+    const out: Record<string, unknown> = {};
+    Object.entries(input as Record<string, unknown>).forEach(([key, entry]) => {
+      out[key] = normalize(entry, stack);
+    });
+    stack.delete(input);
+    return out;
+  };
   try {
-    const seen = new WeakSet<object>();
-    return JSON.stringify(
-      value,
-      (_key, val) => {
-        if (typeof val === "bigint") return val.toString();
-        if (typeof val === "object" && val !== null) {
-          if (seen.has(val)) return "[Circular]";
-          seen.add(val);
-        }
-        return val;
-      },
-      2,
-    );
+    return JSON.stringify(normalize(value, new WeakSet<object>()), null, 2);
   } catch {
     return fallback;
   }
@@ -7696,6 +8081,35 @@ function extractExplicitDocsViewerPath(question: string): string | null {
   return null;
 }
 
+function readWorkstationActionArgString(action: HelixWorkstationAction, keys: string[]): string | null {
+  if (action.action !== "run_panel_action") return null;
+  const args = asObjectRecord(action.args ?? null);
+  if (!args) return null;
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+export function syncDocViewerStateFromWorkstationAction(action: HelixWorkstationAction): boolean {
+  if (action.action !== "run_panel_action") return false;
+  if (action.panel_id !== "docs-viewer") return false;
+  if (
+    action.action_id !== "open_doc" &&
+    action.action_id !== "open_doc_by_path" &&
+    action.action_id !== "open_latest_doc_by_topic" &&
+    action.action_id !== "open_doc_and_read"
+  ) {
+    return false;
+  }
+  const path = readWorkstationActionArgString(action, ["path", "doc_path", "target"]);
+  if (!path) return false;
+  const anchor = readWorkstationActionArgString(action, ["anchor"]) ?? undefined;
+  useDocViewerStore.getState().viewDoc(path, anchor);
+  return true;
+}
+
 function resolveDocsViewerAnchorPathForQuestion(
   question: string,
   answerContract?: HelixAskAnswerContract,
@@ -7736,6 +8150,34 @@ function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
       snap: state.mobileDrawer.snap,
     },
   };
+}
+
+function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefined): Record<string, unknown> {
+  const docState = useDocViewerStore.getState();
+  const layoutState = useWorkstationLayoutStore.getState();
+  const activeGroup = layoutState.groups[layoutState.activeGroupId] ?? null;
+  const activePanel = activeGroup?.activePanelId ?? null;
+  const currentPath = typeof docState.currentPath === "string" && docState.currentPath.trim()
+    ? docState.currentPath.trim().replace(/\\/g, "/")
+    : null;
+  return {
+    sessionId: sessionId ?? "helix-ui",
+    activePanel,
+    activeDocPath: currentPath,
+    hasDocContext: Boolean(currentPath),
+    hasNoteContext: Object.values(layoutState.groups).some((group) => group.panelIds.includes("workstation-notes")),
+    hasClipboardContext: Object.values(layoutState.groups).some((group) =>
+      group.panelIds.includes("workstation-clipboard-history"),
+    ),
+    lastUpdatedAtMs: Date.now(),
+  };
+}
+
+function normalizeDocPathForDebugCompare(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/\\/g, "/");
+  if (!trimmed) return null;
+  return trimmed.replace(/^\/+/, "");
 }
 
 function buildReplyMasterEventClockExport(args: {
@@ -7853,6 +8295,26 @@ function buildReplyMasterEventClockExport(args: {
       ? debugRecord.traceId.trim()
       : null);
   if (debugTraceId) traceIds.add(debugTraceId);
+  const turnTruthTable = readAgentLoopAuditRecord(debugRecord?.turn_truth_table);
+  const visibleTerminal = resolveHelixAskVisibleTerminal(args.reply, args.reply.content);
+  // Keep the debug export anchored to the visible UI answer: visible_answer_text: args.reply.content
+  const visibleAnswerText = visibleTerminal.text || args.reply.content;
+  const backendTerminalText = visibleTerminal.backendTerminalText;
+  const terminalMismatch = Boolean(
+    backendTerminalText &&
+      visibleAnswerText &&
+      normalizeTerminalAnswerText(backendTerminalText) !== normalizeTerminalAnswerText(visibleAnswerText),
+  );
+  const workspaceSnapshotRecord = asObjectRecord(debugRecord?.workspace_context_snapshot ?? null);
+  const debugWorkspaceDocPath = normalizeDocPathForDebugCompare(workspaceSnapshotRecord?.activeDocPath);
+  const channelDocViewerPath = normalizeDocPathForDebugCompare(args.docViewerState.currentPath);
+  const docViewerStateMatchesWorkspaceSnapshot =
+    !debugWorkspaceDocPath || Boolean(channelDocViewerPath && channelDocViewerPath === debugWorkspaceDocPath);
+  const docViewerMismatchReason = docViewerStateMatchesWorkspaceSnapshot
+    ? null
+    : channelDocViewerPath
+      ? "path_mismatch"
+      : "doc_viewer_current_path_missing";
 
   const payload = {
     schema: "helix.ask.master_event_clock.v2",
@@ -7881,6 +8343,103 @@ function buildReplyMasterEventClockExport(args: {
     },
     debugContext: args.debugContext,
     debug: args.reply.debug ?? null,
+    turnTruthTable: turnTruthTable
+      ? {
+          ...turnTruthTable,
+          visible_answer_text: visibleAnswerText,
+          backend_terminal_answer: backendTerminalText,
+          terminal_source: visibleTerminal.source,
+          terminal_mismatch: terminalMismatch,
+        }
+      : {
+          schema: "helix.ask.turn_truth_table.v1",
+          visible_answer_text: visibleAnswerText,
+          backend_terminal_answer: backendTerminalText,
+          terminal_source: visibleTerminal.source,
+          terminal_mismatch: terminalMismatch,
+        },
+    turnTruthTableSummary: [
+      "TURN TRUTH TABLE",
+      `Route: ${String(turnTruthTable?.dispatch_policy ?? "n/a")} / ${String(turnTruthTable?.route_reason_code ?? "n/a")}`,
+      `Tool: ${readProceduralActionLabel(turnTruthTable?.selected_tool)}`,
+      `Terminal: ${String(readAgentLoopAuditRecord(turnTruthTable?.terminal)?.kind ?? "n/a")} | ${clipText(
+        String(backendTerminalText ?? readAgentLoopAuditRecord(turnTruthTable?.terminal)?.text ?? args.reply.content ?? ""),
+        240,
+      )}`,
+      `Visible answer: ${clipText(visibleAnswerText, 240)}`,
+      `Terminal source: ${visibleTerminal.source}`,
+      `Terminal mismatch: ${terminalMismatch ? "true" : "false"}`,
+      `Doc viewer state matches workspace snapshot: ${docViewerStateMatchesWorkspaceSnapshot ? "true" : "false"}`,
+    ].join("\n"),
+    docViewerStateMatchesWorkspaceSnapshot,
+    docViewerMismatchReason,
+    agentLoop: {
+      audit: readAgentLoopAuditRecord(args.reply.debug?.agent_loop_audit),
+      turn_truth_table: turnTruthTable,
+      planner_contract: readAgentLoopAuditRecord(args.reply.debug?.planner_contract),
+      execution_trace: Array.isArray(args.reply.debug?.execution_trace) ? args.reply.debug?.execution_trace : [],
+      execution_lifecycle: Array.isArray(args.reply.debug?.execution_lifecycle)
+        ? args.reply.debug?.execution_lifecycle
+        : [],
+      step_results: Array.isArray(args.reply.debug?.step_results) ? args.reply.debug?.step_results : [],
+      turn_events: Array.isArray(args.reply.debug?.turn_events) ? args.reply.debug?.turn_events : [],
+      turn_transcript_events: resolveHelixTurnTranscriptEvents(args.reply),
+      turn_transcript_source:
+        typeof args.reply.debug?.turn_transcript_source === "string" ? args.reply.debug.turn_transcript_source : null,
+      visible_event_count: resolveHelixTurnTranscriptEvents(args.reply).length,
+      backend_event_count: Array.isArray(args.reply.debug?.turn_events) ? args.reply.debug.turn_events.length : 0,
+      event_source:
+        typeof args.reply.debug?.turn_transcript_source === "string" ? args.reply.debug.turn_transcript_source : null,
+      terminal_mismatch: terminalMismatch,
+      runtime_loop_mode:
+        typeof args.reply.debug?.runtime_loop_mode === "string" ? args.reply.debug.runtime_loop_mode : null,
+      runtime_event_count:
+        typeof args.reply.debug?.runtime_event_count === "number" ? args.reply.debug.runtime_event_count : null,
+      async_executor_used: args.reply.debug?.async_executor_used === true,
+      async_step_count:
+        typeof args.reply.debug?.async_step_count === "number" ? args.reply.debug.async_step_count : null,
+      async_total_duration_ms:
+        typeof args.reply.debug?.async_total_duration_ms === "number"
+          ? args.reply.debug.async_total_duration_ms
+          : null,
+      async_step_durations: Array.isArray(args.reply.debug?.async_step_durations)
+        ? args.reply.debug.async_step_durations
+        : [],
+      model_decision_llm_used: args.reply.debug?.model_decision_llm_used === true,
+      model_decision_count:
+        typeof args.reply.debug?.model_decision_count === "number" ? args.reply.debug.model_decision_count : null,
+      model_decision_audits: Array.isArray(args.reply.debug?.model_decision_audits)
+        ? args.reply.debug.model_decision_audits
+        : [],
+      runtime_summary: readAgentLoopAuditRecord(args.reply.debug?.turn_runtime),
+      pending_request: readAgentLoopAuditRecord(args.reply.debug?.pending_request),
+      pending_intercepted_turn: args.reply.debug?.pending_intercepted_turn === true,
+      pending_interception_reason:
+        typeof args.reply.debug?.pending_interception_reason === "string"
+          ? args.reply.debug.pending_interception_reason
+          : null,
+      pending_resolution_reason:
+        typeof args.reply.debug?.pending_resolution_reason === "string"
+          ? args.reply.debug.pending_resolution_reason
+          : null,
+      pending_status_before:
+        typeof args.reply.debug?.pending_status_before === "string" ? args.reply.debug.pending_status_before : null,
+      pending_status_after:
+        typeof args.reply.debug?.pending_status_after === "string" ? args.reply.debug.pending_status_after : null,
+      pending_transition_reason:
+        typeof args.reply.debug?.pending_transition_reason === "string"
+          ? args.reply.debug.pending_transition_reason
+          : null,
+      pending_transition_trace: Array.isArray(args.reply.debug?.pending_transition_trace)
+        ? args.reply.debug.pending_transition_trace
+        : [],
+      action_envelope: readAgentLoopAuditRecord(args.reply.debug?.action_envelope),
+      terminal_contract: readAgentLoopAuditRecord(args.reply.debug?.turn_contract),
+      invariant_violations: Array.isArray(args.reply.debug?.invariant_violations)
+        ? args.reply.debug?.invariant_violations
+        : [],
+      latest_result_artifact: readAgentLoopAuditRecord(args.reply.debug?.latest_result_artifact),
+    },
     channels: {
       voice: sanitizeVoiceDiagnosticsForExport(args.voiceDiagnostics),
       observer: {
@@ -7906,6 +8465,22 @@ function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
   const kind = typeof meta?.kind === "string" ? meta.kind.trim().toLowerCase() : "";
   if (!kind) return false;
   return kind.startsWith("workstation_") || kind.startsWith("job_") || kind.startsWith("observer_plan_");
+}
+
+function buildObservationGroundedReplyText(entry: AskLiveEventEntry): { text: string; ok: boolean } | null {
+  const raw = String(entry.text ?? "").trim();
+  if (!raw) return null;
+  const failureMatch = raw.match(/^fail:\s*run panel action\s+[\w.-]+(?:\s*-\s*(.+))?$/i);
+  if (failureMatch) {
+    const message = failureMatch[1]?.trim() || "The workspace action failed.";
+    return { text: `Could not complete that workspace action: ${message}`, ok: false };
+  }
+  const successMatch = raw.match(/^ok:\s*run panel action\s+[\w.-]+(?:\s*-\s*(.+))?$/i);
+  if (successMatch) {
+    const message = successMatch[1]?.trim();
+    if (message) return { text: message, ok: true };
+  }
+  return null;
 }
 
 function stripContextCapsuleTokensFromText(value: string): string {
@@ -8409,6 +8984,11 @@ const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
   64,
   HELIX_ASK_MAX_TOKENS,
 );
+const HELIX_ASK_TURN_CLIENT_WATCHDOG_MS = clampNumber(
+  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_TURN_CLIENT_WATCHDOG_MS, 45_000),
+  5_000,
+  180_000,
+);
 const HELIX_ASK_PATH_REGEX =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|js|md|json|cjs|mjs|py|yml|yaml)/g;
 const HELIX_ASK_CORE_FOCUS = /(helix ask|helix|ask system|ask pipeline|ask mode)/i;
@@ -8612,6 +9192,7 @@ function normalizeWorkstationCommandText(value: string): string {
     .replace(/\b(?:pull|bring)\s+up\b/gi, "open")
     .replace(/\bpop\s+open\b/gi, "open")
     .replace(/\bopen\s+up\b/gi, "open")
+    .replace(/\bjump\s+(?:over\s+)?to\b/gi, "go to")
     .replace(/\bread\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
       return `read ${referent.toLowerCase()} doc to me`;
     })
@@ -8700,6 +9281,30 @@ function parseWorkstationLexiconAction(
 ): HelixWorkstationAction | null {
   const normalized = source.toLowerCase();
 
+  const explicitDocPathMatch = conversationalCandidate.match(
+    /\b(?:open|view|show|read|pull\s+up)\s+(\/?docs\/[^\s]+?\.(?:md|mdx|txt|rst|adoc))(?:[?.!])?$/i,
+  );
+  if (explicitDocPathMatch) {
+    const path = explicitDocPathMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    if (path) {
+      return buildLexiconPanelAction("docs-viewer", "open_doc_by_path", { path });
+    }
+  }
+
+  const latestDocMatch =
+    conversationalCandidate.match(/\b(?:open|view|show|read|pick|grab|pull\s+up)\s+(?:the\s+)?(?:latest|newest|most\s+recent)\s+(.+?)\s+(?:doc|docs|document|paper)\b/i) ??
+    conversationalCandidate.match(/\b(?:open|view|show|read|pick|grab|pull\s+up)\s+(?:the\s+)?(.+?)\s+(?:latest|newest|most\s+recent)\s+(?:doc|docs|document|paper)\b/i);
+  if (latestDocMatch) {
+    const topic = latestDocMatch[1]
+      ?.replace(/\b(?:the|a|an|doc|docs|document|paper|latest|newest|most|recent)\b/gi, " ")
+      .replace(/[?.!]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (topic) {
+      return buildLexiconPanelAction("docs-viewer", "open_latest_doc_by_topic", { topic });
+    }
+  }
+
   if (/^(?:ok|okay|please\s+)?(?:list|show)\s+(?:my\s+)?notes\b/i.test(conversationalCandidate)) {
     return buildLexiconPanelAction("workstation-notes", "list_notes");
   }
@@ -8729,6 +9334,17 @@ function parseWorkstationLexiconAction(
   if (appendNamedMatch) {
     const title = appendNamedMatch[1]?.trim();
     const text = appendNamedMatch[2]?.trim();
+    if (title && text) {
+      return buildLexiconPanelAction("workstation-notes", "append_to_note", { title, text });
+    }
+  }
+
+  const appendTextToNamedNoteMatch = conversationalCandidate.match(
+    /\b(?:append|add|put|save|write)\s+(.+?)\s+\b(?:to|into|in)\s+(?:the\s+|my\s+)?(?:note|notepad)\s+(.+)$/i,
+  );
+  if (appendTextToNamedNoteMatch) {
+    const text = appendTextToNamedNoteMatch[1]?.replace(/[?.!]+$/g, "").trim();
+    const title = appendTextToNamedNoteMatch[2]?.replace(/[?.!]+$/g, "").trim();
     if (title && text) {
       return buildLexiconPanelAction("workstation-notes", "append_to_note", { title, text });
     }
@@ -9950,6 +10566,10 @@ export function HelixAskPill({
   const askLiveDraftBufferRef = useRef("");
   const askLiveDraftFlushRef = useRef<number | null>(null);
   const [askQueue, setAskQueue] = useState<string[]>([]);
+  const [askContextChooser, setAskContextChooser] = useState<AskContextChooserState | null>(null);
+  const askContextChooserRef = useRef<AskContextChooserState | null>(null);
+  const [askContextChooserCountdownSec, setAskContextChooserCountdownSec] = useState<number | null>(null);
+  const askContextChooserTimerRef = useRef<number | null>(null);
   const [contextCapsulePreview, setContextCapsulePreview] = useState<ContextCapsulePreview | null>(null);
   const [contextCapsuleDetectedId, setContextCapsuleDetectedId] = useState<string | null>(null);
   const [contextCapsuleSessionLedger, setContextCapsuleSessionLedger] = useState<ContextCapsuleLedgerEntry[]>([]);
@@ -10014,6 +10634,21 @@ export function HelixAskPill({
   useEffect(() => {
     pendingWorkstationUserInputRef.current = pendingWorkstationUserInput;
   }, [pendingWorkstationUserInput]);
+  useEffect(() => {
+    askContextChooserRef.current = askContextChooser;
+  }, [askContextChooser]);
+  const clearAskContextChooserTimer = useCallback(() => {
+    if (askContextChooserTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearInterval(askContextChooserTimerRef.current);
+      askContextChooserTimerRef.current = null;
+    }
+  }, []);
+  const dismissAskContextChooser = useCallback(() => {
+    clearAskContextChooserTimer();
+    setAskContextChooser(null);
+    setAskContextChooserCountdownSec(null);
+  }, [clearAskContextChooserTimer]);
+  useEffect(() => () => clearAskContextChooserTimer(), [clearAskContextChooserTimer]);
   const appendWorkstationEventToLatestActReply = useCallback((entry: AskLiveEventEntry) => {
     if (!isWorkstationLifecycleEvent(entry)) return;
     setAskReplies((prev) => {
@@ -10028,9 +10663,18 @@ export function HelixAskPill({
       const existing = Array.isArray(target.liveEvents) ? target.liveEvents : [];
       if (existing.some((event) => event.id === entry.id)) return prev;
       const nextLiveEvents = [...existing, entry].slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+      const groundedReply = buildObservationGroundedReplyText(entry);
       const next = [...prev];
       next[targetIndex] = {
         ...target,
+        ...(groundedReply
+          ? {
+              content: groundedReply.text,
+              ok: groundedReply.ok,
+              error: groundedReply.ok ? undefined : groundedReply.text,
+              message: groundedReply.text,
+            }
+          : {}),
         liveEvents: nextLiveEvents,
       };
       return next;
@@ -11542,6 +12186,7 @@ export function HelixAskPill({
         resolved.push(...coerceHelixWorkstationActions(payload));
       });
       if (resolved.length === 0) return;
+      resolved.forEach((action) => syncDocViewerStateFromWorkstationAction(action));
       if (onRunWorkstationAction) {
         resolved.forEach((action) => onRunWorkstationAction(action));
         return;
@@ -11598,6 +12243,7 @@ export function HelixAskPill({
           deduped.push(action);
         });
         if (deduped.length > 0) {
+          deduped.forEach((action) => syncDocViewerStateFromWorkstationAction(action));
           if (onRunWorkstationAction) {
             deduped.forEach((action) => onRunWorkstationAction(action));
           } else {
@@ -11888,6 +12534,8 @@ export function HelixAskPill({
 
   const buildCopyText = useCallback((reply: HelixAskReply): string => {
     if (!reply) return "";
+    const terminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+    if (terminal.text) return terminal.text;
     if (!reply.envelope) return reply.content;
     const sections = reply.envelope.sections ?? [];
     const detailSections = sections.filter((section) => section.layer !== "proof");
@@ -17360,12 +18008,7 @@ export function HelixAskPill({
     ((
       question: string,
       capsuleIds?: string[],
-      options?: {
-        bypassWorkstationDispatch?: boolean;
-        forceReasoningDispatch?: boolean;
-        suppressWorkstationPayloadActions?: boolean;
-        answerContract?: HelixAskAnswerContract;
-      },
+      options?: RunAskOptions,
     ) => Promise<void>) | null
   >(null);
 
@@ -21189,6 +21832,15 @@ export function HelixAskPill({
       const controller = new AbortController();
       askAbortRef.current = controller;
       const runId = ++askRunIdRef.current;
+      let askTurnWatchdogFired = false;
+      const askTurnWatchdogId =
+        HELIX_ASK_TURN_CLIENT_WATCHDOG_MS > 0
+          ? window.setTimeout(() => {
+              if (askRunIdRef.current !== runId) return;
+              askTurnWatchdogFired = true;
+              controller.abort("helix_ask_turn_timeout");
+            }, HELIX_ASK_TURN_CLIENT_WATCHDOG_MS)
+          : null;
       let skipReply = false;
 
       try {
@@ -21206,10 +21858,10 @@ export function HelixAskPill({
             signal: controller.signal,
           });
           responseEnvelope = localResponse.envelope;
-          const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
+          const envelopeAnswer = (responseEnvelope?.assistant_answer ?? responseEnvelope?.answer)?.trim() ?? "";
           responseText = envelopeAnswer
             ? envelopeAnswer
-            : stripPromptEcho(localResponse.text ?? "", questionText);
+            : stripPromptEcho(localResponse.assistant_answer ?? localResponse.text ?? "", questionText);
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
@@ -21220,7 +21872,35 @@ export function HelixAskPill({
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
-          if (aborted) {
+          if (aborted && askTurnWatchdogFired) {
+            responseText = `Turn timed out after ${HELIX_ASK_TURN_CLIENT_WATCHDOG_MS}ms before a terminal result was returned.`;
+            responseMode = "observe";
+            setAskStatus("Turn timed out.");
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: "manual",
+              status: "failed",
+              text: responseText,
+              detail: "turn_timeout",
+              mode: inferredMode,
+              traceId,
+              attemptId: manualAttempt?.id,
+              meta: {
+                router_state: "S6_TERMINAL_GUARD",
+                router_fail_id: "RF_TURN_TIMEOUT",
+                turn_id: traceId,
+                watchdog_ms: HELIX_ASK_TURN_CLIENT_WATCHDOG_MS,
+              },
+            });
+            if (manualAttempt) {
+              updateReasoningAttempt(manualAttempt.id, (current) => ({
+                ...current,
+                status: "failed",
+                suppression_reason: "turn_timeout",
+                completedAtMs: Date.now(),
+              }));
+            }
+          } else if (aborted) {
             skipReply = true;
             setAskStatus("Generation stopped.");
           } else {
@@ -21291,6 +21971,9 @@ export function HelixAskPill({
           }
         }
       } finally {
+        if (askTurnWatchdogId !== null) {
+          window.clearTimeout(askTurnWatchdogId);
+        }
         if (askRunIdRef.current === runId) {
           setAskBusy(false);
           setAskStatus(null);
@@ -21314,6 +21997,7 @@ export function HelixAskPill({
       buildConvergenceSnapshot,
       cancelMoodHint,
       clearLiveDraftFlush,
+      clearAskContextChooserTimer,
       clearMoodTimer,
       getHelixAskSessionId,
       launchAtomicViewer,
@@ -21338,12 +22022,7 @@ export function HelixAskPill({
     async (
       question: string,
       capsuleIds?: string[],
-      options?: {
-        bypassWorkstationDispatch?: boolean;
-        forceReasoningDispatch?: boolean;
-        suppressWorkstationPayloadActions?: boolean;
-        answerContract?: HelixAskAnswerContract;
-      },
+      options?: RunAskOptions,
     ) => {
       const trimmed = question.trim();
       if (!trimmed) return;
@@ -21362,7 +22041,8 @@ export function HelixAskPill({
       let parsedWorkstationFollowupActions: HelixWorkstationAction[] = [];
       let parsedWorkstationCommand: HelixWorkstationAction | null = null;
       let reasoningPlanPreEmitted = false;
-      if (!bypassWorkstationDispatch) {
+      const unifiedAskTurnOwnsManualDispatch = HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch;
+      if (!bypassWorkstationDispatch && !unifiedAskTurnOwnsManualDispatch) {
         const pendingResolution = resolveWorkstationActionFromPendingInput(trimmed, "run_ask", runAskTurnId);
         if (pendingResolution.handled) {
           if (!pendingResolution.action) {
@@ -21386,7 +22066,7 @@ export function HelixAskPill({
           parsedWorkstationCommand = pendingResolution.action;
         }
       }
-      if (!parsedWorkstationCommand && !explicitPanelCommand && !bypassWorkstationDispatch) {
+      if (!parsedWorkstationCommand && !explicitPanelCommand && !bypassWorkstationDispatch && !unifiedAskTurnOwnsManualDispatch) {
         const parsedChain = parseWorkstationActionChainCommand(normalizedWorkstationQuestion);
         if (Array.isArray(parsedChain) && parsedChain.length > 0) {
           parsedWorkstationCommand = parsedChain[0] ?? null;
@@ -21410,13 +22090,36 @@ export function HelixAskPill({
       });
       parsedWorkstationCommand = preliminaryPlannerContract.workstation_action;
       const preliminaryDispatchPlan = preliminaryPlannerContract.dispatch_plan;
+      if (options?.skipContextChooser === true) {
+        dismissAskContextChooser();
+      }
+      const shouldOfferContextChooser =
+        HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
+        !options?.skipContextChooser &&
+        !options?.contextMode &&
+        preliminaryDispatchPlan.should_dispatch_reasoning;
+      if (shouldOfferContextChooser) {
+        clearAskContextChooserTimer();
+        setAskContextChooser({
+          id: crypto.randomUUID(),
+          question: trimmed,
+          capsuleIds,
+          options: {
+            ...options,
+          },
+        });
+        setAskContextChooserCountdownSec(3);
+        setAskStatus("Attach workspace context to this reasoning turn?");
+        return;
+      }
       let userMessageCommitted = false;
       const typedPromptLanguageTag = normalizeVoiceLanguageTag(preferredResponseLanguage) ?? inferLanguageTagFromSourceText(trimmed);
       const shouldStageWorkstationIntent =
         !bypassWorkstationDispatch &&
+        !unifiedAskTurnOwnsManualDispatch &&
         !explicitPanelCommand &&
         (Boolean(parsedWorkstationCommand) || shouldProbeWorkstationIntentClassifier(trimmed));
-      if (shouldStageWorkstationIntent && !parsedWorkstationCommand) {
+      if (shouldStageWorkstationIntent && !parsedWorkstationCommand && !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
         try {
           const routerSessionId = getHelixAskSessionId();
           const conversationPreflight = await runConversationTurn({
@@ -21698,6 +22401,7 @@ export function HelixAskPill({
           dispatchPolicy: frozenRunAskDispatchPolicy,
         }).reasoning_required === "hard";
       const manualDispatchHint =
+        !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
         !simpleDirectPromptLane &&
         (options?.forceReasoningDispatch === true || trimmed.length > 0);
       const manualRouteReasonCode = simpleDirectPromptLane
@@ -21845,14 +22549,18 @@ export function HelixAskPill({
         let responseContextCapsule: ContextCapsuleSummary | undefined;
         let responseDebugWithClientMode: HelixAskReply["debug"] | undefined;
         let timelineDebugContext: Record<string, unknown> | null = null;
+        let localResponseForTerminal: AskLocalResult | null = null;
         setAskStatus("Generating answer...");
         try {
           const askModeForRequest =
             !manualDispatchHint || inferredMode === "observe" ? undefined : inferredMode;
+          const reasoningContextModeForTurn: "attached" | "isolated" =
+            options?.contextMode === "isolated" ? "isolated" : "attached";
+          const workspaceContextSnapshot = buildAskTurnWorkspaceContextSnapshot(sessionId);
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
-            localResponse = await runAskTurn({
+            const askTurnPayload = {
               sessionId: sessionId ?? undefined,
               traceId,
               maxTokens: HELIX_ASK_OUTPUT_TOKENS,
@@ -21864,9 +22572,27 @@ export function HelixAskPill({
               debug: userSettings.showHelixAskDebug,
               signal: controller.signal,
               mode: askModeForRequest,
+              contextMode: reasoningContextModeForTurn,
+              workspaceContextSnapshot,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
-            });
+            };
+            try {
+              localResponse = await runAskTurnStream(askTurnPayload, (event) => {
+                const record = readAgentLoopAuditRecord(event.data);
+                const text = typeof record?.text === "string" ? record.text.trim() : "";
+                if (event.event === "turn_transcript_event" && text) {
+                  setAskStatus(text);
+                }
+              });
+            } catch (streamError) {
+              localResponse = await runAskTurn(askTurnPayload);
+              localResponse.debug = {
+                ...(localResponse.debug ?? {}),
+                stream_used: false,
+                stream_fallback_reason: streamError instanceof Error ? streamError.message : String(streamError),
+              };
+            }
           } else {
             const askResult = await askLocalWithPreflightScopeFallback(undefined, {
               sessionId: sessionId ?? undefined,
@@ -21880,17 +22606,22 @@ export function HelixAskPill({
               debug: userSettings.showHelixAskDebug,
               signal: controller.signal,
               mode: askModeForRequest,
+              workspaceContextSnapshot,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
             });
             localResponse = askResult.response;
             downgradedFromMode = askResult.downgradedFromMode;
           }
+          localResponseForTerminal = localResponse;
           responseEnvelope = localResponse.envelope;
-          const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
-          responseText = envelopeAnswer
-            ? envelopeAnswer
-            : stripPromptEcho(localResponse.text ?? "", trimmed);
+          const terminalResolution = resolveHelixAskVisibleTerminal(localResponse);
+          const envelopeAnswer = (responseEnvelope?.assistant_answer ?? responseEnvelope?.answer)?.trim() ?? "";
+          responseText = terminalResolution.text
+            ? terminalResolution.text
+            : envelopeAnswer
+              ? envelopeAnswer
+              : stripPromptEcho(localResponse.assistant_answer ?? localResponse.text ?? "", trimmed);
           responseDebug = localResponse.debug;
           responseDebugWithClientMode =
             localResponse.debug || inferredMode
@@ -21926,6 +22657,68 @@ export function HelixAskPill({
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
+          const firstEnvelopeAction = Array.isArray(responseActionEnvelope?.workstation_actions)
+            ? responseActionEnvelope.workstation_actions[0]
+            : undefined;
+          if (responseDebugWithClientMode || HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
+            responseDebugWithClientMode = {
+              ...responseDebugWithClientMode,
+              ui_turn_contract_source: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? "ask_turn" : "legacy_local",
+              ui_local_fast_path_suppressed: unifiedAskTurnOwnsManualDispatch,
+              ui_action_envelope_panel_id:
+                typeof firstEnvelopeAction?.panel_id === "string" ? firstEnvelopeAction.panel_id : null,
+              ui_action_envelope_action_id:
+                typeof firstEnvelopeAction?.action_id === "string" ? firstEnvelopeAction.action_id : null,
+              server_route_reason_code:
+                typeof localResponse.route_reason_code === "string" ? localResponse.route_reason_code : null,
+              server_dispatch_policy:
+                typeof localResponse.dispatch_policy === "string"
+                  ? localResponse.dispatch_policy
+                  : readAgentLoopAuditRecord(localResponse.agent_loop_audit)?.dispatch_policy ?? null,
+              server_selected_action:
+                readAgentLoopAuditRecord(localResponse.agent_loop_audit)?.selected_action ?? firstEnvelopeAction ?? null,
+              agent_loop_audit: localResponse.agent_loop_audit ?? null,
+              turn_truth_table: localResponse.turn_truth_table ?? null,
+              planner_contract: localResponse.planner_contract ?? null,
+              execution_trace: localResponse.execution_trace ?? [],
+              execution_lifecycle: localResponse.execution_lifecycle ?? [],
+              step_results: localResponse.step_results ?? [],
+              turn_events: localResponse.turn_events ?? [],
+              turn_transcript_events: localResponse.turn_transcript_events ?? [],
+              turn_transcript_event_count: localResponse.turn_transcript_event_count ?? null,
+              turn_transcript_source: localResponse.turn_transcript_source ?? null,
+              runtime_loop_mode: localResponse.runtime_loop_mode ?? null,
+              runtime_event_count: localResponse.runtime_event_count ?? null,
+              async_executor_used: localResponse.async_executor_used === true,
+              async_step_count: localResponse.async_step_count ?? null,
+              async_total_duration_ms: localResponse.async_total_duration_ms ?? null,
+              async_step_durations: localResponse.async_step_durations ?? [],
+              model_decision_llm_used: localResponse.model_decision_llm_used === true,
+              model_decision_count: localResponse.model_decision_count ?? null,
+              model_decision_audits: localResponse.model_decision_audits ?? [],
+              turn_runtime: localResponse.turn_runtime ?? null,
+              pending_request:
+                readAgentLoopAuditRecord(localResponse.agent_loop_audit)?.pending_request ??
+                localResponse.pending_server_request ??
+                localResponse.pending_request ??
+                null,
+              pending_intercepted_turn: localResponse.pending_intercepted_turn === true,
+              pending_interception_reason: localResponse.pending_interception_reason ?? null,
+              pending_resolution_reason: localResponse.pending_resolution_reason ?? null,
+              pending_status_before: localResponse.pending_status_before ?? null,
+              pending_status_after: localResponse.pending_status_after ?? null,
+              pending_transition_reason: localResponse.pending_transition_reason ?? null,
+              pending_transition_trace: localResponse.pending_transition_trace ?? [],
+              workspace_context_snapshot: localResponse.workspace_context_snapshot ?? null,
+              action_envelope: localResponse.action_envelope ?? null,
+              turn_contract: localResponse.turn_contract ?? null,
+              invariant_violations: localResponse.invariant_violations ?? [],
+              latest_result_artifact: localResponse.latest_result_artifact ?? null,
+              terminal_artifact: readAgentLoopAuditRecord((localResponse as unknown as Record<string, unknown>).terminal_artifact),
+              ui_terminal_source: terminalResolution.source,
+              ui_backend_terminal_answer: terminalResolution.backendTerminalText,
+            };
+          }
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -22034,7 +22827,55 @@ export function HelixAskPill({
             debug: responseDebugPayload,
             proof: responseProof,
           });
-          if (evidenceGateDecision.blocked) {
+          const localResponseRecord = (localResponseForTerminal ?? {}) as unknown as Record<string, unknown>;
+          const plannerRecord = readAgentLoopAuditRecord(localResponseForTerminal?.agent_loop_audit);
+          const localDispatchPolicy =
+            typeof localResponseForTerminal?.dispatch_policy === "string"
+              ? localResponseForTerminal.dispatch_policy
+              : typeof plannerRecord?.dispatch_policy === "string"
+                ? plannerRecord.dispatch_policy
+                : null;
+          const localRouteReason =
+            typeof localResponseForTerminal?.route_reason_code === "string"
+              ? localResponseForTerminal.route_reason_code
+              : typeof localResponseRecord.route_reason_code === "string"
+                ? localResponseRecord.route_reason_code
+                : null;
+          const executionTraceForTerminal =
+            Array.isArray(localResponseForTerminal?.execution_trace)
+              ? localResponseForTerminal.execution_trace
+              : [];
+          const runtimeSummaryRecord = readAgentLoopAuditRecord(plannerRecord?.runtime_summary);
+          const runtimeObservationsForTerminal = Array.isArray(runtimeSummaryRecord?.observations)
+            ? runtimeSummaryRecord.observations
+            : [];
+          const terminalResolutionForFinal = resolveHelixAskVisibleTerminal(
+            {
+              ...(localResponseForTerminal ? (localResponseForTerminal as unknown as Record<string, unknown>) : {}),
+              content: responseText,
+              debug: responseDebugPayload,
+            },
+            responseText,
+          );
+          if (terminalResolutionForFinal.text && terminalResolutionForFinal.text !== responseText) {
+            responseText = terminalResolutionForFinal.text;
+          }
+          const hasCompletedWorkspaceTool = [
+            ...executionTraceForTerminal,
+            ...runtimeObservationsForTerminal,
+          ].some((step) => {
+            if (!step || typeof step !== "object") return false;
+            const record = step as Record<string, unknown>;
+            return record.lane === "workspace" && record.status === "completed";
+          });
+          const authoritativeWorkspaceTerminal =
+            (localDispatchPolicy === "workspace_only" || localDispatchPolicy === "workspace_context_reasoning") &&
+            localRouteReason === "dispatch:act" &&
+            hasCompletedWorkspaceTool &&
+            Boolean(terminalResolutionForFinal.backendTerminalText || terminalResolutionForFinal.text) &&
+            !localResponseForTerminal?.pending_server_request &&
+            !localResponseForTerminal?.pending_request;
+          if (evidenceGateDecision.blocked && !authoritativeWorkspaceTerminal) {
             appendSyntheticLiveEvent(
               buildNeedsRetrievalPlanEvent({
                 source: "run_ask",
@@ -22061,12 +22902,44 @@ export function HelixAskPill({
             });
             responseText = evidenceGateDecision.safe_text ?? responseText;
           }
-          const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugPayload);
+          const responseDebugForReply =
+            responseDebugPayload && typeof responseDebugPayload === "object"
+              ? {
+                  ...responseDebugPayload,
+                  turn_truth_table: responseDebugPayload.turn_truth_table &&
+                    typeof responseDebugPayload.turn_truth_table === "object"
+                    ? {
+                        ...(responseDebugPayload.turn_truth_table as Record<string, unknown>),
+                        visible_answer_text: responseText,
+                        backend_terminal_answer: terminalResolutionForFinal.backendTerminalText,
+                        terminal_source: terminalResolutionForFinal.source,
+                        terminal_mismatch: Boolean(
+                          terminalResolutionForFinal.backendTerminalText &&
+                            responseText &&
+                            normalizeTerminalAnswerText(terminalResolutionForFinal.backendTerminalText) !==
+                              normalizeTerminalAnswerText(responseText),
+                        ),
+                      }
+                    : {
+                        schema: "helix.ask.turn_truth_table.v1",
+                        visible_answer_text: responseText,
+                        backend_terminal_answer: terminalResolutionForFinal.backendTerminalText,
+                        terminal_source: terminalResolutionForFinal.source,
+                        terminal_mismatch: Boolean(
+                          terminalResolutionForFinal.backendTerminalText &&
+                            responseText &&
+                            normalizeTerminalAnswerText(terminalResolutionForFinal.backendTerminalText) !==
+                              normalizeTerminalAnswerText(responseText),
+                        ),
+                      },
+                }
+              : responseDebugPayload;
+          const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugForReply);
           const liveEventsSnapshot = [...askLiveEventsRef.current];
           const convergenceSnapshot = buildConvergenceSnapshot({
             events: liveEventsSnapshot,
             proof: responseProof,
-            debug: responseDebug,
+            debug: responseDebugForReply,
           });
           if (briefOnlyReply) {
             patchHelixTimelineEntry(manualBriefTimelineEntry.id, {
@@ -22088,7 +22961,7 @@ export function HelixAskPill({
                   id: replyId,
                   content: responseText,
                   question: trimmed,
-                  debug: responseDebugPayload,
+                  debug: responseDebugForReply,
                   promptIngested: responsePromptIngested,
                   envelope: responseEnvelope,
                   mode: responseMode,
@@ -22229,8 +23102,11 @@ export function HelixAskPill({
                 mode: responseMode ?? inferredMode,
               });
             }
+            const responseRouteReasonCode = String(responseEnvelope?.route_reason_code ?? "").trim();
+            const hasPendingServerRequest = Boolean(responseEnvelope?.pending_server_request);
+            const isClarifyTerminal = responseRouteReasonCode.startsWith("clarify:") || hasPendingServerRequest;
             addHelixTimelineEntry({
-              type: responseMode === "act" ? "action_receipt" : "reasoning_final",
+              type: responseMode === "act" || isClarifyTerminal ? "action_receipt" : "reasoning_final",
               source: "manual",
               status: "done",
               text: clipText(responseText, 520),
@@ -22334,6 +23210,7 @@ export function HelixAskPill({
       resolveWorkstationUserInputGate,
       cancelPendingWorkstationRequestForTurnTransition,
       dispatchWorkstationActionSequence,
+      dismissAskContextChooser,
       requestMoodHint,
       resizeTextarea,
       runWorkstationAction,
@@ -22347,6 +23224,50 @@ export function HelixAskPill({
     ],
   );
   runAskRef.current = runAsk;
+  const executeAskWithContextMode = useCallback((contextMode: "attached" | "isolated") => {
+    const pending = askContextChooserRef.current;
+    if (!pending) return;
+    dismissAskContextChooser();
+    const runner = runAskRef.current;
+    if (!runner) return;
+    void runner(pending.question, pending.capsuleIds, {
+      ...(pending.options ?? {}),
+      contextMode,
+      skipContextChooser: true,
+    });
+  }, [dismissAskContextChooser]);
+  const handleAskContextChooserRunAttached = useCallback(() => {
+    executeAskWithContextMode("attached");
+  }, [executeAskWithContextMode]);
+  const handleAskContextChooserRunIsolated = useCallback(() => {
+    executeAskWithContextMode("isolated");
+  }, [executeAskWithContextMode]);
+  const handleCancelAskPendingRequest = useCallback(() => {
+    const runner = runAskRef.current;
+    if (!runner) return;
+    void runner("cancel that", undefined, {
+      skipContextChooser: true,
+    });
+  }, []);
+  useEffect(() => {
+    if (!askContextChooser) return;
+    clearAskContextChooserTimer();
+    setAskContextChooserCountdownSec(3);
+    let remaining = 3;
+    if (typeof window !== "undefined") {
+      askContextChooserTimerRef.current = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearAskContextChooserTimer();
+          setAskContextChooserCountdownSec(null);
+          executeAskWithContextMode("attached");
+          return;
+        }
+        setAskContextChooserCountdownSec(remaining);
+      }, 1000);
+    }
+    return () => clearAskContextChooserTimer();
+  }, [askContextChooser, clearAskContextChooserTimer, executeAskWithContextMode]);
 
   const executePendingExternalAskPrompt = useCallback(
     async (pending: PendingHelixAskPrompt | null) => {
@@ -22403,6 +23324,7 @@ export function HelixAskPill({
         forceReasoningDispatch,
         suppressWorkstationPayloadActions,
         answerContract,
+        skipContextChooser: true,
       });
     },
     [
@@ -22443,7 +23365,7 @@ export function HelixAskPill({
     if (askBusy || askQueue.length === 0) return;
     const next = askQueue[0];
     setAskQueue((prev) => prev.slice(1));
-    void runAsk(next);
+    void runAsk(next, undefined, { skipContextChooser: true });
   }, [askBusy, askQueue, runAsk]);
 
   const clearCommandConfirmAutoTimer = useCallback(() => {
@@ -22480,7 +23402,7 @@ export function HelixAskPill({
           if (askBusy) {
             setAskQueue((prev) => [fallbackDraft, ...prev]);
           } else {
-            void runAsk(fallbackDraft);
+            void runAsk(fallbackDraft, undefined, { skipContextChooser: true });
           }
           markVoiceCheckpoint("command_executed", "ok", "Command send dispatched current draft.");
           return true;
@@ -22506,7 +23428,7 @@ export function HelixAskPill({
         if (askBusy) {
           setAskQueue((prev) => [lastQuestion, ...prev]);
         } else {
-          void runAsk(lastQuestion);
+          void runAsk(lastQuestion, undefined, { skipContextChooser: true });
         }
         markVoiceCheckpoint("command_executed", "ok", "Command retry replayed last ask.");
         return true;
@@ -22661,7 +23583,8 @@ export function HelixAskPill({
           }
         }
       }
-      const panelCommand = singleEntry ? parseOpenPanelCommand(singleEntry) : null;
+      const panelCommand =
+        singleEntry && !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? parseOpenPanelCommand(singleEntry) : null;
       if (panelCommand) {
         const panelDef = getPanelDef(panelCommand);
         if (askInputRef.current) {
@@ -23588,6 +24511,46 @@ export function HelixAskPill({
                 </div>
               </div>
             ) : null}
+            {askContextChooser ? (
+              <div className="-mt-1 px-4 pb-2 text-[11px]">
+                <div className="rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
+                  <p className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/90">
+                    Reasoning context
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                    Attach current workspace context to this reasoning turn?
+                  </p>
+                  {askContextChooserCountdownSec !== null ? (
+                    <p className="mt-1 text-[10px] text-cyan-100/90">
+                      Auto-attaching context in {askContextChooserCountdownSec}s.
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
+                      onClick={handleAskContextChooserRunAttached}
+                    >
+                      Attach context
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md border border-indigo-300/35 bg-indigo-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-indigo-100 transition hover:bg-indigo-500/25"
+                      onClick={handleAskContextChooserRunIsolated}
+                    >
+                      Run isolated
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md border border-slate-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-200 transition hover:bg-black/35"
+                      onClick={dismissAskContextChooser}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {latestConversationBrief ? (
               <div className="-mt-1 px-4 pb-2 text-[11px]">
                 <p className="text-[9px] uppercase tracking-[0.14em] text-cyan-300/80">brief</p>
@@ -24005,7 +24968,7 @@ export function HelixAskPill({
         ) : null}
         {askReplies.length > 0 ? (
           <div className={replyListClassNameResolved}>
-          {askReplies.map((reply) => {
+          {askReplies.map((reply, replyIndex) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {
               const leftTs = resolveAskLiveEventTimestampMs(left);
@@ -24050,11 +25013,47 @@ export function HelixAskPill({
               docViewerState: docViewerDebugSnapshot,
               workstationLayoutState: workstationLayoutDebugSnapshot,
             });
+            const agentLoopAudit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
+            const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
+            const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
+            const pendingAgentRequest = readAgentLoopAuditRecord(reply.debug?.pending_request);
+            const selectedAgentAction =
+              readAgentLoopAuditRecord(agentLoopAudit?.selected_action) ??
+              readAgentLoopAuditRecord(reply.debug?.server_selected_action);
+            const agentPlanItems = Array.isArray(plannerContract?.plan_items)
+              ? plannerContract?.plan_items
+              : [];
+            const agentObservations = Array.isArray(runtimeSummary?.observations)
+              ? runtimeSummary?.observations
+              : [];
+            const proceduralTurnTimeline = renderProceduralTurnTimeline(reply);
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const expanded = Boolean(askExpandedByReply[reply.id]);
-            return (
+            const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+            const transcriptAnswer = clipForDisplay(
+              transcriptTerminal.text || reply.content || "",
+              HELIX_ASK_MAX_RENDER_CHARS,
+              expanded,
+            );
+            const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
+            const terminalMismatchForReply = Boolean(
+              transcriptTerminal.backendTerminalText &&
+                transcriptTerminal.text &&
+                transcriptTerminal.backendTerminalText.trim() !== transcriptTerminal.text.trim(),
+            );
+            const transcriptTerminalRecord = readAgentLoopAuditRecord(runtimeSummary?.terminal);
+            const debugTraceOpen = Boolean(
+              terminalMismatchForReply ||
+                pendingAgentRequest ||
+                String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
+            );
+            const isLatestReply = replyIndex === 0;
+            const historySummary = clipText(
+              transcriptTerminal.text || reply.content || reply.question || "Previous Helix Ask turn",
+              180,
+            );
+            const replyCard = (
               <div
-                  key={reply.id}
                   className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
                 >
                   <div
@@ -24081,12 +25080,87 @@ export function HelixAskPill({
                     </div>
                   </div>
                 ) : null}
-                {reply.question ? (
-                  <p className="mb-2 text-xs text-slate-300">
-                    <span className="text-slate-400">Question:</span> {reply.question}
-                  </p>
-                ) : null}
-                {renderHelixAskEnvelope(reply)}
+                <div className="space-y-3">
+                  {reply.question ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Question</p>
+                      <p className="mt-1 whitespace-pre-wrap leading-relaxed">{reply.question}</p>
+                    </div>
+                  ) : null}
+                  {turnTranscriptRows.length > 0 ? (
+                    <details
+                      open={askBusy}
+                      className="rounded-2xl border border-sky-300/20 bg-slate-950/45 px-3 py-2 text-xs text-sky-50"
+                    >
+                      <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-sky-200">
+                        Agent work log
+                        <span className="ml-2 rounded border border-sky-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-sky-100">
+                          {turnTranscriptRows.length} events
+                        </span>
+                        <span className="rounded border border-sky-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-sky-100">
+                          {String(reply.debug?.turn_transcript_source ?? reply.debug?.runtime_loop_mode ?? "runtime")}
+                        </span>
+                      </summary>
+                      <div className="mt-2 space-y-1.5">
+                        {turnTranscriptRows.map((row, index) => (
+                          <div key={row.key} className="flex items-start gap-2 rounded-lg bg-black/15 px-2 py-1.5">
+                            <span className="mt-0.5 rounded-full bg-sky-300/15 px-1.5 py-0.5 text-[10px] tabular-nums text-sky-100">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="break-words text-sky-50">
+                                <span className="text-sky-200/80">{row.label}: </span>
+                                {clipText(row.text, 260)}
+                              </p>
+                              <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-sky-100/65">
+                                {row.meta}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                  <div className="rounded-2xl border border-cyan-300/30 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-50">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Final answer</p>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
+                          terminalMismatchForReply
+                            ? "border-rose-300/45 bg-rose-400/10 text-rose-100"
+                            : "border-emerald-300/35 bg-emerald-400/10 text-emerald-100"
+                        }`}
+                      >
+                        {terminalMismatchForReply ? "terminal mismatch" : `source: ${transcriptTerminal.source}`}
+                      </span>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap leading-relaxed">
+                      {renderHelixAskContent(transcriptAnswer)}
+                    </p>
+                    {hasLongText(transcriptTerminal.text || reply.content || "", HELIX_ASK_MAX_RENDER_CHARS) ? (
+                      <button
+                        type="button"
+                        className="mt-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200 hover:text-cyan-100"
+                        onClick={() =>
+                          setAskExpandedByReply((prev) => ({
+                            ...prev,
+                            [reply.id]: !expanded,
+                          }))
+                        }
+                      >
+                        {expanded ? "Show Less" : "Show Full Answer"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                <details
+                  open={debugTraceOpen}
+                  className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300"
+                >
+                  <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.22em] text-slate-400">
+                    Debug trace
+                  </summary>
+                  <div className="mt-2">
                 {(() => {
                   const objectiveSignals = extractObjectiveSignals(replyEvents);
                   if (!objectiveSignals.objective && objectiveSignals.gaps.length === 0 && !objectiveSignals.suppression) return null;
@@ -24152,6 +25226,7 @@ export function HelixAskPill({
                   <p className="mt-1">Mode: {reply.debug.client_inferred_mode}</p>
                 </div>
               ) : null}
+              {proceduralTurnTimeline}
               {userSettings.showHelixAskDebug &&
               (reply.debug?.capsule_dialogue_applied_count !== undefined ||
                 reply.debug?.capsule_evidence_applied_count !== undefined ||
@@ -24193,6 +25268,114 @@ export function HelixAskPill({
                   </p>
                 </div>
               ) : null}
+              {userSettings.showHelixAskDebug && (agentLoopAudit || plannerContract || runtimeSummary) ? (
+                <div className="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-950/15 px-3 py-2 text-xs text-emerald-50">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">Agent loop</p>
+                  <p className="mt-1">
+                    Goal:{" "}
+                    {clipText(
+                      String(runtimeSummary?.goal ?? plannerContract?.restate ?? reply.question ?? "n/a"),
+                      180,
+                    )}
+                  </p>
+                  <p className="mt-1">
+                    Policy:{" "}
+                    {String(
+                      agentLoopAudit?.dispatch_policy ??
+                        plannerContract?.dispatch_policy ??
+                        reply.debug?.server_dispatch_policy ??
+                        "n/a",
+                    )}{" "}
+                    | Route:{" "}
+                    {String(
+                      agentLoopAudit?.route_reason_code ??
+                        reply.debug?.server_route_reason_code ??
+                        "n/a",
+                    )}
+                  </p>
+                  {selectedAgentAction ? (
+                    <p className="mt-1">
+                      Tool selected: {String(selectedAgentAction.panel_id ?? "unknown")}.
+                      {String(selectedAgentAction.action_id ?? "unknown")}
+                    </p>
+                  ) : null}
+                  {agentPlanItems.length > 0 ? (
+                    <p className="mt-1 whitespace-pre-wrap">
+                      Plan:
+                      {"\n"}
+                      {agentPlanItems
+                        .slice(0, 6)
+                        .map((item, index) => {
+                          const record = readAgentLoopAuditRecord(item);
+                          return `${index + 1}. ${String(record?.lane ?? "step")} ${String(record?.id ?? "unknown")} [${String(record?.status ?? "planned")}]`;
+                        })
+                        .join("\n")}
+                    </p>
+                  ) : null}
+                  {agentObservations.length > 0 ? (
+                    <p className="mt-1 whitespace-pre-wrap">
+                      Observations:
+                      {"\n"}
+                      {agentObservations
+                        .slice(-6)
+                        .map((item, index) => {
+                          const record = readAgentLoopAuditRecord(item);
+                          const contract =
+                            typeof record?.contract_pass === "boolean"
+                              ? record.contract_pass
+                                ? "contract=pass"
+                                : `contract=fail:${String(record.contract_fail_reason ?? "unknown")}`
+                              : "contract=n/a";
+                          return `${index + 1}. ${String(record?.step_id ?? "unknown")} [${String(record?.status ?? "unknown")}] ${contract}`;
+                        })
+                        .join("\n")}
+                    </p>
+                  ) : null}
+                  {pendingAgentRequest ? (
+                    <div className="mt-2 rounded border border-amber-300/30 bg-amber-400/10 p-2 text-amber-50">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-amber-200">
+                            Pending request
+                          </p>
+                          <p className="mt-1">
+                            {clipText(String(pendingAgentRequest.prompt ?? "Waiting for missing input."), 220)}
+                          </p>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-amber-200/80">
+                            id={String(pendingAgentRequest.request_id ?? "n/a")} | scope=
+                            {String(pendingAgentRequest.pending_scope ?? "n/a")}
+                          </p>
+                          {reply.debug?.pending_intercepted_turn ? (
+                            <p className="mt-1 text-[10px] text-red-200">
+                              This turn was intercepted by pending state:{" "}
+                              {String(reply.debug.pending_interception_reason ?? "unknown")}
+                            </p>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCancelAskPendingRequest}
+                          className="shrink-0 rounded border border-amber-200/50 bg-amber-300/15 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-amber-50 hover:bg-amber-300/25"
+                        >
+                          cancel pending
+                        </button>
+                      </div>
+                    </div>
+                  ) : reply.debug?.pending_intercepted_turn ? (
+                    <p className="mt-1 text-[10px] text-red-200">
+                      Pending transition: {String(reply.debug.pending_interception_reason ?? "unknown")}
+                    </p>
+                  ) : null}
+                  <p className="mt-1">
+                    Terminal:{" "}
+                    {String(
+                      readAgentLoopAuditRecord(runtimeSummary?.terminal)?.kind ??
+                        readAgentLoopAuditRecord(agentLoopAudit?.terminal_contract)?.terminal_kind ??
+                        "n/a",
+                    )}
+                  </p>
+                </div>
+              ) : null}
               {userSettings.showHelixAskDebug &&
               (replyEventLogPreview.length > 0 || objectiveReasoningTrace.length > 0) ? (
                 <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
@@ -24206,12 +25389,12 @@ export function HelixAskPill({
                       disabled={
                         !replyEventLogPayload ||
                         typeof navigator === "undefined" ||
-                        !navigator.clipboard?.writeText
+                        typeof navigator.clipboard?.writeText !== "function"
                       }
                       className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
                         replyEventLogPayload &&
                         typeof navigator !== "undefined" &&
-                        navigator.clipboard?.writeText
+                        typeof navigator.clipboard?.writeText === "function"
                           ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
                           : "border-slate-600 text-slate-500"
                       }`}
@@ -24356,6 +25539,8 @@ export function HelixAskPill({
                   ) : null}
                 </div>
               ) : null}
+                  </div>
+                </details>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
                 <span>
                   Saved in Helix Console
@@ -24377,12 +25562,12 @@ export function HelixAskPill({
                       disabled={
                         !replyMasterEventClockPayload ||
                         typeof navigator === "undefined" ||
-                        !navigator.clipboard?.writeText
+                        typeof navigator.clipboard?.writeText !== "function"
                       }
                       className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
                         replyMasterEventClockPayload &&
                         typeof navigator !== "undefined" &&
-                        navigator.clipboard?.writeText
+                        typeof navigator.clipboard?.writeText === "function"
                           ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
                           : "border-slate-600 text-slate-500"
                       }`}
@@ -24423,6 +25608,30 @@ export function HelixAskPill({
                 </div>
               </div>
               );
+            if (isLatestReply) {
+              return <div key={reply.id}>{replyCard}</div>;
+            }
+            return (
+              <details
+                key={reply.id}
+                className="rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2 text-xs text-slate-300"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-left">
+                  <span className="min-w-0">
+                    <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                      Previous turn
+                    </span>
+                    <span className="mt-1 block truncate text-slate-200">
+                      {reply.question ? `${reply.question} -> ${historySummary}` : historySummary}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                    expand
+                  </span>
+                </summary>
+                <div className="mt-3 opacity-90">{replyCard}</div>
+              </details>
+            );
             })}
           </div>
         ) : null}

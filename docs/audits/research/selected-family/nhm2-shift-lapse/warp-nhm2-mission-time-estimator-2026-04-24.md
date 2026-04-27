@@ -21,8 +21,8 @@
 | shiftLapseAuthoritativeLowExpansionStatus | pass |
 | shiftLapseWallSafetyStatus | pass |
 | shiftLapseTimingStatus | available |
-| shiftLapseCenterlineAlpha | 0.995 |
-| shiftLapseCenterlineDtauDt | 0.995 |
+| shiftLapseCenterlineAlpha | 0.7 |
+| shiftLapseCenterlineDtauDt | 0.7 |
 | chart | comoving_cartesian |
 | coordinateMap | bubble-centered coordinates |
 | observerFamily | ship_centerline_local_comoving |
@@ -40,8 +40,8 @@
 | routeParameterMeaning | Normalized bounded route progress lambda in [0,1] along the certified local longitudinal probe segment from shell_aft to shell_fore in the fixed comoving Cartesian chart. |
 | coordinateTimeEstimate.seconds | 137755965.9171795 |
 | coordinateTimeEstimate.years | 4.3652231448899625 |
-| properTimeEstimate.seconds | 137067186.0875936 |
-| properTimeEstimate.years | 4.343397029165513 |
+| properTimeEstimate.seconds | 96429176.14202563 |
+| properTimeEstimate.years | 3.055656201422974 |
 | routeTimeStatus | bounded_local_segment_certified |
 | sourceWorldlineStatus | bounded_solve_backed |
 | sourceCruisePreflightStatus | bounded_preflight_ready |

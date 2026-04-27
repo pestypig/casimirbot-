@@ -4,6 +4,12 @@ import path from "node:path";
 export type ResearchClaimStatus = "measured" | "derived" | "hypothesis";
 export type ResearchCitationSourceType = "paper" | "web" | "github_clone";
 export type ResearchChecklistStatus = "pending" | "done";
+export type ResearchCitationEvidenceType =
+  | "repo_clone"
+  | "peer_reviewed"
+  | "preprint"
+  | "internal_artifact"
+  | "reference_web";
 
 export type ResearchCitationChecklistItem = {
   id: string;
@@ -16,12 +22,24 @@ export type ResearchCitationChecklistItem = {
 export type ResearchCitationSource = {
   id: string;
   type: ResearchCitationSourceType;
+  evidenceType?: ResearchCitationEvidenceType;
+  sourceStability?:
+    | "primary_peer_reviewed"
+    | "preprint"
+    | "operational_web"
+    | "repo_clone";
   title: string;
+  supportsClaimIds?: string[];
+  accessedOn?: string;
+  confidenceNote?: string;
   url?: string;
   doi?: string;
   repoUrl?: string;
+  repoBranch?: string;
+  repoTag?: string;
   commitSha?: string;
   clonePath?: string;
+  retrievedOn?: string;
   note?: string;
 };
 
@@ -32,6 +50,8 @@ export type ResearchCitationClaim = {
   artifactPaths: string[];
   sourceIds: string[];
   uncertaintyNote?: string;
+  uncertaintyRationale?: string;
+  scopeBoundary?: string;
 };
 
 export type ResearchCitationPatchChecklistManifest = {
@@ -66,6 +86,31 @@ export type ResearchCitationGateSummary = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value != null && typeof value === "object" && !Array.isArray(value);
+
+const DATE_STAMP_RX = /^\d{4}-\d{2}-\d{2}$/;
+const GIT_SHA_RX = /^[0-9a-f]{7,40}$/i;
+const DOI_RX = /^10\.\d{4,9}\/[-._;()/:A-Z0-9]+$/i;
+const ARXIV_URL_RX = /^https?:\/\/arxiv\.org\/abs\/[A-Za-z0-9._\-\/]+$/i;
+const NON_MEASURED_FORBIDDEN_CERTAINTY_RX =
+  /\b(proven|proof|theorem-level|certified physics|experimentally validated)\b/i;
+const isHttpUrl = (value: string | undefined): boolean => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+const isLiteratureSource = (source: ResearchCitationSource): boolean =>
+  source.type === "paper" ||
+  source.evidenceType === "peer_reviewed" ||
+  source.evidenceType === "preprint";
+const isRepoCloneSource = (source: ResearchCitationSource): boolean =>
+  source.type === "github_clone" || source.evidenceType === "repo_clone";
+const isStableLiteratureSource = (source: ResearchCitationSource): boolean =>
+  source.sourceStability === "primary_peer_reviewed" ||
+  source.sourceStability === "preprint";
 
 const normalizeStatuses = (value: unknown): ResearchClaimStatus[] => {
   if (!Array.isArray(value)) return [];
@@ -144,20 +189,92 @@ export const validateResearchCitationGateManifest = (
     const source: ResearchCitationSource = {
       id,
       type,
+      evidenceType:
+        raw.evidenceType === "repo_clone" ||
+        raw.evidenceType === "peer_reviewed" ||
+        raw.evidenceType === "preprint" ||
+        raw.evidenceType === "internal_artifact" ||
+        raw.evidenceType === "reference_web"
+          ? raw.evidenceType
+          : undefined,
+      sourceStability:
+        raw.sourceStability === "primary_peer_reviewed" ||
+        raw.sourceStability === "preprint" ||
+        raw.sourceStability === "operational_web" ||
+        raw.sourceStability === "repo_clone"
+          ? raw.sourceStability
+          : undefined,
       title,
+      supportsClaimIds: Array.isArray(raw.supportsClaimIds)
+        ? raw.supportsClaimIds.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry.trim().length > 0,
+          )
+        : undefined,
+      accessedOn:
+        typeof raw.accessedOn === "string" ? raw.accessedOn.trim() : undefined,
+      confidenceNote:
+        typeof raw.confidenceNote === "string"
+          ? raw.confidenceNote.trim()
+          : undefined,
       url: typeof raw.url === "string" ? raw.url.trim() : undefined,
       doi: typeof raw.doi === "string" ? raw.doi.trim() : undefined,
       repoUrl: typeof raw.repoUrl === "string" ? raw.repoUrl.trim() : undefined,
+      repoBranch:
+        typeof raw.repoBranch === "string" ? raw.repoBranch.trim() : undefined,
+      repoTag: typeof raw.repoTag === "string" ? raw.repoTag.trim() : undefined,
       commitSha: typeof raw.commitSha === "string" ? raw.commitSha.trim() : undefined,
       clonePath: typeof raw.clonePath === "string" ? raw.clonePath.trim() : undefined,
+      retrievedOn:
+        typeof raw.retrievedOn === "string" ? raw.retrievedOn.trim() : undefined,
       note: typeof raw.note === "string" ? raw.note.trim() : undefined,
     };
+    if (source.evidenceType == null) {
+      issues.push(`source_${index}_evidence_type_missing:${id}`);
+    }
+    if (source.sourceStability == null) {
+      issues.push(`source_${index}_source_stability_missing:${id}`);
+    }
+    if (source.supportsClaimIds == null || source.supportsClaimIds.length <= 0) {
+      issues.push(`source_${index}_supports_claim_ids_missing:${id}`);
+    }
+    if (!source.accessedOn || !DATE_STAMP_RX.test(source.accessedOn)) {
+      issues.push(`source_${index}_accessed_on_invalid:${id}`);
+    }
     if (source.type === "github_clone") {
       if (!source.repoUrl) issues.push(`source_${index}_repo_missing:${id}`);
-      if (!source.commitSha) issues.push(`source_${index}_commit_missing:${id}`);
+      if (!source.commitSha) {
+        issues.push(`source_${index}_commit_missing:${id}`);
+      } else if (!GIT_SHA_RX.test(source.commitSha)) {
+        issues.push(`source_${index}_commit_invalid:${id}`);
+      }
       if (!source.clonePath) issues.push(`source_${index}_clone_path_missing:${id}`);
+      if (!source.retrievedOn || !DATE_STAMP_RX.test(source.retrievedOn)) {
+        issues.push(`source_${index}_retrieved_on_invalid:${id}`);
+      }
+      if (!source.repoBranch && !source.repoTag) {
+        issues.push(`source_${index}_repo_ref_missing:${id}`);
+      }
+      if (source.evidenceType !== "repo_clone") {
+        issues.push(`source_${index}_evidence_type_mismatch:${id}`);
+      }
+      if (source.sourceStability !== "repo_clone") {
+        issues.push(`source_${index}_source_stability_mismatch:${id}`);
+      }
     } else if (!source.url && !source.doi) {
       issues.push(`source_${index}_reference_missing:${id}`);
+    }
+    if (source.type === "paper") {
+      if (!isHttpUrl(source.url)) {
+        issues.push(`source_${index}_paper_url_invalid:${id}`);
+      }
+      if (source.doi != null && source.doi.trim().length > 0) {
+        if (!DOI_RX.test(source.doi)) {
+          issues.push(`source_${index}_doi_invalid:${id}`);
+        }
+      } else if (!ARXIV_URL_RX.test(source.url ?? "")) {
+        issues.push(`source_${index}_paper_requires_doi_or_arxiv_url:${id}`);
+      }
     }
     sourceById.set(id, source);
   }
@@ -228,17 +345,93 @@ export const validateResearchCitationGateManifest = (
       issues.push(`claim_${index}_unknown_source_ref:${claimId}`);
     }
     if (
+      status !== "measured" &&
+      !resolvedSources.some((entry) => isLiteratureSource(entry))
+    ) {
+      issues.push(`claim_${index}_non_measured_paper_required:${claimId}`);
+    }
+    const nonMeasuredPaperSources = resolvedSources.filter((entry) => isLiteratureSource(entry));
+    if (
+      status !== "measured" &&
+      nonMeasuredPaperSources.length > 0 &&
+      !nonMeasuredPaperSources.some((entry) => isStableLiteratureSource(entry))
+    ) {
+      issues.push(`claim_${index}_non_measured_paper_stability_required:${claimId}`);
+    }
+    if (status !== "measured" && NON_MEASURED_FORBIDDEN_CERTAINTY_RX.test(claimText)) {
+      issues.push(`claim_${index}_non_measured_certainty_language_forbidden:${claimId}`);
+    }
+    if (
       status === "measured" &&
       requireGithubCloneForMeasured &&
-      !resolvedSources.some((entry) => entry.type === "github_clone")
+      !resolvedSources.some((entry) => isRepoCloneSource(entry))
     ) {
       issues.push(`claim_${index}_github_clone_required:${claimId}`);
+    }
+    if (status === "measured" && !resolvedSources.some((entry) => isRepoCloneSource(entry))) {
+      issues.push(`claim_${index}_measured_repo_clone_required:${claimId}`);
+    }
+    if (
+      status === "derived" &&
+      !resolvedSources.some((entry) => isRepoCloneSource(entry))
+    ) {
+      issues.push(`claim_${index}_derived_repo_clone_required:${claimId}`);
+    }
+    if (
+      status === "derived" &&
+      !resolvedSources.some((entry) => isLiteratureSource(entry))
+    ) {
+      issues.push(`claim_${index}_derived_literature_required:${claimId}`);
+    }
+    if (
+      status !== "measured" &&
+      !resolvedSources.some((entry) => isStableLiteratureSource(entry))
+    ) {
+      issues.push(`claim_${index}_stable_literature_required:${claimId}`);
+    }
+    if (
+      citationRequired &&
+      !resolvedSources.some((entry) =>
+        Array.isArray(entry.supportsClaimIds)
+          ? entry.supportsClaimIds.includes(claimId)
+          : false,
+      )
+    ) {
+      issues.push(`claim_${index}_source_support_mapping_missing:${claimId}`);
     }
     if (status === "hypothesis") {
       const uncertaintyNote =
         typeof raw.uncertaintyNote === "string" ? raw.uncertaintyNote.trim() : "";
       if (!uncertaintyNote) {
         issues.push(`claim_${index}_uncertainty_note_missing:${claimId}`);
+      }
+      const uncertaintyRationale =
+        typeof raw.uncertaintyRationale === "string"
+          ? raw.uncertaintyRationale.trim()
+          : "";
+      if (!uncertaintyRationale) {
+        issues.push(`claim_${index}_uncertainty_rationale_missing:${claimId}`);
+      }
+      const scopeBoundary =
+        typeof raw.scopeBoundary === "string" ? raw.scopeBoundary.trim() : "";
+      if (!scopeBoundary) {
+        issues.push(`claim_${index}_scope_boundary_missing:${claimId}`);
+      }
+      if (!resolvedSources.some((entry) => isLiteratureSource(entry))) {
+        issues.push(`claim_${index}_hypothesis_literature_required:${claimId}`);
+      }
+    } else if (status === "derived") {
+      const uncertaintyRationale =
+        typeof raw.uncertaintyRationale === "string"
+          ? raw.uncertaintyRationale.trim()
+          : "";
+      if (!uncertaintyRationale) {
+        issues.push(`claim_${index}_uncertainty_rationale_missing:${claimId}`);
+      }
+      const scopeBoundary =
+        typeof raw.scopeBoundary === "string" ? raw.scopeBoundary.trim() : "";
+      if (!scopeBoundary) {
+        issues.push(`claim_${index}_scope_boundary_missing:${claimId}`);
       }
     }
   }

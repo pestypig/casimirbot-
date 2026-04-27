@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWarpMetricAdapterSnapshot,
+  evaluateBoundedLapse,
   evaluateWarpMetricLapseField,
+  resolveWarpShiftLapseProfileStrict,
 } from "../modules/warp/warp-metric-adapter";
 
 describe("buildWarpMetricAdapterSnapshot", () => {
@@ -146,5 +148,21 @@ describe("buildWarpMetricAdapterSnapshot", () => {
     expect(center).toBeCloseTo(0.995, 8);
     expect(above).toBeGreaterThan(center);
     expect(above).toBeLessThanOrEqual(1.01);
+  });
+
+  it("evaluates bounded lapse with centerline alpha as the only dial", () => {
+    expect(evaluateBoundedLapse(1, 0.8)).toBeCloseTo(0.8, 12);
+    expect(evaluateBoundedLapse(0, 0.8)).toBeCloseTo(1, 12);
+    expect(evaluateBoundedLapse(0.5, 0.8)).toBeCloseTo(0.9, 12);
+  });
+
+  it("rejects unknown shift+lapse profiles in strict resolver mode", () => {
+    expect(() => resolveWarpShiftLapseProfileStrict("not-a-real-profile")).toThrow(
+      /Unknown shift-lapse profile id/i,
+    );
+    expect(resolveWarpShiftLapseProfileStrict("stage1_centerline_alpha_0p5000_v1").alphaCenterlineDefault).toBeCloseTo(
+      0.5,
+      12,
+    );
   });
 });

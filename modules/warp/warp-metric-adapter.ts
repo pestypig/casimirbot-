@@ -144,7 +144,12 @@ export type WarpShiftLapseProfileId =
   | "stage1_centerline_alpha_0p7375_v1"
   | "stage1_centerline_alpha_0p7350_v1"
   | "stage1_centerline_alpha_0p7325_v1"
-  | "stage1_centerline_alpha_0p7300_v1";
+  | "stage1_centerline_alpha_0p7300_v1"
+  | "stage1_centerline_alpha_0p7000_v1"
+  | "stage1_centerline_alpha_0p6500_v1"
+  | "stage1_centerline_alpha_0p6000_v1"
+  | "stage1_centerline_alpha_0p5500_v1"
+  | "stage1_centerline_alpha_0p5000_v1";
 export type WarpShiftLapseProfileStage =
   | "baseline_reference_profile"
   | "controlled_tuning_stage_1";
@@ -339,6 +344,11 @@ export const STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS: WarpSh
     "stage1_centerline_alpha_0p7350_v1",
     "stage1_centerline_alpha_0p7325_v1",
     "stage1_centerline_alpha_0p7300_v1",
+    "stage1_centerline_alpha_0p7000_v1",
+    "stage1_centerline_alpha_0p6500_v1",
+    "stage1_centerline_alpha_0p6000_v1",
+    "stage1_centerline_alpha_0p5500_v1",
+    "stage1_centerline_alpha_0p5000_v1",
   ];
 
 const WARP_SHIFT_LAPSE_PROFILE_TABLE: Record<
@@ -1217,6 +1227,46 @@ const WARP_SHIFT_LAPSE_PROFILE_TABLE: Record<
       "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7300 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
     alphaCenterlineDefault: 0.73,
   },
+  stage1_centerline_alpha_0p7000_v1: {
+    profileId: "stage1_centerline_alpha_0p7000_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7000",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse exploratory profile: centerline alpha is reduced to 0.7000 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7,
+  },
+  stage1_centerline_alpha_0p6500_v1: {
+    profileId: "stage1_centerline_alpha_0p6500_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.6500",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse exploratory profile: centerline alpha is reduced to 0.6500 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.65,
+  },
+  stage1_centerline_alpha_0p6000_v1: {
+    profileId: "stage1_centerline_alpha_0p6000_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.6000",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse exploratory profile: centerline alpha is reduced to 0.6000 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.6,
+  },
+  stage1_centerline_alpha_0p5500_v1: {
+    profileId: "stage1_centerline_alpha_0p5500_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.5500",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse exploratory profile: centerline alpha is reduced to 0.5500 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.55,
+  },
+  stage1_centerline_alpha_0p5000_v1: {
+    profileId: "stage1_centerline_alpha_0p5000_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.5000",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse exploratory profile: centerline alpha is reduced to 0.5000 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.5,
+  },
 };
 
 export const resolveWarpShiftLapseProfile = (
@@ -1232,6 +1282,39 @@ export const resolveWarpShiftLapseProfile = (
     ];
   }
   return WARP_SHIFT_LAPSE_PROFILE_TABLE[DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID];
+};
+
+export const resolveWarpShiftLapseProfileStrict = (
+  profileId: string,
+): WarpShiftLapseProfile => {
+  const normalized = profileId.trim();
+  if (!normalized) {
+    throw new Error("shift-lapse profile id must be non-empty");
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(WARP_SHIFT_LAPSE_PROFILE_TABLE, normalized)
+  ) {
+    return WARP_SHIFT_LAPSE_PROFILE_TABLE[normalized as WarpShiftLapseProfileId];
+  }
+  throw new Error(`Unknown shift-lapse profile id: ${profileId}`);
+};
+
+export const evaluateBoundedLapse = (
+  shapeValue: number,
+  centerlineAlpha: number,
+): number => {
+  if (!Number.isFinite(shapeValue)) {
+    throw new Error(`Invalid shapeValue for bounded lapse: ${shapeValue}`);
+  }
+  if (!Number.isFinite(centerlineAlpha) || centerlineAlpha <= 0 || centerlineAlpha > 1) {
+    throw new Error(`Invalid centerlineAlpha for bounded lapse: ${centerlineAlpha}`);
+  }
+  const normalizedShape = Math.min(1, Math.max(0, shapeValue));
+  const alpha = 1 - (1 - centerlineAlpha) * normalizedShape;
+  if (!Number.isFinite(alpha) || alpha <= 0 || alpha > 1) {
+    throw new Error(`Unbounded lapse value: ${alpha}`);
+  }
+  return alpha;
 };
 
 export type WarpChartContract = {

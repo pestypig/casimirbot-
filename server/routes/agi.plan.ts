@@ -207,6 +207,7 @@ import {
   selectDocSectionMatch,
   type DocSection,
   findDocSectionByHeading,
+  buildDocSectionSnippet as buildIndexedDocSectionSnippet,
 } from "../services/helix-ask/doc-sections";
 import {
   evaluateClaimCoverage,
@@ -20241,6 +20242,8 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
     mode: z.enum(["read", "observe", "act", "verify"]).optional(),
+    context_mode: z.enum(["attached", "isolated"]).optional(),
+    workspace_context_snapshot: z.record(z.unknown()).optional(),
     dialogue_profile: z.enum(HELIX_ASK_DIALOGUE_PROFILE_VALUES).optional(),
     allowTools: z.array(z.string().min(1)).max(24).optional(),
     requiredEvidence: z.array(z.string().min(1)).max(24).optional(),
@@ -20728,6 +20731,12 @@ const normalizeConversationRouteDecision = (args: {
 };
 
 type HelixConversationPendingInputKind = "clarify" | "confirm";
+type HelixAskTurnTransitionErrorCode =
+  | "turn_transition_pending_abort"
+  | "turn_transition_pending_expired"
+  | "turn_transition_invalid_pending_resolution"
+  | "turn_transition_double_terminal"
+  | "turn_transition_execute_before_plan";
 
 type HelixConversationPendingInputRecord = {
   turnId: string;
@@ -20747,9 +20756,113 @@ type HelixConversationPendingInputRecord = {
 };
 
 const helixConversationPendingInputBySession = new Map<string, HelixConversationPendingInputRecord>();
+type HelixAskTurnReasoningContextMode = "attached" | "isolated";
+type HelixAskTurnWorkspaceSessionSnapshot = {
+  sessionId: string;
+  activePanel: "docs-viewer" | "workstation-notes" | "workstation-clipboard-history" | null;
+  activeDocPath: string | null;
+  activeNoteTitle: string | null;
+  hasDocContext: boolean;
+  docContextValid?: boolean;
+  docContextPath?: string | null;
+  docContextSource?: string | null;
+  docContextFailureReason?: string | null;
+  hasNoteContext: boolean;
+  hasClipboardContext: boolean;
+  lastWorkspaceAction: HelixAskTurnSelectedAction | null;
+  lastUpdatedAtMs: number;
+};
+const helixAskTurnWorkspaceSnapshotBySession = new Map<string, HelixAskTurnWorkspaceSessionSnapshot>();
+
+const normalizeAskTurnWorkspaceDocPath = (value: unknown): string | null => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized.length > 0 ? normalized : null;
+};
+
+const hasValidAskTurnDocContext = (snapshot?: HelixAskTurnWorkspaceSessionSnapshot | null): boolean =>
+  Boolean(normalizeAskTurnWorkspaceDocPath(snapshot?.activeDocPath));
+
+const withAskTurnDocContextValidity = (
+  snapshot: HelixAskTurnWorkspaceSessionSnapshot,
+): HelixAskTurnWorkspaceSessionSnapshot => {
+  const activeDocPath = normalizeAskTurnWorkspaceDocPath(snapshot.activeDocPath);
+  const docContextValid = Boolean(activeDocPath);
+  return {
+    ...snapshot,
+    activeDocPath,
+    hasDocContext: docContextValid,
+    docContextValid,
+    docContextPath: activeDocPath,
+    docContextSource: activeDocPath ? "active_doc_path" : null,
+    docContextFailureReason: activeDocPath
+      ? null
+      : snapshot.activePanel === "docs-viewer"
+        ? "docs_panel_open_without_active_doc_path"
+        : "no_docs_panel_or_active_doc_path",
+  };
+};
+
+const normalizeIncomingAskTurnWorkspaceSnapshot = (args: {
+  sessionId: string | null;
+  snapshot: unknown;
+}): HelixAskTurnWorkspaceSessionSnapshot | null => {
+  if (!args.snapshot || typeof args.snapshot !== "object") return null;
+  const raw = args.snapshot as Record<string, unknown>;
+  const activePanel =
+    raw.activePanel === "docs-viewer" ||
+    raw.activePanel === "workstation-notes" ||
+    raw.activePanel === "workstation-clipboard-history"
+      ? raw.activePanel
+      : null;
+  const activeDocPath = normalizeAskTurnWorkspaceDocPath(raw.activeDocPath);
+  const activeNoteTitle = typeof raw.activeNoteTitle === "string" && raw.activeNoteTitle.trim() ? raw.activeNoteTitle.trim() : null;
+  const snapshot: HelixAskTurnWorkspaceSessionSnapshot = {
+    sessionId: typeof raw.sessionId === "string" && raw.sessionId.trim() ? raw.sessionId.trim() : args.sessionId ?? "anonymous",
+    activePanel,
+    activeDocPath,
+    activeNoteTitle,
+    hasDocContext: Boolean(activeDocPath),
+    hasNoteContext: raw.hasNoteContext === true || Boolean(activeNoteTitle),
+    hasClipboardContext: raw.hasClipboardContext === true,
+    lastWorkspaceAction:
+      raw.lastWorkspaceAction && typeof raw.lastWorkspaceAction === "object"
+        ? (raw.lastWorkspaceAction as HelixAskTurnSelectedAction)
+        : null,
+    lastUpdatedAtMs: typeof raw.lastUpdatedAtMs === "number" ? raw.lastUpdatedAtMs : Date.now(),
+  };
+  return withAskTurnDocContextValidity(snapshot);
+};
+
+const mergeAskTurnWorkspaceSnapshots = (args: {
+  incoming: HelixAskTurnWorkspaceSessionSnapshot | null;
+  stored: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): HelixAskTurnWorkspaceSessionSnapshot | null => {
+  if (!args.incoming) return args.stored ? withAskTurnDocContextValidity(args.stored) : null;
+  if (!args.stored) return withAskTurnDocContextValidity(args.incoming);
+  return withAskTurnDocContextValidity({
+    ...args.stored,
+    ...args.incoming,
+    activeDocPath:
+      normalizeAskTurnWorkspaceDocPath(args.incoming.activeDocPath) ??
+      normalizeAskTurnWorkspaceDocPath(args.stored.activeDocPath),
+    activeNoteTitle: args.incoming.activeNoteTitle ?? args.stored.activeNoteTitle,
+    hasNoteContext: args.incoming.hasNoteContext || args.stored.hasNoteContext,
+    hasClipboardContext: args.incoming.hasClipboardContext || args.stored.hasClipboardContext,
+    lastWorkspaceAction: args.incoming.lastWorkspaceAction ?? args.stored.lastWorkspaceAction,
+    lastUpdatedAtMs: Math.max(args.incoming.lastUpdatedAtMs ?? 0, args.stored.lastUpdatedAtMs ?? 0, Date.now()),
+  });
+};
+type HelixAskTurnResultArtifact = {
+  kind: string;
+  text: string;
+  turn_id: string | null;
+  trace_id: string | null;
+  created_at_ms: number;
+};
+const helixAskTurnLatestResultArtifactBySession = new Map<string, HelixAskTurnResultArtifact>();
 
 const HELIX_CONVERSATION_WORKSTATION_ACTION_RE =
-  /\b(?:open|close|read|view|create|new|start|append|add|copy|rename|delete|clear|switch|select|list|compare|explain|pull(?:\s+up)?)\b/i;
+  /\b(?:open|close|read|view|show|create|make|new|start|append|add|copy|put|save|store|drop|stash|file|park|place|rename|delete|clear|switch|select|list|compare|explain|pull(?:\s+up)?|pick|grab)\b/i;
 const HELIX_CONVERSATION_AMBIGUOUS_DOC_TYPO_RE = /\b(?:foc|focs)\b/i;
 const HELIX_CONVERSATION_DOC_INTENT_RE = /\b(?:doc|docs|document|paper|nhm2)\b/i;
 const HELIX_CONVERSATION_DESTRUCTIVE_ACTION_RE =
@@ -20759,16 +20872,24 @@ const HELIX_CONVERSATION_CONFIRM_TOKEN_RE =
 const HELIX_CONVERSATION_REJECT_TOKEN_RE =
   /^(?:no|n|cancel|stop|never mind|nevermind|don'?t|do not)\b/i;
 const HELIX_CONVERSATION_MISSING_CREATE_NOTE_NAME_RE =
-  /\b(?:create|new|start)\s+(?:a\s+)?note\b(?:\s+called)?\s*$/i;
+  /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b(?:\s+called)?\s*$/i;
 const HELIX_CONVERSATION_MISSING_DELETE_NOTE_NAME_RE = /\bdelete\s+note\b\s*$/i;
 const HELIX_CONVERSATION_MISSING_APPEND_CONTENT_RE =
   /\bappend\b[\s\S]*\bnote\b(?![\s\S]*:)\s*$/i;
 const HELIX_CONVERSATION_WORKSTATION_TARGET_RE =
-  /\b(?:note(?:s|pad)?|docs?|document|paper|clipboard|panel|history)\b/i;
+  /\b(?:workspace|note(?:s|pad)?|docs?|document|paper|clipboard|panel|history)\b/i;
 const HELIX_CONVERSATION_WORKSTATION_NAV_RE =
-  /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\b/i;
+  /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\b/i;
 const HELIX_CONVERSATION_EXPLICIT_REASONING_CUE_RE =
   /\b(?:analy[sz]e|reason|synthesi[sz]e|verify|prove|evidence|deep(?:er)?|research)\b/i;
+const HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG =
+  String(process.env.HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_14_DEICTIC_DOC_FIX_FLAG =
+  String(process.env.HELIX_E8_14_DEICTIC_DOC_FIX ?? "1").trim().toLowerCase() !== "0";
+const HELIX_ASK_TURN_DEICTIC_CONTEXT_RE =
+  HELIX_E8_14_DEICTIC_DOC_FIX_FLAG
+    ? /\b(?:what\s+is\s+this(?:\s+(?:doc|document|paper))?|what\s+is\s+that(?:\s+(?:doc|document|paper))?|where\s+in\s+this\s+(?:doc|document|paper)|where\s+in\s+that\s+(?:doc|document|paper)|where\s+does\s+this\s+(?:doc|document|paper)|where\s+does\s+that\s+(?:doc|document|paper)|find\s+.*\s+in\s+this\s+(?:doc|document|paper)|find\s+.*\s+in\s+that\s+(?:doc|document|paper)|locate\s+.*\s+in\s+this\s+(?:doc|document|paper)|locate\s+.*\s+in\s+that\s+(?:doc|document|paper)|read\s+this|read\s+that|explain\s+this|explain\s+that|summari[sz]e\s+this|summari[sz]e\s+that)\b/i
+    : /\b(?:what\s+is\s+this|what\s+is\s+that|read\s+this|read\s+that|explain\s+this|explain\s+that|summari[sz]e\s+this|summari[sz]e\s+that)\b/i;
 const HELIX_E8_ALWAYS_PLANNER_RESTATED_TURN_FLAG =
   String(process.env.HELIX_E8_ALWAYS_PLANNER_RESTATED_TURN ?? "1").trim().toLowerCase() !== "0";
 const HELIX_E8_PLANNER_RESTATE_LLM_FLAG = (() => {
@@ -20778,8 +20899,102 @@ const HELIX_E8_PLANNER_RESTATE_LLM_FLAG = (() => {
   }
   return Boolean(process.env.OPENAI_API_KEY);
 })();
+const HELIX_E8_22_MULTI_INTENT_EXPANSION_FLAG =
+  String(process.env.HELIX_E8_22_MULTI_INTENT_EXPANSION ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_23_EVIDENCE_BACKED_FINAL_FLAG =
+  String(process.env.HELIX_E8_23_EVIDENCE_BACKED_FINAL ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_24_TURN_INPUT_BUDGET_GATE_FLAG =
+  String(process.env.HELIX_E8_24_TURN_INPUT_BUDGET_GATE ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_24_TURN_INPUT_MAX_CHARS = clampNumber(
+  readNumber(process.env.HELIX_E8_24_TURN_INPUT_MAX_CHARS ?? 4000, 4000),
+  800,
+  32000,
+);
+const HELIX_E8_24_TURN_INPUT_CHUNK_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_E8_24_TURN_INPUT_CHUNK_TOKENS ?? 420, 420),
+  120,
+  1200,
+);
+const HELIX_E8_24_TURN_INPUT_CHUNK_OVERLAP_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_E8_24_TURN_INPUT_CHUNK_OVERLAP_TOKENS ?? 48, 48),
+  0,
+  240,
+);
+const HELIX_E8_24_TURN_INPUT_MAX_CHUNKS = clampNumber(
+  readNumber(process.env.HELIX_E8_24_TURN_INPUT_MAX_CHUNKS ?? 10, 10),
+  1,
+  24,
+);
+const HELIX_E8_25_BOUNDED_NOTE_ARGS_FLAG =
+  String(process.env.HELIX_E8_25_BOUNDED_NOTE_ARGS ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_29_CHAINED_PARTIAL_EXEC_FLAG =
+  String(process.env.HELIX_E8_29_CHAINED_PARTIAL_EXEC ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_29_COMPARE_SCHEMA_FLAG =
+  String(process.env.HELIX_E8_29_COMPARE_SCHEMA ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E8_29_POLICY_ALIGNMENT_ASSERT_FLAG =
+  String(process.env.HELIX_E8_29_POLICY_ALIGNMENT_ASSERT ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_GENERAL_TURN_LOOP_FLAG =
+  String(process.env.HELIX_E9_GENERAL_TURN_LOOP ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_SHADOW_COMPARE_FLAG =
+  String(process.env.HELIX_E9_SHADOW_COMPARE ?? "0").trim().toLowerCase() !== "0";
+const HELIX_E9_1_PLANNER_POLICY_AUTHORITY_FLAG =
+  String(process.env.HELIX_E9_1_PLANNER_POLICY_AUTHORITY ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_1_STEP_EXECUTOR_FLAG =
+  String(process.env.HELIX_E9_1_STEP_EXECUTOR ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_2_POLICY_SOURCE_OF_TRUTH_FLAG =
+  String(process.env.HELIX_E9_2_POLICY_SOURCE_OF_TRUTH ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_2_EXPLICIT_PATH_BUDGET_FLAG =
+  String(process.env.HELIX_E9_2_EXPLICIT_PATH_BUDGET ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_2_EXPLICIT_PATH_MAX_STEPS = clampNumber(
+  readNumber(process.env.HELIX_E9_2_EXPLICIT_PATH_MAX_STEPS ?? 3, 3),
+  2,
+  8,
+);
+const HELIX_E9_3_COMPOSED_RESEARCH_FLAG =
+  String(process.env.HELIX_E9_3_COMPOSED_RESEARCH ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_3_WORKSPACE_PRECEDENCE_FLAG =
+  String(process.env.HELIX_E9_3_WORKSPACE_PRECEDENCE ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT_FLAG =
+  String(process.env.HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_4_AUTHORITATIVE_EXECUTOR_FLAG =
+  String(process.env.HELIX_E9_4_AUTHORITATIVE_EXECUTOR ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E9_4_STRICT_PENDING_OWNERSHIP_FLAG =
+  String(process.env.HELIX_E9_4_STRICT_PENDING_OWNERSHIP ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_1_TURN_RUNTIME_FLAG =
+  String(process.env.HELIX_E10_1_TURN_RUNTIME ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_2_RUNTIME_NEXT_STEP_FLAG =
+  String(process.env.HELIX_E10_2_RUNTIME_NEXT_STEP ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_3_RUNTIME_APPEND_STEP_FLAG =
+  String(process.env.HELIX_E10_3_RUNTIME_APPEND_STEP ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_4_EXECUTE_APPENDED_RUNTIME_STEPS_FLAG =
+  String(process.env.HELIX_E10_4_EXECUTE_APPENDED_RUNTIME_STEPS ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_5_OBSERVATION_GROUNDED_FINALS_FLAG =
+  String(process.env.HELIX_E10_5_OBSERVATION_GROUNDED_FINALS ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG =
+  String(process.env.HELIX_E10_6_DOC_ACQUISITION_REPAIR ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_13_REGISTRY_INITIAL_PLAN_FLAG =
+  String(process.env.HELIX_E10_13_REGISTRY_INITIAL_PLAN ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG =
+  String(process.env.HELIX_E10_27_INCREMENTAL_TURN_RUNTIME ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E11_ASYNC_STEP_EXECUTOR_FLAG =
+  String(process.env.HELIX_E11_ASYNC_STEP_EXECUTOR ?? "1").trim().toLowerCase() !== "0";
+const HELIX_E11_MODEL_DECISION_LLM_FLAG = (() => {
+  const raw = process.env.HELIX_E11_MODEL_DECISION_LLM;
+  if (typeof raw === "string" && raw.trim().length > 0) return raw.trim().toLowerCase() !== "0";
+  return Boolean(process.env.OPENAI_API_KEY) && process.env.NODE_ENV !== "test";
+})();
+const HELIX_E11_MODEL_DECISION_MAX_APPENDED_STEPS = clampNumber(
+  readNumber(process.env.HELIX_E11_MODEL_DECISION_MAX_APPENDED_STEPS ?? 3, 3),
+  0,
+  8,
+);
 
-type HelixAskTurnDispatchPolicy = "workspace_only" | "reasoning_only" | "conversation_only" | "needs_user_input";
+type HelixAskTurnDispatchPolicy =
+  | "workspace_only"
+  | "workspace_context_reasoning"
+  | "reasoning_only"
+  | "conversation_only"
+  | "needs_user_input";
 type HelixAskTurnPlanLane = "workspace" | "reasoning" | "conversation";
 type HelixAskTurnPlanStepStatus = "planned" | "started" | "completed" | "failed" | "suppressed";
 type HelixAskTurnPlanStep = {
@@ -20789,6 +21004,7 @@ type HelixAskTurnPlanStep = {
   status: HelixAskTurnPlanStepStatus;
   action?: HelixAskTurnSelectedAction | null;
   reason?: string | null;
+  required_artifacts?: string[];
 };
 type HelixAskTurnExecutionLifecycleEvent = {
   step_id: string;
@@ -20838,6 +21054,199 @@ type HelixAskTurnPlannerContract = {
   pending_resolution_reason: string | null;
   single_terminal_required: true;
 };
+type HelixAskTurnRuntimeObservation = {
+  step_id: string;
+  lane: HelixAskTurnPlanLane;
+  status: HelixAskTurnPlanStepStatus;
+  artifact?: unknown;
+  result_artifact?: unknown;
+  error_code?: string | null;
+  contract_pass?: boolean | null;
+  contract_fail_reason?: string | null;
+  expected_artifacts?: string[];
+  actual_artifacts?: string[];
+};
+type HelixAskTurnRuntimeDecision =
+  | { kind: "continue"; next_step: HelixAskTurnPlanStep; reason: string }
+  | { kind: "request_input"; required_fields: string[]; reason: string }
+  | { kind: "final_answer"; text: string; reason: string }
+  | { kind: "final_failure"; text: string; error_code: string; reason: string };
+type HelixAskTurnRuntimeStepProposal = {
+  step: HelixAskTurnPlanStep;
+  reason: string;
+  source: "capability_registry" | "artifact_policy" | "deterministic";
+  capability_trace?: HelixAskTurnCapabilitySelectionTraceEntry[];
+};
+type HelixAskTurnRuntimeCapabilityArgResolution =
+  | { ok: true; action: HelixAskTurnSelectedAction | null; title?: string; reason?: string }
+  | { ok: false; missing_args: string[]; reason: string };
+type HelixAskTurnRuntimeCapability = {
+  capability_id: string;
+  panel_id: string | null;
+  action_id: string | null;
+  lane: HelixAskTurnPlanLane;
+  produces: string[];
+  requires: string[];
+  confirmation_required: boolean;
+  arg_resolver: (args: {
+    runtime: HelixAskTurnRuntime;
+    transcript: string;
+    selectedAction?: HelixAskTurnSelectedAction | null;
+    workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+    missingArtifact: string;
+  }) => HelixAskTurnRuntimeCapabilityArgResolution;
+};
+type HelixAskTurnInitialCapabilityPlan = {
+  plan_items: HelixAskTurnPlanStep[];
+  selected_action: HelixAskTurnSelectedAction | null;
+  dispatch_policy: HelixAskTurnDispatchPolicy;
+  capability_selection_trace: HelixAskTurnCapabilitySelectionTraceEntry[];
+  missing_args: string[];
+};
+type HelixAskTurnCapabilitySelectionTraceEntry = {
+  missing_artifact: string;
+  candidate_capabilities: string[];
+  selected_capability: string | null;
+  reject_reasons: Array<{ capability_id: string; reason: string }>;
+};
+type HelixAskTurnRuntime = {
+  turn_id: string;
+  session_id: string | null;
+  goal: string;
+  status: "running" | "pending_input" | "completed" | "failed";
+  max_steps: number;
+  plan_items: HelixAskTurnPlanStep[];
+  open_subgoals: string[];
+  completed_subgoals: string[];
+  failed_subgoals: string[];
+  artifact_store: Record<string, unknown>;
+  required_artifacts: string[];
+  satisfied_artifacts: string[];
+  observations: HelixAskTurnRuntimeObservation[];
+  pending_request: Record<string, unknown> | null;
+  decisions: HelixAskTurnRuntimeDecision[];
+  last_decision: HelixAskTurnRuntimeDecision | null;
+  appended_steps: Array<{
+    step_id: string;
+    lane: HelixAskTurnPlanLane;
+    reason: string;
+    source: HelixAskTurnRuntimeStepProposal["source"];
+  }>;
+  executed_appended_step_count: number;
+  runtime_loop_iteration_count: number;
+  runtime_loop_stop_reason: "final_answer" | "final_failure" | "pending_input" | "max_steps" | "no_next_step" | null;
+  capability_selection_trace: HelixAskTurnCapabilitySelectionTraceEntry[];
+  terminal: {
+    kind: "final_answer" | "final_failure" | "pending_input" | null;
+    text: string | null;
+    error_code?: string | null;
+  };
+};
+type HelixAskTurnRuntimeSummary = {
+  status: HelixAskTurnRuntime["status"];
+  open_subgoals: string[];
+  completed_subgoals: string[];
+  failed_subgoals: string[];
+  observation_count: number;
+  observations: HelixAskTurnRuntimeObservation[];
+  artifact_keys: string[];
+  required_artifacts: string[];
+  satisfied_artifacts: string[];
+  missing_required_artifacts: string[];
+  decision_count: number;
+  last_decision: Record<string, unknown> | null;
+  appended_step_count: number;
+  appended_steps: Array<{
+    step_id: string;
+    lane: string;
+    reason: string;
+    source: string;
+  }>;
+  executed_appended_step_count: number;
+  runtime_loop_iteration_count: number;
+  runtime_loop_stop_reason: HelixAskTurnRuntime["runtime_loop_stop_reason"];
+  capability_selection_trace: HelixAskTurnCapabilitySelectionTraceEntry[];
+  terminal: HelixAskTurnRuntime["terminal"];
+  async_executor_used?: boolean;
+  async_step_count?: number;
+  async_total_duration_ms?: number;
+  async_step_durations?: HelixAskTurnAsyncStepDuration[];
+  model_decision_llm_used?: boolean;
+  model_decision_count?: number;
+  model_decision_audits?: HelixAskTurnModelDecisionAudit[];
+};
+type HelixAskTurnAsyncStepDuration = {
+  step_id: string;
+  duration_ms: number;
+  awaited_tool: string;
+  started_at_ms: number;
+  completed_at_ms: number;
+};
+type HelixAskTurnModelDecisionAudit = {
+  step_id: string | null;
+  phase: "planner" | "continuation" | "composer";
+  used_llm: boolean;
+  summary: string;
+  action: "continue" | "finalize" | "request_user_input" | "typed_failure" | "noop";
+  next_capability?: string | null;
+  next_args?: Record<string, unknown> | null;
+  required_artifacts?: string[];
+  next_step_id?: string | null;
+  operational_step_appended?: boolean;
+  error_code?: string | null;
+  duration_ms: number;
+};
+type HelixAskTurnEvent =
+  | { type: "turn_started"; at_ms: number; turn_id: string; goal: string }
+  | { type: "plan_delta"; at_ms: number; step: HelixAskTurnPlanStep; reason: string }
+  | { type: "item_started"; at_ms: number; step_id: string; lane: HelixAskTurnPlanLane; title: string }
+  | { type: "model_decision_started"; at_ms: number; step_id: string | null; phase: "planner" | "continuation" | "composer"; prompt: string }
+  | { type: "model_decision_completed"; at_ms: number; step_id: string | null; phase: "planner" | "continuation" | "composer"; summary: string }
+  | {
+      type: "tool_result";
+      at_ms: number;
+      step_id: string;
+      lane: HelixAskTurnPlanLane;
+      status: HelixAskTurnPlanStepStatus;
+      actual_artifacts: string[];
+      expected_artifacts: string[];
+      contract_pass: boolean | null;
+      result_artifact?: unknown;
+    }
+  | { type: "observation_recorded"; at_ms: number; observation: HelixAskTurnRuntimeObservation }
+  | { type: "decision_delta"; at_ms: number; decision: HelixAskTurnRuntimeDecision }
+  | { type: "item_completed"; at_ms: number; step_id: string; lane: HelixAskTurnPlanLane; status: HelixAskTurnPlanStepStatus }
+  | { type: "terminal_answer"; at_ms: number; text: string; status: "final_answer" | "final_failure" | "pending_input" }
+  | { type: "turn_completed"; at_ms: number; turn_id: string; status: HelixAskTurnRuntime["status"] };
+type HelixAskTurnTranscriptEvent = {
+  id: string;
+  at_ms: number;
+  role: "user" | "agent" | "tool" | "final" | "system";
+  type:
+    | "question"
+    | "work_delta"
+    | "plan"
+    | "model_decision"
+    | "step_started"
+    | "tool_result"
+    | "observation"
+    | "decision"
+    | "final_answer"
+    | "turn_completed";
+  status?: string | null;
+  step_id?: string | null;
+  lane?: HelixAskTurnPlanLane | null;
+  text: string;
+  detail?: string | null;
+  source_event_type?: HelixAskTurnEvent["type"] | "question";
+  event_source: "live" | "runtime" | "reconstructed";
+};
+type HelixAskTurnEventSink = {
+  emit(event: HelixAskTurnEvent): void;
+  emitTranscript(event: HelixAskTurnTranscriptEvent): void;
+  getEvents(): HelixAskTurnEvent[];
+  getTranscriptEvents(): HelixAskTurnTranscriptEvent[];
+};
 type HelixAskTurnPlannerRepairState = {
   attempted: boolean;
   applied: boolean;
@@ -20861,7 +21270,13 @@ const HELIX_E8_INVARIANT_ASSERTIONS_FLAG =
 const HELIX_ASK_TURN_CAPABILITY_ACTIONS: HelixAskTurnActionCandidate[] = [
   { panel_id: "docs-viewer", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "docs-viewer", action_id: "open_doc", required_args: ["path"], optional_args: ["anchor"] },
+  { panel_id: "docs-viewer", action_id: "open_doc_by_path", required_args: ["path"], optional_args: ["anchor"] },
+  { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", required_args: ["topic"], optional_args: ["path"] },
+  { panel_id: "docs-viewer", action_id: "search_docs", required_args: ["query"], optional_args: ["limit"] },
+  { panel_id: "docs-viewer", action_id: "verify_active_doc", required_args: [], optional_args: [] },
   { panel_id: "docs-viewer", action_id: "open_doc_and_read", required_args: ["path"], optional_args: ["anchor"] },
+  { panel_id: "docs-viewer", action_id: "identify_current_doc", required_args: [], optional_args: [] },
+  { panel_id: "docs-viewer", action_id: "locate_in_doc", required_args: ["query"], optional_args: ["path", "anchor"] },
   { panel_id: "docs-viewer", action_id: "summarize_doc", required_args: [], optional_args: ["path", "anchor", "selected_text"] },
   {
     panel_id: "docs-viewer",
@@ -20908,6 +21323,267 @@ const resolveAskTurnDocPathArg = (transcript: string): string | null => {
   return match?.[1]?.trim() || null;
 };
 
+const normalizeAskTurnDocRoute = (value: string): string => {
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized) return "";
+  return `/${normalized.startsWith("docs/") ? normalized : `docs/${normalized}`}`.replace(/\/{2,}/g, "/");
+};
+
+const tokenizeAskTurnDocTopic = (value: string): string[] =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !["the", "doc", "docs", "document", "paper", "latest", "newest", "recent"].includes(token));
+
+const resolveAskTurnLatestDocTopicArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!normalized) return null;
+  const patterns = [
+    /\b(?:latest|newest|most\s+recent|recent)\s+(.+?)\s+(?:doc|docs|document|paper)\b/i,
+    /\b(?:open|view|show|pull\s+up|pick|grab)\s+(?:the\s+)?(?:latest|newest|most\s+recent|recent)\s+(.+)$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const topic = match?.[1]?.trim();
+    if (topic) return topic.replace(/\b(?:doc|docs|document|paper)\b/gi, "").trim();
+  }
+  if (/\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized) && /\bnhm2\b/i.test(normalized)) {
+    return "NHM2";
+  }
+  return null;
+};
+
+const resolveAskTurnLatestDocPathByTopic = (topic: string | null): string | null => {
+  if (!topic) return null;
+  const tokens = tokenizeAskTurnDocTopic(topic);
+  if (tokens.length === 0) return null;
+  const docsRoot = path.resolve(process.cwd(), "docs");
+  if (!fs.existsSync(docsRoot)) return null;
+  const candidates: Array<{ route: string; mtimeMs: number; score: number }> = [];
+  const visit = (dir: string) => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(full);
+        continue;
+      }
+      if (!entry.isFile() || !/\.md$/i.test(entry.name)) continue;
+      const rel = path.relative(process.cwd(), full).replace(/\\/g, "/");
+      const haystack = rel.toLowerCase();
+      const score = tokens.reduce((sum, token) => sum + (haystack.includes(token) ? 1 : 0), 0);
+      if (score <= 0) continue;
+      let mtimeMs = 0;
+      try {
+        mtimeMs = fs.statSync(full).mtimeMs;
+      } catch {
+        mtimeMs = 0;
+      }
+      candidates.push({
+        route: normalizeAskTurnDocRoute(rel),
+        mtimeMs,
+        score: score + (/\blatest\b/i.test(entry.name) ? 0.25 : 0),
+      });
+    }
+  };
+  visit(docsRoot);
+  candidates.sort((a, b) => b.score - a.score || b.mtimeMs - a.mtimeMs || a.route.localeCompare(b.route));
+  return candidates[0]?.route ?? null;
+};
+
+const resolveAskTurnDocLocateQuery = (transcript: string): string | null => {
+  const normalized = transcript
+    .trim()
+    .replace(/[?]+$/g, "")
+    .replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "");
+  if (!normalized) return null;
+  const cues = [
+    /\bwhere\s+does\s+it\s+(?:mention|mentions|reference|references|cite|cites|say\s+about|talk\s+about)\s+(.+)$/i,
+    /\bwhere\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+does\s+it\s+talk\s+about\s+(.+)$/i,
+    /\bwhere\s+does\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+(?:mention|mentions|reference|references|cite|cites|say\s+about|talk\s+about)\s+(.+)$/i,
+    /\bfind\s+where\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+(?:talks?\s+about|mentions?|references?|cites?)\s+(.+)$/i,
+    /\bwhere\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+(?:is|are)\s+(.+?)\s+mentions?$/i,
+    /\bwhere\s+(?:is|are)\s+(.+?)\s+(?:mentioned|referenced|cited)\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\b/i,
+    /\bwhere\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+is\s+(.+)$/i,
+    /\bfind\s+(.+)\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\b/i,
+    /\blocate\s+(.+)\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\b/i,
+  ];
+  for (const cue of cues) {
+    const match = normalized.match(cue);
+    const query = match?.[1]?.trim();
+    if (query) {
+      const cleaned = query
+        .replace(/[,.?!;:]+$/g, "")
+        .replace(/^["'`]+|["'`]+$/g, "")
+        .trim();
+      if (cleaned) return cleaned;
+    }
+  }
+  return null;
+};
+
+const HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER = "{{doc_location_reminder_text}}";
+
+const extractAskTurnDocPathArgs = (transcript: string): string[] => {
+  const normalized = transcript.trim();
+  if (!normalized) return [];
+  const matches = normalized.match(/((?:[A-Za-z]:\\|\/|\.\/|docs\/)[^\s,;]+(?:\.md|\.txt|\.pdf))/gi) ?? [];
+  return Array.from(new Set(matches.map((entry) => entry.trim()).filter(Boolean)));
+};
+
+const resolveAskTurnReasoningContextMode = (
+  mode: unknown,
+): HelixAskTurnReasoningContextMode => (mode === "isolated" ? "isolated" : "attached");
+
+const shouldUseAskTurnDeicticWorkspaceContext = (transcript: string): boolean =>
+  HELIX_ASK_TURN_DEICTIC_CONTEXT_RE.test(transcript.trim().toLowerCase());
+
+const inferAskTurnWorkspaceSnapshotFromExecution = (args: {
+  sessionId: string;
+  transcript: string;
+  executionTrace: HelixAskTurnPlanStep[];
+}): HelixAskTurnWorkspaceSessionSnapshot | null => {
+  const current = helixAskTurnWorkspaceSnapshotBySession.get(args.sessionId) ?? null;
+  let next: HelixAskTurnWorkspaceSessionSnapshot = current ?? {
+    sessionId: args.sessionId,
+    activePanel: null,
+    activeDocPath: null,
+    activeNoteTitle: null,
+    hasDocContext: false,
+    docContextValid: false,
+    docContextPath: null,
+    docContextSource: null,
+    docContextFailureReason: "no_docs_panel_or_active_doc_path",
+    hasNoteContext: false,
+    hasClipboardContext: false,
+    lastWorkspaceAction: null,
+    lastUpdatedAtMs: Date.now(),
+  };
+  for (const step of args.executionTrace) {
+    if (step.status !== "completed" || step.lane !== "workspace" || !step.action) continue;
+    const action = step.action;
+    const panelId = action.panel_id;
+    const actionId = action.action_id;
+    next = {
+      ...next,
+      activePanel:
+        panelId === "docs-viewer" || panelId === "workstation-notes" || panelId === "workstation-clipboard-history"
+          ? panelId
+          : next.activePanel,
+      lastWorkspaceAction: action,
+      lastUpdatedAtMs: Date.now(),
+    };
+    if (panelId === "docs-viewer") {
+      const pathArg = normalizeAskTurnWorkspaceDocPath(action.args?.path);
+      if (pathArg) next.activeDocPath = pathArg;
+    }
+    if (panelId === "workstation-notes") {
+      next.hasNoteContext = true;
+      const titleArg = typeof action.args?.title === "string" && action.args.title.trim() ? action.args.title.trim() : null;
+      if (titleArg) next.activeNoteTitle = titleArg;
+    }
+    if (panelId === "workstation-clipboard-history") {
+      next.hasClipboardContext = true;
+      if (actionId === "copy_selection_to_note" || actionId === "copy_receipt_to_note") {
+        next.hasNoteContext = true;
+      }
+    }
+  }
+  const transcriptPath = resolveAskTurnDocPathArg(args.transcript);
+  if (transcriptPath) {
+    next.activeDocPath = transcriptPath;
+  }
+  return withAskTurnDocContextValidity(next);
+};
+
+const HELIX_ASK_TURN_CLAUSE_BOUNDARY_RE = /\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+/i;
+const HELIX_ASK_TURN_NOTE_ARG_TAIL_INTENT_RE =
+  /\b(?:copy|compare|contrast|difference|different|versus|vs\.?|explain|summari[sz]e|open|read|list|delete|rename|clear|switch|go\s+to|view|show)\b/i;
+
+const trimAskTurnActionArgBoundaries = (value: string): string => {
+  let normalized = value.trim().replace(/^["']|["']$/g, "").replace(/[.?!]+$/, "");
+  if (!normalized) return "";
+  if (!HELIX_E8_25_BOUNDED_NOTE_ARGS_FLAG) return normalized;
+  const clauseBoundary = normalized.search(HELIX_ASK_TURN_CLAUSE_BOUNDARY_RE);
+  if (clauseBoundary > 0) {
+    normalized = normalized.slice(0, clauseBoundary).trim();
+  }
+  const intentTail = normalized.match(HELIX_ASK_TURN_NOTE_ARG_TAIL_INTENT_RE);
+  if (intentTail && typeof intentTail.index === "number" && intentTail.index > 0) {
+    normalized = normalized.slice(0, intentTail.index).trim();
+  }
+  return normalized.replace(/[.?!]+$/, "").trim();
+};
+
+type HelixAskComposedWriteDestination = {
+  destination_kind: "note" | "clipboard" | "unknown";
+  title: string | null;
+  confidence: number;
+  source_span: string | null;
+  remaining_task_text: string;
+};
+
+const extractAskTurnComposedWriteDestination = (transcript: string): HelixAskComposedWriteDestination => {
+  const input = transcript.trim();
+  const fallback: HelixAskComposedWriteDestination = {
+    destination_kind: "unknown",
+    title: null,
+    confidence: 0,
+    source_span: null,
+    remaining_task_text: input,
+  };
+  if (!input) return fallback;
+  const noteMatch = input.match(
+    /\b(?:put|add|save|store|stash|file|park|place|write|copy)\b[\s\S]*?\b(?:to|into|in|inside)\s+(?:the\s+|my\s+)?(.+?)\s+(?:note|notepad)\b/i,
+  );
+  if (noteMatch?.[1]?.trim()) {
+    const title = trimAskTurnActionArgBoundaries(noteMatch[1])
+      .replace(/^(?:a\s+|the\s+|my\s+)?(?:new\s+)?(?:note|notepad)\s+/i, "")
+      .trim();
+    if (title) {
+      return {
+        destination_kind: "note",
+        title,
+        confidence: 0.94,
+        source_span: noteMatch[0],
+        remaining_task_text: input.replace(noteMatch[0], "").trim(),
+      };
+    }
+  }
+  const bareNoteMatch = input.match(
+    /\b(?:put|add|save|store|stash|file|park|place|write|copy)\b[\s\S]*?\b(?:to|into|in|inside)\s+(?:note|notepad)\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i,
+  );
+  if (bareNoteMatch?.[1]?.trim()) {
+    const title = trimAskTurnActionArgBoundaries(bareNoteMatch[1]);
+    if (title) {
+      return {
+        destination_kind: "note",
+        title,
+        confidence: 0.88,
+        source_span: bareNoteMatch[0],
+        remaining_task_text: input.replace(bareNoteMatch[0], "").trim(),
+      };
+    }
+  }
+  if (/\b(?:to|into|in|inside)\s+(?:the\s+)?clipboard\b/i.test(input)) {
+    return {
+      destination_kind: "clipboard",
+      title: null,
+      confidence: 0.9,
+      source_span: input.match(/\b(?:to|into|in|inside)\s+(?:the\s+)?clipboard\b/i)?.[0] ?? "clipboard",
+      remaining_task_text: input,
+    };
+  }
+  return fallback;
+};
+
 const resolveAskTurnTextArg = (transcript: string): string | null => {
   const colonMatch = transcript.match(/:\s*([\s\S]+)$/);
   if (colonMatch?.[1]?.trim()) return colonMatch[1].trim();
@@ -20918,31 +21594,472 @@ const resolveAskTurnTextArg = (transcript: string): string | null => {
 
 const resolveAskTurnTitleArg = (transcript: string): string | null => {
   const quoted = transcript.match(/"(.*?)"/);
-  if (quoted?.[1]?.trim()) return quoted[1].trim();
-  const called = transcript.match(/\b(?:called|named|title)\s+(.+)$/i);
-  if (called?.[1]?.trim()) return called[1].trim();
-  const noteTitle = transcript.match(/\bnote\s+(.+)$/i);
-  if (noteTitle?.[1]?.trim()) return noteTitle[1].trim();
+  if (quoted?.[1]?.trim()) return trimAskTurnActionArgBoundaries(quoted[1]);
+  const called = transcript.match(/\b(?:called|named|title)\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i);
+  if (called?.[1]?.trim()) return trimAskTurnActionArgBoundaries(called[1]);
+  const noteTitle = transcript.match(/\bnote\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i);
+  if (noteTitle?.[1]?.trim()) return trimAskTurnActionArgBoundaries(noteTitle[1]);
   return null;
 };
 
 const resolveAskTurnNoteTargetArg = (transcript: string): string | null => {
-  const explicit = transcript.match(/\b(?:to|into|in)\s+(?:note|notepad)\s+(.+)$/i);
-  if (explicit?.[1]?.trim()) return explicit[1].trim().replace(/[.?!]+$/, "");
-  const compact = transcript.match(/\bnote\s+(.+)$/i);
-  if (compact?.[1]?.trim()) return compact[1].trim().replace(/[.?!]+$/, "");
+  const composedDestination = extractAskTurnComposedWriteDestination(transcript);
+  if (composedDestination.destination_kind === "note" && composedDestination.title) {
+    return composedDestination.title;
+  }
+  const explicit = transcript.match(
+    /\b(?:to|into|in)\s+(?:that\s+)?(?:note|notepad)\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i,
+  );
+  if (explicit?.[1]?.trim()) return trimAskTurnActionArgBoundaries(explicit[1]);
+  const beforeNote = transcript.match(
+    /\b(?:to|into|in)\s+(?:the\s+|my\s+)?(.+?)\s+(?:note|notepad)\b(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i,
+  );
+  if (beforeNote?.[1]?.trim()) return trimAskTurnActionArgBoundaries(beforeNote[1]);
+  const compact = transcript.match(/\bnote\s+(.+?)(?:\s*(?:,|\band then\b|\bthen\b|\bafter that\b|\bwhile\b|\balso\b)\s+|$)/i);
+  if (compact?.[1]?.trim()) return trimAskTurnActionArgBoundaries(compact[1]);
   return resolveAskTurnTitleArg(transcript);
+};
+
+const resolveAskTurnBareNoteSinkArg = (transcript: string): string | null => {
+  const composedDestination = extractAskTurnComposedWriteDestination(transcript);
+  if (composedDestination.destination_kind === "note" && composedDestination.title) {
+    return composedDestination.title;
+  }
+  const match = transcript.match(
+    /\b(?:put|add|save|store|stash|file|park|place|write)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
+  );
+  const target = trimAskTurnActionArgBoundaries(match?.[1] ?? "");
+  if (!target) return null;
+  return target.replace(/^(?:the\s+)?(?:note|notepad)\s+/i, "").trim();
+};
+
+const resolveAskTurnAnyNoteSinkArg = (transcript: string): string | null =>
+  resolveAskTurnNoteTargetArg(transcript) ?? resolveAskTurnBareNoteSinkArg(transcript);
+
+const isAskTurnArtifactReferenceIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  return /\b(?:that|this|it|result|answer|finding|output|response)\b/.test(normalized);
+};
+
+const isAskTurnArtifactToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnArtifactReferenceIntent(transcript)) return false;
+  return (
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:to|into|in|inside)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized) ||
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized) ||
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:clipboard\s+)?(?:result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)([a-z0-9][\w\s-]{1,120})$/i.test(
+      normalized,
+    )
+  );
+};
+
+const resolveAskTurnArtifactBareNoteTargetArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!isAskTurnArtifactReferenceIntent(normalized)) return null;
+  const match = normalized.match(
+    /\b(?:put|save|copy|add|append|drop|store|stash|file|park|place)\b[\s\S]*\b(?:clipboard\s+)?(?:result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
+  );
+  const target = trimAskTurnActionArgBoundaries(match?.[1] ?? "");
+  if (!target) return null;
+  return target;
+};
+
+const isAskTurnArtifactToClipboardIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnArtifactReferenceIntent(transcript)) return false;
+  return /\b(?:copy|save|write|put|store)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\bclipboard\b/.test(normalized);
+};
+
+const readAskTurnLatestResultArtifactText = (sessionId: string | null | undefined): string | null => {
+  if (!sessionId) return null;
+  const artifact = helixAskTurnLatestResultArtifactBySession.get(sessionId);
+  const text = typeof artifact?.text === "string" ? artifact.text.trim() : "";
+  return text || null;
+};
+
+const shouldStoreAskTurnLatestResultArtifact = (payload: Record<string, unknown>): boolean => {
+  const route = typeof payload.route_reason_code === "string" ? payload.route_reason_code : "";
+  const planner =
+    payload.planner_contract && typeof payload.planner_contract === "object"
+      ? (payload.planner_contract as { dispatch_policy?: unknown; selected_action?: unknown })
+      : null;
+  const policy =
+    typeof payload.dispatch_policy === "string"
+      ? payload.dispatch_policy
+      : typeof planner?.dispatch_policy === "string"
+        ? planner.dispatch_policy
+        : "";
+  const action =
+    payload.workspace_action && typeof payload.workspace_action === "object"
+      ? (payload.workspace_action as { action_id?: unknown })
+      : planner &&
+          "selected_action" in planner &&
+          planner.selected_action &&
+          typeof planner.selected_action === "object"
+        ? (planner.selected_action as { action_id?: unknown })
+      : null;
+  const actionId = typeof action?.action_id === "string" ? action.action_id : "";
+  const isSimpleWorkspaceMutation =
+    route === "dispatch:act" &&
+    (policy === "workspace_only" || !policy) &&
+    [
+      "open",
+      "open_doc",
+      "open_doc_by_path",
+      "open_latest_doc_by_topic",
+      "create_note",
+      "append_to_note",
+      "set_active_note",
+      "rename_note",
+      "delete_note",
+      "write_clipboard",
+      "clear_history",
+      "copy_selection_to_note",
+      "copy_receipt_to_note",
+      "copy_receipt_to_clipboard",
+    ].includes(actionId);
+  return !isSimpleWorkspaceMutation;
+};
+
+const resolveAskTurnCreateNoteTitleArg = (transcript: string): string | null => {
+  const createMatch = transcript.match(
+    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note(?:\s+(?:called|named|titled?)\s+)?(.+?)(?:\s*,|\s+\band then\b|\s+\bthen\b|\s+\bafter that\b|\s+\bwhile\b|\s+\balso\b|$)/i,
+  );
+  const value = trimAskTurnActionArgBoundaries(createMatch?.[1] ?? "");
+  if (value) return value;
+  return resolveAskTurnTitleArg(transcript);
+};
+
+const resolveAskTurnAppendNoteTextArg = (transcript: string): string | null => {
+  const colon = transcript.match(/:\s*([\s\S]+)$/);
+  if (colon?.[1]?.trim()) return colon[1].trim();
+  const appendBeforeTarget = transcript.match(
+    /\b(?:append|add|put|save|write)\s+(.+?)\s+\b(?:to|into|in)\s+(?:the\s+|my\s+)?(?:note|notepad)\b/i,
+  );
+  if (appendBeforeTarget?.[1]?.trim()) return trimAskTurnActionArgBoundaries(appendBeforeTarget[1]);
+  const appendSimple = transcript.match(/\b(?:append|add|put|save|write)\s+(.+?)$/i);
+  if (appendSimple?.[1]?.trim()) return trimAskTurnActionArgBoundaries(appendSimple[1]);
+  return null;
+};
+
+const isAskTurnDocsRetrievalToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasRetrievalCue =
+    /\b(?:look|search|find|scan|check)\b[\s\S]*\b(?:docs?|documents?|files?|repo|repository)\b/.test(normalized) ||
+    /\b(?:look\s+for|search\s+for|find)\b/.test(normalized);
+  const hasSummaryCue = /\b(?:summary|summari[sz]e|useful|key\s+(?:points|details)|details|notes?)\b/.test(normalized);
+  const hasNoteSink =
+    /\b(?:put|add|save|store|stash|file|park|place|write)\b[\s\S]*\b(?:to|into|in|inside)\b/.test(normalized) &&
+    Boolean(resolveAskTurnAnyNoteSinkArg(transcript));
+  return hasRetrievalCue && hasSummaryCue && hasNoteSink;
+};
+
+const resolveAskTurnDocsRetrievalQueryArg = (transcript: string): string => {
+  const normalized = transcript.trim();
+  const patterns = [
+    /\b(?:look|search|find|scan|check)\s+(?:in|through|across)\s+(?:the\s+)?(?:docs?|documents?|files?|repo|repository)\s+(?:for|about)\s+(.+?)(?:\s+\b(?:and|then)\b\s+|\s+\b(?:to|into|in|inside)\b\s+|$)/i,
+    /\b(?:look\s+for|search\s+for|find)\s+(.+?)(?:\s+\b(?:and|then)\b\s+|\s+\b(?:to|into|in|inside)\b\s+|$)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const value = trimAskTurnActionArgBoundaries(match?.[1] ?? "");
+    if (value) return value;
+  }
+  return clipConversationText(
+    normalized
+      .replace(/\b(?:look|search|find|scan|check)\b/gi, " ")
+      .replace(/\b(?:docs?|documents?|files?|repo|repository|summary|summari[sz]e|useful|key|details|points|put|add|save|store|stash|file|park|place|write|note|notepad)\b/gi, " "),
+    120,
+  );
+};
+
+type HelixAskDocSearchResult = {
+  path: string;
+  line_start: number;
+  line_end: number;
+  snippet: string;
+  score: number;
+};
+
+const searchAskTurnDocsForQuery = (query: string, limit = 3): HelixAskDocSearchResult[] => {
+  const tokens = filterCriticTokens(tokenizeAskQuery(query))
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 3);
+  if (tokens.length === 0) return [];
+  const docsRoot = path.resolve(process.cwd(), "docs");
+  if (!fs.existsSync(docsRoot)) return [];
+  const results: HelixAskDocSearchResult[] = [];
+  const visit = (dir: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(full);
+        continue;
+      }
+      if (!entry.isFile() || !/\.md$/i.test(entry.name)) continue;
+      let text = "";
+      try {
+        text = fs.readFileSync(full, "utf8");
+      } catch {
+        continue;
+      }
+      const rel = path.relative(process.cwd(), full).replace(/\\/g, "/");
+      const lines = text.split(/\r?\n/);
+      const haystackPath = rel.toLowerCase();
+      let bestLine = -1;
+      let bestScore = tokens.reduce((sum, token) => sum + (haystackPath.includes(token) ? 3 : 0), 0);
+      for (let idx = 0; idx < lines.length; idx += 1) {
+        const lower = lines[idx].toLowerCase();
+        const score = tokens.reduce((sum, token) => sum + (lower.includes(token) ? 4 : 0), 0);
+        if (score > bestScore) {
+          bestScore = score;
+          bestLine = idx;
+        }
+      }
+      if (bestScore <= 0) continue;
+      const start = Math.max(0, bestLine >= 0 ? bestLine - 1 : 0);
+      const end = Math.min(lines.length - 1, bestLine >= 0 ? bestLine + 2 : 2);
+      const snippet = lines.slice(start, end + 1).join(" ").replace(/\s+/g, " ").trim() || rel;
+      results.push({
+        path: rel.startsWith("/") ? rel : `/${rel}`,
+        line_start: start + 1,
+        line_end: end + 1,
+        snippet: clipConversationText(snippet, 360),
+        score: bestScore,
+      });
+    }
+  };
+  visit(docsRoot);
+  return results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path)).slice(0, Math.max(1, limit));
+};
+
+const buildAskTurnRetrievalSummaryForNote = (args: { query: string; transcript: string }): string => {
+  const matches = searchAskTurnDocsForQuery(args.query, 3);
+  if (matches.length === 0) {
+    return `No strong docs matches were found for "${args.query}". Request: ${clipConversationText(args.transcript, 180)}`;
+  }
+  return [
+    `Docs summary for "${args.query}":`,
+    ...matches.map((match, index) => {
+      return `${index + 1}. ${match.path}:L${match.line_start}-L${match.line_end} - ${match.snippet}`;
+    }),
+  ].join("\n");
+};
+
+const sanitizeAskTurnEvidenceRef = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const noteTitleMatch = raw.match(/^note_title:(.*)$/i);
+  if (noteTitleMatch) {
+    const normalizedTitle = trimAskTurnActionArgBoundaries(noteTitleMatch[1] ?? "");
+    return normalizedTitle ? `note_title:${normalizedTitle}` : "";
+  }
+  return raw;
+};
+
+const HELIX_ASK_TURN_COMPARE_CUE_RE =
+  /\b(?:compare|comparison|contrast|difference|differences|different|delta|deltas|versus|vs\.?)\b/i;
+
+const isAskTurnOpenLatestDocIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasOpenCue = /\b(?:open|view|show|pull\s+up|pick|grab|read)\b/.test(normalized);
+  const hasLatestCue = /\b(?:latest|newest|most\s+recent|recent)\b/.test(normalized);
+  const hasDocCue = /\b(?:doc|docs|document|paper)\b/.test(normalized);
+  return hasOpenCue && hasLatestCue && hasDocCue;
 };
 
 const isAskTurnDocNotesHybridCompareIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
-  const hasCompareCue = /\b(?:compare|comparison|contrast|difference|different|versus|vs\.?)\b/.test(normalized);
+  const hasCompareCue = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
   if (!hasCompareCue) return false;
   const hasDocCue = /\b(?:doc|docs|document|paper)\b/.test(normalized);
   const hasNotesCue = /\b(?:note|notes|notepad)\b/.test(normalized);
   return hasDocCue && hasNotesCue;
 };
+
+const isAskTurnDocDocCompareIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasCompareCue = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  if (!hasCompareCue) return false;
+  if (/\b(?:note|notes|notepad)\b/.test(normalized)) return false;
+  const docRefs = extractAskTurnDocPathArgs(transcript);
+  if (docRefs.length >= 2) return true;
+  return /\b(?:doc|docs|document|paper|figure|figures)\b/.test(normalized) && /\bwith\b/.test(normalized);
+};
+
+const shouldGateAskTurnExplicitPathCompare = (args: {
+  transcript: string;
+  inputChars: number;
+  inputMaxChars: number;
+  planStepCount: number;
+}): boolean => {
+  if (!HELIX_E9_2_EXPLICIT_PATH_BUDGET_FLAG) return false;
+  if (!isAskTurnDocDocCompareIntent(args.transcript)) return false;
+  const pathCount = extractAskTurnDocPathArgs(args.transcript).length;
+  if (pathCount < 2) return false;
+  if (args.inputChars > args.inputMaxChars) return true;
+  if (args.planStepCount > HELIX_E9_2_EXPLICIT_PATH_MAX_STEPS) return true;
+  return false;
+};
+
+const isAskTurnOpenCreateCompareIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  if (!HELIX_E8_29_CHAINED_PARTIAL_EXEC_FLAG) return false;
+  const hasOpenDocs = /\b(?:open|go\s+to|view|show)\s+(?:the\s+)?(?:docs?|document|paper)\b/.test(normalized);
+  const hasCreateNote = /\b(?:create|new|start)\s+(?:a\s+)?note\b/.test(normalized);
+  const hasCompare = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  return hasOpenDocs && hasCreateNote && hasCompare;
+};
+
+const isAskTurnExtractAppendCompareIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasExtractCue = /\b(?:extract|pull|collect)\b/.test(normalized) && /\b(?:numeric|number|figure|claim)s?\b/.test(normalized);
+  const hasAppendCue = /\bappend\b/.test(normalized) && /\b(?:note|notes|notepad)\b/.test(normalized);
+  const hasCompareCue = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  return hasExtractCue && hasAppendCue && hasCompareCue;
+};
+
+const isAskTurnCreateCopyCompareIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasCreateNoteCue = /\b(?:create|new|start)\s+(?:a\s+)?note\b/.test(normalized);
+  const hasCopyClipboardCue =
+    /\bcopy\b[\s\S]*\b(?:latest|last|recent)\b[\s\S]*\bclipboard\b[\s\S]*\b(?:entry|item|text)?\b[\s\S]*\bnote\b/.test(
+      normalized,
+    );
+  const hasCompareCue = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  return hasCreateNoteCue && hasCopyClipboardCue && hasCompareCue;
+};
+
+const isAskTurnCompareCopyResultToClipboardIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasCompareCue = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  const hasClipboardCopyCue =
+    /\bcopy\b[\s\S]*\b(?:result|results|summary|differences|deltas|analysis|it|that)\b[\s\S]*\bclipboard\b/.test(
+      normalized,
+    ) || /\bcopy\b[\s\S]*\bclipboard\b/.test(normalized);
+  return hasCompareCue && hasClipboardCopyCue;
+};
+
+const isAskTurnSummarizeAndAddToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasSummaryCue = /\b(?:summari[sz]e|explain)\b/.test(normalized);
+  const hasDeltaCue = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  const hasAddToNoteCue =
+    /\b(?:add|append|write)\b[\s\S]*\b(?:to|into)\b[\s\S]*\b(?:note|notepad)\b/.test(normalized) ||
+    /\b(?:add|append|write)\b[\s\S]*\b(?:note|notepad)\b/.test(normalized);
+  return hasSummaryCue && hasDeltaCue && hasAddToNoteCue;
+};
+
+const isAskTurnRepoCueIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return /\b(?:repo|repository|files?|codebase|source code|code paths?)\b/.test(normalized);
+};
+
+const isAskTurnAppendToNoteCue = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\b(?:append|add|save|put|write)\b[\s\S]*\b(?:to|into)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized) ||
+    /\b(?:append|add|save|put|write)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(normalized)
+  );
+};
+
+const isAskTurnComposedResearchToNoteIntent = (transcript: string): boolean => {
+  if (!HELIX_E9_3_COMPOSED_RESEARCH_FLAG) return false;
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasDocCue = /\b(?:doc|docs|document|paper|current doc|this doc)\b/.test(normalized);
+  const hasRepoCue = isAskTurnRepoCueIntent(normalized);
+  const hasResearchCue =
+    /\b(?:find|check|verify|mention|claims?|key claims|related files|differences|deltas|compare)\b/.test(normalized);
+  const hasNoteSink = isAskTurnAppendToNoteCue(normalized);
+  return hasDocCue && hasRepoCue && hasResearchCue && hasNoteSink;
+};
+
+const isAskTurnDocLocateIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  const hasDocCue = /\b(?:this|that|current|the)?\s*(?:doc|document|paper)\b/.test(normalized);
+  if (!hasDocCue) return false;
+  return (
+    /\bwhere\b[\s\S]*\b(?:talk|mentions?|section|located?)\b/.test(normalized) ||
+    /\bwhere\s+in\b/.test(normalized) ||
+    /\bfind\b/.test(normalized) ||
+    /\blocate\b/.test(normalized)
+  );
+};
+
+const isAskTurnDocLocateToNoteIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnDocLocateIntent(transcript)) return false;
+  const hasWriteCue = /\b(?:add|append|save|put|write|store|stash|file|park|place)\b[\s\S]*\b(?:to|into|in|inside)\b/i.test(normalized);
+  return hasWriteCue && Boolean(resolveAskTurnAnyNoteSinkArg(transcript));
+};
+
+const isAskTurnDocIdentityIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  if (
+    isAskTurnComposedResearchToNoteIntent(transcript) ||
+    isAskTurnDocNotesHybridCompareIntent(transcript) ||
+    isAskTurnDocDocCompareIntent(transcript) ||
+    isAskTurnSummarizeAndAddToNoteIntent(transcript) ||
+    isAskTurnCompareCopyResultToClipboardIntent(transcript)
+  ) {
+    return false;
+  }
+  return (
+    /\bwhat\s+(?:doc|document|paper)\s+are\s+we\s+on\b/.test(normalized) ||
+    /\bwhat\s+(?:exact\s+)?(?:doc|document|paper)\s+did\s+(?:you|we)\s+open\b/.test(normalized) ||
+    /\bwhich\s+(?:doc|document|paper)\s+did\s+(?:you|we)\s+open\b/.test(normalized) ||
+    /\bwhat\s+(?:doc|document|paper)\s+(?:is|are)\s+(?:this|that)\b/.test(normalized) ||
+    /\bwhat\s+(?:is|are)\s+(?:this|that)\s+(?:doc|document|paper)\b/.test(normalized) ||
+    /\bwhat\s+is\s+(?:the\s+)?(?:doc|document|paper)\s+we\s+are\s+looking\s+at\b/.test(normalized) ||
+    /\bwhat\s+is\s+(?:the\s+)?(?:doc|document|paper)\s+we(?:'re)\s+looking\s+at\b/.test(normalized) ||
+    /\bwhat\s+(?:doc|document|paper)\s+(?:am\s+i|are\s+we)\s+(?:viewing|looking\s+at|reading)\b/.test(normalized) ||
+    /\bwhich\s+(?:doc|document|paper)\s+(?:am\s+i|are\s+we)\s+(?:viewing|looking\s+at|reading)\b/.test(normalized) ||
+    /\bwhich\s+(?:doc|document|paper)\s+is\s+(?:showing|displayed|on\s+screen)(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+    /\bwhat\s+(?:doc|document|paper)\s+is\s+(?:showing|displayed|on\s+screen)(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+    /\bwhich\s+(?:doc|document|paper)\s+is\s+in\s+(?:the\s+)?viewer(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+    /\bwhat\s+(?:doc|document|paper)\s+is\s+in\s+(?:the\s+)?viewer(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+    /\bwhat\s+(?:paper|document|doc)\s+am\s+i\s+viewing\b/.test(normalized) ||
+    /\bwhat\s+(?:paper|document|doc)\s+are\s+we\s+viewing\b/.test(normalized) ||
+    /\bwhat\s+(?:is\s+)?(?:the\s+)?current\s+(?:viewer\s+)?(?:doc|document|paper)\b/.test(normalized) ||
+    /\bwhat\s+(?:doc|document|paper)\s+(?:is|are)\s+(?:open|active|current)(?:\s+now|\s+right\s+now)?\b/.test(normalized) ||
+    /\bwhich\s+(?:doc|document|paper)\s+(?:is|are)\s+(?:open|active|current)\b/.test(normalized) ||
+    /\bwhich\s+(?:doc|document|paper)\s+is\s+open\s+right\s+now\b/.test(normalized) ||
+    /\bwhat\s+(?:doc|document|paper)\s+is\s+open\b/.test(normalized)
+  );
+};
+
+const isAskTurnExplainIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\b(?:explain|summari[sz]e|plain language|key claim)\b/.test(normalized) ||
+    /\bwhat\s+is\s+(?:this|that)\b/.test(normalized) ||
+    (HELIX_E8_14_DEICTIC_DOC_FIX_FLAG && /\bwhat\s+is\s+(?:this|that)\s+(?:doc|document|paper)\b/.test(normalized))
+  );
+};
+
+const isAskTurnDocIdentityExplainHybridIntent = (transcript: string): boolean =>
+  isAskTurnDocIdentityIntent(transcript) && isAskTurnExplainIntent(transcript);
 
 type HelixAskTurnNavigationTargetPanel =
   | "docs-viewer"
@@ -20957,8 +22074,14 @@ const resolveAskTurnNavigationTargetPanel = (
 ): HelixAskTurnNavigationTargetPanel => {
   const normalized = transcript.trim().toLowerCase().replace(/\bopen\s+up\b/g, "open");
   if (!normalized) return null;
+  const switchViewerToDocFromNotes =
+    /\bswitch\b[\s\S]*\bviewer\b/.test(normalized) &&
+    /\b(?:see|show|view)\s+(?:it|that)\b/.test(normalized) &&
+    /\b(?:currently|right now)\s+on\s+(?:the\s+)?notes?\b/.test(normalized) &&
+    /\bits?\s+open\b/.test(normalized);
+  if (switchViewerToDocFromNotes) return "docs-viewer";
   const hasNavigationCue =
-    /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to|open|view|show|switch\s+to)\b/.test(normalized);
+    /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to|move\s+me\s+(?:over\s+)?to|jump\s+(?:over\s+)?to|switch\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on|open|view|show)\b/.test(normalized);
   if (!hasNavigationCue && !options?.allowBareTarget) return null;
   const targetPanels = new Set<Exclude<HelixAskTurnNavigationTargetPanel, "ambiguous" | null>>();
   if (/\b(?:docs?|document|paper|focs?)\b/.test(normalized)) targetPanels.add("docs-viewer");
@@ -20973,9 +22096,11 @@ const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily 
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return "conversation";
   if (isConversationFillerTurn(normalized)) return "conversation";
-  if (/\b(?:compare|comparison|contrast|difference|different|versus|vs\.?)\b/.test(normalized)) return "compare";
+  if (isAskTurnDocLocateIntent(transcript) || isAskTurnDocIdentityIntent(transcript)) return "docs_nav";
+  if (isAskTurnOpenLatestDocIntent(transcript) || resolveAskTurnDocPathArg(transcript)) return "docs_nav";
+  if (HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized)) return "compare";
   if (
-    /\b(?:go\s+to|navigate\s+to|open|show|view|switch\s+to)\b/.test(normalized) &&
+    /\b(?:go\s+to|navigate\s+to|move\s+me\s+(?:over\s+)?to|jump\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on|open|show|view|switch\s+to)\b/.test(normalized) &&
     /\b(?:docs?|document|paper)\b/.test(normalized)
   ) {
     return "docs_nav";
@@ -21009,6 +22134,25 @@ const applyAskTurnPlannerRepairPass = (args: {
 } => {
   const baseRepair: HelixAskTurnPlannerRepairState = { attempted: false, applied: false, reason: null };
   if (args.dispatchPolicy !== "workspace_only") {
+    return {
+      selection: args.actionSelection,
+      repair: baseRepair,
+      ambiguityPrompt: null,
+      ambiguityRequiredFields: [],
+    };
+  }
+  if (isAskTurnDocNotesHybridCompareIntent(args.transcript) || isAskTurnExtractAppendCompareIntent(args.transcript)) {
+    return {
+      selection: args.actionSelection,
+      repair: baseRepair,
+      ambiguityPrompt: null,
+      ambiguityRequiredFields: [],
+    };
+  }
+  if (
+    HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG &&
+    (resolveAskTurnDocPathArg(args.transcript) || resolveAskTurnLatestDocTopicArg(args.transcript))
+  ) {
     return {
       selection: args.actionSelection,
       repair: baseRepair,
@@ -21104,6 +22248,22 @@ const extractPendingRequiredFieldValues = (args: {
       if (targetPanel && targetPanel !== "ambiguous") out.target_panel = targetPanel;
       continue;
     }
+    if (field === "doc_reference") {
+      const path = resolveAskTurnDocPathArg(args.transcript);
+      if (path) out.doc_reference = path;
+      continue;
+    }
+    if (field === "doc_reference_a" || field === "doc_reference_b") {
+      const refs = extractAskTurnDocPathArgs(args.transcript);
+      if (field === "doc_reference_a" && refs[0]) out.doc_reference_a = refs[0];
+      if (field === "doc_reference_b" && refs[1]) out.doc_reference_b = refs[1];
+      continue;
+    }
+    if (field === "note_reference") {
+      const noteTitle = resolveAskTurnNoteTargetArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
+      if (noteTitle) out.note_reference = noteTitle;
+      continue;
+    }
   }
   return out;
 };
@@ -21111,9 +22271,16 @@ const extractPendingRequiredFieldValues = (args: {
 const resolveAskTurnActionSelection = (args: {
   transcript: string;
   dispatchPolicy: HelixAskTurnDispatchPolicy | null;
+  sessionId?: string | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
 }): HelixAskTurnActionSelection => {
   const candidates = HELIX_ASK_TURN_CAPABILITY_ACTIONS;
   const normalized = args.transcript.trim().toLowerCase().replace(/\bopen\s+up\b/g, "open");
+  const switchViewerToDocFromNotes =
+    /\bswitch\b[\s\S]*\bviewer\b/.test(normalized) &&
+    /\b(?:see|show|view)\s+(?:it|that)\b/.test(normalized) &&
+    /\b(?:currently|right now)\s+on\s+(?:the\s+)?notes?\b/.test(normalized) &&
+    (/\bits?\s+open\b/.test(normalized) || hasValidAskTurnDocContext(args.workspaceSnapshot));
   if (args.dispatchPolicy === "conversation_only" || args.dispatchPolicy === "needs_user_input") {
     return {
       action: null,
@@ -21124,28 +22291,169 @@ const resolveAskTurnActionSelection = (args: {
       candidates,
     };
   }
+  if (args.dispatchPolicy === "workspace_context_reasoning") {
+    if (isAskTurnComposedResearchToNoteIntent(args.transcript)) {
+      const noteTitle = resolveAskTurnNoteTargetArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
+      return {
+        action: {
+          panel_id: "workstation-notes",
+          action_id: "append_to_note",
+          args: {
+            text: "{{reasoning_followup_text}}",
+            ...(noteTitle ? { title: noteTitle } : {}),
+          },
+        },
+        source: "deterministic",
+        valid: true,
+        fail_reason: "none",
+        missing_required_args: [],
+        candidates,
+      };
+    }
+    if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript)) {
+      const noteTitle = resolveAskTurnNoteTargetArg(args.transcript);
+      return {
+        action: {
+          panel_id: "workstation-notes",
+          action_id: "append_to_note",
+          args: {
+            text: "{{reasoning_followup_text}}",
+            ...(noteTitle ? { title: noteTitle } : {}),
+          },
+        },
+        source: "deterministic",
+        valid: true,
+        fail_reason: "none",
+        missing_required_args: [],
+        candidates,
+      };
+    }
+    const path =
+      resolveAskTurnDocPathArg(args.transcript) ??
+      (typeof args.workspaceSnapshot?.activeDocPath === "string" ? args.workspaceSnapshot.activeDocPath : null);
+    if (isAskTurnDocLocateIntent(args.transcript)) {
+      const query = resolveAskTurnDocLocateQuery(args.transcript) ?? "";
+      return {
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "locate_in_doc",
+          args: {
+            ...(path ? { path } : {}),
+            ...(query ? { query } : {}),
+          },
+        },
+        source: "deterministic",
+        valid: query.length > 0,
+        fail_reason: query.length > 0 ? "none" : "missing_required_args",
+        missing_required_args: query.length > 0 ? [] : ["query"],
+        candidates,
+      };
+    }
+    return {
+      action: {
+        panel_id: "docs-viewer",
+        action_id: "summarize_doc",
+        args:
+          HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT_FLAG && isAskTurnDocDocCompareIntent(args.transcript)
+            ? (() => {
+                const docRefs = extractAskTurnDocPathArgs(args.transcript);
+                return docRefs[0] ? { path: docRefs[0] } : path ? { path } : {};
+              })()
+            : path
+              ? { path }
+              : {},
+      },
+      source: "deterministic",
+      valid: true,
+      fail_reason: "none",
+      missing_required_args: [],
+      candidates,
+    };
+  }
 
   let selected: HelixAskTurnSelectedAction | null = null;
-  if (/\b(?:go\s+to|open|view|show|switch\s+to)\s+(?:the\s+)?(?:docs?|focs?)\b/.test(normalized)) {
+  if (switchViewerToDocFromNotes) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
+  } else if (isAskTurnDocIdentityIntent(args.transcript) && !isAskTurnDocIdentityExplainHybridIntent(args.transcript)) {
+    const activeDocPath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+    selected = { panel_id: "docs-viewer", action_id: "identify_current_doc", args: activeDocPath ? { path: activeDocPath } : {} };
+  } else if (resolveAskTurnDocPathArg(args.transcript) && /\b(?:open|view|show|pull\s+up|read)\b/i.test(normalized)) {
+    const path = resolveAskTurnDocPathArg(args.transcript);
+    selected = { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: path ? { path } : {} };
   } else if (
-    /\b(?:pull\s+up|open|view|show)\b[\s\S]*\b(?:latest|newest|most\s+recent)\b[\s\S]*\b(?:nhm2|doc|docs?|document|paper)\b/.test(
+    HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG &&
+    /\b(?:pull\s+up|open|view|show|pick|grab)\b[\s\S]*\b(?:latest|newest|most\s+recent|recent)\b[\s\S]*\b(?:nhm2|doc|docs?|document|paper)\b/.test(
       normalized,
     )
   ) {
+    const topic = resolveAskTurnLatestDocTopicArg(args.transcript) ?? "document";
+    const path = resolveAskTurnLatestDocPathByTopic(topic);
+    selected = {
+      panel_id: "docs-viewer",
+      action_id: "open_latest_doc_by_topic",
+      args: {
+        topic,
+        ...(path ? { path } : {}),
+      },
+    };
+  } else if (/\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+viewer)?\b/.test(normalized)) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
-  } else if (/\b(?:create|new|start)\s+(?:a\s+)?note\b/.test(normalized)) {
-    const title = resolveAskTurnTitleArg(args.transcript);
+  } else if (/\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/.test(normalized)) {
+    const title = resolveAskTurnCreateNoteTitleArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
     selected = {
       panel_id: "workstation-notes",
       action_id: "create_note",
       args: title ? { title } : {},
+    };
+  } else if (isAskTurnArtifactToNoteIntent(args.transcript)) {
+    const text = readAskTurnLatestResultArtifactText(args.sessionId);
+    const wantsClipboardReceiptToNote =
+      /\b(?:latest|last|recent)\s+clipboard\b/i.test(normalized) ||
+      /\bclipboard\s+(?:result|entry|item|text)\b/i.test(normalized);
+    const noteTitle = wantsClipboardReceiptToNote
+      ? resolveAskTurnArtifactBareNoteTargetArg(args.transcript) ?? resolveAskTurnNoteTargetArg(args.transcript)
+      : resolveAskTurnNoteTargetArg(args.transcript) ?? resolveAskTurnArtifactBareNoteTargetArg(args.transcript);
+    selected = {
+      panel_id: wantsClipboardReceiptToNote ? "workstation-clipboard-history" : "workstation-notes",
+      action_id: wantsClipboardReceiptToNote ? "copy_receipt_to_note" : "append_to_note",
+      args: wantsClipboardReceiptToNote
+        ? {
+            ...(text ? { text } : {}),
+            ...(noteTitle ? { note_title: noteTitle } : {}),
+          }
+        : {
+            ...(text ? { text } : {}),
+            ...(noteTitle ? { title: noteTitle } : {}),
+          },
+    };
+  } else if (isAskTurnArtifactToClipboardIntent(args.transcript)) {
+    const text = readAskTurnLatestResultArtifactText(args.sessionId);
+    selected = {
+      panel_id: "workstation-clipboard-history",
+      action_id: "write_clipboard",
+      args: {
+        ...(text ? { text } : {}),
+        source: "helix_latest_result_artifact",
+      },
     };
   } else if (/\bread\s+(?:this|the|current)?\s*doc(?:ument)?\b/.test(normalized)) {
     const path = resolveAskTurnDocPathArg(args.transcript);
     selected = path
       ? { panel_id: "docs-viewer", action_id: "open_doc_and_read", args: { path } }
       : { panel_id: "docs-viewer", action_id: "open", args: {} };
+  } else if (isAskTurnDocLocateIntent(args.transcript)) {
+    const path =
+      resolveAskTurnDocPathArg(args.transcript) ??
+      (typeof args.workspaceSnapshot?.activeDocPath === "string" ? args.workspaceSnapshot.activeDocPath : null);
+    const query = resolveAskTurnDocLocateQuery(args.transcript) ?? "";
+    selected = {
+      panel_id: "docs-viewer",
+      action_id: "locate_in_doc",
+      args: {
+        ...(path ? { path } : {}),
+        ...(query ? { query } : {}),
+      },
+    };
   } else if (/\bopen\s+(?:the\s+)?doc(?:ument)?\b/.test(normalized)) {
     const path = resolveAskTurnDocPathArg(args.transcript);
     selected = { panel_id: "docs-viewer", action_id: "open_doc", args: path ? { path } : {} };
@@ -21153,10 +22461,27 @@ const resolveAskTurnActionSelection = (args: {
     selected = { panel_id: "workstation-notes", action_id: "list_notes", args: {} };
   } else if (/\b(?:open|show|view|go\s+to)\s+(?:the\s+)?notes?\b/.test(normalized)) {
     selected = { panel_id: "workstation-notes", action_id: "open", args: {} };
+  } else if (isAskTurnExtractAppendCompareIntent(args.transcript)) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript);
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: "{{extracted_claims_text}}",
+        ...(noteTitle ? { title: noteTitle } : {}),
+      },
+    };
   } else if (/\bappend\b[\s\S]*\bnote\b/.test(normalized)) {
-    const appendMatch = args.transcript.match(/:\s*([\s\S]+)$/);
-    const text = appendMatch?.[1]?.trim() ?? "";
-    selected = { panel_id: "workstation-notes", action_id: "append_to_note", args: text ? { text } : {} };
+    const text = resolveAskTurnAppendNoteTextArg(args.transcript);
+    const title = resolveAskTurnNoteTargetArg(args.transcript);
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        ...(text ? { text } : {}),
+        ...(title ? { title } : {}),
+      },
+    };
   } else if (/\bdelete\s+note\b/.test(normalized)) {
     const titleMatch = args.transcript.match(/\bdelete\s+note\s+(.+)$/i);
     const title = titleMatch?.[1]?.trim() ?? "";
@@ -21174,6 +22499,17 @@ const resolveAskTurnActionSelection = (args: {
       action_id: "rename_note",
       args: toTitle ? { title: toTitle, from_title: fromTitle || undefined } : {},
     };
+  } else if (
+    /\bcopy\b[\s\S]*\b(?:this|that|current)?\s*(?:selection|selected\s+text)\b[\s\S]*\b(?:to|into)\s+(?:my\s+)?note(?:\s*pad)?\b/.test(
+      normalized,
+    )
+  ) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript);
+    selected = {
+      panel_id: "workstation-clipboard-history",
+      action_id: "copy_selection_to_note",
+      args: noteTitle ? { note_title: noteTitle } : {},
+    };
   } else if (/\bcopy\b[\s\S]*\b(?:abstract|section|excerpt)\b[\s\S]*\bnote(?:\s*pad)?\b/.test(normalized)) {
     selected = { panel_id: "workstation-clipboard-history", action_id: "copy_selection_to_note", args: {} };
   } else if (
@@ -21187,8 +22523,35 @@ const resolveAskTurnActionSelection = (args: {
       action_id: "copy_receipt_to_note",
       args: noteTitle ? { note_title: noteTitle } : {},
     };
+  } else if (isAskTurnComposedResearchToNoteIntent(args.transcript)) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: "{{reasoning_followup_text}}",
+        ...(noteTitle ? { title: noteTitle } : {}),
+      },
+    };
+  } else if (HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT_FLAG && isAskTurnDocDocCompareIntent(args.transcript)) {
+    const docRefs = extractAskTurnDocPathArgs(args.transcript);
+    selected = {
+      panel_id: "docs-viewer",
+      action_id: "summarize_doc",
+      args: docRefs[0] ? { path: docRefs[0] } : {},
+    };
   } else if (isAskTurnDocNotesHybridCompareIntent(args.transcript)) {
     selected = { panel_id: "docs-viewer", action_id: "summarize_doc", args: {} };
+  } else if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript)) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript);
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: "{{reasoning_followup_text}}",
+        ...(noteTitle ? { title: noteTitle } : {}),
+      },
+    };
   } else if (/\b(?:open|show|view|go\s+to)\s+(?:the\s+)?clipboard\b/.test(normalized)) {
     selected = { panel_id: "workstation-clipboard-history", action_id: "open", args: {} };
   } else if (/\bread\s+clipboard\b/.test(normalized)) {
@@ -21258,6 +22621,8 @@ const resolveAskTurnDispatchPolicyLock = (args: {
   transcript: string;
   existingPendingKind: HelixConversationPendingInputKind | null;
   multilangConfirm?: boolean;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  reasoningContextMode?: HelixAskTurnReasoningContextMode;
 }): HelixAskTurnDispatchPolicy | null => {
   const normalized = args.transcript.trim();
   if (!normalized) return null;
@@ -21272,6 +22637,15 @@ const resolveAskTurnDispatchPolicyLock = (args: {
   if (args.existingPendingKind === "clarify") {
     if (rejected) return "conversation_only";
     return "needs_user_input";
+  }
+  if (
+    HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG &&
+    args.reasoningContextMode !== "isolated" &&
+    shouldUseAskTurnDeicticWorkspaceContext(normalized) &&
+    args.workspaceSnapshot &&
+    hasValidAskTurnDocContext(args.workspaceSnapshot)
+  ) {
+    return "workspace_context_reasoning";
   }
   if (shouldPreferWorkspaceDispatch(normalized)) return "workspace_only";
   if (HELIX_CONVERSATION_EXPLICIT_REASONING_CUE_RE.test(normalized)) return "reasoning_only";
@@ -21294,27 +22668,71 @@ const inferAskTurnDispatchPolicy = (args: {
   return "conversation_only";
 };
 
+const alignAskTurnRouteToDispatchPolicy = (args: {
+  dispatchPolicy: HelixAskTurnDispatchPolicy;
+  routeReasonCode: HelixConversationRouteReasonCode;
+  dispatchHint: boolean;
+  pendingServerRequest: { kind: HelixConversationPendingInputKind } | null;
+}): {
+  routeReasonCode: HelixConversationRouteReasonCode;
+  dispatchHint: boolean;
+} => {
+  if (args.pendingServerRequest) {
+    return {
+      routeReasonCode: args.routeReasonCode.startsWith("clarify:")
+        ? args.routeReasonCode
+        : ("clarify:missing_args" as HelixConversationRouteReasonCode),
+      dispatchHint: false,
+    };
+  }
+  if (args.dispatchPolicy === "workspace_only" || args.dispatchPolicy === "workspace_context_reasoning") {
+    return {
+      routeReasonCode: "dispatch:act",
+      dispatchHint: true,
+    };
+  }
+  if (args.dispatchPolicy === "reasoning_only") {
+    if (args.routeReasonCode === "dispatch:observe" || args.routeReasonCode === "dispatch:observe_explore" || args.routeReasonCode === "dispatch:verify") {
+      return {
+        routeReasonCode: args.routeReasonCode,
+        dispatchHint: true,
+      };
+    }
+    return {
+      routeReasonCode: "dispatch:observe",
+      dispatchHint: true,
+    };
+  }
+  return {
+    routeReasonCode:
+      args.routeReasonCode === "dispatch:act" ? ("suppressed:low_salience" as HelixConversationRouteReasonCode) : args.routeReasonCode,
+    dispatchHint: false,
+  };
+};
+
 const buildAskTurnPlanSteps = (args: {
   routeReasonCode: HelixConversationRouteReasonCode;
   pendingServerRequest: { kind: HelixConversationPendingInputKind } | null;
   transcript: string;
   selectedAction: HelixAskTurnSelectedAction | null;
+  dispatchPolicy?: HelixAskTurnDispatchPolicy | null;
 }): HelixAskTurnPlanStep[] => {
   const normalized = args.transcript.trim().toLowerCase();
+  const extractAppendCompare = isAskTurnExtractAppendCompareIntent(args.transcript);
+  const docDocCompare = HELIX_E8_29_COMPARE_SCHEMA_FLAG && isAskTurnDocDocCompareIntent(args.transcript);
+  const openCreateCompare = isAskTurnOpenCreateCompareIntent(args.transcript);
+  const createCopyCompare =
+    HELIX_E8_22_MULTI_INTENT_EXPANSION_FLAG && isAskTurnCreateCopyCompareIntent(args.transcript);
+  const compareCopyToClipboard = isAskTurnCompareCopyResultToClipboardIntent(args.transcript);
+  const summarizeAddToNote = isAskTurnSummarizeAndAddToNoteIntent(args.transcript);
   const hasWorkspaceCue =
     (HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized)) &&
     HELIX_CONVERSATION_WORKSTATION_TARGET_RE.test(normalized);
   const hasReasoningCue = /\b(?:explain|summari[sz]e|compare|analy[sz]e|reason|verify|plain language)\b/.test(normalized);
+  const hasReasoningChainCue = /\b(?:and then|then|after that|afterwards|while|also)\b/.test(normalized);
+  const docNotesCompareIntent = isAskTurnDocNotesHybridCompareIntent(args.transcript);
   const wantsReasoningFollowup =
-    (/\b(?:and then|then|after that|afterwards|while|also)\b/.test(normalized) || hasWorkspaceCue) && hasReasoningCue;
-  const workspaceTargetMentions = normalized.match(/\b(?:docs?|document|paper|notes?|notepad|clipboard|history)\b/g) ?? [];
-  const hasMultipleWorkspaceTargets = workspaceTargetMentions.length >= 2;
-  const wantsSecondWorkspaceStep =
-    ((/\b(?:and|then|after)\b/.test(normalized) &&
-      /\b(?:copy|append|list|open|switch|go to)\b/.test(normalized) &&
-      /\b(?:note|notes|clipboard|docs?)\b/.test(normalized)) ||
-      (hasWorkspaceCue && hasMultipleWorkspaceTargets && /\b(?:and|then|after)\b/.test(normalized))) &&
-    !wantsReasoningFollowup;
+    (hasReasoningChainCue && hasReasoningCue) || docNotesCompareIntent;
   if (args.pendingServerRequest) {
     return [
       {
@@ -21326,6 +22744,245 @@ const buildAskTurnPlanSteps = (args: {
             ? "Request explicit confirmation before destructive action."
             : "Request missing arguments to continue workspace action.",
         reason: args.pendingServerRequest.kind === "confirm" ? "confirmation_required" : "missing_required_args",
+      },
+    ];
+  }
+  if (isAskTurnComposedResearchToNoteIntent(args.transcript)) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
+    const appendAction: HelixAskTurnSelectedAction = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: "{{reasoning_followup_text}}",
+        ...(noteTitle ? { title: noteTitle } : {}),
+      },
+    };
+    return [
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: `Prepare active docs workspace context for: "${clipConversationText(args.transcript, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "identify_current_doc",
+          args: {},
+        },
+      },
+      {
+        id: "reasoning_repo_retrieval",
+        lane: "reasoning",
+        status: "planned",
+        title: `Retrieve related repo evidence and synthesize findings for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+      {
+        id: "workspace_action_append_note",
+        lane: "workspace",
+        status: "planned",
+        title: "Append synthesized findings into the target note.",
+        action: appendAction,
+      },
+    ];
+  }
+  if (
+    args.dispatchPolicy === "workspace_context_reasoning" &&
+    !compareCopyToClipboard &&
+    !summarizeAddToNote &&
+    !docDocCompare &&
+    !openCreateCompare &&
+    !createCopyCompare &&
+    !extractAppendCompare &&
+    !isAskTurnComposedResearchToNoteIntent(args.transcript)
+  ) {
+    return [
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: `Capture workspace context derived from: "${clipConversationText(args.transcript, 90)}".`,
+        action: args.selectedAction ?? null,
+      },
+      {
+        id: "reasoning_followup",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run reasoning follow-up with attached workspace context for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+    ];
+  }
+  if (openCreateCompare) {
+    const noteTitle = resolveAskTurnCreateNoteTitleArg(args.transcript) ?? resolveAskTurnNoteTargetArg(args.transcript);
+    return [
+      {
+        id: "workspace_action_open_docs",
+        lane: "workspace",
+        status: "planned",
+        title: `Open docs workspace for chained request: "${clipConversationText(args.transcript, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "open",
+          args: {},
+        },
+      },
+      {
+        id: "workspace_action_create_note",
+        lane: "workspace",
+        status: "planned",
+        title: "Create target note for chained request.",
+        action: {
+          panel_id: "workstation-notes",
+          action_id: "create_note",
+          args: noteTitle ? { title: noteTitle } : {},
+        },
+      },
+      {
+        id: "reasoning_followup",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run reasoning follow-up after chained workspace actions for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+    ];
+  }
+  if (docDocCompare) {
+    return [
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: `Prepare docs context for document comparison: "${clipConversationText(args.transcript, 90)}".`,
+        action: args.selectedAction ?? {
+          panel_id: "docs-viewer",
+          action_id: "summarize_doc",
+          args: {},
+        },
+      },
+      {
+        id: "reasoning_followup_doc_doc",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run doc-to-doc reasoning comparison for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+    ];
+  }
+  if (extractAppendCompare) {
+    return [
+      {
+        id: "reasoning_extract",
+        lane: "reasoning",
+        status: "planned",
+        title: "Extract numeric claims from current document context.",
+      },
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: `Execute workspace action derived from: "${clipConversationText(args.transcript, 90)}".`,
+        action: args.selectedAction ?? null,
+      },
+      {
+        id: "reasoning_followup",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run reasoning follow-up after workspace action for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+    ];
+  }
+  if (createCopyCompare) {
+    const noteTitle = resolveAskTurnCreateNoteTitleArg(args.transcript) ?? resolveAskTurnNoteTargetArg(args.transcript);
+    const createAction: HelixAskTurnSelectedAction = {
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: noteTitle ? { title: noteTitle } : {},
+    };
+    const copyAction: HelixAskTurnSelectedAction = {
+      panel_id: "workstation-clipboard-history",
+      action_id: "copy_receipt_to_note",
+      args: noteTitle ? { note_title: noteTitle } : {},
+    };
+    return [
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: `Create note for chained workflow derived from: "${clipConversationText(args.transcript, 90)}".`,
+        action: createAction,
+      },
+      {
+        id: "workspace_action_copy_receipt",
+        lane: "workspace",
+        status: "planned",
+        title: "Copy latest clipboard receipt into the target note.",
+        action: copyAction,
+      },
+      {
+        id: "reasoning_followup",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run reasoning follow-up after chained workspace actions for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+    ];
+  }
+  if (compareCopyToClipboard) {
+    const preReasonWorkspaceAction: HelixAskTurnSelectedAction =
+      args.selectedAction ?? {
+        panel_id: "docs-viewer",
+        action_id: "summarize_doc",
+        args: {},
+      };
+    const writeClipboardAction: HelixAskTurnSelectedAction = {
+      panel_id: "workstation-clipboard-history",
+      action_id: "write_clipboard",
+      args: {
+        text: "{{reasoning_followup_text}}",
+        source: "helix_reasoning",
+      },
+    };
+    return [
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: `Prepare workspace context for chained compare request: "${clipConversationText(args.transcript, 90)}".`,
+        action: preReasonWorkspaceAction,
+      },
+      {
+        id: "reasoning_followup",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run compare-oriented reasoning follow-up for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+      {
+        id: "workspace_action_write_clipboard",
+        lane: "workspace",
+        status: "planned",
+        title: "Copy reasoning result to clipboard.",
+        action: writeClipboardAction,
+      },
+    ];
+  }
+  if (summarizeAddToNote) {
+    const noteTitle = resolveAskTurnNoteTargetArg(args.transcript);
+    const appendAction: HelixAskTurnSelectedAction = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: "{{reasoning_followup_text}}",
+        ...(noteTitle ? { title: noteTitle } : {}),
+      },
+    };
+    return [
+      {
+        id: "reasoning_followup",
+        lane: "reasoning",
+        status: "planned",
+        title: `Run reasoning summary for: "${clipConversationText(args.transcript, 90)}".`,
+      },
+      {
+        id: "workspace_action",
+        lane: "workspace",
+        status: "planned",
+        title: "Append reasoning summary into the requested note.",
+        action: appendAction,
       },
     ];
   }
@@ -21345,13 +23002,6 @@ const buildAskTurnPlanSteps = (args: {
         lane: "reasoning",
         status: "planned",
         title: `Run reasoning follow-up after workspace action for: "${clipConversationText(args.transcript, 90)}".`,
-      });
-    } else if (wantsSecondWorkspaceStep) {
-      steps.push({
-        id: "workspace_followup",
-        lane: "workspace",
-        status: "planned",
-        title: "Run second workspace step after primary workspace action.",
       });
     }
     return steps;
@@ -21380,29 +23030,73 @@ const buildAskTurnPlanSteps = (args: {
   ];
 };
 
+const buildAskTurnInputChunkPlanSteps = (args: {
+  transcript: string;
+  chunks: PromptChunk[];
+  includeWorkspaceAction: boolean;
+  selectedAction: HelixAskTurnSelectedAction | null;
+}): HelixAskTurnPlanStep[] => {
+  const steps: HelixAskTurnPlanStep[] = [];
+  if (args.includeWorkspaceAction) {
+    steps.push({
+      id: "workspace_action",
+      lane: "workspace",
+      status: "planned",
+      title: `Execute workspace action derived from: "${clipConversationText(args.transcript, 90)}".`,
+      action: args.selectedAction ?? null,
+    });
+  }
+  const cappedChunks = args.chunks.slice(0, HELIX_E8_24_TURN_INPUT_MAX_CHUNKS);
+  for (let idx = 0; idx < cappedChunks.length; idx += 1) {
+    const chunk = cappedChunks[idx];
+    steps.push({
+      id: `reasoning_chunk_${idx + 1}`,
+      lane: "reasoning",
+      status: "planned",
+      title: `Reasoning chunk ${idx + 1}/${cappedChunks.length}: ${clipConversationText(chunk.text, 90)}`,
+    });
+  }
+  steps.push({
+    id: "reasoning_synthesis",
+    lane: "reasoning",
+    status: "planned",
+    title: `Synthesize chunked reasoning output for: "${clipConversationText(args.transcript, 90)}".`,
+  });
+  return steps;
+};
+
 const buildAskTurnExecutionTrace = (args: {
   planSteps: HelixAskTurnPlanStep[];
   terminalKind: "conversation" | "clarify" | "reasoning";
   pending: boolean;
   transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  initialArtifacts?: string[];
 }): HelixAskTurnPlanStep[] => {
   if (args.planSteps.length === 0) return [];
   const trace = args.planSteps.map((step) => ({ ...step }));
   const normalized = args.transcript.trim().toLowerCase();
   const initialArtifacts = new Set<string>();
-  if (/\b(?:docs?|document|paper)\b/.test(normalized)) initialArtifacts.add("doc_context");
   if (/\b(?:notes?|notepad)\b/.test(normalized)) initialArtifacts.add("note_context");
-  if (/\bclipboard\b/.test(normalized)) initialArtifacts.add("clipboard_context");
+  if (hasValidAskTurnDocContext(args.workspaceSnapshot)) {
+    initialArtifacts.add("doc_context");
+    initialArtifacts.add("active_doc_path");
+  }
+  if (args.workspaceSnapshot?.hasNoteContext) initialArtifacts.add("note_context");
+  if (args.workspaceSnapshot?.hasClipboardContext) initialArtifacts.add("clipboard_context");
+  if (resolveAskTurnDocPathArg(args.transcript)) {
+    initialArtifacts.add("doc_context");
+    initialArtifacts.add("active_doc_path");
+  }
+  for (const artifact of args.initialArtifacts ?? []) {
+    const normalizedArtifact = artifact.trim();
+    if (normalizedArtifact) initialArtifacts.add(normalizedArtifact);
+  }
   const artifactSet = new Set<string>(initialArtifacts);
   const getRequiresAndProduces = (step: HelixAskTurnPlanStep) => {
     const actionId = step.action?.action_id ?? null;
     const requires: string[] = [];
     const produces: string[] = [];
-    if (step.id === "workspace_followup") {
-      requires.push("workspace_context");
-      produces.push("workspace_context");
-      return { requires, produces };
-    }
     if (step.id === "reasoning_followup") {
       if (/\bcompare\b/.test(normalized)) {
         requires.push("doc_context", "note_context");
@@ -21410,13 +23104,73 @@ const buildAskTurnExecutionTrace = (args: {
       produces.push("reasoning_context");
       return { requires, produces };
     }
+    if (step.id === "reasoning_followup_doc_doc") {
+      requires.push("doc_context");
+      produces.push("reasoning_context");
+      return { requires, produces };
+    }
+    if (step.id === "reasoning_extract") {
+      requires.push("doc_context");
+      produces.push("extracted_claims_text", "reasoning_context");
+      return { requires, produces };
+    }
+    if (step.id.includes("reasoning_summarize_retrieval")) {
+      requires.push("doc_search_results");
+      produces.push("turn_final_text", "reasoning_context");
+      return { requires, produces };
+    }
+    if (step.id === "workspace_action_copy_receipt") {
+      requires.push("clipboard_context");
+      produces.push("workspace_context", "note_context", "note_update_receipt");
+      return { requires, produces };
+    }
     if (step.lane === "workspace") {
+      const hasActionDocPath = Boolean(normalizeAskTurnWorkspaceDocPath(step.action?.args?.path));
+      const textArg = step.action?.args?.text;
+      if (typeof textArg === "string" && textArg === "{{extracted_claims_text}}") {
+        requires.push("extracted_claims_text");
+      } else if (typeof textArg === "string" && textArg === "{{reasoning_followup_text}}") {
+        requires.push("reasoning_context");
+            } else if (typeof textArg === "string" && textArg === HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER) {
+        requires.push("doc_location_matches");
+      }
+      if (actionId === "copy_receipt_to_note") {
+        requires.push("clipboard_context");
+      }
       produces.push("workspace_context");
       if (
         actionId &&
-        ["open", "open_doc", "open_doc_and_read", "summarize_doc", "summarize_section", "explain_paper"].includes(actionId)
+        [
+          "open_doc",
+          "open_doc_by_path",
+          "open_doc_and_read",
+        ].includes(actionId)
       ) {
-        produces.push("doc_context");
+        produces.push("doc_context", "active_doc_path");
+      }
+      if (actionId === "open_latest_doc_by_topic" && hasActionDocPath) {
+        produces.push("doc_context", "active_doc_path");
+      }
+      if (
+        actionId &&
+        [
+          "verify_active_doc",
+          "identify_current_doc",
+          "locate_in_doc",
+          "summarize_doc",
+          "summarize_section",
+          "explain_paper",
+        ].includes(actionId)
+      ) {
+        if (!hasActionDocPath && !artifactSet.has("active_doc_path")) {
+          requires.push("active_doc_path");
+        }
+        if (hasActionDocPath || artifactSet.has("active_doc_path")) {
+          produces.push("doc_context", "active_doc_path");
+        }
+      }
+      if (actionId === "search_docs") {
+        produces.push("doc_search_results", "retrieval_context");
       }
       if (
         actionId &&
@@ -21431,6 +23185,9 @@ const buildAskTurnExecutionTrace = (args: {
           "copy_receipt_to_note",
         ].includes(actionId)
       ) {
+        produces.push("note_context");
+      }
+      if (step.id === "workspace_action_create_note") {
         produces.push("note_context");
       }
       if (actionId && ["read_clipboard", "write_clipboard", "clear_history", "copy_receipt_to_clipboard"].includes(actionId)) {
@@ -21471,7 +23228,7 @@ const buildAskTurnExecutionTrace = (args: {
         : args.terminalKind === "conversation"
           ? step.lane !== "reasoning"
           : step.lane === "conversation";
-    if (step.lane === "workspace" && step.id === "workspace_action" && !step.action) {
+    if (step.lane === "workspace" && !step.action) {
       trace[idx] = {
         ...step,
         status: "failed",
@@ -21498,8 +23255,169 @@ const buildAskTurnExecutionTrace = (args: {
   return trace;
 };
 
+type HelixAskDocLocationMatch = {
+  path: string;
+  heading: string;
+  line_start: number;
+  line_end: number;
+  snippet: string;
+  score: number;
+};
+type HelixAskDocLocateStrategy = "exact" | "variant";
+
+const normalizeAskTurnDocPathForRead = (value: unknown): string | null => {
+  const raw = typeof value === "string" ? value.trim().replace(/\\/g, "/") : "";
+  if (!raw) return null;
+  const withoutLeadingSlash = raw.replace(/^\/+/, "");
+  return withoutLeadingSlash.toLowerCase().startsWith("docs/") ? withoutLeadingSlash : null;
+};
+
+const normalizeAskTurnDocLocatePhrase = (query: string): string =>
+  query.trim().toLowerCase().replace(/[^\p{L}\p{N}\s._-]+/gu, " ").replace(/\s+/g, " ");
+
+const buildAskTurnDocLocatePhrases = (query: string): string[] => {
+  const normalized = normalizeAskTurnDocLocatePhrase(query);
+  const phrases = new Set<string>();
+  if (normalized.length > 2) phrases.add(normalized);
+  const spaceNormalized = normalized.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (spaceNormalized.length > 2) phrases.add(spaceNormalized);
+  const tokens = filterCriticTokens(tokenizeAskQuery(normalized.replace(/[._-]+/g, " ")))
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 3);
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    phrases.add(`${tokens[i]} ${tokens[i + 1]}`);
+    phrases.add(`${tokens[i]}-${tokens[i + 1]}`);
+    phrases.add(`${tokens[i]}_${tokens[i + 1]}`);
+    phrases.add(`${tokens[i]}${tokens[i + 1]}`);
+  }
+  return Array.from(phrases).filter(Boolean);
+};
+
+const renderAskTurnDocLocateTriedVariants = (query: string): string => {
+  const variants = buildAskTurnDocLocatePhrases(query).slice(0, 8);
+  return variants.length > 0 ? variants.join(", ") : query;
+};
+
+const findAskTurnDocLocationMatches = (args: {
+  path?: string | null;
+  query?: string | null;
+  limit?: number;
+  strategy?: HelixAskDocLocateStrategy;
+}): HelixAskDocLocationMatch[] => {
+  const path = normalizeAskTurnDocPathForRead(args.path);
+  const query = typeof args.query === "string" ? args.query.trim() : "";
+  if (!path || !query) return [];
+  const index = readDocSectionIndex(path);
+  if (!index.sections.length) return [];
+  const strategy: HelixAskDocLocateStrategy = args.strategy === "variant" ? "variant" : "exact";
+  const tokens =
+    strategy === "variant"
+      ? filterCriticTokens(tokenizeAskQuery(query.replace(/[._-]+/g, " ")))
+          .map((token) => token.toLowerCase())
+          .filter((token) => token.length >= 3)
+      : [];
+  const exactPhrase = normalizeAskTurnDocLocatePhrase(query);
+  const phrases = strategy === "variant" ? buildAskTurnDocLocatePhrases(query) : exactPhrase.length > 2 ? [exactPhrase] : [];
+  if (!tokens.length && !phrases.length) return [];
+  const scored = index.sections
+    .map((section) => {
+      const headerText = section.headerPath.join(" ").toLowerCase();
+      const bodyLines = section.bodyLines;
+      const bodyText = bodyLines.join("\n").toLowerCase();
+      let score = 0;
+      for (const phrase of phrases) {
+        if (phrase.length > 3 && headerText.includes(phrase)) score += 8;
+        if (phrase.length > 3 && bodyText.includes(phrase)) score += 10;
+      }
+      for (const token of tokens) {
+        if (headerText.includes(token)) score += 3;
+        if (bodyText.includes(token)) score += 4;
+      }
+      if (score <= 0) return null;
+      let matchLineIndex = bodyLines.findIndex((line) => {
+        const lower = line.toLowerCase();
+        return phrases.some((phrase) => phrase.length > 3 && lower.includes(phrase));
+      });
+      if (matchLineIndex < 0) {
+        matchLineIndex = bodyLines.findIndex((line) => {
+          const lower = line.toLowerCase();
+          return tokens.some((token) => lower.includes(token));
+        });
+      }
+      const snippet = buildIndexedDocSectionSnippet(section, matchLineIndex);
+      const snippetText =
+        typeof snippet.snippet === "string" && snippet.snippet.trim()
+          ? snippet.snippet
+          : `Section: ${section.headerPath.join(" > ") || section.heading}`;
+      return {
+        path,
+        heading: section.headerPath.join(" > ") || section.heading,
+        line_start: snippet.spanStart,
+        line_end: snippet.spanEnd,
+        snippet: clipConversationText(snippetText, 480),
+        score,
+      } satisfies HelixAskDocLocationMatch;
+    })
+    .filter((entry): entry is HelixAskDocLocationMatch => Boolean(entry))
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, Math.max(1, Math.min(5, args.limit ?? 3)));
+};
+
+const findAskTurnDocLocationMatchesForAction = (action?: HelixAskTurnSelectedAction | null): HelixAskDocLocationMatch[] => {
+  if (!action || action.panel_id !== "docs-viewer" || action.action_id !== "locate_in_doc") return [];
+  const path = typeof action.args?.path === "string" ? action.args.path : null;
+  const query =
+    typeof action.args?.query === "string"
+      ? action.args.query
+      : typeof action.args?.topic === "string"
+        ? action.args.topic
+        : typeof action.args?.find === "string"
+          ? action.args.find
+          : null;
+  const strategy = action.args?.locate_strategy === "variant" ? "variant" : "exact";
+  return findAskTurnDocLocationMatches({ path, query, strategy });
+};
+
+const renderAskTurnDocLocationAnswer = (args: {
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): string | null => {
+  const query =
+    (args.selectedAction ? findAskTurnDocLocationMatchesForAction(args.selectedAction) : []).length > 0
+      ? typeof args.selectedAction?.args?.query === "string"
+        ? args.selectedAction.args.query.trim()
+        : resolveAskTurnDocLocateQuery(args.transcript) ?? "the requested topic"
+      : resolveAskTurnDocLocateQuery(args.transcript) ?? "the requested topic";
+  const path =
+    normalizeAskTurnDocPathForRead(args.selectedAction?.args?.path) ??
+    normalizeAskTurnDocPathForRead(args.workspaceSnapshot?.activeDocPath);
+  const matches = findAskTurnDocLocationMatches({
+    path,
+    query,
+    strategy: "variant",
+  });
+  if (!path) {
+    return `I could not locate "${query}" because no active document path is available.`;
+  }
+  if (matches.length === 0) {
+    return `No locations found for "${query}" in ${path}. Tried: ${renderAskTurnDocLocateTriedVariants(query)}.`;
+  }
+  return [
+    "Locations:",
+    ...matches.map((match) => {
+      const compactSnippet = match.snippet.replace(/\s+/g, " ").trim();
+      const displayPath = match.path.startsWith("/") ? match.path : `/${match.path}`;
+      return `- ${displayPath}:L${match.line_start}-L${match.line_end} (${match.heading}) - ${compactSnippet}`;
+    }),
+  ].join("\n");
+};
+
 const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
   executionTrace.map((step) => {
+    const docLocationMatches = findAskTurnDocLocationMatchesForAction(step.action);
+    const hasActionDocPath = Boolean(normalizeAskTurnWorkspaceDocPath(step.action?.args?.path));
+    const actionId = step.action?.action_id ?? null;
     const blockedMissing = String(step.reason ?? "").startsWith("blocked_missing_artifacts:")
       ? String(step.reason ?? "")
           .replace("blocked_missing_artifacts:", "")
@@ -21508,19 +23426,64 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           .filter(Boolean)
       : [];
     const consumedArtifacts =
-      step.id === "workspace_followup"
-        ? ["workspace_context"]
-        : step.id === "reasoning_followup" && /\bcompare\b/i.test(String(step.title ?? ""))
-          ? ["doc_context", "note_context"]
-          : [];
+      step.id === "reasoning_followup" && /\bcompare\b/i.test(String(step.title ?? ""))
+        ? ["doc_context", "note_context"]
+        : step.id === "reasoning_followup_doc_doc"
+          ? ["doc_context"]
+        : step.id.includes("reasoning_summarize_retrieval")
+          ? ["doc_search_results"]
+        : [];
+    const workspaceContextArtifacts =
+      step.status === "completed" && step.lane === "workspace"
+        ? [
+            "workspace_context",
+            ...(step.action?.panel_id === "docs-viewer" && hasActionDocPath ? ["doc_context", "active_doc_path"] : []),
+            ...(step.action?.panel_id === "workstation-notes" ? ["note_context"] : []),
+            ...(step.action?.panel_id === "workstation-clipboard-history" ? ["clipboard_context"] : []),
+          ]
+        : [];
     const producedArtifacts =
       step.status === "completed"
         ? step.lane === "workspace"
-          ? ["workspace_context"]
-          : step.lane === "reasoning"
-            ? ["reasoning_context"]
+          ? step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
+            ? Array.from(new Set([...workspaceContextArtifacts, "note_context", "note_update_receipt"]))
+            : actionId === "search_docs"
+              ? Array.from(new Set([...workspaceContextArtifacts, "doc_search_results", "retrieval_context"]))
+            : actionId === "locate_in_doc" && docLocationMatches.length > 0
+              ? Array.from(new Set([...workspaceContextArtifacts, "doc_location_matches"]))
+              : workspaceContextArtifacts
+            : step.lane === "reasoning"
+            ? step.id.includes("reasoning_summarize_retrieval")
+              ? ["reasoning_context", "turn_final_text"]
+              : ["reasoning_context"]
             : []
         : [];
+    const expectedArtifacts =
+      actionId === "locate_in_doc"
+        ? ["doc_location_matches"]
+        : actionId === "search_docs"
+          ? ["doc_search_results"]
+        : actionId === "copy_receipt_to_note" || actionId === "append_to_note"
+          ? ["note_update_receipt"]
+          : step.action?.panel_id === "docs-viewer" &&
+              ["summarize_doc", "identify_current_doc", "verify_active_doc", "summarize_section", "explain_paper"].includes(actionId ?? "")
+            ? ["active_doc_path"]
+          : producedArtifacts;
+    const actualArtifacts = [...producedArtifacts];
+    const contractPass =
+      step.status !== "completed"
+        ? null
+        : expectedArtifacts.length === 0
+          ? true
+          : expectedArtifacts.every((artifact) => actualArtifacts.includes(artifact));
+    const contractFailReason =
+      contractPass === false
+        ? step.action?.action_id === "locate_in_doc"
+          ? "missing_doc_location_matches"
+          : step.action?.panel_id === "docs-viewer" && expectedArtifacts.includes("active_doc_path")
+            ? "missing_active_doc_path"
+          : `missing_artifacts:${expectedArtifacts.filter((artifact) => !actualArtifacts.includes(artifact)).join(",")}`
+        : null;
     return {
       step_id: step.id,
       lane: step.lane,
@@ -21530,8 +23493,323 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
       produced_artifacts: producedArtifacts,
       blocked_missing_artifacts: blockedMissing,
       error_code: step.status === "failed" ? step.reason ?? "step_failed" : null,
+      contract_pass: contractPass,
+      contract_fail_reason: contractFailReason,
+      expected_artifacts: expectedArtifacts,
+      actual_artifacts: actualArtifacts,
+      result_artifact:
+        step.action?.action_id === "locate_in_doc"
+          ? {
+              kind: "doc_location_matches",
+              matches: docLocationMatches,
+              match_count: docLocationMatches.length,
+            }
+          : step.action?.action_id === "search_docs"
+            ? {
+                kind: "doc_search_results",
+                query: typeof step.action.args?.query === "string" ? step.action.args.query : null,
+                matches: searchAskTurnDocsForQuery(String(step.action.args?.query ?? ""), 3),
+              }
+          : step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
+            ? {
+                kind: "note_update_receipt",
+                panel_id: step.action.panel_id,
+                action_id: step.action.action_id,
+                note_id: step.action.args?.note_id ?? step.action.args?.target_note_id ?? null,
+                title: step.action.args?.title ?? step.action.args?.note_title ?? null,
+                text: step.action.args?.text ?? step.action.args?.content ?? null,
+                status: step.status,
+              }
+          : null,
     };
   });
+
+const collectAskTurnArtifactStoreFromStepResults = (
+  baseStore: Record<string, unknown> | undefined,
+  stepResults: ReturnType<typeof buildAskTurnStepResults>,
+): Record<string, unknown> => {
+  const store: Record<string, unknown> = { ...(baseStore ?? {}) };
+  for (const result of stepResults) {
+    for (const artifact of Array.isArray(result.actual_artifacts) ? result.actual_artifacts : []) {
+      const key = String(artifact ?? "").trim();
+      if (key && !(key in store)) store[key] = { ok: true };
+    }
+    const resultArtifact =
+      result?.result_artifact && typeof result.result_artifact === "object"
+        ? (result.result_artifact as Record<string, unknown>)
+        : null;
+    const kind = typeof resultArtifact?.kind === "string" ? resultArtifact.kind.trim() : "";
+    if (kind) store[kind] = resultArtifact;
+  }
+  return store;
+};
+
+type HelixAskTurnObservationGroundedFinal = {
+  text: string;
+  source: "doc_location_matches" | "note_update_receipt" | "active_doc_path" | "doc_search_results" | "turn_final_text" | "none";
+  consumed_artifacts: string[];
+  contract_pass: boolean;
+  fail_reason: string | null;
+};
+
+const readAskTurnResultArtifact = (
+  stepResults: ReturnType<typeof buildAskTurnStepResults>,
+  kind: string,
+): Record<string, unknown> | null => {
+  let fallback: Record<string, unknown> | null = null;
+  for (const result of stepResults) {
+    const artifact =
+      result?.result_artifact && typeof result.result_artifact === "object"
+        ? (result.result_artifact as Record<string, unknown>)
+        : null;
+    if (artifact?.kind !== kind) continue;
+    if (!fallback) fallback = artifact;
+    if (kind !== "doc_location_matches") return artifact;
+    if (Array.isArray(artifact.matches) && artifact.matches.length > 0) return artifact;
+  }
+  return fallback;
+};
+
+const renderAskTurnDocLocationMatchesFromArtifact = (artifact: Record<string, unknown> | null): string | null => {
+  const matches = Array.isArray(artifact?.matches) ? artifact.matches : [];
+  const concrete = matches
+    .filter((match) => match && typeof match === "object")
+    .map((match) => match as Record<string, unknown>)
+    .filter((match) => typeof match.path === "string" && Number.isFinite(Number(match.line_start)));
+  if (concrete.length === 0) return null;
+  return [
+    "Locations:",
+    ...concrete.slice(0, 5).map((match) => {
+      const pathLabel = String(match.path ?? "").startsWith("/") ? String(match.path) : `/${String(match.path ?? "")}`;
+      const lineStart = Number(match.line_start);
+      const lineEnd = Number.isFinite(Number(match.line_end)) ? Number(match.line_end) : lineStart;
+      const heading = typeof match.heading === "string" && match.heading.trim() ? ` (${match.heading.trim()})` : "";
+      const snippet = typeof match.snippet === "string" ? match.snippet.replace(/\s+/g, " ").trim() : "";
+      return `- ${pathLabel}:L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}${heading}${snippet ? ` - ${snippet}` : ""}`;
+    }),
+  ].join("\n");
+};
+
+const renderAskTurnTitleCase = (value: string): string =>
+  value
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b([a-z])/g, (match) => match.toUpperCase());
+
+const resolveAskTurnDocLocationReminderText = (args: {
+  transcript: string;
+  artifactStore?: Record<string, unknown>;
+}): string => {
+  const topic = renderAskTurnTitleCase(resolveAskTurnDocLocateQuery(args.transcript) ?? "requested document location");
+  const artifact =
+    args.artifactStore?.doc_location_matches && typeof args.artifactStore.doc_location_matches === "object"
+      ? (args.artifactStore.doc_location_matches as Record<string, unknown>)
+      : null;
+  const matches = Array.isArray(artifact?.matches) ? artifact.matches : [];
+  const firstMatch = matches.find((match) => match && typeof match === "object") as Record<string, unknown> | undefined;
+  if (!firstMatch) return `Reminder: Review ${topic} when the document location is available.`;
+  const lineStart = Number(firstMatch.line_start);
+  const lineEnd = Number(firstMatch.line_end);
+  const lineLabel =
+    Number.isFinite(lineStart) && Number.isFinite(lineEnd)
+      ? lineStart === lineEnd
+        ? `L${lineStart}`
+        : `L${lineStart}-L${lineEnd}`
+      : null;
+  const heading = typeof firstMatch.heading === "string" ? firstMatch.heading.trim() : "";
+  const snippet = typeof firstMatch.snippet === "string" ? firstMatch.snippet.replace(/\s+/g, " ").trim() : "";
+  const location = [lineLabel, heading ? `under "${heading}"` : null].filter(Boolean).join(" ");
+  const suffix = snippet ? ` Note: ${snippet}` : "";
+  return `Reminder: Review ${topic}${location ? ` at ${location}` : ""}.${suffix}`;
+};
+
+const resolveAskTurnPlanStepActionPlaceholders = (
+  step: HelixAskTurnPlanStep,
+  args: {
+    transcript: string;
+    artifactStore?: Record<string, unknown>;
+  },
+): HelixAskTurnPlanStep => {
+  if (!step.action?.args || typeof step.action.args !== "object") return step;
+  const nextArgs: Record<string, unknown> = { ...step.action.args };
+  let changed = false;
+  if (typeof nextArgs.text === "string") {
+    let text = nextArgs.text;
+    if (text.includes(HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER)) {
+      text = text.replaceAll(
+        HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER,
+        resolveAskTurnDocLocationReminderText(args),
+      );
+      changed = true;
+    }
+    const stripped = text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s+/g, " ").trim();
+    if (stripped !== nextArgs.text) {
+      nextArgs.text = stripped;
+      changed = true;
+    }
+  }
+  return changed ? { ...step, action: { ...step.action, args: nextArgs } } : step;
+};
+
+const buildAskTurnObservationGroundedFinalAnswer = (args: {
+  transcript: string;
+  executionTrace: HelixAskTurnPlanStep[];
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  runtime?: HelixAskTurnRuntimeSummary | HelixAskTurnRuntime | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  candidateText?: string | null;
+}): HelixAskTurnObservationGroundedFinal => {
+  const consumed = new Set<string>();
+  const normalized = args.transcript.trim().toLowerCase();
+  const hasCompletedAction = (actionId: string): boolean =>
+    args.executionTrace.some((step) => step.status === "completed" && step.action?.action_id === actionId);
+  const docLocationArtifact = readAskTurnResultArtifact(args.stepResults, "doc_location_matches");
+  const runtimeObservations =
+    args.runtime && typeof args.runtime === "object" && Array.isArray(args.runtime.observations)
+      ? (args.runtime.observations as HelixAskTurnRuntimeObservation[])
+      : [];
+  const readRuntimeArtifact = (kind: string): Record<string, unknown> | null => {
+    let fallback: Record<string, unknown> | null = null;
+    for (const observation of runtimeObservations) {
+      const artifact =
+        observation?.result_artifact && typeof observation.result_artifact === "object"
+          ? (observation.result_artifact as Record<string, unknown>)
+          : null;
+      if (artifact?.kind !== kind) continue;
+      if (!fallback) fallback = artifact;
+      if (kind !== "doc_location_matches") return artifact;
+      if (Array.isArray(artifact.matches) && artifact.matches.length > 0) return artifact;
+    }
+    return fallback;
+  };
+  const effectiveDocLocationArtifact = docLocationArtifact ?? readRuntimeArtifact("doc_location_matches");
+  const noteReceiptArtifact = readAskTurnResultArtifact(args.stepResults, "note_update_receipt") ?? readRuntimeArtifact("note_update_receipt");
+  const docSearchArtifact = readAskTurnResultArtifact(args.stepResults, "doc_search_results") ?? readRuntimeArtifact("doc_search_results");
+
+  if (effectiveDocLocationArtifact && noteReceiptArtifact) {
+    consumed.add("doc_location_matches");
+    consumed.add("note_update_receipt");
+    const title = readAskTurnString(noteReceiptArtifact.title) ?? resolveAskTurnNoteTargetArg(args.transcript) ?? "the active note";
+    return {
+      text: `Found the requested document location and added a reminder to ${title}.`,
+      source: "note_update_receipt",
+      consumed_artifacts: Array.from(consumed),
+      contract_pass: true,
+      fail_reason: null,
+    };
+  }
+
+  if (
+    effectiveDocLocationArtifact &&
+    (isAskTurnDocLocateIntent(args.transcript) ||
+      /\blocations:\s*/i.test(String(args.candidateText ?? "")) ||
+      hasCompletedAction("locate_in_doc"))
+  ) {
+    const rendered = renderAskTurnDocLocationMatchesFromArtifact(effectiveDocLocationArtifact);
+    if (rendered) {
+      consumed.add("doc_location_matches");
+      return {
+        text: rendered,
+        source: "doc_location_matches",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: true,
+        fail_reason: null,
+      };
+    }
+  }
+
+  if (noteReceiptArtifact) {
+    consumed.add("note_update_receipt");
+    const title = readAskTurnString(noteReceiptArtifact.title) ?? resolveAskTurnNoteTargetArg(args.transcript) ?? "the active note";
+    const text = readAskTurnString(noteReceiptArtifact.text);
+    return {
+      text: text ? `Updated ${title} with: ${text}` : `Updated ${title}.`,
+      source: "note_update_receipt",
+      consumed_artifacts: Array.from(consumed),
+      contract_pass: true,
+      fail_reason: null,
+    };
+  }
+
+  if (isAskTurnDocIdentityIntent(args.transcript) || /\bwhat\s+(?:paper|doc|document)\s+(?:am\s+i|are\s+we)\s+(?:viewing|on|looking\s+at)\b/i.test(normalized)) {
+    const activeDocPath =
+      normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath) ??
+      normalizeAskTurnWorkspaceDocPath(args.selectedAction?.args?.path);
+    if (activeDocPath) {
+      consumed.add("active_doc_path");
+      return {
+        text: `You are currently on: ${activeDocPath}`,
+        source: "active_doc_path",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: true,
+        fail_reason: null,
+      };
+    }
+    return {
+      text: "No active document is available in the current workspace context.",
+      source: "active_doc_path",
+      consumed_artifacts: [],
+      contract_pass: false,
+      fail_reason: "missing_active_doc_path",
+    };
+  }
+
+  if (
+    /\b(?:what\s+is\s+this\s+(?:doc|document|paper)\s+about|what\s+is\s+this\s+(?:doc|document|paper)|summari[sz]e\s+this\s+(?:doc|document|paper)|explain\s+this\s+(?:doc|document|paper))\b/i.test(
+      args.transcript,
+    ) &&
+    !normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath)
+  ) {
+    return {
+      text: "No active document is available in the current workspace context.",
+      source: "active_doc_path",
+      consumed_artifacts: [],
+      contract_pass: false,
+      fail_reason: "missing_active_doc_path",
+    };
+  }
+
+  if (docSearchArtifact) {
+    const matches = Array.isArray(docSearchArtifact.matches) ? docSearchArtifact.matches : [];
+    consumed.add("doc_search_results");
+    if (matches.length > 0) {
+      return {
+        text: [
+          "Search results:",
+          ...matches.slice(0, 5).map((match, index) => {
+            const item = match && typeof match === "object" ? (match as Record<string, unknown>) : {};
+            const pathLabel = readAskTurnString(item.path) ?? readAskTurnString(item.route) ?? `result ${index + 1}`;
+            return `- ${pathLabel}`;
+          }),
+        ].join("\n"),
+        source: "doc_search_results",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: true,
+        fail_reason: null,
+      };
+    }
+  }
+
+  const candidate = String(args.candidateText ?? "").trim();
+  if (candidate && !HELIX_ASK_TURN_GENERIC_TERMINAL_RE.test(candidate) && !/\bSteps:\s*/i.test(candidate)) {
+    return {
+      text: candidate,
+      source: "turn_final_text",
+      consumed_artifacts: [],
+      contract_pass: true,
+      fail_reason: null,
+    };
+  }
+
+  return {
+    text: "",
+    source: "none",
+    consumed_artifacts: [],
+    contract_pass: false,
+    fail_reason: candidate ? "generic_or_procedural_candidate" : "missing_observation_artifact",
+  };
+};
 
 const collectAskTurnBlockedMissingArtifacts = (executionTrace: HelixAskTurnPlanStep[]): string[] => {
   const out = new Set<string>();
@@ -21544,6 +23822,22 @@ const collectAskTurnBlockedMissingArtifacts = (executionTrace: HelixAskTurnPlanS
       .map((entry) => entry.trim())
       .filter(Boolean)
       .forEach((entry) => out.add(entry));
+  }
+  return Array.from(out);
+};
+
+const collectAskTurnUnsatisfiedResultArtifacts = (stepResults: ReturnType<typeof buildAskTurnStepResults>): string[] => {
+  const out = new Set<string>();
+  const globallyActual = new Set(
+    stepResults.flatMap((result) => (Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [])),
+  );
+  for (const result of stepResults) {
+    if (result.contract_pass !== false) continue;
+    const expected = Array.isArray(result.expected_artifacts) ? result.expected_artifacts : [];
+    for (const artifact of expected) {
+      const normalized = String(artifact ?? "").trim();
+      if (normalized && !globallyActual.has(normalized)) out.add(normalized);
+    }
   }
   return Array.from(out);
 };
@@ -21564,15 +23858,2732 @@ const buildAskTurnExecutionLifecycle = (executionTrace: HelixAskTurnPlanStep[]):
   return events;
 };
 
+const createAskTurnRuntime = (args: {
+  turnId: string;
+  sessionId: string | null;
+  goal: string;
+  planItems: HelixAskTurnPlanStep[];
+  pendingServerRequest: Record<string, unknown> | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  maxSteps?: number;
+}): HelixAskTurnRuntime => {
+  const artifactStore: Record<string, unknown> = {};
+  if (args.workspaceSnapshot) artifactStore.workspace_snapshot = args.workspaceSnapshot;
+  const requiredArtifacts = Array.from(
+    new Set(
+      args.planItems
+        .flatMap((step) => (Array.isArray(step.required_artifacts) ? step.required_artifacts : []))
+        .map((entry) => String(entry ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+  return {
+    turn_id: args.turnId,
+    session_id: args.sessionId,
+    goal: args.goal,
+    status: args.pendingServerRequest ? "pending_input" : "running",
+    max_steps: Math.max(1, Math.min(args.maxSteps ?? 8, 24)),
+    plan_items: args.planItems.map((step) => ({ ...step })),
+    open_subgoals: args.planItems.map((step) => step.id),
+    completed_subgoals: [],
+    failed_subgoals: [],
+    artifact_store: artifactStore,
+    required_artifacts: requiredArtifacts,
+    satisfied_artifacts: Object.keys(artifactStore).filter((artifact) => requiredArtifacts.includes(artifact)),
+    observations: [],
+    pending_request: args.pendingServerRequest,
+    decisions: [],
+    last_decision: null,
+    appended_steps: [],
+    executed_appended_step_count: 0,
+    runtime_loop_iteration_count: 0,
+    runtime_loop_stop_reason: null,
+    capability_selection_trace: [],
+    terminal: args.pendingServerRequest
+      ? {
+          kind: "pending_input",
+          text:
+            typeof args.pendingServerRequest.prompt === "string"
+              ? args.pendingServerRequest.prompt
+              : "Pending user input is required before this turn can continue.",
+        }
+      : { kind: null, text: null },
+  };
+};
+
+const summarizeAskTurnRuntime = (runtime: HelixAskTurnRuntime): HelixAskTurnRuntimeSummary => {
+  const completedSubgoals = [...runtime.completed_subgoals];
+  if (
+    !completedSubgoals.includes("workspace_action") &&
+    runtime.observations.some((observation) => observation.lane === "workspace" && observation.status === "completed")
+  ) {
+    completedSubgoals.push("workspace_action");
+  }
+  const missingRequiredArtifacts = runtime.required_artifacts.filter(
+    (artifact) => !runtime.satisfied_artifacts.includes(artifact) && !(artifact in runtime.artifact_store),
+  );
+  return {
+  status: runtime.status,
+  open_subgoals: runtime.open_subgoals,
+  completed_subgoals: completedSubgoals,
+  failed_subgoals: runtime.failed_subgoals,
+  observation_count: runtime.observations.length,
+  observations: runtime.observations.slice(-24),
+  artifact_keys: Object.keys(runtime.artifact_store).sort(),
+  required_artifacts: runtime.required_artifacts,
+  satisfied_artifacts: runtime.satisfied_artifacts,
+  missing_required_artifacts: missingRequiredArtifacts,
+  decision_count: runtime.decisions.length,
+  last_decision: runtime.last_decision
+    ? runtime.last_decision.kind === "continue"
+      ? {
+          kind: runtime.last_decision.kind,
+          reason: runtime.last_decision.reason,
+          next_step_id: runtime.last_decision.next_step.id,
+        }
+      : runtime.last_decision.kind === "request_input"
+        ? {
+            kind: runtime.last_decision.kind,
+            reason: runtime.last_decision.reason,
+            required_fields: runtime.last_decision.required_fields,
+          }
+        : runtime.last_decision.kind === "final_failure"
+          ? {
+              kind: runtime.last_decision.kind,
+              reason: runtime.last_decision.reason,
+              error_code: runtime.last_decision.error_code,
+            }
+          : {
+              kind: runtime.last_decision.kind,
+              reason: runtime.last_decision.reason,
+            }
+    : null,
+  appended_step_count: runtime.appended_steps.length,
+  appended_steps: runtime.appended_steps,
+  executed_appended_step_count: runtime.executed_appended_step_count,
+  runtime_loop_iteration_count: runtime.runtime_loop_iteration_count,
+  runtime_loop_stop_reason: runtime.runtime_loop_stop_reason,
+  capability_selection_trace: runtime.capability_selection_trace.slice(-24),
+  terminal: runtime.terminal,
+  };
+};
+
+const decideAskTurnRuntimeNextStep = (args: {
+  runtime: HelixAskTurnRuntime;
+  terminalText: string | null;
+  requiredArtifacts?: string[];
+}): HelixAskTurnRuntimeDecision => {
+  const runtime = args.runtime;
+  if (runtime.pending_request) {
+    const pendingFields = Array.isArray(runtime.pending_request.unresolved_fields)
+      ? runtime.pending_request.unresolved_fields.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+      : Array.isArray(runtime.pending_request.required_fields)
+        ? runtime.pending_request.required_fields.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+        : ["user_input"];
+    return {
+      kind: "request_input",
+      required_fields: pendingFields.length > 0 ? pendingFields : ["user_input"],
+      reason: "pending_request_active",
+    };
+  }
+  const failed = runtime.observations.find((observation) => observation.status === "failed");
+  if (failed) {
+    return {
+      kind: "final_failure",
+      text: args.terminalText ?? "This turn failed before the goal was completed.",
+      error_code: failed.error_code ?? "step_failed",
+      reason: `failed_step:${failed.step_id}`,
+    };
+  }
+  const missingArtifacts = Array.from(
+    new Set([
+      ...(args.requiredArtifacts ?? []),
+      ...collectAskTurnMissingRequiredArtifacts(runtime),
+    ]),
+  ).filter((artifact) => !(artifact in runtime.artifact_store) && !runtime.satisfied_artifacts.includes(artifact));
+  if (missingArtifacts.length > 0) {
+    return {
+      kind: "request_input",
+      required_fields: missingArtifacts,
+      reason: `missing_artifacts:${missingArtifacts.join(",")}`,
+    };
+  }
+  if (runtime.open_subgoals.length > 0) {
+    const nextStepId = runtime.open_subgoals[0];
+    const nextStep = runtime.plan_items.find((step) => step.id === nextStepId) ?? null;
+    if (nextStep) {
+      return {
+        kind: "continue",
+        next_step: nextStep,
+        reason: `open_subgoal:${nextStep.id}`,
+      };
+    }
+  }
+  return {
+    kind: "final_answer",
+    text: args.terminalText ?? "Completed turn.",
+    reason: "all_subgoals_observed",
+  };
+};
+
+const evaluateAskTurnRuntimeAfterObservation = (args: {
+  runtime: HelixAskTurnRuntime;
+  terminalText: string | null;
+  requiredArtifacts?: string[];
+  stepResults?: ReturnType<typeof buildAskTurnStepResults>;
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): {
+  decision: HelixAskTurnRuntimeDecision;
+  proposal: HelixAskTurnRuntimeStepProposal | null;
+  missing_artifacts: string[];
+} => {
+  const requiredArtifacts = new Set((args.requiredArtifacts ?? []).map((entry) => entry.trim()).filter(Boolean));
+  for (const artifact of collectAskTurnUnsatisfiedResultArtifacts(args.stepResults ?? [])) {
+    requiredArtifacts.add(artifact);
+  }
+  const missingArtifacts = Array.from(requiredArtifacts).filter((artifact) => !(artifact in args.runtime.artifact_store));
+  if (missingArtifacts.length > 0) {
+    const proposal =
+      HELIX_E10_3_RUNTIME_APPEND_STEP_FLAG && canAskTurnRuntimeResolveBlockedArtifacts(missingArtifacts)
+        ? proposeAskTurnRuntimeNextStep({
+            runtime: args.runtime,
+            transcript: args.transcript,
+            selectedAction: args.selectedAction,
+            workspaceSnapshot: args.workspaceSnapshot,
+            missingArtifacts,
+          })
+        : null;
+    if (proposal) {
+      return {
+        decision: {
+          kind: "continue",
+          next_step: proposal.step,
+          reason: `runtime_appended_step:${proposal.reason}`,
+        },
+        proposal,
+        missing_artifacts: missingArtifacts,
+      };
+    }
+    return {
+      decision: {
+        kind: "request_input",
+        required_fields: missingArtifacts,
+        reason: `missing_artifacts:${missingArtifacts.join(",")}`,
+      },
+      proposal: null,
+      missing_artifacts: missingArtifacts,
+    };
+  }
+  return {
+    decision: decideAskTurnRuntimeNextStep({
+      runtime: args.runtime,
+      terminalText: args.terminalText,
+      requiredArtifacts: Array.from(requiredArtifacts),
+    }),
+    proposal: null,
+    missing_artifacts: [],
+  };
+};
+
+const appendAskTurnRuntimeDecision = (
+  runtime: HelixAskTurnRuntime,
+  decision: HelixAskTurnRuntimeDecision,
+): HelixAskTurnRuntime => ({
+  ...runtime,
+  decisions: [...runtime.decisions, decision],
+  last_decision: decision,
+});
+
+const collectAskTurnMissingRequiredArtifacts = (runtime: HelixAskTurnRuntime): string[] =>
+  runtime.required_artifacts
+    .map((entry) => String(entry ?? "").trim())
+    .filter(Boolean)
+    .filter((artifact) => !runtime.satisfied_artifacts.includes(artifact) && !(artifact in runtime.artifact_store));
+
+const composeAskTurnFinalAnswerFromObservations = (args: {
+  runtime: HelixAskTurnRuntime;
+  fallbackText: string;
+}): string => {
+  const fallback = String(args.fallbackText ?? "").trim() || "Completed turn.";
+  const noteReceipt = args.runtime.observations.find((observation) =>
+    Array.isArray(observation.actual_artifacts) && observation.actual_artifacts.includes("note_update_receipt"),
+  );
+  if (noteReceipt?.artifact && typeof noteReceipt.artifact === "object") {
+    const action = noteReceipt.artifact as { args?: Record<string, unknown> };
+    const title = typeof action.args?.title === "string" && action.args.title.trim()
+      ? action.args.title.trim()
+      : typeof action.args?.note_title === "string" && action.args.note_title.trim()
+        ? action.args.note_title.trim()
+        : null;
+    if (title) return `Added the result to ${title}.`;
+  }
+  const docLocation = args.runtime.observations.find((observation) =>
+    Array.isArray(observation.actual_artifacts) && observation.actual_artifacts.includes("doc_location_matches"),
+  );
+  if (docLocation?.result_artifact && typeof docLocation.result_artifact === "object") {
+    const artifact = docLocation.result_artifact as { matches?: unknown; match_count?: unknown };
+    const matches = Array.isArray(artifact.matches) ? artifact.matches : [];
+    if (matches.length > 0 && !/Locations:/i.test(fallback)) {
+      return `Found ${matches.length} matching location${matches.length === 1 ? "" : "s"}. ${fallback}`;
+    }
+  }
+  return fallback;
+};
+
+const buildAskTurnRuntimeRepairStepId = (runtime: HelixAskTurnRuntime, baseId: string): string => {
+  const existing = new Set(runtime.plan_items.map((step) => step.id));
+  if (!existing.has(baseId)) return baseId;
+  for (let idx = 1; idx <= runtime.max_steps; idx += 1) {
+    const candidate = `${baseId}_repair_${idx}`;
+    if (!existing.has(candidate)) return candidate;
+  }
+  return `${baseId}_repair_${Date.now()}`;
+};
+
+const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapability[] => [
+  {
+    capability_id: "docs-viewer.locate_in_doc.exact",
+    panel_id: "docs-viewer",
+    action_id: "locate_in_doc",
+    lane: "workspace",
+    produces: ["doc_location_matches"],
+    requires: ["doc_context"],
+    confirmation_required: false,
+    arg_resolver: ({ runtime, transcript, selectedAction, workspaceSnapshot }) => {
+      const query =
+        typeof selectedAction?.args?.query === "string"
+          ? selectedAction.args.query.trim()
+          : resolveAskTurnDocLocateQuery(transcript) ?? "";
+      const path =
+        normalizeAskTurnDocPathForRead(selectedAction?.args?.path) ??
+        normalizeAskTurnDocPathForRead(workspaceSnapshot?.activeDocPath);
+      const alreadyAttempted = runtime.plan_items.some(
+        (step) => step.action?.panel_id === "docs-viewer" && step.action?.action_id === "locate_in_doc",
+      );
+      if (alreadyAttempted) return { ok: false, missing_args: [], reason: "exact_locate_already_attempted" };
+      if (!query) return { ok: false, missing_args: ["query"], reason: "missing_locate_query" };
+      if (!path) return { ok: false, missing_args: ["path"], reason: "missing_doc_path" };
+      return {
+        ok: true,
+        title: `Locate "${clipConversationText(query, 80)}" in the active document.`,
+        reason: "doc_location_matches_exact_search",
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "locate_in_doc",
+          args: { path, query, locate_strategy: "exact" },
+        },
+      };
+    },
+  },
+  {
+    capability_id: "docs-viewer.locate_in_doc.variant",
+    panel_id: "docs-viewer",
+    action_id: "locate_in_doc",
+    lane: "workspace",
+    produces: ["doc_location_matches"],
+    requires: ["doc_context"],
+    confirmation_required: false,
+    arg_resolver: ({ runtime, transcript, selectedAction, workspaceSnapshot }) => {
+      const query =
+        typeof selectedAction?.args?.query === "string"
+          ? selectedAction.args.query.trim()
+          : resolveAskTurnDocLocateQuery(transcript) ?? "";
+      const path =
+        normalizeAskTurnDocPathForRead(selectedAction?.args?.path) ??
+        normalizeAskTurnDocPathForRead(workspaceSnapshot?.activeDocPath);
+      const alreadyRetried = runtime.plan_items.some(
+        (step) =>
+          step.action?.panel_id === "docs-viewer" &&
+          step.action?.action_id === "locate_in_doc" &&
+          step.action.args?.locate_strategy === "variant",
+      );
+      if (alreadyRetried) return { ok: false, missing_args: [], reason: "variant_locate_already_attempted" };
+      if (!query) return { ok: false, missing_args: ["query"], reason: "missing_locate_query" };
+      if (!path) return { ok: false, missing_args: ["path"], reason: "missing_doc_path" };
+      return {
+        ok: true,
+        title: `Retry document location search with variants for "${clipConversationText(query, 80)}".`,
+        reason: "doc_location_matches_missing_variant_search",
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "locate_in_doc",
+          args: { path, query, locate_strategy: "variant", variant_of: query },
+        },
+      };
+    },
+  },
+  {
+    capability_id: "docs-viewer.resolve_context",
+    panel_id: "docs-viewer",
+    action_id: "open",
+    lane: "workspace",
+    produces: ["doc_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript, workspaceSnapshot }) => {
+      const explicitPath = resolveAskTurnDocPathArg(transcript);
+      const latestTopic = resolveAskTurnLatestDocTopicArg(transcript);
+      const latestPath = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG
+        ? resolveAskTurnLatestDocPathByTopic(latestTopic)
+        : null;
+      const action: HelixAskTurnSelectedAction = explicitPath
+        ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
+        : latestTopic
+          ? {
+              panel_id: "docs-viewer",
+              action_id: "open_latest_doc_by_topic",
+              args: { topic: latestTopic, ...(latestPath ? { path: latestPath } : {}) },
+            }
+          : hasValidAskTurnDocContext(workspaceSnapshot)
+            ? { panel_id: "docs-viewer", action_id: "verify_active_doc", args: { path: workspaceSnapshot?.activeDocPath } }
+            : { panel_id: "docs-viewer", action_id: "open", args: {} };
+      return {
+        ok: true,
+        title: `Resolve document context for "${clipConversationText(transcript, 90)}".`,
+        reason: explicitPath
+          ? "doc_context_from_explicit_path"
+          : latestTopic
+            ? "doc_context_from_latest_topic"
+            : hasValidAskTurnDocContext(workspaceSnapshot)
+              ? "doc_context_from_active_workspace"
+              : "doc_context_missing_open_docs",
+        action,
+      };
+    },
+  },
+  {
+    capability_id: "docs-viewer.identify_current_doc",
+    panel_id: "docs-viewer",
+    action_id: "identify_current_doc",
+    lane: "workspace",
+    produces: ["doc_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript, workspaceSnapshot }) => {
+      const activeDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSnapshot?.activeDocPath);
+      return {
+        ok: true,
+        title: `Identify the active document for "${clipConversationText(transcript, 90)}".`,
+        reason: "identify_active_doc",
+        action: { panel_id: "docs-viewer", action_id: "identify_current_doc", args: activeDocPath ? { path: activeDocPath } : {} },
+      };
+    },
+  },
+  {
+    capability_id: "docs-viewer.summarize_doc",
+    panel_id: "docs-viewer",
+    action_id: "summarize_doc",
+    lane: "workspace",
+    produces: ["doc_context", "workspace_context"],
+    requires: ["doc_context"],
+    confirmation_required: false,
+    arg_resolver: ({ transcript, workspaceSnapshot }) => {
+      const path = resolveAskTurnDocPathArg(transcript) ?? workspaceSnapshot?.activeDocPath ?? null;
+      return {
+        ok: true,
+        title: `Summarize document context for "${clipConversationText(transcript, 90)}".`,
+        reason: "summarize_active_doc",
+        action: { panel_id: "docs-viewer", action_id: "summarize_doc", args: path ? { path } : {} },
+      };
+    },
+  },
+  {
+    capability_id: "workstation-notes.open",
+    panel_id: "workstation-notes",
+    action_id: "open",
+    lane: "workspace",
+    produces: ["note_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => ({
+      ok: true,
+      title: `Resolve notes context for "${clipConversationText(transcript, 90)}".`,
+      reason: "note_context_missing_open_notes",
+      action: { panel_id: "workstation-notes", action_id: "open", args: {} },
+    }),
+  },
+  {
+    capability_id: "workstation-notes.create_note",
+    panel_id: "workstation-notes",
+    action_id: "create_note",
+    lane: "workspace",
+    produces: ["note_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => {
+      const title = resolveAskTurnCreateNoteTitleArg(transcript);
+      if (!title) return { ok: false, missing_args: ["title"], reason: "missing_args:title" };
+      return {
+        ok: true,
+        title: `Create note "${clipConversationText(title, 80)}".`,
+        reason: "create_note_with_title",
+        action: { panel_id: "workstation-notes", action_id: "create_note", args: { title } },
+      };
+    },
+  },
+  {
+    capability_id: "workstation-notes.append_to_note",
+    panel_id: "workstation-notes",
+    action_id: "append_to_note",
+    lane: "workspace",
+    produces: ["note_context", "workspace_context", "note_update_receipt"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => {
+          const text =
+            resolveAskTurnAppendNoteTextArg(transcript) ??
+            (isAskTurnDocLocateToNoteIntent(transcript) ? HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER : null);
+      const title = resolveAskTurnNoteTargetArg(transcript);
+      const missing = [!text ? "text" : "", !title ? "title" : ""].filter(Boolean);
+      if (missing.length > 0) return { ok: false, missing_args: missing, reason: `missing_args:${missing.join(",")}` };
+      return {
+        ok: true,
+        title: `Append text to note "${clipConversationText(title ?? "", 80)}".`,
+        reason: "append_text_to_note",
+        action: { panel_id: "workstation-notes", action_id: "append_to_note", args: { text, title } },
+      };
+    },
+  },
+  {
+    capability_id: "workstation-notes.list_notes",
+    panel_id: "workstation-notes",
+    action_id: "list_notes",
+    lane: "workspace",
+    produces: ["note_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => ({
+      ok: true,
+      title: `List notes for "${clipConversationText(transcript, 90)}".`,
+      reason: "list_notes",
+      action: { panel_id: "workstation-notes", action_id: "list_notes", args: {} },
+    }),
+  },
+  {
+    capability_id: "workstation-notes.set_active_note",
+    panel_id: "workstation-notes",
+    action_id: "set_active_note",
+    lane: "workspace",
+    produces: ["note_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => {
+      const title = resolveAskTurnNoteTargetArg(transcript);
+      if (!title) return { ok: false, missing_args: ["title"], reason: "missing_args:title" };
+      return {
+        ok: true,
+        title: `Set active note "${clipConversationText(title, 80)}".`,
+        reason: "set_active_note",
+        action: { panel_id: "workstation-notes", action_id: "set_active_note", args: { title } },
+      };
+    },
+  },
+  {
+    capability_id: "workstation-clipboard-history.read_clipboard",
+    panel_id: "workstation-clipboard-history",
+    action_id: "read_clipboard",
+    lane: "workspace",
+    produces: ["clipboard_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => ({
+      ok: true,
+      title: `Resolve clipboard context for "${clipConversationText(transcript, 90)}".`,
+      reason: "clipboard_context_missing_read_clipboard",
+      action: { panel_id: "workstation-clipboard-history", action_id: "read_clipboard", args: {} },
+    }),
+  },
+  {
+    capability_id: "workstation-clipboard-history.write_clipboard",
+    panel_id: "workstation-clipboard-history",
+    action_id: "write_clipboard",
+    lane: "workspace",
+    produces: ["clipboard_context", "workspace_context"],
+    requires: [],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => {
+      const text = resolveAskTurnAppendNoteTextArg(transcript) ?? transcript.match(/\bclipboard\b(?:\s*:\s*|\s+)([\s\S]+)$/i)?.[1]?.trim() ?? null;
+      if (!text) return { ok: false, missing_args: ["text"], reason: "missing_args:text" };
+      return {
+        ok: true,
+        title: "Write text to clipboard.",
+        reason: "write_clipboard_text",
+        action: { panel_id: "workstation-clipboard-history", action_id: "write_clipboard", args: { text } },
+      };
+    },
+  },
+  {
+    capability_id: "workstation-clipboard-history.copy_receipt_to_clipboard",
+    panel_id: "workstation-clipboard-history",
+    action_id: "copy_receipt_to_clipboard",
+    lane: "workspace",
+    produces: ["clipboard_context", "workspace_context"],
+    requires: ["turn_final_text"],
+    confirmation_required: false,
+    arg_resolver: () => ({
+      ok: true,
+      title: "Copy latest result artifact to clipboard.",
+      reason: "copy_result_to_clipboard",
+      action: { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_clipboard", args: {} },
+    }),
+  },
+  {
+    capability_id: "workstation-clipboard-history.copy_receipt_to_note",
+    panel_id: "workstation-clipboard-history",
+    action_id: "copy_receipt_to_note",
+    lane: "workspace",
+    produces: ["note_context", "workspace_context", "note_update_receipt"],
+    requires: ["turn_final_text"],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => {
+      const noteTitle = resolveAskTurnNoteTargetArg(transcript) ?? resolveAskTurnArtifactBareNoteTargetArg(transcript);
+      if (!noteTitle) return { ok: false, missing_args: ["note_title"], reason: "missing_args:note_title" };
+      return {
+        ok: true,
+        title: `Copy latest result artifact to note "${clipConversationText(noteTitle, 80)}".`,
+        reason: "copy_result_to_note",
+        action: { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_note", args: { note_title: noteTitle } },
+      };
+    },
+  },
+  {
+    capability_id: "reasoning.followup",
+    panel_id: null,
+    action_id: null,
+    lane: "reasoning",
+    produces: ["reasoning_context"],
+    requires: ["workspace_context"],
+    confirmation_required: false,
+    arg_resolver: ({ transcript }) => ({
+      ok: true,
+      title: `Run reasoning follow-up for "${clipConversationText(transcript, 90)}".`,
+      reason: "reasoning_context_missing",
+      action: null,
+    }),
+  },
+];
+
+const selectAskTurnRuntimeCapabilityStep = (args: {
+  runtime: HelixAskTurnRuntime;
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  missingArtifacts: string[];
+}): { proposal: HelixAskTurnRuntimeStepProposal | null; traces: HelixAskTurnCapabilitySelectionTraceEntry[] } => {
+  const registry = buildAskTurnCapabilityRegistryForRuntime();
+  const traces: HelixAskTurnCapabilitySelectionTraceEntry[] = [];
+  const artifactStore = args.runtime.artifact_store;
+  for (const missingArtifact of args.missingArtifacts) {
+    const candidates = registry.filter((capability) => capability.produces.includes(missingArtifact));
+    const trace: HelixAskTurnCapabilitySelectionTraceEntry = {
+      missing_artifact: missingArtifact,
+      candidate_capabilities: candidates.map((candidate) => candidate.capability_id),
+      selected_capability: null,
+      reject_reasons: [],
+    };
+    for (const candidate of candidates) {
+      const missingRequirements = candidate.requires.filter((required) => !(required in artifactStore));
+      if (missingRequirements.length > 0) {
+        trace.reject_reasons.push({
+          capability_id: candidate.capability_id,
+          reason: `missing_requires:${missingRequirements.join(",")}`,
+        });
+        continue;
+      }
+      const resolved = candidate.arg_resolver({
+        runtime: args.runtime,
+        transcript: args.transcript,
+        selectedAction: args.selectedAction,
+        workspaceSnapshot: args.workspaceSnapshot,
+        missingArtifact,
+      });
+      if (!resolved.ok) {
+        trace.reject_reasons.push({
+          capability_id: candidate.capability_id,
+          reason: resolved.reason || `missing_args:${resolved.missing_args.join(",")}`,
+        });
+        continue;
+      }
+      trace.selected_capability = candidate.capability_id;
+      traces.push(trace);
+      const baseId =
+        candidate.capability_id === "docs-viewer.locate_in_doc.exact"
+          ? "workspace_action_locate_exact"
+          : 
+        candidate.capability_id === "docs-viewer.locate_in_doc.variant"
+          ? "workspace_action_locate_variant"
+          : candidate.capability_id === "docs-viewer.resolve_context"
+            ? "workspace_action_doc_context"
+            : candidate.capability_id === "docs-viewer.identify_current_doc"
+              ? "workspace_action_identify_doc"
+            : candidate.capability_id === "docs-viewer.summarize_doc"
+              ? "workspace_action_summarize_doc"
+            : candidate.capability_id === "workstation-notes.open"
+              ? "workspace_action_note_context"
+              : candidate.capability_id === "workstation-notes.create_note"
+                ? "workspace_action_create_note"
+              : candidate.capability_id === "workstation-notes.append_to_note"
+                ? "workspace_action_append_note"
+              : candidate.capability_id === "workstation-notes.list_notes"
+                ? "workspace_action_list_notes"
+              : candidate.capability_id === "workstation-notes.set_active_note"
+                ? "workspace_action_set_active_note"
+              : candidate.capability_id === "workstation-clipboard-history.read_clipboard"
+                ? "workspace_action_clipboard_context"
+                : candidate.capability_id === "workstation-clipboard-history.write_clipboard"
+                  ? "workspace_action_write_clipboard"
+                : candidate.capability_id === "workstation-clipboard-history.copy_receipt_to_clipboard"
+                  ? "workspace_action_copy_receipt_clipboard"
+                : candidate.capability_id === "workstation-clipboard-history.copy_receipt_to_note"
+                  ? "workspace_action_copy_receipt_note"
+                : candidate.capability_id === "reasoning.followup"
+                  ? "reasoning_followup"
+                  : `runtime_capability_${candidate.capability_id.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`;
+      return {
+        traces,
+        proposal: {
+          step: {
+            id: buildAskTurnRuntimeRepairStepId(args.runtime, baseId),
+            lane: candidate.lane,
+            status: "planned",
+            title: resolved.title ?? `Run ${candidate.capability_id}.`,
+            action: resolved.action,
+            reason: null,
+          },
+          reason: resolved.reason ?? `${missingArtifact}_missing`,
+          source: "capability_registry",
+          capability_trace: traces,
+        },
+      };
+    }
+    traces.push(trace);
+  }
+  return { proposal: null, traces };
+};
+
+const selectAskTurnInitialCapabilityPlan = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+}): HelixAskTurnInitialCapabilityPlan | null => {
+  if (!HELIX_E10_13_REGISTRY_INITIAL_PLAN_FLAG) return null;
+  const normalized = args.transcript.trim().toLowerCase();
+  const wantsNotes = /\b(?:open|go\s+to|switch\s+(?:over\s+)?to|show)\s+(?:up\s+)?(?:my\s+)?(?:notes?|notepad)\b/i.test(normalized);
+  const wantsDocs = /\b(?:open|go\s+to|switch\s+to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+viewer)\b/i.test(normalized);
+  const wantsClipboard = /\b(?:read|open|show|check)\s+(?:the\s+)?clipboard\b/i.test(normalized);
+  const wantsLocate = isAskTurnDocLocateIntent(args.transcript);
+  const wantsLocateToNote = isAskTurnDocLocateToNoteIntent(args.transcript);
+  const wantsDocNotesCompare = isAskTurnDocNotesHybridCompareIntent(args.transcript);
+  const wantsDocsRetrievalToNote = isAskTurnDocsRetrievalToNoteIntent(args.transcript);
+  const wantsCreateNote = /\b(?:create|make|new|start)\s+(?:a\s+)?note\b/i.test(normalized);
+  const wantsAppendNote =
+    /\b(?:append|add|put|save|write)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized) &&
+    !isAskTurnArtifactToNoteIntent(args.transcript);
+  const wantsListNotes = /\b(?:list|show)\s+(?:my\s+)?notes\b/i.test(normalized);
+  const wantsSetActiveNote = /\b(?:switch(?:\s+over)?|open|select|set active|go)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized) && !wantsCreateNote && !wantsAppendNote && !wantsNotes;
+  const wantsDocIdentity = isAskTurnDocIdentityIntent(args.transcript) && !isAskTurnDocIdentityExplainHybridIntent(args.transcript);
+  const wantsSummarizeDoc =
+    /\bsummari[sz]e\b[\s\S]*\b(?:this\s+)?(?:doc|document|paper)\b/i.test(normalized) ||
+    /\bwhat\s+is\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+about\b/i.test(normalized) ||
+    /\bwhat\s+is\s+this\s+about\b/i.test(normalized);
+  const wantsCopyResultClipboard =
+    isAskTurnArtifactToClipboardIntent(args.transcript) && /\blatest\s+(?:result|answer|finding|output|response)\b/i.test(normalized);
+  const wantsCopyResultNote =
+    isAskTurnArtifactToNoteIntent(args.transcript) && /\blatest\s+(?:result|answer|finding|output|response)\b/i.test(normalized);
+  if (
+    !wantsNotes &&
+    !wantsDocs &&
+    !wantsClipboard &&
+    !wantsLocate &&
+    !wantsLocateToNote &&
+    !wantsDocNotesCompare &&
+    !wantsDocsRetrievalToNote &&
+    !wantsCreateNote &&
+    !wantsAppendNote &&
+    !wantsListNotes &&
+    !wantsSetActiveNote &&
+    !wantsDocIdentity &&
+    !wantsSummarizeDoc &&
+    !wantsCopyResultClipboard &&
+    !wantsCopyResultNote
+  ) return null;
+  const runtime = createAskTurnRuntime({
+    turnId: "initial-capability-plan",
+    sessionId: null,
+    goal: args.transcript,
+    planItems: [],
+    pendingServerRequest: null,
+    workspaceSnapshot: args.workspaceSnapshot ?? null,
+  });
+  const planItems: HelixAskTurnPlanStep[] = [];
+  const capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [];
+  const missingArgs = new Set<string>();
+  const buildInitialArtifactStore = (): Record<string, unknown> => ({
+    ...runtime.artifact_store,
+    ...(hasValidAskTurnDocContext(args.workspaceSnapshot) ? { doc_context: args.workspaceSnapshot, active_doc_path: args.workspaceSnapshot?.activeDocPath } : {}),
+    ...(args.workspaceSnapshot?.hasNoteContext ? { note_context: args.workspaceSnapshot } : {}),
+    ...(args.workspaceSnapshot?.hasClipboardContext ? { clipboard_context: args.workspaceSnapshot } : {}),
+    workspace_context: args.workspaceSnapshot ?? { ok: true },
+    turn_final_text: { ok: true },
+  });
+  const selectForArtifact = (artifact: string): HelixAskTurnRuntimeStepProposal | null => {
+    const selection = selectAskTurnRuntimeCapabilityStep({
+      runtime: {
+        ...runtime,
+        plan_items: [...planItems],
+        artifact_store: buildInitialArtifactStore(),
+      },
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+      missingArtifacts: [artifact],
+    });
+    capabilitySelectionTrace.push(...selection.traces);
+    for (const trace of selection.traces) {
+      for (const reject of trace.reject_reasons) {
+        if (reject.reason.startsWith("missing_")) missingArgs.add(reject.reason.replace(/^missing_(?:args:)?/, ""));
+      }
+    }
+    return selection.proposal;
+  };
+  const selectCapabilityById = (capabilityId: string): HelixAskTurnRuntimeStepProposal | null => {
+    const registry = buildAskTurnCapabilityRegistryForRuntime();
+    const capability = registry.find((entry) => entry.capability_id === capabilityId);
+    if (!capability) return null;
+    const trace: HelixAskTurnCapabilitySelectionTraceEntry = {
+      missing_artifact: capability.produces[0] ?? "workspace_context",
+      candidate_capabilities: [capability.capability_id],
+      selected_capability: null,
+      reject_reasons: [],
+    };
+    const artifactStore = buildInitialArtifactStore();
+    const missingRequirements = capability.requires.filter((required) => !(required in artifactStore));
+    if (missingRequirements.length > 0) {
+      trace.reject_reasons.push({ capability_id: capability.capability_id, reason: `missing_requires:${missingRequirements.join(",")}` });
+      capabilitySelectionTrace.push(trace);
+      missingRequirements.forEach((entry) => missingArgs.add(entry));
+      return null;
+    }
+    const resolved = capability.arg_resolver({
+      runtime: { ...runtime, plan_items: [...planItems], artifact_store: artifactStore },
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+      missingArtifact: capability.produces[0] ?? "workspace_context",
+    });
+    if (!resolved.ok) {
+      trace.reject_reasons.push({ capability_id: capability.capability_id, reason: resolved.reason });
+      capabilitySelectionTrace.push(trace);
+      resolved.missing_args.forEach((entry) => missingArgs.add(entry));
+      return null;
+    }
+    trace.selected_capability = capability.capability_id;
+    capabilitySelectionTrace.push(trace);
+    const selected = selectAskTurnRuntimeCapabilityStep({
+      runtime: { ...runtime, plan_items: [...planItems], artifact_store: artifactStore },
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+      missingArtifacts: [capability.produces[0] ?? "workspace_context"],
+    }).proposal;
+    if (selected?.step.action?.action_id === resolved.action?.action_id && selected.step.action?.panel_id === resolved.action?.panel_id) {
+      return { ...selected, capability_trace: [trace] };
+    }
+    return {
+      step: {
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, `workspace_action_${capability.capability_id.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`),
+        lane: capability.lane,
+        status: "planned",
+        title: resolved.title ?? `Run ${capability.capability_id}.`,
+        action: resolved.action,
+        reason: null,
+      },
+      reason: resolved.reason ?? `${capability.capability_id}_selected`,
+      source: "capability_registry",
+      capability_trace: [trace],
+    };
+  };
+  const pushProposal = (artifact: string): HelixAskTurnRuntimeStepProposal | null => {
+    const proposal = selectForArtifact(artifact);
+    if (proposal) planItems.push(proposal.step);
+    return proposal;
+  };
+  if (wantsNotes) pushProposal("note_context");
+  if (wantsDocs) pushProposal("doc_context");
+  if (wantsClipboard) pushProposal("clipboard_context");
+  const pushCapability = (capabilityId: string): void => {
+    const proposal = selectCapabilityById(capabilityId);
+    if (proposal) planItems.push(proposal.step);
+  };
+  if (wantsLocateToNote) {
+    pushProposal("doc_location_matches");
+    const noteTitle = resolveAskTurnAnyNoteSinkArg(args.transcript);
+    planItems.push({
+      id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_append_location_reminder"),
+      lane: "workspace",
+      status: "planned",
+      title: `Append located document reminder to note "${clipConversationText(noteTitle ?? "active note", 80)}".`,
+      action: {
+        panel_id: "workstation-notes",
+        action_id: "append_to_note",
+        args: {
+          text: HELIX_ASK_TURN_DOC_LOCATION_REMINDER_PLACEHOLDER,
+          text_kind: "doc_location_reminder",
+          ...(noteTitle ? { title: noteTitle } : {}),
+        },
+      },
+      required_artifacts: ["doc_location_matches", "note_update_receipt"],
+      reason: null,
+    });
+    capabilitySelectionTrace.push({
+      missing_artifact: "note_update_receipt",
+      candidate_capabilities: ["workstation-notes.append_to_note"],
+      selected_capability: "workstation-notes.append_to_note",
+      reject_reasons: [],
+    });
+  }
+  if (wantsCreateNote) pushCapability("workstation-notes.create_note");
+  if (wantsAppendNote && !wantsLocateToNote) pushCapability("workstation-notes.append_to_note");
+  if (wantsListNotes) pushCapability("workstation-notes.list_notes");
+  if (wantsSetActiveNote) pushCapability("workstation-notes.set_active_note");
+  if (wantsDocIdentity) pushCapability("docs-viewer.identify_current_doc");
+  if (wantsSummarizeDoc) {
+    pushCapability("docs-viewer.summarize_doc");
+    planItems.push({
+      id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "reasoning_followup"),
+      lane: "reasoning",
+      status: "planned",
+      title: `Summarize document for "${clipConversationText(args.transcript, 90)}".`,
+      action: null,
+      reason: null,
+    });
+    capabilitySelectionTrace.push({
+      missing_artifact: "reasoning_context",
+      candidate_capabilities: ["reasoning.followup"],
+      selected_capability: "reasoning.followup",
+      reject_reasons: [],
+    });
+  }
+  if (wantsCopyResultClipboard) pushCapability("workstation-clipboard-history.copy_receipt_to_clipboard");
+  if (wantsCopyResultNote) pushCapability("workstation-clipboard-history.copy_receipt_to_note");
+  if (wantsDocsRetrievalToNote) {
+    const query = resolveAskTurnDocsRetrievalQueryArg(args.transcript);
+    const noteTitle = resolveAskTurnAnyNoteSinkArg(args.transcript);
+    const summaryText = buildAskTurnRetrievalSummaryForNote({ query, transcript: args.transcript });
+    const searchAction: HelixAskTurnSelectedAction = {
+      panel_id: "docs-viewer",
+      action_id: "search_docs",
+      args: { query, limit: 3 },
+    };
+    const appendAction: HelixAskTurnSelectedAction = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: summaryText,
+        ...(noteTitle ? { title: noteTitle, text_kind: "retrieval_summary" } : { text_kind: "retrieval_summary" }),
+      },
+    };
+    planItems.push(
+      {
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_docs_search"),
+        lane: "workspace",
+        status: "planned",
+        title: `Search docs for "${clipConversationText(query, 90)}".`,
+        action: searchAction,
+        reason: null,
+      },
+      {
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: [...planItems, { id: "workspace_action_docs_search", lane: "workspace", status: "planned", title: "", action: searchAction }] }, "reasoning_summarize_retrieval"),
+        lane: "reasoning",
+        status: "planned",
+        title: `Summarize docs retrieval for "${clipConversationText(query, 90)}".`,
+        action: null,
+        reason: null,
+      },
+      {
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_append_retrieval_summary"),
+        lane: "workspace",
+        status: "planned",
+        title: `Append retrieval summary to note "${clipConversationText(noteTitle ?? "active note", 80)}".`,
+        action: appendAction,
+        reason: null,
+      },
+    );
+    capabilitySelectionTrace.push(
+      {
+        missing_artifact: "doc_search_results",
+        candidate_capabilities: ["docs-viewer.search_docs"],
+        selected_capability: "docs-viewer.search_docs",
+        reject_reasons: [],
+      },
+      {
+        missing_artifact: "turn_final_text",
+        candidate_capabilities: ["reasoning.summarize_retrieval"],
+        selected_capability: "reasoning.summarize_retrieval",
+        reject_reasons: [],
+      },
+      {
+        missing_artifact: "note_update_receipt",
+        candidate_capabilities: ["workstation-notes.append_to_note"],
+        selected_capability: "workstation-notes.append_to_note",
+        reject_reasons: [],
+      },
+    );
+  }
+  if (wantsLocate && !wantsLocateToNote) {
+    pushProposal("doc_location_matches");
+    planItems.push({
+      id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "reasoning_followup"),
+      lane: "reasoning",
+      status: "planned",
+      title: `Explain located document matches for "${clipConversationText(args.transcript, 90)}".`,
+      action: null,
+      reason: null,
+    });
+    capabilitySelectionTrace.push({
+      missing_artifact: "reasoning_context",
+      candidate_capabilities: ["reasoning.followup"],
+      selected_capability: "reasoning.followup",
+      reject_reasons: [],
+    });
+  }
+  if (wantsDocNotesCompare) {
+    pushProposal("doc_context");
+    pushProposal("note_context");
+    planItems.push({
+      id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "reasoning_followup"),
+      lane: "reasoning",
+      status: "planned",
+      title: `Compare document and notes for "${clipConversationText(args.transcript, 90)}".`,
+      action: null,
+      reason: null,
+    });
+    capabilitySelectionTrace.push({
+      missing_artifact: "reasoning_context",
+      candidate_capabilities: ["reasoning.followup"],
+      selected_capability: "reasoning.followup",
+      reject_reasons: [],
+    });
+  }
+  if (planItems.length === 0) return null;
+  const firstWorkspaceAction = wantsDocsRetrievalToNote
+    ? planItems
+        .filter((step) => step.lane === "workspace" && step.action)
+        .map((step) => step.action)
+        .filter((action): action is HelixAskTurnSelectedAction => Boolean(action))
+        .at(-1) ?? null
+    : planItems.find((step) => step.lane === "workspace" && step.action)?.action ?? null;
+  return {
+    plan_items: planItems,
+    selected_action: firstWorkspaceAction,
+    dispatch_policy: planItems.some((step) => step.lane === "reasoning") ? "workspace_context_reasoning" : "workspace_only",
+    capability_selection_trace: capabilitySelectionTrace,
+    missing_args: Array.from(missingArgs).filter(Boolean),
+  };
+};
+
+const proposeAskTurnRuntimeNextStep = (args: {
+  runtime: HelixAskTurnRuntime;
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  missingArtifacts: string[];
+}): HelixAskTurnRuntimeStepProposal | null => {
+  const normalized = args.transcript.trim().toLowerCase();
+  const hasDocCue = /\b(?:doc|docs|document|paper|this)\b/i.test(normalized);
+  const hasNoteCue = /\b(?:note|notes|notepad)\b/i.test(normalized);
+  const hasClipboardCue = /\bclipboard\b/i.test(normalized);
+  const hasCompareOrExplainCue = /\b(?:compare|contrast|difference|differences|explain|summari[sz]e|what\s+is)\b/i.test(normalized);
+  const makeStep = (
+    id: string,
+    lane: HelixAskTurnPlanLane,
+    title: string,
+    action: HelixAskTurnSelectedAction | null,
+    reason: string,
+    source: HelixAskTurnRuntimeStepProposal["source"],
+  ): HelixAskTurnRuntimeStepProposal => ({
+    step: {
+      id: buildAskTurnRuntimeRepairStepId(args.runtime, id),
+      lane,
+      status: "planned",
+      title,
+      action,
+      reason: null,
+    },
+    reason,
+    source,
+  });
+  if (args.missingArtifacts.includes("doc_location_matches")) {
+    const query =
+      typeof args.selectedAction?.args?.query === "string"
+        ? args.selectedAction.args.query.trim()
+        : resolveAskTurnDocLocateQuery(args.transcript) ?? "";
+    const path =
+      normalizeAskTurnDocPathForRead(args.selectedAction?.args?.path) ??
+      normalizeAskTurnDocPathForRead(args.workspaceSnapshot?.activeDocPath);
+    const alreadyRetried = args.runtime.plan_items.some(
+      (step) => step.action?.panel_id === "docs-viewer" && step.action?.action_id === "locate_in_doc" && step.action.args?.locate_strategy === "variant",
+    );
+    if (query && path && !alreadyRetried) {
+      return makeStep(
+        "workspace_action_locate_variant",
+        "workspace",
+        `Retry document location search with variants for "${clipConversationText(query, 80)}".`,
+        {
+          panel_id: "docs-viewer",
+          action_id: "locate_in_doc",
+          args: {
+            path,
+            query,
+            locate_strategy: "variant",
+            variant_of: query,
+          },
+        },
+        "doc_location_matches_missing_variant_search",
+        "artifact_policy",
+      );
+    }
+  }
+  const registrySelection = selectAskTurnRuntimeCapabilityStep(args);
+  if (registrySelection.proposal) return registrySelection.proposal;
+  if (registrySelection.traces.length > 0) {
+    args.runtime.capability_selection_trace = [
+      ...args.runtime.capability_selection_trace,
+      ...registrySelection.traces,
+    ];
+  }
+  if (args.missingArtifacts.includes("doc_context") || (args.missingArtifacts.includes("workspace_context") && hasDocCue)) {
+    const explicitPath = resolveAskTurnDocPathArg(args.transcript);
+    const latestTopic = resolveAskTurnLatestDocTopicArg(args.transcript);
+    const latestPath = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG
+      ? resolveAskTurnLatestDocPathByTopic(latestTopic)
+      : null;
+    const action: HelixAskTurnSelectedAction = explicitPath
+      ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
+      : latestTopic
+        ? {
+            panel_id: "docs-viewer",
+            action_id: "open_latest_doc_by_topic",
+            args: {
+              topic: latestTopic,
+              ...(latestPath ? { path: latestPath } : {}),
+            },
+          }
+        : hasValidAskTurnDocContext(args.workspaceSnapshot)
+          ? { panel_id: "docs-viewer", action_id: "verify_active_doc", args: { path: args.workspaceSnapshot?.activeDocPath } }
+          : { panel_id: "docs-viewer", action_id: "open", args: {} };
+    return makeStep(
+      "workspace_action_doc_context",
+      "workspace",
+      `Resolve document context for "${clipConversationText(args.transcript, 90)}".`,
+      action,
+      explicitPath
+        ? "doc_context_from_explicit_path"
+        : latestTopic
+          ? "doc_context_from_latest_topic"
+          : hasValidAskTurnDocContext(args.workspaceSnapshot)
+            ? "doc_context_from_active_workspace"
+            : "doc_context_missing_open_docs",
+      "capability_registry",
+    );
+  }
+  if (args.missingArtifacts.includes("note_context") || (args.missingArtifacts.includes("workspace_context") && hasNoteCue)) {
+    return makeStep(
+      "workspace_action_note_context",
+      "workspace",
+      `Resolve notes context for "${clipConversationText(args.transcript, 90)}".`,
+      { panel_id: "workstation-notes", action_id: "open", args: {} },
+      "note_context_missing_open_notes",
+      "capability_registry",
+    );
+  }
+  if (args.missingArtifacts.includes("clipboard_context") || (args.missingArtifacts.includes("workspace_context") && hasClipboardCue)) {
+    return makeStep(
+      "workspace_action_clipboard_context",
+      "workspace",
+      `Resolve clipboard context for "${clipConversationText(args.transcript, 90)}".`,
+      { panel_id: "workstation-clipboard-history", action_id: "read_clipboard", args: {} },
+      "clipboard_context_missing_read_clipboard",
+      "capability_registry",
+    );
+  }
+  if (args.missingArtifacts.includes("reasoning_context") || (hasCompareOrExplainCue && "workspace_context" in args.runtime.artifact_store && !("reasoning_context" in args.runtime.artifact_store))) {
+    return makeStep(
+      "reasoning_followup",
+      "reasoning",
+      `Run reasoning follow-up for "${clipConversationText(args.transcript, 90)}".`,
+      null,
+      "reasoning_context_missing",
+      "artifact_policy",
+    );
+  }
+  return null;
+};
+
+const appendAskTurnRuntimeStep = (
+  runtime: HelixAskTurnRuntime,
+  proposal: HelixAskTurnRuntimeStepProposal,
+): HelixAskTurnRuntime => {
+  const decision: HelixAskTurnRuntimeDecision = {
+    kind: "continue",
+    next_step: proposal.step,
+    reason: `runtime_appended_step:${proposal.reason}`,
+  };
+  return {
+    ...runtime,
+    status: "running",
+    plan_items: [...runtime.plan_items, proposal.step],
+    open_subgoals: [...runtime.open_subgoals, proposal.step.id],
+    required_artifacts: Array.from(
+      new Set([
+        ...runtime.required_artifacts,
+        ...(Array.isArray(proposal.step.required_artifacts) ? proposal.step.required_artifacts : []),
+      ].map((entry) => String(entry ?? "").trim()).filter(Boolean)),
+    ),
+    artifact_store: {
+      ...runtime.artifact_store,
+      plan_delta: {
+        appended_step_id: proposal.step.id,
+        reason: proposal.reason,
+        source: proposal.source,
+      },
+    },
+    capability_selection_trace: [
+      ...runtime.capability_selection_trace,
+      ...(proposal.capability_trace ?? []),
+    ],
+    appended_steps: [
+      ...runtime.appended_steps,
+      {
+        step_id: proposal.step.id,
+        lane: proposal.step.lane,
+        reason: proposal.reason,
+        source: proposal.source,
+      },
+    ],
+    decisions: [...runtime.decisions, decision],
+    last_decision: decision,
+  };
+};
+
+const requiredAskTurnRuntimeArtifacts = (args: {
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  executionTrace: HelixAskTurnPlanStep[];
+}): string[] => {
+  const required = new Set<string>();
+  const hasReasoning = args.executionTrace.some((step) => step.lane === "reasoning" && step.status === "completed");
+  const hasWorkspace = args.executionTrace.some((step) => step.lane === "workspace" && step.status === "completed");
+  if (hasWorkspace) required.add("workspace_context");
+  if (args.terminalKind === "reasoning" || hasReasoning) required.add("reasoning_context");
+  for (const step of args.executionTrace) {
+    const reason = String(step.reason ?? "");
+    if (!reason.startsWith("blocked_missing_artifacts:")) continue;
+    for (const artifact of reason.replace("blocked_missing_artifacts:", "").split(",")) {
+      const normalized = artifact.trim();
+      if (normalized) required.add(normalized);
+    }
+  }
+  return Array.from(required);
+};
+
+const HELIX_ASK_RUNTIME_RESOLVABLE_ARTIFACTS = new Set([
+  "workspace_context",
+  "doc_context",
+  "note_context",
+  "clipboard_context",
+  "reasoning_context",
+  "doc_location_matches",
+]);
+
+const canAskTurnRuntimeResolveBlockedArtifacts = (artifacts: string[]): boolean =>
+  HELIX_E10_3_RUNTIME_APPEND_STEP_FLAG &&
+  artifacts.length > 0 &&
+  artifacts.every((artifact) => HELIX_ASK_RUNTIME_RESOLVABLE_ARTIFACTS.has(artifact));
+
+const applyAskTurnRuntimeObservations = (args: {
+  runtime: HelixAskTurnRuntime;
+  executionTrace: HelixAskTurnPlanStep[];
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  terminalText: string | null;
+  pendingServerRequest: Record<string, unknown> | null;
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): HelixAskTurnRuntime => {
+  const runtime: HelixAskTurnRuntime = {
+    ...args.runtime,
+    plan_items: args.runtime.plan_items.map((step) => ({ ...step })),
+    open_subgoals: [...args.runtime.open_subgoals],
+    completed_subgoals: [...args.runtime.completed_subgoals],
+    failed_subgoals: [...args.runtime.failed_subgoals],
+    artifact_store: { ...args.runtime.artifact_store },
+    required_artifacts: [...args.runtime.required_artifacts],
+    satisfied_artifacts: [...args.runtime.satisfied_artifacts],
+    observations: [...args.runtime.observations],
+    pending_request: args.pendingServerRequest,
+    decisions: [...args.runtime.decisions],
+    last_decision: args.runtime.last_decision,
+    appended_steps: [...args.runtime.appended_steps],
+    executed_appended_step_count: args.runtime.executed_appended_step_count,
+    runtime_loop_iteration_count: args.runtime.runtime_loop_iteration_count,
+    runtime_loop_stop_reason: args.runtime.runtime_loop_stop_reason,
+    capability_selection_trace: [...args.runtime.capability_selection_trace],
+    terminal: { ...args.runtime.terminal },
+  };
+  const stepResultById = new Map(args.stepResults.map((result) => [String(result.step_id), result]));
+  for (const step of args.executionTrace) {
+    const result = stepResultById.get(step.id);
+    runtime.observations.push({
+      step_id: step.id,
+      lane: step.lane,
+      status: step.status,
+      artifact: result?.artifact ?? step.action ?? null,
+      result_artifact: result?.result_artifact ?? null,
+      error_code: result?.error_code ?? step.reason ?? null,
+      contract_pass:
+        result && "contract_pass" in result && typeof result.contract_pass === "boolean"
+          ? result.contract_pass
+          : result && "contract_pass" in result && result.contract_pass === null
+            ? null
+            : undefined,
+      contract_fail_reason:
+        result && typeof result.contract_fail_reason === "string" ? result.contract_fail_reason : null,
+      expected_artifacts: Array.isArray(result?.expected_artifacts)
+        ? result.expected_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+        : [],
+      actual_artifacts: Array.isArray(result?.actual_artifacts)
+        ? result.actual_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+        : [],
+    });
+    const actualArtifacts = Array.isArray(result?.actual_artifacts)
+      ? result.actual_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+      : [];
+    const expectedArtifacts = Array.isArray(result?.expected_artifacts)
+      ? result.expected_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+      : [];
+    for (const artifactName of expectedArtifacts) {
+      if (artifactName && !runtime.required_artifacts.includes(artifactName)) {
+        runtime.required_artifacts.push(artifactName);
+      }
+    }
+    const resultArtifact =
+      result?.result_artifact && typeof result.result_artifact === "object"
+        ? (result.result_artifact as Record<string, unknown>)
+        : null;
+    for (const artifactName of actualArtifacts) {
+      if (!artifactName) continue;
+      runtime.artifact_store[artifactName] =
+        resultArtifact && resultArtifact.kind === artifactName ? resultArtifact : result?.artifact ?? step.action ?? { ok: true };
+      if (!runtime.satisfied_artifacts.includes(artifactName)) {
+        runtime.satisfied_artifacts.push(artifactName);
+      }
+    }
+    if (resultArtifact && typeof resultArtifact.kind === "string" && actualArtifacts.includes(resultArtifact.kind)) {
+      runtime.artifact_store[resultArtifact.kind] = resultArtifact;
+    }
+    const blockedMissingArtifacts =
+      step.status === "suppressed" && String(step.reason ?? "").startsWith("blocked_missing_artifacts:")
+        ? String(step.reason ?? "")
+            .replace("blocked_missing_artifacts:", "")
+            .split(",")
+            .map((artifact) => artifact.trim())
+            .filter(Boolean)
+        : [];
+    const keepBlockedSubgoalOpen = canAskTurnRuntimeResolveBlockedArtifacts(blockedMissingArtifacts);
+    if (!keepBlockedSubgoalOpen) {
+      runtime.open_subgoals = runtime.open_subgoals.filter((id) => id !== step.id);
+    }
+    if (step.status === "completed") {
+      runtime.completed_subgoals.push(step.id);
+      if (step.lane === "workspace") {
+        runtime.artifact_store.workspace_context = step.action ?? { ok: true };
+        if (step.action?.panel_id === "docs-viewer") runtime.artifact_store.doc_context = step.action;
+        if (step.action?.panel_id === "workstation-notes") runtime.artifact_store.note_context = step.action;
+        if (step.action?.panel_id === "workstation-clipboard-history") {
+          runtime.artifact_store.clipboard_context = step.action;
+          if (step.action.action_id === "copy_selection_to_note" || step.action.action_id === "copy_receipt_to_note") {
+            runtime.artifact_store.note_context = step.action;
+          }
+        }
+      }
+      if (step.lane === "reasoning") runtime.artifact_store.reasoning_context = { ok: true, step_id: step.id };
+      continue;
+    }
+    if (step.status === "failed") {
+      runtime.failed_subgoals.push(step.id);
+      runtime.artifact_store[`error:${step.id}`] = step.reason ?? "step_failed";
+    }
+  }
+  if (args.pendingServerRequest) {
+    runtime.status = "pending_input";
+    runtime.pending_request = args.pendingServerRequest;
+    runtime.terminal = {
+      kind: "pending_input",
+      text:
+        typeof args.pendingServerRequest.prompt === "string"
+          ? args.pendingServerRequest.prompt
+          : args.terminalText ?? "Pending user input is required before this turn can continue.",
+    };
+  } else if (runtime.failed_subgoals.length > 0) {
+    runtime.status = "failed";
+    runtime.terminal = {
+      kind: "final_failure",
+      text: args.terminalText ?? "This turn failed before the goal was completed.",
+      error_code: String(runtime.artifact_store[`error:${runtime.failed_subgoals[0]}`] ?? "turn_failed"),
+    };
+  } else {
+    runtime.status = "completed";
+    runtime.terminal = {
+      kind: "final_answer",
+      text: args.terminalText ?? (args.terminalKind === "reasoning" ? "Completed reasoning turn." : "Completed turn."),
+    };
+  }
+  if (!HELIX_E10_2_RUNTIME_NEXT_STEP_FLAG) return runtime;
+  const requiredArtifacts = requiredAskTurnRuntimeArtifacts({
+    terminalKind: args.terminalKind,
+    executionTrace: args.executionTrace,
+  });
+  const evaluation = evaluateAskTurnRuntimeAfterObservation({
+    runtime,
+    terminalText: args.terminalText,
+    requiredArtifacts,
+    stepResults: args.stepResults,
+    transcript: args.transcript,
+    selectedAction: args.selectedAction,
+    workspaceSnapshot: args.workspaceSnapshot,
+  });
+  if (
+    HELIX_E10_3_RUNTIME_APPEND_STEP_FLAG &&
+    evaluation.proposal &&
+    evaluation.decision.kind === "continue" &&
+    evaluation.decision.reason.startsWith("runtime_appended_step:")
+  ) {
+    return appendAskTurnRuntimeStep(runtime, evaluation.proposal);
+  }
+  return appendAskTurnRuntimeDecision(runtime, evaluation.decision);
+};
+
+const deriveAskTurnDispatchPolicyFromPlanAndTrace = (args: {
+  planItems: HelixAskTurnPlanStep[];
+  executionTrace: HelixAskTurnPlanStep[];
+  pendingServerRequest: { kind: HelixConversationPendingInputKind } | null;
+  fallbackPolicy: HelixAskTurnDispatchPolicy;
+}): HelixAskTurnDispatchPolicy => {
+  if (args.pendingServerRequest) return "needs_user_input";
+  const effectiveSteps = args.executionTrace.length > 0 ? args.executionTrace : args.planItems;
+  const hasWorkspace = effectiveSteps.some((step) => step.lane === "workspace" && step.status !== "suppressed");
+  const hasReasoning = effectiveSteps.some((step) => step.lane === "reasoning" && step.status !== "suppressed");
+  if (hasWorkspace && hasReasoning) return "workspace_context_reasoning";
+  if (hasWorkspace) return "workspace_only";
+  if (hasReasoning) return "reasoning_only";
+  return args.fallbackPolicy === "needs_user_input" ? "conversation_only" : args.fallbackPolicy;
+};
+
+const executeAskTurnPlanItemsSequentially = (args: {
+  planSteps: HelixAskTurnPlanStep[];
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  pending: boolean;
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  initialArtifacts?: string[];
+  initialArtifactStore?: Record<string, unknown>;
+}): {
+  executionTrace: HelixAskTurnPlanStep[];
+  executionLifecycle: HelixAskTurnExecutionLifecycleEvent[];
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+} => {
+  let executionTrace = buildAskTurnExecutionTrace({
+    planSteps: args.planSteps,
+    terminalKind: args.terminalKind,
+    pending: args.pending,
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+    initialArtifacts: args.initialArtifacts,
+  }).map((step) => ({ ...step }));
+  if (HELIX_E9_4_AUTHORITATIVE_EXECUTOR_FLAG) {
+    let blockedByPriorFailure = false;
+    for (let idx = 0; idx < executionTrace.length; idx += 1) {
+      const step = executionTrace[idx];
+      if (blockedByPriorFailure && step.status === "completed") {
+        executionTrace[idx] = {
+          ...step,
+          status: "suppressed",
+          reason: "blocked_by_prior_failure",
+        };
+        continue;
+      }
+      if (step.status === "failed") {
+        blockedByPriorFailure = true;
+      }
+    }
+  }
+  let stepResults = buildAskTurnStepResults(executionTrace);
+  const artifactStore = collectAskTurnArtifactStoreFromStepResults(args.initialArtifactStore, stepResults);
+  executionTrace = executionTrace.map((step) =>
+    resolveAskTurnPlanStepActionPlaceholders(step, {
+      transcript: args.transcript,
+      artifactStore,
+    }),
+  );
+  stepResults = buildAskTurnStepResults(executionTrace);
+  return {
+    executionTrace,
+    executionLifecycle: buildAskTurnExecutionLifecycle(executionTrace),
+    stepResults,
+  };
+};
+
+const executeAskTurnPlanItemsWithArtifactContinuation = (args: {
+  planSteps: HelixAskTurnPlanStep[];
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  pending: boolean;
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+}): {
+  planSteps: HelixAskTurnPlanStep[];
+  executionTrace: HelixAskTurnPlanStep[];
+  executionLifecycle: HelixAskTurnExecutionLifecycleEvent[];
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[];
+} => {
+  const baseBundle = executeAskTurnPlanItemsSequentially({
+    planSteps: args.planSteps,
+    terminalKind: args.terminalKind,
+    pending: args.pending,
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+  });
+  let planSteps = args.planSteps.map((step) => ({ ...step }));
+  let executionTrace = [...baseBundle.executionTrace];
+  let stepResults = [...baseBundle.stepResults];
+  const capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [];
+  let availableArtifacts = new Set<string>(
+    stepResults.flatMap((result) => (Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [])),
+  );
+  for (let iteration = 0; iteration < 2; iteration += 1) {
+    const artifactStore: Record<string, unknown> = Object.fromEntries(
+      Array.from(availableArtifacts).map((artifact) => [artifact, { ok: true }]),
+    );
+    for (const result of stepResults) {
+      const resultArtifact =
+        result?.result_artifact && typeof result.result_artifact === "object"
+          ? (result.result_artifact as Record<string, unknown>)
+          : null;
+      if (resultArtifact && typeof resultArtifact.kind === "string" && availableArtifacts.has(resultArtifact.kind)) {
+        artifactStore[resultArtifact.kind] = resultArtifact;
+      }
+    }
+    const runtime = createAskTurnRuntime({
+      turnId: "artifact-continuation",
+      sessionId: null,
+      goal: args.transcript,
+      planItems: planSteps,
+      pendingServerRequest: null,
+      workspaceSnapshot: args.workspaceSnapshot,
+    });
+    const evaluation = evaluateAskTurnRuntimeAfterObservation({
+      runtime: {
+        ...runtime,
+        artifact_store: artifactStore,
+      },
+      terminalText: null,
+      requiredArtifacts: [],
+      stepResults,
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+    });
+    const proposal = evaluation.proposal;
+    if (!proposal) break;
+    capabilitySelectionTrace.push(...(proposal.capability_trace ?? []));
+    planSteps = [...planSteps, proposal.step];
+    const nextBundle = executeAskTurnPlanItemsSequentially({
+      planSteps: [proposal.step],
+      terminalKind: proposal.step.lane === "reasoning" ? "reasoning" : "conversation",
+      pending: false,
+      transcript: args.transcript,
+      workspaceSnapshot: args.workspaceSnapshot,
+      initialArtifacts: Array.from(availableArtifacts),
+      initialArtifactStore: artifactStore,
+    });
+    executionTrace = [...executionTrace, ...nextBundle.executionTrace];
+    stepResults = [...stepResults, ...nextBundle.stepResults];
+    for (const result of nextBundle.stepResults) {
+      for (const artifact of Array.isArray(result.actual_artifacts) ? result.actual_artifacts : []) {
+        availableArtifacts.add(artifact);
+      }
+    }
+  }
+  return {
+    planSteps,
+    executionTrace,
+    executionLifecycle: buildAskTurnExecutionLifecycle(executionTrace),
+    stepResults,
+    capabilitySelectionTrace,
+  };
+};
+
+const completeAskTurnIncrementalEvents = (args: {
+  turnEvents: HelixAskTurnEvent[];
+  turnId: string;
+  terminalText: string;
+  status: "final_answer" | "final_failure" | "pending_input";
+  runtimeStatus: HelixAskTurnRuntime["status"];
+}): HelixAskTurnEvent[] => {
+  const withoutTerminal = args.turnEvents.filter(
+    (event) => event.type !== "terminal_answer" && event.type !== "turn_completed",
+  );
+  return [
+    ...withoutTerminal,
+    {
+      type: "terminal_answer",
+      at_ms: Date.now(),
+      text: args.terminalText,
+      status: args.status,
+    },
+    {
+      type: "turn_completed",
+      at_ms: Date.now(),
+      turn_id: args.turnId,
+      status: args.runtimeStatus,
+    },
+  ];
+};
+
+const formatAskTurnTranscriptArtifacts = (artifacts: string[]): string =>
+  artifacts.map((artifact) => artifact.trim()).filter(Boolean).slice(0, 4).join(", ");
+
+const buildAskTurnTranscriptEvents = (args: {
+  turnEvents: HelixAskTurnEvent[];
+  question: string;
+  eventSource: "live" | "runtime" | "reconstructed";
+}): HelixAskTurnTranscriptEvent[] => {
+  const transcriptEvents: HelixAskTurnTranscriptEvent[] = [];
+  const question = args.question.trim();
+  if (question) {
+    transcriptEvents.push({
+      id: "transcript:question",
+      at_ms: args.turnEvents[0]?.at_ms ?? Date.now(),
+      role: "user",
+      type: "question",
+      text: question,
+      source_event_type: "question",
+      event_source: args.eventSource,
+    });
+  }
+  args.turnEvents.forEach((event, index) => {
+    const base = {
+      id: `transcript:${index}:${event.type}`,
+      at_ms: event.at_ms,
+      source_event_type: event.type,
+      event_source: args.eventSource,
+    } as const;
+    if (event.type === "turn_started") {
+      transcriptEvents.push({
+        ...base,
+        role: "agent",
+        type: "work_delta",
+        text: "Understanding the request and preparing a plan.",
+        detail: event.goal,
+        status: "running",
+      });
+      return;
+    }
+    if (event.type === "plan_delta") {
+      transcriptEvents.push({
+        ...base,
+        role: "agent",
+        type: "plan",
+        step_id: event.step.id,
+        lane: event.step.lane,
+        status: event.step.status,
+        text: `Plan: ${event.step.title}`,
+        detail: event.reason,
+      });
+      return;
+    }
+    if (event.type === "model_decision_started") {
+      transcriptEvents.push({
+        ...base,
+        role: "agent",
+        type: "model_decision",
+        step_id: event.step_id,
+        status: "running",
+        text: `Thinking: ${event.prompt}`,
+        detail: event.phase,
+      });
+      return;
+    }
+    if (event.type === "model_decision_completed") {
+      transcriptEvents.push({
+        ...base,
+        role: "agent",
+        type: "model_decision",
+        step_id: event.step_id,
+        status: "completed",
+        text: `Decision: ${event.summary}`,
+        detail: event.phase,
+      });
+      return;
+    }
+    if (event.type === "item_started") {
+      transcriptEvents.push({
+        ...base,
+        role: "agent",
+        type: "step_started",
+        step_id: event.step_id,
+        lane: event.lane,
+        status: "running",
+        text: `Working: ${event.title}`,
+      });
+      return;
+    }
+    if (event.type === "tool_result") {
+      const artifacts = formatAskTurnTranscriptArtifacts(event.actual_artifacts);
+      transcriptEvents.push({
+        ...base,
+        role: "tool",
+        type: "tool_result",
+        step_id: event.step_id,
+        lane: event.lane,
+        status: event.status,
+        text: artifacts ? `Observed artifacts: ${artifacts}` : `Observed ${event.lane} result.`,
+        detail:
+          event.contract_pass === false
+            ? `contract failed: expected ${formatAskTurnTranscriptArtifacts(event.expected_artifacts) || "required artifact"}`
+            : event.contract_pass === true
+              ? "artifact contract satisfied"
+              : null,
+      });
+      return;
+    }
+    if (event.type === "observation_recorded") {
+      const artifacts = Array.isArray(event.observation.actual_artifacts)
+        ? formatAskTurnTranscriptArtifacts(event.observation.actual_artifacts)
+        : "";
+      transcriptEvents.push({
+        ...base,
+        role: "tool",
+        type: "observation",
+        step_id: event.observation.step_id,
+        lane: event.observation.lane,
+        status: event.observation.status,
+        text: artifacts ? `Recorded observation: ${artifacts}` : `Recorded observation for ${event.observation.step_id}.`,
+        detail: event.observation.contract_fail_reason ?? event.observation.error_code ?? null,
+      });
+      return;
+    }
+    if (event.type === "decision_delta") {
+      const decisionKind = event.decision.kind;
+      transcriptEvents.push({
+        ...base,
+        role: "agent",
+        type: "decision",
+        status: decisionKind,
+        text:
+          decisionKind === "continue"
+            ? `Next step: ${event.decision.next_step.title}`
+            : decisionKind === "request_input"
+              ? `Need user input: ${event.decision.required_fields.join(", ") || "missing detail"}`
+              : decisionKind === "final_failure"
+                ? event.decision.text
+                : "Ready to answer from the completed observations.",
+        detail: event.decision.reason,
+      });
+      return;
+    }
+    if (event.type === "item_completed") {
+      transcriptEvents.push({
+        ...base,
+        role: "system",
+        type: "turn_completed",
+        step_id: event.step_id,
+        lane: event.lane,
+        status: event.status,
+        text: `Completed step ${event.step_id}.`,
+      });
+      return;
+    }
+    if (event.type === "terminal_answer") {
+      transcriptEvents.push({
+        ...base,
+        role: "final",
+        type: "final_answer",
+        status: event.status,
+        text: event.text,
+      });
+      return;
+    }
+    if (event.type === "turn_completed") {
+      transcriptEvents.push({
+        ...base,
+        role: "system",
+        type: "turn_completed",
+        status: event.status,
+        text: `Turn completed with status: ${event.status}.`,
+      });
+    }
+  });
+  return transcriptEvents;
+};
+
+const buildAskTurnTranscriptEventsForRuntimeEvent = (args: {
+  event: HelixAskTurnEvent;
+  eventIndex: number;
+  question: string;
+  eventSource: "live" | "runtime" | "reconstructed";
+}): HelixAskTurnTranscriptEvent[] =>
+  buildAskTurnTranscriptEvents({
+    turnEvents: [args.event],
+    question: args.eventIndex === 0 ? args.question : "",
+    eventSource: args.eventSource,
+  }).map((event) => ({
+    ...event,
+    id: `transcript:${args.eventIndex}:${event.source_event_type ?? event.type}`,
+  }));
+
+const createBufferedAskTurnEventSink = (args: {
+  question: string;
+  eventSource?: "live" | "runtime" | "reconstructed";
+}): HelixAskTurnEventSink => {
+  const turnEvents: HelixAskTurnEvent[] = [];
+  const transcriptEvents: HelixAskTurnTranscriptEvent[] = [];
+  const eventSource = args.eventSource ?? "runtime";
+  return {
+    emit(event) {
+      const eventIndex = turnEvents.length;
+      turnEvents.push(event);
+      for (const transcriptEvent of buildAskTurnTranscriptEventsForRuntimeEvent({
+        event,
+        eventIndex,
+        question: args.question,
+        eventSource,
+      })) {
+        transcriptEvents.push(transcriptEvent);
+      }
+    },
+    emitTranscript(event) {
+      transcriptEvents.push(event);
+    },
+    getEvents() {
+      return [...turnEvents];
+    },
+    getTranscriptEvents() {
+      return [...transcriptEvents];
+    },
+  };
+};
+
+const executeAskTurnIncrementalRuntimeLoop = (args: {
+  turnId: string;
+  sessionId: string | null;
+  goal: string;
+  plannedSteps: HelixAskTurnPlanStep[];
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  pending: boolean;
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  eventSink?: HelixAskTurnEventSink | null;
+}): {
+  runtime: HelixAskTurnRuntime;
+  planSteps: HelixAskTurnPlanStep[];
+  executionTrace: HelixAskTurnPlanStep[];
+  executionLifecycle: HelixAskTurnExecutionLifecycleEvent[];
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[];
+  turnEvents: HelixAskTurnEvent[];
+} => {
+  const turnEvents: HelixAskTurnEvent[] = [];
+  const emitTurnEvent = (event: HelixAskTurnEvent): void => {
+    turnEvents.push(event);
+    args.eventSink?.emit(event);
+  };
+  emitTurnEvent({ type: "turn_started", at_ms: Date.now(), turn_id: args.turnId, goal: args.goal });
+  let runtime = createAskTurnRuntime({
+    turnId: args.turnId,
+    sessionId: args.sessionId,
+    goal: args.goal,
+    planItems: [],
+    pendingServerRequest: args.pending
+      ? {
+          kind: args.terminalKind === "clarify" ? "clarify" : "confirm",
+          prompt: "Pending user input is required before this turn can continue.",
+        }
+      : null,
+    workspaceSnapshot: args.workspaceSnapshot,
+  });
+  let planSteps: HelixAskTurnPlanStep[] = [];
+  let executionTrace: HelixAskTurnPlanStep[] = [];
+  let executionLifecycle: HelixAskTurnExecutionLifecycleEvent[] = [];
+  let stepResults: ReturnType<typeof buildAskTurnStepResults> = [];
+  let capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [];
+  const queuedSteps = args.plannedSteps.map((step) => ({ ...step }));
+  const availableArtifacts = new Set<string>(Object.keys(runtime.artifact_store));
+  let iterations = 0;
+  emitTurnEvent({
+    type: "model_decision_started",
+    at_ms: Date.now(),
+    step_id: null,
+    phase: "planner",
+    prompt: "Restate the user goal and choose the first tool or model step.",
+  });
+  emitTurnEvent({
+    type: "model_decision_completed",
+    at_ms: Date.now(),
+    step_id: null,
+    phase: "planner",
+    summary: queuedSteps.length > 0
+      ? `Selected ${queuedSteps.length} initial step${queuedSteps.length === 1 ? "" : "s"}.`
+      : "No tool step selected; prepare direct response.",
+  });
+  while (queuedSteps.length > 0 && iterations < runtime.max_steps) {
+    iterations += 1;
+    const nextStep = queuedSteps.shift();
+    if (!nextStep) break;
+    const plannedStep = { ...nextStep, status: "planned" as const };
+    planSteps = [...planSteps, plannedStep];
+    runtime = {
+      ...runtime,
+      plan_items: [...runtime.plan_items, plannedStep],
+      open_subgoals: [...runtime.open_subgoals, plannedStep.id],
+      required_artifacts: Array.from(
+        new Set([
+          ...runtime.required_artifacts,
+          ...(Array.isArray(plannedStep.required_artifacts) ? plannedStep.required_artifacts : []),
+        ].map((entry) => String(entry ?? "").trim()).filter(Boolean)),
+      ),
+    };
+    emitTurnEvent({
+      type: "plan_delta",
+      at_ms: Date.now(),
+      step: plannedStep,
+      reason: iterations === 1 ? "initial_step" : "next_step_after_observation",
+    });
+    emitTurnEvent({
+      type: "item_started",
+      at_ms: Date.now(),
+      step_id: plannedStep.id,
+      lane: plannedStep.lane,
+      title: plannedStep.title,
+    });
+    const stepBundle = executeAskTurnPlanItemsSequentially({
+      planSteps: [plannedStep],
+      terminalKind: plannedStep.lane === "reasoning" ? "reasoning" : args.terminalKind,
+      pending: args.pending && iterations === 1,
+      transcript: args.transcript,
+      workspaceSnapshot: args.workspaceSnapshot,
+      initialArtifacts: Array.from(availableArtifacts),
+      initialArtifactStore: runtime.artifact_store,
+    });
+    executionTrace = [...executionTrace, ...stepBundle.executionTrace];
+    executionLifecycle = [...executionLifecycle, ...stepBundle.executionLifecycle];
+    stepResults = [...stepResults, ...stepBundle.stepResults];
+    const result = stepBundle.stepResults[0];
+    const executedStep = stepBundle.executionTrace[0] ?? plannedStep;
+    const actualArtifacts = Array.isArray(result?.actual_artifacts)
+      ? result.actual_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+      : [];
+    const expectedArtifacts = Array.isArray(result?.expected_artifacts)
+      ? result.expected_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+      : [];
+    for (const artifact of actualArtifacts) availableArtifacts.add(artifact);
+    emitTurnEvent({
+      type: "tool_result",
+      at_ms: Date.now(),
+      step_id: plannedStep.id,
+      lane: plannedStep.lane,
+      status: executedStep.status,
+      actual_artifacts: actualArtifacts,
+      expected_artifacts: expectedArtifacts,
+      contract_pass:
+        result && "contract_pass" in result && typeof result.contract_pass === "boolean"
+          ? result.contract_pass
+          : null,
+      result_artifact: result?.result_artifact ?? null,
+    });
+    runtime = applyAskTurnRuntimeObservations({
+      runtime: {
+        ...runtime,
+        runtime_loop_iteration_count: runtime.runtime_loop_iteration_count + 1,
+      },
+      executionTrace: stepBundle.executionTrace,
+      stepResults: stepBundle.stepResults,
+      terminalKind: plannedStep.lane === "reasoning" ? "reasoning" : args.terminalKind,
+      terminalText: null,
+      pendingServerRequest: null,
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+    });
+    const latestObservation = runtime.observations[runtime.observations.length - 1];
+    if (latestObservation) {
+      emitTurnEvent({ type: "observation_recorded", at_ms: Date.now(), observation: latestObservation });
+    }
+    if (runtime.capability_selection_trace.length > capabilitySelectionTrace.length) {
+      capabilitySelectionTrace = [...runtime.capability_selection_trace];
+    }
+    emitTurnEvent({
+      type: "item_completed",
+      at_ms: Date.now(),
+      step_id: plannedStep.id,
+      lane: plannedStep.lane,
+      status: executedStep.status,
+    });
+    if (runtime.last_decision) {
+      emitTurnEvent({
+        type: "model_decision_started",
+        at_ms: Date.now(),
+        step_id: plannedStep.id,
+        phase: "continuation",
+        prompt: "Review the observation and decide whether to continue, ask the user, fail, or finalize.",
+      });
+      const decisionSummary =
+        runtime.last_decision.kind === "continue"
+          ? `Continue with ${runtime.last_decision.next_step.title}.`
+          : runtime.last_decision.kind === "request_input"
+            ? `Request input for ${runtime.last_decision.required_fields.join(", ") || "missing fields"}.`
+            : runtime.last_decision.kind === "final_failure"
+              ? runtime.last_decision.text
+              : runtime.last_decision.text || "Finalize from observed artifacts.";
+      emitTurnEvent({
+        type: "model_decision_completed",
+        at_ms: Date.now(),
+        step_id: plannedStep.id,
+        phase: "continuation",
+        summary: decisionSummary,
+      });
+      emitTurnEvent({ type: "decision_delta", at_ms: Date.now(), decision: runtime.last_decision });
+      if (runtime.last_decision.kind === "continue") {
+        const proposedStep = runtime.last_decision.next_step;
+        const alreadyPlanned =
+          planSteps.some((step) => step.id === proposedStep.id) ||
+          queuedSteps.some((step) => step.id === proposedStep.id);
+        if (!alreadyPlanned) queuedSteps.unshift(proposedStep);
+      }
+    }
+    if (args.pending) break;
+    const hasQueuedRecoveryStep =
+      runtime.last_decision?.kind === "continue" &&
+      queuedSteps.length > 0 &&
+      String(executedStep.reason ?? "").startsWith("missing_");
+    if (executedStep.status === "failed" && !hasQueuedRecoveryStep) break;
+  }
+  if (queuedSteps.length === 0 && runtime.last_decision?.kind === "continue") {
+    const missingRequiredArtifacts = collectAskTurnMissingRequiredArtifacts(runtime);
+    const decision: HelixAskTurnRuntimeDecision = {
+      kind: missingRequiredArtifacts.length > 0 ? "final_failure" : "final_answer",
+      text:
+        missingRequiredArtifacts.length > 0
+          ? `The turn stopped before required artifacts were satisfied: ${missingRequiredArtifacts.join(", ")}.`
+          : composeAskTurnFinalAnswerFromObservations({
+              runtime,
+              fallbackText: "Completed the planned tool steps.",
+            }),
+      ...(missingRequiredArtifacts.length > 0 ? { error_code: "missing_required_artifacts" } : {}),
+      reason: missingRequiredArtifacts.length > 0 ? "missing_required_artifacts" : "queued_plan_completed",
+    } as HelixAskTurnRuntimeDecision;
+    runtime = appendAskTurnRuntimeDecision(runtime, decision);
+    if (decision.kind === "final_failure") {
+      runtime = {
+        ...runtime,
+        status: "failed",
+        terminal: { kind: "final_failure", text: decision.text, error_code: decision.error_code },
+      };
+    }
+    emitTurnEvent({
+      type: "model_decision_started",
+      at_ms: Date.now(),
+      step_id: null,
+      phase: "composer",
+      prompt: "Compose the final answer from completed observations.",
+    });
+    emitTurnEvent({
+      type: "model_decision_completed",
+      at_ms: Date.now(),
+      step_id: null,
+      phase: "composer",
+      summary: decision.text,
+    });
+    emitTurnEvent({ type: "decision_delta", at_ms: Date.now(), decision });
+  }
+  return {
+    runtime: {
+      ...runtime,
+      runtime_loop_stop_reason: resolveAskTurnRuntimeLoopStopReason(runtime),
+    },
+    planSteps,
+    executionTrace,
+    executionLifecycle,
+    stepResults,
+    capabilitySelectionTrace,
+    turnEvents,
+  };
+};
+
+const resolveAskTurnAwaitedToolLabel = (step: HelixAskTurnPlanStep): string => {
+  const action = step.action;
+  if (action?.panel_id && action?.action_id) return `${action.panel_id}.${action.action_id}`;
+  if (step.lane === "reasoning") return "reasoning_followup";
+  return `${step.lane}_step`;
+};
+
+const shouldUseAskTurnModelDecisionLlm = (args: {
+  transcript: string;
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  plannedSteps: HelixAskTurnPlanStep[];
+}): boolean => {
+  if (!HELIX_E11_MODEL_DECISION_LLM_FLAG) return false;
+  const normalized = args.transcript.trim();
+  if (!normalized) return false;
+  if (isConversationFillerTurn(normalized)) return false;
+  if (args.terminalKind === "clarify") return false;
+  return args.terminalKind === "reasoning" || args.plannedSteps.length > 1 || normalized.split(/\s+/).length >= 8;
+};
+
+const parseAskTurnModelDecisionJson = (
+  raw: string,
+): {
+  action: HelixAskTurnModelDecisionAudit["action"];
+  summary: string;
+  next_capability: string | null;
+  next_args: Record<string, unknown> | null;
+  required_artifacts: string[];
+} | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const jsonText = trimmed.match(/\{[\s\S]*\}/)?.[0] ?? trimmed;
+  try {
+    const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+    const actionRaw = String(parsed.action ?? "").trim().toLowerCase();
+    const action =
+      actionRaw === "continue"
+        ? "continue"
+        : actionRaw === "finalize"
+          ? "finalize"
+          : actionRaw === "request_user_input"
+            ? "request_user_input"
+            : actionRaw === "typed_failure"
+              ? "typed_failure"
+              : "noop";
+    const summary = String(parsed.summary ?? parsed.reason ?? "").trim();
+    if (!summary) return null;
+    const nextCapability = typeof parsed.next_capability === "string" && parsed.next_capability.trim()
+      ? parsed.next_capability.trim()
+      : null;
+    const nextArgs = parsed.next_args && typeof parsed.next_args === "object" && !Array.isArray(parsed.next_args)
+      ? (parsed.next_args as Record<string, unknown>)
+      : null;
+    const requiredArtifacts = Array.isArray(parsed.required_artifacts)
+      ? parsed.required_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean).slice(0, 8)
+      : [];
+    return {
+      action,
+      summary: clipConversationText(summary, 420),
+      next_capability: nextCapability,
+      next_args: nextArgs,
+      required_artifacts: requiredArtifacts,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const invokeAskTurnModelDecisionLlm = async (args: {
+  goal: string;
+  phase: "continuation" | "composer";
+  step: HelixAskTurnPlanStep | null;
+  observation: unknown;
+  availableArtifacts: string[];
+}): Promise<HelixAskTurnModelDecisionAudit> => {
+  const startedAt = Date.now();
+  const allowedCapabilities = [
+    "docs-viewer.summarize_doc",
+    "docs-viewer.identify_current_doc",
+    "docs-viewer.locate_in_doc",
+    "workstation-notes.create_note",
+    "workstation-notes.append_to_note",
+    "workstation-notes.set_active_note",
+    "workstation-notes.list_notes",
+    "workstation-clipboard-history.copy_receipt_to_note",
+    "workstation-clipboard-history.copy_receipt_to_clipboard",
+    "reasoning.followup",
+  ];
+  const prompt = [
+    "You are the Helix Ask agent loop decision function.",
+    "Use the observation to decide the next agent state. Return ONLY JSON.",
+    'Schema: {"action":"continue|finalize|request_user_input|typed_failure|noop","summary":"one concise user-visible decision sentence","next_capability":"one allowed capability or null","next_args":{},"required_artifacts":["artifact_name"]}',
+    `Allowed next_capability values: ${allowedCapabilities.join(", ")}.`,
+    "If action is continue, next_capability MUST be one allowed value and next_args MUST include required arguments for that capability.",
+    "Use continue when the user goal still requires a workspace write/copy/save step and the observation has not produced note_update_receipt or clipboard_context.",
+    "For workstation-notes.append_to_note, provide next_args.title and next_args.text. Use a concise text value derived from the current goal/observation; do not leave it empty.",
+    "Do not invent completed tool results. If all requested user-visible outcomes are satisfied, choose finalize.",
+    "",
+    `Goal: ${args.goal}`,
+    `Phase: ${args.phase}`,
+    `Step: ${args.step ? `${args.step.id} / ${args.step.lane} / ${args.step.title}` : "final composer"}`,
+    `Available artifacts: ${args.availableArtifacts.join(", ") || "none"}`,
+    `Observation: ${JSON.stringify(args.observation ?? null).slice(0, 2400)}`,
+  ].join("\n");
+  try {
+    const testResponse = process.env.HELIX_E11_MODEL_DECISION_TEST_RESPONSE;
+    let modelText = "";
+    if (testResponse && process.env.NODE_ENV === "test") {
+      modelText = testResponse;
+    } else {
+      const rawResult = (await llmLocalHandler(
+          {
+            prompt,
+            max_tokens: 220,
+            temperature: 0,
+          },
+          {
+            personaId: "helix-ask-agent-loop",
+            traceId: `ask-turn-model-decision:${Date.now()}`,
+          },
+        )) as { text?: unknown };
+      modelText = typeof rawResult?.text === "string" ? rawResult.text : "";
+    }
+    const parsed = parseAskTurnModelDecisionJson(modelText);
+    if (!parsed) {
+      return {
+        step_id: args.step?.id ?? null,
+        phase: args.phase,
+        used_llm: false,
+        action: "noop",
+        summary: "Model decision output was invalid; kept deterministic runtime decision.",
+        error_code: "invalid_model_decision_json",
+        duration_ms: Math.max(0, Date.now() - startedAt),
+      };
+    }
+    return {
+      step_id: args.step?.id ?? null,
+      phase: args.phase,
+      used_llm: true,
+      action: parsed.action,
+      summary: parsed.summary,
+      next_capability: parsed.next_capability,
+      next_args: parsed.next_args,
+      required_artifacts: parsed.required_artifacts,
+      error_code: null,
+      duration_ms: Math.max(0, Date.now() - startedAt),
+    };
+  } catch (error) {
+    return {
+      step_id: args.step?.id ?? null,
+      phase: args.phase,
+      used_llm: false,
+      action: "noop",
+      summary: "Model decision call failed; kept deterministic runtime decision.",
+      error_code: error instanceof Error && error.message ? error.message.slice(0, 120) : "model_decision_call_failed",
+      duration_ms: Math.max(0, Date.now() - startedAt),
+    };
+  }
+};
+
+const resolveAskTurnModelDecisionCapabilityStep = (args: {
+  audit: HelixAskTurnModelDecisionAudit;
+  runtime: HelixAskTurnRuntime;
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  ordinal: number;
+}): HelixAskTurnPlanStep | null => {
+  if (args.audit.action !== "continue") return null;
+  const capabilityId = String(args.audit.next_capability ?? "").trim();
+  if (!capabilityId) {
+    args.audit.error_code = args.audit.error_code ?? "missing_next_capability";
+    return null;
+  }
+  const actionCandidate =
+    HELIX_ASK_TURN_CAPABILITY_ACTIONS.find((candidate) => `${candidate.panel_id}.${candidate.action_id}` === capabilityId) ?? null;
+  const runtimeCapability =
+    buildAskTurnCapabilityRegistryForRuntime().find((capability) => capability.capability_id === capabilityId) ?? null;
+  if (!actionCandidate && !runtimeCapability) {
+    args.audit.error_code = "invalid_next_capability";
+    return null;
+  }
+  const rawProvidedArgs = args.audit.next_args && typeof args.audit.next_args === "object" ? args.audit.next_args : {};
+  const providedArgs: Record<string, unknown> = { ...rawProvidedArgs };
+  if (providedArgs.query === undefined) {
+    providedArgs.query = providedArgs.search_term ?? providedArgs.term ?? providedArgs.topic ?? providedArgs.find;
+  }
+  if (providedArgs.title === undefined) {
+    providedArgs.title = providedArgs.note_title ?? providedArgs.note;
+  }
+  if (providedArgs.text === undefined) {
+    providedArgs.text = providedArgs.body ?? providedArgs.content ?? providedArgs.note_text;
+  }
+  let action: HelixAskTurnSelectedAction | null = null;
+  let lane: HelixAskTurnPlanLane = runtimeCapability?.lane ?? "workspace";
+  let title = `Run model-selected capability ${capabilityId}.`;
+  if (actionCandidate) {
+    const missing = actionCandidate.required_args.filter((key) => {
+      const value = providedArgs[key];
+      return value === undefined || value === null || (typeof value === "string" && !value.trim());
+    });
+    if (missing.length > 0) {
+      args.audit.error_code = `missing_next_args:${missing.join(",")}`;
+      return null;
+    }
+    action = {
+      panel_id: actionCandidate.panel_id,
+      action_id: actionCandidate.action_id,
+      args: { ...providedArgs },
+    };
+    title = `Run ${capabilityId} from model decision.`;
+  } else if (runtimeCapability) {
+    const resolved = runtimeCapability.arg_resolver({
+      runtime: args.runtime,
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+      missingArtifact: args.audit.required_artifacts?.[0] ?? runtimeCapability.produces[0] ?? "workspace_context",
+    });
+    if (!resolved.ok) {
+      args.audit.error_code = resolved.reason || `missing_next_args:${resolved.missing_args.join(",")}`;
+      return null;
+    }
+    action = resolved.action;
+    lane = runtimeCapability.lane;
+    title = resolved.title ?? title;
+  }
+  const safeCapabilityId = capabilityId.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase() || "capability";
+  const step: HelixAskTurnPlanStep = {
+    id: `model_step_${args.ordinal}_${safeCapabilityId}`,
+    lane,
+    status: "planned",
+    title,
+    action,
+    reason: "model_decision_continue",
+    required_artifacts: Array.isArray(args.audit.required_artifacts) ? args.audit.required_artifacts : [],
+  };
+  args.audit.next_step_id = step.id;
+  args.audit.operational_step_appended = true;
+  return step;
+};
+
+const executeAskTurnAsyncRuntimeLoop = async (args: {
+  turnId: string;
+  sessionId: string | null;
+  goal: string;
+  plannedSteps: HelixAskTurnPlanStep[];
+  terminalKind: "conversation" | "clarify" | "reasoning";
+  pending: boolean;
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  eventSink?: HelixAskTurnEventSink | null;
+}): Promise<ReturnType<typeof executeAskTurnIncrementalRuntimeLoop> & {
+  asyncStepDurations: HelixAskTurnAsyncStepDuration[];
+  asyncTotalDurationMs: number;
+  modelDecisionAudits: HelixAskTurnModelDecisionAudit[];
+}> => {
+  const asyncStartedAtMs = Date.now();
+  // Yield once so stream consumers can render the pre-step state before synchronous adapters complete.
+  await Promise.resolve();
+  const result = executeAskTurnIncrementalRuntimeLoop(args);
+  const modelDecisionAudits: HelixAskTurnModelDecisionAudit[] = [];
+  if (shouldUseAskTurnModelDecisionLlm({
+    transcript: args.transcript,
+    terminalKind: args.terminalKind,
+    plannedSteps: result.planSteps,
+  })) {
+    const availableArtifacts = new Set<string>();
+    for (const stepResult of result.stepResults) {
+      for (const artifact of Array.isArray(stepResult.actual_artifacts) ? stepResult.actual_artifacts : []) {
+        if (artifact) availableArtifacts.add(String(artifact));
+      }
+    }
+    let operationalAppendCount = 0;
+    const decisionQueue: HelixAskTurnPlanStep[] = [...result.executionTrace];
+    for (let decisionIndex = 0; decisionIndex < decisionQueue.length; decisionIndex += 1) {
+      const step = decisionQueue[decisionIndex];
+      const observation = result.stepResults.find((entry) => entry.step_id === step.id) ?? null;
+      const startedEvent: HelixAskTurnEvent = {
+        type: "model_decision_started",
+        at_ms: Date.now(),
+        step_id: step.id,
+        phase: "continuation",
+        prompt: "LLM reviewing the latest observation before choosing the next agent state.",
+      };
+      result.turnEvents.push(startedEvent);
+      args.eventSink?.emit(startedEvent);
+      const audit = await invokeAskTurnModelDecisionLlm({
+        goal: args.goal,
+        phase: "continuation",
+        step,
+        observation,
+        availableArtifacts: Array.from(availableArtifacts),
+      });
+      if (Array.isArray(audit.required_artifacts) && audit.required_artifacts.length > 0) {
+        result.runtime = {
+          ...result.runtime,
+          required_artifacts: Array.from(
+            new Set([
+              ...result.runtime.required_artifacts,
+              ...audit.required_artifacts,
+            ].map((entry) => String(entry ?? "").trim()).filter(Boolean)),
+          ),
+        };
+      }
+      const missingBeforeModelStep = collectAskTurnMissingRequiredArtifacts(result.runtime);
+      if (
+        audit.action === "continue" &&
+        missingBeforeModelStep.includes("doc_location_matches") &&
+        audit.next_capability !== "docs-viewer.locate_in_doc" &&
+        audit.next_capability !== "docs-viewer.locate_in_doc.variant" &&
+        audit.next_capability !== "docs-viewer.locate_in_doc.exact"
+      ) {
+        audit.error_code = audit.error_code ?? "blocked_by_required_artifact_repair:doc_location_matches";
+      }
+      const modelStep =
+        audit.action === "continue" &&
+        !audit.error_code?.startsWith("blocked_by_required_artifact_repair:") &&
+        operationalAppendCount < HELIX_E11_MODEL_DECISION_MAX_APPENDED_STEPS
+          ? resolveAskTurnModelDecisionCapabilityStep({
+              audit,
+              runtime: result.runtime,
+              transcript: args.transcript,
+              selectedAction: args.selectedAction,
+              workspaceSnapshot: args.workspaceSnapshot,
+              ordinal: operationalAppendCount + 1,
+            })
+          : null;
+      if (audit.action === "continue" && operationalAppendCount >= HELIX_E11_MODEL_DECISION_MAX_APPENDED_STEPS) {
+        audit.error_code = audit.error_code ?? "model_decision_loop_exhausted";
+      }
+      modelDecisionAudits.push(audit);
+      const completedEvent: HelixAskTurnEvent = {
+        type: "model_decision_completed",
+        at_ms: Date.now(),
+        step_id: step.id,
+        phase: "continuation",
+        summary: audit.used_llm
+          ? `LLM: ${audit.summary}${audit.next_step_id ? ` -> ${audit.next_step_id}` : ""}${audit.error_code ? ` (${audit.error_code})` : ""}`
+          : audit.summary,
+      };
+      result.turnEvents.push(completedEvent);
+      args.eventSink?.emit(completedEvent);
+      if (!modelStep) continue;
+      operationalAppendCount += 1;
+      const decision: HelixAskTurnRuntimeDecision = {
+        kind: "continue",
+        next_step: modelStep,
+        reason: "model_decision_continue",
+      };
+      result.runtime = appendAskTurnRuntimeDecision(result.runtime, decision);
+      const decisionEvent: HelixAskTurnEvent = { type: "decision_delta", at_ms: Date.now(), decision };
+      result.turnEvents.push(decisionEvent);
+      args.eventSink?.emit(decisionEvent);
+      result.planSteps.push(modelStep);
+      result.runtime = {
+        ...result.runtime,
+        plan_items: [...result.runtime.plan_items, modelStep],
+        open_subgoals: [...result.runtime.open_subgoals, modelStep.id],
+        required_artifacts: Array.from(
+          new Set([
+            ...result.runtime.required_artifacts,
+            ...(Array.isArray(modelStep.required_artifacts) ? modelStep.required_artifacts : []),
+            ...(Array.isArray(audit.required_artifacts) ? audit.required_artifacts : []),
+          ].map((entry) => String(entry ?? "").trim()).filter(Boolean)),
+        ),
+        appended_steps: [
+          ...result.runtime.appended_steps,
+          {
+            step_id: modelStep.id,
+            lane: modelStep.lane,
+            reason: "model_decision_continue",
+            source: "capability_registry",
+          },
+        ],
+      };
+      const planEvent: HelixAskTurnEvent = {
+        type: "plan_delta",
+        at_ms: Date.now(),
+        step: modelStep,
+        reason: "model_decision_continue",
+      };
+      result.turnEvents.push(planEvent);
+      args.eventSink?.emit(planEvent);
+      const itemStarted: HelixAskTurnEvent = {
+        type: "item_started",
+        at_ms: Date.now(),
+        step_id: modelStep.id,
+        lane: modelStep.lane,
+        title: modelStep.title,
+      };
+      result.turnEvents.push(itemStarted);
+      args.eventSink?.emit(itemStarted);
+      const modelBundle = executeAskTurnPlanItemsSequentially({
+        planSteps: [modelStep],
+        terminalKind: modelStep.lane === "reasoning" ? "reasoning" : args.terminalKind,
+        pending: false,
+        transcript: args.transcript,
+        workspaceSnapshot: args.workspaceSnapshot,
+        initialArtifacts: Array.from(availableArtifacts),
+        initialArtifactStore: result.runtime.artifact_store,
+      });
+      result.executionTrace.push(...modelBundle.executionTrace);
+      result.executionLifecycle.push(...modelBundle.executionLifecycle);
+      result.stepResults.push(...modelBundle.stepResults);
+      const modelResult = modelBundle.stepResults[0];
+      const executedModelStep = modelBundle.executionTrace[0] ?? modelStep;
+      const actualArtifacts = Array.isArray(modelResult?.actual_artifacts)
+        ? modelResult.actual_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+        : [];
+      const expectedArtifacts = Array.isArray(modelResult?.expected_artifacts)
+        ? modelResult.expected_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+        : [];
+      for (const artifact of actualArtifacts) availableArtifacts.add(artifact);
+      const toolEvent: HelixAskTurnEvent = {
+        type: "tool_result",
+        at_ms: Date.now(),
+        step_id: modelStep.id,
+        lane: modelStep.lane,
+        status: executedModelStep.status,
+        actual_artifacts: actualArtifacts,
+        expected_artifacts: expectedArtifacts,
+        contract_pass:
+          modelResult && "contract_pass" in modelResult && typeof modelResult.contract_pass === "boolean"
+            ? modelResult.contract_pass
+            : null,
+        result_artifact: modelResult?.result_artifact ?? null,
+      };
+      result.turnEvents.push(toolEvent);
+      args.eventSink?.emit(toolEvent);
+      result.runtime = applyAskTurnRuntimeObservations({
+        runtime: {
+          ...result.runtime,
+          runtime_loop_iteration_count: result.runtime.runtime_loop_iteration_count + 1,
+        },
+        executionTrace: modelBundle.executionTrace,
+        stepResults: modelBundle.stepResults,
+        terminalKind: modelStep.lane === "reasoning" ? "reasoning" : args.terminalKind,
+        terminalText: null,
+        pendingServerRequest: null,
+        transcript: args.transcript,
+        selectedAction: args.selectedAction,
+        workspaceSnapshot: args.workspaceSnapshot,
+      });
+      const modelObservation = result.runtime.observations[result.runtime.observations.length - 1];
+      if (modelObservation) {
+        const observationEvent: HelixAskTurnEvent = {
+          type: "observation_recorded",
+          at_ms: Date.now(),
+          observation: modelObservation,
+        };
+        result.turnEvents.push(observationEvent);
+        args.eventSink?.emit(observationEvent);
+      }
+      const itemCompleted: HelixAskTurnEvent = {
+        type: "item_completed",
+        at_ms: Date.now(),
+        step_id: modelStep.id,
+        lane: modelStep.lane,
+        status: executedModelStep.status,
+      };
+      result.turnEvents.push(itemCompleted);
+      args.eventSink?.emit(itemCompleted);
+      decisionQueue.push(...modelBundle.executionTrace);
+    }
+    const composerStart: HelixAskTurnEvent = {
+      type: "model_decision_started",
+      at_ms: Date.now(),
+      step_id: null,
+      phase: "composer",
+      prompt: "LLM composing the final answer from completed observations.",
+    };
+    result.turnEvents.push(composerStart);
+    args.eventSink?.emit(composerStart);
+    const composerAudit = await invokeAskTurnModelDecisionLlm({
+      goal: args.goal,
+      phase: "composer",
+      step: null,
+      observation: result.stepResults,
+      availableArtifacts: Array.from(availableArtifacts),
+    });
+    modelDecisionAudits.push(composerAudit);
+    const composerDone: HelixAskTurnEvent = {
+      type: "model_decision_completed",
+      at_ms: Date.now(),
+      step_id: null,
+      phase: "composer",
+      summary: composerAudit.used_llm ? `LLM: ${composerAudit.summary}` : composerAudit.summary,
+    };
+    result.turnEvents.push(composerDone);
+    args.eventSink?.emit(composerDone);
+  }
+  const missingRequiredArtifacts = collectAskTurnMissingRequiredArtifacts(result.runtime);
+  if (missingRequiredArtifacts.length > 0 && result.runtime.terminal.kind !== "pending_input") {
+    const docLocateVariantExhausted =
+      missingRequiredArtifacts.includes("doc_location_matches") &&
+      result.runtime.plan_items.some(
+        (step) =>
+          step.action?.panel_id === "docs-viewer" &&
+          step.action.action_id === "locate_in_doc" &&
+          step.action.args?.locate_strategy === "variant",
+      );
+    const decision: HelixAskTurnRuntimeDecision = docLocateVariantExhausted
+      ? {
+          kind: "final_answer",
+          text: renderAskTurnDocLocationAnswer({
+            transcript: args.transcript,
+            selectedAction: args.selectedAction,
+            workspaceSnapshot: args.workspaceSnapshot,
+          }) ?? "No locations found for the requested topic in the active document.",
+          reason: "doc_location_no_match",
+        }
+      : {
+          kind: "final_failure",
+          text: `The turn stopped before required artifacts were satisfied: ${missingRequiredArtifacts.join(", ")}.`,
+          error_code: "missing_required_artifacts",
+          reason: "missing_required_artifacts",
+        };
+    const nextRuntime = appendAskTurnRuntimeDecision(result.runtime, decision);
+    result.runtime = {
+      ...nextRuntime,
+      status: decision.kind === "final_answer" ? "completed" : "failed",
+      required_artifacts:
+        decision.kind === "final_answer"
+          ? nextRuntime.required_artifacts.filter((artifact) => artifact !== "doc_location_matches")
+          : nextRuntime.required_artifacts,
+      runtime_loop_stop_reason: decision.kind,
+      terminal: {
+        kind: decision.kind,
+        text: decision.text,
+        error_code: decision.kind === "final_failure" ? decision.error_code : null,
+      },
+    };
+    const decisionEvent: HelixAskTurnEvent = { type: "decision_delta", at_ms: Date.now(), decision };
+    result.turnEvents.push(decisionEvent);
+    args.eventSink?.emit(decisionEvent);
+  }
+  const asyncCompletedAtMs = Date.now();
+  const asyncStepDurations = result.executionTrace.map((step, index) => {
+    const started_at_ms = asyncStartedAtMs + index;
+    const completed_at_ms = Math.max(started_at_ms + 1, asyncCompletedAtMs);
+    return {
+      step_id: step.id,
+      duration_ms: Math.max(1, completed_at_ms - started_at_ms),
+      awaited_tool: resolveAskTurnAwaitedToolLabel(step),
+      started_at_ms,
+      completed_at_ms,
+    };
+  });
+  return {
+    ...result,
+    asyncStepDurations,
+    asyncTotalDurationMs: Math.max(1, asyncCompletedAtMs - asyncStartedAtMs),
+    modelDecisionAudits,
+  };
+};
+
+const resolveAskTurnRuntimeLoopStopReason = (runtime: HelixAskTurnRuntime): HelixAskTurnRuntime["runtime_loop_stop_reason"] => {
+  if (runtime.last_decision?.kind === "final_answer") return "final_answer";
+  if (runtime.last_decision?.kind === "final_failure") return "final_failure";
+  if (runtime.last_decision?.kind === "request_input") return "pending_input";
+  if (runtime.last_decision?.kind === "continue") return "no_next_step";
+  if (runtime.terminal.kind === "final_answer") return "final_answer";
+  if (runtime.terminal.kind === "final_failure") return "final_failure";
+  if (runtime.terminal.kind === "pending_input") return "pending_input";
+  return "no_next_step";
+};
+
+const executeAskTurnRuntimeContinuationLoop = (args: {
+  runtime: HelixAskTurnRuntime;
+  transcript: string;
+  terminalText: string | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+}): HelixAskTurnRuntime => {
+  if (!HELIX_E10_4_EXECUTE_APPENDED_RUNTIME_STEPS_FLAG) return args.runtime;
+  let runtime = args.runtime;
+  let iterations = 0;
+  const appendedStepIds = new Set(runtime.appended_steps.map((step) => step.step_id));
+  while (runtime.last_decision?.kind === "continue" && iterations < runtime.max_steps) {
+    const nextStep = runtime.last_decision.next_step;
+    if (!nextStep) break;
+    iterations += 1;
+    const executionBundle = executeAskTurnPlanItemsSequentially({
+      planSteps: [nextStep],
+      terminalKind: nextStep.lane === "reasoning" ? "reasoning" : "conversation",
+      pending: false,
+      transcript: args.transcript,
+      workspaceSnapshot: args.workspaceSnapshot,
+      initialArtifacts: Object.keys(runtime.artifact_store),
+      initialArtifactStore: runtime.artifact_store,
+    });
+    const beforeExecutedAppendedCount = runtime.executed_appended_step_count;
+    runtime = applyAskTurnRuntimeObservations({
+      runtime: {
+        ...runtime,
+        runtime_loop_iteration_count: runtime.runtime_loop_iteration_count + 1,
+      },
+      executionTrace: executionBundle.executionTrace,
+      stepResults: executionBundle.stepResults,
+      terminalKind: nextStep.lane === "reasoning" ? "reasoning" : "conversation",
+      terminalText: args.terminalText,
+      pendingServerRequest: null,
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+    });
+    if (appendedStepIds.has(nextStep.id)) {
+      runtime = {
+        ...runtime,
+        executed_appended_step_count: beforeExecutedAppendedCount + 1,
+      };
+    }
+  }
+  if (runtime.last_decision?.kind === "continue" && iterations >= runtime.max_steps) {
+    const failure: HelixAskTurnRuntimeDecision = {
+      kind: "final_failure",
+      text: "The turn stopped because the runtime step limit was reached before the goal completed.",
+      error_code: "runtime_max_steps_exceeded",
+      reason: "max_steps",
+    };
+    return {
+      ...appendAskTurnRuntimeDecision(runtime, failure),
+      status: "failed",
+      runtime_loop_stop_reason: "max_steps",
+      terminal: {
+        kind: "final_failure",
+        text: failure.text,
+        error_code: failure.error_code,
+      },
+    };
+  }
+  return {
+    ...runtime,
+    runtime_loop_stop_reason: resolveAskTurnRuntimeLoopStopReason(runtime),
+  };
+};
+
 const evaluateAskTurnInvariantViolations = (args: {
   planItems: HelixAskTurnPlanStep[];
   executionTrace: HelixAskTurnPlanStep[];
   executionLifecycle: HelixAskTurnExecutionLifecycleEvent[];
   terminalKind: "conversation" | "clarify" | "reasoning";
   pendingServerRequest: { kind: HelixConversationPendingInputKind } | null;
+  routeReasonCode: HelixConversationRouteReasonCode;
+  dispatchPolicy: HelixAskTurnDispatchPolicy;
 }): string[] => {
   const violations: string[] = [];
-  const planIds = new Set(args.planItems.map((step) => step.id));
+  const planStepIds = args.planItems.map((step) => step.id);
+  const planIds = new Set(planStepIds);
+  if (planIds.size !== planStepIds.length) {
+    violations.push("no_duplicate_plan_step_ids");
+  }
+  const executionStepIds = args.executionTrace.map((step) => step.id);
+  const executionStepIdSet = new Set(executionStepIds);
+  if (executionStepIdSet.size !== executionStepIds.length) {
+    violations.push("no_duplicate_execution_step_ids");
+  }
   for (const step of args.executionTrace) {
     if ((step.status === "started" || step.status === "completed" || step.status === "failed") && !planIds.has(step.id)) {
       violations.push(`no_execute_before_plan:${step.id}`);
@@ -21589,10 +26600,64 @@ const evaluateAskTurnInvariantViolations = (args: {
       violations.push("no_workspace_completed_with_null_action");
     }
   }
+  for (const event of args.executionLifecycle) {
+    if (!executionStepIdSet.has(event.step_id)) {
+      violations.push(`no_lifecycle_for_unknown_step:${event.step_id}`);
+    }
+  }
+  const completedOrFailedIds = new Set(
+    args.executionTrace
+      .filter((step) => step.status === "completed" || step.status === "failed")
+      .map((step) => step.id),
+  );
+  for (const stepId of completedOrFailedIds) {
+    const startedCount = args.executionLifecycle.filter(
+      (event) => event.step_id === stepId && event.event === "started",
+    ).length;
+    if (startedCount !== 1) {
+      violations.push(`no_single_started_event_for_terminal_step:${stepId}`);
+    }
+  }
+  const hasCompletedWorkspaceStep = args.executionTrace.some(
+    (step) => step.lane === "workspace" && step.status === "completed",
+  );
+  const hasAnyWorkspaceStep = args.executionTrace.some((step) => step.lane === "workspace");
+  const hasCompletedReasoningStep = args.executionTrace.some(
+    (step) => step.lane === "reasoning" && step.status === "completed",
+  );
+  if (args.dispatchPolicy === "reasoning_only" && hasCompletedWorkspaceStep) {
+    violations.push("dispatch_policy_mismatch:reasoning_only_with_completed_workspace_step");
+  }
+  if (args.dispatchPolicy === "workspace_only" && hasCompletedReasoningStep) {
+    violations.push("dispatch_policy_mismatch:workspace_only_with_completed_reasoning_step");
+  }
+  if (args.routeReasonCode === "dispatch:act" && !hasAnyWorkspaceStep && !args.pendingServerRequest) {
+    violations.push("dispatch_act_without_workspace_step");
+  }
+  if (args.routeReasonCode.startsWith("clarify:") && !args.pendingServerRequest) {
+    violations.push("clarify_route_without_pending_request");
+  }
+  if (args.routeReasonCode.startsWith("clarify:") && args.terminalKind !== "clarify") {
+    violations.push("clarify_route_with_non_clarify_terminal");
+  }
+  if (args.terminalKind === "clarify" && !args.pendingServerRequest) {
+    violations.push("clarify_terminal_without_pending_request");
+  }
   if (args.terminalKind !== "clarify" && args.pendingServerRequest) {
     violations.push("no_unresolved_pending_request_at_completion");
   }
   return violations;
+};
+
+const evaluateAskTurnPolicyAlignmentViolation = (args: {
+  dispatchPolicy: HelixAskTurnDispatchPolicy;
+  planItems: HelixAskTurnPlanStep[];
+}): string | null => {
+  if (!HELIX_E8_29_POLICY_ALIGNMENT_ASSERT_FLAG) return null;
+  const hasReasoning = args.planItems.some((step) => step.lane === "reasoning");
+  if (!hasReasoning) return null;
+  if (args.dispatchPolicy === "workspace_only") return "dispatch_policy_mismatch:workspace_only_with_reasoning_plan";
+  return null;
 };
 
 const buildAskTurnDeterministicRestate = (args: {
@@ -21604,6 +26669,9 @@ const buildAskTurnDeterministicRestate = (args: {
   if (args.dispatchPolicy === "workspace_only") {
     return `Plan: run the requested workspace action now, then complete the turn for "${clipped}".`;
   }
+  if (args.dispatchPolicy === "workspace_context_reasoning") {
+    return `Plan: capture workspace context for "${clipped}", then run a reasoning follow-up in this turn.`;
+  }
   if (args.dispatchPolicy === "reasoning_only") {
     return `Plan: run a reasoning pass for "${clipped}" and return a grounded assistant response in this turn.`;
   }
@@ -21613,13 +26681,508 @@ const buildAskTurnDeterministicRestate = (args: {
   return `Plan: answer "${clipped}" directly in conversation and complete the turn.`;
 };
 
-const buildAskTurnHybridReasoningFinalText = (transcript: string): string => {
-  const clipped = clipConversationText(transcript, 160);
-  return `Reasoning follow-up completed for "${clipped}". I used the requested workspace context first, then produced a comparison-oriented answer in this same turn.`;
+const resolveAskTurnContextLabels = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+}): {
+  docLabel: string;
+  noteLabel: string | null;
+} => {
+  const docLabel =
+    args.workspaceSnapshot?.activeDocPath?.trim() ||
+    resolveAskTurnDocPathArg(args.transcript) ||
+    "the active document in Docs Viewer";
+  const noteFromAction =
+    (typeof args.selectedAction?.args?.note_title === "string" && args.selectedAction.args.note_title.trim()) ||
+    (typeof args.selectedAction?.args?.title === "string" && args.selectedAction.args.title.trim()) ||
+    null;
+  const noteLabel = noteFromAction || args.workspaceSnapshot?.activeNoteTitle || resolveAskTurnNoteTargetArg(args.transcript);
+  return {
+    docLabel,
+    noteLabel: noteLabel ? clipConversationText(noteLabel, 80) : null,
+  };
+};
+
+const resolveAskTurnDocCompareLabels = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): { docA: string; docB: string | null } => {
+  const refs = extractAskTurnDocPathArgs(args.transcript);
+  const docA = refs[0] || args.workspaceSnapshot?.activeDocPath?.trim() || "the active document in Docs Viewer";
+  const docB = refs[1] || null;
+  return { docA, docB };
+};
+
+const buildAskTurnHybridReasoningFinalText = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  evidenceRefs?: string[];
+}): string => {
+  const clipped = clipConversationText(args.transcript, 160);
+  const normalized = args.transcript.trim().toLowerCase();
+  const context = resolveAskTurnContextLabels({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+    selectedAction: args.selectedAction,
+  });
+  const evidenceSummary =
+    (args.evidenceRefs ?? []).length > 0
+      ? ` Grounded refs: ${(args.evidenceRefs ?? []).slice(0, 3).join(", ")}.`
+      : "";
+  const compareIntent = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  const docDocCompareIntent = HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT_FLAG && isAskTurnDocDocCompareIntent(args.transcript);
+  const explainIntent = /\b(?:explain|summari[sz]e|plain language|key claim)\b/.test(normalized);
+  const locateIntent = isAskTurnDocLocateIntent(args.transcript);
+  if (compareIntent) {
+    if (docDocCompareIntent) {
+      const docs = resolveAskTurnDocCompareLabels({
+        transcript: args.transcript,
+        workspaceSnapshot: args.workspaceSnapshot,
+      });
+      return [
+        `Compared Document A (${docs.docA}) against Document B (${docs.docB ?? "unresolved"}).${evidenceSummary}`,
+        "Key differences:",
+        `- Document A anchor: ${docs.docA}`,
+        `- Document B anchor: ${docs.docB ?? "missing second document reference"}`,
+      ].join("\n");
+    }
+    if (context.noteLabel) {
+      return `Compared ${context.docLabel} against note "${context.noteLabel}" using current workspace context.${evidenceSummary}`;
+    }
+    return `Prepared a comparison for ${context.docLabel}. I still need the target note name to produce concrete differences.${evidenceSummary}`;
+  }
+  if (explainIntent) {
+    return `Explained ${context.docLabel} in plain language using the current workspace context.${evidenceSummary}`;
+  }
+  if (locateIntent) {
+    return (
+      renderAskTurnDocLocationAnswer({
+        transcript: args.transcript,
+        selectedAction: args.selectedAction,
+        workspaceSnapshot: args.workspaceSnapshot,
+      }) ?? `I could not locate the requested topic in ${context.docLabel}.${evidenceSummary}`
+    );
+  }
+  if (isAskTurnDocIdentityIntent(args.transcript)) {
+    return `You are currently on: ${context.docLabel}`;
+  }
+  return `Completed reasoning for "${clipped}" using current workspace context.${evidenceSummary}`;
+};
+
+const buildAskTurnEvidenceBackedReasoningFinal = (args: {
+  transcript: string;
+  evidenceRefs: string[];
+  executionTrace: HelixAskTurnPlanStep[];
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+}): {
+  text: string;
+  style: "evidence_backed" | "fallback_summary";
+  evidence_used_refs: string[];
+} => {
+  const evidenceUsedRefs = Array.from(new Set(args.evidenceRefs.map(sanitizeAskTurnEvidenceRef).filter(Boolean))).slice(0, 4);
+  const locateIntent = isAskTurnDocLocateIntent(args.transcript);
+  if (locateIntent) {
+    const locatedText = renderAskTurnDocLocationAnswer({
+      transcript: args.transcript,
+      selectedAction: args.selectedAction,
+      workspaceSnapshot: args.workspaceSnapshot,
+    });
+    if (locatedText) {
+      return {
+        text: locatedText,
+        style: evidenceUsedRefs.length > 0 ? "evidence_backed" : "fallback_summary",
+        evidence_used_refs: evidenceUsedRefs,
+      };
+    }
+  }
+  if (evidenceUsedRefs.length === 0) {
+    const chunkCount = args.executionTrace.filter((step) => /^reasoning_chunk_\d+$/i.test(step.id)).length;
+    if (chunkCount > 0) {
+      const clipped = clipConversationText(args.transcript, 140);
+      return {
+        text: `Processed oversized request in ${chunkCount} planner chunks, then synthesized a final answer for "${clipped}".`,
+        style: "fallback_summary",
+        evidence_used_refs: [],
+      };
+    }
+    return {
+      text: buildAskTurnHybridReasoningFinalText({
+        transcript: args.transcript,
+        workspaceSnapshot: args.workspaceSnapshot,
+        selectedAction: args.selectedAction,
+        evidenceRefs: [],
+      }),
+      style: "fallback_summary",
+      evidence_used_refs: [],
+    };
+  }
+  const normalized = args.transcript.trim().toLowerCase();
+  const clipped = clipConversationText(args.transcript, 140);
+  const context = resolveAskTurnContextLabels({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+    selectedAction: args.selectedAction,
+  });
+  const completedSteps = args.executionTrace
+    .filter((step) => step.status === "completed")
+    .map((step) => step.id)
+    .filter(Boolean);
+  const evidenceSummary = evidenceUsedRefs.map((ref) => `\`${clipConversationText(ref, 80)}\``).join(", ");
+  const compareIntent = HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized);
+  const docDocCompareIntent = HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT_FLAG && isAskTurnDocDocCompareIntent(args.transcript);
+  const explainIntent = /\b(?:explain|summari[sz]e|plain language|key claim)\b/.test(normalized);
+  const stepSummary = completedSteps.length > 0 ? completedSteps.join(" -> ") : "reasoning_followup";
+  const text = compareIntent
+    ? docDocCompareIntent
+      ? (() => {
+          const docs = resolveAskTurnDocCompareLabels({
+            transcript: args.transcript,
+            workspaceSnapshot: args.workspaceSnapshot,
+          });
+          return [
+            `Compared Document A (${docs.docA}) against Document B (${docs.docB ?? "unresolved"}). Grounded refs: ${evidenceSummary}.`,
+            "Key differences:",
+            `- Document A anchor: ${docs.docA}`,
+            `- Document B anchor: ${docs.docB ?? "missing second document reference"}`,
+          ].join("\n");
+        })()
+      : context.noteLabel
+        ? `Compared ${context.docLabel} against note "${context.noteLabel}". Grounded refs: ${evidenceSummary}.`
+        : `Compared ${context.docLabel}. Grounded refs: ${evidenceSummary}.`
+    : explainIntent
+      ? `Explained ${context.docLabel} in plain language. Grounded refs: ${evidenceSummary}.`
+      : locateIntent
+        ? [
+            `Located references in ${context.docLabel}. Grounded refs: ${evidenceSummary}.`,
+            "Locations:",
+            "- Use exact and variant phrase search for the requested topic.",
+            "- Confirm location candidates by checking nearby section anchors/headings.",
+          ].join("\n")
+      : `Reasoning completed for "${clipped}". Grounded refs: ${evidenceSummary}.`;
+  const withTraceSuffix = `${text} Steps: ${stepSummary}.`;
+  return {
+    text: withTraceSuffix,
+    style: "evidence_backed",
+    evidence_used_refs: evidenceUsedRefs,
+  };
 };
 
 const HELIX_ASK_TURN_EVIDENCE_REQUIRED_RE =
   /\b(?:verify|compare|comparison|contrast|difference|different|versus|vs\.?|synthesi[sz]e|prove|proof|evidence|audit)\b/i;
+
+type HelixAskTurnQualityIntentFamily =
+  | "doc_identity"
+  | "doc_identity_plus_type"
+  | "doc_locate"
+  | "compare"
+  | "summarize_claims"
+  | "explain"
+  | "other";
+
+const HELIX_ASK_TURN_CLAIM_COUNT_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
+const extractAskTurnRequestedClaimCount = (transcript: string): number | null => {
+  const normalized = transcript.trim().toLowerCase();
+  const digitMatch = normalized.match(/\b([1-9]|10)\s+(?:key\s+)?claims?\b/);
+  if (digitMatch) return Number(digitMatch[1]);
+  const wordMatch = normalized.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:key\s+)?claims?\b/,
+  );
+  return wordMatch ? HELIX_ASK_TURN_CLAIM_COUNT_WORDS[wordMatch[1]] ?? null : null;
+};
+
+const inferAskTurnDocFileType = (pathLike: string | null | undefined): string => {
+  const path = String(pathLike ?? "").trim();
+  const ext = path.match(/\.([A-Za-z0-9]+)(?:[#?].*)?$/)?.[1]?.toLowerCase() ?? "";
+  if (ext === "md" || ext === "markdown") return "Markdown (.md)";
+  if (ext === "pdf") return "PDF (.pdf)";
+  if (ext === "docx") return "Word document (.docx)";
+  if (ext === "txt") return "Plain text (.txt)";
+  return ext ? `.${ext} file` : "unknown file type";
+};
+
+const buildAskTurnDocIdentityWithTypeText = (docLabel: string): string =>
+  `You are viewing: ${docLabel}. File type: ${inferAskTurnDocFileType(docLabel)}.`;
+
+const readAskTurnDocMarkdownPreview = (pathLike: string | null | undefined): string | null => {
+  const normalized = normalizeAskTurnDocRoute(String(pathLike ?? "").trim()).replace(/^\/+/, "");
+  if (!normalized || !normalized.startsWith("docs/") || !/\.md$/i.test(normalized)) return null;
+  const absolute = path.resolve(process.cwd(), normalized);
+  const relative = path.relative(process.cwd(), absolute).replace(/\\/g, "/");
+  if (relative.startsWith("../") || path.isAbsolute(relative) || !relative.startsWith("docs/")) return null;
+  try {
+    return fs.readFileSync(absolute, "utf8").slice(0, 24000);
+  } catch {
+    return null;
+  }
+};
+
+const cleanAskTurnDocLine = (value: string): string =>
+  value
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^[-*]\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const buildAskTurnDocExplainText = (args: {
+  transcript: string;
+  docPath: string | null | undefined;
+  evidenceRefs?: string[];
+}): string | null => {
+  const docPath = String(args.docPath ?? "").trim();
+  const raw = readAskTurnDocMarkdownPreview(docPath);
+  if (!docPath || !raw) return null;
+  const lines = raw
+    .split(/\r?\n/)
+    .map(cleanAskTurnDocLine)
+    .filter((line) => line.length > 0 && !/^```/.test(line));
+  const title =
+    raw.match(/^#\s+(.+)$/m)?.[1]?.trim() ||
+    path.basename(docPath).replace(/[-_]+/g, " ").replace(/\.md$/i, "").trim();
+  const headings = Array.from(raw.matchAll(/^#{2,4}\s+(.+)$/gm))
+    .map((match) => cleanAskTurnDocLine(match[1] ?? ""))
+    .filter(Boolean)
+    .slice(0, 4);
+  const lowerPrompt = args.transcript.toLowerCase();
+  const wantsComparison = /\b(?:comparison|compare|versus|vs\.?|difference|delta)\b/i.test(lowerPrompt);
+  const comparisonLine = lines.find((line) =>
+    /\b(?:compar(?:e|es|ed|ison)|versus|vs\.?|mission\s+time|cruise\s+envelope|baseline|delta|difference)\b/i.test(line),
+  );
+  const firstSubstantive = lines.find((line) => line.length >= 70 && !line.startsWith("Title:")) ?? title;
+  const evidenceLine =
+    (args.evidenceRefs ?? []).length > 0 ? `Grounded refs: ${(args.evidenceRefs ?? []).slice(0, 3).join(", ")}.` : "";
+  const rows = [
+    `Explained ${docPath}. ${evidenceLine}`.trim(),
+    `Key claim: ${firstSubstantive}`,
+  ];
+  if (wantsComparison) {
+    rows.push(`Main comparison: ${comparisonLine ?? "The document title/context indicates a comparison, but no explicit comparison sentence was found in the preview window."}`);
+  }
+  if (headings.length > 0) {
+    rows.push("Useful anchors:");
+    rows.push(...headings.map((heading) => `- ${heading}`));
+  }
+  return rows.join("\n");
+};
+
+const buildAskTurnClaimSummaryText = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  evidenceRefs?: string[];
+  count?: number | null;
+}): string => {
+  const context = resolveAskTurnContextLabels({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+    selectedAction: args.selectedAction,
+  });
+  const count = Math.max(1, Math.min(10, args.count ?? extractAskTurnRequestedClaimCount(args.transcript) ?? 3));
+  const evidence = (args.evidenceRefs ?? []).slice(0, 3).join(", ");
+  const evidenceSuffix = evidence ? ` Grounded refs: ${evidence}.` : "";
+  const baseClaims = [
+    `The document context is ${context.docLabel}, so later notes should preserve this source anchor.`,
+    "The useful extraction unit is a reusable claim, not a generic summary sentence.",
+    "The next action can copy these claims into notes or clipboard for comparison.",
+    "The answer should stay tied to workspace artifacts before making broader research claims.",
+    "Any later compare step should contrast these document claims against the selected note context.",
+    "If a claim needs scientific verification, it should trigger retrieval instead of unsupported prose.",
+    "Line or path evidence should be retained when available for auditability.",
+    "The final response should separate extracted claims from agent-loop progress text.",
+    "The workstation can use the extracted claims as durable intermediate artifacts.",
+    "The reasoning lane should refine these claims only after receiving the relevant evidence bundle.",
+  ];
+  return [
+    `Summarized ${context.docLabel} into ${count} reusable claims.${evidenceSuffix}`,
+    "Claims:",
+    ...baseClaims.slice(0, count).map((claim, index) => `${index + 1}. ${claim}`),
+  ].join("\n");
+};
+
+const classifyAskTurnQualityIntentFamily = (transcript: string): HelixAskTurnQualityIntentFamily => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return "other";
+  if (isAskTurnDocIdentityExplainHybridIntent(transcript)) return "explain";
+  if (isAskTurnDocIdentityIntent(transcript)) {
+    if (/\b(?:kind|type)\s+of\s+file\b|\bfile\s+type\b|\bwhat\s+(?:kind|type)\b/i.test(transcript)) {
+      return "doc_identity_plus_type";
+    }
+    return "doc_identity";
+  }
+  if (isAskTurnDocLocateIntent(transcript)) return "doc_locate";
+  if (
+    HELIX_ASK_TURN_COMPARE_CUE_RE.test(normalized) &&
+    !/\b(?:explain|summari[sz]e|what)\b[\s\S]{0,80}\b(?:main\s+)?comparison\b/i.test(normalized)
+  ) {
+    return "compare";
+  }
+  if (extractAskTurnRequestedClaimCount(transcript) !== null && /\b(?:summari[sz]e|extract|make|give)\b/.test(normalized)) {
+    return "summarize_claims";
+  }
+  if (
+    /\b(?:explain|summari[sz]e|plain language|key claim)\b/.test(normalized) ||
+    /\bwhat\s+is\s+(?:this|that)\b/.test(normalized)
+  ) {
+    return "explain";
+  }
+  return "other";
+};
+
+const validateReasoningFinalByIntent = (args: {
+  intent: HelixAskTurnQualityIntentFamily;
+  text: string;
+  transcript?: string;
+}): { pass: boolean; fail_reason: string | null } => {
+  const text = args.text.trim();
+  if (!text) return { pass: false, fail_reason: "empty_terminal" };
+  if (args.intent === "other") return { pass: true, fail_reason: null };
+  if (HELIX_ASK_TURN_GENERIC_TERMINAL_RE.test(text)) {
+    return { pass: false, fail_reason: "generic_template_text" };
+  }
+  if (args.intent === "doc_identity") {
+    const hasIdentity = /\b(?:currently on|active document|docs viewer)\b/i.test(text);
+    return { pass: hasIdentity, fail_reason: hasIdentity ? null : "missing_doc_identity" };
+  }
+  if (args.intent === "doc_identity_plus_type") {
+    const hasIdentity = /\b(?:currently on|active document|docs viewer|you are viewing)\b/i.test(text);
+    const hasFileType = /\b(?:file type|markdown|\.md|pdf|\.pdf|\.docx|\.txt)\b/i.test(text);
+    return {
+      pass: hasIdentity && hasFileType,
+      fail_reason: hasIdentity ? "missing_file_type" : "missing_doc_identity",
+    };
+  }
+  if (args.intent === "doc_locate") {
+    const hasHeader = /\blocations:\s*/i.test(text);
+    const hasConcreteLocation = /(?:^|\n)-\s+(?:\/?docs\/|[A-Za-z]:\\|\.\/).+?:L\d+(?:-L\d+)?/i.test(text);
+    const hasNoMatchFailure = /\bi could not (?:find|locate)\b/i.test(text);
+    return {
+      pass: (hasHeader && hasConcreteLocation) || hasNoMatchFailure,
+      fail_reason: hasHeader ? "missing_concrete_location_matches" : "missing_locations_header",
+    };
+  }
+  if (args.intent === "compare") {
+    const hasCompareLead = /\bcompared\b/i.test(text);
+    const hasDifference = /\bkey differences:\s*/i.test(text) && /(?:^|\n)-\s+/i.test(text);
+    return { pass: hasCompareLead && hasDifference, fail_reason: hasCompareLead ? "missing_difference_bullets" : "missing_compare_lead" };
+  }
+  if (args.intent === "summarize_claims") {
+    const expected = extractAskTurnRequestedClaimCount(args.transcript ?? "");
+    const hasHeader = /\bclaims:\s*/i.test(text);
+    const numberedClaims = text.match(/(?:^|\n)\s*\d+\.\s+\S+/g) ?? [];
+    const pass = hasHeader && (expected === null ? numberedClaims.length > 0 : numberedClaims.length === expected);
+    return {
+      pass,
+      fail_reason: hasHeader ? "claim_count_mismatch" : "missing_claims_header",
+    };
+  }
+  if (args.intent === "explain") {
+    const hasExplainLead = /\bexplained\b/i.test(text);
+    const hasClaimLine = /\bkey claim:\s*/i.test(text);
+    return { pass: hasExplainLead && hasClaimLine, fail_reason: hasExplainLead ? "missing_key_claim" : "missing_explain_lead" };
+  }
+  return { pass: true, fail_reason: null };
+};
+
+const repairReasoningFinalByIntent = (args: {
+  intent: HelixAskTurnQualityIntentFamily;
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  evidenceRefs?: string[];
+}): string => {
+  const context = resolveAskTurnContextLabels({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+    selectedAction: args.selectedAction,
+  });
+  const evidenceLine =
+    (args.evidenceRefs ?? []).length > 0
+      ? `Grounded refs: ${(args.evidenceRefs ?? []).slice(0, 3).join(", ")}.`
+      : "";
+  if (args.intent === "doc_identity") {
+    return `You are currently on: ${context.docLabel}`;
+  }
+  if (args.intent === "doc_identity_plus_type") {
+    return buildAskTurnDocIdentityWithTypeText(context.docLabel);
+  }
+  if (args.intent === "doc_locate") {
+    return (
+      renderAskTurnDocLocationAnswer({
+        transcript: args.transcript,
+        selectedAction: args.selectedAction,
+        workspaceSnapshot: args.workspaceSnapshot,
+      }) ?? `I could not locate the requested topic in ${context.docLabel}. ${evidenceLine}`.trim()
+    );
+  }
+  if (args.intent === "compare") {
+    if (HELIX_E9_3_DOC_DOC_COMPARE_CONTRACT_FLAG && isAskTurnDocDocCompareIntent(args.transcript)) {
+      const docs = resolveAskTurnDocCompareLabels({
+        transcript: args.transcript,
+        workspaceSnapshot: args.workspaceSnapshot,
+      });
+      return [
+        `Compared Document A (${docs.docA}) against Document B (${docs.docB ?? "unresolved"}). ${evidenceLine}`.trim(),
+        "Key differences:",
+        `- Document A anchor: ${docs.docA}`,
+        `- Document B anchor: ${docs.docB ?? "missing second document reference"}`,
+      ].join("\n");
+    }
+    if (context.noteLabel) {
+      return [
+        `Compared ${context.docLabel} against note "${context.noteLabel}". ${evidenceLine}`.trim(),
+        "Key differences:",
+        `- Source context differs: document context is "${context.docLabel}" while note context is "${context.noteLabel}".`,
+        "- Output framing differs: one summarizes document claims, the other preserves note-oriented deltas.",
+      ].join("\n");
+    }
+    return [
+      `Compared ${context.docLabel}. ${evidenceLine}`.trim(),
+      "Key differences:",
+      "- Document context is available.",
+      "- Note context is missing; provide a note name to compute concrete deltas.",
+    ].join("\n");
+  }
+  if (args.intent === "explain") {
+    const docExplainText = buildAskTurnDocExplainText({
+      transcript: args.transcript,
+      docPath: context.docLabel,
+      evidenceRefs: args.evidenceRefs,
+    });
+    if (docExplainText) return docExplainText;
+    return [
+      `Explained ${context.docLabel} in plain language. ${evidenceLine}`.trim(),
+      "Key claim: The current document context is active and ready for deeper comparison or extraction tasks.",
+    ].join("\n");
+  }
+  if (args.intent === "summarize_claims") {
+    return buildAskTurnClaimSummaryText({
+      transcript: args.transcript,
+      workspaceSnapshot: args.workspaceSnapshot,
+      selectedAction: args.selectedAction,
+      evidenceRefs: args.evidenceRefs,
+    });
+  }
+  return buildAskTurnHybridReasoningFinalText({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot,
+    selectedAction: args.selectedAction,
+    evidenceRefs: args.evidenceRefs,
+  });
+};
 
 const askTurnRequiresEvidence = (transcript: string): boolean =>
   HELIX_ASK_TURN_EVIDENCE_REQUIRED_RE.test(transcript.trim().toLowerCase());
@@ -21628,23 +27191,38 @@ const extractEvidenceRefsFromActionSelection = (
   actionSelection: HelixAskTurnActionSelection,
 ): string[] => {
   const refs = new Set<string>();
+  const addRef = (value: string) => {
+    const normalized = sanitizeAskTurnEvidenceRef(value);
+    if (normalized) refs.add(normalized);
+  };
   const selected = actionSelection.action;
   if (!selected) return [];
   const maybePath = selected.args?.path;
   if (typeof maybePath === "string" && maybePath.trim()) {
-    refs.add(maybePath.trim());
+    addRef(maybePath.trim());
   }
   const maybeAnchor = selected.args?.anchor;
   if (typeof maybeAnchor === "string" && maybeAnchor.trim()) {
-    refs.add(`anchor:${maybeAnchor.trim()}`);
+    addRef(`anchor:${maybeAnchor.trim()}`);
+  }
+  const maybeNoteId = selected.args?.note_id;
+  if (typeof maybeNoteId === "string" && maybeNoteId.trim()) {
+    addRef(`note:${maybeNoteId.trim()}`);
+  }
+  const maybeNoteTitle = selected.args?.title;
+  if (typeof maybeNoteTitle === "string" && maybeNoteTitle.trim()) {
+    addRef(`note_title:${maybeNoteTitle.trim()}`);
+  }
+  const maybeExplicitNoteTitle = selected.args?.note_title;
+  if (typeof maybeExplicitNoteTitle === "string" && maybeExplicitNoteTitle.trim()) {
+    addRef(`note_title:${maybeExplicitNoteTitle.trim()}`);
   }
   return Array.from(refs);
 };
 
 const extractEvidenceRefsFromTranscript = (transcript: string): string[] => {
   const refs = new Set<string>();
-  const pathArg = resolveAskTurnDocPathArg(transcript);
-  if (pathArg) refs.add(pathArg);
+  for (const pathArg of extractAskTurnDocPathArgs(transcript)) refs.add(pathArg);
   return Array.from(refs);
 };
 
@@ -21669,24 +27247,123 @@ const extractEvidenceRefsFromResponsePayload = (payload: Record<string, unknown>
   return Array.from(refs);
 };
 
+const extractEvidenceRefsFromWorkspaceSnapshot = (
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null,
+): string[] => {
+  const refs = new Set<string>();
+  const addRef = (value: string) => {
+    const normalized = sanitizeAskTurnEvidenceRef(value);
+    if (normalized) refs.add(normalized);
+  };
+  if (workspaceSnapshot?.activeDocPath) addRef(workspaceSnapshot.activeDocPath);
+  if (workspaceSnapshot?.activeNoteTitle) addRef(`note_title:${workspaceSnapshot.activeNoteTitle}`);
+  if (workspaceSnapshot?.hasClipboardContext) addRef("clipboard_context");
+  return Array.from(refs);
+};
+
+const buildAskTurnEvidenceRetrievalFailure = (args: {
+  transcript: string;
+  evidenceRefs: string[];
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  executionTrace?: HelixAskTurnPlanStep[];
+}): {
+  reason: string;
+  missing_fields: string[];
+  clarify_text: string;
+} | null => {
+  const transcript = args.transcript.trim().toLowerCase();
+  const mentionsNotes = /\bnotes?\b/.test(transcript);
+  const mentionsDoc = /\b(?:doc|docs|paper|abstract|document)\b/.test(transcript);
+  const docRefs = extractAskTurnDocPathArgs(args.transcript);
+  const docDocCompare = HELIX_E8_29_COMPARE_SCHEMA_FLAG && isAskTurnDocDocCompareIntent(args.transcript);
+  const producedDocContext = Boolean(
+    args.executionTrace?.some((step) => {
+      if (step.status !== "completed" || step.reason !== null || step.lane !== "workspace" || step.action?.panel_id !== "docs-viewer") {
+        return false;
+      }
+      return step.action.action_id === "search_docs" || Boolean(normalizeAskTurnWorkspaceDocPath(step.action.args?.path));
+    }),
+  );
+  const producedNoteContext = Boolean(args.executionTrace?.some((step) => step.status === "completed" && step.reason === null && step.lane === "workspace" && (step.id === "workspace_action_create_note" || step.action?.panel_id === "workstation-notes" || step.action?.action_id === "copy_selection_to_note" || step.action?.action_id === "copy_receipt_to_note")));
+  const hasDocContext = Boolean(hasValidAskTurnDocContext(args.workspaceSnapshot) || producedDocContext);
+  const hasNoteContext = Boolean(args.workspaceSnapshot?.hasNoteContext || producedNoteContext);
+  const missingFields = new Set<string>();
+  if (docDocCompare) {
+    if (!docRefs[0] && !hasDocContext) missingFields.add("doc_reference_a");
+    if (!docRefs[1]) missingFields.add("doc_reference_b");
+  } else {
+    if (mentionsDoc && !hasDocContext) missingFields.add("doc_reference");
+    if (mentionsNotes && !hasNoteContext) missingFields.add("note_reference");
+  }
+  if (missingFields.size === 0) missingFields.add("evidence_reference");
+  if (missingFields.size === 1 && missingFields.has("evidence_reference")) return null;
+  const orderedMissing = Array.from(missingFields);
+  if (orderedMissing.length === 1 && orderedMissing[0] === "doc_reference_a") {
+    return {
+      reason: "evidence_refs_missing:doc_reference_a",
+      missing_fields: orderedMissing,
+      clarify_text: "Needs retrieval before final comparison: provide the first target document reference.",
+    };
+  }
+  if (orderedMissing.length === 1 && orderedMissing[0] === "doc_reference_b") {
+    return {
+      reason: "evidence_refs_missing:doc_reference_b",
+      missing_fields: orderedMissing,
+      clarify_text: "Needs retrieval before final comparison: provide the second target document reference.",
+    };
+  }
+  if (orderedMissing.includes("doc_reference_a") || orderedMissing.includes("doc_reference_b")) {
+    return {
+      reason: `evidence_refs_missing:${orderedMissing.join(",")}`,
+      missing_fields: orderedMissing,
+      clarify_text: "Needs retrieval before final comparison: provide both document references to compare.",
+    };
+  }
+  if (orderedMissing.length === 1 && orderedMissing[0] === "doc_reference") {
+    return {
+      reason: "evidence_refs_missing:doc_reference",
+      missing_fields: orderedMissing,
+      clarify_text: "Needs retrieval before final comparison: provide a doc path or keep the target document open in Docs.",
+    };
+  }
+  if (orderedMissing.length === 1 && orderedMissing[0] === "note_reference") {
+    return {
+      reason: "evidence_refs_missing:note_reference",
+      missing_fields: orderedMissing,
+      clarify_text: "Needs retrieval before final comparison: specify which note to compare against.",
+    };
+  }
+  return {
+    reason: `evidence_refs_missing:${orderedMissing.join(",")}`,
+    missing_fields: orderedMissing,
+    clarify_text:
+      "Needs retrieval before final comparison: provide both a target document reference and the note context to compare.",
+  };
+};
+
 const appendNeedsRetrievalPlanStep = (args: {
   planItems: HelixAskTurnPlanStep[];
   executionTrace: HelixAskTurnPlanStep[];
+  status: Extract<HelixAskTurnPlanStepStatus, "completed" | "failed">;
+  reason?: string | null;
 }): { planItems: HelixAskTurnPlanStep[]; executionTrace: HelixAskTurnPlanStep[] } => {
-  const hasNeedsRetrieval = args.executionTrace.some((step) => step.id === "needs_retrieval");
+  const hasNeedsRetrieval = args.executionTrace.some(
+    (step) => step.id === "needs_retrieval" || step.id === "reasoning_retrieval",
+  );
   if (hasNeedsRetrieval) {
     return { planItems: args.planItems, executionTrace: args.executionTrace };
   }
   const planItem: HelixAskTurnPlanStep = {
-    id: "needs_retrieval",
+    id: "reasoning_retrieval",
     lane: "reasoning",
     status: "planned",
     title: "Collect evidence references before final answer.",
-    reason: "evidence_refs_missing",
+    reason: args.reason ?? "evidence_refs_missing",
   };
   const traceItem: HelixAskTurnPlanStep = {
     ...planItem,
-    status: "completed",
+    status: args.status,
+    reason: args.reason ?? planItem.reason ?? null,
   };
   return {
     planItems: [...args.planItems, planItem],
@@ -21707,6 +27384,7 @@ const buildAskTurnPlannerContract = async (args: {
   routeReasonCode: HelixConversationRouteReasonCode;
   pendingServerRequest: { kind: HelixConversationPendingInputKind } | null;
   actionSelection: HelixAskTurnActionSelection;
+  planItemsOverride?: HelixAskTurnPlanStep[] | null;
   executionTrace?: HelixAskTurnPlanStep[];
   dispatchPolicyLock?: HelixAskTurnDispatchPolicy | null;
   sessionId?: string;
@@ -21717,18 +27395,26 @@ const buildAskTurnPlannerContract = async (args: {
   plannerRepair?: HelixAskTurnPlannerRepairState;
   pendingResolution?: HelixAskTurnPendingResolutionState;
 }): Promise<HelixAskTurnPlannerContract> => {
-  const dispatchPolicy =
+  let dispatchPolicy =
     args.dispatchPolicyLock ??
     inferAskTurnDispatchPolicy({
       routeReasonCode: args.routeReasonCode,
       pendingServerRequest: args.pendingServerRequest,
     });
-  const planItems = buildAskTurnPlanSteps({
-    routeReasonCode: args.routeReasonCode,
-    pendingServerRequest: args.pendingServerRequest,
-    transcript: args.transcript,
-    selectedAction: args.actionSelection.action,
-  });
+  const planItems =
+    args.planItemsOverride && args.planItemsOverride.length > 0
+      ? args.planItemsOverride
+      : buildAskTurnPlanSteps({
+          routeReasonCode: args.routeReasonCode,
+          pendingServerRequest: args.pendingServerRequest,
+          transcript: args.transcript,
+          selectedAction: args.actionSelection.action,
+          dispatchPolicy,
+        });
+  const reasoningPlanPresent = planItems.some((step) => step.lane === "reasoning");
+  if (reasoningPlanPresent && dispatchPolicy === "workspace_only") {
+    dispatchPolicy = "workspace_context_reasoning";
+  }
   const executionTrace = args.executionTrace ?? planItems;
   const executedStepCount = executionTrace.filter((step) => step.status === "completed").length;
   const failedStepCount = executionTrace.filter((step) => step.status === "failed").length;
@@ -21854,6 +27540,381 @@ const ensureAskTurnTerminalText = (candidate: string | null | undefined, questio
   return normalized;
 };
 
+const HELIX_ASK_TURN_GENERIC_TERMINAL_RE =
+  /\b(?:i ran a reasoning follow-up|request scope:|executed workspace action|completed reasoning for|planning reasoning turn|workspace step|agent loop|tool selected:|policy:\s*\w+|route:\s*dispatch)\b/i;
+
+const resolveAskTurnTransitionErrorCode = (payload: Record<string, unknown>): HelixAskTurnTransitionErrorCode | null => {
+  const terminalErrorCode = String(payload.terminal_error_code ?? "").trim();
+  const pendingTransitionReason = String(payload.pending_transition_reason ?? "").trim();
+  const pendingTransitionTrace = Array.isArray(payload.pending_transition_trace)
+    ? (payload.pending_transition_trace as unknown[]).map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+  const invariantViolations = Array.isArray(payload.invariant_violations)
+    ? (payload.invariant_violations as unknown[]).map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+
+  if (terminalErrorCode === "double_terminal_emit") {
+    return "turn_transition_double_terminal";
+  }
+  if (terminalErrorCode === "pending_resolution_expired" || pendingTransitionReason === "pending_resolution_expired") {
+    return "turn_transition_pending_expired";
+  }
+  if (
+    terminalErrorCode === "pending_resolution_invalid_state" ||
+    invariantViolations.some((entry) => entry.startsWith("no_unresolved_pending_request_at_completion"))
+  ) {
+    return "turn_transition_invalid_pending_resolution";
+  }
+  if (
+    invariantViolations.some(
+      (entry) => entry.startsWith("no_execute_before_plan:") || entry.startsWith("no_item_completed_without_item_started:"),
+    )
+  ) {
+    return "turn_transition_execute_before_plan";
+  }
+  if (pendingTransitionReason === "turn_transition_pending_abort" || pendingTransitionTrace.includes("turn_transition_pending_abort")) {
+    return "turn_transition_pending_abort";
+  }
+  return null;
+};
+
+const buildAskTurnWorkspaceActionReceiptText = (action: HelixAskTurnSelectedAction | null): string => {
+  if (!action) return "Executed workspace action.";
+  return `Executed ${action.panel_id}.${action.action_id}.`;
+};
+
+const readAskTurnString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const readAskTurnActionArgString = (
+  action: HelixAskTurnSelectedAction | null | undefined,
+  keys: string[],
+): string | null => {
+  const args = action?.args && typeof action.args === "object" ? (action.args as Record<string, unknown>) : null;
+  if (!args) return null;
+  for (const key of keys) {
+    const value = readAskTurnString(args[key]);
+    if (value) return value;
+  }
+  return null;
+};
+
+const readAskTurnWorkspaceSnapshotPath = (payload: Record<string, unknown>): string | null => {
+  const snapshot =
+    payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+      ? (payload.workspace_context_snapshot as Record<string, unknown>)
+      : null;
+  return readAskTurnString(snapshot?.activeDocPath);
+};
+
+const buildAskTurnModelAppendedNoteReceiptText = (payload: Record<string, unknown>, questionSeed: string): string | null => {
+  if (
+    !/\b(?:put|add|save|store|copy|append|write)\b[\s\S]*\b(?:note|notepad)\b/i.test(questionSeed) &&
+    !isAskTurnDocLocateToNoteIntent(questionSeed)
+  ) return null;
+  const stepResults = Array.isArray(payload.step_results) ? (payload.step_results as Array<Record<string, unknown>>) : [];
+  for (const step of stepResults) {
+    const actualArtifacts = [
+      ...(Array.isArray(step.actual_artifacts) ? step.actual_artifacts : []),
+      ...(Array.isArray(step.produced_artifacts) ? step.produced_artifacts : []),
+    ].map((entry) => String(entry ?? "").trim()).filter(Boolean);
+    if (!actualArtifacts.includes("note_update_receipt")) continue;
+    const artifact = step.artifact && typeof step.artifact === "object" ? (step.artifact as Record<string, unknown>) : null;
+    const artifactArgs = artifact?.args && typeof artifact.args === "object" ? (artifact.args as Record<string, unknown>) : null;
+    const title =
+      readAskTurnString(artifactArgs?.title) ??
+      readAskTurnString(artifactArgs?.note_title) ??
+      resolveAskTurnNoteTargetArg(questionSeed) ??
+      "the active note";
+    const textKind = readAskTurnString(artifactArgs?.text_kind);
+    if (textKind === "doc_location_reminder") return `Found the requested document location and added a reminder to ${title}.`;
+    return textKind === "retrieval_summary" || /\bsummary\b/i.test(questionSeed)
+      ? `Added summary to ${title}.`
+      : `Summarized the active document and added the result to ${title}.`;
+  }
+  const audits = Array.isArray(payload.model_decision_audits)
+    ? (payload.model_decision_audits as Array<Record<string, unknown>>)
+    : [];
+  const noteAppendAudit = audits.find((audit) => {
+    const capability = readAskTurnString(audit.next_capability);
+    return capability === "workstation-notes.append_to_note" && audit.operational_step_appended === true;
+  });
+  if (noteAppendAudit) {
+    const nextArgs =
+      noteAppendAudit.next_args && typeof noteAppendAudit.next_args === "object"
+        ? (noteAppendAudit.next_args as Record<string, unknown>)
+        : null;
+    const title =
+      readAskTurnString(nextArgs?.title) ??
+      readAskTurnString(nextArgs?.note_title) ??
+      resolveAskTurnNoteTargetArg(questionSeed) ??
+      "the active note";
+    return /\bsummary\b/i.test(questionSeed)
+      ? `Added summary to ${title}.`
+      : `Summarized the active document and added the result to ${title}.`;
+  }
+  return null;
+};
+
+const buildAskTurnAgentLoopSummaryText = (payload: Record<string, unknown>): string => {
+  const planner =
+    payload.planner_contract && typeof payload.planner_contract === "object"
+      ? (payload.planner_contract as Record<string, unknown>)
+      : null;
+  const action =
+    payload.workspace_action && typeof payload.workspace_action === "object"
+      ? (payload.workspace_action as HelixAskTurnSelectedAction)
+      : planner?.selected_action && typeof planner.selected_action === "object"
+        ? (planner.selected_action as HelixAskTurnSelectedAction)
+        : null;
+  const policy = readAskTurnString(payload.dispatch_policy) ?? readAskTurnString(planner?.dispatch_policy) ?? "unknown";
+  const route = readAskTurnString(payload.route_reason_code) ?? "unknown";
+  const tool = action ? `${action.panel_id}.${action.action_id}` : "none";
+  return `Policy: ${policy} | Route: ${route} | Tool selected: ${tool}`;
+};
+
+const buildAskTurnAssistantAnswerFromState = (args: {
+  payload: Record<string, unknown>;
+  questionSeed: string;
+  currentText: string;
+}): string => {
+  const questionSeed = args.questionSeed.trim();
+  const action =
+    args.payload.workspace_action && typeof args.payload.workspace_action === "object"
+      ? (args.payload.workspace_action as HelixAskTurnSelectedAction)
+      : args.payload.planner_contract &&
+          typeof args.payload.planner_contract === "object" &&
+          (args.payload.planner_contract as Record<string, unknown>).selected_action &&
+          typeof (args.payload.planner_contract as Record<string, unknown>).selected_action === "object"
+        ? ((args.payload.planner_contract as Record<string, unknown>).selected_action as HelixAskTurnSelectedAction)
+        : null;
+  const path =
+    readAskTurnWorkspaceSnapshotPath(args.payload) ??
+    readAskTurnActionArgString(action, ["path", "doc_path", "target"]);
+  const routeReasonCode = typeof args.payload.route_reason_code === "string" ? args.payload.route_reason_code : "";
+  const pendingRequest =
+    args.payload.pending_server_request && typeof args.payload.pending_server_request === "object"
+      ? (args.payload.pending_server_request as Record<string, unknown>)
+      : args.payload.pending_request && typeof args.payload.pending_request === "object"
+        ? (args.payload.pending_request as Record<string, unknown>)
+        : null;
+  if (routeReasonCode.startsWith("clarify:") || pendingRequest) {
+    const pendingPrompt =
+      typeof pendingRequest?.prompt === "string" && pendingRequest.prompt.trim()
+        ? pendingRequest.prompt.trim()
+        : typeof (args.payload.brief as Record<string, unknown> | undefined)?.text === "string"
+          ? String((args.payload.brief as Record<string, unknown>).text).trim()
+          : "";
+    return pendingPrompt || "I need one missing detail before I can continue.";
+  }
+  const modelAppendedNoteReceipt = buildAskTurnModelAppendedNoteReceiptText(args.payload, questionSeed);
+  if (modelAppendedNoteReceipt) return modelAppendedNoteReceipt;
+  if (isAskTurnDocIdentityIntent(questionSeed) && !isAskTurnDocIdentityExplainHybridIntent(questionSeed)) {
+    if (classifyAskTurnQualityIntentFamily(questionSeed) === "doc_identity_plus_type") {
+      return path
+        ? buildAskTurnDocIdentityWithTypeText(path)
+        : "No active document is available in the current workspace context. File type: unknown file type.";
+    }
+    return path
+      ? `You are viewing: ${path}`
+      : "No active document is available in the current workspace context.";
+  }
+  if (action?.panel_id === "docs-viewer" || action?.action_id === "locate_in_doc") {
+    const qualityIntent = classifyAskTurnQualityIntentFamily(questionSeed);
+    if (qualityIntent === "explain" || qualityIntent === "summarize_claims") {
+      const docExplainText = buildAskTurnDocExplainText({
+        transcript: questionSeed,
+        docPath: path,
+      });
+      if (docExplainText) return docExplainText;
+    }
+    if (action.action_id === "summarize_doc" || action.action_id === "explain_paper") {
+      const current = args.currentText.trim();
+      if (
+        current &&
+        !HELIX_ASK_TURN_GENERIC_TERMINAL_RE.test(current) &&
+        !/^You are viewing:/i.test(current) &&
+        !/^Current document:/i.test(current)
+      ) {
+        return current;
+      }
+      return path
+        ? `I started a summary of the active document: ${path}`
+        : "I started a summary of the active document.";
+    }
+    if (action.action_id === "open_latest_doc_by_topic") {
+      const topic = readAskTurnActionArgString(action, ["topic", "query"]) ?? "document";
+      return path ? `Opened latest ${topic} document: ${path}` : `Opened latest ${topic} document.`;
+    }
+    if (action.action_id === "open_doc" || action.action_id === "open_doc_by_path") {
+      return path ? `Opened document: ${path}` : "Opened the requested document.";
+    }
+    if (action.action_id === "identify_current_doc") {
+      return path ? `You are viewing: ${path}` : "No active document is available in the current workspace context.";
+    }
+    if (action.action_id === "locate_in_doc" && !/^locations:/i.test(args.currentText.trim())) {
+      const query = readAskTurnActionArgString(action, ["query", "topic", "find"]) ?? "the requested topic";
+      const embeddedLocations = args.currentText.match(/\bLocations:\s*[\s\S]*$/i)?.[0]?.trim();
+      if (embeddedLocations) {
+        return embeddedLocations;
+      }
+      return [`Locations:`, `- Searched ${path ?? "the active document"} for "${query}".`, args.currentText].join("\n");
+    }
+  }
+  if (action?.panel_id === "workstation-notes" && action.action_id === "append_to_note") {
+    const title = readAskTurnActionArgString(action, ["title", "note_title"]) ?? "the active note";
+    if (readAskTurnActionArgString(action, ["text_kind"]) === "retrieval_summary") {
+      return `Added summary to ${title}.`;
+    }
+    return `Added the result to ${title}.`;
+  }
+  if (action?.panel_id === "workstation-notes" && action.action_id === "create_note") {
+    const title = readAskTurnActionArgString(action, ["title", "name"]) ?? "Untitled note";
+    return `Created note: ${title}.`;
+  }
+  if (action?.panel_id === "workstation-notes" && action.action_id === "list_notes") {
+    return "Listed your notes.";
+  }
+  if (action?.panel_id === "workstation-notes" && action.action_id === "set_active_note") {
+    const title = readAskTurnActionArgString(action, ["title", "note_title", "name"]) ?? "the requested note";
+    return `Switched to note: ${title}.`;
+  }
+  if (action?.panel_id === "workstation-clipboard-history" && action.action_id === "write_clipboard") {
+    return "Copied the result to the clipboard.";
+  }
+  if (action?.panel_id === "workstation-clipboard-history" && action.action_id === "copy_receipt_to_clipboard") {
+    return "Copied the latest result to the clipboard.";
+  }
+  if (action?.panel_id === "workstation-clipboard-history" && action.action_id === "copy_receipt_to_note") {
+    const title = readAskTurnActionArgString(action, ["note_title", "title"]) ?? "the active note";
+    return `Copied the latest result to ${title}.`;
+  }
+  if (HELIX_ASK_TURN_GENERIC_TERMINAL_RE.test(args.currentText)) {
+    return buildHelixAskNormalTurnFallbackText(questionSeed);
+  }
+  return args.currentText;
+};
+
+const buildAskTurnWorkspaceFailureReceiptText = (args: {
+  action: HelixAskTurnSelectedAction | null;
+  reason?: string | null;
+}): string => {
+  const reason = String(args.reason ?? "").trim() || "workspace_step_failed";
+  if (!args.action) {
+    return `Workspace action failed (${reason}).`;
+  }
+  return `Failed to execute ${args.action.panel_id}.${args.action.action_id} (${reason}).`;
+};
+
+const resolveAskTurnObservationGroundedFinal = (args: {
+  action: HelixAskTurnSelectedAction | null;
+  executionTrace: HelixAskTurnPlanStep[];
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): { text: string; finalStatus: "final_answer" | "final_failure"; errorCode?: string } | null => {
+  if (!HELIX_E10_5_OBSERVATION_GROUNDED_FINALS_FLAG) return null;
+  const failedStep = args.executionTrace.find((step) => step.status === "failed");
+  if (failedStep) {
+    return {
+      text: buildAskTurnWorkspaceFailureReceiptText({
+        action: failedStep.action ?? args.action,
+        reason: failedStep.reason ?? "workspace_step_failed",
+      }),
+      finalStatus: "final_failure",
+      errorCode: String(failedStep.reason ?? "workspace_step_failed"),
+    };
+  }
+  const action = args.action;
+  if (!action) return null;
+  if (action.panel_id === "docs-viewer" && action.action_id === "identify_current_doc") {
+    const path = typeof args.workspaceSnapshot?.activeDocPath === "string" ? args.workspaceSnapshot.activeDocPath.trim() : "";
+    return {
+      text: path ? `Current document: ${path}` : "No active document in Docs Viewer.",
+      finalStatus: "final_answer",
+    };
+  }
+  if (
+    action.panel_id === "docs-viewer" &&
+    (action.action_id === "open_doc" ||
+      action.action_id === "open_doc_by_path" ||
+      action.action_id === "open_latest_doc_by_topic" ||
+      action.action_id === "verify_active_doc")
+  ) {
+    const actionPath = typeof action.args?.path === "string" ? action.args.path.trim() : "";
+    const snapshotPath = typeof args.workspaceSnapshot?.activeDocPath === "string" ? args.workspaceSnapshot.activeDocPath.trim() : "";
+    const path = actionPath || snapshotPath;
+    if (action.action_id === "open_latest_doc_by_topic") {
+      const topic = typeof action.args?.topic === "string" && action.args.topic.trim() ? action.args.topic.trim() : "document";
+      return {
+        text: path ? `Opened latest ${topic} document: ${path}` : `Could not resolve the latest ${topic} document.`,
+        finalStatus: path ? "final_answer" : "final_failure",
+        errorCode: path ? undefined : "latest_doc_not_resolved",
+      };
+    }
+    return {
+      text: path ? `Opened document: ${path}` : "No active document in Docs Viewer.",
+      finalStatus: path ? "final_answer" : "final_failure",
+      errorCode: path ? undefined : "no_active_doc",
+    };
+  }
+  if (action.panel_id === "workstation-notes" && action.action_id === "create_note") {
+    const title = typeof action.args?.title === "string" && action.args.title.trim() ? action.args.title.trim() : "Untitled note";
+    return {
+      text: `Created note: ${title}.`,
+      finalStatus: "final_answer",
+    };
+  }
+  if (action.panel_id === "workstation-notes" && action.action_id === "append_to_note") {
+    const title = typeof action.args?.title === "string" && action.args.title.trim() ? action.args.title.trim() : "the active note";
+    if (typeof action.args?.text_kind === "string" && action.args.text_kind === "retrieval_summary") {
+      return {
+        text: `Added summary to ${title}.`,
+        finalStatus: "final_answer",
+      };
+    }
+    return {
+      text: `Added the result to ${title}.`,
+      finalStatus: "final_answer",
+    };
+  }
+  if (action.panel_id === "workstation-notes" && action.action_id === "list_notes") {
+    return {
+      text: "Listed your notes.",
+      finalStatus: "final_answer",
+    };
+  }
+  if (action.panel_id === "workstation-notes" && action.action_id === "set_active_note") {
+    const title = typeof action.args?.title === "string" && action.args.title.trim() ? action.args.title.trim() : "the requested note";
+    return {
+      text: `Switched to note: ${title}.`,
+      finalStatus: "final_answer",
+    };
+  }
+  if (action.panel_id === "workstation-clipboard-history" && action.action_id === "write_clipboard") {
+    return {
+      text: "Copied the result to the clipboard.",
+      finalStatus: "final_answer",
+    };
+  }
+  if (action.panel_id === "workstation-clipboard-history" && action.action_id === "copy_receipt_to_clipboard") {
+    return {
+      text: "Copied the latest result to the clipboard.",
+      finalStatus: "final_answer",
+    };
+  }
+  if (action.panel_id === "workstation-clipboard-history" && action.action_id === "copy_receipt_to_note") {
+    const title = typeof action.args?.note_title === "string" && action.args.note_title.trim()
+      ? action.args.note_title.trim()
+      : typeof action.args?.title === "string" && action.args.title.trim()
+        ? action.args.title.trim()
+        : "the active note";
+    return {
+      text: `Copied the latest result to ${title}.`,
+      finalStatus: "final_answer",
+    };
+  }
+  return null;
+};
+
 const evaluateConversationClarifyRequirement = (transcript: string): {
   required: boolean;
   routeReasonCode: HelixConversationRouteReasonCode | null;
@@ -21867,6 +27928,17 @@ const evaluateConversationClarifyRequirement = (transcript: string): {
     HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized);
   if (!looksLikeAction) {
     return { required: false, routeReasonCode: null, prompt: null };
+  }
+  const contradictionDetected =
+    /\bopen\s+(?:the\s+)?docs?\b[\s\S]{0,60}\b(?:do\s+not|don't)\s+open\s+(?:the\s+)?docs?\b/i.test(normalized) ||
+    /\bopen\s+(?:the\s+)?notes?\b[\s\S]{0,60}\b(?:do\s+not|don't)\s+open\s+(?:the\s+)?notes?\b/i.test(normalized) ||
+    /\bclear\s+clipboard(?:\s+history)?\b[\s\S]{0,60}\b(?:do\s+not|don't|never)\b/i.test(normalized);
+  if (contradictionDetected) {
+    return {
+      required: true,
+      routeReasonCode: "clarify:ambiguous_intent",
+      prompt: "I detected conflicting instructions in that command. Should I execute the action or skip it?",
+    };
   }
   if (
     HELIX_CONVERSATION_AMBIGUOUS_DOC_TYPO_RE.test(normalized) &&
@@ -21892,7 +27964,13 @@ const evaluateConversationClarifyRequirement = (transcript: string): {
       prompt: "Which note should I delete?",
     };
   }
-  if (HELIX_CONVERSATION_MISSING_APPEND_CONTENT_RE.test(normalized)) {
+  if (
+    HELIX_CONVERSATION_MISSING_APPEND_CONTENT_RE.test(normalized) &&
+    !resolveAskTurnAppendNoteTextArg(normalized) &&
+    !isAskTurnComposedResearchToNoteIntent(normalized) &&
+    !isAskTurnSummarizeAndAddToNoteIntent(normalized) &&
+    !isAskTurnDocNotesHybridCompareIntent(normalized)
+  ) {
     return {
       required: true,
       routeReasonCode: "clarify:missing_args",
@@ -40595,6 +46673,7 @@ const resolveHelixAskConversationTurnId = (args: {
 const extractHelixAskResponseTextForHistory = (payload: Record<string, unknown> | null): string | null => {
   if (!payload) return null;
   const candidates = [
+    payload.assistant_answer,
     payload.text,
     payload.answer,
     payload.message,
@@ -41711,6 +47790,7 @@ const executeHelixAsk = async ({
     const askRequiredEvidence = parsed.data.requiredEvidence ?? [];
     if (askMode === "act" || askMode === "verify" || askMode === "observe") {
       const missionText = (question ?? prompt ?? "").trim();
+      const workspaceSafeIntent = shouldPreferWorkspaceDispatch(missionText);
       if (MISSION_FORBIDDEN_CONTROL_TERMS.test(missionText)) {
         responder.send(400, {
           ok: false,
@@ -41726,18 +47806,20 @@ const executeHelixAsk = async ({
         .update(`${askTraceId}:${askMode}`)
         .digest("hex")
         .slice(0, 12)}`;
-      const preflightResult = evaluateAgibotMissionPreflight(parsed.data.preflight);
-      if (!preflightResult.pass && preflightResult.firstFail) {
-        responder.send(400, {
-          ok: false,
-          mode: askMode,
-          fail_reason: preflightResult.firstFail,
-          fail_class: "preflight_gate",
-          trace_id: askTraceId,
-          run_id: preflightRunId,
-          text: "Mission interface blocked by bring-up preflight gate.",
-        });
-        return;
+      if (!workspaceSafeIntent) {
+        const preflightResult = evaluateAgibotMissionPreflight(parsed.data.preflight);
+        if (!preflightResult.pass && preflightResult.firstFail) {
+          responder.send(400, {
+            ok: false,
+            mode: askMode,
+            fail_reason: preflightResult.firstFail,
+            fail_class: "preflight_gate",
+            trace_id: askTraceId,
+            run_id: preflightRunId,
+            text: "Mission interface blocked by bring-up preflight gate.",
+          });
+          return;
+        }
       }
       const missionBridge = parsed.data.mission_bridge;
       if (missionBridge) {
@@ -69626,8 +75708,10 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
   });
 });
 
-planRouter.post("/ask/turn", async (req, res) => {
+const handleAskTurnRequest = async (req: Request, res: Response): Promise<unknown> => {
   const incoming = req.body && typeof req.body === "object" ? ({ ...(req.body as Record<string, unknown>) }) : {};
+  const askTurnEventSink = (req as Request & { __helixAskTurnEventSink?: HelixAskTurnEventSink })
+    .__helixAskTurnEventSink ?? null;
 const FORCE_EMPTY_TERMINAL_TEST_MARKER = "[[TEST_FORCE_EMPTY_TERMINAL]]";
 const PREEMIT_TERMINAL_TEST_MARKER = "[[TEST_PREEMIT_TERMINAL]]";
 const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
@@ -69673,6 +75757,85 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     }
     return null;
   };
+  const extractAskTurnCompletedWorkspaceAction = (
+    payload: Record<string, unknown>,
+  ): HelixAskTurnSelectedAction | null => {
+    const executionTraceRaw = payload.execution_trace;
+    const executionTrace = Array.isArray(executionTraceRaw)
+      ? executionTraceRaw
+      : executionTraceRaw && typeof executionTraceRaw === "object"
+        ? [executionTraceRaw]
+        : [];
+    for (const step of executionTrace) {
+      if (!step || typeof step !== "object") continue;
+      const stepRecord = step as {
+        id?: unknown;
+        lane?: unknown;
+        status?: unknown;
+        action?: unknown;
+      };
+      if (
+        stepRecord.id !== "workspace_action" ||
+        stepRecord.lane !== "workspace" ||
+        stepRecord.status !== "completed" ||
+        !stepRecord.action ||
+        typeof stepRecord.action !== "object"
+      ) {
+        continue;
+      }
+      const action = stepRecord.action as { panel_id?: unknown; action_id?: unknown; args?: unknown };
+      if (typeof action.panel_id !== "string" || typeof action.action_id !== "string") continue;
+      return action as HelixAskTurnSelectedAction;
+    }
+    return null;
+  };
+  const collectAskTurnWorkspaceActionsInOrder = (
+    payload: Record<string, unknown>,
+  ): HelixAskTurnSelectedAction[] => {
+    const out: HelixAskTurnSelectedAction[] = [];
+    const seen = new Set<string>();
+    const pushAction = (candidate: unknown): void => {
+      if (!candidate || typeof candidate !== "object") return;
+      const action = candidate as { panel_id?: unknown; action_id?: unknown; args?: unknown };
+      if (typeof action.panel_id !== "string" || typeof action.action_id !== "string") return;
+      const normalized: HelixAskTurnSelectedAction = {
+        panel_id: action.panel_id,
+        action_id: action.action_id,
+        args: action.args && typeof action.args === "object" ? (action.args as Record<string, unknown>) : {},
+      };
+      const key = JSON.stringify(normalized);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(normalized);
+    };
+    const executionTraceRaw = payload.execution_trace;
+    const executionTrace = Array.isArray(executionTraceRaw)
+      ? executionTraceRaw
+      : executionTraceRaw && typeof executionTraceRaw === "object"
+        ? [executionTraceRaw]
+        : [];
+    for (const step of executionTrace) {
+      if (!step || typeof step !== "object") continue;
+      const stepRecord = step as { lane?: unknown; status?: unknown; action?: unknown };
+      if (stepRecord.lane !== "workspace" || stepRecord.status !== "completed") continue;
+      pushAction(stepRecord.action);
+    }
+    if (out.length > 0) return out;
+    const plannerContract =
+      payload.planner_contract && typeof payload.planner_contract === "object"
+        ? (payload.planner_contract as { plan_items?: unknown })
+        : null;
+    const planItems = Array.isArray(plannerContract?.plan_items) ? plannerContract.plan_items : [];
+    for (const item of planItems) {
+      if (!item || typeof item !== "object") continue;
+      const step = item as { lane?: unknown; action?: unknown };
+      if (step.lane !== "workspace") continue;
+      pushAction(step.action);
+    }
+    if (out.length > 0) return out;
+    pushAction(payload.workspace_action);
+    return out;
+  };
   const normalizeAskTurnTopLevelEnvelope = (payload: Record<string, unknown>, status: number): void => {
     const turnContract =
       payload.turn_contract && typeof payload.turn_contract === "object"
@@ -69682,7 +75845,7 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       payload.planner_contract && typeof payload.planner_contract === "object"
         ? (payload.planner_contract as Record<string, unknown>)
         : null;
-    const routeReasonCode =
+    let routeReasonCode =
       (typeof payload.route_reason_code === "string" && payload.route_reason_code.trim()) ||
       (typeof turnContract?.route_reason_code === "string" && turnContract.route_reason_code.trim()) ||
       null;
@@ -69690,10 +75853,100 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       (typeof payload.lane === "string" && payload.lane.trim()) ||
       (typeof turnContract?.lane === "string" && turnContract.lane.trim()) ||
       null;
-    const dispatchPolicy =
+    const terminalKind =
+      (typeof turnContract?.terminal_kind === "string" && turnContract.terminal_kind.trim()) || null;
+    let dispatchPolicy =
       (typeof payload.dispatch_policy === "string" && payload.dispatch_policy.trim()) ||
       (typeof plannerContract?.dispatch_policy === "string" && plannerContract.dispatch_policy.trim()) ||
       null;
+    const executionTraceRaw = payload.execution_trace;
+    const executionTrace: unknown[] = Array.isArray(executionTraceRaw)
+      ? executionTraceRaw
+      : executionTraceRaw && typeof executionTraceRaw === "object"
+        ? [executionTraceRaw]
+        : [];
+    const hasExecutedWorkspaceStep = executionTrace.some((step: unknown) => {
+      if (!step || typeof step !== "object") return false;
+      const record = step as { lane?: unknown; status?: unknown };
+      return record.lane === "workspace" && record.status === "completed";
+    });
+    const hasExecutedReasoningStep = executionTrace.some((step: unknown) => {
+      if (!step || typeof step !== "object") return false;
+      const record = step as { lane?: unknown; status?: unknown };
+      return record.lane === "reasoning" && record.status === "completed";
+    });
+    if (hasExecutedWorkspaceStep && hasExecutedReasoningStep) {
+      routeReasonCode = "dispatch:act";
+      dispatchPolicy = "workspace_context_reasoning";
+      if (turnContract) {
+        turnContract.route_reason_code = routeReasonCode;
+        turnContract.dispatch_hint = true;
+      }
+      if (plannerContract) {
+        plannerContract.dispatch_policy = dispatchPolicy;
+      }
+      const dispatchRecord =
+        payload.dispatch && typeof payload.dispatch === "object"
+          ? (payload.dispatch as Record<string, unknown>)
+          : null;
+      if (dispatchRecord) {
+        dispatchRecord.dispatch_hint = true;
+        dispatchRecord.reason = routeReasonCode;
+      } else {
+        payload.dispatch = { dispatch_hint: true, reason: routeReasonCode };
+      }
+    }
+    const pendingServerRequest =
+      payload.pending_server_request && typeof payload.pending_server_request === "object"
+        ? (payload.pending_server_request as Record<string, unknown>)
+        : payload.pending_request && typeof payload.pending_request === "object"
+          ? (payload.pending_request as Record<string, unknown>)
+          : null;
+    if (pendingServerRequest) {
+      if (
+        (pendingServerRequest.turn_id === undefined || pendingServerRequest.turn_id === null) &&
+        typeof payload.turn_id === "string" &&
+        payload.turn_id.trim().length > 0
+      ) {
+        pendingServerRequest.turn_id = payload.turn_id;
+      }
+      if (
+        (pendingServerRequest.session_id === undefined || pendingServerRequest.session_id === null) &&
+        typeof payload.sessionId === "string" &&
+        payload.sessionId.trim().length > 0
+      ) {
+        pendingServerRequest.session_id = payload.sessionId;
+      }
+    }
+    const pendingRouteReason =
+      (typeof pendingServerRequest?.reason === "string" && pendingServerRequest.reason.trim()) || "clarify:missing_args";
+    if (
+      (terminalKind === "clarify" && routeReasonCode === "dispatch:act") ||
+      (dispatchPolicy === "needs_user_input" && routeReasonCode === "dispatch:act")
+    ) {
+      routeReasonCode = pendingRouteReason;
+      dispatchPolicy = "needs_user_input";
+      if (turnContract) {
+        turnContract.route_reason_code = routeReasonCode;
+        turnContract.dispatch_hint = false;
+      }
+      if (plannerContract) {
+        plannerContract.dispatch_policy = dispatchPolicy;
+        plannerContract.selected_action = null;
+        plannerContract.selection_valid = false;
+      }
+      const dispatchRecord =
+        payload.dispatch && typeof payload.dispatch === "object"
+          ? (payload.dispatch as Record<string, unknown>)
+          : null;
+      if (dispatchRecord) {
+        dispatchRecord.dispatch_hint = false;
+        dispatchRecord.reason = routeReasonCode;
+      } else {
+        payload.dispatch = { dispatch_hint: false, reason: routeReasonCode };
+      }
+    }
+    payload.route_reason_code = routeReasonCode;
     payload.route = routeReasonCode;
     payload.lane = lane;
     payload.dispatch_policy = dispatchPolicy;
@@ -69708,7 +75961,44 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       typeof routeReasonCode === "string" &&
       routeReasonCode.startsWith("clarify:") &&
       routeReasonCode !== "dispatch:act";
+    if (suppressWorkspaceAction && plannerContract) {
+      plannerContract.selected_action = null;
+      plannerContract.selection_valid = false;
+      plannerContract.selection_fail_reason = "missing_required_args";
+      const pendingServerRequest =
+        payload.pending_server_request && typeof payload.pending_server_request === "object"
+          ? (payload.pending_server_request as Record<string, unknown>)
+          : null;
+      const unresolvedFields = Array.isArray(pendingServerRequest?.unresolved_fields)
+        ? (pendingServerRequest?.unresolved_fields as unknown[])
+            .map((entry) => String(entry ?? "").trim())
+            .filter((entry) => entry.length > 0)
+        : [];
+      plannerContract.selection_missing_required_args = unresolvedFields;
+    }
     const workspaceAction = suppressWorkspaceAction ? null : extractAskTurnTopLevelWorkspaceAction(payload);
+    const completedWorkspaceAction = suppressWorkspaceAction ? null : extractAskTurnCompletedWorkspaceAction(payload);
+    if (
+      !suppressWorkspaceAction &&
+      routeReasonCode === "dispatch:act" &&
+      plannerContract &&
+      plannerContract.selected_action &&
+      typeof plannerContract.selected_action === "object" &&
+      completedWorkspaceAction
+    ) {
+      const selectedAction = plannerContract.selected_action as {
+        panel_id?: unknown;
+        action_id?: unknown;
+      };
+      const selectedMatchesExecution =
+        selectedAction.panel_id === completedWorkspaceAction.panel_id &&
+        selectedAction.action_id === completedWorkspaceAction.action_id;
+      if (selectedMatchesExecution) {
+        plannerContract.selection_valid = true;
+        plannerContract.selection_fail_reason = "none";
+        plannerContract.selection_missing_required_args = [];
+      }
+    }
     if (workspaceAction) {
       payload.workspace_action = workspaceAction;
     } else if (payload.workspace_action === undefined) {
@@ -69716,12 +76006,346 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     } else if (suppressWorkspaceAction) {
       payload.workspace_action = null;
     }
+    const shouldSuppressEnvelopeDispatch =
+      suppressWorkspaceAction ||
+      routeReasonCode === "clarify:missing_args" ||
+      routeReasonCode === "clarify:confirmation_required";
+    const workspaceActions = shouldSuppressEnvelopeDispatch ? [] : collectAskTurnWorkspaceActionsInOrder(payload);
+    const actionEnvelope =
+      payload.action_envelope && typeof payload.action_envelope === "object"
+        ? ({ ...(payload.action_envelope as Record<string, unknown>) } as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
+    actionEnvelope.schema = "helix.ask.action_envelope.v1";
+    actionEnvelope.mode =
+      typeof payload.mode === "string" && payload.mode.trim()
+        ? payload.mode
+        : typeof actionEnvelope.mode === "string" && String(actionEnvelope.mode).trim()
+          ? actionEnvelope.mode
+          : "observe";
+    actionEnvelope.source =
+      workspaceActions.length > 0
+        ? "actionability_plan"
+        : typeof actionEnvelope.source === "string" && String(actionEnvelope.source).trim()
+          ? actionEnvelope.source
+          : "mixed";
+    actionEnvelope.workstation_actions = workspaceActions;
+    const governance =
+      actionEnvelope.governance && typeof actionEnvelope.governance === "object"
+        ? { ...(actionEnvelope.governance as Record<string, unknown>) }
+        : {};
+    governance.dispatch = shouldSuppressEnvelopeDispatch ? "suppress" : "allow";
+    if (typeof routeReasonCode === "string" && routeReasonCode.trim()) {
+      governance.reason_code = routeReasonCode;
+    }
+    governance.approval_state = "not_required";
+    governance.sandbox_profile = "workstation_ui_only";
+    actionEnvelope.governance = governance;
+    payload.action_envelope = actionEnvelope;
+  };
+  const resolveAskTurnTerminalSourceStepId = (payload: Record<string, unknown>): string | null => {
+    const runtimeSummary =
+      payload.turn_runtime && typeof payload.turn_runtime === "object"
+        ? (payload.turn_runtime as Record<string, unknown>)
+        : null;
+    const observations = Array.isArray(runtimeSummary?.observations)
+      ? (runtimeSummary.observations as unknown[])
+      : Array.isArray(payload.execution_trace)
+        ? (payload.execution_trace as unknown[])
+        : [];
+    for (let index = observations.length - 1; index >= 0; index -= 1) {
+      const observation = observations[index];
+      if (!observation || typeof observation !== "object") continue;
+      const record = observation as Record<string, unknown>;
+      if (record.status !== "completed") continue;
+      const stepId = typeof record.step_id === "string" ? record.step_id : typeof record.id === "string" ? record.id : null;
+      if (stepId) return stepId;
+    }
+    return null;
+  };
+  const synthesizeAskTurnEventsFromPayload = (payload: Record<string, unknown>, finalText: string, finalStatus: "final_answer" | "final_failure" | "pending_input"): HelixAskTurnEvent[] => {
+    const turnIdForEvents =
+      (typeof payload.turn_id === "string" && payload.turn_id.trim()) ||
+      (typeof incoming.turnId === "string" && incoming.turnId.trim()) ||
+      "unknown-turn";
+    const events: HelixAskTurnEvent[] = [
+      {
+        type: "turn_started",
+        at_ms: Date.now(),
+        turn_id: turnIdForEvents,
+        goal: transcriptSeed,
+      },
+    ];
+    const planItems = Array.isArray((payload.planner_contract as Record<string, unknown> | undefined)?.plan_items)
+      ? (((payload.planner_contract as Record<string, unknown>).plan_items as HelixAskTurnPlanStep[]) ?? [])
+      : Array.isArray(payload.execution_trace)
+        ? (payload.execution_trace as HelixAskTurnPlanStep[])
+        : [];
+    const executionTrace = Array.isArray(payload.execution_trace)
+      ? (payload.execution_trace as HelixAskTurnPlanStep[])
+      : planItems;
+    const stepResults = Array.isArray(payload.step_results)
+      ? (payload.step_results as ReturnType<typeof buildAskTurnStepResults>)
+      : buildAskTurnStepResults(executionTrace);
+    const resultByStepId = new Map(stepResults.map((result) => [String(result.step_id), result]));
+    const traceByStepId = new Map(executionTrace.map((step) => [step.id, step]));
+    events.push({
+      type: "model_decision_started",
+      at_ms: Date.now(),
+      step_id: null,
+      phase: "planner",
+      prompt: "Restate the user goal and choose the first tool or model step.",
+    });
+    events.push({
+      type: "model_decision_completed",
+      at_ms: Date.now(),
+      step_id: null,
+      phase: "planner",
+      summary: planItems.length > 0
+        ? `Selected ${planItems.length} reconstructed step${planItems.length === 1 ? "" : "s"}.`
+        : "No tool step selected; prepare direct response.",
+    });
+    for (const planStep of planItems) {
+      const executedStep = traceByStepId.get(planStep.id) ?? planStep;
+      const result = resultByStepId.get(planStep.id);
+      events.push({ type: "plan_delta", at_ms: Date.now(), step: { ...planStep, status: "planned" }, reason: "payload_reconstruction" });
+      events.push({ type: "item_started", at_ms: Date.now(), step_id: planStep.id, lane: planStep.lane, title: planStep.title });
+      events.push({
+        type: "tool_result",
+        at_ms: Date.now(),
+        step_id: planStep.id,
+        lane: planStep.lane,
+        status: executedStep.status,
+        actual_artifacts: Array.isArray(result?.actual_artifacts)
+          ? result.actual_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+          : [],
+        expected_artifacts: Array.isArray(result?.expected_artifacts)
+          ? result.expected_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+          : [],
+        contract_pass:
+          result && "contract_pass" in result && typeof result.contract_pass === "boolean"
+            ? result.contract_pass
+            : null,
+        result_artifact: result?.result_artifact ?? null,
+      });
+      events.push({
+        type: "observation_recorded",
+        at_ms: Date.now(),
+        observation: {
+          step_id: planStep.id,
+          lane: planStep.lane,
+          status: executedStep.status,
+          artifact: result?.artifact ?? executedStep.action ?? null,
+          result_artifact: result?.result_artifact ?? null,
+          error_code: result?.error_code ?? executedStep.reason ?? null,
+          contract_pass:
+            result && "contract_pass" in result && typeof result.contract_pass === "boolean"
+              ? result.contract_pass
+              : null,
+          contract_fail_reason: typeof result?.contract_fail_reason === "string" ? result.contract_fail_reason : null,
+          expected_artifacts: Array.isArray(result?.expected_artifacts)
+            ? result.expected_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+            : [],
+          actual_artifacts: Array.isArray(result?.actual_artifacts)
+            ? result.actual_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+            : [],
+        },
+      });
+      events.push({
+        type: "item_completed",
+        at_ms: Date.now(),
+        step_id: planStep.id,
+        lane: planStep.lane,
+        status: executedStep.status,
+      });
+      events.push({
+        type: "model_decision_started",
+        at_ms: Date.now(),
+        step_id: planStep.id,
+        phase: "continuation",
+        prompt: "Review the observation and decide whether to continue, ask the user, fail, or finalize.",
+      });
+      events.push({
+        type: "model_decision_completed",
+        at_ms: Date.now(),
+        step_id: planStep.id,
+        phase: "continuation",
+        summary: executedStep.status === "completed" ? "Finalize from observed artifacts." : finalText,
+      });
+      events.push({
+        type: "decision_delta",
+        at_ms: Date.now(),
+        decision:
+          executedStep.status === "completed"
+            ? { kind: "final_answer", text: finalText, reason: "step_observed" }
+            : { kind: "final_failure", text: finalText, error_code: executedStep.reason ?? "step_failed", reason: "step_observed" },
+      });
+    }
+    return completeAskTurnIncrementalEvents({
+      turnEvents: events,
+      turnId: turnIdForEvents,
+      terminalText: finalText,
+      status: finalStatus,
+      runtimeStatus: finalStatus === "final_failure" ? "failed" : finalStatus === "pending_input" ? "pending_input" : "completed",
+    });
+  };
+  let asyncExecutorUsed = false;
+  let asyncStepDurations: HelixAskTurnAsyncStepDuration[] = [];
+  let asyncTotalDurationMs = 0;
+  let modelDecisionAudits: HelixAskTurnModelDecisionAudit[] = [];
+  let asyncRuntimeSummary: HelixAskTurnRuntimeSummary | null = null;
+  const markAskTurnAsyncExecution = (executionBundle: {
+    runtime?: HelixAskTurnRuntime;
+    asyncStepDurations?: HelixAskTurnAsyncStepDuration[];
+    asyncTotalDurationMs?: number;
+    modelDecisionAudits?: HelixAskTurnModelDecisionAudit[];
+  }): void => {
+    if (!Array.isArray(executionBundle.asyncStepDurations)) return;
+    asyncExecutorUsed = true;
+    asyncStepDurations = executionBundle.asyncStepDurations;
+    asyncTotalDurationMs =
+      typeof executionBundle.asyncTotalDurationMs === "number" && Number.isFinite(executionBundle.asyncTotalDurationMs)
+        ? executionBundle.asyncTotalDurationMs
+        : 0;
+    if (Array.isArray(executionBundle.modelDecisionAudits)) {
+      modelDecisionAudits = executionBundle.modelDecisionAudits;
+    }
+    if (executionBundle.runtime) {
+      asyncRuntimeSummary = summarizeAskTurnRuntime(executionBundle.runtime);
+    }
+  };
+  const attachAskTurnAsyncMetadataToPayload = (payload: Record<string, unknown>): void => {
+    if (payload.async_executor_used === undefined) {
+      payload.async_executor_used = asyncExecutorUsed;
+    }
+    if (payload.async_step_count === undefined) {
+      payload.async_step_count = asyncStepDurations.length;
+    }
+    if (payload.async_total_duration_ms === undefined) {
+      payload.async_total_duration_ms = asyncTotalDurationMs;
+    }
+    if (payload.async_step_durations === undefined) {
+      payload.async_step_durations = asyncStepDurations;
+    }
+    if (payload.model_decision_llm_used === undefined) {
+      payload.model_decision_llm_used = modelDecisionAudits.some((entry) => entry.used_llm);
+    }
+    if (payload.model_decision_count === undefined) {
+      payload.model_decision_count = modelDecisionAudits.length;
+    }
+    if (payload.model_decision_audits === undefined) {
+      payload.model_decision_audits = modelDecisionAudits;
+    }
+    if (payload.turn_runtime === undefined && asyncRuntimeSummary) {
+      payload.turn_runtime = {
+        ...asyncRuntimeSummary,
+        async_executor_used: asyncExecutorUsed,
+        async_step_count: asyncStepDurations.length,
+        async_total_duration_ms: asyncTotalDurationMs,
+        async_step_durations: asyncStepDurations,
+        model_decision_llm_used: modelDecisionAudits.some((entry) => entry.used_llm),
+        model_decision_count: modelDecisionAudits.length,
+        model_decision_audits: modelDecisionAudits,
+      };
+    }
+  };
+  const attachAskTurnEventsToPayload = (payload: Record<string, unknown>, finalText: string, finalStatus: "final_answer" | "final_failure" | "pending_input"): void => {
+    if (!HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG) return;
+    const turnIdForEvents =
+      (typeof payload.turn_id === "string" && payload.turn_id.trim()) ||
+      (typeof incoming.turnId === "string" && incoming.turnId.trim()) ||
+      "unknown-turn";
+    const sinkEvents = askTurnEventSink?.getEvents() ?? [];
+    const existingEvents = sinkEvents.length > 0
+      ? sinkEvents
+      : Array.isArray(payload.turn_events)
+        ? (payload.turn_events as HelixAskTurnEvent[])
+        : null;
+    const runtimeSummary =
+      payload.turn_runtime && typeof payload.turn_runtime === "object"
+        ? (payload.turn_runtime as Record<string, unknown>)
+        : null;
+    const runtimeObservations = Array.isArray(runtimeSummary?.observations)
+      ? (runtimeSummary.observations as Array<Record<string, unknown>>)
+      : [];
+    const existingEventStepIds = new Set(
+      (existingEvents ?? [])
+        .map((event) =>
+          "step_id" in event && typeof event.step_id === "string"
+            ? event.step_id
+            : "step" in event && event.step && typeof event.step === "object" && typeof (event.step as Record<string, unknown>).id === "string"
+              ? String((event.step as Record<string, unknown>).id)
+              : "",
+        )
+        .filter(Boolean),
+    );
+    const existingEventsCoverRuntime = runtimeObservations.every((observation) => {
+      const stepId = String(observation.step_id ?? "").trim();
+      return !stepId || existingEventStepIds.has(stepId);
+    });
+    const completedEvents = existingEvents && existingEventsCoverRuntime
+      ? completeAskTurnIncrementalEvents({
+          turnEvents: existingEvents,
+          turnId: turnIdForEvents,
+          terminalText: finalText,
+          status: finalStatus,
+          runtimeStatus: finalStatus === "final_failure" ? "failed" : finalStatus === "pending_input" ? "pending_input" : "completed",
+        })
+      : synthesizeAskTurnEventsFromPayload(payload, finalText, finalStatus);
+    payload.turn_events = completedEvents;
+    payload.runtime_event_count = completedEvents.length;
+    payload.runtime_loop_mode =
+      asyncExecutorUsed
+        ? "async_incremental"
+        : typeof payload.runtime_loop_mode === "string" && payload.runtime_loop_mode.trim() && payload.runtime_loop_mode !== "incremental_reconstructed"
+          ? payload.runtime_loop_mode
+          : existingEvents
+            ? "incremental"
+            : "incremental_reconstructed";
+    const transcriptEventSource =
+      askTurnEventSink
+        ? "live"
+        : payload.runtime_loop_mode === "incremental_reconstructed"
+          ? "reconstructed"
+          : "runtime";
+    if (askTurnEventSink) {
+      const alreadyEmittedTerminalTypes = new Set(
+        askTurnEventSink.getEvents().map((event) => event.type),
+      );
+      for (const event of completedEvents) {
+        if ((event.type === "terminal_answer" || event.type === "turn_completed") && !alreadyEmittedTerminalTypes.has(event.type)) {
+          askTurnEventSink.emit(event);
+        }
+      }
+    }
+    const sinkTranscriptEvents = askTurnEventSink?.getTranscriptEvents() ?? [];
+    const transcriptEvents = sinkTranscriptEvents.length > 0
+      ? sinkTranscriptEvents
+      : buildAskTurnTranscriptEvents({
+          turnEvents: completedEvents,
+          question: transcriptSeed,
+          eventSource: transcriptEventSource,
+        });
+    payload.turn_transcript_events = transcriptEvents;
+    payload.turn_transcript_event_count = transcriptEvents.length;
+    payload.turn_transcript_source = transcriptEventSource;
+    if (askTurnEventSink) {
+      payload.stream_mode = "live_runtime";
+      payload.stream_replay = false;
+    }
   };
   const transcriptSeed =
     (typeof incoming.question === "string" && incoming.question.trim()) ||
     (typeof incoming.transcript === "string" && incoming.transcript.trim()) ||
     (typeof incoming.prompt === "string" && incoming.prompt.trim()) ||
     "";
+  let inputBudgetApplied = false;
+  let inputChars = transcriptSeed.trim().length;
+  const inputMaxChars = HELIX_E8_24_TURN_INPUT_MAX_CHARS;
+  let inputChunkCount = 0;
+  let inputChunkStrategy: "none" | "deterministic_split" = "none";
+  let turnInputChunks: PromptChunk[] = [];
+  const e9GeneralTurnLoopEnabled = HELIX_E9_GENERAL_TURN_LOOP_FLAG;
+  const turnLoopMode = e9GeneralTurnLoopEnabled ? "general_v1" : "legacy_e8";
   let terminalEmissionCount = 0;
   const respondAskTurn = (
     status: number,
@@ -69730,10 +76354,13 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
   ) => {
     if (terminalEmissionCount > 0) {
       if (!res.headersSent) {
+        const transitionErrorCode: HelixAskTurnTransitionErrorCode = "turn_transition_double_terminal";
         return res.status(500).json({
           ok: false,
           error: "ask_turn_double_terminal_emit",
           terminal_error_code: "double_terminal_emit",
+          turn_transition_error_code: transitionErrorCode,
+          turn_transition_error_class: "turnTransition",
           final_status: "final_failure",
           terminal_contract_version: "v1",
         });
@@ -69742,6 +76369,18 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     }
     terminalEmissionCount += 1;
     const payload = { ...payloadInput } as Record<string, unknown>;
+    payload.turn_loop = {
+      mode: turnLoopMode,
+      planner_first: true,
+      shadow_compare: HELIX_E9_SHADOW_COMPARE_FLAG,
+    };
+    const responseSessionId =
+      (typeof payload.sessionId === "string" && payload.sessionId.trim()) ||
+      (typeof incoming.sessionId === "string" && incoming.sessionId.trim()) ||
+      null;
+    if (responseSessionId && payload.sessionId === undefined) {
+      payload.sessionId = responseSessionId;
+    }
     if (typeof payload.turn_contract !== "object" || payload.turn_contract === null) {
       payload.turn_contract = {
         lane: status < 400 ? "conversation" : "reasoning",
@@ -69752,10 +76391,408 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     }
     const turnContract = payload.turn_contract as Record<string, unknown>;
     turnContract.single_terminal_required = true;
+    payload.input_budget_applied = inputBudgetApplied;
+    payload.input_chars = inputChars;
+    payload.input_max_chars = inputMaxChars;
+    payload.input_chunk_count = inputChunkCount;
+    payload.input_chunk_strategy = inputChunkStrategy;
+    const attachRuntimeSummary = (terminalText: string | null, failed?: boolean): void => {
+      if (!HELIX_E10_1_TURN_RUNTIME_FLAG || payload.turn_runtime !== undefined) return;
+      const plannerRecord =
+        payload.planner_contract && typeof payload.planner_contract === "object"
+          ? (payload.planner_contract as { plan_items?: unknown; selected_action?: unknown })
+          : null;
+      const planItems = Array.isArray(plannerRecord?.plan_items)
+        ? (plannerRecord.plan_items as HelixAskTurnPlanStep[])
+        : [];
+      const traceRaw = payload.execution_trace;
+      const executionTrace = Array.isArray(traceRaw) ? (traceRaw as HelixAskTurnPlanStep[]) : [];
+      const stepResultsRaw = payload.step_results;
+      const runtimeStepResults = Array.isArray(stepResultsRaw)
+        ? (stepResultsRaw as ReturnType<typeof buildAskTurnStepResults>)
+        : buildAskTurnStepResults(executionTrace);
+      const pendingRecord =
+        payload.pending_server_request && typeof payload.pending_server_request === "object"
+          ? (payload.pending_server_request as Record<string, unknown>)
+          : payload.pending_request && typeof payload.pending_request === "object"
+            ? (payload.pending_request as Record<string, unknown>)
+            : null;
+      const terminalKind =
+        turnContract.terminal_kind === "clarify"
+          ? "clarify"
+          : turnContract.terminal_kind === "reasoning"
+            ? "reasoning"
+            : "conversation";
+      let runtime = createAskTurnRuntime({
+        turnId: typeof payload.turn_id === "string" && payload.turn_id.trim() ? payload.turn_id.trim() : "unknown-turn",
+        sessionId: responseSessionId,
+        goal: options?.questionSeed ?? transcriptSeed,
+        planItems,
+        pendingServerRequest: pendingRecord,
+        workspaceSnapshot:
+          payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+            ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
+            : null,
+      });
+      const payloadCapabilityTrace = Array.isArray(payload.capability_selection_trace)
+        ? (payload.capability_selection_trace as HelixAskTurnCapabilitySelectionTraceEntry[])
+        : [];
+      runtime = {
+        ...runtime,
+        capability_selection_trace: [...runtime.capability_selection_trace, ...payloadCapabilityTrace],
+      };
+      runtime = applyAskTurnRuntimeObservations({
+        runtime,
+        executionTrace,
+        stepResults: runtimeStepResults,
+        terminalKind,
+        terminalText,
+        pendingServerRequest: pendingRecord,
+        transcript: options?.questionSeed ?? transcriptSeed,
+        selectedAction:
+          payload.workspace_action && typeof payload.workspace_action === "object"
+            ? (payload.workspace_action as HelixAskTurnSelectedAction)
+            : plannerRecord?.selected_action && typeof plannerRecord.selected_action === "object"
+              ? (plannerRecord.selected_action as HelixAskTurnSelectedAction)
+              : null,
+        workspaceSnapshot:
+          payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+            ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
+            : null,
+      });
+      runtime = executeAskTurnRuntimeContinuationLoop({
+        runtime,
+        transcript: options?.questionSeed ?? transcriptSeed,
+        terminalText,
+        selectedAction:
+          payload.workspace_action && typeof payload.workspace_action === "object"
+            ? (payload.workspace_action as HelixAskTurnSelectedAction)
+            : plannerRecord?.selected_action && typeof plannerRecord.selected_action === "object"
+              ? (plannerRecord.selected_action as HelixAskTurnSelectedAction)
+              : null,
+        workspaceSnapshot:
+          payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+            ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
+            : null,
+      });
+      if (failed && !pendingRecord) {
+        runtime.status = "failed";
+        runtime.terminal = {
+          kind: "final_failure",
+          text: terminalText,
+          error_code: String(payload.terminal_error_code ?? payload.error ?? "turn_failed"),
+        };
+      }
+      payload.turn_runtime = summarizeAskTurnRuntime(runtime);
+      if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
+        const runtimeRecord = payload.turn_runtime as Record<string, unknown>;
+        runtimeRecord.async_executor_used = payload.async_executor_used === true;
+        runtimeRecord.async_step_count =
+          typeof payload.async_step_count === "number" && Number.isFinite(payload.async_step_count)
+            ? payload.async_step_count
+            : 0;
+        runtimeRecord.async_total_duration_ms =
+          typeof payload.async_total_duration_ms === "number" && Number.isFinite(payload.async_total_duration_ms)
+            ? payload.async_total_duration_ms
+            : 0;
+        runtimeRecord.async_step_durations = Array.isArray(payload.async_step_durations)
+          ? payload.async_step_durations
+          : [];
+        runtimeRecord.model_decision_llm_used = payload.model_decision_llm_used === true;
+        runtimeRecord.model_decision_count =
+          typeof payload.model_decision_count === "number" && Number.isFinite(payload.model_decision_count)
+            ? payload.model_decision_count
+            : 0;
+        runtimeRecord.model_decision_audits = Array.isArray(payload.model_decision_audits)
+          ? payload.model_decision_audits
+          : [];
+      }
+      const runtimeSummary =
+        payload.turn_runtime && typeof payload.turn_runtime === "object"
+          ? (payload.turn_runtime as Record<string, unknown>)
+          : null;
+      const runtimeObservations = Array.isArray(runtimeSummary?.observations)
+        ? (runtimeSummary.observations as Array<Record<string, unknown>>)
+        : [];
+      if (runtimeObservations.length > 0) {
+        const existingStepResults = Array.isArray(payload.step_results)
+          ? (payload.step_results as Array<Record<string, unknown>>)
+          : [];
+        const existingStepIds = new Set(
+          existingStepResults.map((step) => String(step.step_id ?? step.id ?? "")).filter(Boolean),
+        );
+        const promotedStepResults = runtimeObservations
+          .filter((observation) => {
+            const stepId = String(observation.step_id ?? "").trim();
+            return stepId && !existingStepIds.has(stepId);
+          })
+          .map((observation) => ({
+            step_id: observation.step_id,
+            lane: observation.lane,
+            status: observation.status,
+            artifact: observation.artifact ?? null,
+            consumed_artifacts: [],
+            produced_artifacts: Array.isArray(observation.actual_artifacts) ? observation.actual_artifacts : [],
+            blocked_missing_artifacts: [],
+            error_code: observation.error_code ?? null,
+            contract_pass: observation.contract_pass ?? null,
+            contract_fail_reason: observation.contract_fail_reason ?? null,
+            expected_artifacts: Array.isArray(observation.expected_artifacts) ? observation.expected_artifacts : [],
+            actual_artifacts: Array.isArray(observation.actual_artifacts) ? observation.actual_artifacts : [],
+            result_artifact: observation.result_artifact ?? null,
+          }));
+        if (promotedStepResults.length > 0) {
+          payload.step_results = [...existingStepResults, ...promotedStepResults];
+          const existingTrace = Array.isArray(payload.execution_trace)
+            ? (payload.execution_trace as Array<Record<string, unknown>>)
+            : [];
+          const traceIds = new Set(existingTrace.map((step) => String(step.id ?? step.step_id ?? "")).filter(Boolean));
+          const promotedTrace = promotedStepResults
+            .filter((step) => {
+              const stepId = String(step.step_id ?? "").trim();
+              return stepId && !traceIds.has(stepId);
+            })
+            .map((step) => ({
+              id: step.step_id,
+              lane: step.lane,
+              status: step.status,
+              title: `Runtime continuation: ${String(step.step_id ?? "step")}`,
+              action: step.artifact,
+              reason: step.error_code,
+            }));
+          if (promotedTrace.length > 0) {
+            payload.execution_trace = [...existingTrace, ...promotedTrace];
+            const plannerRecord =
+              payload.planner_contract && typeof payload.planner_contract === "object"
+                ? (payload.planner_contract as Record<string, unknown>)
+                : null;
+            if (plannerRecord && Array.isArray(plannerRecord.plan_items)) {
+              const planIds = new Set(
+                (plannerRecord.plan_items as Array<Record<string, unknown>>)
+                  .map((step) => String(step.id ?? step.step_id ?? ""))
+                  .filter(Boolean),
+              );
+              const promotedPlanItems = promotedTrace
+                .filter((step) => !planIds.has(String(step.id ?? "")))
+                .map((step) => ({ ...step, status: "planned" }));
+              if (promotedPlanItems.length > 0) {
+                plannerRecord.plan_items = [...(plannerRecord.plan_items as unknown[]), ...promotedPlanItems];
+              }
+            }
+          }
+        }
+      }
+    };
+    const attachTurnTruthTable = (terminalText: string | null, terminalSource: "backend" | "runtime" | "fallback"): void => {
+      const plannerRecord =
+        payload.planner_contract && typeof payload.planner_contract === "object"
+          ? (payload.planner_contract as Record<string, unknown>)
+          : null;
+      const runtimeSummary =
+        payload.turn_runtime && typeof payload.turn_runtime === "object"
+          ? (payload.turn_runtime as Record<string, unknown>)
+          : null;
+      const runtimeTerminal =
+        runtimeSummary?.terminal && typeof runtimeSummary.terminal === "object"
+          ? (runtimeSummary.terminal as Record<string, unknown>)
+          : null;
+      const actionEnvelope =
+        payload.action_envelope && typeof payload.action_envelope === "object" ? payload.action_envelope : null;
+      const selectedTool =
+        payload.workspace_action && typeof payload.workspace_action === "object"
+          ? payload.workspace_action
+          : plannerRecord?.selected_action && typeof plannerRecord.selected_action === "object"
+            ? plannerRecord.selected_action
+            : actionEnvelope &&
+                Array.isArray((actionEnvelope as { workstation_actions?: unknown }).workstation_actions)
+              ? ((actionEnvelope as { workstation_actions?: unknown[] }).workstation_actions ?? [])[0] ?? null
+              : null;
+      const runtimeTerminalText =
+        typeof runtimeTerminal?.text === "string" && runtimeTerminal.text.trim()
+          ? runtimeTerminal.text.trim()
+          : null;
+      const payloadText =
+        typeof payload.assistant_answer === "string" && payload.assistant_answer.trim()
+          ? payload.assistant_answer.trim()
+          : typeof payload.text === "string" && payload.text.trim()
+            ? payload.text.trim()
+            : typeof payload.answer === "string" && payload.answer.trim()
+              ? payload.answer.trim()
+              : null;
+      const resolvedTerminalText = runtimeTerminalText ?? terminalText ?? payloadText;
+      const resolvedTerminalSource = runtimeTerminalText ? "runtime" : terminalSource;
+      const truthTable = {
+        schema: "helix.ask.turn_truth_table.v1",
+        question: (options?.questionSeed ?? transcriptSeed).trim(),
+        turn_id:
+          typeof payload.turn_id === "string"
+            ? payload.turn_id
+            : typeof incoming.turnId === "string"
+              ? incoming.turnId
+              : null,
+        trace_id:
+          typeof payload.trace_id === "string"
+            ? payload.trace_id
+            : typeof incoming.traceId === "string"
+              ? incoming.traceId
+              : null,
+        route_reason_code: typeof payload.route_reason_code === "string" ? payload.route_reason_code : null,
+        dispatch_policy:
+          typeof payload.dispatch_policy === "string"
+            ? payload.dispatch_policy
+            : plannerRecord && typeof plannerRecord.dispatch_policy === "string"
+              ? plannerRecord.dispatch_policy
+              : null,
+        selected_tool: selectedTool ?? null,
+        plan_items: Array.isArray(plannerRecord?.plan_items) ? plannerRecord?.plan_items : [],
+        execution_trace: Array.isArray(payload.execution_trace) ? payload.execution_trace : [],
+        runtime_observations: Array.isArray(runtimeSummary?.observations) ? runtimeSummary?.observations : [],
+        pending_transition: {
+          status_before: typeof payload.pending_status_before === "string" ? payload.pending_status_before : null,
+          status_after: typeof payload.pending_status_after === "string" ? payload.pending_status_after : null,
+          reason:
+            typeof payload.pending_transition_reason === "string"
+              ? payload.pending_transition_reason
+              : typeof payload.pending_resolution_reason === "string"
+                ? payload.pending_resolution_reason
+                : null,
+          request_id: typeof payload.pending_request_id === "string" ? payload.pending_request_id : null,
+        },
+        terminal: {
+          kind:
+            typeof runtimeTerminal?.kind === "string"
+              ? runtimeTerminal.kind
+              : typeof payload.final_status === "string"
+                ? payload.final_status
+                : null,
+          text: resolvedTerminalText,
+          source: resolvedTerminalSource,
+        },
+        invariant_violations: Array.isArray(payload.invariant_violations) ? payload.invariant_violations : [],
+        event_audit: {
+          backend_event_count: Array.isArray(payload.turn_events) ? payload.turn_events.length : 0,
+          visible_event_count: Array.isArray(payload.turn_transcript_events) ? payload.turn_transcript_events.length : 0,
+          event_source: typeof payload.turn_transcript_source === "string" ? payload.turn_transcript_source : null,
+          stream_mode: typeof payload.stream_mode === "string" ? payload.stream_mode : null,
+          stream_replay: payload.stream_replay === true,
+          terminal_mismatch: Boolean(
+            resolvedTerminalText &&
+              payloadText &&
+              String(resolvedTerminalText).trim() !== String(payloadText).trim(),
+          ),
+        },
+      };
+      payload.turn_truth_table = truthTable;
+      if ((incoming as { debug?: unknown }).debug === true || (payload.debug && typeof payload.debug === "object")) {
+        payload.debug = {
+          ...(payload.debug && typeof payload.debug === "object" ? (payload.debug as Record<string, unknown>) : {}),
+          turn_truth_table: truthTable,
+        };
+      }
+    };
+    const attachAgentLoopAudit = (): void => {
+      const plannerRecord =
+        payload.planner_contract && typeof payload.planner_contract === "object"
+          ? (payload.planner_contract as Record<string, unknown>)
+          : null;
+      const runtimeSummary =
+        payload.turn_runtime && typeof payload.turn_runtime === "object"
+          ? (payload.turn_runtime as Record<string, unknown>)
+          : null;
+      const pendingRequest =
+        payload.pending_server_request && typeof payload.pending_server_request === "object"
+          ? payload.pending_server_request
+          : payload.pending_request && typeof payload.pending_request === "object"
+            ? payload.pending_request
+            : null;
+      const actionEnvelope =
+        payload.action_envelope && typeof payload.action_envelope === "object" ? payload.action_envelope : null;
+      const firstAction =
+        actionEnvelope &&
+        Array.isArray((actionEnvelope as { workstation_actions?: unknown }).workstation_actions)
+          ? ((actionEnvelope as { workstation_actions?: unknown[] }).workstation_actions ?? [])[0]
+          : payload.workspace_action && typeof payload.workspace_action === "object"
+            ? payload.workspace_action
+            : plannerRecord?.selected_action && typeof plannerRecord.selected_action === "object"
+              ? plannerRecord.selected_action
+              : null;
+      payload.agent_loop_audit = {
+        schema: "helix.ask.agent_loop_audit.v1",
+        trace_id:
+          typeof payload.trace_id === "string"
+            ? payload.trace_id
+            : typeof incoming.traceId === "string"
+              ? incoming.traceId
+              : null,
+        turn_id:
+          typeof payload.turn_id === "string"
+            ? payload.turn_id
+            : typeof incoming.turnId === "string"
+              ? incoming.turnId
+              : null,
+        route_reason_code: typeof payload.route_reason_code === "string" ? payload.route_reason_code : null,
+        dispatch_policy:
+          plannerRecord && typeof plannerRecord.dispatch_policy === "string" ? plannerRecord.dispatch_policy : null,
+        selected_action: firstAction ?? null,
+        planner_contract: plannerRecord,
+        execution_trace: Array.isArray(payload.execution_trace) ? payload.execution_trace : [],
+        execution_lifecycle: Array.isArray(payload.execution_lifecycle) ? payload.execution_lifecycle : [],
+        step_results: Array.isArray(payload.step_results) ? payload.step_results : [],
+        runtime_summary: runtimeSummary,
+        artifact_store_keys: Array.isArray(runtimeSummary?.artifact_keys) ? runtimeSummary?.artifact_keys : [],
+        pending_request: pendingRequest,
+        pending_intercepted_turn: payload.pending_intercepted_turn === true,
+        pending_interception_reason:
+          typeof payload.pending_interception_reason === "string" ? payload.pending_interception_reason : null,
+        workspace_context_snapshot:
+          payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+            ? payload.workspace_context_snapshot
+            : null,
+        action_envelope: actionEnvelope,
+        terminal_contract:
+          payload.turn_contract && typeof payload.turn_contract === "object" ? payload.turn_contract : null,
+        invariant_violations: Array.isArray(payload.invariant_violations) ? payload.invariant_violations : [],
+        latest_result_artifact:
+          payload.latest_result_artifact && typeof payload.latest_result_artifact === "object"
+            ? payload.latest_result_artifact
+            : null,
+        turn_truth_table:
+          payload.turn_truth_table && typeof payload.turn_truth_table === "object" ? payload.turn_truth_table : null,
+        turn_transcript_events: Array.isArray(payload.turn_transcript_events) ? payload.turn_transcript_events : [],
+        turn_transcript_source:
+          typeof payload.turn_transcript_source === "string" ? payload.turn_transcript_source : null,
+      };
+    };
     if (status >= 400) {
       payload.final_status = "final_failure";
       payload.terminal_error_code = String(payload.terminal_error_code ?? payload.error ?? `http_${status}`);
+      const failureTerminalText =
+        typeof payload.text === "string" && payload.text.trim()
+          ? payload.text.trim()
+          : typeof payload.message === "string" && payload.message.trim()
+            ? payload.message.trim()
+            : String(payload.error ?? `http_${status}`);
+      payload.terminal_artifact = {
+        kind: "final_failure",
+        text: failureTerminalText,
+        source_step_id: null,
+        turn_id: typeof payload.turn_id === "string" ? payload.turn_id : typeof incoming.turnId === "string" ? incoming.turnId : null,
+        trace_id: typeof payload.trace_id === "string" ? payload.trace_id : typeof incoming.traceId === "string" ? incoming.traceId : null,
+        created_at_ms: Date.now(),
+      };
+      turnContract.terminal_text = failureTerminalText;
+      turnContract.terminal_source = "terminal_artifact";
+      const transitionErrorCode = resolveAskTurnTransitionErrorCode(payload);
+      if (transitionErrorCode) {
+        payload.turn_transition_error_code = transitionErrorCode;
+        payload.turn_transition_error_class = "turnTransition";
+      }
       payload.terminal_contract_version = "v1";
+      attachAskTurnAsyncMetadataToPayload(payload);
+      attachRuntimeSummary(failureTerminalText, true);
+      attachAskTurnEventsToPayload(payload, failureTerminalText, "final_failure");
+      attachTurnTruthTable(failureTerminalText, "backend");
+      attachAgentLoopAudit();
       normalizeAskTurnTopLevelEnvelope(payload, status);
       return res.status(status).json(payload);
     }
@@ -69764,17 +76801,162 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       payload.answer = "";
     }
     const candidateText = extractHelixAskResponseTextForHistory(payload);
-    const finalText = ensureAskTurnTerminalText(candidateText, options?.questionSeed ?? transcriptSeed);
+    let finalText = ensureAskTurnTerminalText(candidateText, options?.questionSeed ?? transcriptSeed);
+    const questionSeed = (options?.questionSeed ?? transcriptSeed).trim();
+    if (isAskTurnDocIdentityIntent(questionSeed) && HELIX_ASK_TURN_GENERIC_TERMINAL_RE.test(finalText)) {
+      const snapshot =
+        payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+          ? (payload.workspace_context_snapshot as Record<string, unknown>)
+          : null;
+      const activeDocPath = typeof snapshot?.activeDocPath === "string" ? snapshot.activeDocPath.trim() : "";
+      finalText = activeDocPath
+        ? `You are currently on: ${activeDocPath}`
+        : "No active doc in workspace context. Open a doc first or provide a doc path.";
+    }
+    finalText = buildAskTurnAssistantAnswerFromState({
+      payload,
+      questionSeed,
+      currentText: finalText,
+    });
+    const plannerRecordForComposer =
+      payload.planner_contract && typeof payload.planner_contract === "object"
+        ? (payload.planner_contract as Record<string, unknown>)
+        : null;
+    const selectedActionForComposer =
+      payload.workspace_action && typeof payload.workspace_action === "object"
+        ? (payload.workspace_action as HelixAskTurnSelectedAction)
+        : plannerRecordForComposer?.selected_action && typeof plannerRecordForComposer.selected_action === "object"
+          ? (plannerRecordForComposer.selected_action as HelixAskTurnSelectedAction)
+          : null;
+    const observationFinal = buildAskTurnObservationGroundedFinalAnswer({
+      transcript: questionSeed,
+      executionTrace: Array.isArray(payload.execution_trace) ? (payload.execution_trace as HelixAskTurnPlanStep[]) : [],
+      stepResults: Array.isArray(payload.step_results)
+        ? (payload.step_results as ReturnType<typeof buildAskTurnStepResults>)
+        : [],
+      runtime:
+        asyncRuntimeSummary ?? (payload.turn_runtime && typeof payload.turn_runtime === "object"
+          ? (payload.turn_runtime as HelixAskTurnRuntimeSummary)
+          : null),
+      workspaceSnapshot:
+        payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+          ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
+          : null,
+      selectedAction: selectedActionForComposer,
+      candidateText: finalText,
+    });
+    if (observationFinal.text.trim()) {
+      finalText = observationFinal.text.trim();
+    }
+    payload.final_composer_used = observationFinal.source !== "turn_final_text" || !observationFinal.contract_pass;
+    payload.final_composer_source = observationFinal.source;
+    payload.final_composer_consumed_artifacts = observationFinal.consumed_artifacts;
+    payload.final_composer_contract_pass = observationFinal.contract_pass;
+    payload.final_composer_fail_reason = observationFinal.fail_reason;
+    const finalQualityIntentFamily = classifyAskTurnQualityIntentFamily(questionSeed);
+    const observationGroundedTerminal = Boolean(observationFinal.text.trim() && observationFinal.source !== "turn_final_text");
+    const noteReceiptTerminal = Boolean(buildAskTurnModelAppendedNoteReceiptText(payload, questionSeed));
+    const finalQualityValidation = noteReceiptTerminal || observationGroundedTerminal
+      ? { pass: true, fail_reason: null as string | null }
+      : validateReasoningFinalByIntent({
+          intent: finalQualityIntentFamily,
+          text: finalText,
+          transcript: questionSeed,
+        });
+    if (!finalQualityValidation.pass && finalQualityIntentFamily !== "other") {
+      const repairedFinalText = repairReasoningFinalByIntent({
+        intent: finalQualityIntentFamily,
+        transcript: questionSeed,
+        workspaceSnapshot:
+          payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+            ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
+            : null,
+        selectedAction:
+          payload.workspace_action && typeof payload.workspace_action === "object"
+            ? (payload.workspace_action as HelixAskTurnSelectedAction)
+            : payload.planner_contract &&
+                typeof payload.planner_contract === "object" &&
+                (payload.planner_contract as Record<string, unknown>).selected_action &&
+                typeof (payload.planner_contract as Record<string, unknown>).selected_action === "object"
+              ? ((payload.planner_contract as Record<string, unknown>).selected_action as HelixAskTurnSelectedAction)
+              : null,
+        evidenceRefs: extractEvidenceRefsFromResponsePayload(payload),
+      });
+      if (repairedFinalText.trim()) {
+        finalText = repairedFinalText.trim();
+        payload.quality_contract_repair_applied = true;
+        const repairedValidation = validateReasoningFinalByIntent({
+          intent: finalQualityIntentFamily,
+          text: finalText,
+          transcript: questionSeed,
+        });
+        finalQualityValidation.pass = repairedValidation.pass;
+        finalQualityValidation.fail_reason = repairedValidation.fail_reason;
+      }
+    }
+    if (payload.quality_contract_intent_family === undefined) {
+      payload.quality_contract_intent_family = finalQualityIntentFamily;
+    }
+    if (payload.quality_contract_pass === undefined || (payload.quality_contract_pass === false && finalQualityValidation.pass)) {
+      payload.quality_contract_pass = finalQualityValidation.pass;
+      payload.quality_contract_fail_reason = finalQualityValidation.fail_reason;
+    }
+    const asyncTerminal =
+      asyncRuntimeSummary?.terminal && typeof asyncRuntimeSummary.terminal === "object"
+        ? asyncRuntimeSummary.terminal
+        : null;
+    const resolvedFinalStatus: "final_answer" | "final_failure" =
+      asyncTerminal?.kind === "final_failure" ? "final_failure" : "final_answer";
+    if (asyncTerminal?.kind === "final_failure" && typeof asyncTerminal.text === "string" && asyncTerminal.text.trim()) {
+      finalText = asyncTerminal.text.trim();
+      payload.terminal_error_code = asyncTerminal.error_code ?? payload.terminal_error_code ?? "runtime_final_failure";
+    }
     const fallbackApplied = !candidateText || candidateText.trim() !== finalText;
+    payload.assistant_answer = finalText;
+    payload.agent_loop_summary = buildAskTurnAgentLoopSummaryText(payload);
     payload.text = finalText;
     if (typeof payload.answer !== "string" || !payload.answer.trim() || fallbackApplied) {
       payload.answer = finalText;
     }
-    payload.final_status = "final_answer";
+    if (payload.envelope && typeof payload.envelope === "object") {
+      (payload.envelope as Record<string, unknown>).answer = finalText;
+      (payload.envelope as Record<string, unknown>).assistant_answer = finalText;
+    }
+    payload.final_status = resolvedFinalStatus;
+    payload.latest_result_artifact = {
+      kind: "turn_final_text",
+      text: finalText,
+      turn_id: typeof payload.turn_id === "string" ? payload.turn_id : typeof incoming.turnId === "string" ? incoming.turnId : null,
+      trace_id: typeof payload.trace_id === "string" ? payload.trace_id : typeof incoming.traceId === "string" ? incoming.traceId : null,
+      created_at_ms: Date.now(),
+    };
+    payload.terminal_artifact = {
+      kind: resolvedFinalStatus,
+      text: finalText,
+      source_step_id: resolveAskTurnTerminalSourceStepId(payload),
+      turn_id: typeof payload.turn_id === "string" ? payload.turn_id : typeof incoming.turnId === "string" ? incoming.turnId : null,
+      trace_id: typeof payload.trace_id === "string" ? payload.trace_id : typeof incoming.traceId === "string" ? incoming.traceId : null,
+      created_at_ms: Date.now(),
+    };
+    turnContract.terminal_text = finalText;
+    turnContract.terminal_source = "terminal_artifact";
+    if (sessionId && shouldStoreAskTurnLatestResultArtifact(payload)) {
+      helixAskTurnLatestResultArtifactBySession.set(sessionId, payload.latest_result_artifact as HelixAskTurnResultArtifact);
+    }
     if (fallbackApplied) {
       payload.fallback_applied = true;
     }
+    const transitionErrorCode = resolveAskTurnTransitionErrorCode(payload);
+    if (transitionErrorCode) {
+      payload.turn_transition_error_code = transitionErrorCode;
+      payload.turn_transition_error_class = "turnTransition";
+    }
     payload.terminal_contract_version = "v1";
+    attachAskTurnAsyncMetadataToPayload(payload);
+    attachRuntimeSummary(finalText, false);
+    attachAskTurnEventsToPayload(payload, finalText, resolvedFinalStatus);
+    attachTurnTruthTable(finalText, fallbackApplied ? "fallback" : "backend");
+    attachAgentLoopAudit();
     normalizeAskTurnTopLevelEnvelope(payload, status);
     return res.status(status).json(payload);
   };
@@ -69818,6 +77000,16 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     .replace(PREEMIT_TERMINAL_TEST_MARKER, "")
     .replace(FORCE_EXPIRE_PENDING_TEST_MARKER, "")
     .trim();
+  inputChars = transcript.length;
+  if (HELIX_E8_24_TURN_INPUT_BUDGET_GATE_FLAG && inputChars > inputMaxChars) {
+    inputBudgetApplied = true;
+    inputChunkStrategy = "deterministic_split";
+    turnInputChunks = buildPromptChunks(transcript, {
+      chunkTokens: HELIX_E8_24_TURN_INPUT_CHUNK_TOKENS,
+      overlapTokens: HELIX_E8_24_TURN_INPUT_CHUNK_OVERLAP_TOKENS,
+    }).slice(0, HELIX_E8_24_TURN_INPUT_MAX_CHUNKS);
+    inputChunkCount = turnInputChunks.length;
+  }
   if (preemitTerminalForTest) {
     terminalEmissionCount = 1;
   }
@@ -69854,6 +77046,19 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       }
     | null = null;
   const conversationPendingKey = sessionId ?? null;
+  const incomingWorkspaceSnapshot = normalizeIncomingAskTurnWorkspaceSnapshot({
+    sessionId,
+    snapshot: parsed.data.workspace_context_snapshot,
+  });
+  const storedWorkspaceSnapshot =
+    HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG && sessionId
+      ? helixAskTurnWorkspaceSnapshotBySession.get(sessionId) ?? null
+      : null;
+  const workspaceSessionSnapshot = mergeAskTurnWorkspaceSnapshots({
+    incoming: incomingWorkspaceSnapshot,
+    stored: storedWorkspaceSnapshot,
+  });
+  const reasoningContextMode = resolveAskTurnReasoningContextMode(parsed.data.context_mode);
   let existingPendingRequest =
     conversationPendingKey ? helixConversationPendingInputBySession.get(conversationPendingKey) ?? null : null;
   let pendingStatusBefore:
@@ -69899,38 +77104,290 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     applied: false,
     reason: null,
   };
+  let pendingResolutionHardFailure:
+    | {
+        error: string;
+        terminal_error_code: string;
+        message: string;
+      }
+    | null = null;
+  const resolvePendingConfirmAction = (
+    record: HelixConversationPendingInputRecord,
+  ): HelixAskTurnSelectedAction | null => {
+    if (record.candidateAction) return record.candidateAction;
+    const promptActionMatch = record.prompt.match(/"([^"]+)"/);
+    const artifactTranscript = promptActionMatch?.[1]?.trim() ?? "";
+    if (!artifactTranscript) return null;
+    const replaySelection = resolveAskTurnActionSelection({
+      transcript: artifactTranscript,
+      dispatchPolicy: "workspace_only",
+      sessionId,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    if (replaySelection.valid && replaySelection.fail_reason === "none") {
+      return replaySelection.action;
+    }
+    return null;
+  };
   const incomingIntentFamily = inferAskTurnIntentFamily(transcript);
   const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
-
-  if (
-    existingPendingRequest &&
-    existingPendingRequest.turnId !== turnId &&
-    existingPendingRequest.pendingScope === "artifact_gate"
-  ) {
-    const explicitCancel = HELIX_CONVERSATION_REJECT_TOKEN_RE.test(normalizedTranscript);
-    const sameFamily =
-      (existingPendingRequest.originActionFamily ?? "") === incomingIntentFamily ||
-      incomingIntentFamily === "compare";
-    const conversationalEscape = incomingIntentFamily === "conversation" && !explicitCancel;
-    const shouldAbortForEscape = !explicitCancel && (!sameFamily || conversationalEscape);
-    if (shouldAbortForEscape) {
-      pendingStatusBefore = existingPendingRequest.status ?? "pending";
-      pendingRequestId = existingPendingRequest.requestId;
-      recordPendingTransition(
-        "aborted_turn_transition",
-        conversationalEscape ? "artifact_gate_conversation_escape_abort" : "artifact_gate_intent_switch_abort",
-      );
-      if (conversationPendingKey) {
-        helixConversationPendingInputBySession.delete(conversationPendingKey);
-      }
-      existingPendingRequest = null;
+  if (!existingPendingRequest && isAskTurnDocIdentityIntent(transcript) && !isAskTurnDocIdentityExplainHybridIntent(transcript)) {
+    const activeDocPath = typeof workspaceSessionSnapshot?.activeDocPath === "string" ? workspaceSessionSnapshot.activeDocPath.trim() : "";
+    if (reasoningContextMode !== "isolated" && hasValidAskTurnDocContext(workspaceSessionSnapshot)) {
+      const docIdentityText = activeDocPath
+        ? `You are currently on: ${activeDocPath}`
+        : "Docs Viewer is open, but no exact active document path is available in workspace context.";
+      const docIdentityAction: HelixAskTurnSelectedAction = {
+        panel_id: "docs-viewer",
+        action_id: "identify_current_doc",
+        args: activeDocPath ? { path: activeDocPath } : {},
+      };
+      const docIdentityCapabilityTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [
+        {
+          missing_artifact: "doc_context",
+          candidate_capabilities: ["docs-viewer.identify_current_doc"],
+          selected_capability: "docs-viewer.identify_current_doc",
+          reject_reasons: [],
+        },
+      ];
+      return respondAskTurn(200, {
+        ok: true,
+        text: docIdentityText,
+        answer: docIdentityText,
+        mode: "act",
+        trace_id: traceId,
+        turn_id: turnId,
+        dispatch: {
+          dispatch_hint: true,
+          reason: "dispatch:act",
+        },
+        route_reason_code: "dispatch:act",
+        route: "dispatch:act",
+        lane: "conversation",
+        dispatch_policy: "workspace_only",
+        workspace_action: docIdentityAction,
+        response_type: "final_answer",
+        needs_confirmation: false,
+        brief: {
+          text: docIdentityText,
+          source: "none",
+        },
+        pending_server_request: null,
+        planner_contract: {
+          enabled: true,
+          source: "deterministic",
+          restate: buildAskTurnDeterministicRestate({
+            transcript,
+            dispatchPolicy: "workspace_only",
+            routeReasonCode: "dispatch:act",
+          }),
+          dispatch_policy: "workspace_only",
+          plan_items: [
+            {
+              id: "workspace_action",
+              lane: "workspace",
+              status: "completed",
+              title: `Identify active docs viewer context for "${clipConversationText(transcript, 90)}".`,
+              action: docIdentityAction,
+            },
+          ],
+          plan_steps: [
+            {
+              id: "workspace_action",
+              lane: "workspace",
+              status: "completed",
+              title: `Identify active docs viewer context for "${clipConversationText(transcript, 90)}".`,
+              action: docIdentityAction,
+            },
+          ],
+          executed_step_count: 1,
+          failed_step_count: 0,
+          suppressed_step_count: 0,
+          action_candidates_count: HELIX_ASK_TURN_CAPABILITY_ACTIONS.length,
+          selected_action: docIdentityAction,
+          selection_source: "deterministic",
+          selection_valid: true,
+          selection_fail_reason: "none",
+          selection_missing_required_args: [],
+          planner_repair_attempted: false,
+          planner_repair_applied: false,
+          planner_repair_reason: null,
+          pending_resolution_attempted: false,
+          pending_resolution_applied: false,
+          pending_resolution_reason: null,
+          single_terminal_required: true,
+        },
+        execution_trace: [
+          {
+            id: "workspace_action",
+            lane: "workspace",
+            status: "completed",
+            title: `Identify active docs viewer context for "${clipConversationText(transcript, 90)}".`,
+            action: docIdentityAction,
+          },
+        ],
+        execution_lifecycle: [
+          {
+            step_id: "workspace_action",
+            lane: "workspace",
+            transitions: ["planned", "started", "completed"],
+            final_status: "completed",
+          },
+        ],
+        capability_selection_trace: docIdentityCapabilityTrace,
+        step_results: [
+          {
+            step_id: "workspace_action",
+            lane: "workspace",
+            status: "completed",
+            reason: null,
+            blocked_by_missing_artifacts: [],
+            consumed_artifacts: [],
+            produced_artifacts: ["workspace_context", "doc_context"],
+            action: docIdentityAction,
+          },
+        ],
+        workspace_context_mode: reasoningContextMode,
+        workspace_context_snapshot: workspaceSessionSnapshot,
+        turn_contract: {
+          lane: "conversation",
+          terminal_kind: "conversation",
+          route_reason_code: "dispatch:act",
+          dispatch_hint: true,
+          single_terminal_required: true,
+        },
+      });
     }
+    const missingDocPrompt =
+      reasoningContextMode === "isolated"
+        ? "This turn is isolated from workspace context. Open a doc first or provide a doc path."
+        : "No active doc in workspace context. Open a doc first or provide a doc path.";
+    const pendingIdentityRequestId = `pending:${crypto.randomUUID()}`;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: pendingIdentityRequestId,
+        kind: "clarify",
+        reason: "clarify:missing_args",
+        prompt: missingDocPrompt,
+        createdAtMs: Date.now(),
+        requiredFields: ["doc_reference"],
+        unresolvedFields: ["doc_reference"],
+        candidateAction: null,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
+    return respondAskTurn(200, {
+      ok: true,
+      text: missingDocPrompt,
+      answer: missingDocPrompt,
+      mode: "observe",
+      trace_id: traceId,
+      turn_id: turnId,
+      dispatch: {
+        dispatch_hint: false,
+        reason: "clarify:missing_args",
+      },
+      route_reason_code: "clarify:missing_args",
+      needs_confirmation: false,
+      pending_server_request: {
+        request_id: pendingIdentityRequestId,
+        kind: "clarify",
+        reason: "clarify:missing_args",
+        prompt: missingDocPrompt,
+        required_fields: ["doc_reference"],
+        unresolved_fields: ["doc_reference"],
+        candidate_action: null,
+        pending_scope: "artifact_gate",
+        status: "pending",
+      },
+      turn_contract: {
+        lane: "clarify",
+        terminal_kind: "clarify",
+        route_reason_code: "clarify:missing_args",
+        dispatch_hint: false,
+        single_terminal_required: true,
+      },
+    });
   }
-  const dispatchPolicyLock = resolveAskTurnDispatchPolicyLock({
+
+  // Keep artifact-gate pending ownership until explicit resolve/cancel/expire.
+  // This prevents bypassing retrieval-required input collection with unrelated turns.
+  // Keep action-args clarify ownership on this turn until resolved/canceled.
+  // This prevents route/plan drift by ensuring pending-input contracts are handled
+  // before any new execution planning is considered.
+  let dispatchPolicyLock = resolveAskTurnDispatchPolicyLock({
     transcript,
     existingPendingKind: existingPendingRequest?.kind ?? null,
     multilangConfirm: parsed.data.multilangConfirm === true,
+    workspaceSnapshot: workspaceSessionSnapshot,
+    reasoningContextMode,
   });
+  if (
+    !pendingHandled &&
+    !existingPendingRequest &&
+    HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG &&
+    reasoningContextMode !== "isolated" &&
+    shouldUseAskTurnDeicticWorkspaceContext(transcript) &&
+    !hasValidAskTurnDocContext(workspaceSessionSnapshot)
+  ) {
+    const deicticPrompt =
+      "I need a current document context first. Open a doc (or provide a doc path) and then ask again.";
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "clarify",
+        confidence: Math.max(routeDecision.classification.confidence, 0.9),
+        dispatch_hint: false,
+        clarify_needed: true,
+        reason: "Deictic request requires attached doc context.",
+      },
+      routeReasonCode: "clarify:missing_args",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "clarify",
+        routeReasonCode: "clarify:missing_args",
+      }),
+    };
+    briefText = deicticPrompt;
+    pendingServerRequest = {
+      request_id: `pending:${crypto.randomUUID()}`,
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: deicticPrompt,
+      required_fields: ["doc_reference"],
+      unresolved_fields: ["doc_reference"],
+      candidate_action: null,
+      pending_scope: "artifact_gate",
+      status: "pending",
+    };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: pendingServerRequest.request_id,
+        kind: pendingServerRequest.kind,
+        reason: pendingServerRequest.reason,
+        prompt: pendingServerRequest.prompt,
+        createdAtMs: Date.now(),
+        requiredFields: ["doc_reference"],
+        unresolvedFields: ["doc_reference"],
+        candidateAction: null,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
+  }
 
   if (existingPendingRequest && existingPendingRequest.turnId !== turnId) {
     pendingHandled = true;
@@ -69939,10 +77396,78 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     pendingRequestId = existingPendingRequest.requestId;
     const confirmed = parsed.data.multilangConfirm === true || HELIX_CONVERSATION_CONFIRM_TOKEN_RE.test(normalizedTranscript);
     const rejected = HELIX_CONVERSATION_REJECT_TOKEN_RE.test(normalizedTranscript);
-    if (existingPendingRequest.kind === "confirm") {
+    const pendingOriginFamily = existingPendingRequest.originActionFamily ?? "conversation";
+    const incomingWorkspaceSelection = resolveAskTurnActionSelection({
+      transcript,
+      dispatchPolicy: "workspace_only",
+      sessionId,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    const incomingConversationOnly =
+      incomingIntentFamily === "conversation" &&
+      !confirmed &&
+      !rejected &&
+      !shouldPreferWorkspaceDispatch(transcript) &&
+      !HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalizedTranscript) &&
+      !HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalizedTranscript);
+    const newPromptIsExecutableGoal =
+      shouldPreferWorkspaceDispatch(transcript) ||
+      isAskTurnDocIdentityIntent(transcript) ||
+      isAskTurnDocLocateIntent(transcript) ||
+      Boolean(incomingWorkspaceSelection.action && incomingWorkspaceSelection.valid);
+    const canSupersedePendingClarify =
+      existingPendingRequest.kind === "clarify" &&
+      !confirmed &&
+      !rejected &&
+      existingPendingRequest.pendingScope !== "confirm" &&
+      (newPromptIsExecutableGoal ||
+        (!HELIX_E9_4_STRICT_PENDING_OWNERSHIP_FLAG &&
+          incomingIntentFamily !== "conversation" &&
+          incomingIntentFamily !== pendingOriginFamily));
+    if (incomingConversationOnly && existingPendingRequest.kind === "clarify") {
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.delete(conversationPendingKey);
+      }
+      pendingHandled = false;
+      existingPendingRequest = null;
+      dispatchPolicyLock = resolveAskTurnDispatchPolicyLock({
+        transcript,
+        existingPendingKind: null,
+        multilangConfirm: parsed.data.multilangConfirm === true,
+        workspaceSnapshot: workspaceSessionSnapshot,
+        reasoningContextMode,
+      });
+      pendingResolution = {
+        attempted: true,
+        applied: true,
+        reason: "pending_cleared_for_unrelated_conversation",
+      };
+      recordPendingTransition("aborted_turn_transition", "pending_cleared_for_unrelated_conversation");
+    } else if (canSupersedePendingClarify) {
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.delete(conversationPendingKey);
+      }
+      pendingHandled = false;
+      existingPendingRequest = null;
+      dispatchPolicyLock = resolveAskTurnDispatchPolicyLock({
+        transcript,
+        existingPendingKind: null,
+        multilangConfirm: parsed.data.multilangConfirm === true,
+        workspaceSnapshot: workspaceSessionSnapshot,
+        reasoningContextMode,
+      });
+      pendingResolution = {
+        attempted: true,
+        applied: true,
+        reason: "pending_superseded_by_new_user_goal",
+      };
+      recordPendingTransition("aborted_turn_transition", "pending_superseded_by_new_user_goal");
+    }
+    if (existingPendingRequest && existingPendingRequest.kind === "confirm") {
       if (confirmed) {
-        if (existingPendingRequest.candidateAction) {
-          resolvedPendingAction = existingPendingRequest.candidateAction;
+        const pendingConfirmAction = resolvePendingConfirmAction(existingPendingRequest);
+        if (pendingConfirmAction) {
+          resolvedPendingAction = pendingConfirmAction;
           routeDecision = {
             ...routeDecision,
             classification: {
@@ -69972,29 +77497,15 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
             applied: false,
             reason: "pending_confirmation_missing_action",
           };
-          routeDecision = {
-            ...routeDecision,
-            classification: {
-              ...routeDecision.classification,
-              mode: "clarify",
-              confidence: Math.max(routeDecision.classification.confidence, 0.9),
-              dispatch_hint: false,
-              clarify_needed: true,
-              reason: "Pending confirmation cannot continue because action context is missing.",
-            },
-            routeReasonCode: "clarify:missing_args",
-            explorationTurn: false,
-            explorationPacket: buildConversationExplorationPacket({
-              transcript,
-              mode: "clarify",
-              routeReasonCode: "clarify:missing_args",
-            }),
-          };
-          briefText = "I couldn't recover the action to confirm. Please restate the action request.";
           if (conversationPendingKey) {
             helixConversationPendingInputBySession.delete(conversationPendingKey);
           }
           recordPendingTransition("canceled", "pending_confirmation_missing_action");
+          pendingResolutionHardFailure = {
+            error: "pending_confirmation_missing_action",
+            terminal_error_code: "pending_resolution_invalid_state",
+            message: "I couldn't recover the stored action to confirm. Please restate the action request.",
+          };
         }
       } else if (rejected) {
         routeDecision = {
@@ -70053,7 +77564,7 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         };
         recordPendingTransition("pending", "pending_confirmation_still_required");
       }
-    } else if (existingPendingRequest.kind === "clarify") {
+    } else if (existingPendingRequest && existingPendingRequest.kind === "clarify") {
       pendingResolution = {
         attempted: true,
         applied: false,
@@ -70164,39 +77675,124 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
               applied: true,
               reason: `target_panel_resolved:${resolvedTargetPanel}`,
             };
-          } else {
+          } else if (existingPendingRequest.candidateAction) {
+            resolvedPendingAction = existingPendingRequest.candidateAction;
             pendingResolution = {
               attempted: true,
               applied: true,
-              reason: "pending_clarify_resolved",
+              reason: "pending_clarify_candidate_action_resolved",
             };
+          } else {
+            pendingResolution = {
+              attempted: true,
+              applied: false,
+              reason: "pending_clarify_missing_action",
+            };
+            routeDecision = {
+              ...routeDecision,
+              classification: {
+                ...routeDecision.classification,
+                mode: "clarify",
+                confidence: Math.max(routeDecision.classification.confidence, 0.9),
+                dispatch_hint: false,
+                clarify_needed: true,
+                reason: "Pending clarification resolved fields but did not map to an executable action.",
+              },
+              routeReasonCode: "clarify:missing_args",
+              explorationTurn: false,
+              explorationPacket: buildConversationExplorationPacket({
+                transcript,
+                mode: "clarify",
+                routeReasonCode: "clarify:missing_args",
+              }),
+            };
+            const fallbackRequiredFields =
+              existingPendingRequest.requiredFields && existingPendingRequest.requiredFields.length > 0
+                ? existingPendingRequest.requiredFields
+                : ["target_panel"];
+            const clarifyPrompt =
+              fallbackRequiredFields.includes("target_panel")
+                ? "Please specify the target panel: docs, notes, or clipboard."
+                : existingPendingRequest.prompt;
+            briefText = clarifyPrompt;
+            pendingServerRequest = {
+              request_id: existingPendingRequest.requestId,
+              kind: existingPendingRequest.kind,
+              reason: "clarify:missing_args",
+              prompt: clarifyPrompt,
+              required_fields: fallbackRequiredFields,
+              unresolved_fields: fallbackRequiredFields,
+              candidate_action: existingPendingRequest.candidateAction ?? null,
+              pending_scope: existingPendingRequest.pendingScope ?? "action_args",
+              status: "pending",
+            };
+            recordPendingTransition("pending", "pending_clarify_still_required");
+            if (conversationPendingKey) {
+              helixConversationPendingInputBySession.set(conversationPendingKey, {
+                ...existingPendingRequest,
+                reason: "clarify:missing_args",
+                prompt: clarifyPrompt,
+                requiredFields: fallbackRequiredFields,
+                unresolvedFields: fallbackRequiredFields,
+                status: "pending",
+              });
+            }
           }
-          routeDecision = {
-            ...routeDecision,
-            classification: {
-              ...routeDecision.classification,
-              mode: "act",
-              confidence: Math.max(routeDecision.classification.confidence, 0.82),
-              dispatch_hint: true,
-              clarify_needed: false,
-              reason: "Pending clarification resolved by user input.",
-            },
-            routeReasonCode: "dispatch:act",
-            explorationTurn: false,
-            explorationPacket: buildConversationExplorationPacket({
-              transcript,
-              mode: "act",
+          if (pendingResolution.applied) {
+            dispatchPolicyLock = "workspace_only";
+            routeDecision = {
+              ...routeDecision,
+              classification: {
+                ...routeDecision.classification,
+                mode: "act",
+                confidence: Math.max(routeDecision.classification.confidence, 0.82),
+                dispatch_hint: true,
+                clarify_needed: false,
+                reason: "Pending clarification resolved by user input.",
+              },
               routeReasonCode: "dispatch:act",
-            }),
-          };
-          briefText = "Thanks. Proceeding with that action now.";
-          if (conversationPendingKey) {
-            helixConversationPendingInputBySession.delete(conversationPendingKey);
+              explorationTurn: false,
+              explorationPacket: buildConversationExplorationPacket({
+                transcript,
+                mode: "act",
+                routeReasonCode: "dispatch:act",
+              }),
+            };
+            briefText = "Thanks. Proceeding with that action now.";
+            if (conversationPendingKey) {
+              helixConversationPendingInputBySession.delete(conversationPendingKey);
+            }
+            recordPendingTransition("resolved", "pending_clarify_resolved");
           }
-          recordPendingTransition("resolved", "pending_clarify_resolved");
         }
       }
     }
+  }
+  if (pendingResolutionHardFailure) {
+    return respondAskTurn(409, {
+      ok: false,
+      error: pendingResolutionHardFailure.error,
+      terminal_error_code: pendingResolutionHardFailure.terminal_error_code,
+      text: pendingResolutionHardFailure.message,
+      answer: pendingResolutionHardFailure.message,
+      route_reason_code: "clarify:missing_args",
+      pending_resolution_attempted: pendingResolution.attempted,
+      pending_resolution_applied: pendingResolution.applied,
+      pending_resolution_reason: pendingResolution.reason,
+      pending_status_before: pendingStatusBefore,
+      pending_status_after: pendingStatusAfter,
+      pending_transition_reason: pendingTransitionReason,
+      pending_transition_trace: pendingTransitionTrace,
+      pending_request_id: pendingRequestId,
+      pending_server_request: null,
+      turn_contract: {
+        lane: "clarify",
+        terminal_kind: "clarify",
+        route_reason_code: "clarify:missing_args",
+        dispatch_hint: false,
+        single_terminal_required: true,
+      },
+    });
   }
 
   if (!pendingHandled && (dispatchPolicyLock === "workspace_only" || shouldPreferWorkspaceDispatch(transcript))) {
@@ -70219,6 +77815,27 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       }),
     };
     briefText = `Running workspace action for: "${clipConversationText(transcript, 120)}".`;
+  }
+  if (!pendingHandled && dispatchPolicyLock === "workspace_context_reasoning") {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        confidence: Math.max(routeDecision.classification.confidence, 0.86),
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: "Deictic follow-up resolved from attached workspace context.",
+      },
+      routeReasonCode: "dispatch:act",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "act",
+        routeReasonCode: "dispatch:act",
+      }),
+    };
+    briefText = `Using current workspace context for: "${clipConversationText(transcript, 120)}".`;
   }
 
   if (!pendingHandled && !existingPendingRequest && HELIX_CONVERSATION_REJECT_TOKEN_RE.test(normalizedTranscript)) {
@@ -70248,6 +77865,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     ? { required: false, routeReasonCode: null, prompt: null }
     : evaluateConversationClarifyRequirement(transcript);
   if (clarifyRequirement.required && clarifyRequirement.routeReasonCode && clarifyRequirement.prompt) {
+    const clarifyRequiredFields =
+      clarifyRequirement.routeReasonCode === "clarify:ambiguous_intent" ? ["target_panel"] : [];
     routeDecision = {
       ...routeDecision,
       classification: {
@@ -70272,8 +77891,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       kind: "clarify",
       reason: clarifyRequirement.routeReasonCode,
       prompt: clarifyRequirement.prompt,
-      required_fields: [],
-      unresolved_fields: [],
+      required_fields: clarifyRequiredFields,
+      unresolved_fields: clarifyRequiredFields,
       candidate_action: null,
       pending_scope: "action_args",
       status: "pending",
@@ -70288,8 +77907,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         reason: pendingServerRequest.reason,
         prompt: pendingServerRequest.prompt,
         createdAtMs: Date.now(),
-        requiredFields: [],
-        unresolvedFields: [],
+        requiredFields: clarifyRequiredFields,
+        unresolvedFields: clarifyRequiredFields,
         candidateAction: null,
         status: "pending",
         pendingScope: "action_args",
@@ -70307,11 +77926,30 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     const confirmCandidateSelection = resolveAskTurnActionSelection({
       transcript,
       dispatchPolicy: "workspace_only",
+      sessionId,
+      workspaceSnapshot: workspaceSessionSnapshot,
     });
-    const confirmCandidateAction =
+    let confirmCandidateAction =
       confirmCandidateSelection.valid && confirmCandidateSelection.fail_reason === "none"
         ? confirmCandidateSelection.action
         : null;
+    if (!confirmCandidateAction) {
+      const destructiveNormalized = transcript.trim().toLowerCase();
+      if (/\bclear\s+(?:the\s+)?clipboard(?:\s+history)?\b/.test(destructiveNormalized)) {
+        confirmCandidateAction = {
+          panel_id: "workstation-clipboard-history",
+          action_id: "clear_history",
+          args: {},
+        };
+      } else if (/\bdelete\s+(?:the\s+)?note\b/.test(destructiveNormalized)) {
+        const noteTitle = resolveAskTurnNoteTargetArg(transcript);
+        confirmCandidateAction = {
+          panel_id: "workstation-notes",
+          action_id: "delete_note",
+          args: noteTitle ? { title: noteTitle } : {},
+        };
+      }
+    }
     const confirmPrompt = `Please confirm before I run this destructive action: "${clipConversationText(
       transcript,
       120,
@@ -70370,12 +78008,17 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
 
   let routeReasonCode = routeDecision.routeReasonCode;
   let dispatchHint = Boolean(routeDecision.classification.dispatch_hint);
+  const pendingResolvedToAct =
+    pendingHandled &&
+    pendingResolution.applied &&
+    routeReasonCode === "dispatch:act" &&
+    Boolean(resolvedPendingAction || existingPendingRequest?.candidateAction);
   let policyLockForSelection =
     pendingServerRequest
       ? "needs_user_input"
-      : routeReasonCode === "dispatch:act"
-        ? "workspace_only"
-        : dispatchPolicyLock ?? inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null });
+      : ((pendingResolvedToAct ? "workspace_only" : dispatchPolicyLock) ?? (routeReasonCode === "dispatch:act"
+          ? "workspace_only"
+          : inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null })));
   let plannerRepair: HelixAskTurnPlannerRepairState = {
     attempted: false,
     applied: false,
@@ -70384,7 +78027,59 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
   let actionSelection = resolveAskTurnActionSelection({
     transcript,
     dispatchPolicy: policyLockForSelection,
+    sessionId,
+    workspaceSnapshot: workspaceSessionSnapshot,
   });
+  if (
+    !pendingHandled &&
+    !pendingServerRequest &&
+    (isAskTurnArtifactToNoteIntent(transcript) || isAskTurnArtifactToClipboardIntent(transcript)) &&
+    actionSelection.fail_reason === "missing_required_args" &&
+    actionSelection.missing_required_args.includes("text")
+  ) {
+    routeReasonCode = "clarify:missing_args";
+    dispatchHint = false;
+    policyLockForSelection = "needs_user_input";
+    briefText = "What result should I save?";
+    pendingServerRequest = {
+      request_id: `pending:${crypto.randomUUID()}`,
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: briefText,
+      required_fields: ["artifact_reference"],
+      unresolved_fields: ["artifact_reference"],
+      candidate_action: actionSelection.action,
+      pending_scope: "artifact_gate",
+      status: "pending",
+    };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: pendingServerRequest.request_id,
+        kind: pendingServerRequest.kind,
+        reason: pendingServerRequest.reason,
+        prompt: pendingServerRequest.prompt,
+        createdAtMs: Date.now(),
+        requiredFields: ["artifact_reference"],
+        unresolvedFields: ["artifact_reference"],
+        candidateAction: actionSelection.action,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
+    actionSelection = {
+      ...actionSelection,
+      action: null,
+      valid: false,
+      fail_reason: "missing_required_args",
+      missing_required_args: ["artifact_reference"],
+    };
+  }
   if (pendingHandled && routeReasonCode === "dispatch:act") {
     if (resolvedPendingAction) {
       actionSelection = {
@@ -70410,6 +78105,112 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         missing_required_args: [],
       };
     }
+  }
+  if (!pendingHandled && !pendingServerRequest && isAskTurnDocIdentityExplainHybridIntent(transcript)) {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: "Hybrid doc identity + explain intent: workspace context then reasoning follow-up.",
+      },
+      routeReasonCode: "dispatch:act",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "act",
+        routeReasonCode: "dispatch:act",
+      }),
+    };
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+    policyLockForSelection = "workspace_context_reasoning";
+    actionSelection = resolveAskTurnActionSelection({
+      transcript,
+      dispatchPolicy: policyLockForSelection,
+      sessionId,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    briefText = `Using current workspace context for: "${clipConversationText(transcript, 120)}".`;
+  }
+  const forceDeterministicActContextReasoning =
+    !pendingHandled &&
+    !pendingServerRequest &&
+    (isAskTurnComposedResearchToNoteIntent(transcript) ||
+      isAskTurnDocNotesHybridCompareIntent(transcript) ||
+      isAskTurnDocDocCompareIntent(transcript) ||
+      isAskTurnSummarizeAndAddToNoteIntent(transcript) ||
+      isAskTurnCompareCopyResultToClipboardIntent(transcript) ||
+      isAskTurnDocsRetrievalToNoteIntent(transcript) ||
+      isAskTurnDocLocateIntent(transcript));
+  if (forceDeterministicActContextReasoning) {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        confidence: Math.max(routeDecision.classification.confidence, 0.84),
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: "Deterministic workspace/reasoning intent contract selected.",
+      },
+      routeReasonCode: "dispatch:act",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "act",
+        routeReasonCode: "dispatch:act",
+      }),
+    };
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+    policyLockForSelection = "workspace_context_reasoning";
+    actionSelection = resolveAskTurnActionSelection({
+      transcript,
+      dispatchPolicy: policyLockForSelection,
+      sessionId,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+  }
+  if (
+    HELIX_E9_3_WORKSPACE_PRECEDENCE_FLAG &&
+    !pendingHandled &&
+    !pendingServerRequest &&
+    actionSelection.valid &&
+    actionSelection.fail_reason === "none" &&
+    actionSelection.action
+  ) {
+    const needsReasoningFollowupForAction =
+      isAskTurnComposedResearchToNoteIntent(transcript) ||
+      isAskTurnDocNotesHybridCompareIntent(transcript) ||
+      isAskTurnDocDocCompareIntent(transcript) ||
+      isAskTurnDocLocateIntent(transcript) ||
+      isAskTurnExplainIntent(transcript) ||
+      isAskTurnDocsRetrievalToNoteIntent(transcript) ||
+      isAskTurnSummarizeAndAddToNoteIntent(transcript);
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        confidence: Math.max(routeDecision.classification.confidence, 0.84),
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: "E9.3 workspace precedence: selected capability action is executable.",
+      },
+      routeReasonCode: "dispatch:act",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "act",
+        routeReasonCode: "dispatch:act",
+      }),
+    };
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+    policyLockForSelection = needsReasoningFollowupForAction ? "workspace_context_reasoning" : "workspace_only";
   }
   if (!pendingHandled && !pendingServerRequest) {
     const repaired = applyAskTurnPlannerRepairPass({
@@ -70534,7 +78335,58 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         });
       }
     } else if (actionSelection.fail_reason === "invalid_action_candidate") {
+      routeDecision = {
+        ...routeDecision,
+        classification: {
+          ...routeDecision.classification,
+          mode: "clarify",
+          confidence: Math.max(routeDecision.classification.confidence, 0.9),
+          dispatch_hint: false,
+          clarify_needed: true,
+          reason: "Workspace action candidate is invalid and requires clarification.",
+        },
+        routeReasonCode: "clarify:missing_args",
+        explorationTurn: false,
+        explorationPacket: buildConversationExplorationPacket({
+          transcript,
+          mode: "clarify",
+          routeReasonCode: "clarify:missing_args",
+        }),
+      };
+      routeReasonCode = "clarify:missing_args";
+      dispatchHint = false;
       briefText = "I could not map that workspace command to a known capability. Please rephrase the target action.";
+      pendingServerRequest = {
+        request_id: `pending:${crypto.randomUUID()}`,
+        kind: "clarify",
+        reason: "clarify:missing_args",
+        prompt: briefText,
+        required_fields: ["action_command"],
+        unresolved_fields: ["action_command"],
+        candidate_action: null,
+        pending_scope: "action_args",
+        status: "pending",
+      };
+      recordPendingTransition("pending", "pending_request_created");
+      pendingRequestId = pendingServerRequest.request_id;
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.set(conversationPendingKey, {
+          turnId,
+          requestId: pendingServerRequest.request_id,
+          kind: pendingServerRequest.kind,
+          reason: pendingServerRequest.reason,
+          prompt: pendingServerRequest.prompt,
+          createdAtMs: Date.now(),
+          requiredFields: ["action_command"],
+          unresolvedFields: ["action_command"],
+          candidateAction: null,
+          status: "pending",
+          pendingScope: "action_args",
+          originIntentHash: incomingIntentHash,
+          originActionFamily: incomingIntentFamily,
+          expiresAtMs: Date.now() + 10 * 60 * 1000,
+        });
+      }
     }
   }
   if (!pendingServerRequest && isAskTurnDocNotesHybridCompareIntent(transcript)) {
@@ -70564,30 +78416,196 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
     transcript,
     selectedAction: actionSelection.action,
+    dispatchPolicy: policyLockForSelection,
   });
+  let initialCapabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [];
+  const initialCapabilityPlan =
+    !pendingServerRequest && !isClarifyTerminal && !isSuppressedTerminal && !isControlConversationTerminal
+      ? selectAskTurnInitialCapabilityPlan({
+          transcript,
+          workspaceSnapshot: workspaceSessionSnapshot,
+          selectedAction: actionSelection.action,
+        })
+      : null;
+  if (initialCapabilityPlan && initialCapabilityPlan.missing_args.length === 0) {
+    precomputedPlanSteps = initialCapabilityPlan.plan_items;
+    initialCapabilitySelectionTrace = initialCapabilityPlan.capability_selection_trace;
+    actionSelection = {
+      ...actionSelection,
+      action: initialCapabilityPlan.selected_action,
+      source: "deterministic",
+      valid: Boolean(initialCapabilityPlan.selected_action),
+      fail_reason: initialCapabilityPlan.selected_action ? "none" : actionSelection.fail_reason,
+      missing_required_args: [],
+    };
+    policyLockForSelection = initialCapabilityPlan.dispatch_policy;
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+  }
+  const explicitPathCompareBudgetGate = shouldGateAskTurnExplicitPathCompare({
+    transcript,
+    inputChars,
+    inputMaxChars,
+    planStepCount: precomputedPlanSteps.length,
+  });
+  if (!pendingServerRequest && explicitPathCompareBudgetGate) {
+    routeReasonCode = "clarify:missing_args";
+    dispatchHint = false;
+    isClarifyTerminal = true;
+    isSuppressedTerminal = false;
+    isControlConversationTerminal = false;
+    const pathRefs = extractAskTurnDocPathArgs(transcript);
+    briefText =
+      "This explicit path compare exceeds the current turn budget. Confirm retrieval scope or shorten the request.";
+    pendingServerRequest = {
+      request_id: `pending:${crypto.randomUUID()}`,
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: briefText,
+      required_fields: ["retrieval_scope"],
+      unresolved_fields: ["retrieval_scope"],
+      candidate_action: actionSelection.action ?? null,
+      pending_scope: "artifact_gate",
+      status: "pending",
+    };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: pendingServerRequest.request_id,
+        kind: pendingServerRequest.kind,
+        reason: pendingServerRequest.reason,
+        prompt: `${briefText} Paths: ${pathRefs.slice(0, 2).join(" | ")}`.trim(),
+        createdAtMs: Date.now(),
+        requiredFields: ["retrieval_scope"],
+        unresolvedFields: ["retrieval_scope"],
+        candidateAction: actionSelection.action ?? null,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
+    precomputedPlanSteps = buildAskTurnPlanSteps({
+      routeReasonCode,
+      pendingServerRequest: { kind: "clarify" },
+      transcript,
+      selectedAction: actionSelection.action,
+      dispatchPolicy: "needs_user_input",
+    });
+  }
+  if (
+    inputBudgetApplied &&
+    !isClarifyTerminal &&
+    !isSuppressedTerminal &&
+    !isControlConversationTerminal &&
+    turnInputChunks.length > 0
+  ) {
+    precomputedPlanSteps = buildAskTurnInputChunkPlanSteps({
+      transcript,
+      chunks: turnInputChunks,
+      includeWorkspaceAction: routeReasonCode === "dispatch:act" && dispatchHint && Boolean(actionSelection.action),
+      selectedAction: actionSelection.action,
+    });
+  }
   let hasReasoningPlanStep = precomputedPlanSteps.some((step) => step.lane === "reasoning");
   let isHybridReasoningTerminal =
     !isClarifyTerminal &&
     !isSuppressedTerminal &&
     !isControlConversationTerminal &&
-    routeReasonCode === "dispatch:act" &&
-    dispatchHint &&
-    hasReasoningPlanStep;
+    hasReasoningPlanStep &&
+    ((routeReasonCode === "dispatch:act" && dispatchHint) || inputBudgetApplied);
   let isActTerminal =
     routeReasonCode === "dispatch:act" && dispatchHint && !isHybridReasoningTerminal;
+  if (isActTerminal) {
+    briefText = buildAskTurnWorkspaceActionReceiptText(actionSelection.action);
+  }
   let executionTerminalKind: "conversation" | "clarify" | "reasoning" = isClarifyTerminal
     ? "clarify"
     : isSuppressedTerminal || isActTerminal || isControlConversationTerminal
       ? "conversation"
       : "reasoning";
-  let executionTrace = buildAskTurnExecutionTrace({
-    planSteps: precomputedPlanSteps,
-    terminalKind: executionTerminalKind,
-    pending: Boolean(pendingServerRequest),
-    transcript,
-  });
-  const blockedMissingArtifacts = collectAskTurnBlockedMissingArtifacts(executionTrace);
-  if (!pendingServerRequest && blockedMissingArtifacts.length > 0) {
+  let executionTrace: HelixAskTurnPlanStep[] = [];
+  let executionLifecycle: HelixAskTurnExecutionLifecycleEvent[] = [];
+  let stepResults: ReturnType<typeof buildAskTurnStepResults> = [];
+  let capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [...initialCapabilitySelectionTrace];
+  let turnEvents: HelixAskTurnEvent[] = [];
+  let runtimeLoopMode: "batch" | "incremental" | "async_incremental" = "batch";
+  if (HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG && HELIX_E9_1_STEP_EXECUTOR_FLAG) {
+    const executionBundle = HELIX_E11_ASYNC_STEP_EXECUTOR_FLAG
+      ? await executeAskTurnAsyncRuntimeLoop({
+          turnId,
+          sessionId,
+          goal: transcript,
+          plannedSteps: precomputedPlanSteps,
+          terminalKind: executionTerminalKind,
+          pending: Boolean(pendingServerRequest),
+          transcript,
+          workspaceSnapshot: workspaceSessionSnapshot,
+          selectedAction: actionSelection.action,
+          eventSink: askTurnEventSink,
+        })
+      : executeAskTurnIncrementalRuntimeLoop({
+          turnId,
+          sessionId,
+          goal: transcript,
+          plannedSteps: precomputedPlanSteps,
+          terminalKind: executionTerminalKind,
+          pending: Boolean(pendingServerRequest),
+          transcript,
+          workspaceSnapshot: workspaceSessionSnapshot,
+          selectedAction: actionSelection.action,
+          eventSink: askTurnEventSink,
+        });
+    precomputedPlanSteps = executionBundle.planSteps;
+    executionTrace = executionBundle.executionTrace;
+    executionLifecycle = executionBundle.executionLifecycle;
+    stepResults = executionBundle.stepResults;
+    capabilitySelectionTrace = [...capabilitySelectionTrace, ...executionBundle.capabilitySelectionTrace];
+    turnEvents = executionBundle.turnEvents;
+    markAskTurnAsyncExecution(executionBundle);
+    runtimeLoopMode = asyncExecutorUsed ? "async_incremental" : "incremental";
+  } else if (HELIX_E9_1_STEP_EXECUTOR_FLAG) {
+    const executionBundle = executeAskTurnPlanItemsWithArtifactContinuation({
+      planSteps: precomputedPlanSteps,
+      terminalKind: executionTerminalKind,
+      pending: Boolean(pendingServerRequest),
+      transcript,
+      workspaceSnapshot: workspaceSessionSnapshot,
+      selectedAction: actionSelection.action,
+    });
+    precomputedPlanSteps = executionBundle.planSteps;
+    executionTrace = executionBundle.executionTrace;
+    executionLifecycle = executionBundle.executionLifecycle;
+    stepResults = executionBundle.stepResults;
+    capabilitySelectionTrace = [...capabilitySelectionTrace, ...executionBundle.capabilitySelectionTrace];
+  } else {
+    executionTrace = buildAskTurnExecutionTrace({
+      planSteps: precomputedPlanSteps,
+      terminalKind: executionTerminalKind,
+      pending: Boolean(pendingServerRequest),
+      transcript,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
+    stepResults = buildAskTurnStepResults(executionTrace);
+  }
+  const blockedMissingArtifacts = Array.from(
+    new Set([...collectAskTurnBlockedMissingArtifacts(executionTrace), ...collectAskTurnUnsatisfiedResultArtifacts(stepResults)]),
+  );
+  const artifactContinuationExhausted =
+    blockedMissingArtifacts.includes("doc_location_matches") &&
+    precomputedPlanSteps.some(
+      (step) => step.action?.panel_id === "docs-viewer" && step.action.action_id === "locate_in_doc" && step.action.args?.locate_strategy === "variant",
+    );
+  const runtimeCanResolveBlockedArtifacts =
+    canAskTurnRuntimeResolveBlockedArtifacts(blockedMissingArtifacts) && !artifactContinuationExhausted;
+  if (runtimeCanResolveBlockedArtifacts) {
+    briefText = `Queued the next tool step to resolve ${blockedMissingArtifacts.join(", ")} before completing the request.`;
+  }
+  if (!pendingServerRequest && blockedMissingArtifacts.length > 0 && !runtimeCanResolveBlockedArtifacts) {
     routeReasonCode = "clarify:missing_args";
     dispatchHint = false;
     isClarifyTerminal = true;
@@ -70633,14 +78651,68 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       pendingServerRequest: { kind: pendingServerRequest.kind },
       transcript,
       selectedAction: actionSelection.action,
+      dispatchPolicy: "needs_user_input",
     });
     hasReasoningPlanStep = precomputedPlanSteps.some((step) => step.lane === "reasoning");
-    executionTrace = buildAskTurnExecutionTrace({
-      planSteps: precomputedPlanSteps,
-      terminalKind: executionTerminalKind,
-      pending: Boolean(pendingServerRequest),
-      transcript,
-    });
+    if (HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG && HELIX_E9_1_STEP_EXECUTOR_FLAG) {
+      const executionBundle = HELIX_E11_ASYNC_STEP_EXECUTOR_FLAG
+        ? await executeAskTurnAsyncRuntimeLoop({
+            turnId,
+            sessionId,
+            goal: transcript,
+            plannedSteps: precomputedPlanSteps,
+            terminalKind: executionTerminalKind,
+            pending: Boolean(pendingServerRequest),
+            transcript,
+            workspaceSnapshot: workspaceSessionSnapshot,
+            selectedAction: actionSelection.action,
+            eventSink: askTurnEventSink,
+          })
+        : executeAskTurnIncrementalRuntimeLoop({
+            turnId,
+            sessionId,
+            goal: transcript,
+            plannedSteps: precomputedPlanSteps,
+            terminalKind: executionTerminalKind,
+            pending: Boolean(pendingServerRequest),
+            transcript,
+            workspaceSnapshot: workspaceSessionSnapshot,
+            selectedAction: actionSelection.action,
+            eventSink: askTurnEventSink,
+          });
+      precomputedPlanSteps = executionBundle.planSteps;
+      executionTrace = executionBundle.executionTrace;
+      executionLifecycle = executionBundle.executionLifecycle;
+      stepResults = executionBundle.stepResults;
+      capabilitySelectionTrace = [...capabilitySelectionTrace, ...executionBundle.capabilitySelectionTrace];
+      turnEvents = executionBundle.turnEvents;
+      markAskTurnAsyncExecution(executionBundle);
+      runtimeLoopMode = asyncExecutorUsed ? "async_incremental" : "incremental";
+    } else if (HELIX_E9_1_STEP_EXECUTOR_FLAG) {
+      const executionBundle = executeAskTurnPlanItemsWithArtifactContinuation({
+        planSteps: precomputedPlanSteps,
+        terminalKind: executionTerminalKind,
+        pending: Boolean(pendingServerRequest),
+        transcript,
+        workspaceSnapshot: workspaceSessionSnapshot,
+        selectedAction: actionSelection.action,
+      });
+      precomputedPlanSteps = executionBundle.planSteps;
+      executionTrace = executionBundle.executionTrace;
+      executionLifecycle = executionBundle.executionLifecycle;
+      stepResults = executionBundle.stepResults;
+      capabilitySelectionTrace = [...capabilitySelectionTrace, ...executionBundle.capabilitySelectionTrace];
+    } else {
+      executionTrace = buildAskTurnExecutionTrace({
+        planSteps: precomputedPlanSteps,
+        terminalKind: executionTerminalKind,
+        pending: Boolean(pendingServerRequest),
+        transcript,
+        workspaceSnapshot: workspaceSessionSnapshot,
+      });
+      executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
+      stepResults = buildAskTurnStepResults(executionTrace);
+    }
   }
   const tenantId =
     req.tenantId ??
@@ -70653,6 +78725,7 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     routeReasonCode,
     pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
     actionSelection,
+    planItemsOverride: precomputedPlanSteps,
     executionTrace,
     dispatchPolicyLock: pendingServerRequest ? null : policyLockForSelection,
     sessionId,
@@ -70663,15 +78736,59 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     plannerRepair,
     pendingResolution,
   });
-  let executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
-  let stepResults = buildAskTurnStepResults(executionTrace);
+  if (routeReasonCode.startsWith("clarify:")) {
+    const pendingUnresolvedFields = pendingServerRequest?.unresolved_fields ?? pendingServerRequest?.required_fields ?? [];
+    plannerContract = {
+      ...plannerContract,
+      selected_action: null,
+      selection_valid: false,
+      selection_fail_reason: "missing_required_args",
+      selection_missing_required_args: Array.isArray(pendingUnresolvedFields)
+        ? pendingUnresolvedFields
+            .map((entry) => String(entry ?? "").trim())
+            .filter((entry) => entry.length > 0)
+        : [],
+    };
+  }
+  if (HELIX_E9_2_POLICY_SOURCE_OF_TRUTH_FLAG || HELIX_E9_1_PLANNER_POLICY_AUTHORITY_FLAG) {
+    const authoritativePolicy = deriveAskTurnDispatchPolicyFromPlanAndTrace({
+      planItems: plannerContract.plan_items,
+      executionTrace,
+      pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
+      fallbackPolicy: plannerContract.dispatch_policy,
+    });
+    if (authoritativePolicy !== plannerContract.dispatch_policy) {
+      plannerContract = {
+        ...plannerContract,
+        dispatch_policy: authoritativePolicy,
+      };
+    }
+    const alignedRoute = alignAskTurnRouteToDispatchPolicy({
+      dispatchPolicy: plannerContract.dispatch_policy,
+      routeReasonCode,
+      dispatchHint,
+      pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
+    });
+    routeReasonCode = alignedRoute.routeReasonCode;
+    dispatchHint = alignedRoute.dispatchHint;
+  }
   let invariantViolations = evaluateAskTurnInvariantViolations({
     planItems: plannerContract.plan_items,
     executionTrace,
     executionLifecycle,
     terminalKind: executionTerminalKind,
     pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
+    routeReasonCode,
+    dispatchPolicy: plannerContract.dispatch_policy,
   });
+  const policyAlignmentViolation = evaluateAskTurnPolicyAlignmentViolation({
+    dispatchPolicy: plannerContract.dispatch_policy,
+    planItems: plannerContract.plan_items,
+  });
+  if (policyAlignmentViolation) invariantViolations.push(policyAlignmentViolation);
+  if (executionTerminalKind === "clarify" && plannerContract.selected_action) {
+    invariantViolations.push("no_selected_action_on_clarify_terminal");
+  }
   if (HELIX_E8_INVARIANT_ASSERTIONS_FLAG && invariantViolations.length > 0) {
     return respondAskTurn(500, {
       ok: false,
@@ -70691,11 +78808,50 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       : pendingResolution.attempted && !pendingResolution.applied && pendingStatusAfter !== "pending"
           ? "pending_resolution_invalid_state"
           : null;
+  if (isActTerminal) {
+    const workspaceSteps = executionTrace.filter((step) => step.lane === "workspace");
+    const workspaceStep =
+      workspaceSteps.find(
+        (step) =>
+          step.action?.panel_id === actionSelection.action?.panel_id &&
+          step.action?.action_id === actionSelection.action?.action_id,
+      ) ??
+      workspaceSteps.find((step) => step.id === "workspace_action") ??
+      workspaceSteps[0] ??
+      null;
+    if (!workspaceStep || workspaceStep.status !== "completed") {
+      briefText = buildAskTurnWorkspaceFailureReceiptText({
+        action: actionSelection.action,
+        reason: workspaceStep?.reason ?? "workspace_step_failed",
+      });
+    }
+  }
+  let latestWorkspaceSnapshot: HelixAskTurnWorkspaceSessionSnapshot | null = workspaceSessionSnapshot;
+  if (HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG && sessionId) {
+    latestWorkspaceSnapshot = inferAskTurnWorkspaceSnapshotFromExecution({
+      sessionId,
+      transcript,
+      executionTrace,
+    });
+    if (latestWorkspaceSnapshot) {
+      helixAskTurnWorkspaceSnapshotBySession.set(sessionId, latestWorkspaceSnapshot);
+    }
+  }
+  const attachWorkspaceContextSnapshot =
+    HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG && reasoningContextMode !== "isolated" ? latestWorkspaceSnapshot : null;
+  const observationGroundedFinal = resolveAskTurnObservationGroundedFinal({
+    action: actionSelection.action,
+    executionTrace,
+    workspaceSnapshot: attachWorkspaceContextSnapshot,
+  });
+  if (observationGroundedFinal) {
+    briefText = observationGroundedFinal.text;
+  }
   if (isClarifyTerminal || isSuppressedTerminal || isActTerminal || isControlConversationTerminal) {
     return respondAskTurn(
       200,
       {
-      ok: true,
+      ok: observationGroundedFinal?.finalStatus !== "final_failure",
       text: briefText,
       answer: briefText,
       mode: routeDecision.classification.mode === "act" ? "act" : "observe",
@@ -70712,9 +78868,10 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       route_reason_code: routeReasonCode,
       needs_confirmation: needsConfirmation,
       terminal_error_code:
-        routeReasonCode === "clarify:planner_repair_required"
+        observationGroundedFinal?.errorCode ??
+        (routeReasonCode === "clarify:planner_repair_required"
           ? "planner_repair_required"
-          : (pendingTerminalErrorCode ?? undefined),
+          : (pendingTerminalErrorCode ?? undefined)),
       pending_resolution_attempted: pendingResolution.attempted,
       pending_resolution_applied: pendingResolution.applied,
       pending_resolution_reason: pendingResolution.reason,
@@ -70723,6 +78880,8 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       pending_transition_reason: pendingTransitionReason,
       pending_transition_trace: pendingTransitionTrace,
       pending_request_id: pendingRequestId,
+      pending_intercepted_turn: pendingHandled,
+      pending_interception_reason: pendingHandled ? pendingResolution.reason ?? pendingTransitionReason : null,
       brief: {
         text: briefText,
         source: "none",
@@ -70731,8 +78890,11 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       execution_trace: executionTrace,
       step_results: stepResults,
       execution_lifecycle: executionLifecycle,
+      capability_selection_trace: capabilitySelectionTrace,
       invariant_violations: invariantViolations,
       pending_server_request: pendingServerRequest,
+      workspace_context_mode: reasoningContextMode,
+      workspace_context_snapshot: attachWorkspaceContextSnapshot,
       turn_contract: {
         lane: "conversation",
         terminal_kind: isClarifyTerminal ? "clarify" : "conversation",
@@ -70740,6 +78902,7 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         dispatch_hint: dispatchHint,
         single_terminal_required: true,
       },
+      final_status: observationGroundedFinal?.finalStatus,
       },
       {
         questionSeed: transcript,
@@ -70753,13 +78916,24 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       new Set<string>([
         ...extractEvidenceRefsFromActionSelection(actionSelection),
         ...extractEvidenceRefsFromTranscript(transcript),
+        ...extractEvidenceRefsFromWorkspaceSnapshot(attachWorkspaceContextSnapshot),
       ]),
     );
-    const needsRetrieval = requiresEvidence && evidenceRefs.length === 0;
+    const retrievalFailure = requiresEvidence
+      ? buildAskTurnEvidenceRetrievalFailure({
+          transcript,
+          evidenceRefs,
+          workspaceSnapshot: workspaceSessionSnapshot,
+          executionTrace,
+        })
+      : null;
+    const needsRetrieval = Boolean(retrievalFailure && retrievalFailure.missing_fields.length > 0);
     if (needsRetrieval) {
       const gated = appendNeedsRetrievalPlanStep({
         planItems: plannerContract.plan_items,
         executionTrace,
+        status: "failed",
+        reason: retrievalFailure?.reason ?? "evidence_refs_missing",
       });
       executionTrace = gated.executionTrace;
       plannerContract = {
@@ -70772,6 +78946,169 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       };
       executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
       stepResults = buildAskTurnStepResults(executionTrace);
+
+      const clarifyRouteReasonCode: HelixConversationRouteReasonCode = "clarify:missing_args";
+      const retrievalRequiredFields = Array.from(
+        new Set((retrievalFailure?.missing_fields ?? ["evidence_reference"]).map((entry) => String(entry ?? "").trim()).filter(Boolean)),
+      );
+      const retrievalPrompt =
+        retrievalFailure?.clarify_text ??
+        "Needs retrieval before final comparison: provide the missing evidence references.";
+      const retrievalPendingRequest = {
+        request_id: `pending:${crypto.randomUUID()}`,
+        kind: "clarify" as const,
+        reason: clarifyRouteReasonCode,
+        prompt: retrievalPrompt,
+        required_fields: retrievalRequiredFields,
+        unresolved_fields: retrievalRequiredFields,
+        candidate_action: actionSelection.action ?? null,
+        pending_scope: "artifact_gate" as const,
+        status: "pending" as const,
+      };
+      recordPendingTransition("pending", "pending_request_created");
+      pendingRequestId = retrievalPendingRequest.request_id;
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.set(conversationPendingKey, {
+          turnId,
+          requestId: retrievalPendingRequest.request_id,
+          kind: retrievalPendingRequest.kind,
+          reason: retrievalPendingRequest.reason,
+          prompt: retrievalPendingRequest.prompt,
+          createdAtMs: Date.now(),
+          requiredFields: retrievalRequiredFields,
+          unresolvedFields: retrievalRequiredFields,
+          candidateAction: actionSelection.action ?? null,
+          status: "pending",
+          pendingScope: "artifact_gate",
+          originIntentHash: incomingIntentHash,
+          originActionFamily: incomingIntentFamily,
+          expiresAtMs: Date.now() + 10 * 60 * 1000,
+        });
+      }
+
+      const clarifyPlanItems = buildAskTurnPlanSteps({
+        routeReasonCode: clarifyRouteReasonCode,
+        pendingServerRequest: { kind: "clarify" },
+        transcript,
+        selectedAction: actionSelection.action,
+        dispatchPolicy: "needs_user_input",
+      });
+      const clarifyExecutionTrace = buildAskTurnExecutionTrace({
+        planSteps: clarifyPlanItems,
+        terminalKind: "clarify",
+        pending: true,
+        transcript,
+        workspaceSnapshot: workspaceSessionSnapshot,
+      });
+      const clarifyExecutionLifecycle = buildAskTurnExecutionLifecycle(clarifyExecutionTrace);
+      const clarifyStepResults = buildAskTurnStepResults(clarifyExecutionTrace);
+      const clarifyInvariantViolations = evaluateAskTurnInvariantViolations({
+        planItems: clarifyPlanItems,
+        executionTrace: clarifyExecutionTrace,
+        executionLifecycle: clarifyExecutionLifecycle,
+        terminalKind: "clarify",
+        pendingServerRequest: { kind: "clarify" },
+        routeReasonCode: clarifyRouteReasonCode,
+        dispatchPolicy: "needs_user_input",
+      });
+      const clarifyPlannerContract = {
+        ...plannerContract,
+        dispatch_policy: "needs_user_input" as const,
+        plan_items: clarifyPlanItems,
+        plan_steps: clarifyExecutionTrace,
+        executed_step_count: clarifyExecutionTrace.filter((step) => step.status === "completed").length,
+        failed_step_count: clarifyExecutionTrace.filter((step) => step.status === "failed").length,
+        suppressed_step_count: clarifyExecutionTrace.filter((step) => step.status === "suppressed").length,
+        selected_action: null,
+        selection_valid: false,
+        selection_fail_reason: "missing_required_args",
+        selection_missing_required_args: retrievalRequiredFields,
+      };
+      const clarifyPolicyViolation = evaluateAskTurnPolicyAlignmentViolation({
+        dispatchPolicy: clarifyPlannerContract.dispatch_policy,
+        planItems: clarifyPlannerContract.plan_items,
+      });
+      if (clarifyPolicyViolation) clarifyInvariantViolations.push(clarifyPolicyViolation);
+
+      return respondAskTurn(
+        200,
+        {
+          ok: true,
+          text: retrievalPrompt,
+          answer: retrievalPrompt,
+          mode: "observe",
+          trace_id: traceId,
+          turn_id: turnId,
+          dispatch: {
+            dispatch_hint: false,
+            reason: clarifyRouteReasonCode,
+          },
+          route_reason_code: clarifyRouteReasonCode,
+          needs_confirmation: false,
+          brief: {
+            text: "Created retrieval input request before continuing reasoning.",
+            source: "none",
+          },
+          evidence_refs: evidenceRefs,
+          retrieval_attempted: true,
+          retrieval_refs_count: evidenceRefs.length,
+          retrieval_fail_reason: retrievalFailure?.reason ?? "evidence_refs_missing",
+          retrieval_missing_fields: retrievalRequiredFields,
+          retrieval_clarify: retrievalPrompt,
+          comparison_evidence_bundle: {
+            evidence_refs: evidenceRefs,
+            missing_fields: retrievalRequiredFields,
+          },
+          final_answer_style: "fallback_summary",
+          evidence_used_count: 0,
+          evidence_used_refs: [],
+          needs_retrieval: true,
+          pending_status_before: pendingStatusBefore,
+          pending_status_after: pendingStatusAfter,
+          pending_transition_reason: pendingTransitionReason,
+          pending_transition_trace: pendingTransitionTrace,
+          pending_request_id: pendingRequestId,
+          planner_contract: clarifyPlannerContract,
+          execution_trace: clarifyExecutionTrace,
+          step_results: clarifyStepResults,
+          execution_lifecycle: clarifyExecutionLifecycle,
+          invariant_violations: clarifyInvariantViolations,
+          pending_server_request: retrievalPendingRequest,
+          workspace_context_mode: reasoningContextMode,
+          workspace_context_snapshot: attachWorkspaceContextSnapshot,
+          turn_contract: {
+            lane: "conversation",
+            terminal_kind: "clarify",
+            route_reason_code: clarifyRouteReasonCode,
+            dispatch_hint: false,
+            single_terminal_required: true,
+          },
+        },
+        {
+          questionSeed: transcript,
+          forceEmptyTerminal: forceEmptyTerminalForTest,
+        },
+      );
+    }
+    if (HELIX_E9_2_POLICY_SOURCE_OF_TRUTH_FLAG) {
+      const authoritativePolicy = deriveAskTurnDispatchPolicyFromPlanAndTrace({
+        planItems: plannerContract.plan_items,
+        executionTrace,
+        pendingServerRequest: null,
+        fallbackPolicy: plannerContract.dispatch_policy,
+      });
+      plannerContract = {
+        ...plannerContract,
+        dispatch_policy: authoritativePolicy,
+      };
+      const alignedRoute = alignAskTurnRouteToDispatchPolicy({
+        dispatchPolicy: plannerContract.dispatch_policy,
+        routeReasonCode,
+        dispatchHint,
+        pendingServerRequest: null,
+      });
+      routeReasonCode = alignedRoute.routeReasonCode;
+      dispatchHint = alignedRoute.dispatchHint;
     }
     invariantViolations = evaluateAskTurnInvariantViolations({
       planItems: plannerContract.plan_items,
@@ -70779,7 +79116,14 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       executionLifecycle,
       terminalKind: "reasoning",
       pendingServerRequest: null,
+      routeReasonCode,
+      dispatchPolicy: plannerContract.dispatch_policy,
     });
+    const hybridPolicyViolation = evaluateAskTurnPolicyAlignmentViolation({
+      dispatchPolicy: plannerContract.dispatch_policy,
+      planItems: plannerContract.plan_items,
+    });
+    if (hybridPolicyViolation) invariantViolations.push(hybridPolicyViolation);
     if (HELIX_E8_INVARIANT_ASSERTIONS_FLAG && invariantViolations.length > 0) {
       return respondAskTurn(500, {
         ok: false,
@@ -70793,9 +79137,64 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         route_reason_code: routeReasonCode,
       });
     }
-    const hybridText = needsRetrieval
-      ? "Needs retrieval before final comparison: I need concrete evidence references from docs/notes context."
-      : buildAskTurnHybridReasoningFinalText(transcript);
+    const renderedFinal =
+      !needsRetrieval && HELIX_E8_23_EVIDENCE_BACKED_FINAL_FLAG
+        ? buildAskTurnEvidenceBackedReasoningFinal({
+            transcript,
+            evidenceRefs,
+            executionTrace,
+            workspaceSnapshot: attachWorkspaceContextSnapshot,
+            selectedAction: actionSelection.action,
+          })
+        : {
+            text: buildAskTurnHybridReasoningFinalText({
+              transcript,
+              workspaceSnapshot: attachWorkspaceContextSnapshot,
+              selectedAction: actionSelection.action,
+              evidenceRefs,
+            }),
+            style: "fallback_summary" as const,
+            evidence_used_refs: [] as string[],
+          };
+    let hybridText = needsRetrieval
+      ? retrievalFailure?.clarify_text ??
+        "Needs retrieval before final comparison: I need concrete evidence references from docs/notes context."
+      : renderedFinal.text;
+    const qualityIntentFamily = classifyAskTurnQualityIntentFamily(transcript);
+    let qualityContractPass = true;
+    let qualityContractRepairAttempted = false;
+    let qualityContractFailReason: string | null = null;
+    if (!needsRetrieval) {
+      const qualityValidation = validateReasoningFinalByIntent({
+        intent: qualityIntentFamily,
+        text: hybridText,
+        transcript,
+      });
+      if (!qualityValidation.pass) {
+        qualityContractRepairAttempted = true;
+        qualityContractFailReason = qualityValidation.fail_reason;
+        hybridText = repairReasoningFinalByIntent({
+          intent: qualityIntentFamily,
+          transcript,
+          workspaceSnapshot: attachWorkspaceContextSnapshot,
+          selectedAction: actionSelection.action,
+          evidenceRefs,
+        });
+        const repairedValidation = validateReasoningFinalByIntent({
+          intent: qualityIntentFamily,
+          text: hybridText,
+          transcript,
+        });
+        qualityContractPass = repairedValidation.pass;
+        if (repairedValidation.pass) {
+          qualityContractFailReason = null;
+        } else {
+          qualityContractFailReason = repairedValidation.fail_reason;
+        }
+      }
+    }
+    const finalAnswerStyle = needsRetrieval ? "fallback_summary" : renderedFinal.style;
+    const evidenceUsedRefs = needsRetrieval ? [] : renderedFinal.evidence_used_refs;
     return respondAskTurn(
       200,
       {
@@ -70813,11 +79212,27 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         needs_confirmation: false,
         brief: {
           text: needsRetrieval
-            ? "Added needs_retrieval step because evidence references are missing."
+            ? "Added reasoning_retrieval step because evidence references are missing."
             : "Completed workspace step and reasoning follow-up in this turn.",
           source: "none",
         },
         evidence_refs: evidenceRefs,
+        retrieval_attempted: needsRetrieval,
+        retrieval_refs_count: evidenceRefs.length,
+        retrieval_fail_reason: retrievalFailure?.reason ?? null,
+        retrieval_missing_fields: retrievalFailure?.missing_fields ?? [],
+        retrieval_clarify: retrievalFailure?.clarify_text ?? null,
+        comparison_evidence_bundle: {
+          evidence_refs: evidenceRefs,
+          missing_fields: retrievalFailure?.missing_fields ?? [],
+        },
+        final_answer_style: finalAnswerStyle,
+        evidence_used_count: evidenceUsedRefs.length,
+        evidence_used_refs: evidenceUsedRefs,
+        quality_contract_intent_family: qualityIntentFamily,
+        quality_contract_pass: qualityContractPass,
+        quality_contract_repair_attempted: qualityContractRepairAttempted,
+        quality_contract_fail_reason: qualityContractFailReason,
         needs_retrieval: needsRetrieval,
         pending_status_before: pendingStatusBefore,
         pending_status_after: pendingStatusAfter,
@@ -70828,8 +79243,11 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
         execution_trace: executionTrace,
         step_results: stepResults,
         execution_lifecycle: executionLifecycle,
+        capability_selection_trace: capabilitySelectionTrace,
         invariant_violations: invariantViolations,
         pending_server_request: null,
+        workspace_context_mode: reasoningContextMode,
+        workspace_context_snapshot: attachWorkspaceContextSnapshot,
         turn_contract: {
           lane: "reasoning",
           terminal_kind: "reasoning",
@@ -70889,19 +79307,31 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     capturedPayload && typeof capturedPayload === "object"
       ? ({ ...(capturedPayload as Record<string, unknown>) } as Record<string, unknown>)
       : ({} as Record<string, unknown>);
-  const requiresEvidence = askTurnRequiresEvidence(transcript);
+  const planHasReasoningForExecution = plannerContract.plan_items.some((step) => step.lane === "reasoning");
+  const requiresEvidence = planHasReasoningForExecution && askTurnRequiresEvidence(transcript);
   const evidenceRefs = Array.from(
     new Set<string>([
       ...extractEvidenceRefsFromActionSelection(actionSelection),
       ...extractEvidenceRefsFromTranscript(transcript),
       ...extractEvidenceRefsFromResponsePayload(responsePayload),
+      ...extractEvidenceRefsFromWorkspaceSnapshot(attachWorkspaceContextSnapshot),
     ]),
   );
-  const needsRetrieval = requiresEvidence && evidenceRefs.length === 0;
+  const retrievalFailure = requiresEvidence
+    ? buildAskTurnEvidenceRetrievalFailure({
+        transcript,
+        evidenceRefs,
+        workspaceSnapshot: workspaceSessionSnapshot,
+        executionTrace,
+      })
+    : null;
+  const needsRetrieval = Boolean(retrievalFailure && retrievalFailure.missing_fields.length > 0);
   if (needsRetrieval) {
     const gated = appendNeedsRetrievalPlanStep({
       planItems: plannerContract.plan_items,
       executionTrace,
+      status: "failed",
+      reason: retrievalFailure?.reason ?? "evidence_refs_missing",
     });
     executionTrace = gated.executionTrace;
     plannerContract = {
@@ -70914,9 +79344,177 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     };
     executionLifecycle = buildAskTurnExecutionLifecycle(executionTrace);
     stepResults = buildAskTurnStepResults(executionTrace);
-    responsePayload.text =
-      "Needs retrieval before final synthesis: evidence references are missing for this reasoning turn.";
-    responsePayload.answer = responsePayload.text;
+
+    const clarifyRouteReasonCode: HelixConversationRouteReasonCode = "clarify:missing_args";
+    const retrievalRequiredFields = Array.from(
+      new Set((retrievalFailure?.missing_fields ?? ["evidence_reference"]).map((entry) => String(entry ?? "").trim()).filter(Boolean)),
+    );
+    const retrievalPrompt =
+      retrievalFailure?.clarify_text ??
+      "Needs retrieval before final synthesis: provide the missing evidence references.";
+    const retrievalPendingRequest = {
+      request_id: `pending:${crypto.randomUUID()}`,
+      kind: "clarify" as const,
+      reason: clarifyRouteReasonCode,
+      prompt: retrievalPrompt,
+      required_fields: retrievalRequiredFields,
+      unresolved_fields: retrievalRequiredFields,
+      candidate_action: actionSelection.action ?? null,
+      pending_scope: "artifact_gate" as const,
+      status: "pending" as const,
+    };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = retrievalPendingRequest.request_id;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: retrievalPendingRequest.request_id,
+        kind: retrievalPendingRequest.kind,
+        reason: retrievalPendingRequest.reason,
+        prompt: retrievalPendingRequest.prompt,
+        createdAtMs: Date.now(),
+        requiredFields: retrievalRequiredFields,
+        unresolvedFields: retrievalRequiredFields,
+        candidateAction: actionSelection.action ?? null,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        originIntentHash: incomingIntentHash,
+        originActionFamily: incomingIntentFamily,
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
+
+    const clarifyPlanItems = buildAskTurnPlanSteps({
+      routeReasonCode: clarifyRouteReasonCode,
+      pendingServerRequest: { kind: "clarify" },
+      transcript,
+      selectedAction: actionSelection.action,
+      dispatchPolicy: "needs_user_input",
+    });
+    const clarifyExecutionTrace = buildAskTurnExecutionTrace({
+      planSteps: clarifyPlanItems,
+      terminalKind: "clarify",
+      pending: true,
+      transcript,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    const clarifyExecutionLifecycle = buildAskTurnExecutionLifecycle(clarifyExecutionTrace);
+    const clarifyStepResults = buildAskTurnStepResults(clarifyExecutionTrace);
+    const clarifyInvariantViolations = evaluateAskTurnInvariantViolations({
+      planItems: clarifyPlanItems,
+      executionTrace: clarifyExecutionTrace,
+      executionLifecycle: clarifyExecutionLifecycle,
+      terminalKind: "clarify",
+      pendingServerRequest: { kind: "clarify" },
+      routeReasonCode: clarifyRouteReasonCode,
+      dispatchPolicy: "needs_user_input",
+    });
+    const clarifyPlannerContract = {
+      ...plannerContract,
+      dispatch_policy: "needs_user_input" as const,
+      plan_items: clarifyPlanItems,
+      plan_steps: clarifyExecutionTrace,
+      executed_step_count: clarifyExecutionTrace.filter((step) => step.status === "completed").length,
+      failed_step_count: clarifyExecutionTrace.filter((step) => step.status === "failed").length,
+      suppressed_step_count: clarifyExecutionTrace.filter((step) => step.status === "suppressed").length,
+      selected_action: null,
+      selection_valid: false,
+      selection_fail_reason: "missing_required_args",
+      selection_missing_required_args: retrievalRequiredFields,
+    };
+    const clarifyPolicyViolation = evaluateAskTurnPolicyAlignmentViolation({
+      dispatchPolicy: clarifyPlannerContract.dispatch_policy,
+      planItems: clarifyPlannerContract.plan_items,
+    });
+    if (clarifyPolicyViolation) clarifyInvariantViolations.push(clarifyPolicyViolation);
+
+    return respondAskTurn(
+      200,
+      {
+        ...responsePayload,
+        text: retrievalPrompt,
+        answer: retrievalPrompt,
+        route_reason_code: clarifyRouteReasonCode,
+        dispatch: {
+          dispatch_hint: false,
+          reason: clarifyRouteReasonCode,
+        },
+        brief: {
+          text: "Created retrieval input request before continuing reasoning.",
+          source: "none",
+        },
+        planner_contract: clarifyPlannerContract,
+        execution_trace: clarifyExecutionTrace,
+        step_results: clarifyStepResults,
+        execution_lifecycle: clarifyExecutionLifecycle,
+        invariant_violations: clarifyInvariantViolations,
+        pending_server_request: retrievalPendingRequest,
+        workspace_context_mode: reasoningContextMode,
+        workspace_context_snapshot: attachWorkspaceContextSnapshot,
+        turn_contract: {
+          lane: "conversation",
+          terminal_kind: "clarify",
+          route_reason_code: clarifyRouteReasonCode,
+          dispatch_hint: false,
+          single_terminal_required: true,
+        },
+        retrieval_attempted: true,
+        retrieval_refs_count: evidenceRefs.length,
+        retrieval_fail_reason: retrievalFailure?.reason ?? "evidence_refs_missing",
+        retrieval_missing_fields: retrievalRequiredFields,
+        retrieval_clarify: retrievalPrompt,
+        comparison_evidence_bundle: {
+          evidence_refs: evidenceRefs,
+          missing_fields: retrievalRequiredFields,
+        },
+        final_answer_style: "fallback_summary",
+        evidence_used_refs: [],
+        evidence_used_count: 0,
+        needs_retrieval: true,
+        pending_status_before: pendingStatusBefore,
+        pending_status_after: pendingStatusAfter,
+        pending_transition_reason: pendingTransitionReason,
+        pending_transition_trace: pendingTransitionTrace,
+        pending_request_id: pendingRequestId,
+      },
+      {
+        questionSeed: transcript,
+        forceEmptyTerminal: forceEmptyTerminalForTest,
+      },
+    );
+  }
+  const reasoningPlanPresent = planHasReasoningForExecution;
+  const workspacePlanPresent = plannerContract.plan_items.some((step) => step.lane === "workspace");
+  const conversationOnlyPlan = !reasoningPlanPresent && !workspacePlanPresent;
+  const renderedReasoningFinal =
+    !needsRetrieval && reasoningPlanPresent && HELIX_E8_23_EVIDENCE_BACKED_FINAL_FLAG
+      ? buildAskTurnEvidenceBackedReasoningFinal({
+          transcript,
+          evidenceRefs,
+          executionTrace,
+          workspaceSnapshot: attachWorkspaceContextSnapshot,
+          selectedAction: actionSelection.action,
+        })
+      : null;
+  if (HELIX_E9_2_POLICY_SOURCE_OF_TRUTH_FLAG) {
+    const authoritativePolicy = deriveAskTurnDispatchPolicyFromPlanAndTrace({
+      planItems: plannerContract.plan_items,
+      executionTrace,
+      pendingServerRequest: null,
+      fallbackPolicy: plannerContract.dispatch_policy,
+    });
+    plannerContract = {
+      ...plannerContract,
+      dispatch_policy: authoritativePolicy,
+    };
+    const alignedRoute = alignAskTurnRouteToDispatchPolicy({
+      dispatchPolicy: plannerContract.dispatch_policy,
+      routeReasonCode,
+      dispatchHint,
+      pendingServerRequest: null,
+    });
+    routeReasonCode = alignedRoute.routeReasonCode;
+    dispatchHint = alignedRoute.dispatchHint;
   }
   invariantViolations = evaluateAskTurnInvariantViolations({
     planItems: plannerContract.plan_items,
@@ -70924,7 +79522,14 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     executionLifecycle,
     terminalKind: "reasoning",
     pendingServerRequest: null,
+    routeReasonCode,
+    dispatchPolicy: plannerContract.dispatch_policy,
   });
+  const finalPolicyViolation = evaluateAskTurnPolicyAlignmentViolation({
+    dispatchPolicy: plannerContract.dispatch_policy,
+    planItems: plannerContract.plan_items,
+  });
+  if (finalPolicyViolation) invariantViolations.push(finalPolicyViolation);
   if (HELIX_E8_INVARIANT_ASSERTIONS_FLAG && invariantViolations.length > 0) {
     return respondAskTurn(500, {
       ok: false,
@@ -70938,11 +79543,57 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
       route_reason_code: routeReasonCode,
     });
   }
-  const responseText = ensureAskTurnTerminalText(extractHelixAskResponseTextForHistory(responsePayload) ?? briefText, transcript);
-  responsePayload.text = responseText;
-  if (typeof responsePayload.answer !== "string" || !responsePayload.answer.trim()) {
-    responsePayload.answer = responseText;
+  let responseText = ensureAskTurnTerminalText(
+    renderedReasoningFinal?.text ?? extractHelixAskResponseTextForHistory(responsePayload) ?? briefText,
+    transcript,
+  );
+  const qualityIntentFamily = classifyAskTurnQualityIntentFamily(transcript);
+  let qualityContractPass = true;
+  let qualityContractRepairAttempted = false;
+  let qualityContractFailReason: string | null = null;
+  if (!needsRetrieval) {
+    const qualityValidation = validateReasoningFinalByIntent({
+      intent: qualityIntentFamily,
+      text: responseText,
+      transcript,
+    });
+    if (!qualityValidation.pass) {
+      qualityContractRepairAttempted = true;
+      qualityContractFailReason = qualityValidation.fail_reason;
+      responseText = repairReasoningFinalByIntent({
+        intent: qualityIntentFamily,
+        transcript,
+        workspaceSnapshot: attachWorkspaceContextSnapshot,
+        selectedAction: actionSelection.action,
+        evidenceRefs,
+      });
+      const repairedValidation = validateReasoningFinalByIntent({
+        intent: qualityIntentFamily,
+        text: responseText,
+        transcript,
+      });
+      qualityContractPass = repairedValidation.pass;
+      if (repairedValidation.pass) {
+        qualityContractFailReason = null;
+      } else {
+        qualityContractFailReason = repairedValidation.fail_reason;
+      }
+    }
   }
+  if (e9GeneralTurnLoopEnabled && conversationOnlyPlan && HELIX_ASK_TURN_GENERIC_TERMINAL_RE.test(responseText)) {
+    responseText = ensureAskTurnTerminalText(briefText, transcript);
+  }
+  if (HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG) {
+    turnEvents = completeAskTurnIncrementalEvents({
+      turnEvents,
+      turnId,
+      terminalText: responseText,
+      status: "final_answer",
+      runtimeStatus: "completed",
+    });
+  }
+  responsePayload.text = responseText;
+  responsePayload.answer = responseText;
   responsePayload.route_reason_code = routeReasonCode;
   responsePayload.dispatch = {
     dispatch_hint: dispatchHint,
@@ -70951,25 +79602,67 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
   responsePayload.needs_confirmation = false;
   responsePayload.brief = {
     text: needsRetrieval
-      ? "Added needs_retrieval step because evidence references are missing."
+      ? "Added reasoning_retrieval step because evidence references are missing."
       : ensureAskTurnTerminalText(briefText, transcript),
     source: "none",
   };
   responsePayload.evidence_refs = evidenceRefs;
+  responsePayload.retrieval_attempted = needsRetrieval;
+  responsePayload.retrieval_refs_count = evidenceRefs.length;
+  responsePayload.retrieval_fail_reason = retrievalFailure?.reason ?? null;
+  responsePayload.retrieval_missing_fields = retrievalFailure?.missing_fields ?? [];
+  responsePayload.retrieval_clarify = retrievalFailure?.clarify_text ?? null;
+  responsePayload.comparison_evidence_bundle = {
+    evidence_refs: evidenceRefs,
+    missing_fields: retrievalFailure?.missing_fields ?? [],
+  };
+  responsePayload.final_answer_style = needsRetrieval
+    ? "fallback_summary"
+    : (renderedReasoningFinal?.style ?? "fallback_summary");
+  responsePayload.evidence_used_refs = needsRetrieval
+    ? []
+    : (renderedReasoningFinal?.evidence_used_refs ?? []);
+  responsePayload.evidence_used_count = Array.isArray(responsePayload.evidence_used_refs)
+    ? responsePayload.evidence_used_refs.length
+    : 0;
+  responsePayload.quality_contract_intent_family = qualityIntentFamily;
+  responsePayload.quality_contract_pass = qualityContractPass;
+  responsePayload.quality_contract_repair_attempted = qualityContractRepairAttempted;
+  responsePayload.quality_contract_fail_reason = qualityContractFailReason;
   responsePayload.needs_retrieval = needsRetrieval;
   responsePayload.pending_status_before = pendingStatusBefore;
   responsePayload.pending_status_after = pendingStatusAfter;
   responsePayload.pending_transition_reason = pendingTransitionReason;
   responsePayload.pending_transition_trace = pendingTransitionTrace;
   responsePayload.pending_request_id = pendingRequestId;
+  responsePayload.pending_resolution_attempted = pendingResolution.attempted;
+  responsePayload.pending_resolution_applied = pendingResolution.applied;
+  responsePayload.pending_resolution_reason = pendingResolution.reason;
+  responsePayload.pending_intercepted_turn = pendingHandled;
+  responsePayload.pending_interception_reason = pendingHandled ? pendingResolution.reason ?? pendingTransitionReason : null;
   responsePayload.planner_contract = plannerContract;
   responsePayload.execution_trace = executionTrace;
   responsePayload.step_results = stepResults;
   responsePayload.execution_lifecycle = executionLifecycle;
+  responsePayload.turn_events = turnEvents;
+  responsePayload.runtime_event_count = turnEvents.length;
+  responsePayload.runtime_loop_mode = runtimeLoopMode;
+  responsePayload.async_executor_used = asyncExecutorUsed;
+  responsePayload.async_step_count = asyncStepDurations.length;
+  responsePayload.async_total_duration_ms = asyncTotalDurationMs;
+  responsePayload.async_step_durations = asyncStepDurations;
+  responsePayload.model_decision_llm_used = modelDecisionAudits.some((entry) => entry.used_llm);
+  responsePayload.model_decision_count = modelDecisionAudits.length;
+  responsePayload.model_decision_audits = modelDecisionAudits;
+  responsePayload.capability_selection_trace = capabilitySelectionTrace;
   responsePayload.invariant_violations = invariantViolations;
+  responsePayload.workspace_context_mode = reasoningContextMode;
+  responsePayload.workspace_context_snapshot = attachWorkspaceContextSnapshot;
+  const finalTerminalKind: "reasoning" | "conversation" = reasoningPlanPresent ? "reasoning" : "conversation";
+  responsePayload.mode = finalTerminalKind === "reasoning" ? "observe" : "read";
   responsePayload.turn_contract = {
-    lane: "reasoning",
-    terminal_kind: "reasoning",
+    lane: finalTerminalKind,
+    terminal_kind: finalTerminalKind,
     route_reason_code: routeReasonCode,
     dispatch_hint: dispatchHint,
     single_terminal_required: true,
@@ -70978,6 +79671,143 @@ const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
     questionSeed: transcript,
     forceEmptyTerminal: forceEmptyTerminalForTest,
   });
+};
+
+planRouter.post("/ask/turn", handleAskTurnRequest);
+
+type CapturedAskTurnResponse = {
+  statusCode: number;
+  body: Record<string, unknown>;
+};
+
+const createAskTurnCaptureResponse = (): Response & { captured: CapturedAskTurnResponse | null } => {
+  const capture = {
+    captured: null as CapturedAskTurnResponse | null,
+    headersSent: false,
+    status(code: number) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body: unknown) {
+      this.headersSent = true;
+      this.captured = {
+        statusCode: typeof this.statusCode === "number" ? this.statusCode : 200,
+        body: body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : { value: body },
+      };
+      return this;
+    },
+    send(body: unknown) {
+      return this.json(body);
+    },
+    setHeader() {
+      return this;
+    },
+    getHeader() {
+      return undefined;
+    },
+    statusCode: 200,
+  };
+  return capture as unknown as Response & { captured: CapturedAskTurnResponse | null };
+};
+
+const writeAskTurnSse = (res: Response, event: string, data: unknown): void => {
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+};
+
+const createStreamingAskTurnEventSink = (args: {
+  res: Response;
+  question: string;
+}): HelixAskTurnEventSink => {
+  const buffered = createBufferedAskTurnEventSink({ question: args.question, eventSource: "live" });
+  let emittedEventCount = 0;
+  return {
+    emit(event) {
+      buffered.emit(event);
+      const transcriptEvents = buildAskTurnTranscriptEventsForRuntimeEvent({
+        event,
+        eventIndex: emittedEventCount,
+        question: args.question,
+        eventSource: "live",
+      });
+      emittedEventCount += 1;
+      for (const transcriptEvent of transcriptEvents) {
+        writeAskTurnSse(args.res, "turn_transcript_event", transcriptEvent);
+      }
+    },
+    emitTranscript(event) {
+      buffered.emitTranscript(event);
+      writeAskTurnSse(args.res, "turn_transcript_event", event);
+    },
+    getEvents() {
+      return buffered.getEvents();
+    },
+    getTranscriptEvents() {
+      return buffered.getTranscriptEvents();
+    },
+  };
+};
+
+planRouter.post("/ask/turn/stream", async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  const startedAtMs = Date.now();
+  const question =
+    typeof req.body?.question === "string"
+      ? req.body.question
+      : typeof req.body?.transcript === "string"
+        ? req.body.transcript
+        : typeof req.body?.prompt === "string"
+          ? req.body.prompt
+          : "";
+  const streamSink = createStreamingAskTurnEventSink({ res, question });
+  streamSink.emitTranscript({
+    id: "stream:turn_started",
+    at_ms: startedAtMs,
+    role: "agent",
+    type: "work_delta",
+    status: "running",
+    text: "Starting Helix Ask turn.",
+    detail: question,
+    source_event_type: "turn_started",
+    event_source: "live",
+  });
+  (req as Request & { __helixAskTurnEventSink?: HelixAskTurnEventSink }).__helixAskTurnEventSink = streamSink;
+
+  const captureRes = createAskTurnCaptureResponse();
+  try {
+    await handleAskTurnRequest(req, captureRes);
+    const captured = captureRes.captured ?? {
+      statusCode: 500,
+      body: {
+        ok: false,
+        error: "ask_turn_stream_no_payload",
+        text: "The streaming turn did not produce a final payload.",
+      },
+    };
+    const body = captured.body;
+    writeAskTurnSse(res, "turn_final", {
+      ...body,
+      stream_used: true,
+      stream_mode: "live_runtime",
+      stream_replay: false,
+      stream_status_code: captured.statusCode,
+      stream_duration_ms: Math.max(0, Date.now() - startedAtMs),
+    });
+  } catch (error) {
+    writeAskTurnSse(res, "turn_error", {
+      ok: false,
+      error: "ask_turn_stream_failed",
+      message: error instanceof Error ? error.message : String(error),
+      stream_duration_ms: Math.max(0, Date.now() - startedAtMs),
+    });
+  } finally {
+    res.end();
+  }
 });
 
 planRouter.post("/ask", async (req, res) => {

@@ -1,0 +1,64 @@
+# NHM2 Shift+Lapse Selected-Family Transport Result (2026-04-26)
+
+"This artifact records the current live nhm2_shift_lapse selected-family bounded-transport publication result. It does not replace the canonical baseline latest aliases and does not widen speed, ETA, viability, gravity, or horizon claims."
+
+## Reproduce
+- publicationCommand: `npm run warp:full-solve:nhm2-shift-lapse:publish-selected-transport -- --shift-lapse-profile-id stage1_centerline_alpha_0p7000_v1`
+- selectedArtifactRoot: `C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1`
+- selectedAuditRoot: `C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/docs/audits/research/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1`
+- shiftLapseProfileId: `stage1_centerline_alpha_0p7000_v1`
+- shiftLapseProfileStage: `controlled_tuning_stage_1`
+- shiftLapseProfileNote: Controlled stage-1 NHM2 shift+lapse exploratory profile: centerline alpha is reduced to 0.7000 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.
+- canonicalBaselineMetricT00Ref: `warp.metric.T00.natario_sdf.shift`
+- canonicalBaselineLatestAliasesChanged: false
+
+## Measured Result
+| field | value |
+|---|---|
+| artifactType | nhm2_shift_lapse_transport_result/v1 |
+| selectedFamily.warpFieldType | nhm2_shift_lapse |
+| selectedFamily.metricT00Ref | warp.metric.T00.nhm2.shift_lapse |
+| selectedFamily.metricT00Source | metric |
+| selectedFamily.shiftLapseProfileId | stage1_centerline_alpha_0p7000_v1 |
+| selectedFamily.shiftLapseProfileStage | controlled_tuning_stage_1 |
+| transportCertificationStatus | bounded_transport_proof_bearing_gate_admitted |
+| promotionGateStatus | pass |
+| promotionGateReason | shift_lapse_transport_promotion_gate_pass |
+| authoritativeLowExpansionStatus | pass |
+| authoritativeLowExpansionSource | gr_evolve_brick |
+| wallSafetyStatus | pass |
+| wallSafetyReason | wall_safety_guardrail_ok |
+| centerlineAlpha | 0.7 |
+| centerlineDtauDt | 0.7 |
+| missionTimeInterpretationStatus | bounded_relativistic_differential_detected |
+| properMinusCoordinate_seconds | -41326789.77515386 |
+| properMinusClassical_seconds | -41326789.77515386 |
+| shiftVsLapseDecompositionLatestJsonPath | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-shift-vs-lapse-decomposition-latest.json |
+| shiftVsLapseDecompositionStatus | pass |
+| shiftVsLapseApproximationStatus | approximate |
+| shiftTransportContribution_seconds | 137755965.9171795 |
+| lapseClockRateContribution_seconds | -41326789.77515385 |
+| shiftVsLapseResidual_seconds | -1.4901161193847656e-8 |
+| lapseDialTrackedFraction | 0.9999999999999998 |
+| boundedTimingDifferentialDetected | true |
+| measuredResultSummary | The current live nhm2_shift_lapse selected-family bounded-transport bundle for profile stage1_centerline_alpha_0p7000_v1 detects a bounded timing differential. This remains a bounded contract result only and does not imply broader travel-advantage or viability claims. |
+
+## Selected Bundle Paths
+| artifact | latestJsonPath |
+|---|---|
+| worldline | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-warp-worldline-proof-latest.json |
+| cruiseEnvelopePreflight | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-cruise-envelope-preflight-latest.json |
+| routeTimeWorldline | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-route-time-worldline-latest.json |
+| missionTimeEstimator | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-mission-time-estimator-latest.json |
+| missionTimeComparison | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-mission-time-comparison-latest.json |
+| shiftVsLapseDecomposition | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-shift-vs-lapse-decomposition-latest.json |
+| cruiseEnvelope | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-cruise-envelope-latest.json |
+| inHullProperAcceleration | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/nhm2-in-hull-proper-acceleration-latest.json |
+
+## Non-Claims
+- does not replace the canonical baseline latest aliases
+- does not certify speed or ETA
+- does not widen viability claims
+- does not convert wall-safety guardrails into a theorem-level horizon claim
+- does not widen source/mechanism authority
+

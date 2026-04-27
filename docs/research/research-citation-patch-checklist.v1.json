@@ -40,23 +40,155 @@
     {
       "id": "springer_natario_zero_expansion_2024",
       "type": "paper",
+      "evidenceType": "peer_reviewed",
+      "sourceStability": "primary_peer_reviewed",
       "title": "A Closer Look at Natario's Zero-Expansion Warp Drive",
+      "supportsClaimIds": [
+        "claim_observed_vs_theoretical_lane_separation"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Peer-reviewed journal source used for curvature/warp-context framing.",
       "url": "https://link.springer.com/article/10.1007/s10773-024-05700-0",
       "doi": "10.1007/s10773-024-05700-0"
     },
     {
       "id": "ligo_technology_reference",
       "type": "web",
+      "evidenceType": "reference_web",
+      "sourceStability": "operational_web",
       "title": "LIGO Technology (detector measurement context)",
+      "supportsClaimIds": [
+        "claim_observed_vs_theoretical_lane_separation"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Operational measurement-system context only; not a warp-drive mechanics source.",
       "url": "https://www.ligo.caltech.edu/LA/page/ligo-technology"
     },
     {
       "id": "casimirbot_repo_clone_6baffda",
       "type": "github_clone",
-      "title": "CasimirBot local evidence clone",
+      "evidenceType": "repo_clone",
+      "sourceStability": "repo_clone",
+      "title": "CasimirBot local evidence clone (current workspace commit)",
+      "supportsClaimIds": [
+        "claim_nhm2_secondary_curvature_rendering",
+        "claim_future_mechanism_closure_hypothesis",
+        "claim_nhm2_alpha_sweep_clocking_isolation",
+        "claim_nhm2_exploratory_alpha_not_auto_promoted",
+        "claim_nhm2_locked_coordinate_schedule_invariant"
+      ],
+      "accessedOn": "2026-04-25",
+      "retrievedOn": "2026-04-25",
+      "confidenceNote": "Primary implementation evidence for repo-measured claims.",
       "repoUrl": "https://github.com/pestypig/casimirbot-.git",
-      "commitSha": "6baffda05f9d9e0aedb783f9cfd1169af84a59b4",
+      "repoBranch": "main",
+      "commitSha": "c8e42f1b4033b5be343dcf873c53b830939a796e",
       "clonePath": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot"
+    },
+    {
+      "id": "natario_2001_zero_expansion",
+      "type": "paper",
+      "evidenceType": "peer_reviewed",
+      "sourceStability": "primary_peer_reviewed",
+      "title": "Warp Drive with Zero Expansion",
+      "supportsClaimIds": [
+        "claim_nhm2_alpha_sweep_clocking_isolation"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Foundational GR warp metric reference for expansion/shift semantics.",
+      "url": "https://arxiv.org/abs/gr-qc/0110086"
+    },
+    {
+      "id": "gourgoulhon_2007_3plus1",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "3+1 Formalism in General Relativity",
+      "supportsClaimIds": [
+        "claim_nhm2_alpha_sweep_clocking_isolation",
+        "claim_nhm2_locked_coordinate_schedule_invariant"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "3+1 formalism reference for lapse/shift decomposition language.",
+      "url": "https://arxiv.org/abs/gr-qc/0703035"
+    },
+    {
+      "id": "alcubierre_1994_warp_drive",
+      "type": "paper",
+      "evidenceType": "peer_reviewed",
+      "sourceStability": "primary_peer_reviewed",
+      "title": "The Warp Drive: Hyper-fast travel within general relativity",
+      "supportsClaimIds": [
+        "claim_nhm2_locked_coordinate_schedule_invariant"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Primary warp-drive baseline citation; used for historical metric context.",
+      "url": "https://arxiv.org/abs/gr-qc/0009013"
+    },
+    {
+      "id": "lentz_2021_breaking_warp_barrier",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "Breaking the Warp Barrier: Hyper-Fast Solitons in Einstein-Maxwell-Plasma Theory",
+      "supportsClaimIds": [
+        "claim_nhm2_alpha_sweep_clocking_isolation"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Speculative comparative context only; not treated as direct validation of NHM2 outputs.",
+      "url": "https://arxiv.org/abs/2006.07125"
+    },
+    {
+      "id": "pfenning_ford_1997_unphysical_warp",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "The Unphysical Nature of Warp Drive",
+      "supportsClaimIds": [
+        "claim_future_mechanism_closure_hypothesis"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Constraint-focused literature context; does not certify NHM2 outputs.",
+      "url": "https://arxiv.org/abs/gr-qc/9702026"
+    },
+    {
+      "id": "van_den_broeck_1999_natario_scaling",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "A Warp Drive with More Reasonable Total Energy Requirements",
+      "supportsClaimIds": [
+        "claim_future_mechanism_closure_hypothesis"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Scaling-context reference only; not direct evidence for this repo's gate results.",
+      "url": "https://arxiv.org/abs/gr-qc/9905084"
+    },
+    {
+      "id": "bobrick_martire_2021_physical_warp_drives",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "Introducing Physical Warp Drives",
+      "supportsClaimIds": [
+        "claim_nhm2_alpha_sweep_clocking_isolation"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Framework-level context for warp-drive physical interpretation boundaries.",
+      "url": "https://arxiv.org/abs/2102.06824"
+    },
+    {
+      "id": "santiago_schuster_visser_2021_nec",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "Generic warp drives violate the null energy condition",
+      "supportsClaimIds": [
+        "claim_future_mechanism_closure_hypothesis"
+      ],
+      "accessedOn": "2026-04-25",
+      "confidenceNote": "Energy-condition limitation context to constrain over-claims.",
+      "url": "https://arxiv.org/abs/2105.03079"
     }
   ],
   "claims": [
@@ -69,8 +201,11 @@
       ],
       "sourceIds": [
         "springer_natario_zero_expansion_2024",
-        "ligo_technology_reference"
-      ]
+        "ligo_technology_reference",
+        "casimirbot_repo_clone_6baffda"
+      ],
+      "uncertaintyRationale": "Lane-separation policy is implementation-specific and does not imply external physical validation.",
+      "scopeBoundary": "This claim defines output interpretation boundaries only and does not establish transport or viability performance."
     },
     {
       "claimId": "claim_nhm2_secondary_curvature_rendering",
@@ -92,9 +227,59 @@
         "docs/research/nhm2-current-status-memo-2026-04-03.md"
       ],
       "sourceIds": [
-        "casimirbot_repo_clone_6baffda"
+        "casimirbot_repo_clone_6baffda",
+        "lentz_2021_breaking_warp_barrier"
       ],
       "uncertaintyNote": "Predictive projection only; not validated by present bounded-stack evidence."
+      ,
+      "uncertaintyRationale": "Mechanism closure remains unresolved in this repository; literature only bounds plausible directions.",
+      "scopeBoundary": "This claim is scenario-planning context and does not certify a physically admissible NHM2 transport regime."
+    },
+    {
+      "claimId": "claim_nhm2_alpha_sweep_clocking_isolation",
+      "claimText": "The NHM2 lapse alpha sweep treats centerlineAlpha as the only clocking dial while preserving route and coordinate transport schedule checks in fail-closed invariants.",
+      "status": "derived",
+      "artifactPaths": [
+        "scripts/warp-york-control-family-proof-pack.ts",
+        "scripts/research/run-nhm2-lapse-alpha-sweep.ts",
+        "configs/research/nhm2-lapse-alpha-sweep.json"
+      ],
+      "sourceIds": [
+        "natario_2001_zero_expansion",
+        "gourgoulhon_2007_3plus1",
+        "casimirbot_repo_clone_6baffda"
+      ],
+      "uncertaintyRationale": "Isolation semantics are policy- and implementation-bound until all sweep profiles complete pass-level full-loop audits.",
+      "scopeBoundary": "This claim constrains decomposition interpretation and does not prove that any specific alpha profile is promoted."
+    },
+    {
+      "claimId": "claim_nhm2_exploratory_alpha_not_auto_promoted",
+      "claimText": "Exploratory alpha bracket entries are retained as diagnostic unless explicit promotion override is requested and full-loop gates pass.",
+      "status": "measured",
+      "artifactPaths": [
+        "scripts/research/run-nhm2-lapse-alpha-sweep.ts",
+        "configs/research/nhm2-lapse-alpha-sweep.json"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda"
+      ]
+    },
+    {
+      "claimId": "claim_nhm2_locked_coordinate_schedule_invariant",
+      "claimText": "The locked_coordinate_schedule invariant in NHM2 alpha-sweep full-loop checks must compare mission coordinate time against classical mission coordinate reference on a common target-coupled basis, while local route span remains diagnostic context only.",
+      "status": "derived",
+      "artifactPaths": [
+        "scripts/warp-york-control-family-proof-pack.ts",
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-route-time-worldline-latest.json"
+      ],
+      "sourceIds": [
+        "casimirbot_repo_clone_6baffda",
+        "gourgoulhon_2007_3plus1",
+        "alcubierre_1994_warp_drive"
+      ],
+      "uncertaintyRationale": "Coordinate-lock interpretation depends on current comparator contracts and may change with future contract revisions.",
+      "scopeBoundary": "This claim defines comparator semantics only and does not by itself validate elapsed-time reductions."
     }
   ]
 }

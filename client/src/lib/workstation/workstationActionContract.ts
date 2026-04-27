@@ -114,7 +114,10 @@ function normalizeActionName(value: unknown): string | null {
 function coerceAction(value: unknown): HelixWorkstationAction | null {
   const record = asRecord(value);
   if (!record) return null;
-  const action = normalizeActionName(record.action ?? record.kind ?? record.type);
+  let action = normalizeActionName(record.action ?? record.kind ?? record.type);
+  if (!action && asNonEmptyString(record.panel_id ?? record.panelId ?? record.id) && asNonEmptyString(record.action_id ?? record.actionId)) {
+    action = "run_panel_action";
+  }
   if (!action) return null;
 
   if (action === "open_panel" || action === "focus_panel" || action === "close_panel") {

@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-23T03:45:47.383Z",
+  "generatedAt": "2026-04-25T02:11:25.514Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -61,8 +61,10 @@
     },
     "claim_tier": {
       "sectionId": "claim_tier",
-      "state": "pass",
-      "reasons": [],
+      "state": "review",
+      "reasons": [
+        "insufficient_provenance"
+      ],
       "artifactRefs": [
         {
           "artifactId": "nhm2_shift_lapse_transport_result",
@@ -81,6 +83,12 @@
           "path": "shared/contracts/warp-proof-surface-manifest.v1.ts",
           "contractVersion": null,
           "status": null
+        },
+        {
+          "artifactId": "nhm2_research_citation_checklist",
+          "path": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/docs/research/research-citation-patch-checklist.v1.json",
+          "contractVersion": "research_citation_patch_checklist/v1",
+          "status": "pass"
         }
       ],
       "currentTier": "diagnostic",
@@ -117,8 +125,10 @@
     },
     "lapse_provenance": {
       "sectionId": "lapse_provenance",
-      "state": "pass",
-      "reasons": [],
+      "state": "review",
+      "reasons": [
+        "insufficient_provenance"
+      ],
       "artifactRefs": [
         {
           "artifactId": "nhm2_shift_lapse_transport_result",
@@ -331,8 +341,10 @@
     },
     "gr_stability_safety": {
       "sectionId": "gr_stability_safety",
-      "state": "pass",
-      "reasons": [],
+      "state": "review",
+      "reasons": [
+        "policy_review_required"
+      ],
       "artifactRefs": [
         {
           "artifactId": "nhm2_shift_lapse_transport_result",
@@ -357,6 +369,12 @@
           "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-in-hull-proper-acceleration-latest.json",
           "contractVersion": "warp_in_hull_proper_acceleration/v1",
           "status": "bounded_in_hull_profile_certified"
+        },
+        {
+          "artifactId": "nhm2_selected_family_timeout_diagnostic",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-selected-family-timeout-diagnostic-latest.json",
+          "contractVersion": "nhm2_selected_family_timeout_diagnostic/v1",
+          "status": null
         }
       ],
       "solverHealth": "CERTIFIED",
@@ -382,8 +400,10 @@
     },
     "mission_time_outputs": {
       "sectionId": "mission_time_outputs",
-      "state": "pass",
-      "reasons": [],
+      "state": "review",
+      "reasons": [
+        "insufficient_provenance"
+      ],
       "artifactRefs": [
         {
           "artifactId": "nhm2_warp_worldline_proof",
@@ -422,8 +442,8 @@
       "missionTimeComparisonStatus": "bounded_target_coupled_comparison_ready",
       "targetId": "alpha-cen-a",
       "coordinateTimeEstimateSeconds": 137755965.9171795,
-      "properTimeEstimateSeconds": 137067186.0875936,
-      "properMinusCoordinateSeconds": -688779.8295859098,
+      "properTimeEstimateSeconds": 96429176.14202563,
+      "properMinusCoordinateSeconds": -41326789.77515386,
       "comparatorId": "nhm2_classical_no_time_dilation_reference",
       "supportedClaimTiers": [
         "diagnostic",
@@ -433,8 +453,10 @@
     },
     "shift_vs_lapse_decomposition": {
       "sectionId": "shift_vs_lapse_decomposition",
-      "state": "pass",
-      "reasons": [],
+      "state": "review",
+      "reasons": [
+        "insufficient_provenance"
+      ],
       "artifactRefs": [
         {
           "artifactId": "nhm2_shift_vs_lapse_decomposition_selected",
@@ -450,7 +472,7 @@
         }
       ],
       "shiftDrivenContribution": 137755965.9171795,
-      "lapseDrivenContribution": -688779.8295858981,
+      "lapseDrivenContribution": -41326789.77515385,
       "expansionLeakageBound": 0.001,
       "thetaFlatnessStatus": "pass",
       "divBetaFlatnessStatus": "shell_cross_samples_reveal_shift_variation_while_dtau_stays_flat_in_bounded_regime",
@@ -484,7 +506,7 @@
       "smoothingKernelSensitivity": null,
       "coldStartReproductionStatus": "deterministic_case_order_recorded",
       "independentReproductionStatus": null,
-      "artifactHashConsistencyStatus": "consistent",
+      "artifactHashConsistencyStatus": "mismatch",
       "supportedClaimTiers": [
         "reduced-order",
         "certified"
@@ -557,7 +579,7 @@
   "claimTierReadiness": {
     "diagnostic": {
       "tier": "diagnostic",
-      "state": "pass",
+      "state": "review",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -565,16 +587,15 @@
         "mission_time_outputs"
       ],
       "satisfiedSections": [
-        "family_semantics",
-        "claim_tier",
-        "lapse_provenance",
-        "mission_time_outputs"
+        "family_semantics"
       ],
-      "blockingReasons": []
+      "blockingReasons": [
+        "insufficient_provenance"
+      ]
     },
     "reduced-order": {
       "tier": "reduced-order",
-      "state": "pass",
+      "state": "review",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -589,21 +610,19 @@
       ],
       "satisfiedSections": [
         "family_semantics",
-        "claim_tier",
-        "lapse_provenance",
         "strict_signal_readiness",
         "source_closure",
         "observer_audit",
-        "gr_stability_safety",
-        "mission_time_outputs",
-        "shift_vs_lapse_decomposition",
         "uncertainty_perturbation_reproducibility"
       ],
-      "blockingReasons": []
+      "blockingReasons": [
+        "insufficient_provenance",
+        "policy_review_required"
+      ]
     },
     "certified": {
       "tier": "certified",
-      "state": "pass",
+      "state": "review",
       "requiredSections": [
         "family_semantics",
         "claim_tier",
@@ -619,23 +638,236 @@
       ],
       "satisfiedSections": [
         "family_semantics",
-        "claim_tier",
-        "lapse_provenance",
         "strict_signal_readiness",
         "source_closure",
         "observer_audit",
-        "gr_stability_safety",
-        "mission_time_outputs",
-        "shift_vs_lapse_decomposition",
         "uncertainty_perturbation_reproducibility",
         "certificate_policy_result"
       ],
-      "blockingReasons": []
+      "blockingReasons": [
+        "insufficient_provenance",
+        "policy_review_required"
+      ]
     }
   },
   "currentClaimTier": "diagnostic",
   "maximumClaimTier": "reduced-order",
-  "highestPassingClaimTier": "reduced-order",
-  "overallState": "pass",
-  "blockingReasons": []
+  "highestPassingClaimTier": null,
+  "overallState": "review",
+  "blockingReasons": [
+    "insufficient_provenance",
+    "policy_review_required"
+  ],
+  "claimEvidence": {
+    "checklistPath": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/docs/research/research-citation-patch-checklist.v1.json",
+    "validationOk": true,
+    "validationIssues": [],
+    "hasBlockingEvidence": true,
+    "sourceCatalog": [
+      {
+        "id": "springer_natario_zero_expansion_2024",
+        "title": "A Closer Look at Natario's Zero-Expansion Warp Drive",
+        "url": "https://link.springer.com/article/10.1007/s10773-024-05700-0",
+        "doi": "10.1007/s10773-024-05700-0",
+        "evidenceType": "peer_reviewed",
+        "sourceStability": "primary_peer_reviewed"
+      },
+      {
+        "id": "ligo_technology_reference",
+        "title": "LIGO Technology (detector measurement context)",
+        "url": "https://www.ligo.caltech.edu/LA/page/ligo-technology",
+        "doi": null,
+        "evidenceType": "reference_web",
+        "sourceStability": "operational_web"
+      },
+      {
+        "id": "casimirbot_repo_clone_6baffda",
+        "title": "CasimirBot local evidence clone (current workspace commit)",
+        "url": null,
+        "doi": null,
+        "evidenceType": "repo_clone",
+        "sourceStability": "repo_clone"
+      },
+      {
+        "id": "natario_2001_zero_expansion",
+        "title": "Warp Drive with Zero Expansion",
+        "url": "https://arxiv.org/abs/gr-qc/0110086",
+        "doi": null,
+        "evidenceType": "peer_reviewed",
+        "sourceStability": "primary_peer_reviewed"
+      },
+      {
+        "id": "gourgoulhon_2007_3plus1",
+        "title": "3+1 Formalism in General Relativity",
+        "url": "https://arxiv.org/abs/gr-qc/0703035",
+        "doi": null,
+        "evidenceType": "preprint",
+        "sourceStability": "preprint"
+      },
+      {
+        "id": "alcubierre_1994_warp_drive",
+        "title": "The Warp Drive: Hyper-fast travel within general relativity",
+        "url": "https://arxiv.org/abs/gr-qc/0009013",
+        "doi": null,
+        "evidenceType": "peer_reviewed",
+        "sourceStability": "primary_peer_reviewed"
+      },
+      {
+        "id": "lentz_2021_breaking_warp_barrier",
+        "title": "Breaking the Warp Barrier: Hyper-Fast Solitons in Einstein-Maxwell-Plasma Theory",
+        "url": "https://arxiv.org/abs/2006.07125",
+        "doi": null,
+        "evidenceType": "preprint",
+        "sourceStability": "preprint"
+      },
+      {
+        "id": "pfenning_ford_1997_unphysical_warp",
+        "title": "The Unphysical Nature of Warp Drive",
+        "url": "https://arxiv.org/abs/gr-qc/9702026",
+        "doi": null,
+        "evidenceType": "preprint",
+        "sourceStability": "preprint"
+      },
+      {
+        "id": "van_den_broeck_1999_natario_scaling",
+        "title": "A Warp Drive with More Reasonable Total Energy Requirements",
+        "url": "https://arxiv.org/abs/gr-qc/9905084",
+        "doi": null,
+        "evidenceType": "preprint",
+        "sourceStability": "preprint"
+      },
+      {
+        "id": "bobrick_martire_2021_physical_warp_drives",
+        "title": "Introducing Physical Warp Drives",
+        "url": "https://arxiv.org/abs/2102.06824",
+        "doi": null,
+        "evidenceType": "preprint",
+        "sourceStability": "preprint"
+      },
+      {
+        "id": "santiago_schuster_visser_2021_nec",
+        "title": "Generic warp drives violate the null energy condition",
+        "url": "https://arxiv.org/abs/2105.03079",
+        "doi": null,
+        "evidenceType": "preprint",
+        "sourceStability": "preprint"
+      }
+    ],
+    "entries": [
+      {
+        "claimId": "claim_observed_vs_theoretical_lane_separation",
+        "claimStatus": "derived",
+        "claimClass": "literature_context",
+        "claimText": "Observed gravitational-wave products and theoretical curvature-invariant plots must be rendered as separate lanes.",
+        "sourceIds": [
+          "springer_natario_zero_expansion_2024",
+          "ligo_technology_reference",
+          "casimirbot_repo_clone_6baffda"
+        ],
+        "sourceEvidenceTypes": [
+          "peer_reviewed",
+          "reference_web",
+          "repo_clone"
+        ],
+        "literatureSourceIds": [
+          "springer_natario_zero_expansion_2024"
+        ],
+        "mappingStatus": "mapped",
+        "uncertaintyNote": null
+      },
+      {
+        "claimId": "claim_nhm2_secondary_curvature_rendering",
+        "claimStatus": "measured",
+        "claimClass": "not_validated",
+        "claimText": "NHM2 curvature invariant frames in this pipeline are secondary solve-backed visualization artifacts, not primary proof surfaces.",
+        "sourceIds": [
+          "casimirbot_repo_clone_6baffda"
+        ],
+        "sourceEvidenceTypes": [
+          "repo_clone"
+        ],
+        "literatureSourceIds": [],
+        "mappingStatus": "mapped",
+        "uncertaintyNote": null
+      },
+      {
+        "claimId": "claim_future_mechanism_closure_hypothesis",
+        "claimStatus": "hypothesis",
+        "claimClass": "extrapolation_candidate",
+        "claimText": "Future NHM2 mechanism closure may enable stronger physically interpretable volumetric curvature signatures.",
+        "sourceIds": [
+          "casimirbot_repo_clone_6baffda",
+          "lentz_2021_breaking_warp_barrier"
+        ],
+        "sourceEvidenceTypes": [
+          "repo_clone",
+          "preprint"
+        ],
+        "literatureSourceIds": [
+          "lentz_2021_breaking_warp_barrier"
+        ],
+        "mappingStatus": "mapped",
+        "uncertaintyNote": "Predictive projection only; not validated by present bounded-stack evidence."
+      },
+      {
+        "claimId": "claim_nhm2_alpha_sweep_clocking_isolation",
+        "claimStatus": "derived",
+        "claimClass": "literature_context",
+        "claimText": "The NHM2 lapse alpha sweep treats centerlineAlpha as the only clocking dial while preserving route and coordinate transport schedule checks in fail-closed invariants.",
+        "sourceIds": [
+          "natario_2001_zero_expansion",
+          "gourgoulhon_2007_3plus1",
+          "casimirbot_repo_clone_6baffda"
+        ],
+        "sourceEvidenceTypes": [
+          "peer_reviewed",
+          "preprint",
+          "repo_clone"
+        ],
+        "literatureSourceIds": [
+          "natario_2001_zero_expansion",
+          "gourgoulhon_2007_3plus1"
+        ],
+        "mappingStatus": "mapped",
+        "uncertaintyNote": null
+      },
+      {
+        "claimId": "claim_nhm2_exploratory_alpha_not_auto_promoted",
+        "claimStatus": "measured",
+        "claimClass": "not_validated",
+        "claimText": "Exploratory alpha bracket entries are retained as diagnostic unless explicit promotion override is requested and full-loop gates pass.",
+        "sourceIds": [
+          "casimirbot_repo_clone_6baffda"
+        ],
+        "sourceEvidenceTypes": [
+          "repo_clone"
+        ],
+        "literatureSourceIds": [],
+        "mappingStatus": "mapped",
+        "uncertaintyNote": null
+      },
+      {
+        "claimId": "claim_nhm2_locked_coordinate_schedule_invariant",
+        "claimStatus": "derived",
+        "claimClass": "literature_context",
+        "claimText": "The locked_coordinate_schedule invariant in NHM2 alpha-sweep full-loop checks must compare mission coordinate time against classical mission coordinate reference on a common target-coupled basis, while local route span remains diagnostic context only.",
+        "sourceIds": [
+          "casimirbot_repo_clone_6baffda",
+          "gourgoulhon_2007_3plus1",
+          "alcubierre_1994_warp_drive"
+        ],
+        "sourceEvidenceTypes": [
+          "repo_clone",
+          "preprint",
+          "peer_reviewed"
+        ],
+        "literatureSourceIds": [
+          "gourgoulhon_2007_3plus1",
+          "alcubierre_1994_warp_drive"
+        ],
+        "mappingStatus": "mapped",
+        "uncertaintyNote": null
+      }
+    ]
+  }
 }

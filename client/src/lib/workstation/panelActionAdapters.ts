@@ -1,4 +1,5 @@
 import { openDocPanel } from "@/lib/docs/openDocPanel";
+import { DOC_MANIFEST, findDocEntry } from "@/lib/docs/docManifest";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import type { HelixAskAnswerContract } from "@/lib/helix/ask-prompt-launch";
@@ -70,6 +71,35 @@ function buildDeterministicNoteId(title: string, existingIds: string[]): string 
   return `${stem}-${index}`;
 }
 
+function normalizeDocRoute(value: string): string {
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized) return "";
+  return `/${normalized.startsWith("docs/") ? normalized : `docs/${normalized}`}`.replace(/\/{2,}/g, "/");
+}
+
+function tokenizeDocTopic(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !["the", "doc", "docs", "document", "paper", "latest", "newest", "recent"].includes(token));
+}
+
+function searchDocManifest(query: string, limit = 8) {
+  const tokens = tokenizeDocTopic(query);
+  if (tokens.length === 0) return [];
+  return DOC_MANIFEST
+    .map((entry) => {
+      const searchText = entry.searchText.toLowerCase();
+      const score = tokens.reduce((sum, token) => sum + (searchText.includes(token) ? 1 : 0), 0);
+      return { entry, score: score + (/\blatest\b/i.test(entry.relativePath) ? 0.25 : 0) };
+    })
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score || a.entry.route.localeCompare(b.entry.route))
+    .slice(0, Math.max(1, Math.min(24, limit)));
+}
+
 function resolveNoteId(args: Record<string, unknown>, options?: { allowActiveFallback?: boolean }): string | null {
   const notesState = useWorkstationNotesStore.getState();
   const directId = asNonEmptyString(args.note_id ?? args.id);
@@ -111,15 +141,17 @@ function requireConfirmation(
 }
 
 function buildDocReasoningPrompt(args: {
-  mode: "summarize_doc" | "summarize_section" | "explain_paper";
+  mode: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc";
   path: string;
   anchor?: string;
   selectedText?: string;
+  query?: string;
 }): string {
   const pathLine = `Document path: ${args.path}`;
   const anchorLine = args.anchor ? `Section anchor: #${args.anchor}` : null;
   const selectionLine = args.selectedText ? `Selected text: "${args.selectedText}"` : null;
-  const contextLines = [pathLine, anchorLine, selectionLine].filter(Boolean).join("\n");
+  const queryLine = args.query ? `Locate query: "${args.query}"` : null;
+  const contextLines = [pathLine, anchorLine, selectionLine, queryLine].filter(Boolean).join("\n");
 
   if (args.mode === "summarize_section") {
     return `Summarize this section from the current docs viewer selection. Start with one sentence on what this section is for, then key points.\n${contextLines}`;
@@ -127,10 +159,13 @@ function buildDocReasoningPrompt(args: {
   if (args.mode === "explain_paper") {
     return `Explain this paper from the current docs viewer context in plain language.\n${contextLines}`;
   }
+  if (args.mode === "locate_in_doc") {
+    return `Find where this topic is addressed in the current docs viewer context. Return a short "Locations:" list with anchors/sections and one-line evidence snippets.\n${contextLines}`;
+  }
   return `Summarize this document from the current docs viewer context. Start with one sentence on what this document is for, then key findings and caveats.\n${contextLines}`;
 }
 
-function buildDocAnswerContract(mode: "summarize_doc" | "summarize_section" | "explain_paper"): HelixAskAnswerContract {
+function buildDocAnswerContract(mode: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc"): HelixAskAnswerContract {
   const sharedSections = [
     { id: "purpose", heading: "Purpose", required: true, synonyms: ["What this document is for"] },
   ];
@@ -161,6 +196,19 @@ function buildDocAnswerContract(mode: "summarize_doc" | "summarize_section" | "e
         { id: "core_mechanism", heading: "Core Mechanism", required: true, synonyms: ["How it works"] },
         { id: "evidence", heading: "Evidence", required: true, synonyms: ["Findings"] },
         { id: "caveats", heading: "Caveats", required: true, synonyms: ["Limits", "Limitations"] },
+      ],
+    };
+  }
+  if (mode === "locate_in_doc") {
+    return {
+      schema: "helix.ask.answer_contract.v1",
+      source: "docs_viewer",
+      mode,
+      strict_sections: true,
+      min_tokens: 500,
+      sections: [
+        ...sharedSections,
+        { id: "locations", heading: "Locations", required: true, synonyms: ["Matches", "Where It Appears"] },
       ],
     };
   }
@@ -210,7 +258,7 @@ export function executeHelixPanelAction(
     return { ok: true, panel_id: panelId, action_id: actionId };
   }
 
-  if (panelId === "docs-viewer" && actionId === "open_doc") {
+  if (panelId === "docs-viewer" && (actionId === "open_doc" || actionId === "open_doc_by_path")) {
     const args = asRecord(request.args) ?? {};
     const path = asNonEmptyString(args.path ?? args.doc_path ?? args.target);
     const anchor = asNonEmptyString(args.anchor);
@@ -224,12 +272,76 @@ export function executeHelixPanelAction(
     }
     context.openPanel("docs-viewer", undefined);
     context.focusPanel("docs-viewer", undefined);
-    openDocPanel(anchor ? { path, anchor } : { path });
+    const route = normalizeDocRoute(path);
+    openDocPanel(anchor ? { path: route, anchor } : { path: route });
     return {
       ok: true,
       panel_id: panelId,
       action_id: actionId,
-      artifact: { path, anchor: anchor ?? null },
+      artifact: { path: route, anchor: anchor ?? null },
+      message: `Opened document: ${route}`,
+    };
+  }
+
+  if (panelId === "docs-viewer" && actionId === "open_latest_doc_by_topic") {
+    const args = asRecord(request.args) ?? {};
+    const topic = asNonEmptyString(args.topic ?? args.query ?? args.target);
+    const providedPath = asNonEmptyString(args.path ?? args.doc_path);
+    if (!topic && !providedPath) {
+      return {
+        ok: false,
+        panel_id: panelId,
+        action_id: actionId,
+        message: "docs-viewer.open_latest_doc_by_topic requires a topic or resolved path.",
+      };
+    }
+    const route =
+      providedPath ? normalizeDocRoute(providedPath) : searchDocManifest(topic ?? "", 1)[0]?.entry.route ?? null;
+    if (!route) {
+      return {
+        ok: false,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { topic: topic ?? null, candidates: [] },
+        message: `No local docs matched topic: ${topic ?? "unknown"}.`,
+      };
+    }
+    context.openPanel("docs-viewer", undefined);
+    context.focusPanel("docs-viewer", undefined);
+    openDocPanel({ path: route });
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: { topic: topic ?? null, path: route },
+      message: topic ? `Opened latest ${topic} document: ${route}` : `Opened document: ${route}`,
+    };
+  }
+
+  if (panelId === "docs-viewer" && actionId === "search_docs") {
+    const args = asRecord(request.args) ?? {};
+    const query = asNonEmptyString(args.query ?? args.topic ?? args.target);
+    if (!query) {
+      return {
+        ok: false,
+        panel_id: panelId,
+        action_id: actionId,
+        message: "docs-viewer.search_docs requires query.",
+      };
+    }
+    const limitRaw = typeof args.limit === "number" ? args.limit : 8;
+    const matches = searchDocManifest(query, limitRaw).map(({ entry }) => ({
+      path: entry.route,
+      title: entry.title,
+    }));
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: { query, matches },
+      message: matches.length
+        ? `Found ${matches.length} doc(s): ${matches.map((entry) => entry.path).join(", ")}`
+        : `No docs matched: ${query}`,
     };
   }
 
@@ -268,9 +380,29 @@ export function executeHelixPanelAction(
     };
   }
 
+  if (panelId === "docs-viewer" && (actionId === "identify_current_doc" || actionId === "verify_active_doc")) {
+    const store = useDocViewerStore.getState();
+    const path = asNonEmptyString(store.currentPath);
+    const anchor = asNonEmptyString(store.anchor);
+    const entry = findDocEntry(path);
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: {
+        path: path ?? null,
+        anchor: anchor ?? null,
+        mode: store.mode,
+        title: entry?.title ?? null,
+        has_doc_context: Boolean(path),
+      },
+      message: path ? `Current document: ${path}` : "No active document in Docs Viewer.",
+    };
+  }
+
   if (
     panelId === "docs-viewer" &&
-    (actionId === "summarize_doc" || actionId === "summarize_section" || actionId === "explain_paper")
+    (actionId === "summarize_doc" || actionId === "summarize_section" || actionId === "explain_paper" || actionId === "locate_in_doc")
   ) {
     const args = asRecord(request.args) ?? {};
     const store = useDocViewerStore.getState();
@@ -279,6 +411,7 @@ export function executeHelixPanelAction(
       asNonEmptyString(store.currentPath);
     const anchor = asNonEmptyString(args.anchor) ?? asNonEmptyString(store.anchor);
     const selectedText = asNonEmptyString(args.selected_text ?? args.selection_text ?? args.selection);
+    const query = asNonEmptyString(args.query ?? args.topic ?? args.find);
     if (!path) {
       return {
         ok: false,
@@ -287,11 +420,20 @@ export function executeHelixPanelAction(
         message: "No active docs context to summarize/explain.",
       };
     }
+    if (actionId === "locate_in_doc" && !query) {
+      return {
+        ok: false,
+        panel_id: panelId,
+        action_id: actionId,
+        message: "docs-viewer.locate_in_doc requires query.",
+      };
+    }
     const prompt = buildDocReasoningPrompt({
       mode: actionId,
       path,
       anchor: anchor ?? undefined,
       selectedText: selectedText ?? undefined,
+      query: query ?? undefined,
     });
     launchHelixAskPrompt({
       question: prompt,
@@ -309,6 +451,7 @@ export function executeHelixPanelAction(
       artifact: {
         path,
         anchor: anchor ?? null,
+        query: query ?? null,
         selected_text: selectedText ?? null,
         launched_prompt: true,
       },
@@ -317,6 +460,8 @@ export function executeHelixPanelAction(
           ? "Summarizing current section in Helix Ask."
           : actionId === "explain_paper"
             ? "Explaining current paper in Helix Ask."
+            : actionId === "locate_in_doc"
+              ? "Locating topic in current document in Helix Ask."
             : "Summarizing current document in Helix Ask.",
     };
   }

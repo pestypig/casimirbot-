@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "rootId": "physics-compact-star-limit-observables-tree",
+  "nodes": [
+    {
+      "id": "physics-compact-star-limit-observables-tree",
+      "slug": "physics-compact-star-limit-observables-tree",
+      "title": "Physics Compact-Star Limit Observables Tree",
+      "excerpt": "Diagnostic compact-star lane for pulsar limit probes, transfer observables, and bounded matter hypotheses.",
+      "bodyMD": "This tree defines a compact-star observable lane that records death-line, gap, diffraction, and EOS-hypothesis tensions using explicit evidence-bounded contracts.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "pulsar",
+        "diagnostic"
+      ],
+      "children": [
+        "physics-compact-star-radio-observable-contract-definition",
+        "physics-compact-star-death-line-limit-definition",
+        "physics-compact-star-vacuum-gap-sparking-definition",
+        "physics-compact-star-surface-mountain-definition",
+        "physics-compact-star-dynamic-spectrum-diffraction-definition",
+        "physics-compact-star-matter-hypothesis-envelope-definition",
+        "physics-compact-star-quantum-classical-bridge-definition",
+        "physics-compact-star-long-period-radio-transient-limit-definition"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Compact-star diagnostic lane for boundary-case observables and bounded hypotheses.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/compact-star-radio-observable-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-radio-observable-contract-definition",
+      "slug": "physics-compact-star-radio-observable-contract-definition",
+      "title": "Compact-Star Radio Observable Contract Definition",
+      "excerpt": "Definition for compact-star observables in the shared lane grammar.",
+      "bodyMD": "Defines compact-star observable semantics and claim-tier boundaries.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "definition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Compact-star shared-contract definition.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/compact-star-radio-observable-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-death-line-limit-definition",
+      "slug": "physics-compact-star-death-line-limit-definition",
+      "title": "Pulsar Death-Line Limit Definition",
+      "excerpt": "Definition for death-line limit probes and bridge-case semantics.",
+      "bodyMD": "Defines how period/P-dot state and bridge-case outcomes are represented without over-claim.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "pulsar",
+        "death-line"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Death-line probe and bridge-case contract branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/pulsar-death-line-limit.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-vacuum-gap-sparking-definition",
+      "slug": "physics-compact-star-vacuum-gap-sparking-definition",
+      "title": "Pulsar Vacuum Gap Sparking Definition",
+      "excerpt": "Definition for vacuum-gap and pair-cascade closure descriptors.",
+      "bodyMD": "Defines the forcing and closure semantics used for spark-threshold probes.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "vacuum-gap"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Vacuum-gap and pair-cascade closure branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/pulsar-vacuum-gap-sparking.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-surface-mountain-definition",
+      "slug": "physics-compact-star-surface-mountain-definition",
+      "title": "Pulsar Surface Mountain Hypothesis Definition",
+      "excerpt": "Definition for surface-rigidity/mountain hypotheses under constrained claim tiers.",
+      "bodyMD": "Defines mountain-enhancement hypotheses as bounded explanatory probes requiring explicit evidence.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "mountain",
+        "hypothesis"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Surface mountain bounded-hypothesis branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/pulsar-surface-mountain-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-dynamic-spectrum-diffraction-definition",
+      "slug": "physics-compact-star-dynamic-spectrum-diffraction-definition",
+      "title": "Pulsar Dynamic Spectrum Diffraction Definition",
+      "excerpt": "Definition for zebra-band and related dynamic-spectrum transfer observables.",
+      "bodyMD": "Defines dynamic-spectrum features as transfer observables, not atomic-line identifiers.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "dynamic-spectrum",
+        "diffraction"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Zebra-band transfer-observable branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/pulsar-dynamic-spectrum-diffraction.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-matter-hypothesis-envelope-definition",
+      "slug": "physics-compact-star-matter-hypothesis-envelope-definition",
+      "title": "Compact-Star Matter Hypothesis Envelope Definition",
+      "excerpt": "Definition for EOS and matter-state hypothesis envelopes with support/contradiction refs.",
+      "bodyMD": "Defines explicit support and contradiction references for compact-star matter hypotheses.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "eos",
+        "hypothesis"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Compact-star matter hypothesis envelope branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/compact-star-matter-hypothesis-envelope.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-quantum-classical-bridge-definition",
+      "slug": "physics-compact-star-quantum-classical-bridge-definition",
+      "title": "Compact-Star Quantum Classical Bridge Definition",
+      "excerpt": "Definition for explicit micro-to-observable bridge status in compact-star records.",
+      "bodyMD": "Defines the bridge record connecting microphysics assumptions to classical observables under bounded status labels.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "bridge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Quantum-classical bridge branch for compact-star observables.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/compact-star-quantum-classical-bridge.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-compact-star-long-period-radio-transient-limit-definition",
+      "slug": "physics-compact-star-long-period-radio-transient-limit-definition",
+      "title": "Long-Period Radio Transient Limit Definition",
+      "excerpt": "Definition for long-period bridge-case handling in compact-star limit probes.",
+      "bodyMD": "Defines how long-period radio transient tension cases are represented as bridge cases under model-declared limits.",
+      "tags": [
+        "physics",
+        "compact-star",
+        "lprt",
+        "bridge-case"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-compact-star-limit-observables-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Long-period bridge-case semantics branch.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-compact-star-limit-observables-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/long-period-radio-transient-limit.md"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

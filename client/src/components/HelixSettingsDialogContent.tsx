@@ -1057,7 +1057,7 @@ function HelixAskReasoningEventLogPanel({
   }, [selectedEvents]);
   const exportPayload = React.useMemo(() => {
     if (selectedEvents.length === 0) return "";
-    return selectedEvents.map((event) => JSON.stringify(event)).join("\n");
+    return JSON.stringify(buildSettingsHelixAskMasterEventClockExport(selectedEvents), null, 2);
   }, [selectedEvents]);
 
   const handleCopy = async () => {
@@ -1611,6 +1611,72 @@ function getReasoningTimelineTurnKey(event: VoiceLaneTimelineDebugEvent): string
 function readHelixAskDebugContextRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
+}
+
+function buildSettingsHelixAskMasterEventClockExport(events: VoiceLaneTimelineDebugEvent[]) {
+  const latestContext = [...events]
+    .reverse()
+    .map((event) => readHelixAskDebugContextRecord(event.debugContext))
+    .find((context): context is Record<string, unknown> => Boolean(context));
+  const agentLoopAudit = readHelixAskDebugContextRecord(latestContext?.agent_loop_audit);
+  const runtimeSummary =
+    readHelixAskDebugContextRecord(latestContext?.turn_runtime) ??
+    readHelixAskDebugContextRecord(agentLoopAudit?.runtime_summary);
+  return {
+    schema: "helix.ask.master_event_clock.v2",
+    exportedAt: new Date().toISOString(),
+    source: "helix_start_settings",
+    counts: {
+      eventLogRows: events.length,
+      traceIds: new Set(events.map((event) => event.traceId).filter(Boolean)).size,
+      turnKeys: new Set(events.map((event) => getReasoningTimelineTurnKey(event)).filter(Boolean)).size,
+      attemptIds: new Set(events.map((event) => event.attemptId).filter(Boolean)).size,
+    },
+    trace: {
+      traceIds: [...new Set(events.map((event) => event.traceId).filter(Boolean))],
+      turnKeys: [...new Set(events.map((event) => getReasoningTimelineTurnKey(event)).filter(Boolean))],
+      attemptIds: [...new Set(events.map((event) => event.attemptId).filter(Boolean))],
+    },
+    debugContext: latestContext ?? null,
+    agentLoop: {
+      audit: agentLoopAudit,
+      planner_contract:
+        readHelixAskDebugContextRecord(latestContext?.planner_contract) ??
+        readHelixAskDebugContextRecord(agentLoopAudit?.planner_contract),
+      execution_trace: Array.isArray(latestContext?.execution_trace)
+        ? latestContext?.execution_trace
+        : Array.isArray(agentLoopAudit?.execution_trace)
+          ? agentLoopAudit?.execution_trace
+          : [],
+      execution_lifecycle: Array.isArray(latestContext?.execution_lifecycle)
+        ? latestContext?.execution_lifecycle
+        : Array.isArray(agentLoopAudit?.execution_lifecycle)
+          ? agentLoopAudit?.execution_lifecycle
+          : [],
+      step_results: Array.isArray(latestContext?.step_results)
+        ? latestContext?.step_results
+        : Array.isArray(agentLoopAudit?.step_results)
+          ? agentLoopAudit?.step_results
+          : [],
+      runtime_summary: runtimeSummary,
+      artifact_store_keys: Array.isArray(runtimeSummary?.artifact_keys) ? runtimeSummary?.artifact_keys : [],
+      pending_request:
+        readHelixAskDebugContextRecord(latestContext?.pending_request) ??
+        readHelixAskDebugContextRecord(agentLoopAudit?.pending_request),
+      terminal_contract:
+        readHelixAskDebugContextRecord(latestContext?.turn_contract) ??
+        readHelixAskDebugContextRecord(agentLoopAudit?.terminal_contract),
+      invariant_violations: Array.isArray(latestContext?.invariant_violations)
+        ? latestContext?.invariant_violations
+        : Array.isArray(agentLoopAudit?.invariant_violations)
+          ? agentLoopAudit?.invariant_violations
+          : [],
+      latest_result_artifact:
+        readHelixAskDebugContextRecord(latestContext?.latest_result_artifact) ??
+        readHelixAskDebugContextRecord(agentLoopAudit?.latest_result_artifact),
+    },
+    eventLog: events,
+  };
 }
 
 function readHelixAskDebugStringArray(value: unknown): string[] {

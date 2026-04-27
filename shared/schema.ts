@@ -3166,3 +3166,33 @@ export type {
   SunquakeImpactSource,
   SurfaceEventOriginHypothesis,
 } from "./solar-surface-event-contract";
+
+export {
+  COMPACT_STAR_MATH_CLAIMS,
+  classifyLongPeriodPulsarBridgeStatus,
+  compactStarClosureStateSchema,
+  compactStarDynamicSpectrumFeatureSchema,
+  compactStarForcingStateSchema,
+  compactStarGeometryStateSchema,
+  compactStarLaneBundleSchema,
+  compactStarLimitProbeSchema,
+  compactStarMatterHypothesisSchema,
+  compactStarMicroMacroBridgeSchema,
+  compactStarObservableContractSchema,
+  compactStarStateVectorSchema,
+  evaluateCompactStarContractGuardrails,
+} from "./compact-star-limit-observable";
+
+export type {
+  CompactStarClosureState,
+  CompactStarDynamicSpectrumFeature,
+  CompactStarForcingState,
+  CompactStarGeometryState,
+  CompactStarLaneBundle,
+  CompactStarLimitProbe,
+  CompactStarMathClaimId,
+  CompactStarMatterHypothesis,
+  CompactStarMicroMacroBridge,
+  CompactStarObservableContract,
+  CompactStarStateVector,
+} from "./compact-star-limit-observable";

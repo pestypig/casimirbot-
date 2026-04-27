@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 let transcribeVoice: typeof import("@/lib/agi/api").transcribeVoice;
 let runConversationTurn: typeof import("@/lib/agi/api").runConversationTurn;
@@ -138,7 +138,12 @@ describe("runConversationTurn", () => {
 });
 
 describe("askLocal capsule ids", () => {
+  beforeEach(() => {
+    (globalThis as Record<string, unknown>).__HELIX_E8_14_LANE_PARITY__ = false;
+  });
+
   afterEach(() => {
+    delete (globalThis as Record<string, unknown>).__HELIX_E8_14_LANE_PARITY__;
     vi.unstubAllGlobals();
   });
 
@@ -275,5 +280,35 @@ describe("askLocal capsule ids", () => {
     expect(response.text).toBe("Translation confidence is too low to dispatch retrieval safely.");
     expect(response.fail_reason).toBe("HELIX_INTERPRETER_DISPATCH_BLOCKED");
     expect(response.fail_class).toBe("multilang_confidence_gate");
+  });
+});
+
+describe("askLocal lane parity default", () => {
+  afterEach(() => {
+    delete (globalThis as Record<string, unknown>).__HELIX_E8_14_LANE_PARITY__;
+    vi.unstubAllGlobals();
+  });
+
+  it("defaults to /api/agi/ask/turn when no explicit parity override is set", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Turn path response.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "hello",
+    });
+
+    expect(response.text).toBe("Turn path response.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
   });
 });

@@ -219,6 +219,46 @@ describe("validatePhysicsEquationBackbone", () => {
     expect(radiativeTransferNote).toContain("dtau_nu = alpha_nu ds");
   });
 
+  it("registers compact-star limit-observable descriptor equations in repo backbone", () => {
+    const repoRoot = process.cwd();
+    const backbone = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
+    ) as {
+      equations: Array<{
+        id: string;
+        claim_tier?: string;
+        category?: string;
+        symbols?: Array<{ symbol?: string }>;
+      }>;
+    };
+
+    const requiredIds = [
+      "pulsar_period_period_derivative_state_point",
+      "pulsar_spin_down_power_definition",
+      "pulsar_death_line_limit_classifier",
+      "pulsar_vacuum_gap_potential_definition",
+      "pulsar_pair_cascade_threshold_descriptor",
+      "pulsar_surface_mountain_gap_enhancement_descriptor",
+      "pulsar_diffraction_band_spacing_observable",
+      "compact_star_matter_hypothesis_envelope",
+      "compact_star_micro_macro_bridge_descriptor",
+    ];
+
+    for (const id of requiredIds) {
+      const equation = backbone.equations.find((entry) => entry.id === id);
+      expect(equation).toBeDefined();
+      expect(equation?.claim_tier).toBe("diagnostic");
+      expect(equation?.category).toBe("compact_star_limit_observables");
+    }
+
+    const deathLine = backbone.equations.find(
+      (entry) => entry.id === "pulsar_death_line_limit_classifier",
+    );
+    expect(deathLine?.symbols?.some((entry) => entry.symbol === "P")).toBe(true);
+    expect(deathLine?.symbols?.some((entry) => entry.symbol === "Pdot")).toBe(true);
+    expect(deathLine?.symbols?.some((entry) => entry.symbol === "status")).toBe(true);
+  });
+
   it("fails when manifest/equation claim tier is invalid", () => {
     const repoRoot = makeFixture((manifest) => {
       manifest.claim_tier = "exploratory";

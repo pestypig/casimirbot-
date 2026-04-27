@@ -34089,7 +34089,19 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
     latestMdPath: string;
     artifact: Nhm2ShiftLapseTransportResultArtifact;
   };
+  runtimeDiagnostics: {
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+    stepDurationsMs: {
+      boundedStack: number;
+      shiftVsLapseDecomposition: number;
+      transportArtifactBuild: number;
+      transportArtifactWrite: number;
+    };
+  };
 }> => {
+  const startedAtMs = Date.now();
   const artifactRootDir = options?.artifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
   const auditRootDir = options?.auditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
   const shiftLapseProfileId =
@@ -34098,6 +34110,7 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
       ? options.shiftLapseProfileId
       : SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS.shiftLapseProfileId ??
         DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID;
+  const boundedStackStartedAtMs = Date.now();
   const boundedStack = await publishNhm2BoundedStackLatest({
     baseUrl: options?.baseUrl,
     publicationLockPath:
@@ -34117,6 +34130,8 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
     sourceAuditArtifactPath: DEFAULT_LATEST_JSON,
     sourceAuditReportPath: DEFAULT_LATEST_MD,
   });
+  const boundedStackDurationMs = Date.now() - boundedStackStartedAtMs;
+  const shiftVsLapseDecompositionStartedAtMs = Date.now();
   const shiftVsLapseDecomposition = publishNhm2ShiftVsLapseDecompositionLatest({
     artifactRootDir,
     auditRootDir,
@@ -34125,6 +34140,7 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
       boundedStack.missionTimeComparison.latestJsonPath,
     sourceWorldlineArtifactPath: boundedStack.worldline.latestJsonPath,
   });
+  const shiftVsLapseDecompositionDurationMs = Date.now() - shiftVsLapseDecompositionStartedAtMs;
   if (
     shouldPublishSelectedShiftLapseDedicatedResearchSurface({
       artifactRootDir,
@@ -34138,6 +34154,7 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
       auditRootDir: DOC_AUDIT_DIR,
     });
   }
+  const transportArtifactBuildStartedAtMs = Date.now();
   const artifact = buildNhm2ShiftLapseTransportResultArtifact({
     boundedStack,
     publicationCommand: buildSelectedShiftLapsePublicationCommand(shiftLapseProfileId),
@@ -34148,6 +34165,7 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
       shiftVsLapseDecomposition.latestJsonPath,
   });
   const markdown = renderNhm2ShiftLapseTransportResultMarkdown(artifact);
+  const transportArtifactBuildDurationMs = Date.now() - transportArtifactBuildStartedAtMs;
   const outJsonPath = path.join(
     artifactRootDir,
     path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_JSON),
@@ -34168,10 +34186,13 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
   ensureDirForFile(latestJsonPath);
   ensureDirForFile(outMdPath);
   ensureDirForFile(latestMdPath);
+  const transportArtifactWriteStartedAtMs = Date.now();
   fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  const transportArtifactWriteDurationMs = Date.now() - transportArtifactWriteStartedAtMs;
+  const completedAtMs = Date.now();
   return {
     boundedStack,
     shiftVsLapseDecomposition,
@@ -34181,6 +34202,17 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
       outMdPath,
       latestMdPath,
       artifact,
+    },
+    runtimeDiagnostics: {
+      startedAt: new Date(startedAtMs).toISOString(),
+      completedAt: new Date(completedAtMs).toISOString(),
+      durationMs: completedAtMs - startedAtMs,
+      stepDurationsMs: {
+        boundedStack: boundedStackDurationMs,
+        shiftVsLapseDecomposition: shiftVsLapseDecompositionDurationMs,
+        transportArtifactBuild: transportArtifactBuildDurationMs,
+        transportArtifactWrite: transportArtifactWriteDurationMs,
+      },
     },
   };
 };
@@ -38310,6 +38342,42 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
   });
 
   const sourceClosureRegions = getPublishedSourceClosureRegions(sourceClosureArtifact);
+  const sourceClosureResidualRelLInf = toFiniteNumber(
+    sourceClosureArtifact?.residualNorms.relLInf,
+  );
+  const sourceClosureToleranceRelLInf = toFiniteNumber(
+    asRecord(sourceClosureArtifact?.residualNorms).toleranceRelLInf,
+  );
+  const sourceClosureToleranceRef =
+    sourceClosureToleranceRelLInf == null || sourceClosureResidualRelLInf == null
+      ? "tensor_residual_relLInf"
+      : `tensor_residual_relLInf<=${sourceClosureToleranceRelLInf};observed=${sourceClosureResidualRelLInf};status=${
+          sourceClosureResidualRelLInf <= sourceClosureToleranceRelLInf
+            ? "within_threshold"
+            : "exceeded_threshold"
+        }`;
+  const observerNextTechnicalAction =
+    observerAuditArtifact?.observerNextTechnicalAction != null &&
+    observerAuditArtifact.observerNextTechnicalAction !== "unknown"
+      ? observerAuditArtifact.observerNextTechnicalAction
+      : observerAuditArtifact?.observerBlockingAssessmentStatus ===
+            "observer_contract_incomplete" ||
+          observerAuditReasons.includes("observer_audit_incomplete")
+        ? "emit_same_chart_metric_flux_and_shear_terms"
+        : observerAuditReasons.includes("observer_blocking_violation")
+          ? "targeted_dec_physics_remediation"
+          : observerAuditReasons.includes("policy_review_required")
+            ? "research_basis_gap_review"
+            : "unknown";
+  const observerBlockingAssessmentNote =
+    observerAuditArtifact?.observerBlockingAssessmentNote ??
+    (observerAuditReasons.includes("observer_audit_incomplete")
+      ? "Observer contract is incomplete. Complete same-chart metric observer emission and tensor semantics before promotion."
+      : observerAuditReasons.includes("observer_blocking_violation")
+        ? "Observer blocking violation is still active on the promoted surface. Run targeted DEC/WEC remediation before promotion."
+        : observerAuditReasons.includes("policy_review_required")
+          ? "Observer result remains policy-limited by surrogate-model scope. Keep claim tier diagnostic/reduced-order pending basis extension."
+          : null);
   const envelopeHashConsistencyStatus =
     rootEnvelopeChecksum != null && selectedEnvelopeChecksum != null
       ? rootEnvelopeChecksum === selectedEnvelopeChecksum
@@ -38410,7 +38478,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
           sourceClosureRegions.find((entry) => entry.regionId === "exterior_shell")
             ?.residualNorms?.relLInf ?? null,
       },
-      toleranceRef: "tensor_residual_relLInf",
+      toleranceRef: sourceClosureToleranceRef,
       assumptionsDrifted: sourceClosureArtifact?.assumptionsDrifted ?? null,
     },
     observer_audit: {
@@ -38420,8 +38488,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       artifactRefs: collectFullLoopArtifactRefs(observerAuditInspections),
       observerBlockingAssessmentStatus:
         observerAuditArtifact?.observerBlockingAssessmentStatus ?? "unknown",
-      observerBlockingAssessmentNote:
-        observerAuditArtifact?.observerBlockingAssessmentNote ?? null,
+      observerBlockingAssessmentNote: observerBlockingAssessmentNote,
       observerPromotionBlockingSurface:
         observerAuditArtifact?.observerPromotionBlockingSurface ?? "unknown",
       observerPromotionBlockingCondition:
@@ -38496,8 +38563,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
         observerAuditArtifact?.observerLeadReadinessWorkstream ?? "unknown",
       observerLeadReadinessReason:
         observerAuditArtifact?.observerLeadReadinessReason ?? null,
-      observerNextTechnicalAction:
-        observerAuditArtifact?.observerNextTechnicalAction ?? "unknown",
+      observerNextTechnicalAction: observerNextTechnicalAction,
       metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
       tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
     },

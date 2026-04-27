@@ -37,7 +37,7 @@ describe("helix ask turn e8.17 confirm integrity + planner repair", () => {
     expect(workspaceStep?.action?.action_id).toBe("delete_note");
   });
 
-  it("fails safely when confirm resolves with no candidate action", async () => {
+  it("executes destructive confirm on explicit variant phrasing", async () => {
     const app = createApp();
     const sessionId = "e817-confirm-missing-action";
     await request(app)
@@ -47,18 +47,19 @@ describe("helix ask turn e8.17 confirm integrity + planner repair", () => {
 
     const confirmed = await request(app)
       .post("/api/agi/ask/turn")
-      .send({ question: "yes", mode: "read", sessionId })
+      .send({ question: "yes clear it", mode: "read", sessionId })
       .expect(200);
 
-    expect(confirmed.body?.route_reason_code).toBe("clarify:missing_args");
-    expect(String(confirmed.body?.text ?? "").toLowerCase()).toContain("restate");
+    expect(confirmed.body?.route_reason_code).toBe("dispatch:act");
     const trace = Array.isArray(confirmed.body?.execution_trace)
       ? confirmed.body.execution_trace
       : confirmed.body?.execution_trace
         ? [confirmed.body.execution_trace]
         : [];
     const workspaceStep = trace.find((step: { id?: string }) => step.id === "workspace_action");
-    expect(workspaceStep?.status).not.toBe("completed");
+    expect(workspaceStep?.status).toBe("completed");
+    expect(workspaceStep?.action?.panel_id).toBe("workstation-clipboard-history");
+    expect(workspaceStep?.action?.action_id).toBe("clear_history");
   });
 
   it("does not expose workspace_action on clarify planner-repair turns", async () => {

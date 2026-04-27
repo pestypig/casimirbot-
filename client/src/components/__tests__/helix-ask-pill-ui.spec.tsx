@@ -70,6 +70,7 @@ let parseWorkstationActionChainCommand: typeof import("@/components/helix/HelixA
 let buildWorkstationProceduralStepEvent: typeof import("@/components/helix/HelixAskPill").buildWorkstationProceduralStepEvent;
 let evaluateEvidenceFinalizationGate: typeof import("@/components/helix/HelixAskPill").evaluateEvidenceFinalizationGate;
 let buildNeedsRetrievalPlanEvent: typeof import("@/components/helix/HelixAskPill").buildNeedsRetrievalPlanEvent;
+let syncDocViewerStateFromWorkstationAction: typeof import("@/components/helix/HelixAskPill").syncDocViewerStateFromWorkstationAction;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -141,6 +142,7 @@ beforeAll(async () => {
     buildWorkstationProceduralStepEvent,
     evaluateEvidenceFinalizationGate,
     buildNeedsRetrievalPlanEvent,
+    syncDocViewerStateFromWorkstationAction,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -225,6 +227,62 @@ describe("HelixAskPill mic-first surface contract", () => {
       /commandLane\?\.decision === "accepted"[\s\S]+setCommandConfirmState\([\s\S]+continue;/,
     );
   });
+
+  it("does not let evidence gating overwrite authoritative workspace terminals", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("authoritativeWorkspaceTerminal");
+    expect(source).toMatch(/evidenceGateDecision\.blocked && !authoritativeWorkspaceTerminal/);
+    expect(source).toContain('localDispatchPolicy === "workspace_only"');
+    expect(source).toContain('localRouteReason === "dispatch:act"');
+    expect(source).toContain("runtimeObservationsForTerminal");
+    expect(source).toContain("runtimeSummaryRecord?.observations");
+  });
+
+  it("copies turn truth table and visible answer text into debug exports", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    const apiSource = fs.readFileSync(path.resolve(process.cwd(), "client/src/lib/agi/api.ts"), "utf8");
+    expect(apiSource).toContain("turn_truth_table?: Record<string, unknown>");
+    expect(source).toContain("turn_truth_table: localResponse.turn_truth_table ?? null");
+    expect(source).toContain("visible_answer_text: responseText");
+    expect(source).toContain("turnTruthTable");
+    expect(source).toContain("visible_answer_text: args.reply.content");
+  });
+
+  it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("buildHelixTurnTranscriptRows");
+    expect(source).toContain("Agent work log");
+    expect(source).toContain('type === "model_decision"');
+    expect(source).toContain("Thinking");
+    expect(source).toContain("turn_transcript_events");
+    expect(source).toContain("turn_transcript_source");
+    expect(source).toContain("visible_event_count");
+    expect(source).toContain("backend_event_count");
+    expect(source).toContain("runAskTurnStream");
+    expect(source).toContain("stream_fallback_reason");
+    expect(source).toContain("async_executor_used");
+    expect(source).toContain("async_step_durations");
+  });
+
+  it("renders a procedural workspace timeline from the turn truth table", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("function renderProceduralTurnTimeline");
+    expect(source).toContain("reply.debug?.turn_truth_table");
+    expect(source).toContain("Procedural workspace timeline");
+    expect(source).toContain("backend terminal == visible answer");
+    expect(source).toContain("Appended step:");
+    expect(source).toContain("planned");
+    expect(source).toContain("completed");
+    expect(source).toContain("suppressed");
+    expect(source).toContain("pending_input");
+    expect(source).toContain("failed");
+    expect(source).toContain("TURN TRUTH TABLE");
+  });
+
+  it("normalizes jump-over navigation before workstation parsing", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('.replace(/\\bjump\\s+(?:over\\s+)?to\\b/gi, "go to")');
+  });
 });
 
 describe("HelixAskPill mic helper behavior", () => {
@@ -306,29 +364,29 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(pickLatest?.action).toBe("run_panel_action");
     if (pickLatest?.action !== "run_panel_action") return;
     expect(pickLatest.panel_id).toBe("docs-viewer");
-    expect(pickLatest.action_id).toBe("open_doc");
-    expect((pickLatest.args as { path?: string } | undefined)?.path).toBeTruthy();
+    expect(pickLatest.action_id).toBe("open_latest_doc_by_topic");
+    expect((pickLatest.args as { topic?: string } | undefined)?.topic).toMatch(/nhm2/i);
 
     const viewLatest = parseWorkstationActionCommand("ok view the latest NHM2 doc");
     expect(viewLatest?.action).toBe("run_panel_action");
     if (viewLatest?.action !== "run_panel_action") return;
     expect(viewLatest.panel_id).toBe("docs-viewer");
-    expect(viewLatest.action_id).toBe("open_doc");
-    expect((viewLatest.args as { path?: string } | undefined)?.path).toBeTruthy();
+    expect(viewLatest.action_id).toBe("open_latest_doc_by_topic");
+    expect((viewLatest.args as { topic?: string } | undefined)?.topic).toMatch(/nhm2/i);
 
     const pullLatestToday = parseWorkstationActionCommand("Ok pull up the latest NHM2 doc from today");
     expect(pullLatestToday?.action).toBe("run_panel_action");
     if (pullLatestToday?.action !== "run_panel_action") return;
     expect(pullLatestToday.panel_id).toBe("docs-viewer");
-    expect(pullLatestToday.action_id).toBe("open_doc");
-    expect((pullLatestToday.args as { path?: string } | undefined)?.path).toBeTruthy();
+    expect(pullLatestToday.action_id).toBe("open_latest_doc_by_topic");
+    expect((pullLatestToday.args as { topic?: string } | undefined)?.topic).toMatch(/nhm2/i);
 
     const popLatestToday = parseWorkstationActionCommand("Ok pop open the latest NHM2 document from today");
     expect(popLatestToday?.action).toBe("run_panel_action");
     if (popLatestToday?.action !== "run_panel_action") return;
     expect(popLatestToday.panel_id).toBe("docs-viewer");
-    expect(popLatestToday.action_id).toBe("open_doc");
-    expect((popLatestToday.args as { path?: string } | undefined)?.path).toBeTruthy();
+    expect(popLatestToday.action_id).toBe("open_latest_doc_by_topic");
+    expect((popLatestToday.args as { topic?: string } | undefined)?.topic).toMatch(/nhm2/i);
   });
 
   it("maps notes lexicon utterances to deterministic panel actions", () => {
@@ -349,6 +407,12 @@ describe("HelixAskPill mic helper behavior", () => {
       panel_id: "workstation-notes",
       action_id: "append_to_note",
       args: { title: "Mission Log", text: "Track quantum inequality bounds" },
+    });
+    expect(parseWorkstationActionCommand("append centerline alpha notes to note Mission Log")).toEqual({
+      action: "run_panel_action",
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: { title: "Mission Log", text: "centerline alpha notes" },
     });
     expect(parseWorkstationActionCommand("rename note Mission Log to Mission Log v2")).toEqual({
       action: "run_panel_action",
@@ -2339,5 +2403,25 @@ describe("HelixAskPill mic helper behavior", () => {
     });
     expect(continuation.band).toBe("continuation");
     expect(shifted.band).toBe("shift");
+  });
+
+  it("syncs doc viewer state from shorthand docs action envelopes", async () => {
+    const { coerceHelixWorkstationActions } = await import("@/lib/workstation/workstationActionContract");
+    const path = "/docs/research/example.md";
+    useDocViewerStore.setState({ mode: "directory", currentPath: undefined, anchor: undefined, recent: [] });
+
+    const actions = coerceHelixWorkstationActions([
+      {
+        panel_id: "docs-viewer",
+        action_id: "open_latest_doc_by_topic",
+        args: { topic: "example", path },
+      },
+    ]);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("run_panel_action");
+    expect(syncDocViewerStateFromWorkstationAction(actions[0]!)).toBe(true);
+    expect(useDocViewerStore.getState().mode).toBe("doc");
+    expect(useDocViewerStore.getState().currentPath).toBe(path);
   });
 });

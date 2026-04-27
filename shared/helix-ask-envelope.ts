@@ -40,6 +40,7 @@ export type HelixAskResponseEnvelope = {
   tier: HelixAskEnvelopeTier;
   secondaryTier?: HelixAskEnvelopeTier;
   answer: string;
+  assistant_answer?: string;
   sections?: HelixAskEnvelopeSection[];
   proof?: HelixAskProofEnvelope;
   extension?: HelixAskAnswerExtension;

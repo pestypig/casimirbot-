@@ -13,8 +13,10 @@ import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.ts';
 import type { SimulationParameters, WarpGeometry, WarpGeometryKind } from '../../shared/schema.js';
 import {
   buildWarpMetricAdapterSnapshot,
+  DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
   DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM,
-  resolveWarpShiftLapseProfile,
+  evaluateBoundedLapse,
+  resolveWarpShiftLapseProfileStrict,
   type WarpMetricAdapterSnapshot,
   type WarpChartLabel,
   type WarpMetricFamily,
@@ -3344,7 +3346,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const quantumValidation = validateQuantumInequality(totalExoticMass, amplifiedEnergyDensity, Math.max(1e-12, (params.burstDuration||1) * 1e-6), a_m, params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg);
   const resolveLapseSummary = (): WarpMetricLapseSummary | undefined => {
     if (fieldType !== "nhm2_shift_lapse") return undefined;
-    const shiftLapseProfile = resolveWarpShiftLapseProfile(params.shiftLapseProfileId);
+    const shiftLapseProfile = resolveWarpShiftLapseProfileStrict(
+      params.shiftLapseProfileId ?? DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+    );
     const hullAxesResolved: Vec3 = params.hullAxes
       ? [
           Math.max(1e-6, params.hullAxes.a),
@@ -3364,9 +3368,10 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
             Number(params.alphaGradientVec_m_inv[2] ?? 0),
           ] as Vec3)
         : ([0, 0, DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM] as Vec3);
-    const alphaCenterline = Number.isFinite(params.alphaCenterline)
-      ? Math.max(1e-6, params.alphaCenterline as number)
+    const alphaCenterlineRequested = Number.isFinite(params.alphaCenterline)
+      ? Number(params.alphaCenterline)
       : shiftLapseProfile.alphaCenterlineDefault;
+    const alphaCenterline = evaluateBoundedLapse(1, alphaCenterlineRequested);
     const supportKind =
       params.alphaInteriorSupportKind ??
       (params.warpGeometry ? "hull_interior" : "bubble_interior");
@@ -3395,7 +3400,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     return {
       alphaCenterline,
       alphaMin: Math.max(1e-6, Math.min(1, alphaCenterline - delta)),
-      alphaMax: Math.max(alphaCenterline, 1, alphaCenterline + delta),
+      alphaMax: evaluateBoundedLapse(0, alphaCenterline),
       alphaProfileKind,
       alphaGradientAxis:
         Math.abs(gradientVec[0]) >= Math.abs(gradientVec[1]) &&

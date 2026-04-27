@@ -1,0 +1,250 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "compact-star-limit-observables-core",
+  "domain": "compact-star-diagnostics",
+  "updatedAt": "2026-04-24",
+  "claims": [
+    {
+      "claimId": "claim:compact_star:period_pdot_state_point",
+      "statement": "A compact-star death-line probe is diagnostic-only unless period and period-derivative state are explicit or a substitute state reference is supplied.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "state-point references must be explicit",
+          "bridge cases remain diagnostic",
+          "no solver-level causality is implied"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2503.07936",
+          "note": "Bridge-case tension for long-period pulsar relative to common death-line expectations."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/pulsar-death-line-limit.md"
+      ],
+      "notes": "Descriptor claim; no emission-theorem promotion."
+    },
+    {
+      "claimId": "claim:compact_star:spin_down_power_definition",
+      "statement": "Spin-down power is represented as an observable-facing descriptor in the compact-star lane.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "used for limit classification",
+          "does not by itself certify an emission mechanism",
+          "requires declared assumptions for I and braking law"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2503.07936",
+          "note": "Periodic source characterization context for long-period pulsar diagnostics."
+        }
+      ],
+      "repoBindings": [
+        "configs/physics-equation-backbone.v1.json",
+        "shared/contracts/compact-star-observable-contract.v1.ts"
+      ],
+      "notes": "State descriptor for energy-budget probes."
+    },
+    {
+      "claimId": "claim:compact_star:death_line_limit_classifier",
+      "statement": "Death-line outcomes are recorded as envelope statuses including bridge_case instead of binary valid/invalid labels.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "status must remain model-dependent",
+          "bridge-case handling must preserve falsifiability",
+          "cannot upgrade unresolved hypotheses to certified"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2503.07936",
+          "note": "Bridge-case framing for slow pulsar activity."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "docs/knowledge/physics/long-period-radio-transient-limit.md"
+      ],
+      "notes": "Classifier claim bounded to diagnostic tier."
+    },
+    {
+      "claimId": "claim:compact_star:vacuum_gap_potential_descriptor",
+      "statement": "Vacuum-gap potential is represented as a forcing/closure descriptor rather than a universal emission guarantee.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "forcing and closure fields must stay separate",
+          "pair-cascade assumptions are explicit",
+          "descriptor remains model-dependent"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2506.12305",
+          "note": "Sparking sensitivity to local field enhancement and surface state."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "docs/knowledge/physics/pulsar-vacuum-gap-sparking.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "Explicitly not a certified constitutive law."
+    },
+    {
+      "claimId": "claim:compact_star:pair_cascade_threshold_descriptor",
+      "statement": "Pair-cascade threshold conditions are lane descriptors for boundary classification and must carry evidence references.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "thresholds are closure-dependent",
+          "evidence refs are mandatory in probes",
+          "no standalone promotion to certified"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2506.12305",
+          "note": "Gap sparking and pair-production context under mountain-assisted scenarios."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "Threshold descriptor kept explicit in closure slot."
+    },
+    {
+      "claimId": "claim:compact_star:surface_mountain_gap_enhancement_descriptor",
+      "statement": "Surface-mountain enhancement is represented as a bounded hypothesis requiring explicit matter-model assumptions.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "surface rigidity assumptions must be explicit",
+          "matter model remains hypothesis-bounded",
+          "phase-1 tier cap blocks certified promotion"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2506.12305",
+          "note": "Mountain and gap-enhancement proposal."
+        },
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/pdf/1904.11153",
+          "note": "Unresolved compact-star matter context."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "docs/knowledge/physics/pulsar-surface-mountain-hypothesis.md",
+        "docs/knowledge/physics/compact-star-matter-hypothesis-envelope.md"
+      ],
+      "notes": "Bounded explanatory lane only."
+    },
+    {
+      "claimId": "claim:compact_star:diffraction_band_spacing_observable",
+      "statement": "Crab-like zebra-band features are modeled as dynamic-spectrum transfer observables and not as atomic line identities.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "modality must be spectrogram or channel_series",
+          "response should be transfer-function compatible",
+          "feature records stay evidence-linked"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://link.aps.org/doi/10.1103/PhysRevLett.133.205201",
+          "note": "Zebra-band diffraction/interference interpretation."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "docs/knowledge/physics/pulsar-dynamic-spectrum-diffraction.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "Transfer-observable descriptor."
+    },
+    {
+      "claimId": "claim:compact_star:compact_matter_hypothesis_envelope",
+      "statement": "Compact-star matter classes are represented as hypothesis envelopes with required supporting or contradicting observable references.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "each hypothesis must carry evidence references",
+          "candidate strangeon classes remain non-certified in phase 1",
+          "status labels remain explicit"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/pdf/1904.11153",
+          "note": "Strangeon hypothesis context and unresolved compact-star matter assumptions."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "docs/knowledge/physics/compact-star-matter-hypothesis-envelope.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "Evidence-bounded hypothesis envelope."
+    },
+    {
+      "claimId": "claim:compact_star:micro_macro_bridge_descriptor",
+      "statement": "Micro-to-macro bridge status is explicit and bounded (`hypothesis`, `diagnostic`, `reduced_order`, `validated`) to prevent hidden over-claim.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "compact-star lane",
+        "constraints": [
+          "bridge status must be explicit",
+          "bridge records require both quantum-side and classical-side refs",
+          "bridge status does not bypass claim-tier caps"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "https://arxiv.org/abs/2503.07936",
+          "note": "Bridge-case motivation from long-period pulsar context."
+        },
+        {
+          "kind": "paper",
+          "citation": "https://link.aps.org/doi/10.1103/PhysRevLett.133.205201",
+          "note": "Classical dynamic-spectrum observables tied to transfer-model assumptions."
+        }
+      ],
+      "repoBindings": [
+        "shared/compact-star-limit-observable.ts",
+        "docs/knowledge/physics/compact-star-quantum-classical-bridge.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "Bridge descriptor for falsifiable multi-scale interpretation."
+    }
+  ]
+}

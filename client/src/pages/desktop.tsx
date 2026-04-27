@@ -365,7 +365,10 @@ export default function DesktopPage() {
             const isProceduralDocsAction =
               workstationEnabled &&
               action.panel_id === "docs-viewer" &&
-              (actionId === "open_doc" || actionId === "open_doc_and_read");
+              (actionId === "open_doc" ||
+                actionId === "open_doc_by_path" ||
+                actionId === "open_latest_doc_by_topic" ||
+                actionId === "open_doc_and_read");
             const targetGroupId =
               store.activeGroupId ??
               Object.values(store.groups).find((group) => group.panelIds.includes("docs-viewer"))?.id;

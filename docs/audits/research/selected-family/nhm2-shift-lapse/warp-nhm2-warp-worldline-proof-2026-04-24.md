@@ -19,8 +19,8 @@
 | shiftLapseAuthoritativeLowExpansionStatus | pass |
 | shiftLapseWallSafetyStatus | pass |
 | shiftLapseTimingStatus | available |
-| shiftLapseCenterlineAlpha | 0.995 |
-| shiftLapseCenterlineDtauDt | 0.995 |
+| shiftLapseCenterlineAlpha | 0.7 |
+| shiftLapseCenterlineDtauDt | 0.7 |
 | chart | comoving_cartesian |
 | coordinateMap | bubble-centered coordinates |
 | observerFamily | ship_centerline_local_comoving |
@@ -39,9 +39,9 @@
 | sampleGeometryShellVerticalOffset_m | 86.46002767226666 |
 | sampleGeometryShellClearance_m | 0.039972327733333333 |
 | sampleCount | 9 |
-| dtau_dt_representative | 0.995 |
-| dtau_dt_min | 0.995 |
-| dtau_dt_max | 0.995 |
+| dtau_dt_representative | 0.7 |
+| dtau_dt_min | 0.7 |
+| dtau_dt_max | 0.7 |
 | normalizationResidual_maxAbs | 0 |
 | normalizationTolerance | 1e-9 |
 | sourceAuditArtifactPath | artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json |
@@ -58,15 +58,15 @@
 ## Samples
 | sampleId | sampleRole | sourceModel | transportProvenance | coordinateTime_s | position_m | coordinateVelocity | betaCoord | effectiveTransportVelocityCoord | dtau_dt | normalizationResidual |
 |---|---|---|---|---:|---|---|---|---|---:|---:|
-| centerline_aft | centerline_aft | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | -251.75,0,0 | 0,0,0 | 0,-1.9546804721038186e-15,0 | 0,-1.9546804721038186e-15,0 | 0.995 | 0 |
-| centerline_center | centerline_center | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,0,0 | 0,0,0 | 0,-1.9546804721038186e-15,0 | 0,-1.9546804721038186e-15,0 | 0.995 | 0 |
-| centerline_fore | centerline_fore | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 251.75,0,0 | 0,0,0 | 0,-1.9546804721038186e-15,0 | 0,-1.9546804721038186e-15,0 | 0.995 | 0 |
-| shell_aft | shell_aft | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | -503.4600276722667,0,0 | 0,0,0 | 4.859355146973553e-17,-3.620679151750087e-16,0 | 4.859355146973553e-17,-3.620679151750087e-16,0 | 0.995 | 0 |
-| shell_fore | shell_fore | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 503.4600276722667,0,0 | 0,0,0 | -4.8593551469735516e-17,-3.6206791517500797e-16,0 | -4.8593551469735516e-17,-3.6206791517500797e-16,0 | 0.995 | 0 |
-| shell_port | shell_port | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,131.96002767226668,0 | 0,0,0 | 0,-5.953350122297911e-16,0 | 0,-5.953350122297911e-16,0 | 0.995 | 0 |
-| shell_starboard | shell_starboard | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,-131.96002767226668,0 | 0,0,0 | 0,-5.138899925587988e-16,0 | 0,-5.138899925587988e-16,0 | 0.995 | 0 |
-| shell_dorsal | shell_dorsal | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,0,86.46002767226666 | 0,0,0 | 0,-7.398353470421468e-16,-8.144501967099243e-17 | 0,-7.398353470421468e-16,-8.144501967099243e-17 | 0.995 | 0 |
-| shell_ventral | shell_ventral | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,0,-86.46002767226666 | 0,0,0 | 0,-7.398353470421502e-16,8.144501967099243e-17 | 0,-7.398353470421502e-16,8.144501967099243e-17 | 0.995 | 0 |
+| centerline_aft | centerline_aft | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | -251.75,0,0 | 0,0,0 | 0,-1.9546804721038186e-15,0 | 0,-1.9546804721038186e-15,0 | 0.7 | 0 |
+| centerline_center | centerline_center | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,0,0 | 0,0,0 | 0,-1.9546804721038186e-15,0 | 0,-1.9546804721038186e-15,0 | 0.7 | 0 |
+| centerline_fore | centerline_fore | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 251.75,0,0 | 0,0,0 | 0,-1.9546804721038186e-15,0 | 0,-1.9546804721038186e-15,0 | 0.7 | 0 |
+| shell_aft | shell_aft | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | -503.4600276722667,0,0 | 0,0,0 | 4.859355146973553e-17,-3.620679151750087e-16,0 | 4.859355146973553e-17,-3.620679151750087e-16,0 | 0.7 | 0 |
+| shell_fore | shell_fore | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 503.4600276722667,0,0 | 0,0,0 | -4.8593551469735516e-17,-3.6206791517500797e-16,0 | -4.8593551469735516e-17,-3.6206791517500797e-16,0 | 0.7 | 0 |
+| shell_port | shell_port | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,131.96002767226668,0 | 0,0,0 | 0,-5.953350122297911e-16,0 | 0,-5.953350122297911e-16,0 | 0.7 | 0 |
+| shell_starboard | shell_starboard | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,-131.96002767226668,0 | 0,0,0 | 0,-5.138899925587988e-16,0 | 0,-5.138899925587988e-16,0 | 0.7 | 0 |
+| shell_dorsal | shell_dorsal | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,0,86.46002767226666 | 0,0,0 | 0,-7.398353470421468e-16,-8.144501967099243e-17 | 0,-7.398353470421468e-16,-8.144501967099243e-17 | 0.7 | 0 |
+| shell_ventral | shell_ventral | warp_worldline_local_comoving | solve_backed_shift_vector_sample | 0 | 0,0,-86.46002767226666 | 0,0,0 | 0,-7.398353470421502e-16,8.144501967099243e-17 | 0,-7.398353470421502e-16,8.144501967099243e-17 | 0.7 | 0 |
 
 ## Geometry
 - Deterministic bounded local-comoving shell-cross family: centerline aft-center-fore plus shell-proximal aft/fore/port/starboard/dorsal/ventral probes. Samples are evaluated directly from the solve-backed shift-vector field and remain bounded to local transport inspection only.

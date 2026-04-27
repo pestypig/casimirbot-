@@ -18,8 +18,8 @@
 | shiftLapseAuthoritativeLowExpansionStatus | pass |
 | shiftLapseWallSafetyStatus | pass |
 | shiftLapseTimingStatus | available |
-| shiftLapseCenterlineAlpha | 0.995 |
-| shiftLapseCenterlineDtauDt | 0.995 |
+| shiftLapseCenterlineAlpha | 0.7 |
+| shiftLapseCenterlineDtauDt | 0.7 |
 | chart | comoving_cartesian |
 | observerFamily | ship_centerline_local_comoving |
 | validityRegimeId | nhm2_bounded_cruise_preflight |

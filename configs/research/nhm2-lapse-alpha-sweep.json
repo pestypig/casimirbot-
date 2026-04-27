@@ -1,0 +1,49 @@
+{
+  "family": "nhm2-shift-lapse",
+  "sweepName": "nhm2-centerline-lapse-efficiency-sweep-v1",
+  "clockingMode": "bounded-lapse",
+  "preserveTransportSchedule": true,
+  "currentClaimTier": "diagnostic",
+  "maximumClaimTier": "reduced-order",
+  "alphas": [
+    { "alpha": 0.995, "tag": "0p995", "bracket": "baseline" },
+    { "alpha": 0.98, "tag": "0p9800", "bracket": "near-baseline" },
+    { "alpha": 0.95, "tag": "0p9500", "bracket": "near-baseline" },
+    { "alpha": 0.9, "tag": "0p9000", "bracket": "moderate" },
+    { "alpha": 0.85, "tag": "0p8500", "bracket": "moderate" },
+    { "alpha": 0.8, "tag": "0p8000", "bracket": "moderate" },
+    { "alpha": 0.75, "tag": "0p7500", "bracket": "strong" },
+    { "alpha": 0.73, "tag": "0p7300", "bracket": "strong-known" },
+    { "alpha": 0.7, "tag": "0p7000", "bracket": "exploratory" },
+    { "alpha": 0.65, "tag": "0p6500", "bracket": "exploratory" },
+    { "alpha": 0.6, "tag": "0p6000", "bracket": "exploratory" },
+    { "alpha": 0.55, "tag": "0p5500", "bracket": "exploratory" },
+    { "alpha": 0.5, "tag": "0p5000", "bracket": "exploratory" }
+  ],
+  "citations": [
+    {
+      "id": "natario-2001",
+      "type": "paper",
+      "title": "Warp Drive with Zero Expansion",
+      "url": "https://arxiv.org/abs/gr-qc/0110086"
+    },
+    {
+      "id": "gourgoulhon-2007-3plus1",
+      "type": "paper",
+      "title": "3+1 Formalism in General Relativity",
+      "url": "https://arxiv.org/abs/gr-qc/0703035"
+    },
+    {
+      "id": "springer-natario-2024",
+      "type": "paper",
+      "title": "A Closer Look at Natario's Zero-Expansion Warp Drive",
+      "url": "https://link.springer.com/article/10.1007/s10773-024-05700-0",
+      "doi": "10.1007/s10773-024-05700-0"
+    }
+  ],
+  "claimLanguagePolicy": {
+    "measuredOrDerivedRequiresCitation": true,
+    "hypothesisRequiresUncertaintyNote": true,
+    "exploratoryBracketCannotAutoPromote": true
+  }
+}

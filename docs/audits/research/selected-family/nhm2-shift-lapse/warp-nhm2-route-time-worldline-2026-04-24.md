@@ -19,8 +19,8 @@
 | shiftLapseAuthoritativeLowExpansionStatus | pass |
 | shiftLapseWallSafetyStatus | pass |
 | shiftLapseTimingStatus | available |
-| shiftLapseCenterlineAlpha | 0.995 |
-| shiftLapseCenterlineDtauDt | 0.995 |
+| shiftLapseCenterlineAlpha | 0.7 |
+| shiftLapseCenterlineDtauDt | 0.7 |
 | chart | comoving_cartesian |
 | coordinateMap | bubble-centered coordinates |
 | observerFamily | ship_centerline_local_comoving |
@@ -36,8 +36,8 @@
 | coordinateTimeSummary.end | 0.0000033587237719787246 |
 | coordinateTimeSummary.span | 0.0000033587237719787246 |
 | properTimeSummary.start | 0 |
-| properTimeSummary.end | 0.000003341930153118831 |
-| properTimeSummary.span | 0.000003341930153118831 |
+| properTimeSummary.end | 0.000002351106640385107 |
+| properTimeSummary.span | 0.000002351106640385107 |
 | descriptorScheduleSummary.representative | 1.9546804721038186e-15 |
 | descriptorScheduleSummary.min | 3.6531425984160347e-16 |
 | descriptorScheduleSummary.max | 1.9546804721038186e-15 |
@@ -54,11 +54,11 @@
 ## Progression Samples
 | index | sourceSampleId | lambda | coordinateTime_s | coordinateTimeIncrement_s | properTimeIncrement_s | cumulativeProperTime_s | boundedProgressCoordinate_m | localDescriptorValue | dtau_dt | normalizationResidual |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | shell_aft | 0 | 0 | 0 | 0 | 0 | 0 | 3.653142598416042e-16 | 0.995 | 0 |
-| 1 | centerline_aft | 0.2499801511909902 | 8.396142763280144e-7 | 8.396142763280144e-7 | 8.354162049463743e-7 | 8.354162049463743e-7 | 251.71002767226668 | 1.9546804721038186e-15 | 0.995 | 0 |
-| 2 | centerline_center | 0.5 | 0.0000016793618859893623 | 8.397476096613479e-7 | 8.355488716130411e-7 | 0.0000016709650765594154 | 503.4600276722667 | 1.9546804721038186e-15 | 0.995 | 0 |
-| 3 | centerline_fore | 0.7500198488090098 | 0.00000251910949565071 | 8.397476096613479e-7 | 8.355488716130411e-7 | 0.0000025065139481724566 | 755.2100276722667 | 1.9546804721038186e-15 | 0.995 | 0 |
-| 4 | shell_fore | 1 | 0.0000033587237719787246 | 8.396142763280144e-7 | 8.354162049463743e-7 | 0.000003341930153118831 | 1006.9200553445334 | 3.6531425984160347e-16 | 0.995 | 0 |
+| 0 | shell_aft | 0 | 0 | 0 | 0 | 0 | 0 | 3.653142598416042e-16 | 0.7 | 0 |
+| 1 | centerline_aft | 0.2499801511909902 | 8.396142763280144e-7 | 8.396142763280144e-7 | 5.877299934296101e-7 | 5.877299934296101e-7 | 251.71002767226668 | 1.9546804721038186e-15 | 0.7 | 0 |
+| 2 | centerline_center | 0.5 | 0.0000016793618859893623 | 8.397476096613479e-7 | 5.878233267629435e-7 | 0.0000011755533201925536 | 503.4600276722667 | 1.9546804721038186e-15 | 0.7 | 0 |
+| 3 | centerline_fore | 0.7500198488090098 | 0.00000251910949565071 | 8.397476096613479e-7 | 5.878233267629435e-7 | 0.000001763376646955497 | 755.2100276722667 | 1.9546804721038186e-15 | 0.7 | 0 |
+| 4 | shell_fore | 1 | 0.0000033587237719787246 | 8.396142763280144e-7 | 5.877299934296101e-7 | 0.000002351106640385107 | 1006.9200553445334 | 3.6531425984160347e-16 | 0.7 | 0 |
 
 ## Claim Boundary
 - bounded route-time worldline over a local probe segment only

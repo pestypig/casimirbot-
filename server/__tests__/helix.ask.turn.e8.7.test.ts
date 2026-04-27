@@ -12,7 +12,7 @@ const createApp = (): express.Express => {
 };
 
 describe("helix ask turn e8.7 evidence-gated reasoning finalization", () => {
-  it("emits needs_retrieval when compare prompt has no evidence refs", async () => {
+  it("emits reasoning_retrieval when compare prompt has no evidence refs", async () => {
     const app = createApp();
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -28,10 +28,12 @@ describe("helix ask turn e8.7 evidence-gated reasoning finalization", () => {
     expect(response.body?.needs_retrieval).toBe(true);
     expect(Array.isArray(response.body?.evidence_refs)).toBe(true);
     expect((response.body?.evidence_refs ?? []).length).toBe(0);
+    expect(response.body?.retrieval_attempted).toBe(true);
+    expect(response.body?.retrieval_fail_reason).toContain("evidence_refs_missing");
     const planIds = (response.body?.planner_contract?.plan_items ?? []).map(
       (step: { id?: string }) => step.id,
     );
-    expect(planIds).toContain("needs_retrieval");
+    expect(planIds).toContain("reasoning_retrieval");
     expect(String(response.body?.text ?? "").toLowerCase()).toContain("needs retrieval");
   });
 
