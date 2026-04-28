@@ -263,6 +263,7 @@ export type LocalAskResponse = {
   turn_contract?: Record<string, unknown>;
   invariant_violations?: unknown[];
   latest_result_artifact?: Record<string, unknown>;
+  job_ready_links?: unknown[];
   route_reason_code?: string | null;
   dispatch_policy?: string | null;
   pending_request?: Record<string, unknown> | null;

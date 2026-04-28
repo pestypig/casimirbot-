@@ -126,6 +126,7 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessProvenance,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1.ts";
+import type { Nhm2PhaseTopologyArtifact } from "../shared/contracts/nhm2-phase-topology.v1.ts";
 import {
   buildStressEnergyBrick,
   forEachStressEnergyBrickRegionVoxel,
@@ -255,7 +256,13 @@ import type {
 import { appendPhaseCalibrationLog } from "./utils/phase-calibration.ts";
 import { slewPump } from "./instruments/pump.ts";
 import { slewPumpMultiTone } from "./instruments/pump-multitone.ts";
-import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses, type PhaseSchedule } from "./energy/phase-scheduler.ts";
+import { analyzeNhm2PhaseTopology } from "./energy/phase-topology.ts";
+import {
+  computeSectorPhaseOffsets,
+  applyPhaseScheduleToPulses,
+  smoothSectorPhaseAngles,
+  type PhaseSchedule,
+} from "./energy/phase-scheduler.ts";
 import { QiMonitor } from "./qi/qi-monitor.ts";
 import { configuredQiScalarBound, qiBound_Jm3 } from "./qi/qi-bounds.ts";
 import { buildWindow, type RawTileInput } from "./qi/qi-saturation.ts";
@@ -830,6 +837,7 @@ const buildNatarioRuntimePayload = (
   const stressEnergyTensor = normalizePublishedTensor(stress);
   const nhm2ObserverAudit = state.nhm2ObserverAudit;
   const nhm2StrictSignalReadiness = state.nhm2StrictSignalReadiness;
+  const nhm2PhaseTopology = state.nhm2PhaseTopology;
 
   return {
     ...(fallback ?? {}),
@@ -862,6 +870,7 @@ const buildNatarioRuntimePayload = (
     ...(nhm2StrictSignalReadiness
       ? { nhm2StrictSignalReadiness }
       : {}),
+    ...(nhm2PhaseTopology ? { nhm2PhaseTopology } : {}),
     metricT00,
     metricT00Source: metricT00Source ?? undefined,
     metricT00Ref,
@@ -1744,6 +1753,7 @@ export interface EnergyPipelineState {
   warpMissionTimeEstimator?: WarpMissionTimeEstimatorContractV1;
   warpMissionTimeComparison?: WarpMissionTimeComparisonContractV1;
   warpCruiseEnvelope?: WarpCruiseEnvelopeContractV1;
+  nhm2PhaseTopology?: Nhm2PhaseTopologyArtifact;
   warpInHullProperAcceleration?: WarpInHullProperAccelerationContractV1;
   warpViability?: {
     certificate: WarpViabilityCertificate;
@@ -16242,6 +16252,11 @@ export async function calculateEnergyPipeline(
     deltaPos_deg: 90,
     neutral_deg: 45,
   });
+  const phasePhiRaw = phaseSchedule.phi_deg_by_sector;
+  const phasePhiForPulses =
+    process.env.NHM2_PHASE_SMOOTHING === "1"
+      ? smoothSectorPhaseAngles(phasePhiRaw, 2)
+      : phasePhiRaw;
 
   const roleSets = {
     neg: new Set(phaseSchedule.negSectors),
@@ -16251,7 +16266,7 @@ export async function calculateEnergyPipeline(
   if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
     const scheduled = applyPhaseScheduleToPulses(
       state.gateAnalytics.pulses,
-      phaseSchedule.phi_deg_by_sector,
+      phasePhiForPulses,
       roleSets,
     );
     state.gateAnalytics = {
@@ -16264,13 +16279,22 @@ export async function calculateEnergyPipeline(
     N: totalSectors,
     sectorPeriod_ms: sectorPeriodMs,
     phase01,
-    phi_deg_by_sector: phaseSchedule.phi_deg_by_sector,
+    phi_deg_by_sector: phasePhiForPulses,
     negSectors: phaseSchedule.negSectors,
     posSectors: phaseSchedule.posSectors,
     sampler,
     tau_s_ms: tauMs,
     weights: phaseSchedule.weights,
   };
+
+  const topologyResult = analyzeNhm2PhaseTopology({
+    schedule: state.phaseSchedule,
+    hull: state.hull ?? hullDims,
+    nowMs: wallNow,
+    previous: (state as any).__nhm2PhaseTopologyPrev ?? null,
+  });
+  state.nhm2PhaseTopology = topologyResult.artifact;
+  (state as any).__nhm2PhaseTopologyPrev = topologyResult.nextState;
 
   const qiGuardPre = evaluateQiGuardrail(state, {
     schedule: phaseSchedule,
@@ -17250,6 +17274,18 @@ export async function calculateEnergyPipeline(
   }
   refreshNhm2StrictSignalReadiness(state);
   refreshNhm2ObserverAudit(state);
+  if (
+    process.env.NHM2_PHASE_TOPOLOGY_GATE === "1" &&
+    state.nhm2PhaseTopology?.status === "fail"
+  ) {
+    if (state.overallStatus !== "CRITICAL") {
+      state.overallStatus = "WARNING";
+    }
+    (state as any).topologyGuardrail = {
+      status: "fail",
+      reason: "phase topology fail; sector strobe not admissible for certified strobe-pattern claim",
+    };
+  }
   // Canonical Natario payload now mirrors solved warp metric output.
   // Legacy inverse/proxy Natario is retained under `natarioLegacy` for diagnostics.
   (state as any).natario = buildNatarioRuntimePayload(

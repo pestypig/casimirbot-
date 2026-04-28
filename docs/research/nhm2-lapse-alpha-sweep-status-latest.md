@@ -1,6 +1,6 @@
 # NHM2 Lapse Alpha Sweep Status
 
-- generatedAt: 2026-04-27T14:06:02.583Z
+- generatedAt: 2026-04-28T18:08:35.297Z
 - sweepName: nhm2-centerline-lapse-efficiency-sweep-v1
 - firstFailureProfileId: stage1_centerline_alpha_0p7000_v1
 - strongestPassingProfileId: null

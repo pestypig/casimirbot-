@@ -77,6 +77,24 @@ export function computeSectorPhaseOffsets(args: {
   };
 }
 
+export function smoothSectorPhaseAngles(
+  phiDeg: number[],
+  passes = 2,
+): number[] {
+  if (!Array.isArray(phiDeg) || phiDeg.length === 0) return [];
+  let out = [...phiDeg];
+
+  for (let p = 0; p < passes; p++) {
+    out = out.map((value, i) => {
+      const left = out[(i - 1 + out.length) % out.length];
+      const right = out[(i + 1) % out.length];
+      return 0.25 * left + 0.5 * value + 0.25 * right;
+    });
+  }
+
+  return out;
+}
+
 export function applyPhaseScheduleToPulses(
   pulses: GatePulse[],
   phi_deg_by_sector: number[],

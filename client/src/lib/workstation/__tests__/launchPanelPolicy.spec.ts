@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { isUnfinishedPanel, isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 
 describe("launchPanelPolicy", () => {
   it("includes workstation notes in the user launch panel list", () => {
@@ -14,5 +14,21 @@ describe("launchPanelPolicy", () => {
 
   it("keeps unknown ids out of the launch panel list", () => {
     expect(isUserLaunchPanel("not-a-real-panel")).toBe(false);
+  });
+
+  it("keeps unfinished panels out of the user launch panel list", () => {
+    const unfinishedPanels = [
+      "agi-contribution-workbench",
+      "code-admin",
+      "helix-noise-gens",
+      "mission-ethos",
+      "mission-ethos-source",
+      "rag-admin",
+    ];
+
+    for (const panelId of unfinishedPanels) {
+      expect(isUnfinishedPanel(panelId)).toBe(true);
+      expect(isUserLaunchPanel(panelId)).toBe(false);
+    }
   });
 });

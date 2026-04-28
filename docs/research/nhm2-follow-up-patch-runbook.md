@@ -13,6 +13,18 @@
 5. Milestone 5: Status memo regeneration.
 6. Milestone 6: Test and citation-gate verification.
 
+## Frontier-Distance Patch Instructions
+- Anchor all expected clocking computations to `stage1_centerline_alpha_0p995_v1`.
+- Emit `nhm2-frontier-distance-latest.json` beside the sweep summary.
+- Emit `docs/research/nhm2-frontier-distance-report.md` for operator review.
+- Group rows as:
+  - `confirmed_revalidation_ladder`: `0p995 -> 0p7300`
+  - `frontier_bisection_ladder`: `0p7250 -> 0p7000`
+  - `deep_exploratory_ladder`: `0p6500 -> 0p5000`
+- Treat `tau_expected(alpha)=alpha*coordinateTimeS` as an expected target only.
+- Keep `0p7000` classified as runtime-blocked unless selected transport completes and full-loop evidence is fresh.
+- Use literature only for formalism, historical context, and uncertainty boundaries. NHM2 pass/fail language must come from repository artifacts.
+
 ## Commands
 Run the controlled exploratory ladder:
 
@@ -38,6 +50,12 @@ $env:NHM2_CENTERLINE_ALPHA = "0.7"
 $env:NHM2_CENTERLINE_DTAU_DT = "0.7"
 $env:NHM2_OUTPUT_DIR = "artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\stage1_centerline_alpha_0p7000_v1\debug-selected-transport"
 npm run warp:full-solve:nhm2-shift-lapse:alpha-sweep
+```
+
+Alternative smoke alias:
+
+```powershell
+npm run warp:full-solve:nhm2-shift-lapse:selected-transport-only
 ```
 
 ## Freshness Gate (must pass before next alpha)
@@ -82,6 +100,10 @@ Never claim experimental validation from literature citations alone.
   - `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-lapse-alpha-sweep-latest.json`
 - Claim promotion report:
   - `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-claim-promotion-report-latest.json`
+- Frontier distance ledger:
+  - `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-frontier-distance-latest.json`
+- Frontier distance report:
+  - `docs/research/nhm2-frontier-distance-report.md`
 - Controlled ladder status:
   - `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-exploratory-controlled-ladder-latest.json`
 - Status memo:
@@ -90,3 +112,4 @@ Never claim experimental validation from literature citations alone.
   - `nhm2-profile-resolution-latest.json` (per profile root)
 - Runtime attempts:
   - `attempts/attempt-###/` (selected transport artifact isolation)
+  - `attempt-worker-pids.json` (timeout cleanup PID manifest per attempt)

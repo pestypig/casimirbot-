@@ -121,6 +121,26 @@ type SweepFullLoopAvailability = {
   };
 };
 
+export interface Nhm2ClockingBaseline {
+  profileId: string;
+  centerlineAlpha: number;
+  coordinateTimeS: number;
+  properTimeS: number;
+  properMinusCoordinateS: number;
+}
+
+export interface Nhm2ExpectedClockingTarget {
+  derivedFromProfileId: string;
+  coordinateTimeS: number;
+  expectedProperTimeS: number;
+  expectedProperMinusCoordinateS: number;
+  expectedSavedTimeS: number;
+  expectedSavedDays: number;
+  expectedProperToCoordinateRatio: number;
+  expectedSubjectiveEfficiency: number;
+  savedTimeMultipleVsBaseline: number;
+}
+
 type SweepRow = {
   profileId: string;
   bracket: SweepBracket;
@@ -134,6 +154,9 @@ type SweepRow = {
   savedDays: number | null;
   properToCoordinateRatio: number | null;
   subjectiveEfficiency: number;
+  clockingTargetState: "expected_not_validated" | "expected_and_validated";
+  validationState: "planned" | "runtime_blocked" | "gate_failed" | "evidence_viable";
+  expectedClockingTarget: Nhm2ExpectedClockingTarget | null;
   betaOverAlphaMax: number | null;
   wallHorizonMargin: number | null;
   decompositionResidualS: number | null;
@@ -205,8 +228,10 @@ type SweepRow = {
     baselineToleranceRel: number;
     ratioError: number | null;
     ratioTolerance: number;
+    expectedProperTimeErrorS: number | null;
     properMinusErrorS: number | null;
     properMinusToleranceS: number;
+    expectedProperMinusErrorS: number | null;
     betaOverAlphaMaxLimit: number;
     wallHorizonMarginMin: number;
     decompositionResidualToleranceS: number;
@@ -276,6 +301,77 @@ type SweepFailureSummary = {
     failedGates: string[];
     overallState: string;
   }>;
+};
+
+type FrontierBlockerClass =
+  | "not_run"
+  | "selected_transport_runtime"
+  | "missing_full_loop_audit"
+  | "stale_artifact"
+  | "profile_mismatch"
+  | "clocking_mismatch"
+  | "decomposition_mismatch"
+  | "anti_sr_gate_fail"
+  | "stress_or_constraint_gate_fail"
+  | "unknown";
+
+type FrontierLadderGroup =
+  | "confirmed_revalidation_ladder"
+  | "frontier_bisection_ladder"
+  | "deep_exploratory_ladder";
+
+type Nhm2FrontierDistanceRow = {
+  profileId: string;
+  tag: string;
+  centerlineAlpha: number;
+  bracket: SweepBracket;
+  ladderGroup: FrontierLadderGroup;
+  expectedProperTimeS: number;
+  expectedSavedDays: number;
+  expectedSubjectiveEfficiency: number;
+  validationState:
+    | "evidence_viable"
+    | "runtime_viable"
+    | "runtime_blocked"
+    | "gate_failed"
+    | "planned"
+    | "skipped_after_blocker";
+  distanceFromAnchor: {
+    anchorProfileId: "stage1_centerline_alpha_0p995_v1";
+    alphaDeltaFromAnchor: number;
+    expectedAdditionalSavedDaysVsAnchor: number;
+    expectedEfficiencyGainVsAnchor: number;
+  };
+  measuredDistance: {
+    measuredProperTimeS: number | null;
+    measuredProperToCoordinateRatio: number | null;
+    properTimeErrorVsExpectedS: number | null;
+    decompositionResidualS: number | null;
+    lapseTrackedFraction: number | null;
+    betaOverAlphaMax: number | null;
+    wallHorizonMargin: number | null;
+  } | null;
+  blocker: {
+    blockerClass: FrontierBlockerClass | null;
+    blockerStage: string | null;
+    runtimeBlockingReason: SweepRow["runtimeBlockingReason"] | null;
+    nextAction: string | null;
+  };
+};
+
+type Nhm2FrontierDistanceSummary = {
+  manifestType: "nhm2_frontier_distance/v1";
+  generatedAt: string;
+  sweepName: string;
+  family: "nhm2-shift-lapse";
+  clockingMode: "bounded-lapse";
+  anchor: Nhm2ClockingBaseline;
+  expectedClockingModel: {
+    model: "tau_expected(alpha)=alpha*coordinate_time";
+    claimBoundary: string;
+  };
+  frontier: LadderProgressSummary["frontier"];
+  rows: Nhm2FrontierDistanceRow[];
 };
 
 type SweepClaimPromotionReport = {
@@ -414,6 +510,12 @@ const proofSurfacePublicationLockPath = path.join(
   ".nhm2-proof-surface-publication.lock",
 );
 const baselineProfileId = "stage1_centerline_alpha_0p995_v1";
+const baselineAnchorDefaults = {
+  centerlineAlpha: 0.995,
+  coordinateTimeS: 137755965.9171795,
+  properTimeS: 137067186.0875936,
+  properMinusCoordinateS: -688779.8295859098,
+} as const;
 const baselineCoordinateRelTol = 1e-9;
 const baselineCoordinateAbsTolS = 1e-3;
 const clockRatioTol = 1e-9;
@@ -446,6 +548,59 @@ const toFinite = (value: unknown): number | null => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+export function deriveExpectedClockingTarget(
+  baseline: Nhm2ClockingBaseline,
+  targetAlpha: number,
+): Nhm2ExpectedClockingTarget {
+  if (!Number.isFinite(targetAlpha) || targetAlpha <= 0 || targetAlpha > 1) {
+    throw new Error(`Invalid targetAlpha=${targetAlpha}; expected 0 < alpha <= 1`);
+  }
+  if (!Number.isFinite(baseline.coordinateTimeS) || baseline.coordinateTimeS <= 0) {
+    throw new Error(`Invalid baseline coordinateTimeS=${baseline.coordinateTimeS}`);
+  }
+  const baselineSavedTimeS = -baseline.properMinusCoordinateS;
+  if (!Number.isFinite(baselineSavedTimeS) || baselineSavedTimeS <= 0) {
+    throw new Error(`Invalid baseline saved time=${baselineSavedTimeS}`);
+  }
+  const expectedProperTimeS = targetAlpha * baseline.coordinateTimeS;
+  const expectedProperMinusCoordinateS = (targetAlpha - 1) * baseline.coordinateTimeS;
+  const expectedSavedTimeS = -expectedProperMinusCoordinateS;
+  return {
+    derivedFromProfileId: baseline.profileId,
+    coordinateTimeS: baseline.coordinateTimeS,
+    expectedProperTimeS,
+    expectedProperMinusCoordinateS,
+    expectedSavedTimeS,
+    expectedSavedDays: expectedSavedTimeS / 86400,
+    expectedProperToCoordinateRatio: targetAlpha,
+    expectedSubjectiveEfficiency: 1 / targetAlpha,
+    savedTimeMultipleVsBaseline: expectedSavedTimeS / baselineSavedTimeS,
+  };
+}
+
+export function assertBaselineClockingCoherence(
+  baseline: Nhm2ClockingBaseline,
+  toleranceS = 1e-5,
+): void {
+  const expectedProperTimeS = baseline.centerlineAlpha * baseline.coordinateTimeS;
+  const expectedProperMinusCoordinateS =
+    (baseline.centerlineAlpha - 1) * baseline.coordinateTimeS;
+  const properTimeErrorS = Math.abs(baseline.properTimeS - expectedProperTimeS);
+  const deltaErrorS = Math.abs(
+    baseline.properMinusCoordinateS - expectedProperMinusCoordinateS,
+  );
+  if (properTimeErrorS > toleranceS || deltaErrorS > toleranceS) {
+    throw new Error(
+      [
+        "Baseline NHM2 clocking artifact is not coherent.",
+        `properTimeErrorS=${properTimeErrorS}`,
+        `deltaErrorS=${deltaErrorS}`,
+        `toleranceS=${toleranceS}`,
+      ].join(" "),
+    );
+  }
+}
 
 export const readPositiveTimeoutMsFromEnv = (
   envName: string,
@@ -609,6 +764,7 @@ type SelectedTransportRuntimeAttempt = {
   attemptArtifactRoot: string;
   attemptAuditRoot: string;
   killedProcessTree: boolean;
+  killedPids: number[];
   selectedTransportRuntimeDiagnostics?: {
     startedAt: string;
     completedAt: string;
@@ -736,7 +892,7 @@ export const resolveSelectedTransportOnlyContract = (env: NodeJS.ProcessEnv): {
   };
 };
 
-const getNextActionForRuntimeReason = (reason: SweepRow["runtimeBlockingReason"]): string | null => {
+export const getNextActionForRuntimeReason = (reason: SweepRow["runtimeBlockingReason"]): string | null => {
   if (reason === "selected_transport_timeout") {
     return "Increase NHM2_SELECTED_TRANSPORT_TIMEOUT_S within cap and rerun controlled single-profile loop.";
   }
@@ -786,35 +942,75 @@ const writeJsonAtomic = (filePath: string, payload: unknown): void => {
   fs.renameSync(tmpPath, filePath);
 };
 
-const killPotentialSelectedTransportProcessTree = (profileId: string): boolean => {
+const writeAttemptWorkerPidManifest = (args: {
+  attemptArtifactRoot: string;
+  profileId: string;
+  candidatePids: number[];
+  killedPids: number[];
+}): void => {
+  writeJsonAtomic(path.join(args.attemptArtifactRoot, "attempt-worker-pids.json"), {
+    generatedAt: new Date().toISOString(),
+    profileId: args.profileId,
+    currentPid: process.pid,
+    candidatePids: args.candidatePids,
+    killedPids: args.killedPids,
+  });
+};
+
+const collectPotentialSelectedTransportPids = (profileId: string): number[] => {
   try {
-    if (process.platform !== "win32") return false;
+    if (process.platform !== "win32") return [];
     const script = [
       `$self=${process.pid};`,
-      `$killed=0;`,
       "$targets = Get-CimInstance Win32_Process | Where-Object {",
       "  $_.ProcessId -ne $self -and $_.CommandLine -and (",
       `    $_.CommandLine -like '*${profileId}*' -or`,
-      "    $_.CommandLine -like '*warp-york-control-family-proof-pack*' -or",
-      "    $_.CommandLine -like '*run-nhm2-lapse-alpha-sweep*'",
+      "    $_.CommandLine -like '*warp-york-control-family-proof-pack*'",
       "  )",
       "};",
-      "foreach ($t in $targets) {",
-      "  try {",
-      "    taskkill /PID $t.ProcessId /T /F | Out-Null;",
-      "    $killed += 1;",
-      "  } catch {}",
-      "}",
-      "Write-Output $killed;",
+      "$targets | Select-Object -ExpandProperty ProcessId | ConvertTo-Json -Compress",
     ].join(" ");
     const out = execFileSync(
       "powershell",
       ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
       { encoding: "utf8" },
-    );
-    return Number(out.trim()) > 0;
+    ).trim();
+    if (!out) return [];
+    const parsed = JSON.parse(out);
+    const pids = Array.isArray(parsed) ? parsed : [parsed];
+    return pids
+      .map((entry) => Number(entry))
+      .filter((pid) => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
   } catch {
-    return false;
+    return [];
+  }
+};
+
+const killPotentialSelectedTransportProcessTree = (profileId: string): {
+  killedProcessTree: boolean;
+  candidatePids: number[];
+  killedPids: number[];
+} => {
+  const candidatePids = collectPotentialSelectedTransportPids(profileId);
+  try {
+    if (process.platform !== "win32") {
+      return { killedProcessTree: false, candidatePids, killedPids: [] };
+    }
+    const killedPids: number[] = [];
+    for (const pid of candidatePids) {
+      if (pid === process.pid) continue;
+      try {
+        execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+          stdio: "ignore",
+        });
+        killedPids.push(pid);
+      } catch {
+        // ignore per-pid failure
+      }
+    }
+    return { killedProcessTree: killedPids.length > 0, candidatePids, killedPids };
+  } catch {
+    return { killedProcessTree: false, candidatePids, killedPids: [] };
   }
 };
 
@@ -830,6 +1026,7 @@ const validateSelectedTransportAttemptOutputs = (args: {
   attemptArtifactRoot: string;
   expectedProfileId: string;
   expectedAlpha: number;
+  attemptStartedMs: number;
 }): void => {
   const transportPath = path.join(
     args.attemptArtifactRoot,
@@ -842,6 +1039,12 @@ const validateSelectedTransportAttemptOutputs = (args: {
   for (const requiredPath of [transportPath, worldlinePath]) {
     if (!fs.existsSync(requiredPath)) {
       throw new Error(`selected_transport_missing_artifact:${requiredPath}`);
+    }
+    const mtimeMs = fs.statSync(requiredPath).mtimeMs;
+    if (!Number.isFinite(mtimeMs) || mtimeMs + 1 < args.attemptStartedMs) {
+      throw new Error(
+        `selected_transport_stale_artifact:${requiredPath}:mtimeMs=${mtimeMs}:attemptStartedMs=${args.attemptStartedMs}`,
+      );
     }
   }
   const transport = parseJsonOrThrow<Record<string, unknown>>(transportPath);
@@ -2264,6 +2467,204 @@ const buildLadderProgressSummary = (args: {
   };
 };
 
+export const classifyFrontierLadderGroup = (
+  spec: Pick<SweepSpec, "alpha" | "tag">,
+): FrontierLadderGroup => {
+  if (spec.alpha >= 0.73 || spec.tag === "0p7300") {
+    return "confirmed_revalidation_ladder";
+  }
+  if (
+    spec.tag === "0p7250" ||
+    spec.tag === "0p7200" ||
+    spec.tag === "0p7150" ||
+    spec.tag === "0p7100" ||
+    spec.tag === "0p7050" ||
+    spec.tag === "0p7000"
+  ) {
+    return "frontier_bisection_ladder";
+  }
+  return "deep_exploratory_ladder";
+};
+
+export const classifyFrontierBlocker = (
+  row: Pick<
+    SweepRow,
+    | "runtimeBlockingReason"
+    | "runHealth"
+    | "fullLoopStateRaw"
+    | "fullLoopStateNormalized"
+    | "gates"
+  > | null,
+): FrontierBlockerClass | null => {
+  if (row == null) return "not_run";
+  if (row.runtimeBlockingReason === "selected_transport_profile_mismatch") {
+    return "profile_mismatch";
+  }
+  if (row.runtimeBlockingReason != null) {
+    return "selected_transport_runtime";
+  }
+  if (row.runHealth === "failed_stale") {
+    return "stale_artifact";
+  }
+  if (
+    row.fullLoopStateRaw == null ||
+    row.fullLoopStateRaw === "unavailable" ||
+    row.fullLoopStateNormalized !== "pass"
+  ) {
+    return "missing_full_loop_audit";
+  }
+  if (row.gates.clockingConsistency !== "pass") return "clocking_mismatch";
+  if (row.gates.decompositionConsistency !== "pass") return "decomposition_mismatch";
+  if (row.gates.antiSrSafety !== "pass") return "anti_sr_gate_fail";
+  if (row.gates.invariantGate !== "pass" || row.gates.fullLoopAudit !== "pass") {
+    return "stress_or_constraint_gate_fail";
+  }
+  if (row.gates.promotionEligible === "pass") return null;
+  return "unknown";
+};
+
+const frontierBlockerStage = (blockerClass: FrontierBlockerClass | null): string | null => {
+  switch (blockerClass) {
+    case null:
+      return null;
+    case "selected_transport_runtime":
+    case "profile_mismatch":
+      return "selected_transport";
+    case "missing_full_loop_audit":
+      return "full_loop_audit";
+    case "stale_artifact":
+      return "freshness";
+    case "clocking_mismatch":
+      return "clocking_consistency";
+    case "decomposition_mismatch":
+      return "shift_lapse_decomposition";
+    case "anti_sr_gate_fail":
+      return "anti_sr_safety";
+    case "stress_or_constraint_gate_fail":
+      return "stress_or_constraint_gate";
+    case "not_run":
+      return "not_run";
+    case "unknown":
+      return "unknown";
+  }
+};
+
+const frontierNextAction = (
+  blockerClass: FrontierBlockerClass | null,
+  runtimeReason: SweepRow["runtimeBlockingReason"] | null,
+): string | null => {
+  const runtimeAction = getNextActionForRuntimeReason(runtimeReason);
+  if (runtimeAction != null) return runtimeAction;
+  switch (blockerClass) {
+    case null:
+      return null;
+    case "not_run":
+      return "Run the controlled ladder from the confirmed anchor outward before using this row as evidence.";
+    case "selected_transport_runtime":
+      return "Run selected-transport-only smoke with isolated attempts, then promote artifacts only after success.";
+    case "missing_full_loop_audit":
+      return "Regenerate the full-loop audit after selected transport completes and verify artifact freshness.";
+    case "stale_artifact":
+      return "Clean or isolate stale artifacts and rerun the affected profile.";
+    case "profile_mismatch":
+      return "Fix profile/env resolution so profileId, tag, centerlineAlpha, and centerlineDtauDt agree.";
+    case "clocking_mismatch":
+      return "Compare measured proper time and proper-minus-coordinate against the alpha*T target.";
+    case "decomposition_mismatch":
+      return "Inspect shift-vs-lapse decomposition residual and lapseTrackedFraction for this profile.";
+    case "anti_sr_gate_fail":
+      return "Inspect betaOverAlphaMax and wallHorizonMargin before any bounded-lapse promotion.";
+    case "stress_or_constraint_gate_fail":
+      return "Inspect invariant, stress, constraint, and full-loop audit gate details.";
+    case "unknown":
+      return "Inspect row gate diagnostics and runtime diagnostics before advancing the ladder.";
+  }
+};
+
+export const buildNhm2FrontierDistanceSummary = (args: {
+  sweepName: string;
+  specs: SweepSpec[];
+  rows: SweepRow[];
+  baseline: Nhm2ClockingBaseline;
+  ladder: LadderProgressSummary;
+}): Nhm2FrontierDistanceSummary => {
+  const rowByProfileId = new Map(args.rows.map((row) => [row.profileId, row]));
+  const ladderByProfileId = new Map(args.ladder.rows.map((row) => [row.profileId, row]));
+  const anchorTarget = deriveExpectedClockingTarget(
+    args.baseline,
+    args.baseline.centerlineAlpha,
+  );
+  return {
+    manifestType: "nhm2_frontier_distance/v1",
+    generatedAt: new Date().toISOString(),
+    sweepName: args.sweepName,
+    family: "nhm2-shift-lapse",
+    clockingMode: "bounded-lapse",
+    anchor: args.baseline,
+    expectedClockingModel: {
+      model: "tau_expected(alpha)=alpha*coordinate_time",
+      claimBoundary:
+        "Expected clocking targets are not validated outcomes; NHM2 full-loop artifacts decide evidence viability.",
+    },
+    frontier: args.ladder.frontier,
+    rows: args.specs.map((spec) => {
+      const profileId = inferProfileId(spec.tag);
+      const row = rowByProfileId.get(profileId) ?? null;
+      const ladderRow = ladderByProfileId.get(profileId) ?? null;
+      const expected = deriveExpectedClockingTarget(args.baseline, spec.alpha);
+      const blockerClass =
+        ladderRow?.ladderState === "skipped_after_blocker"
+          ? "not_run"
+          : classifyFrontierBlocker(row);
+      const validationState: Nhm2FrontierDistanceRow["validationState"] =
+        ladderRow?.ladderState === "skipped_after_blocker"
+          ? "skipped_after_blocker"
+          : row?.validationState ?? "planned";
+      return {
+        profileId,
+        tag: spec.tag,
+        centerlineAlpha: spec.alpha,
+        bracket: spec.bracket,
+        ladderGroup: classifyFrontierLadderGroup(spec),
+        expectedProperTimeS: expected.expectedProperTimeS,
+        expectedSavedDays: expected.expectedSavedDays,
+        expectedSubjectiveEfficiency: expected.expectedSubjectiveEfficiency,
+        validationState,
+        distanceFromAnchor: {
+          anchorProfileId: baselineProfileId,
+          alphaDeltaFromAnchor: spec.alpha - args.baseline.centerlineAlpha,
+          expectedAdditionalSavedDaysVsAnchor:
+            expected.expectedSavedDays - anchorTarget.expectedSavedDays,
+          expectedEfficiencyGainVsAnchor:
+            expected.expectedSubjectiveEfficiency -
+            anchorTarget.expectedSubjectiveEfficiency,
+        },
+        measuredDistance:
+          row == null
+            ? null
+            : {
+                measuredProperTimeS: row.properTimeS,
+                measuredProperToCoordinateRatio: row.properToCoordinateRatio,
+                properTimeErrorVsExpectedS:
+                  row.properTimeS == null
+                    ? null
+                    : Math.abs(row.properTimeS - expected.expectedProperTimeS),
+                decompositionResidualS: row.decompositionResidualS,
+                lapseTrackedFraction: row.lapseTrackedFraction,
+                betaOverAlphaMax: row.betaOverAlphaMax,
+                wallHorizonMargin: row.wallHorizonMargin,
+              },
+        blocker: {
+          blockerClass,
+          blockerStage: frontierBlockerStage(blockerClass),
+          runtimeBlockingReason: row?.runtimeBlockingReason ?? null,
+          nextAction: frontierNextAction(blockerClass, row?.runtimeBlockingReason ?? null),
+        },
+      };
+    }),
+  };
+};
+
 export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
   const runModeRaw = (process.env.NHM2_SWEEP_MODE ?? "full").trim().toLowerCase();
   const selectedTransportOnly =
@@ -2492,10 +2893,16 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           selectedTransportResult.stalled ||
           selectedTransportResult.value == null
         ) {
-          const killedProcessTree =
+          const killResult =
             selectedTransportResult.timedOut || selectedTransportResult.stalled
               ? killPotentialSelectedTransportProcessTree(profileId)
-              : false;
+              : { killedProcessTree: false, candidatePids: [], killedPids: [] };
+          writeAttemptWorkerPidManifest({
+            attemptArtifactRoot,
+            profileId,
+            candidatePids: killResult.candidatePids,
+            killedPids: killResult.killedPids,
+          });
           const runtimeReason: SelectedTransportRuntimeReason = selectedTransportResult.stalled
             ? "selected_transport_stall"
             : "selected_transport_timeout";
@@ -2514,7 +2921,8 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
             error: null,
             attemptArtifactRoot,
             attemptAuditRoot,
-            killedProcessTree,
+            killedProcessTree: killResult.killedProcessTree,
+            killedPids: killResult.killedPids,
             selectedTransportRuntimeDiagnostics: null,
           });
           selectedTransportRuntimeReason = runtimeReason;
@@ -2531,6 +2939,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           attemptArtifactRoot,
           expectedProfileId: profileId,
           expectedAlpha: spec.alpha,
+          attemptStartedMs,
         });
         promoteAttemptOutputs({
           attemptArtifactRoot,
@@ -2554,6 +2963,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           attemptArtifactRoot,
           attemptAuditRoot,
           killedProcessTree: false,
+          killedPids: [],
           selectedTransportRuntimeDiagnostics:
             selectedTransportResult.value.runtimeDiagnostics ?? null,
         });
@@ -2580,6 +2990,7 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           attemptArtifactRoot,
           attemptAuditRoot,
           killedProcessTree: false,
+          killedPids: [],
           selectedTransportRuntimeDiagnostics: null,
         });
         selectedTransportRuntimeReason = runtimeReason;
@@ -2631,6 +3042,9 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
         savedDays: null,
         properToCoordinateRatio: null,
         subjectiveEfficiency: 1 / spec.alpha,
+        clockingTargetState: "expected_not_validated",
+        validationState: "runtime_blocked",
+        expectedClockingTarget: null,
         betaOverAlphaMax: null,
         wallHorizonMargin: null,
         decompositionResidualS: null,
@@ -2683,8 +3097,10 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
           baselineToleranceRel: baselineCoordinateRelTol,
           ratioError: null,
           ratioTolerance: clockRatioTol,
+          expectedProperTimeErrorS: null,
           properMinusErrorS: null,
           properMinusToleranceS: properMinusAbsTolS,
+          expectedProperMinusErrorS: null,
           betaOverAlphaMaxLimit: antiSrBetaOverAlphaMaxLimit,
           wallHorizonMarginMin: antiSrWallHorizonMarginMin,
           decompositionResidualToleranceS,
@@ -2901,6 +3317,9 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
       properToCoordinateRatio:
         coordinateTimeS != null && properTimeS != null ? properTimeS / coordinateTimeS : null,
       subjectiveEfficiency: 1 / spec.alpha,
+      clockingTargetState: "expected_not_validated",
+      validationState: "planned",
+      expectedClockingTarget: null,
       betaOverAlphaMax,
       wallHorizonMargin,
       decompositionResidualS: toFinite(transport.shiftVsLapseResidual_seconds),
@@ -2942,8 +3361,10 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
         baselineToleranceRel: baselineCoordinateRelTol,
         ratioError: null,
         ratioTolerance: clockRatioTol,
+        expectedProperTimeErrorS: null,
         properMinusErrorS: null,
         properMinusToleranceS: properMinusAbsTolS,
+        expectedProperMinusErrorS: null,
         betaOverAlphaMaxLimit: antiSrBetaOverAlphaMaxLimit,
         wallHorizonMarginMin: antiSrWallHorizonMarginMin,
         decompositionResidualToleranceS,
@@ -2974,36 +3395,53 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
   const baselineRow = rows.find((entry) => entry.profileId === baselineProfileId);
   let baselineCoordinateS: number | null =
     baselineRow && isFinitePositive(baselineRow.coordinateTimeS) ? baselineRow.coordinateTimeS : null;
+  let baselineProperS: number | null =
+    baselineRow && isFinitePositive(baselineRow.properTimeS) ? baselineRow.properTimeS : null;
+  let baselineProperMinusS: number | null =
+    baselineRow && baselineRow.properMinusCoordinateS != null ? baselineRow.properMinusCoordinateS : null;
   if (baselineCoordinateS == null) {
     const baselineMissionPathAlphaSweep = path.join(
       sweepRoot,
       baselineProfileId,
       "nhm2-mission-time-comparison-latest.json",
     );
-    const baselineMissionPathSelectedFamily = path.join(
-      repoRoot,
-      "artifacts",
-      "research",
-      "full-solve",
-      "selected-family",
-      "nhm2-shift-lapse",
-      "nhm2-mission-time-comparison-latest.json",
-    );
     const baselineMission =
-      readJsonMaybe<Record<string, any>>(baselineMissionPathAlphaSweep) ??
-      readJsonMaybe<Record<string, any>>(baselineMissionPathSelectedFamily);
+      readJsonMaybe<Record<string, any>>(baselineMissionPathAlphaSweep);
     baselineCoordinateS = toFinite(baselineMission?.warpCoordinateTimeEstimate?.seconds);
+    baselineProperS = toFinite(baselineMission?.warpProperTimeEstimate?.seconds);
+    baselineProperMinusS = toFinite(
+      baselineMission?.comparisonMetrics?.properMinusCoordinate_seconds,
+    );
   }
-  if (!isFinitePositive(baselineCoordinateS)) {
+  baselineCoordinateS ??= baselineAnchorDefaults.coordinateTimeS;
+  baselineProperS ??= baselineAnchorDefaults.properTimeS;
+  baselineProperMinusS ??= baselineAnchorDefaults.properMinusCoordinateS;
+  if (
+    !isFinitePositive(baselineCoordinateS) ||
+    !isFinitePositive(baselineProperS) ||
+    baselineProperMinusS == null
+  ) {
     throw new Error(
-      `Baseline coordinate time unavailable. Include ${baselineProfileId} in current run or provide existing baseline artifacts under ${path.join(
+      `Baseline clocking anchor unavailable. Include ${baselineProfileId} in current run or provide existing baseline artifacts under ${path.join(
         sweepRoot,
         baselineProfileId,
       )}`,
     );
   }
+  const baselineClocking: Nhm2ClockingBaseline = {
+    profileId: baselineProfileId,
+    centerlineAlpha: baselineAnchorDefaults.centerlineAlpha,
+    coordinateTimeS: baselineCoordinateS,
+    properTimeS: baselineProperS,
+    properMinusCoordinateS: baselineProperMinusS,
+  };
+  assertBaselineClockingCoherence(baselineClocking);
 
   for (const row of rows) {
+    row.expectedClockingTarget = deriveExpectedClockingTarget(
+      baselineClocking,
+      row.centerlineAlpha,
+    );
     const coordinate = row.coordinateTimeS;
     const proper = row.properTimeS;
     const properMinus = row.properMinusCoordinateS;
@@ -3024,19 +3462,29 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     const ratioMeasured =
       isFinitePositive(coordinate) && isFinitePositive(proper) ? proper / coordinate : null;
     const ratioError = ratioMeasured == null ? null : Math.abs(ratioMeasured - row.centerlineAlpha);
+    const expectedProperTimeS = row.expectedClockingTarget?.expectedProperTimeS ?? null;
+    const expectedProperTimeErrorS =
+      proper == null || expectedProperTimeS == null ? null : Math.abs(proper - expectedProperTimeS);
     const properMinusTarget =
       coordinate == null ? null : (row.centerlineAlpha - 1) * coordinate;
     const properMinusError =
       properMinus == null || properMinusTarget == null
         ? null
         : Math.abs(properMinus - properMinusTarget);
+    const expectedProperMinusTarget = row.expectedClockingTarget?.expectedProperMinusCoordinateS ?? null;
+    const expectedProperMinusErrorS =
+      properMinus == null || expectedProperMinusTarget == null
+        ? null
+        : Math.abs(properMinus - expectedProperMinusTarget);
     const properMinusTolS = Math.max(
       properMinusAbsTolS,
       Math.abs(properMinusTarget ?? 0) * properMinusRelTol,
     );
     row.gateDiagnostics.ratioError = ratioError;
+    row.gateDiagnostics.expectedProperTimeErrorS = expectedProperTimeErrorS;
     row.gateDiagnostics.properMinusErrorS = properMinusError;
     row.gateDiagnostics.properMinusToleranceS = properMinusTolS;
+    row.gateDiagnostics.expectedProperMinusErrorS = expectedProperMinusErrorS;
     row.gates.clockingConsistency =
       ratioError != null &&
       ratioError <= clockRatioTol &&
@@ -3106,6 +3554,16 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     row.claimClass = claimClass.claimClass;
     row.claimClassNote = claimClass.claimClassNote;
     row.runHealth = deriveRunHealth(row);
+    row.clockingTargetState = row.overallState === "pass" ? "expected_and_validated" : "expected_not_validated";
+    row.validationState =
+      row.runtimeBlockingReason != null
+        ? "runtime_blocked"
+        : row.overallState === "pass"
+          ? "evidence_viable"
+          : row.overallState === "pending_no_full_loop" ||
+              row.overallState === "pending_exploratory"
+            ? "planned"
+            : "gate_failed";
   }
 
   const claims: SweepClaimLedgerClaim[] = [];
@@ -3269,6 +3727,13 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     allSpecs: config.alphas,
     rows,
   });
+  const frontierDistance = buildNhm2FrontierDistanceSummary({
+    sweepName: config.sweepName,
+    specs: config.alphas,
+    rows,
+    baseline: baselineClocking,
+    ladder: ladderProgress,
+  });
 
   const summary = {
     sweepName: config.sweepName,
@@ -3286,11 +3751,18 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     researchLockChecksum,
     citationGateSummary,
     citationPolicy: config.claimLanguagePolicy ?? null,
+    expectedClockingModel: {
+      model: "tau_expected(alpha)=alpha*coordinate_time",
+      baselineAnchor: baselineClocking,
+      note:
+        "Expected clocking targets are derived from baseline anchor and are not validated outcomes until full-loop gates pass.",
+    },
     citations: effectiveCitations,
     firstFailureProfileId: failureSummary.firstFailureProfileId,
     strongestPassingProfileId: failureSummary.strongestPassingProfileId,
     dominantFailureGate: failureSummary.dominantFailureGate,
     ladder: ladderProgress,
+    frontierDistance,
     rows,
   };
   const claimPromotionReport: SweepClaimPromotionReport = {
@@ -3379,6 +3851,8 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
 
   const summaryPath = path.join(sweepRoot, "nhm2-lapse-alpha-sweep-latest.json");
   writeJsonAtomic(summaryPath, summary);
+  const frontierDistancePath = path.join(sweepRoot, "nhm2-frontier-distance-latest.json");
+  writeJsonAtomic(frontierDistancePath, frontierDistance);
   const claimsWithUncertainty = claims.map((claim) => {
     const row = claim.profileId
       ? rows.find((entry) => entry.profileId === claim.profileId) ?? null
@@ -3484,6 +3958,12 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
     "research",
     "nhm2-lapse-alpha-sweep-status-latest.md",
   );
+  const frontierReportPath = path.join(
+    repoRoot,
+    "docs",
+    "research",
+    "nhm2-frontier-distance-report.md",
+  );
   const rowLines = rows
     .map(
       (row) =>
@@ -3588,6 +4068,44 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
       return `- ${row.profileId}: category=${row.uncertainty.category}, blockers=${row.uncertainty.blockers.join(",") || "none"}, nextMeasurement=${row.uncertainty.nextMeasurement}. Literature references provide theoretical context only; this is not experimental validation of this profile. Note: ${row.uncertainty.note} Paper refs: ${resolvedRefs.join(", ") || "none"}.`;
     })
     .join("\n");
+  const frontierDistanceLines = frontierDistance.rows
+    .map(
+      (row) =>
+        `| ${row.profileId} | ${row.centerlineAlpha} | ${row.ladderGroup} | ${row.validationState} | ${row.expectedSavedDays.toFixed(3)} | ${row.expectedSubjectiveEfficiency.toFixed(6)} | ${row.distanceFromAnchor.expectedAdditionalSavedDaysVsAnchor.toFixed(3)} | ${row.blocker.blockerClass ?? "none"} | ${row.blocker.blockerStage ?? "none"} | ${row.blocker.nextAction ?? "none"} |`,
+    )
+    .join("\n");
+  const frontierReport = `# NHM2 Frontier Distance From 0p995
+
+- generatedAt: ${new Date().toISOString()}
+- anchorProfileId: ${baselineClocking.profileId}
+- anchorAlpha: ${baselineClocking.centerlineAlpha}
+- coordinateTimeS: ${baselineClocking.coordinateTimeS}
+- frontierDistanceJson: ${frontierDistancePath}
+- sweepSummaryJson: ${summaryPath}
+
+## Claim Boundary
+The 0p995 profile remains the confirmed full-pass anchor unless a newer full-loop artifact proves otherwise.
+Lower-alpha rows are expected clocking targets until their own NHM2 full-loop artifacts pass.
+The current strategy is to revalidate outward from 0p995, locate the lowest full-pass alpha, then bisect toward 0p7000.
+
+## Research Context
+- ADM / 3+1 lapse-shift formalism provides formalism context only: https://arxiv.org/abs/gr-qc/0405109 and https://arxiv.org/abs/gr-qc/0703035.
+- Alcubierre and Natario provide warp metric context only: https://arxiv.org/abs/gr-qc/0009013 and https://arxiv.org/abs/gr-qc/0110086.
+- Quantum inequality and energy-condition papers provide limitation and uncertainty language only: https://arxiv.org/abs/gr-qc/9702026 and https://arxiv.org/abs/2105.03079.
+- NHM2 repository artifacts are required for project-specific pass, validated, frontier, and full-loop claims.
+
+## Frontier Distance Table
+| profileId | alpha | ladderGroup | validationState | expectedSavedDays | expectedSubjectiveEfficiency | additionalSavedDaysVs0p995 | blockerClass | blockerStage | nextAction |
+|---|---:|---|---|---:|---:|---:|---|---|---|
+${frontierDistanceLines}
+
+## Interpretation
+- A row with \`validationState=evidence_viable\` has earned repository-measured evidence under the current full-loop gates.
+- A row with \`validationState=runtime_blocked\` has not reached the evidence question yet.
+- A row with \`validationState=planned\` or \`skipped_after_blocker\` remains an expected target only.
+- Literature references constrain wording and uncertainty; they do not validate an NHM2 profile.
+`;
+  fs.writeFileSync(frontierReportPath, `${frontierReport}\n`);
   const memo = `# NHM2 Lapse Alpha Sweep Status
 
 - generatedAt: ${new Date().toISOString()}
@@ -3596,6 +4114,8 @@ export const runNhm2LapseAlphaSweep = async (): Promise<void> => {
 - strongestPassingProfileId: ${failureSummary.strongestPassingProfileId ?? "null"}
 - dominantFailureGate: ${failureSummary.dominantFailureGate ?? "null"}
 - summaryJson: ${summaryPath}
+- frontierDistanceJson: ${frontierDistancePath}
+- frontierDistanceReport: ${frontierReportPath}
 - failuresJson: ${failuresPath}
 - claimsJson: ${claimsPath}
 - claimPromotionReportJson: ${promotionReportPath}

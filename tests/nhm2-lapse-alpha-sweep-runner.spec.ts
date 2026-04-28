@@ -12,8 +12,13 @@ import {
   deriveEvidenceSufficiency,
   deriveResearchConfidenceTier,
   deriveEvidenceLedgerReason,
+  deriveExpectedClockingTarget,
   deriveSweepFailureSummary,
+  assertBaselineClockingCoherence,
   inferSelectedTransportRuntimeReason,
+  getNextActionForRuntimeReason,
+  classifyFrontierBlocker,
+  classifyFrontierLadderGroup,
   getFirstBlockingReason,
   isStalledByHeartbeat,
   normalizeFullLoopState,
@@ -787,6 +792,16 @@ describe("nhm2 lapse alpha sweep runner helpers", () => {
     expect(inferSelectedTransportRuntimeReason("selected_transport_profile_mismatch:baz")).toBe(
       "selected_transport_profile_mismatch",
     );
+    expect(inferSelectedTransportRuntimeReason("selected_transport_stale_artifact:old")).toBe(
+      "selected_transport_stale_artifact",
+    );
+  });
+
+  it("maps runtime blocker classes to concrete next actions", () => {
+    expect(getNextActionForRuntimeReason("selected_transport_missing_artifact")).toMatch(/artifact/i);
+    expect(getNextActionForRuntimeReason("selected_transport_invalid_json")).toMatch(/json/i);
+    expect(getNextActionForRuntimeReason("selected_transport_profile_mismatch")).toMatch(/profile/i);
+    expect(getNextActionForRuntimeReason("selected_transport_stale_artifact")).toMatch(/stale/i);
   });
 
   it("enforces selected-transport-only env contract", () => {
@@ -807,6 +822,102 @@ describe("nhm2 lapse alpha sweep runner helpers", () => {
         NHM2_CENTERLINE_ALPHA: "0.7",
         NHM2_CENTERLINE_DTAU_DT: "0.7",
         NHM2_OUTPUT_DIR: "out",
+      }),
+    ).not.toThrow();
+  });
+
+  it("derives expected clocking target from baseline anchor", () => {
+    const target = deriveExpectedClockingTarget(
+      {
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        centerlineAlpha: 0.995,
+        coordinateTimeS: 137755965.9171795,
+        properTimeS: 137067186.0875936,
+        properMinusCoordinateS: -688779.8295859098,
+      },
+      0.7,
+    );
+    expect(target.expectedProperToCoordinateRatio).toBe(0.7);
+    expect(target.expectedSubjectiveEfficiency).toBeCloseTo(1.42857142857, 9);
+    expect(target.expectedSavedDays).toBeCloseTo(478.3193261013, 6);
+  });
+
+  it("derives 0p5000 as an expected 2x target, not validated evidence", () => {
+    const target = deriveExpectedClockingTarget(
+      {
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        centerlineAlpha: 0.995,
+        coordinateTimeS: 137755965.9171795,
+        properTimeS: 137067186.0875936,
+        properMinusCoordinateS: -688779.8295859098,
+      },
+      0.5,
+    );
+    expect(target.expectedSubjectiveEfficiency).toBe(2);
+    expect(target.expectedProperTimeS).toBeCloseTo(68877982.95858975, 6);
+    expect(target.expectedSavedDays).toBeCloseTo(797.1988768355295, 6);
+  });
+
+  it("groups the alpha ladder into revalidation, bisection, and deep exploratory regions", () => {
+    expect(classifyFrontierLadderGroup({ alpha: 0.995, tag: "0p995" })).toBe(
+      "confirmed_revalidation_ladder",
+    );
+    expect(classifyFrontierLadderGroup({ alpha: 0.705, tag: "0p7050" })).toBe(
+      "frontier_bisection_ladder",
+    );
+    expect(classifyFrontierLadderGroup({ alpha: 0.65, tag: "0p6500" })).toBe(
+      "deep_exploratory_ladder",
+    );
+  });
+
+  it("classifies selected transport runtime blockers before physics gates", () => {
+    expect(
+      classifyFrontierBlocker({
+        runtimeBlockingReason: "selected_transport_timeout",
+        runHealth: "failed_timeout",
+        fullLoopStateRaw: "unavailable",
+        fullLoopStateNormalized: "fail",
+        gates: {
+          baselineInvariance: "fail",
+          clockingConsistency: "fail",
+          antiSrSafety: "fail",
+          decompositionConsistency: "fail",
+          invariantGate: "fail",
+          fullLoopAudit: "fail",
+          evidenceLedger: "fail",
+          promotionEligible: "fail",
+        },
+      }),
+    ).toBe("selected_transport_runtime");
+
+    expect(
+      classifyFrontierBlocker({
+        runtimeBlockingReason: null,
+        runHealth: "healthy_fresh",
+        fullLoopStateRaw: "pass",
+        fullLoopStateNormalized: "pass",
+        gates: {
+          baselineInvariance: "pass",
+          clockingConsistency: "fail",
+          antiSrSafety: "pass",
+          decompositionConsistency: "pass",
+          invariantGate: "pass",
+          fullLoopAudit: "pass",
+          evidenceLedger: "pass",
+          promotionEligible: "fail",
+        },
+      }),
+    ).toBe("clocking_mismatch");
+  });
+
+  it("accepts coherent baseline clocking anchor", () => {
+    expect(() =>
+      assertBaselineClockingCoherence({
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        centerlineAlpha: 0.995,
+        coordinateTimeS: 137755965.9171795,
+        properTimeS: 137067186.0875936,
+        properMinusCoordinateS: -688779.8295859098,
       }),
     ).not.toThrow();
   });

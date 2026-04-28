@@ -1,0 +1,10 @@
+import express from "express";
+import request from "supertest";
+import { planRouter } from "./server/routes/agi.plan";
+const app = express();
+app.use(express.json());
+app.use("/api/agi", planRouter);
+app.use((err:any, req:any, res:any, next:any) => { console.error("ERR", err?.stack || err); res.status(500).json({ error: String(err?.message || err), stack: err?.stack }); });
+const activePath = "/docs/audits/research/halobank-warp-gr-foundations-bridge-2026-03-24.md";
+const response = await request(app).post("/api/agi/ask/turn").send({ question: "Now summarize what changed in my workspace in two bullets.", mode: "read", sessionId: `debug-e21-${Date.now()}`, workspace_context_snapshot: { activePanel: "workstation-notes", activeDocPath: activePath, activeNoteTitle: "artifact handoff browser e21", hasDocContext: true, hasNoteContext: true, lastWorkspaceAction: { panel_id: "workstation-notes", action_id: "append_to_note", args: { title: "artifact handoff browser e21" } } } });
+console.log(response.status, JSON.stringify(response.body, null, 2).slice(0, 4000));

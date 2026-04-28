@@ -179,6 +179,19 @@
         "repo_plus_literature",
         "literature_only_nonproof"
       ]
+    },
+    {
+      "id": "adm-2004-grqc0405109",
+      "title": "The Dynamics of General Relativity",
+      "url": "https://arxiv.org/abs/gr-qc/0405109",
+      "sourceStability": "preprint",
+      "evidenceRole": "theory_context",
+      "year": 2004,
+      "publisherType": "review",
+      "allowedClaimClasses": [
+        "repo_plus_literature",
+        "literature_only_nonproof"
+      ]
     }
   ],
   "claimClassRequiredPaperIds": {
@@ -204,6 +217,7 @@
     "fewster-roman-2003-prd-doi",
     "santiago-schuster-visser-2021-210503079",
     "natario-closer-look-2024-springer",
-    "gourgoulhon-2007-3plus1"
+    "gourgoulhon-2007-3plus1",
+    "adm-2004-grqc0405109"
   ]
 }

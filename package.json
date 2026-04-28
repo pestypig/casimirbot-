@@ -283,7 +283,8 @@
     "render:spacetime-grid-overlay": "tsx scripts/render-spacetime-grid-overlay.ts",
     "hull:mis:prepare": "npm run hull:mis:clone && npm run hull:mis:install-bridge",
     "hull:mis:rollout": "tsx scripts/hull-mis-rollout.ts",
-    "hull:export:smoke": "tsx scripts/hull-export-dataset-smoke.ts"
+    "hull:export:smoke": "tsx scripts/hull-export-dataset-smoke.ts",
+    "warp:full-solve:nhm2-shift-lapse:selected-transport-only": "tsx scripts/research/run-nhm2-lapse-alpha-sweep.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

@@ -156,6 +156,18 @@
                                          ]
                     },
                     {
+                        "id":  "adm-2004-grqc0405109",
+                        "url":  "https://arxiv.org/abs/gr-qc/0405109",
+                        "accessedOn":  "2026-04-28",
+                        "publisherType":  "review",
+                        "year":  2004,
+                        "evidenceRole":  "theory_context",
+                        "claimClasses":  [
+                                             "repo_plus_literature",
+                                             "literature_only_nonproof"
+                                         ]
+                    },
+                    {
                         "id":  "gourgoulhon-2007-3plus1",
                         "url":  "https://arxiv.org/abs/gr-qc/0703035",
                         "accessedOn":  "2026-04-26",

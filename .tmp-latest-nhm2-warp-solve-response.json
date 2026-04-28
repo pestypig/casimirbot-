@@ -1,0 +1,1772 @@
+{
+    "ok":  true,
+    "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+    "answer":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+    "mode":  "act",
+    "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+    "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+    "dispatch":  {
+                     "dispatch_hint":  true,
+                     "reason":  "dispatch:act"
+                 },
+    "route_reason_code":  "dispatch:act",
+    "needs_confirmation":  false,
+    "pending_resolution_attempted":  false,
+    "pending_resolution_applied":  false,
+    "pending_resolution_reason":  null,
+    "pending_status_before":  null,
+    "pending_status_after":  null,
+    "pending_transition_reason":  null,
+    "pending_transition_trace":  [
+
+                                 ],
+    "pending_request_id":  null,
+    "pending_intercepted_turn":  false,
+    "pending_interception_reason":  null,
+    "brief":  {
+                  "text":  "Opened latest NHM2 warp solve document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                  "source":  "none"
+              },
+    "planner_contract":  {
+                             "enabled":  true,
+                             "source":  "deterministic",
+                             "restate":  "Plan: run the requested workspace action now, then complete the turn for \"go to the latest NHM2 warp solve doc\".",
+                             "dispatch_policy":  "workspace_only",
+                             "plan_items":  [
+                                                {
+                                                    "id":  "workspace_action",
+                                                    "lane":  "workspace",
+                                                    "status":  "planned",
+                                                    "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                    "action":  {
+                                                                   "panel_id":  "docs-viewer",
+                                                                   "action_id":  "open_latest_doc_by_topic",
+                                                                   "args":  {
+                                                                                "topic":  "NHM2 warp solve",
+                                                                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                            }
+                                                               }
+                                                }
+                                            ],
+                             "plan_steps":  [
+                                                {
+                                                    "id":  "workspace_action",
+                                                    "lane":  "workspace",
+                                                    "status":  "completed",
+                                                    "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                    "action":  {
+                                                                   "panel_id":  "docs-viewer",
+                                                                   "action_id":  "open_latest_doc_by_topic",
+                                                                   "args":  {
+                                                                                "topic":  "NHM2 warp solve",
+                                                                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                            }
+                                                               },
+                                                    "reason":  null
+                                                }
+                                            ],
+                             "executed_step_count":  1,
+                             "failed_step_count":  0,
+                             "suppressed_step_count":  0,
+                             "action_candidates_count":  26,
+                             "selected_action":  {
+                                                     "panel_id":  "docs-viewer",
+                                                     "action_id":  "open_latest_doc_by_topic",
+                                                     "args":  {
+                                                                  "topic":  "NHM2 warp solve",
+                                                                  "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                              }
+                                                 },
+                             "selection_source":  "deterministic",
+                             "selection_valid":  true,
+                             "selection_fail_reason":  "none",
+                             "selection_missing_required_args":  [
+
+                                                                 ],
+                             "planner_repair_attempted":  false,
+                             "planner_repair_applied":  false,
+                             "planner_repair_reason":  null,
+                             "pending_resolution_attempted":  false,
+                             "pending_resolution_applied":  false,
+                             "pending_resolution_reason":  null,
+                             "single_terminal_required":  true
+                         },
+    "execution_trace":  [
+                            {
+                                "id":  "workspace_action",
+                                "lane":  "workspace",
+                                "status":  "completed",
+                                "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                "action":  {
+                                               "panel_id":  "docs-viewer",
+                                               "action_id":  "open_latest_doc_by_topic",
+                                               "args":  {
+                                                            "topic":  "NHM2 warp solve",
+                                                            "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                        }
+                                           },
+                                "reason":  null
+                            }
+                        ],
+    "step_results":  [
+                         {
+                             "step_id":  "workspace_action",
+                             "lane":  "workspace",
+                             "status":  "completed",
+                             "artifact":  {
+                                              "panel_id":  "docs-viewer",
+                                              "action_id":  "open_latest_doc_by_topic",
+                                              "args":  {
+                                                           "topic":  "NHM2 warp solve",
+                                                           "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                       }
+                                          },
+                             "consumed_artifacts":  [
+
+                                                    ],
+                             "produced_artifacts":  [
+                                                        "workspace_context",
+                                                        "doc_context",
+                                                        "active_doc_path"
+                                                    ],
+                             "blocked_missing_artifacts":  [
+
+                                                           ],
+                             "error_code":  null,
+                             "contract_pass":  true,
+                             "contract_fail_reason":  null,
+                             "expected_artifacts":  [
+                                                        "workspace_context",
+                                                        "doc_context",
+                                                        "active_doc_path"
+                                                    ],
+                             "actual_artifacts":  [
+                                                      "workspace_context",
+                                                      "doc_context",
+                                                      "active_doc_path"
+                                                  ],
+                             "result_artifact":  null
+                         }
+                     ],
+    "execution_lifecycle":  [
+                                {
+                                    "step_id":  "workspace_action",
+                                    "lane":  "workspace",
+                                    "event":  "started"
+                                },
+                                {
+                                    "step_id":  "workspace_action",
+                                    "lane":  "workspace",
+                                    "event":  "completed"
+                                }
+                            ],
+    "capability_selection_trace":  [
+
+                                   ],
+    "invariant_violations":  [
+
+                             ],
+    "pending_server_request":  null,
+    "workspace_context_mode":  "attached",
+    "workspace_context_snapshot":  {
+                                       "sessionId":  "live-eval-latest-nhm2-warp-solve",
+                                       "activePanel":  "docs-viewer",
+                                       "activeDocPath":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                       "source":  "workstation_action",
+                                       "activeNoteId":  null,
+                                       "activeNoteTitle":  null,
+                                       "lastCreatedNoteId":  null,
+                                       "lastCreatedNoteTitle":  null,
+                                       "hasDocContext":  true,
+                                       "docContextValid":  true,
+                                       "docContextPath":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                       "docContextSource":  "workstation_action",
+                                       "docContextFailureReason":  null,
+                                       "hasNoteContext":  false,
+                                       "hasClipboardContext":  false,
+                                       "lastWorkspaceAction":  {
+                                                                   "panel_id":  "docs-viewer",
+                                                                   "action_id":  "open_latest_doc_by_topic",
+                                                                   "args":  {
+                                                                                "topic":  "NHM2 warp solve",
+                                                                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                            }
+                                                               },
+                                       "workspaceActionLedger":  [
+                                                                     {
+                                                                         "turn_id":  "live-eval-latest-nhm2-warp-solve",
+                                                                         "trace_id":  null,
+                                                                         "step_id":  "workspace_action",
+                                                                         "panel_id":  "docs-viewer",
+                                                                         "action_id":  "open_latest_doc_by_topic",
+                                                                         "args":  {
+                                                                                      "topic":  "NHM2 warp solve",
+                                                                                      "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                  },
+                                                                         "status":  "completed",
+                                                                         "at_ms":  1777407067831
+                                                                     }
+                                                                 ],
+                                       "lastUpdatedAtMs":  1777407067831,
+                                       "preservationReason":  "updated_by_context_mutating_action"
+                                   },
+    "turn_contract":  {
+                          "lane":  "conversation",
+                          "terminal_kind":  "conversation",
+                          "route_reason_code":  "dispatch:act",
+                          "dispatch_hint":  true,
+                          "single_terminal_required":  true,
+                          "terminal_text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                          "terminal_source":  "terminal_artifact"
+                      },
+    "final_status":  "final_answer",
+    "turn_loop":  {
+                      "mode":  "general_v1",
+                      "planner_first":  true,
+                      "shadow_compare":  false
+                  },
+    "sessionId":  "live-eval-latest-nhm2-warp-solve",
+    "input_budget_applied":  false,
+    "input_chars":  36,
+    "input_max_chars":  4000,
+    "input_chunk_count":  0,
+    "input_chunk_strategy":  "none",
+    "open_doc_goal_satisfied":  true,
+    "open_doc_selected_path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+    "open_doc_selection_reason":  null,
+    "open_doc_terminal_contract_pass":  true,
+    "open_doc_terminal_contract_fail_reason":  null,
+    "final_composer_used":  true,
+    "final_composer_source":  "active_doc_path",
+    "final_composer_consumed_artifacts":  [
+                                              "doc_search_results",
+                                              "active_doc_path"
+                                          ],
+    "final_composer_contract_pass":  true,
+    "final_composer_fail_reason":  null,
+    "quality_contract_intent_family":  "other",
+    "quality_contract_pass":  true,
+    "quality_contract_fail_reason":  null,
+    "final_answer_contract_family":  "general",
+    "final_answer_contract_pass":  true,
+    "final_answer_contract_fail_reason":  null,
+    "final_answer_contract_repair_attempted":  false,
+    "final_answer_contract_repair_applied":  false,
+    "assistant_answer":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+    "agent_loop_summary":  "Policy: workspace_only | Route: dispatch:act | Tool selected: docs-viewer.open_latest_doc_by_topic",
+    "latest_result_artifact":  {
+                                   "kind":  "turn_final_text",
+                                   "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                   "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                   "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                   "created_at_ms":  1777407067835
+                               },
+    "terminal_artifact":  {
+                              "kind":  "final_answer",
+                              "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                              "source_step_id":  "workspace_action",
+                              "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                              "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                              "created_at_ms":  1777407067836
+                          },
+    "job_ready_links":  [
+                            {
+                                "id":  "active-doc",
+                                "label":  "Open active doc",
+                                "type":  "open_doc",
+                                "panel_id":  "docs-viewer",
+                                "action_id":  "open_doc",
+                                "args":  {
+                                             "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                         },
+                                "source":  "workspace_context_snapshot",
+                                "source_step_id":  null,
+                                "source_artifact_kind":  "active_doc_path",
+                                "source_action_id":  "workspace_context_snapshot",
+                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                            },
+                            {
+                                "id":  "copy-latest-result",
+                                "label":  "Copy final answer",
+                                "type":  "copy_result",
+                                "panel_id":  "workstation-clipboard-history",
+                                "action_id":  "write_clipboard",
+                                "args":  {
+                                             "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                             "source":  "helix_final_answer"
+                                         },
+                                "source":  "latest_result_artifact",
+                                "source_step_id":  null,
+                                "source_artifact_kind":  "turn_final_text",
+                                "source_action_id":  "write_clipboard"
+                            }
+                        ],
+    "job_ready_links_source":  "current_turn_artifacts",
+    "job_ready_links_suppressed":  [
+
+                                   ],
+    "fallback_applied":  true,
+    "terminal_contract_version":  "v1",
+    "async_executor_used":  true,
+    "async_step_count":  1,
+    "async_total_duration_ms":  4039,
+    "async_step_durations":  [
+                                 {
+                                     "step_id":  "workspace_action",
+                                     "duration_ms":  4039,
+                                     "awaited_tool":  "docs-viewer.open_latest_doc_by_topic",
+                                     "started_at_ms":  1777407062578,
+                                     "completed_at_ms":  1777407066617
+                                 }
+                             ],
+    "model_decision_llm_used":  true,
+    "model_decision_count":  2,
+    "model_decision_audits":  [
+                                  {
+                                      "step_id":  "workspace_action",
+                                      "phase":  "continuation",
+                                      "used_llm":  true,
+                                      "decision_source":  "model",
+                                      "action":  "finalize",
+                                      "summary":  "Successfully opened the latest NHM2 warp solve document.",
+                                      "next_capability":  null,
+                                      "next_args":  {
+
+                                                    },
+                                      "required_artifacts":  [
+
+                                                             ],
+                                      "error_code":  null,
+                                      "duration_ms":  2162,
+                                      "satisfied_artifacts":  [
+                                                                  "active_doc_path",
+                                                                  "doc_context",
+                                                                  "workspace_context"
+                                                              ],
+                                      "missing_artifacts":  [
+
+                                                            ]
+                                  },
+                                  {
+                                      "step_id":  null,
+                                      "phase":  "composer",
+                                      "used_llm":  true,
+                                      "decision_source":  "model",
+                                      "action":  "finalize",
+                                      "summary":  "Successfully opened the latest NHM2 warp solve document.",
+                                      "next_capability":  null,
+                                      "next_args":  {
+
+                                                    },
+                                      "required_artifacts":  [
+
+                                                             ],
+                                      "error_code":  null,
+                                      "duration_ms":  1873,
+                                      "satisfied_artifacts":  [
+                                                                  "active_doc_path",
+                                                                  "doc_context",
+                                                                  "workspace_context"
+                                                              ],
+                                      "missing_artifacts":  [
+
+                                                            ]
+                                  }
+                              ],
+    "general_controller_enabled":  true,
+    "general_controller_decisions":  [
+                                         {
+                                             "decision":  "finalize",
+                                             "source":  "deterministic",
+                                             "reason":  "all_required_artifacts_satisfied",
+                                             "selected_capability":  null,
+                                             "missing_required_artifacts":  [
+
+                                                                            ],
+                                             "satisfied_artifacts":  [
+                                                                         "workspace_context",
+                                                                         "doc_context",
+                                                                         "active_doc_path"
+                                                                     ],
+                                             "error_code":  null
+                                         },
+                                         {
+                                             "decision":  "finalize",
+                                             "source":  "deterministic",
+                                             "reason":  "all_required_artifacts_satisfied",
+                                             "selected_capability":  null,
+                                             "missing_required_artifacts":  [
+
+                                                                            ],
+                                             "satisfied_artifacts":  [
+                                                                         "workspace_context",
+                                                                         "doc_context",
+                                                                         "active_doc_path"
+                                                                     ],
+                                             "error_code":  null
+                                         }
+                                     ],
+    "general_controller_decision_count":  2,
+    "general_controller_final_decision":  "finalize",
+    "general_controller_stop_reason":  "all_required_artifacts_satisfied",
+    "turn_runtime":  {
+                         "status":  "completed",
+                         "open_subgoals":  [
+
+                                           ],
+                         "completed_subgoals":  [
+                                                    "workspace_action"
+                                                ],
+                         "failed_subgoals":  [
+
+                                             ],
+                         "observation_count":  1,
+                         "observations":  [
+                                              {
+                                                  "step_id":  "workspace_action",
+                                                  "lane":  "workspace",
+                                                  "status":  "completed",
+                                                  "artifact":  {
+                                                                   "panel_id":  "docs-viewer",
+                                                                   "action_id":  "open_latest_doc_by_topic",
+                                                                   "args":  {
+                                                                                "topic":  "NHM2 warp solve",
+                                                                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                            }
+                                                               },
+                                                  "result_artifact":  null,
+                                                  "error_code":  null,
+                                                  "contract_pass":  true,
+                                                  "contract_fail_reason":  null,
+                                                  "expected_artifacts":  [
+                                                                             "workspace_context",
+                                                                             "doc_context",
+                                                                             "active_doc_path"
+                                                                         ],
+                                                  "actual_artifacts":  [
+                                                                           "workspace_context",
+                                                                           "doc_context",
+                                                                           "active_doc_path"
+                                                                       ]
+                                              }
+                                          ],
+                         "artifact_keys":  [
+                                               "active_doc_path",
+                                               "doc_context",
+                                               "workspace_context"
+                                           ],
+                         "required_artifacts":  [
+                                                    "workspace_context",
+                                                    "doc_context",
+                                                    "active_doc_path"
+                                                ],
+                         "satisfied_artifacts":  [
+                                                     "workspace_context",
+                                                     "doc_context",
+                                                     "active_doc_path"
+                                                 ],
+                         "missing_required_artifacts":  [
+
+                                                        ],
+                         "decision_count":  1,
+                         "last_decision":  {
+                                               "kind":  "final_answer",
+                                               "reason":  "all_subgoals_observed"
+                                           },
+                         "appended_step_count":  0,
+                         "appended_steps":  [
+
+                                            ],
+                         "executed_appended_step_count":  0,
+                         "runtime_loop_iteration_count":  1,
+                         "runtime_loop_stop_reason":  "final_answer",
+                         "capability_selection_trace":  [
+
+                                                        ],
+                         "terminal":  {
+                                          "kind":  "final_answer",
+                                          "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                          "source":  "terminal_artifact"
+                                      },
+                         "async_executor_used":  true,
+                         "async_step_count":  1,
+                         "async_total_duration_ms":  4039,
+                         "async_step_durations":  [
+                                                      {
+                                                          "step_id":  "workspace_action",
+                                                          "duration_ms":  4039,
+                                                          "awaited_tool":  "docs-viewer.open_latest_doc_by_topic",
+                                                          "started_at_ms":  1777407062578,
+                                                          "completed_at_ms":  1777407066617
+                                                      }
+                                                  ],
+                         "model_decision_llm_used":  true,
+                         "model_decision_count":  2,
+                         "model_decision_audits":  [
+                                                       {
+                                                           "step_id":  "workspace_action",
+                                                           "phase":  "continuation",
+                                                           "used_llm":  true,
+                                                           "decision_source":  "model",
+                                                           "action":  "finalize",
+                                                           "summary":  "Successfully opened the latest NHM2 warp solve document.",
+                                                           "next_capability":  null,
+                                                           "next_args":  {
+
+                                                                         },
+                                                           "required_artifacts":  [
+
+                                                                                  ],
+                                                           "error_code":  null,
+                                                           "duration_ms":  2162,
+                                                           "satisfied_artifacts":  [
+                                                                                       "active_doc_path",
+                                                                                       "doc_context",
+                                                                                       "workspace_context"
+                                                                                   ],
+                                                           "missing_artifacts":  [
+
+                                                                                 ]
+                                                       },
+                                                       {
+                                                           "step_id":  null,
+                                                           "phase":  "composer",
+                                                           "used_llm":  true,
+                                                           "decision_source":  "model",
+                                                           "action":  "finalize",
+                                                           "summary":  "Successfully opened the latest NHM2 warp solve document.",
+                                                           "next_capability":  null,
+                                                           "next_args":  {
+
+                                                                         },
+                                                           "required_artifacts":  [
+
+                                                                                  ],
+                                                           "error_code":  null,
+                                                           "duration_ms":  1873,
+                                                           "satisfied_artifacts":  [
+                                                                                       "active_doc_path",
+                                                                                       "doc_context",
+                                                                                       "workspace_context"
+                                                                                   ],
+                                                           "missing_artifacts":  [
+
+                                                                                 ]
+                                                       }
+                                                   ],
+                         "general_controller_enabled":  true,
+                         "general_controller_decision_count":  2,
+                         "general_controller_final_decision":  "finalize",
+                         "general_controller_stop_reason":  "all_required_artifacts_satisfied"
+                     },
+    "turn_events":  [
+                        {
+                            "type":  "turn_started",
+                            "at_ms":  1777407067837,
+                            "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                            "goal":  "go to the latest NHM2 warp solve doc"
+                        },
+                        {
+                            "type":  "model_decision_started",
+                            "at_ms":  1777407067837,
+                            "step_id":  null,
+                            "phase":  "planner",
+                            "prompt":  "Restate the user goal and choose the first tool or model step."
+                        },
+                        {
+                            "type":  "model_decision_completed",
+                            "at_ms":  1777407067837,
+                            "step_id":  null,
+                            "phase":  "planner",
+                            "summary":  "Selected 1 reconstructed step."
+                        },
+                        {
+                            "type":  "plan_delta",
+                            "at_ms":  1777407067837,
+                            "step":  {
+                                         "id":  "workspace_action",
+                                         "lane":  "workspace",
+                                         "status":  "planned",
+                                         "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                         "action":  {
+                                                        "panel_id":  "docs-viewer",
+                                                        "action_id":  "open_latest_doc_by_topic",
+                                                        "args":  {
+                                                                     "topic":  "NHM2 warp solve",
+                                                                     "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                 }
+                                                    }
+                                     },
+                            "reason":  "payload_reconstruction"
+                        },
+                        {
+                            "type":  "item_started",
+                            "at_ms":  1777407067837,
+                            "step_id":  "workspace_action",
+                            "lane":  "workspace",
+                            "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\"."
+                        },
+                        {
+                            "type":  "tool_result",
+                            "at_ms":  1777407067837,
+                            "step_id":  "workspace_action",
+                            "lane":  "workspace",
+                            "status":  "completed",
+                            "actual_artifacts":  [
+                                                     "workspace_context",
+                                                     "doc_context",
+                                                     "active_doc_path"
+                                                 ],
+                            "expected_artifacts":  [
+                                                       "workspace_context",
+                                                       "doc_context",
+                                                       "active_doc_path"
+                                                   ],
+                            "contract_pass":  true,
+                            "result_artifact":  null
+                        },
+                        {
+                            "type":  "observation_recorded",
+                            "at_ms":  1777407067837,
+                            "observation":  {
+                                                "step_id":  "workspace_action",
+                                                "lane":  "workspace",
+                                                "status":  "completed",
+                                                "artifact":  {
+                                                                 "panel_id":  "docs-viewer",
+                                                                 "action_id":  "open_latest_doc_by_topic",
+                                                                 "args":  {
+                                                                              "topic":  "NHM2 warp solve",
+                                                                              "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                          }
+                                                             },
+                                                "result_artifact":  null,
+                                                "error_code":  null,
+                                                "contract_pass":  true,
+                                                "contract_fail_reason":  null,
+                                                "expected_artifacts":  [
+                                                                           "workspace_context",
+                                                                           "doc_context",
+                                                                           "active_doc_path"
+                                                                       ],
+                                                "actual_artifacts":  [
+                                                                         "workspace_context",
+                                                                         "doc_context",
+                                                                         "active_doc_path"
+                                                                     ]
+                                            }
+                        },
+                        {
+                            "type":  "item_completed",
+                            "at_ms":  1777407067837,
+                            "step_id":  "workspace_action",
+                            "lane":  "workspace",
+                            "status":  "completed"
+                        },
+                        {
+                            "type":  "model_decision_started",
+                            "at_ms":  1777407067837,
+                            "step_id":  "workspace_action",
+                            "phase":  "continuation",
+                            "prompt":  "Review the observation and decide whether to continue, ask the user, fail, or finalize."
+                        },
+                        {
+                            "type":  "model_decision_completed",
+                            "at_ms":  1777407067837,
+                            "step_id":  "workspace_action",
+                            "phase":  "continuation",
+                            "summary":  "Finalize from observed artifacts."
+                        },
+                        {
+                            "type":  "decision_delta",
+                            "at_ms":  1777407067837,
+                            "decision":  {
+                                             "kind":  "final_answer",
+                                             "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                             "reason":  "step_observed"
+                                         }
+                        },
+                        {
+                            "type":  "terminal_answer",
+                            "at_ms":  1777407067837,
+                            "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                            "status":  "final_answer"
+                        },
+                        {
+                            "type":  "turn_completed",
+                            "at_ms":  1777407067837,
+                            "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                            "status":  "completed"
+                        }
+                    ],
+    "runtime_event_count":  13,
+    "runtime_loop_mode":  "async_incremental",
+    "turn_transcript_events":  [
+                                   {
+                                       "id":  "transcript:question",
+                                       "at_ms":  1777407067837,
+                                       "role":  "user",
+                                       "type":  "question",
+                                       "text":  "go to the latest NHM2 warp solve doc",
+                                       "source_event_type":  "question",
+                                       "event_source":  "runtime"
+                                   },
+                                   {
+                                       "id":  "transcript:0:turn_started",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "turn_started",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "work_delta",
+                                       "text":  "Understanding the request and preparing a plan.",
+                                       "detail":  "go to the latest NHM2 warp solve doc",
+                                       "status":  "running"
+                                   },
+                                   {
+                                       "id":  "transcript:1:model_decision_started",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "model_decision_started",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "model_decision",
+                                       "step_id":  null,
+                                       "status":  "running",
+                                       "text":  "Thinking: Restate the user goal and choose the first tool or model step.",
+                                       "detail":  "planner"
+                                   },
+                                   {
+                                       "id":  "transcript:2:model_decision_completed",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "model_decision_completed",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "model_decision",
+                                       "step_id":  null,
+                                       "status":  "completed",
+                                       "text":  "Decision: Selected 1 reconstructed step.",
+                                       "detail":  "planner"
+                                   },
+                                   {
+                                       "id":  "transcript:3:plan_delta",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "plan_delta",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "plan",
+                                       "step_id":  "workspace_action",
+                                       "lane":  "workspace",
+                                       "status":  "planned",
+                                       "text":  "Plan: Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                       "detail":  "payload_reconstruction"
+                                   },
+                                   {
+                                       "id":  "transcript:4:item_started",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "item_started",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "step_started",
+                                       "step_id":  "workspace_action",
+                                       "lane":  "workspace",
+                                       "status":  "running",
+                                       "text":  "Working: Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\"."
+                                   },
+                                   {
+                                       "id":  "transcript:5:tool_result",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "tool_result",
+                                       "event_source":  "runtime",
+                                       "role":  "tool",
+                                       "type":  "tool_result",
+                                       "step_id":  "workspace_action",
+                                       "lane":  "workspace",
+                                       "status":  "completed",
+                                       "text":  "Observed artifacts: workspace_context, doc_context, active_doc_path",
+                                       "detail":  "artifact contract satisfied"
+                                   },
+                                   {
+                                       "id":  "transcript:6:observation_recorded",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "observation_recorded",
+                                       "event_source":  "runtime",
+                                       "role":  "tool",
+                                       "type":  "observation",
+                                       "step_id":  "workspace_action",
+                                       "lane":  "workspace",
+                                       "status":  "completed",
+                                       "text":  "Recorded observation: workspace_context, doc_context, active_doc_path",
+                                       "detail":  null
+                                   },
+                                   {
+                                       "id":  "transcript:7:item_completed",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "item_completed",
+                                       "event_source":  "runtime",
+                                       "role":  "system",
+                                       "type":  "turn_completed",
+                                       "step_id":  "workspace_action",
+                                       "lane":  "workspace",
+                                       "status":  "completed",
+                                       "text":  "Completed step workspace_action."
+                                   },
+                                   {
+                                       "id":  "transcript:8:model_decision_started",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "model_decision_started",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "model_decision",
+                                       "step_id":  "workspace_action",
+                                       "status":  "running",
+                                       "text":  "Thinking: Review the observation and decide whether to continue, ask the user, fail, or finalize.",
+                                       "detail":  "continuation"
+                                   },
+                                   {
+                                       "id":  "transcript:9:model_decision_completed",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "model_decision_completed",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "model_decision",
+                                       "step_id":  "workspace_action",
+                                       "status":  "completed",
+                                       "text":  "Decision: Finalize from observed artifacts.",
+                                       "detail":  "continuation"
+                                   },
+                                   {
+                                       "id":  "transcript:10:decision_delta",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "decision_delta",
+                                       "event_source":  "runtime",
+                                       "role":  "agent",
+                                       "type":  "decision",
+                                       "status":  "final_answer",
+                                       "text":  "Ready to answer from the completed observations.",
+                                       "detail":  "step_observed"
+                                   },
+                                   {
+                                       "id":  "transcript:11:terminal_answer",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "terminal_answer",
+                                       "event_source":  "runtime",
+                                       "role":  "final",
+                                       "type":  "final_answer",
+                                       "status":  "final_answer",
+                                       "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                   },
+                                   {
+                                       "id":  "transcript:12:turn_completed",
+                                       "at_ms":  1777407067837,
+                                       "source_event_type":  "turn_completed",
+                                       "event_source":  "runtime",
+                                       "role":  "system",
+                                       "type":  "turn_completed",
+                                       "status":  "completed",
+                                       "text":  "Turn completed with status: completed."
+                                   }
+                               ],
+    "turn_transcript_event_count":  14,
+    "turn_transcript_source":  "runtime",
+    "turn_truth_table":  {
+                             "schema":  "helix.ask.turn_truth_table.v1",
+                             "question":  "go to the latest NHM2 warp solve doc",
+                             "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                             "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                             "route_reason_code":  "dispatch:act",
+                             "dispatch_policy":  "workspace_only",
+                             "selected_tool":  {
+                                                   "panel_id":  "docs-viewer",
+                                                   "action_id":  "open_latest_doc_by_topic",
+                                                   "args":  {
+                                                                "topic":  "NHM2 warp solve",
+                                                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                            }
+                                               },
+                             "plan_items":  [
+                                                {
+                                                    "id":  "workspace_action",
+                                                    "lane":  "workspace",
+                                                    "status":  "planned",
+                                                    "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                    "action":  {
+                                                                   "panel_id":  "docs-viewer",
+                                                                   "action_id":  "open_latest_doc_by_topic",
+                                                                   "args":  {
+                                                                                "topic":  "NHM2 warp solve",
+                                                                                "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                            }
+                                                               }
+                                                }
+                                            ],
+                             "execution_trace":  [
+                                                     {
+                                                         "id":  "workspace_action",
+                                                         "lane":  "workspace",
+                                                         "status":  "completed",
+                                                         "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                         "action":  {
+                                                                        "panel_id":  "docs-viewer",
+                                                                        "action_id":  "open_latest_doc_by_topic",
+                                                                        "args":  {
+                                                                                     "topic":  "NHM2 warp solve",
+                                                                                     "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                 }
+                                                                    },
+                                                         "reason":  null
+                                                     }
+                                                 ],
+                             "runtime_observations":  [
+                                                          {
+                                                              "step_id":  "workspace_action",
+                                                              "lane":  "workspace",
+                                                              "status":  "completed",
+                                                              "artifact":  {
+                                                                               "panel_id":  "docs-viewer",
+                                                                               "action_id":  "open_latest_doc_by_topic",
+                                                                               "args":  {
+                                                                                            "topic":  "NHM2 warp solve",
+                                                                                            "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                        }
+                                                                           },
+                                                              "result_artifact":  null,
+                                                              "error_code":  null,
+                                                              "contract_pass":  true,
+                                                              "contract_fail_reason":  null,
+                                                              "expected_artifacts":  [
+                                                                                         "workspace_context",
+                                                                                         "doc_context",
+                                                                                         "active_doc_path"
+                                                                                     ],
+                                                              "actual_artifacts":  [
+                                                                                       "workspace_context",
+                                                                                       "doc_context",
+                                                                                       "active_doc_path"
+                                                                                   ]
+                                                          }
+                                                      ],
+                             "pending_transition":  {
+                                                        "status_before":  null,
+                                                        "status_after":  null,
+                                                        "reason":  null,
+                                                        "request_id":  null
+                                                    },
+                             "terminal":  {
+                                              "kind":  "final_answer",
+                                              "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                              "source":  "backend",
+                                              "contract":  {
+                                                               "family":  "general",
+                                                               "pass":  true,
+                                                               "fail_reason":  null,
+                                                               "repair_attempted":  false,
+                                                               "repair_applied":  false
+                                                           }
+                                          },
+                             "invariant_violations":  [
+
+                                                      ],
+                             "event_audit":  {
+                                                 "backend_event_count":  13,
+                                                 "visible_event_count":  14,
+                                                 "event_source":  "runtime",
+                                                 "stream_mode":  null,
+                                                 "stream_replay":  false,
+                                                 "terminal_mismatch":  false
+                                             }
+                         },
+    "debug":  {
+                  "turn_truth_table":  {
+                                           "schema":  "helix.ask.turn_truth_table.v1",
+                                           "question":  "go to the latest NHM2 warp solve doc",
+                                           "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                           "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                           "route_reason_code":  "dispatch:act",
+                                           "dispatch_policy":  "workspace_only",
+                                           "selected_tool":  {
+                                                                 "panel_id":  "docs-viewer",
+                                                                 "action_id":  "open_latest_doc_by_topic",
+                                                                 "args":  {
+                                                                              "topic":  "NHM2 warp solve",
+                                                                              "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                          }
+                                                             },
+                                           "plan_items":  [
+                                                              {
+                                                                  "id":  "workspace_action",
+                                                                  "lane":  "workspace",
+                                                                  "status":  "planned",
+                                                                  "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                  "action":  {
+                                                                                 "panel_id":  "docs-viewer",
+                                                                                 "action_id":  "open_latest_doc_by_topic",
+                                                                                 "args":  {
+                                                                                              "topic":  "NHM2 warp solve",
+                                                                                              "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                          }
+                                                                             }
+                                                              }
+                                                          ],
+                                           "execution_trace":  [
+                                                                   {
+                                                                       "id":  "workspace_action",
+                                                                       "lane":  "workspace",
+                                                                       "status":  "completed",
+                                                                       "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                       "action":  {
+                                                                                      "panel_id":  "docs-viewer",
+                                                                                      "action_id":  "open_latest_doc_by_topic",
+                                                                                      "args":  {
+                                                                                                   "topic":  "NHM2 warp solve",
+                                                                                                   "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                               }
+                                                                                  },
+                                                                       "reason":  null
+                                                                   }
+                                                               ],
+                                           "runtime_observations":  [
+                                                                        {
+                                                                            "step_id":  "workspace_action",
+                                                                            "lane":  "workspace",
+                                                                            "status":  "completed",
+                                                                            "artifact":  {
+                                                                                             "panel_id":  "docs-viewer",
+                                                                                             "action_id":  "open_latest_doc_by_topic",
+                                                                                             "args":  {
+                                                                                                          "topic":  "NHM2 warp solve",
+                                                                                                          "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                      }
+                                                                                         },
+                                                                            "result_artifact":  null,
+                                                                            "error_code":  null,
+                                                                            "contract_pass":  true,
+                                                                            "contract_fail_reason":  null,
+                                                                            "expected_artifacts":  [
+                                                                                                       "workspace_context",
+                                                                                                       "doc_context",
+                                                                                                       "active_doc_path"
+                                                                                                   ],
+                                                                            "actual_artifacts":  [
+                                                                                                     "workspace_context",
+                                                                                                     "doc_context",
+                                                                                                     "active_doc_path"
+                                                                                                 ]
+                                                                        }
+                                                                    ],
+                                           "pending_transition":  {
+                                                                      "status_before":  null,
+                                                                      "status_after":  null,
+                                                                      "reason":  null,
+                                                                      "request_id":  null
+                                                                  },
+                                           "terminal":  {
+                                                            "kind":  "final_answer",
+                                                            "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                            "source":  "backend",
+                                                            "contract":  {
+                                                                             "family":  "general",
+                                                                             "pass":  true,
+                                                                             "fail_reason":  null,
+                                                                             "repair_attempted":  false,
+                                                                             "repair_applied":  false
+                                                                         }
+                                                        },
+                                           "invariant_violations":  [
+
+                                                                    ],
+                                           "event_audit":  {
+                                                               "backend_event_count":  13,
+                                                               "visible_event_count":  14,
+                                                               "event_source":  "runtime",
+                                                               "stream_mode":  null,
+                                                               "stream_replay":  false,
+                                                               "terminal_mismatch":  false
+                                                           }
+                                       }
+              },
+    "agent_loop_audit":  {
+                             "schema":  "helix.ask.agent_loop_audit.v1",
+                             "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                             "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                             "route_reason_code":  "dispatch:act",
+                             "dispatch_policy":  "workspace_only",
+                             "selected_action":  {
+                                                     "panel_id":  "docs-viewer",
+                                                     "action_id":  "open_latest_doc_by_topic",
+                                                     "args":  {
+                                                                  "topic":  "NHM2 warp solve",
+                                                                  "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                              }
+                                                 },
+                             "planner_contract":  {
+                                                      "enabled":  true,
+                                                      "source":  "deterministic",
+                                                      "restate":  "Plan: run the requested workspace action now, then complete the turn for \"go to the latest NHM2 warp solve doc\".",
+                                                      "dispatch_policy":  "workspace_only",
+                                                      "plan_items":  [
+                                                                         {
+                                                                             "id":  "workspace_action",
+                                                                             "lane":  "workspace",
+                                                                             "status":  "planned",
+                                                                             "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                             "action":  {
+                                                                                            "panel_id":  "docs-viewer",
+                                                                                            "action_id":  "open_latest_doc_by_topic",
+                                                                                            "args":  {
+                                                                                                         "topic":  "NHM2 warp solve",
+                                                                                                         "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                     }
+                                                                                        }
+                                                                         }
+                                                                     ],
+                                                      "plan_steps":  [
+                                                                         {
+                                                                             "id":  "workspace_action",
+                                                                             "lane":  "workspace",
+                                                                             "status":  "completed",
+                                                                             "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                             "action":  {
+                                                                                            "panel_id":  "docs-viewer",
+                                                                                            "action_id":  "open_latest_doc_by_topic",
+                                                                                            "args":  {
+                                                                                                         "topic":  "NHM2 warp solve",
+                                                                                                         "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                     }
+                                                                                        },
+                                                                             "reason":  null
+                                                                         }
+                                                                     ],
+                                                      "executed_step_count":  1,
+                                                      "failed_step_count":  0,
+                                                      "suppressed_step_count":  0,
+                                                      "action_candidates_count":  26,
+                                                      "selected_action":  {
+                                                                              "panel_id":  "docs-viewer",
+                                                                              "action_id":  "open_latest_doc_by_topic",
+                                                                              "args":  {
+                                                                                           "topic":  "NHM2 warp solve",
+                                                                                           "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                       }
+                                                                          },
+                                                      "selection_source":  "deterministic",
+                                                      "selection_valid":  true,
+                                                      "selection_fail_reason":  "none",
+                                                      "selection_missing_required_args":  [
+
+                                                                                          ],
+                                                      "planner_repair_attempted":  false,
+                                                      "planner_repair_applied":  false,
+                                                      "planner_repair_reason":  null,
+                                                      "pending_resolution_attempted":  false,
+                                                      "pending_resolution_applied":  false,
+                                                      "pending_resolution_reason":  null,
+                                                      "single_terminal_required":  true
+                                                  },
+                             "execution_trace":  [
+                                                     {
+                                                         "id":  "workspace_action",
+                                                         "lane":  "workspace",
+                                                         "status":  "completed",
+                                                         "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                         "action":  {
+                                                                        "panel_id":  "docs-viewer",
+                                                                        "action_id":  "open_latest_doc_by_topic",
+                                                                        "args":  {
+                                                                                     "topic":  "NHM2 warp solve",
+                                                                                     "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                 }
+                                                                    },
+                                                         "reason":  null
+                                                     }
+                                                 ],
+                             "execution_lifecycle":  [
+                                                         {
+                                                             "step_id":  "workspace_action",
+                                                             "lane":  "workspace",
+                                                             "event":  "started"
+                                                         },
+                                                         {
+                                                             "step_id":  "workspace_action",
+                                                             "lane":  "workspace",
+                                                             "event":  "completed"
+                                                         }
+                                                     ],
+                             "step_results":  [
+                                                  {
+                                                      "step_id":  "workspace_action",
+                                                      "lane":  "workspace",
+                                                      "status":  "completed",
+                                                      "artifact":  {
+                                                                       "panel_id":  "docs-viewer",
+                                                                       "action_id":  "open_latest_doc_by_topic",
+                                                                       "args":  {
+                                                                                    "topic":  "NHM2 warp solve",
+                                                                                    "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                }
+                                                                   },
+                                                      "consumed_artifacts":  [
+
+                                                                             ],
+                                                      "produced_artifacts":  [
+                                                                                 "workspace_context",
+                                                                                 "doc_context",
+                                                                                 "active_doc_path"
+                                                                             ],
+                                                      "blocked_missing_artifacts":  [
+
+                                                                                    ],
+                                                      "error_code":  null,
+                                                      "contract_pass":  true,
+                                                      "contract_fail_reason":  null,
+                                                      "expected_artifacts":  [
+                                                                                 "workspace_context",
+                                                                                 "doc_context",
+                                                                                 "active_doc_path"
+                                                                             ],
+                                                      "actual_artifacts":  [
+                                                                               "workspace_context",
+                                                                               "doc_context",
+                                                                               "active_doc_path"
+                                                                           ],
+                                                      "result_artifact":  null
+                                                  }
+                                              ],
+                             "runtime_summary":  {
+                                                     "status":  "completed",
+                                                     "open_subgoals":  [
+
+                                                                       ],
+                                                     "completed_subgoals":  [
+                                                                                "workspace_action"
+                                                                            ],
+                                                     "failed_subgoals":  [
+
+                                                                         ],
+                                                     "observation_count":  1,
+                                                     "observations":  [
+                                                                          {
+                                                                              "step_id":  "workspace_action",
+                                                                              "lane":  "workspace",
+                                                                              "status":  "completed",
+                                                                              "artifact":  {
+                                                                                               "panel_id":  "docs-viewer",
+                                                                                               "action_id":  "open_latest_doc_by_topic",
+                                                                                               "args":  {
+                                                                                                            "topic":  "NHM2 warp solve",
+                                                                                                            "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                        }
+                                                                                           },
+                                                                              "result_artifact":  null,
+                                                                              "error_code":  null,
+                                                                              "contract_pass":  true,
+                                                                              "contract_fail_reason":  null,
+                                                                              "expected_artifacts":  [
+                                                                                                         "workspace_context",
+                                                                                                         "doc_context",
+                                                                                                         "active_doc_path"
+                                                                                                     ],
+                                                                              "actual_artifacts":  [
+                                                                                                       "workspace_context",
+                                                                                                       "doc_context",
+                                                                                                       "active_doc_path"
+                                                                                                   ]
+                                                                          }
+                                                                      ],
+                                                     "artifact_keys":  [
+                                                                           "active_doc_path",
+                                                                           "doc_context",
+                                                                           "workspace_context"
+                                                                       ],
+                                                     "required_artifacts":  [
+                                                                                "workspace_context",
+                                                                                "doc_context",
+                                                                                "active_doc_path"
+                                                                            ],
+                                                     "satisfied_artifacts":  [
+                                                                                 "workspace_context",
+                                                                                 "doc_context",
+                                                                                 "active_doc_path"
+                                                                             ],
+                                                     "missing_required_artifacts":  [
+
+                                                                                    ],
+                                                     "decision_count":  1,
+                                                     "last_decision":  {
+                                                                           "kind":  "final_answer",
+                                                                           "reason":  "all_subgoals_observed"
+                                                                       },
+                                                     "appended_step_count":  0,
+                                                     "appended_steps":  [
+
+                                                                        ],
+                                                     "executed_appended_step_count":  0,
+                                                     "runtime_loop_iteration_count":  1,
+                                                     "runtime_loop_stop_reason":  "final_answer",
+                                                     "capability_selection_trace":  [
+
+                                                                                    ],
+                                                     "terminal":  {
+                                                                      "kind":  "final_answer",
+                                                                      "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                                      "source":  "terminal_artifact"
+                                                                  },
+                                                     "async_executor_used":  true,
+                                                     "async_step_count":  1,
+                                                     "async_total_duration_ms":  4039,
+                                                     "async_step_durations":  [
+                                                                                  {
+                                                                                      "step_id":  "workspace_action",
+                                                                                      "duration_ms":  4039,
+                                                                                      "awaited_tool":  "docs-viewer.open_latest_doc_by_topic",
+                                                                                      "started_at_ms":  1777407062578,
+                                                                                      "completed_at_ms":  1777407066617
+                                                                                  }
+                                                                              ],
+                                                     "model_decision_llm_used":  true,
+                                                     "model_decision_count":  2,
+                                                     "model_decision_audits":  [
+                                                                                   {
+                                                                                       "step_id":  "workspace_action",
+                                                                                       "phase":  "continuation",
+                                                                                       "used_llm":  true,
+                                                                                       "decision_source":  "model",
+                                                                                       "action":  "finalize",
+                                                                                       "summary":  "Successfully opened the latest NHM2 warp solve document.",
+                                                                                       "next_capability":  null,
+                                                                                       "next_args":  {
+
+                                                                                                     },
+                                                                                       "required_artifacts":  [
+
+                                                                                                              ],
+                                                                                       "error_code":  null,
+                                                                                       "duration_ms":  2162,
+                                                                                       "satisfied_artifacts":  [
+                                                                                                                   "active_doc_path",
+                                                                                                                   "doc_context",
+                                                                                                                   "workspace_context"
+                                                                                                               ],
+                                                                                       "missing_artifacts":  [
+
+                                                                                                             ]
+                                                                                   },
+                                                                                   {
+                                                                                       "step_id":  null,
+                                                                                       "phase":  "composer",
+                                                                                       "used_llm":  true,
+                                                                                       "decision_source":  "model",
+                                                                                       "action":  "finalize",
+                                                                                       "summary":  "Successfully opened the latest NHM2 warp solve document.",
+                                                                                       "next_capability":  null,
+                                                                                       "next_args":  {
+
+                                                                                                     },
+                                                                                       "required_artifacts":  [
+
+                                                                                                              ],
+                                                                                       "error_code":  null,
+                                                                                       "duration_ms":  1873,
+                                                                                       "satisfied_artifacts":  [
+                                                                                                                   "active_doc_path",
+                                                                                                                   "doc_context",
+                                                                                                                   "workspace_context"
+                                                                                                               ],
+                                                                                       "missing_artifacts":  [
+
+                                                                                                             ]
+                                                                                   }
+                                                                               ],
+                                                     "general_controller_enabled":  true,
+                                                     "general_controller_decision_count":  2,
+                                                     "general_controller_final_decision":  "finalize",
+                                                     "general_controller_stop_reason":  "all_required_artifacts_satisfied"
+                                                 },
+                             "artifact_store_keys":  [
+                                                         "active_doc_path",
+                                                         "doc_context",
+                                                         "workspace_context"
+                                                     ],
+                             "pending_request":  null,
+                             "pending_intercepted_turn":  false,
+                             "pending_interception_reason":  null,
+                             "workspace_context_snapshot":  {
+                                                                "sessionId":  "live-eval-latest-nhm2-warp-solve",
+                                                                "activePanel":  "docs-viewer",
+                                                                "activeDocPath":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                                "source":  "workstation_action",
+                                                                "activeNoteId":  null,
+                                                                "activeNoteTitle":  null,
+                                                                "lastCreatedNoteId":  null,
+                                                                "lastCreatedNoteTitle":  null,
+                                                                "hasDocContext":  true,
+                                                                "docContextValid":  true,
+                                                                "docContextPath":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                                "docContextSource":  "workstation_action",
+                                                                "docContextFailureReason":  null,
+                                                                "hasNoteContext":  false,
+                                                                "hasClipboardContext":  false,
+                                                                "lastWorkspaceAction":  {
+                                                                                            "panel_id":  "docs-viewer",
+                                                                                            "action_id":  "open_latest_doc_by_topic",
+                                                                                            "args":  {
+                                                                                                         "topic":  "NHM2 warp solve",
+                                                                                                         "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                     }
+                                                                                        },
+                                                                "workspaceActionLedger":  [
+                                                                                              {
+                                                                                                  "turn_id":  "live-eval-latest-nhm2-warp-solve",
+                                                                                                  "trace_id":  null,
+                                                                                                  "step_id":  "workspace_action",
+                                                                                                  "panel_id":  "docs-viewer",
+                                                                                                  "action_id":  "open_latest_doc_by_topic",
+                                                                                                  "args":  {
+                                                                                                               "topic":  "NHM2 warp solve",
+                                                                                                               "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                           },
+                                                                                                  "status":  "completed",
+                                                                                                  "at_ms":  1777407067831
+                                                                                              }
+                                                                                          ],
+                                                                "lastUpdatedAtMs":  1777407067831,
+                                                                "preservationReason":  "updated_by_context_mutating_action"
+                                                            },
+                             "action_envelope":  null,
+                             "terminal_contract":  {
+                                                       "lane":  "conversation",
+                                                       "terminal_kind":  "conversation",
+                                                       "route_reason_code":  "dispatch:act",
+                                                       "dispatch_hint":  true,
+                                                       "single_terminal_required":  true,
+                                                       "terminal_text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                       "terminal_source":  "terminal_artifact"
+                                                   },
+                             "invariant_violations":  [
+
+                                                      ],
+                             "latest_result_artifact":  {
+                                                            "kind":  "turn_final_text",
+                                                            "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                            "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                                            "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                                            "created_at_ms":  1777407067835
+                                                        },
+                             "final_answer_contract":  {
+                                                           "family":  "general",
+                                                           "pass":  true,
+                                                           "fail_reason":  null,
+                                                           "repair_attempted":  false,
+                                                           "repair_applied":  false
+                                                       },
+                             "final_answer_contract_family":  "general",
+                             "final_answer_contract_pass":  true,
+                             "final_answer_contract_fail_reason":  null,
+                             "final_answer_contract_repair_attempted":  false,
+                             "final_answer_contract_repair_applied":  false,
+                             "turn_truth_table":  {
+                                                      "schema":  "helix.ask.turn_truth_table.v1",
+                                                      "question":  "go to the latest NHM2 warp solve doc",
+                                                      "turn_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                                      "trace_id":  "ask:d6f7be61-12ca-4b1f-a2b5-43ec3b8628a1",
+                                                      "route_reason_code":  "dispatch:act",
+                                                      "dispatch_policy":  "workspace_only",
+                                                      "selected_tool":  {
+                                                                            "panel_id":  "docs-viewer",
+                                                                            "action_id":  "open_latest_doc_by_topic",
+                                                                            "args":  {
+                                                                                         "topic":  "NHM2 warp solve",
+                                                                                         "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                     }
+                                                                        },
+                                                      "plan_items":  [
+                                                                         {
+                                                                             "id":  "workspace_action",
+                                                                             "lane":  "workspace",
+                                                                             "status":  "planned",
+                                                                             "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                             "action":  {
+                                                                                            "panel_id":  "docs-viewer",
+                                                                                            "action_id":  "open_latest_doc_by_topic",
+                                                                                            "args":  {
+                                                                                                         "topic":  "NHM2 warp solve",
+                                                                                                         "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                     }
+                                                                                        }
+                                                                         }
+                                                                     ],
+                                                      "execution_trace":  [
+                                                                              {
+                                                                                  "id":  "workspace_action",
+                                                                                  "lane":  "workspace",
+                                                                                  "status":  "completed",
+                                                                                  "title":  "Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                                  "action":  {
+                                                                                                 "panel_id":  "docs-viewer",
+                                                                                                 "action_id":  "open_latest_doc_by_topic",
+                                                                                                 "args":  {
+                                                                                                              "topic":  "NHM2 warp solve",
+                                                                                                              "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                          }
+                                                                                             },
+                                                                                  "reason":  null
+                                                                              }
+                                                                          ],
+                                                      "runtime_observations":  [
+                                                                                   {
+                                                                                       "step_id":  "workspace_action",
+                                                                                       "lane":  "workspace",
+                                                                                       "status":  "completed",
+                                                                                       "artifact":  {
+                                                                                                        "panel_id":  "docs-viewer",
+                                                                                                        "action_id":  "open_latest_doc_by_topic",
+                                                                                                        "args":  {
+                                                                                                                     "topic":  "NHM2 warp solve",
+                                                                                                                     "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                                                                 }
+                                                                                                    },
+                                                                                       "result_artifact":  null,
+                                                                                       "error_code":  null,
+                                                                                       "contract_pass":  true,
+                                                                                       "contract_fail_reason":  null,
+                                                                                       "expected_artifacts":  [
+                                                                                                                  "workspace_context",
+                                                                                                                  "doc_context",
+                                                                                                                  "active_doc_path"
+                                                                                                              ],
+                                                                                       "actual_artifacts":  [
+                                                                                                                "workspace_context",
+                                                                                                                "doc_context",
+                                                                                                                "active_doc_path"
+                                                                                                            ]
+                                                                                   }
+                                                                               ],
+                                                      "pending_transition":  {
+                                                                                 "status_before":  null,
+                                                                                 "status_after":  null,
+                                                                                 "reason":  null,
+                                                                                 "request_id":  null
+                                                                             },
+                                                      "terminal":  {
+                                                                       "kind":  "final_answer",
+                                                                       "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+                                                                       "source":  "backend",
+                                                                       "contract":  {
+                                                                                        "family":  "general",
+                                                                                        "pass":  true,
+                                                                                        "fail_reason":  null,
+                                                                                        "repair_attempted":  false,
+                                                                                        "repair_applied":  false
+                                                                                    }
+                                                                   },
+                                                      "invariant_violations":  [
+
+                                                                               ],
+                                                      "event_audit":  {
+                                                                          "backend_event_count":  13,
+                                                                          "visible_event_count":  14,
+                                                                          "event_source":  "runtime",
+                                                                          "stream_mode":  null,
+                                                                          "stream_replay":  false,
+                                                                          "terminal_mismatch":  false
+                                                                      }
+                                                  },
+                             "turn_transcript_events":  [
+                                                            {
+                                                                "id":  "transcript:question",
+                                                                "at_ms":  1777407067837,
+                                                                "role":  "user",
+                                                                "type":  "question",
+                                                                "text":  "go to the latest NHM2 warp solve doc",
+                                                                "source_event_type":  "question",
+                                                                "event_source":  "runtime"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:0:turn_started",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "turn_started",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "work_delta",
+                                                                "text":  "Understanding the request and preparing a plan.",
+                                                                "detail":  "go to the latest NHM2 warp solve doc",
+                                                                "status":  "running"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:1:model_decision_started",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "model_decision_started",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "model_decision",
+                                                                "step_id":  null,
+                                                                "status":  "running",
+                                                                "text":  "Thinking: Restate the user goal and choose the first tool or model step.",
+                                                                "detail":  "planner"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:2:model_decision_completed",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "model_decision_completed",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "model_decision",
+                                                                "step_id":  null,
+                                                                "status":  "completed",
+                                                                "text":  "Decision: Selected 1 reconstructed step.",
+                                                                "detail":  "planner"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:3:plan_delta",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "plan_delta",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "plan",
+                                                                "step_id":  "workspace_action",
+                                                                "lane":  "workspace",
+                                                                "status":  "planned",
+                                                                "text":  "Plan: Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\".",
+                                                                "detail":  "payload_reconstruction"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:4:item_started",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "item_started",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "step_started",
+                                                                "step_id":  "workspace_action",
+                                                                "lane":  "workspace",
+                                                                "status":  "running",
+                                                                "text":  "Working: Execute workspace action derived from: \"go to the latest NHM2 warp solve doc\"."
+                                                            },
+                                                            {
+                                                                "id":  "transcript:5:tool_result",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "tool_result",
+                                                                "event_source":  "runtime",
+                                                                "role":  "tool",
+                                                                "type":  "tool_result",
+                                                                "step_id":  "workspace_action",
+                                                                "lane":  "workspace",
+                                                                "status":  "completed",
+                                                                "text":  "Observed artifacts: workspace_context, doc_context, active_doc_path",
+                                                                "detail":  "artifact contract satisfied"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:6:observation_recorded",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "observation_recorded",
+                                                                "event_source":  "runtime",
+                                                                "role":  "tool",
+                                                                "type":  "observation",
+                                                                "step_id":  "workspace_action",
+                                                                "lane":  "workspace",
+                                                                "status":  "completed",
+                                                                "text":  "Recorded observation: workspace_context, doc_context, active_doc_path",
+                                                                "detail":  null
+                                                            },
+                                                            {
+                                                                "id":  "transcript:7:item_completed",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "item_completed",
+                                                                "event_source":  "runtime",
+                                                                "role":  "system",
+                                                                "type":  "turn_completed",
+                                                                "step_id":  "workspace_action",
+                                                                "lane":  "workspace",
+                                                                "status":  "completed",
+                                                                "text":  "Completed step workspace_action."
+                                                            },
+                                                            {
+                                                                "id":  "transcript:8:model_decision_started",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "model_decision_started",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "model_decision",
+                                                                "step_id":  "workspace_action",
+                                                                "status":  "running",
+                                                                "text":  "Thinking: Review the observation and decide whether to continue, ask the user, fail, or finalize.",
+                                                                "detail":  "continuation"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:9:model_decision_completed",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "model_decision_completed",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "model_decision",
+                                                                "step_id":  "workspace_action",
+                                                                "status":  "completed",
+                                                                "text":  "Decision: Finalize from observed artifacts.",
+                                                                "detail":  "continuation"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:10:decision_delta",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "decision_delta",
+                                                                "event_source":  "runtime",
+                                                                "role":  "agent",
+                                                                "type":  "decision",
+                                                                "status":  "final_answer",
+                                                                "text":  "Ready to answer from the completed observations.",
+                                                                "detail":  "step_observed"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:11:terminal_answer",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "terminal_answer",
+                                                                "event_source":  "runtime",
+                                                                "role":  "final",
+                                                                "type":  "final_answer",
+                                                                "status":  "final_answer",
+                                                                "text":  "Opened document: /docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                            },
+                                                            {
+                                                                "id":  "transcript:12:turn_completed",
+                                                                "at_ms":  1777407067837,
+                                                                "source_event_type":  "turn_completed",
+                                                                "event_source":  "runtime",
+                                                                "role":  "system",
+                                                                "type":  "turn_completed",
+                                                                "status":  "completed",
+                                                                "text":  "Turn completed with status: completed."
+                                                            }
+                                                        ],
+                             "turn_transcript_source":  "runtime"
+                         },
+    "route":  "dispatch:act",
+    "lane":  "conversation",
+    "dispatch_policy":  "workspace_only",
+    "response_type":  "final_answer",
+    "pending_request":  null,
+    "workspace_action":  {
+                             "panel_id":  "docs-viewer",
+                             "action_id":  "open_latest_doc_by_topic",
+                             "args":  {
+                                          "topic":  "NHM2 warp solve",
+                                          "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                      }
+                         },
+    "action_envelope":  {
+                            "schema":  "helix.ask.action_envelope.v1",
+                            "mode":  "act",
+                            "source":  "actionability_plan",
+                            "workstation_actions":  [
+                                                        {
+                                                            "panel_id":  "docs-viewer",
+                                                            "action_id":  "open_latest_doc_by_topic",
+                                                            "args":  {
+                                                                         "topic":  "NHM2 warp solve",
+                                                                         "path":  "/docs/audits/research/warp-nhm2-solve-authority-audit-latest.md"
+                                                                     }
+                                                        }
+                                                    ],
+                            "governance":  {
+                                               "dispatch":  "allow",
+                                               "reason_code":  "dispatch:act",
+                                               "approval_state":  "not_required",
+                                               "sandbox_profile":  "workstation_ui_only"
+                                           }
+                        }
+}

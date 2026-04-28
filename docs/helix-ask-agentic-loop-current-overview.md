@@ -1,6 +1,6 @@
 # Helix Ask Agentic Loop: Current Overview
 
-Last updated: 2026-04-23
+Last updated: 2026-04-27
 
 ## Purpose
 This document is the current implementation map for the Helix Ask agentic loop and workstation orchestration. Use it as the source-of-truth context before generating new code for routing, events, or UI action primitives.
@@ -12,11 +12,16 @@ Companion execution handoff:
 The Helix loop is aligned to the proven codex app-server patterns:
 
 - Plan/lifecycle artifact pattern: `external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs`
+  - `item/started`, `item/completed`, `item/plan/delta`, and `turn/completed` are consumed as distinct lifecycle notifications at lines 189-215.
 - Request-user-input roundtrip pattern: `external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs`
+  - `ToolRequestUserInput` is asserted before resolution at lines 83-90.
+  - `serverRequest/resolved` is required before `turn/completed` at lines 109-121.
 - Explicit request/turn error typing: `external/openai-codex/codex-rs/app-server/src/server_request_error.rs`
+  - pending-request supersession is typed with `reason = "turnTransition"` at lines 3-11.
 - Deterministic bespoke event lifecycle: `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs`
 
 Helix parity principle: prefer typed, streamed lifecycle artifacts over prose-only status text.
+Do not treat a planning/subgoal statement as a terminal answer unless the required action artifact has actually been produced.
 
 ## Runtime Lanes
 1. Workspace lane: deterministic action routing and execution first.
@@ -140,6 +145,46 @@ Implemented:
   - docs explain/summarize actions default to workspace-owned execution unless hard reasoning cues are present
   - background reasoning queue admission now requires hard reasoning cues (or explicit background phrasing)
   - empty reasoning terminal responses now fail with `RF_EMPTY_TERMINAL` instead of appearing as successful finals
+- UI turn stream pass:
+  - latest turn renders as question, line-by-line agent work log, and final answer
+  - older turns collapse behind expandable summaries
+  - `/api/agi/ask/turn/stream` emits backend transcript events consumed by the UI
+  - Unified Debug Copy includes backend runtime, transcript events, turn truth table, workspace state, voice timeline, visible answer state, and job-ready links
+  - workspace actions now surface procedural steps and job-ready links instead of only canned receipts
+
+Partially implemented:
+- The line-by-line work log exists, but many rows are deterministic/runtime-generated instead of repeated LLM deliberation after each observation.
+- The async executor records per-step duration, but local capability decisions still complete quickly because no model re-evaluation is required for simple commands.
+- Final answer assembly uses terminal artifacts and runtime observations better than before, but it is not yet a universal composer for every task family.
+- Reasoning Theater remains visible, but it is not fully unified as the collapsible "thinking" layer for the main answer stream.
+- Job-ready links are now artifact-grounded, but final-answer link/action labels still depend on correct artifact identity resolution.
+
+Open gaps found in UI testing on 2026-04-27:
+- `what is this doc about?` routes through the current doc context, but the final answer degrades to document identity/path instead of a summary. Summary/explain intents must not be satisfied by `identify_current_doc` artifacts.
+- `that note` works as a follow-up target in some flows, but the visible note label and job-ready link can remain `that` instead of resolving to the last created/active note title.
+- `compare the current doc with my notes...` can produce shallow comparisons when note identity/body artifacts are not fully resolved.
+- `put the centerline alpha location into quick NHM2 test note` currently clarifies instead of composing `docs-viewer.locate_in_doc -> workstation-notes.append_to_note`.
+- Browser/UI tests must target `textarea[aria-label="Ask Helix"]`; after opening notes, the first textarea belongs to the note editor.
+
+Not yet implemented:
+- Full Codex-style loop where each step can decide model vs tool, execute, observe, then ask the model what to do next.
+- True step-by-step LLM self-dialogue generation per subgoal.
+- Automatic continuation until all required artifacts are satisfied for every task family.
+- Collapsing the live thinking block automatically after completion while preserving it as a dropdown.
+- A generalized final-answer synthesizer that always consumes all observations/artifacts rather than relying on action-specific answer shaping.
+
+## Immediate Patch Priority
+1. Summary terminal contract:
+   - For summarize/explain/doc-about intents, active doc identity is context only.
+   - Terminal success requires a summary/explanation artifact or a typed `summary_unavailable` failure.
+   - Regression: `what is this doc about?` must not return only `You are currently on: <path>`.
+2. Pronoun/note resolution:
+   - Resolve `that note`, `this note`, and `my note` against the last created note, active note, or explicit note title.
+   - Job-ready links must display the resolved note title/id, never the raw pronoun.
+3. Two-step locate-to-note composition:
+   - Support prompts such as `put the centerline alpha location into quick NHM2 test note`.
+   - Plan shape: `docs-viewer.locate_in_doc` then `workstation-notes.append_to_note`.
+   - Final answer must report both the location artifact and the note update artifact.
 
 ## Test Coverage
 Primary regression and behavior tests:

@@ -1,0 +1,10 @@
+import express from "express";
+import request from "supertest";
+import { planRouter } from "./server/routes/agi.plan";
+const app = express(); app.use(express.json()); app.use("/api/agi", planRouter);
+const sessionId = `debug-${Date.now()}`;
+await request(app).post('/api/agi/ask/turn').send({question:'create a note called quick NHM2 test note', mode:'read', sessionId});
+const res = await request(app).post('/api/agi/ask/turn').send({question:'copy the current document path to that note', mode:'read', sessionId, workspace_context_snapshot:{activePanel:'docs-viewer', hasDocContext:true, activeDocPath:'/docs/research/example.md'}});
+console.log(JSON.stringify({text:res.body.text, route:res.body.route_reason_code, policy:res.body.dispatch_policy, workspace_action:res.body.workspace_action, planner:res.body.planner_contract, trace:res.body.execution_trace, links:res.body.job_ready_links}, null, 2));
+const res2 = await request(app).post('/api/agi/ask/turn').send({question:'put the centerline alpha location into quick NHM2 test note', mode:'read', sessionId:`loc-${Date.now()}`, workspace_context_snapshot:{activePanel:'docs-viewer', hasDocContext:true, activeDocPath:'/docs/audits/research/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/warp-nhm2-mission-time-comparison-latest.md'}});
+console.log(JSON.stringify({text:res2.body.text, workspace_action:res2.body.workspace_action, trace:res2.body.execution_trace}, null, 2));

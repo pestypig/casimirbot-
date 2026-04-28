@@ -1622,6 +1622,29 @@ function buildSettingsHelixAskMasterEventClockExport(events: VoiceLaneTimelineDe
   const runtimeSummary =
     readHelixAskDebugContextRecord(latestContext?.turn_runtime) ??
     readHelixAskDebugContextRecord(agentLoopAudit?.runtime_summary);
+  const finalAnswerContract =
+    readHelixAskDebugContextRecord(agentLoopAudit?.final_answer_contract) ??
+    readHelixAskDebugContextRecord(
+      readHelixAskDebugContextRecord(
+        readHelixAskDebugContextRecord(agentLoopAudit?.turn_truth_table)?.terminal,
+      )?.contract,
+    ) ??
+    {
+      family:
+        typeof latestContext?.final_answer_contract_family === "string"
+          ? latestContext.final_answer_contract_family
+          : null,
+      pass:
+        typeof latestContext?.final_answer_contract_pass === "boolean"
+          ? latestContext.final_answer_contract_pass
+          : null,
+      fail_reason:
+        typeof latestContext?.final_answer_contract_fail_reason === "string"
+          ? latestContext.final_answer_contract_fail_reason
+          : null,
+      repair_attempted: latestContext?.final_answer_contract_repair_attempted === true,
+      repair_applied: latestContext?.final_answer_contract_repair_applied === true,
+    };
   return {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
@@ -1640,6 +1663,10 @@ function buildSettingsHelixAskMasterEventClockExport(events: VoiceLaneTimelineDe
     debugContext: latestContext ?? null,
     agentLoop: {
       audit: agentLoopAudit,
+      final_answer_contract: finalAnswerContract,
+      final_answer_contract_family: finalAnswerContract?.family ?? null,
+      final_answer_contract_pass: finalAnswerContract?.pass ?? null,
+      final_answer_contract_fail_reason: finalAnswerContract?.fail_reason ?? null,
       planner_contract:
         readHelixAskDebugContextRecord(latestContext?.planner_contract) ??
         readHelixAskDebugContextRecord(agentLoopAudit?.planner_contract),

@@ -140,6 +140,7 @@ import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
@@ -534,7 +535,7 @@ export type PendingWorkstationUserInputRequest = {
   doc_topic?: string | null;
 };
 
-export type HelixTurnTerminalOutcome = "final_answer" | "final_failure";
+export type HelixTurnTerminalOutcome = "final_answer" | "final_failure" | "pending_input";
 
 export function isWorkstationTurnTransitionPendingRequest(args: {
   pending_turn_id: string | null | undefined;
@@ -5565,6 +5566,123 @@ function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | nul
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function readHelixPendingInputRecord(value: unknown): Record<string, unknown> | null {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return null;
+  const status = coerceText(record.status ?? record.state ?? record.resolution_status).trim().toLowerCase();
+  if (status === "resolved" || status === "cancelled" || status === "canceled" || status === "superseded") {
+    return null;
+  }
+  const requestId = coerceText(record.request_id ?? record.requestId ?? record.id).trim();
+  const prompt = coerceText(record.prompt ?? record.message ?? record.text ?? record.question).trim();
+  const requiredFieldsCandidate = record.required_fields ?? record.requiredFields;
+  const requiredFields = Array.isArray(requiredFieldsCandidate) ? requiredFieldsCandidate : [];
+  if (requestId || prompt || requiredFields.length > 0 || record.kind === "request_user_input") return record;
+  return null;
+}
+
+function resolveHelixPendingInputRecord(...sources: unknown[]): Record<string, unknown> | null {
+  for (const source of sources) {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) continue;
+    const direct = readHelixPendingInputRecord(record);
+    if (direct && (record.prompt || record.request_id || record.requestId || record.required_fields || record.requiredFields)) {
+      return direct;
+    }
+    const agentLoopAudit = readAgentLoopAuditRecord(record.agent_loop_audit);
+    const turnTruthTable = readAgentLoopAuditRecord(record.turn_truth_table);
+    const runtimeSummary = readAgentLoopAuditRecord(record.turn_runtime ?? agentLoopAudit?.runtime_summary);
+    const pendingCandidates = [
+      record.pending_request,
+      record.pending_server_request,
+      record.pendingRequest,
+      record.server_request,
+      record.request_user_input,
+      agentLoopAudit?.pending_request,
+      agentLoopAudit?.pending_server_request,
+      turnTruthTable?.pending_request,
+      turnTruthTable?.pending_transition,
+      runtimeSummary?.pending_request,
+    ];
+    for (const candidate of pendingCandidates) {
+      const pending = readHelixPendingInputRecord(candidate);
+      if (pending) return pending;
+    }
+  }
+  return null;
+}
+
+function resolveHelixVisibleTerminalKind(args: {
+  reply?: HelixAskReply | null;
+  terminal?: Record<string, unknown> | null;
+  fallback?: string;
+  extraSources?: unknown[];
+}): string {
+  const pending = resolveHelixPendingInputRecord(args.reply, args.reply?.debug, ...(args.extraSources ?? []));
+  if (pending) return "pending_input";
+  return String(args.terminal?.kind ?? args.fallback ?? "n/a");
+}
+
+function resolveHelixTranscriptActionLabel(event: Record<string, unknown>): string | null {
+  const directPanelId = coerceText(event.panel_id ?? event.panelId).trim();
+  const directActionId = coerceText(event.action_id ?? event.actionId).trim();
+  if (directPanelId && directActionId) return `${directPanelId}.${directActionId}`;
+
+  const action =
+    readAgentLoopAuditRecord(event.action) ??
+    readAgentLoopAuditRecord(event.selected_action) ??
+    readAgentLoopAuditRecord(event.tool_action);
+  const panelId = coerceText(action?.panel_id ?? action?.panelId).trim();
+  const actionId = coerceText(action?.action_id ?? action?.actionId).trim();
+  if (panelId && actionId) return `${panelId}.${actionId}`;
+
+  const stepId = coerceText(event.step_id ?? event.stepId).trim();
+  if (/^workspace_action_locate_(?:exact|variant|doc)$/i.test(stepId)) {
+    return "docs-viewer.locate_in_doc";
+  }
+  if (/^workspace_action_append_(?:location_reminder|to_note|doc_summary)$/i.test(stepId)) {
+    return "workstation-notes.append_to_note";
+  }
+  if (/^workspace_action_docs_viewer_summarize_doc$/i.test(stepId)) {
+    return "docs-viewer.summarize_doc";
+  }
+  if (/^workspace_action_docs_viewer_search_docs$/i.test(stepId)) {
+    return "docs-viewer.search_docs";
+  }
+
+  const toolName = coerceText(event.tool ?? event.tool_name ?? event.capability).trim();
+  return toolName || null;
+}
+
+function normalizeHelixVisibleEventText(value: unknown): string {
+  return coerceText(value).replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function buildHelixVisibleActionReceiptKey(event: Record<string, unknown>): string | null {
+  const type = String(event.type ?? event.kind ?? "");
+  if (type !== "action_receipt" && type !== "workstation_action_receipt" && type !== "tool_result") return null;
+  const text = normalizeHelixVisibleEventText(event.text);
+  if (!text) return null;
+  const turnKey = coerceText(event.turnKey ?? event.turn_key ?? event.traceId ?? event.trace_id);
+  const status = coerceText(event.status);
+  const stepId = coerceText(event.step_id ?? event.stepId);
+  return [turnKey, type, status, stepId, text].filter(Boolean).join("|");
+}
+
+function dedupeHelixVisibleTranscriptEvents(events: Record<string, unknown>[]): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const event of events) {
+    const key = buildHelixVisibleActionReceiptKey(event);
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push(event);
+  }
+  return out;
+}
+
 type HelixAskVisibleTerminalResolution = {
   text: string;
   source: string;
@@ -5696,6 +5814,13 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   const visibleAnswer = typeof truthTable?.visible_answer_text === "string" ? truthTable.visible_answer_text : reply.content;
   const terminalText = typeof terminal?.text === "string" ? terminal.text : "";
   const truthMatchesVisible = Boolean(terminalText && visibleAnswer && terminalText.trim() === visibleAnswer.trim());
+  const pendingInput = resolveHelixPendingInputRecord(reply, reply.debug, truthTable, runtimeSummary, agentLoopAudit);
+  const visibleTerminalKind = resolveHelixVisibleTerminalKind({
+    reply,
+    terminal,
+    fallback: "final_answer",
+    extraSources: [truthTable, runtimeSummary, agentLoopAudit],
+  });
 
   if (!truthTable && planItems.length === 0 && observations.length === 0 && !terminal) {
     return null;
@@ -5759,9 +5884,18 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   if (terminal) {
     rows.push({
       key: "terminal",
-      label: `Terminal: ${String(terminal.kind ?? "final_answer")}`,
-      detail: clipText(String(terminal.text ?? visibleAnswer ?? "turn completed"), 160),
-      status: String(terminal.kind ?? "completed") === "pending_input" ? "pending_input" : "completed",
+      label: `Terminal: ${visibleTerminalKind}`,
+      detail: clipText(
+        String(
+          pendingInput?.prompt ??
+            pendingInput?.text ??
+            terminal.text ??
+            visibleAnswer ??
+            "turn completed",
+        ),
+        160,
+      ),
+      status: visibleTerminalKind === "pending_input" ? "pending_input" : "completed",
     });
   }
 
@@ -5803,11 +5937,15 @@ function resolveHelixTurnTranscriptEvents(reply: HelixAskReply): Record<string, 
     ? reply.debug.turn_transcript_events
     : [];
   if (directEvents.length > 0) {
-    return directEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+    return dedupeHelixVisibleTranscriptEvents(
+      directEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[],
+    );
   }
   const audit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
   const auditEvents = Array.isArray(audit?.turn_transcript_events) ? audit.turn_transcript_events : [];
-  return auditEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  return dedupeHelixVisibleTranscriptEvents(
+    auditEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[],
+  );
 }
 
 function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
@@ -5823,13 +5961,20 @@ function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
     return transcriptEvents
       .filter((event) => {
         const type = String(event.type ?? "");
-        return type !== "question" && type !== "turn_completed";
+        const status = String(event.status ?? "");
+        return type !== "question" && type !== "turn_completed" && status !== "superseded";
       })
       .slice(-14)
       .map((event, index) => {
         const role = String(event.role ?? "agent");
         const type = String(event.type ?? "event");
         const status = String(event.status ?? "");
+        const actionLabel = resolveHelixTranscriptActionLabel(event);
+        const eventText = String(event.text ?? "");
+        const rowText =
+          actionLabel && !eventText.includes(actionLabel)
+            ? `${actionLabel}: ${eventText || type}`
+            : eventText;
         const label =
           type === "plan"
             ? "Plan"
@@ -5852,8 +5997,10 @@ function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
           key: `${reply.id}-transcript-event-${index}`,
           role,
           label,
-          text: String(event.text ?? ""),
-          meta: [String(event.lane ?? ""), String(event.step_id ?? ""), status].filter(Boolean).join(" | "),
+          text: rowText,
+          meta: [String(event.lane ?? ""), String(event.step_id ?? ""), actionLabel ?? "", status]
+            .filter(Boolean)
+            .join(" | "),
           status,
         };
       });
@@ -6872,6 +7019,32 @@ function buildHelixAskDebugContextSummary(
       typeof debug?.composer_v2_best_attempt_stage === "string"
         ? debug?.composer_v2_best_attempt_stage
         : null,
+    final_answer_contract_family:
+      typeof debugRecord?.final_answer_contract_family === "string"
+        ? debugRecord.final_answer_contract_family
+        : asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_family ?? null,
+    final_answer_contract_pass:
+      typeof debugRecord?.final_answer_contract_pass === "boolean"
+        ? debugRecord.final_answer_contract_pass
+        : typeof asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_pass === "boolean"
+          ? asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_pass
+          : null,
+    final_answer_contract_fail_reason:
+      typeof debugRecord?.final_answer_contract_fail_reason === "string"
+        ? debugRecord.final_answer_contract_fail_reason
+        : asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_fail_reason ?? null,
+    final_answer_contract_repair_attempted:
+      typeof debugRecord?.final_answer_contract_repair_attempted === "boolean"
+        ? debugRecord.final_answer_contract_repair_attempted
+        : typeof asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_repair_attempted === "boolean"
+          ? asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_repair_attempted
+          : null,
+    final_answer_contract_repair_applied:
+      typeof debugRecord?.final_answer_contract_repair_applied === "boolean"
+        ? debugRecord.final_answer_contract_repair_applied
+        : typeof asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_repair_applied === "boolean"
+          ? asObjectRecord(debugRecord?.agent_loop_audit)?.final_answer_contract_repair_applied
+          : null,
     agent_loop_audit: asObjectRecord(debug?.agent_loop_audit ?? null),
     planner_contract: asObjectRecord(debug?.planner_contract ?? null),
     execution_trace: Array.isArray(debug?.execution_trace) ? debug?.execution_trace : [],
@@ -6884,7 +7057,8 @@ function buildHelixAskDebugContextSummary(
         ? debug.runtime_event_count
         : null,
     turn_runtime: asObjectRecord(debug?.turn_runtime ?? null),
-    pending_request: asObjectRecord(debug?.pending_request ?? null),
+    pending_request: asObjectRecord(debug?.pending_request ?? debug?.pending_server_request ?? null),
+    pending_server_request: asObjectRecord(debug?.pending_server_request ?? null),
     pending_intercepted_turn: debug?.pending_intercepted_turn === true,
     pending_interception_reason:
       typeof debug?.pending_interception_reason === "string" ? debug.pending_interception_reason : null,
@@ -7622,8 +7796,11 @@ function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
     event.meta && typeof event.meta.stage === "string" ? String(event.meta.stage).trim() : "";
   const detailLabel =
     event.meta && typeof event.meta.detail === "string" ? String(event.meta.detail).trim() : "";
+  const statusLabel =
+    event.meta && typeof event.meta.status === "string" ? String(event.meta.status).trim() : "";
   const parts: string[] = [`tool=${toolLabel}`];
   if (stageLabel) parts.push(`stage=${stageLabel}`);
+  if (statusLabel) parts.push(`status=${statusLabel}`);
   if (detailLabel) parts.push(`detail=${detailLabel}`);
   if (typeof event.seq === "number" && Number.isFinite(event.seq)) {
     parts.push(`seq=${Math.max(0, Math.trunc(event.seq))}`);
@@ -7633,6 +7810,10 @@ function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
   }
   const text = summarizeVoiceDebugText(event.text ?? "", 220) || "event";
   return `[${timestamp}] ${parts.join(" | ")} | text=${text}`;
+}
+
+function isAskLiveEventSuperseded(event: AskLiveEventEntry): boolean {
+  return Boolean(event.meta && String(event.meta.status ?? "").trim() === "superseded");
 }
 
 function buildAskLiveEventLogExport(events: AskLiveEventEntry[]): string {
@@ -8070,6 +8251,25 @@ function readDocViewerDebugSnapshot(): Record<string, unknown> {
   };
 }
 
+function resolveAskTurnDocViewerSnapshotPath(): { path: string | null; source: string } {
+  const state = useDocViewerStore.getState();
+  const storePath = normalizeDocViewerPathForAskSnapshot(state.currentPath);
+  if (storePath) {
+    rememberDocViewerPathForAskSnapshot(storePath);
+    return { path: storePath, source: "doc_viewer_store" };
+  }
+  const debugSnapshot = readDocViewerDebugSnapshot();
+  const debugPath = normalizeDocViewerPathForAskSnapshot(debugSnapshot.currentPath);
+  if (debugPath) {
+    rememberDocViewerPathForAskSnapshot(debugPath);
+    return { path: debugPath, source: "doc_viewer_debug_snapshot" };
+  }
+  const rememberedPath = rememberDocViewerPathForAskSnapshot(null);
+  return rememberedPath
+    ? { path: rememberedPath, source: "doc_viewer_last_known" }
+    : { path: null, source: "none" };
+}
+
 const HELIX_DOC_VIEWER_DEICTIC_CUE_RE = /\b(?:this|current)\s+doc(?:ument)?\b/i;
 const HELIX_DOC_VIEWER_CONTEXT_CUE_RE = /\b(?:docs?|document)\s+viewer(?:\s+context)?\b/i;
 const HELIX_EXPLICIT_PATH_CUE_RE =
@@ -8172,17 +8372,57 @@ function readWorkstationLayoutDebugSnapshot(): Record<string, unknown> {
 }
 
 function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefined): Record<string, unknown> {
-  const docState = useDocViewerStore.getState();
   const layoutState = useWorkstationLayoutStore.getState();
+  const notesState = useWorkstationNotesStore.getState();
+  const clipNoteBodyForAskTurn = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, 12000) : null;
+  };
   const activeGroup = layoutState.groups[layoutState.activeGroupId] ?? null;
   const activePanel = activeGroup?.activePanelId ?? null;
-  const currentPath = rememberDocViewerPathForAskSnapshot(docState.currentPath);
+  const docContext = resolveAskTurnDocViewerSnapshotPath();
+  const currentPath = docContext.path;
+  const docContextSource = docContext.source;
+  const activeNoteId = notesState.active_note_id ?? null;
+  const activeNote = activeNoteId ? notesState.notes[activeNoteId] ?? null : null;
+  const lastCreatedNoteId = notesState.order[0] ?? null;
+  const lastCreatedNote = lastCreatedNoteId ? notesState.notes[lastCreatedNoteId] ?? null : null;
+  const recentNotes = notesState.order.slice(0, 8).flatMap((noteId) => {
+    const note = notesState.notes[noteId] ?? null;
+    if (!note?.title) return [];
+    return [{
+      id: note.id,
+      title: note.title,
+      body: clipNoteBodyForAskTurn(note.body),
+    }];
+  });
+  const hasNoteContext =
+    Boolean(activeNote?.title) ||
+    Boolean(lastCreatedNote?.title) ||
+    Object.values(layoutState.groups).some((group) => group.panelIds.includes("workstation-notes"));
   return {
     sessionId: sessionId ?? "helix-ui",
     activePanel,
     activeDocPath: currentPath,
+    source: docContextSource,
     hasDocContext: Boolean(currentPath),
-    hasNoteContext: Object.values(layoutState.groups).some((group) => group.panelIds.includes("workstation-notes")),
+    docContextValid: Boolean(currentPath),
+    docContextPath: currentPath,
+    docContextSource: currentPath ? docContextSource : null,
+    docContextFailureReason: currentPath
+      ? null
+      : activePanel === "docs-viewer"
+        ? "docs_panel_open_without_active_doc_path"
+        : "no_docs_panel_or_active_doc_path",
+    activeNoteId,
+    activeNoteTitle: activeNote?.title ?? null,
+    activeNoteBody: clipNoteBodyForAskTurn(activeNote?.body),
+    lastCreatedNoteId,
+    lastCreatedNoteTitle: lastCreatedNote?.title ?? null,
+    lastCreatedNoteBody: clipNoteBodyForAskTurn(lastCreatedNote?.body),
+    recentNotes,
+    hasNoteContext,
     hasClipboardContext: Object.values(layoutState.groups).some((group) =>
       group.panelIds.includes("workstation-clipboard-history"),
     ),
@@ -8209,6 +8449,22 @@ function buildReplyMasterEventClockExport(args: {
   const turnKeys = new Set<string>();
   const attemptIds = new Set<string>();
   const debugRecord = asObjectRecord(args.reply.debug as unknown);
+  const rawTranscriptEvents = Array.isArray(args.reply.debug?.turn_transcript_events)
+    ? (args.reply.debug.turn_transcript_events
+        .map((entry) => readAgentLoopAuditRecord(entry))
+        .filter(Boolean) as Record<string, unknown>[])
+    : [];
+  const visibleTranscriptEvents = resolveHelixTurnTranscriptEvents(args.reply);
+  const rawJobReadyLinks = Array.isArray(args.reply.debug?.job_ready_links)
+    ? (args.reply.debug.job_ready_links
+        .map((entry) => readAgentLoopAuditRecord(entry))
+        .filter(Boolean) as Record<string, unknown>[])
+    : [];
+  const suppressedJobReadyLinks = Array.isArray(args.reply.debug?.job_ready_links_suppressed)
+    ? (args.reply.debug.job_ready_links_suppressed
+        .map((entry) => readAgentLoopAuditRecord(entry))
+        .filter(Boolean) as Record<string, unknown>[])
+    : [];
 
   const timeline = args.events.map((event, index) => {
     const meta = asObjectRecord(event.meta ?? null) ?? undefined;
@@ -8270,7 +8526,7 @@ function buildReplyMasterEventClockExport(args: {
       })
     : [];
   const observerRows: UnifiedDebugEventRow[] = askRows
-    .map((row) => {
+    .map((row): UnifiedDebugEventRow | null => {
       const commentary = buildObserverCommentaryForRow(row, {
         userPrompt: args.reply.question ?? null,
       });
@@ -8313,10 +8569,114 @@ function buildReplyMasterEventClockExport(args: {
       : null);
   if (debugTraceId) traceIds.add(debugTraceId);
   const turnTruthTable = readAgentLoopAuditRecord(debugRecord?.turn_truth_table);
+  const currentTraceIds = new Set<string>();
+  const currentTurnKeys = new Set<string>();
+  const addCurrentId = (target: Set<string>, value: unknown): void => {
+    if (typeof value === "string" && value.trim()) target.add(value.trim());
+  };
+  addCurrentId(currentTraceIds, debugTraceId);
+  addCurrentId(currentTraceIds, debugRecord?.trace_id);
+  addCurrentId(currentTraceIds, debugRecord?.traceId);
+  addCurrentId(currentTraceIds, turnTruthTable?.trace_id);
+  addCurrentId(currentTraceIds, turnTruthTable?.traceId);
+  addCurrentId(currentTurnKeys, debugRecord?.turn_key);
+  addCurrentId(currentTurnKeys, debugRecord?.turnKey);
+  addCurrentId(currentTurnKeys, debugRecord?.turn_id);
+  addCurrentId(currentTurnKeys, debugRecord?.turnId);
+  addCurrentId(currentTurnKeys, turnTruthTable?.turn_key);
+  addCurrentId(currentTurnKeys, turnTruthTable?.turnKey);
+  addCurrentId(currentTurnKeys, turnTruthTable?.turn_id);
+  addCurrentId(currentTurnKeys, turnTruthTable?.turnId);
+  const rowBelongsToCurrentTurn = (row: UnifiedDebugEventRow): boolean => {
+    if (row.traceId && currentTraceIds.has(row.traceId)) return true;
+    if (row.turnKey && currentTurnKeys.has(row.turnKey)) return true;
+    return currentTraceIds.size === 0 && currentTurnKeys.size === 0;
+  };
+  const normalizedCurrentQuestion = (args.reply.question ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  const relatedWorkstationTraceIds = new Set<string>();
+  if (normalizedCurrentQuestion) {
+    unifiedTimeline.forEach((row) => {
+      const rowText = `${row.detail ?? ""} ${row.text ?? ""}`.replace(/\s+/g, " ").trim().toLowerCase();
+      if (row.traceId?.startsWith("workstation-action:") && rowText.includes(normalizedCurrentQuestion)) {
+        relatedWorkstationTraceIds.add(row.traceId);
+      }
+    });
+  }
+  const rowBelongsToRelatedWorkstationAction = (row: UnifiedDebugEventRow): boolean =>
+    Boolean(row.traceId && relatedWorkstationTraceIds.has(row.traceId));
+  const transcriptRows: UnifiedDebugEventRow[] = visibleTranscriptEvents.map((event, idx) => {
+    const record = readAgentLoopAuditRecord(event) ?? {};
+    const atMs = typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : null;
+    const eventTraceId =
+      typeof record.trace_id === "string" && record.trace_id.trim()
+        ? record.trace_id.trim()
+        : debugTraceId;
+    const eventTurnKey =
+      typeof record.turn_id === "string" && record.turn_id.trim()
+        ? record.turn_id.trim()
+        : typeof record.turn_key === "string" && record.turn_key.trim()
+          ? record.turn_key.trim()
+          : null;
+    if (eventTraceId) currentTraceIds.add(eventTraceId);
+    if (eventTurnKey) currentTurnKeys.add(eventTurnKey);
+    return {
+      index: idx + 1,
+      channel: "ask_live" as const,
+      id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : `turn_transcript:${idx + 1}`,
+      tsMs: atMs,
+      tool: typeof record.role === "string" ? record.role : "agent",
+      traceId: eventTraceId,
+      turnKey: eventTurnKey,
+      attemptId: null,
+      stage: typeof record.type === "string" ? record.type : typeof record.source_event_type === "string" ? record.source_event_type : null,
+      detail: typeof record.detail === "string" ? record.detail : null,
+      text: summarizeVoiceDebugText(String(record.text ?? record.summary ?? record.detail ?? ""), 280),
+    };
+  });
+  const currentTurnEventLog = [
+    ...unifiedTimeline.filter((row) => rowBelongsToCurrentTurn(row) || rowBelongsToRelatedWorkstationAction(row)),
+    ...transcriptRows,
+  ].map((row, index) => ({
+    ...row,
+    index: index + 1,
+  }));
+  const selectedTraceIds = new Set<string>([...currentTraceIds, ...relatedWorkstationTraceIds]);
+  const selectedTurnKeys = new Set<string>(currentTurnKeys);
+  const currentTimeline = timeline.filter((row) => {
+    if (row.traceId && currentTraceIds.has(row.traceId)) return true;
+    if (row.turnKey && currentTurnKeys.has(row.turnKey)) return true;
+    if (row.traceId && relatedWorkstationTraceIds.has(row.traceId)) return true;
+    return currentTraceIds.size === 0 && currentTurnKeys.size === 0;
+  });
+  const agentLoopAuditForExport = readAgentLoopAuditRecord(args.reply.debug?.agent_loop_audit);
+  const finalAnswerContract =
+    readAgentLoopAuditRecord(agentLoopAuditForExport?.final_answer_contract) ??
+    readAgentLoopAuditRecord(readAgentLoopAuditRecord(turnTruthTable?.terminal)?.contract) ??
+    {
+      family:
+        typeof args.reply.debug?.final_answer_contract_family === "string"
+          ? args.reply.debug.final_answer_contract_family
+          : null,
+      pass:
+        typeof args.reply.debug?.final_answer_contract_pass === "boolean"
+          ? args.reply.debug.final_answer_contract_pass
+          : null,
+      fail_reason:
+        typeof args.reply.debug?.final_answer_contract_fail_reason === "string"
+          ? args.reply.debug.final_answer_contract_fail_reason
+          : null,
+      repair_attempted: args.reply.debug?.final_answer_contract_repair_attempted === true,
+      repair_applied: args.reply.debug?.final_answer_contract_repair_applied === true,
+    };
   const visibleTerminal = resolveHelixAskVisibleTerminal(args.reply, args.reply.content);
   // Keep the debug export anchored to the visible UI answer: visible_answer_text: args.reply.content
   const visibleAnswerText = visibleTerminal.text || args.reply.content;
   const backendTerminalText = visibleTerminal.backendTerminalText;
+  const visibleTerminalKind = resolveHelixVisibleTerminalKind({
+    reply: args.reply,
+    terminal: readAgentLoopAuditRecord(turnTruthTable?.terminal),
+    extraSources: [debugRecord, turnTruthTable, agentLoopAuditForExport],
+  });
   const terminalMismatch = Boolean(
     backendTerminalText &&
       visibleAnswerText &&
@@ -8325,17 +8685,99 @@ function buildReplyMasterEventClockExport(args: {
   const workspaceSnapshotRecord = asObjectRecord(debugRecord?.workspace_context_snapshot ?? null);
   const debugWorkspaceDocPath = normalizeDocPathForDebugCompare(workspaceSnapshotRecord?.activeDocPath);
   const channelDocViewerPath = normalizeDocPathForDebugCompare(args.docViewerState.currentPath);
+  const debugActivePanel = typeof workspaceSnapshotRecord?.activePanel === "string" ? workspaceSnapshotRecord.activePanel : null;
   const docViewerStateMatchesWorkspaceSnapshot =
-    !debugWorkspaceDocPath || Boolean(channelDocViewerPath && channelDocViewerPath === debugWorkspaceDocPath);
+    channelDocViewerPath && debugActivePanel === "docs-viewer"
+      ? Boolean(debugWorkspaceDocPath && channelDocViewerPath === debugWorkspaceDocPath)
+      : !debugWorkspaceDocPath || Boolean(channelDocViewerPath && channelDocViewerPath === debugWorkspaceDocPath);
   const docViewerMismatchReason = docViewerStateMatchesWorkspaceSnapshot
     ? null
-    : channelDocViewerPath
-      ? "path_mismatch"
-      : "doc_viewer_current_path_missing";
+    : channelDocViewerPath && !debugWorkspaceDocPath
+      ? "doc_viewer_path_missing_from_workspace_snapshot"
+      : channelDocViewerPath
+        ? "path_mismatch"
+        : "doc_viewer_current_path_missing";
+  const currentTurnActionText = [
+    ...currentTurnEventLog.map((row) => `${row.tool ?? ""} ${row.stage ?? ""} ${row.detail ?? ""} ${row.text ?? ""}`),
+    ...(Array.isArray(args.reply.debug?.execution_trace) ? args.reply.debug.execution_trace : []),
+    ...(Array.isArray(args.reply.debug?.step_results) ? args.reply.debug.step_results : []),
+  ]
+    .map((entry) => (typeof entry === "string" ? entry : safeJsonStringify(entry)))
+    .join("\n");
+  const currentTurnActionSummary = {
+    hasSearchDocs: /\b(?:docs-viewer\.)?search_docs\b/.test(currentTurnActionText),
+    hasOpenDocByPath: /\b(?:docs-viewer\.)?open_doc_by_path\b/.test(currentTurnActionText),
+    hasOpenLatestDocByTopic: /\b(?:docs-viewer\.)?open_latest_doc_by_topic\b/.test(currentTurnActionText),
+    hasOpenDocIntent:
+      /\b(?:open|go to|view|show|pull up|navigate to)\b[\s\S]{0,120}\b(?:doc|docs|document|paper|result)\b/i.test(
+        args.reply.question ?? "",
+      ),
+    hasAppendNote: /\b(?:workstation-notes\.)?append_to_note\b/.test(currentTurnActionText),
+    hasCreateNote: /\b(?:workstation-notes\.)?create_note\b/.test(currentTurnActionText),
+    hasLocateInDoc: /\b(?:docs-viewer\.)?locate_in_doc\b/.test(currentTurnActionText),
+  };
+  const openDocApplicable =
+    currentTurnActionSummary.hasOpenDocByPath ||
+    currentTurnActionSummary.hasOpenLatestDocByTopic ||
+    (currentTurnActionSummary.hasSearchDocs && currentTurnActionSummary.hasOpenDocIntent) ||
+    args.reply.debug?.open_doc_goal_satisfied === true ||
+    (typeof args.reply.debug?.open_doc_selected_path === "string" && args.reply.debug.open_doc_selected_path.trim().length > 0) ||
+    (typeof args.reply.debug?.open_doc_selection_reason === "string" && args.reply.debug.open_doc_selection_reason.trim().length > 0) ||
+    (typeof args.reply.debug?.open_doc_terminal_contract_fail_reason === "string" &&
+      args.reply.debug.open_doc_terminal_contract_fail_reason.trim().length > 0);
+  const openDocContract = {
+    applicable: openDocApplicable,
+    goal_satisfied: openDocApplicable ? args.reply.debug?.open_doc_goal_satisfied === true : null,
+    selected_path:
+      typeof args.reply.debug?.open_doc_selected_path === "string" &&
+      args.reply.debug.open_doc_selected_path.trim()
+        ? args.reply.debug.open_doc_selected_path.trim()
+        : null,
+    selection_reason:
+      typeof args.reply.debug?.open_doc_selection_reason === "string" &&
+      args.reply.debug.open_doc_selection_reason.trim()
+        ? args.reply.debug.open_doc_selection_reason.trim()
+        : null,
+    terminal_contract_pass: openDocApplicable ? args.reply.debug?.open_doc_terminal_contract_pass === true : null,
+    terminal_contract_fail_reason:
+      openDocApplicable &&
+      typeof args.reply.debug?.open_doc_terminal_contract_fail_reason === "string" &&
+      args.reply.debug.open_doc_terminal_contract_fail_reason.trim()
+        ? args.reply.debug.open_doc_terminal_contract_fail_reason.trim()
+        : null,
+  };
+  const debugAuditSummary = {
+    question: args.reply.question ?? null,
+    route:
+      typeof turnTruthTable?.route_reason_code === "string"
+        ? turnTruthTable.route_reason_code
+        : typeof args.reply.debug?.route_reason_code === "string"
+          ? args.reply.debug.route_reason_code
+          : typeof args.reply.debug?.server_route_reason_code === "string"
+            ? args.reply.debug.server_route_reason_code
+            : null,
+    policy:
+      typeof turnTruthTable?.dispatch_policy === "string"
+        ? turnTruthTable.dispatch_policy
+        : typeof args.reply.debug?.dispatch_policy === "string"
+          ? args.reply.debug.dispatch_policy
+          : typeof args.reply.debug?.server_dispatch_policy === "string"
+            ? args.reply.debug.server_dispatch_policy
+            : null,
+    terminalMismatch,
+    docViewerStateMatchesWorkspaceSnapshot,
+    openDocContract,
+    currentTurnActionSummary,
+  };
 
   const payload = {
     schema: "helix.ask.master_event_clock.v2",
     exportedAt: new Date().toISOString(),
+    selectedDebugTurnId: args.reply.id,
+    selectedDebugQuestion: args.reply.question ?? null,
+    selectedDebugFinalAnswer: visibleAnswerText,
+    selectedDebugTraceIds: [...selectedTraceIds],
+    selectedDebugSource: "reply_payload",
     reply: {
       id: args.reply.id,
       mode: args.reply.mode ?? null,
@@ -8346,14 +8788,23 @@ function buildReplyMasterEventClockExport(args: {
       events: args.events.length,
       timelineRows: timeline.length,
       unifiedTimelineRows: unifiedTimeline.length,
+      currentTurnTimelineRows: currentTimeline.length,
+      currentTurnEventLogRows: currentTurnEventLog.length,
       askLiveRows: askRows.length,
       observerRows: observerRows.length,
       voiceTimelineRows: voiceRows.length,
-      traceIds: traceIds.size,
-      turnKeys: turnKeys.size,
+      traceIds: selectedTraceIds.size,
+      sessionTraceIds: traceIds.size,
+      turnKeys: selectedTurnKeys.size,
+      sessionTurnKeys: turnKeys.size,
       attemptIds: attemptIds.size,
     },
     trace: {
+      traceIds: [...selectedTraceIds],
+      turnKeys: [...selectedTurnKeys],
+      attemptIds: [...attemptIds],
+    },
+    sessionTrace: {
       traceIds: [...traceIds],
       turnKeys: [...turnKeys],
       attemptIds: [...attemptIds],
@@ -8367,6 +8818,7 @@ function buildReplyMasterEventClockExport(args: {
           backend_terminal_answer: backendTerminalText,
           terminal_source: visibleTerminal.source,
           terminal_mismatch: terminalMismatch,
+          final_answer_contract: finalAnswerContract,
         }
       : {
           schema: "helix.ask.turn_truth_table.v1",
@@ -8374,12 +8826,13 @@ function buildReplyMasterEventClockExport(args: {
           backend_terminal_answer: backendTerminalText,
           terminal_source: visibleTerminal.source,
           terminal_mismatch: terminalMismatch,
+          final_answer_contract: finalAnswerContract,
         },
     turnTruthTableSummary: [
       "TURN TRUTH TABLE",
       `Route: ${String(turnTruthTable?.dispatch_policy ?? "n/a")} / ${String(turnTruthTable?.route_reason_code ?? "n/a")}`,
       `Tool: ${readProceduralActionLabel(turnTruthTable?.selected_tool)}`,
-      `Terminal: ${String(readAgentLoopAuditRecord(turnTruthTable?.terminal)?.kind ?? "n/a")} | ${clipText(
+      `Terminal: ${visibleTerminalKind} | ${clipText(
         String(backendTerminalText ?? readAgentLoopAuditRecord(turnTruthTable?.terminal)?.text ?? args.reply.content ?? ""),
         240,
       )}`,
@@ -8390,8 +8843,21 @@ function buildReplyMasterEventClockExport(args: {
     ].join("\n"),
     docViewerStateMatchesWorkspaceSnapshot,
     docViewerMismatchReason,
+    openDocContract,
+    currentTurnOnly: {
+      traceIds: [...selectedTraceIds],
+      turnKeys: [...selectedTurnKeys],
+      timeline: currentTimeline,
+      eventLog: currentTurnEventLog,
+      actionSummary: currentTurnActionSummary,
+    },
+    debugAuditSummary,
     agentLoop: {
-      audit: readAgentLoopAuditRecord(args.reply.debug?.agent_loop_audit),
+      audit: agentLoopAuditForExport,
+      final_answer_contract: finalAnswerContract,
+      final_answer_contract_family: finalAnswerContract?.family ?? null,
+      final_answer_contract_pass: finalAnswerContract?.pass ?? null,
+      final_answer_contract_fail_reason: finalAnswerContract?.fail_reason ?? null,
       turn_truth_table: turnTruthTable,
       planner_contract: readAgentLoopAuditRecord(args.reply.debug?.planner_contract),
       execution_trace: Array.isArray(args.reply.debug?.execution_trace) ? args.reply.debug?.execution_trace : [],
@@ -8400,10 +8866,18 @@ function buildReplyMasterEventClockExport(args: {
         : [],
       step_results: Array.isArray(args.reply.debug?.step_results) ? args.reply.debug?.step_results : [],
       turn_events: Array.isArray(args.reply.debug?.turn_events) ? args.reply.debug?.turn_events : [],
-      turn_transcript_events: resolveHelixTurnTranscriptEvents(args.reply),
+      turn_transcript_events: visibleTranscriptEvents,
+      raw_turn_transcript_event_count: rawTranscriptEvents.length,
+      visible_turn_transcript_event_count: visibleTranscriptEvents.length,
+      deduped_turn_transcript_event_count: Math.max(0, rawTranscriptEvents.length - visibleTranscriptEvents.length),
+      raw_job_ready_links: rawJobReadyLinks,
+      visible_job_ready_links: rawJobReadyLinks,
+      job_ready_links_source:
+        typeof args.reply.debug?.job_ready_links_source === "string" ? args.reply.debug.job_ready_links_source : null,
+      suppressed_job_ready_links: suppressedJobReadyLinks,
       turn_transcript_source:
         typeof args.reply.debug?.turn_transcript_source === "string" ? args.reply.debug.turn_transcript_source : null,
-      visible_event_count: resolveHelixTurnTranscriptEvents(args.reply).length,
+      visible_event_count: visibleTranscriptEvents.length,
       backend_event_count: Array.isArray(args.reply.debug?.turn_events) ? args.reply.debug.turn_events.length : 0,
       event_source:
         typeof args.reply.debug?.turn_transcript_source === "string" ? args.reply.debug.turn_transcript_source : null,
@@ -8456,6 +8930,7 @@ function buildReplyMasterEventClockExport(args: {
         ? args.reply.debug?.invariant_violations
         : [],
       latest_result_artifact: readAgentLoopAuditRecord(args.reply.debug?.latest_result_artifact),
+      open_doc_contract: openDocContract,
     },
     channels: {
       voice: sanitizeVoiceDiagnosticsForExport(args.voiceDiagnostics),
@@ -8466,10 +8941,71 @@ function buildReplyMasterEventClockExport(args: {
       docViewer: args.docViewerState,
       workstationLayout: args.workstationLayoutState,
     },
-    timeline,
-    eventLog: unifiedTimeline,
+    timeline: currentTimeline,
+    eventLog: currentTurnEventLog,
+    historyTimeline: timeline,
+    historyEventLog: unifiedTimeline,
   };
   return safeJsonStringify(payload);
+}
+
+function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: string): string {
+  const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+  const visibleAnswerText = visibleTerminal.text || reply.content || "";
+  return safeJsonStringify({
+    schema: "helix.ask.unified_debug.v1",
+    exportedAt: new Date().toISOString(),
+    error: {
+      kind: "debug_export_incomplete",
+      message: "Unified debug state was unavailable for the current turn.",
+      reason,
+    },
+    currentTurn: {
+      id: reply.id,
+      mode: reply.mode ?? null,
+      question: reply.question ?? null,
+    },
+    visibleAnswerState: {
+      question: reply.question ?? null,
+      finalAnswer: visibleAnswerText,
+      terminalSource: visibleTerminal.source,
+      backendTerminalAnswer: visibleTerminal.backendTerminalText,
+    },
+    finalAnswer: visibleAnswerText,
+    plannerContract: readAgentLoopAuditRecord(reply.debug?.planner_contract),
+    executionTrace: Array.isArray(reply.debug?.execution_trace) ? reply.debug.execution_trace : [],
+    stepResults: Array.isArray(reply.debug?.step_results) ? reply.debug.step_results : [],
+    turnEvents: Array.isArray(reply.debug?.turn_events) ? reply.debug.turn_events : [],
+    pendingServerRequest: readAgentLoopAuditRecord(reply.debug?.pending_request),
+  });
+}
+
+function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string | null | undefined): string {
+  const trimmed = typeof payload === "string" ? payload.trim() : "";
+  if (!trimmed) return buildFallbackReplyMasterDebugExport(reply, "empty_payload");
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    if (parsed && typeof parsed === "object") {
+      const hasVisibleAnswer =
+        typeof parsed.selectedDebugFinalAnswer === "string" ||
+        typeof parsed.finalAnswer === "string" ||
+        Boolean(readAgentLoopAuditRecord(parsed.visibleAnswerState)?.finalAnswer);
+      if (!hasVisibleAnswer) {
+        return safeJsonStringify({
+          ...parsed,
+          schema: typeof parsed.schema === "string" ? parsed.schema : "helix.ask.master_event_clock.v2",
+          visibleAnswerState: {
+            question: reply.question ?? null,
+            finalAnswer: resolveHelixAskVisibleTerminal(reply, reply.content).text || reply.content || "",
+          },
+          finalAnswer: resolveHelixAskVisibleTerminal(reply, reply.content).text || reply.content || "",
+        });
+      }
+    }
+    return trimmed;
+  } catch {
+    return buildFallbackReplyMasterDebugExport(reply, "invalid_json_payload");
+  }
 }
 
 function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
@@ -9152,12 +9688,10 @@ function resolvePanelIdFromText(value: string): PanelDefinition["id"] | null {
 
 function resolvePanelIdFromPath(value: string): PanelDefinition["id"] | null {
   const normalized = value.replace(/\\/g, "/").toLowerCase();
-  for (const hint of HELIX_FILE_PANEL_HINTS) {
-    if (hint.pattern.test(normalized) && getPanelDef(hint.panelId)) {
-      return hint.panelId;
-    }
+  if ((/(^|\/)docs\//i.test(normalized) || /\.md$/i.test(normalized)) && getPanelDef("docs-viewer")) {
+    return "docs-viewer";
   }
-  return resolvePanelIdFromText(normalized);
+  return null;
 }
 
 function parseOpenPanelCommand(value: string): PanelDefinition["id"] | null {
@@ -12274,6 +12808,29 @@ export function HelixAskPill({
     [launchAtomicViewer, onRunWorkstationAction],
   );
 
+  const runJobReadyLink = useCallback(
+    (rawLink: unknown) => {
+      const link = readAgentLoopAuditRecord(rawLink);
+      const panelId = typeof link?.panel_id === "string" ? link.panel_id.trim() : "";
+      const actionId = typeof link?.action_id === "string" ? link.action_id.trim() : "";
+      if (!panelId || !actionId) return;
+      const args = readAgentLoopAuditRecord(link?.args) ?? {};
+      const action: HelixWorkstationAction = {
+        action: "run_panel_action",
+        panel_id: panelId,
+        action_id: actionId,
+        args,
+      };
+      syncDocViewerStateFromWorkstationAction(action);
+      if (onRunWorkstationAction) {
+        onRunWorkstationAction(action);
+        return;
+      }
+      dispatchHelixWorkstationActions([action]);
+    },
+    [onRunWorkstationAction],
+  );
+
   const renderHelixAskTextWithPathLinks = useCallback(
     (text: string, keyPrefix: string): ReactNode[] => {
       const parts: ReactNode[] = [];
@@ -12627,18 +13184,25 @@ export function HelixAskPill({
   );
 
   const handleCopyReplyMasterDebug = useCallback(
-    async (replyId: string, payload: string) => {
-      if (!payload || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+    async (reply: HelixAskReply, payload: string | null | undefined) => {
+      const exportPayload = normalizeReplyMasterDebugPayload(reply, payload);
+      if (typeof window !== "undefined") {
+        (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
+      }
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
         return;
       }
       try {
-        await navigator.clipboard.writeText(payload);
-        setCopiedReplyMasterDebugId(replyId);
+        await navigator.clipboard.writeText(exportPayload);
+        setCopiedReplyMasterDebugId(reply.id);
         window.setTimeout(() => {
-          setCopiedReplyMasterDebugId((current) => (current === replyId ? null : current));
+          setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
         }, 1400);
       } catch {
-        // ignore clipboard failures
+        if (typeof window !== "undefined") {
+          (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
+            "clipboard_write_failed";
+        }
       }
     },
     [],
@@ -21695,9 +22259,27 @@ export function HelixAskPill({
     [askLiveEvents],
   );
   const observerLaneEvents = useMemo(() => {
+    if (!askBusy) return [];
+    const activeTraceId = (askLiveTraceId ?? "").trim();
+    const seen = new Set<string>();
     return [...helixTimeline]
       .sort((left, right) => right.updatedAtMs - left.updatedAtMs)
       .filter((entry) => {
+        if (activeTraceId) {
+          const entryTraceId = (entry.traceId ?? "").trim();
+          const entryMeta = readAgentLoopAuditRecord(entry.meta);
+          const entryParentTraceId = coerceText(
+            entryMeta?.parent_trace_id ??
+              entryMeta?.parentTraceId ??
+              entryMeta?.ask_trace_id ??
+              entryMeta?.askTraceId ??
+              entryMeta?.turn_id ??
+              entryMeta?.turnId,
+          ).trim();
+          if (entryTraceId && entryTraceId !== activeTraceId && entryParentTraceId !== activeTraceId) {
+            return false;
+          }
+        }
         const detail = (entry.detail ?? "").trim().toLowerCase();
         return (
           (entry.type === "action_receipt" && detail.includes("observer_lane_commentary")) ||
@@ -21705,14 +22287,26 @@ export function HelixAskPill({
           entry.type === "suppressed"
         );
       })
-      .map((entry) => ({
-        id: `observer:${entry.id}`,
-        text: clipText(entry.text, 320),
-        tsMs: Number.isFinite(entry.updatedAtMs) ? entry.updatedAtMs : entry.createdAtMs,
-        traceId: entry.traceId ?? null,
-      }))
+      .map((entry) => {
+        const text = clipText(entry.text, 320);
+        return {
+          id: `observer:${entry.id}`,
+          text,
+          tsMs: Number.isFinite(entry.updatedAtMs) ? entry.updatedAtMs : entry.createdAtMs,
+          traceId: entry.traceId ?? null,
+          dedupeKey: [entry.type, entry.status, normalizeHelixVisibleEventText(text)]
+            .filter(Boolean)
+            .join("|"),
+        };
+      })
+      .filter((event) => {
+        if (!event.dedupeKey) return true;
+        if (seen.has(event.dedupeKey)) return false;
+        seen.add(event.dedupeKey);
+        return true;
+      })
       .slice(0, 12);
-  }, [helixTimeline]);
+  }, [askBusy, askLiveTraceId, helixTimeline]);
 
   const buildConvergenceSnapshot = useCallback(
     (args: {
@@ -21750,6 +22344,50 @@ export function HelixAskPill({
   }, []);
 
   const resolveReplyEvents = useCallback((reply: HelixAskReply): AskLiveEventEntry[] => {
+    const transcriptEvents = Array.isArray(reply.debug?.turn_transcript_events)
+      ? reply.debug.turn_transcript_events
+      : [];
+    if (transcriptEvents.length > 0) {
+      return transcriptEvents
+        .map((entry, index): AskLiveEventEntry | null => {
+          const record = readAgentLoopAuditRecord(entry);
+          if (!record) return null;
+          const stage = typeof record.type === "string" ? record.type : typeof record.source_event_type === "string" ? record.source_event_type : null;
+          const detail = typeof record.detail === "string" ? record.detail : null;
+          const status = typeof record.status === "string" ? record.status : null;
+          const traceId = typeof record.trace_id === "string" ? record.trace_id : typeof reply.debug?.trace_id === "string" ? reply.debug.trace_id : null;
+          const turnKey =
+            typeof record.turn_id === "string"
+              ? record.turn_id
+              : typeof record.turn_key === "string"
+                ? record.turn_key
+                : typeof reply.debug?.turn_id === "string"
+                  ? reply.debug.turn_id
+                  : null;
+          const text = String(record.text ?? record.summary ?? detail ?? stage ?? "Helix Ask update").trim();
+          return {
+            id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : `${reply.id}-transcript-${index}`,
+            text,
+            tool: typeof record.role === "string" ? record.role : "agent",
+            tsMs: typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : undefined,
+            meta: {
+              stage,
+              detail,
+              status,
+              traceId,
+              turnKey,
+              stepId: typeof record.step_id === "string" ? record.step_id : null,
+              lane: typeof record.lane === "string" ? record.lane : null,
+              superseded_by_step_id:
+                typeof record.superseded_by_step_id === "string" ? record.superseded_by_step_id : null,
+              superseded_reason: typeof record.superseded_reason === "string" ? record.superseded_reason : null,
+              source_event_type: typeof record.source_event_type === "string" ? record.source_event_type : null,
+              event_source: typeof record.event_source === "string" ? record.event_source : null,
+            },
+          };
+        })
+        .filter((event): event is AskLiveEventEntry => event !== null);
+    }
     if (reply.liveEvents && reply.liveEvents.length > 0) {
       return reply.liveEvents;
     }
@@ -22497,11 +23135,14 @@ export function HelixAskPill({
         enqueueReasoningAttempt(backgroundAttempt.id);
       }
       reasoningAttemptManualIdRef.current = plannedManualAttempt?.id ?? null;
+      const unifiedAskTurnBriefLane = HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG;
       const manualBriefTimelineEntry = addHelixTimelineEntry({
         type: "conversation_brief",
         source: "manual",
-        status: manualDispatchHint ? "queued" : simpleDirectPromptLane ? "done" : "suppressed",
-        text: manualDispatchHint
+        status: unifiedAskTurnBriefLane ? "queued" : manualDispatchHint ? "queued" : simpleDirectPromptLane ? "done" : "suppressed",
+        text: unifiedAskTurnBriefLane
+          ? "Planning turn through unified agent loop."
+          : manualDispatchHint
           ? formatVoiceDecisionSentence({
               lifecycle: "queued",
               mode: normalizeConversationModeForDispatch(inferredMode) ?? "observe",
@@ -22516,7 +23157,9 @@ export function HelixAskPill({
                 ? "Normal turn mode: responding directly without queued reasoning."
               : "Direct reply mode: handling this request immediately."
             : "Quick reply mode: no background reasoning queued for this turn.",
-        detail: manualDispatchHint
+        detail: unifiedAskTurnBriefLane
+          ? "unified ask/turn intake"
+          : manualDispatchHint
           ? "manual dispatch queued"
           : backgroundWorkspaceReasoningLane
             ? "manual direct lane + background workspace reasoning queued"
@@ -22538,6 +23181,7 @@ export function HelixAskPill({
           docsViewerWorkstationLane,
           backgroundWorkspaceReasoningLane,
           backgroundAttemptId: backgroundAttempt?.id ?? null,
+          ui_turn_contract_source: unifiedAskTurnBriefLane ? "ask_turn" : "legacy_local",
         },
       });
       setAskLiveSessionId(sessionId ?? null);
@@ -22677,6 +23321,7 @@ export function HelixAskPill({
           const firstEnvelopeAction = Array.isArray(responseActionEnvelope?.workstation_actions)
             ? responseActionEnvelope.workstation_actions[0]
             : undefined;
+          const localResponseRecord = localResponse as unknown as Record<string, unknown>;
           if (responseDebugWithClientMode || HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
             responseDebugWithClientMode = {
               ...responseDebugWithClientMode,
@@ -22731,7 +23376,22 @@ export function HelixAskPill({
               turn_contract: localResponse.turn_contract ?? null,
               invariant_violations: localResponse.invariant_violations ?? [],
               latest_result_artifact: localResponse.latest_result_artifact ?? null,
-              terminal_artifact: readAgentLoopAuditRecord((localResponse as unknown as Record<string, unknown>).terminal_artifact),
+              job_ready_links: localResponse.job_ready_links ?? [],
+              job_ready_links_source: localResponseRecord.job_ready_links_source ?? null,
+              job_ready_links_suppressed: localResponseRecord.job_ready_links_suppressed ?? [],
+              open_doc_goal_satisfied: localResponseRecord.open_doc_goal_satisfied === true,
+              open_doc_selected_path:
+                typeof localResponseRecord.open_doc_selected_path === "string" ? localResponseRecord.open_doc_selected_path : null,
+              open_doc_selection_reason:
+                typeof localResponseRecord.open_doc_selection_reason === "string"
+                  ? localResponseRecord.open_doc_selection_reason
+                  : null,
+              open_doc_terminal_contract_pass: localResponseRecord.open_doc_terminal_contract_pass === true,
+              open_doc_terminal_contract_fail_reason:
+                typeof localResponseRecord.open_doc_terminal_contract_fail_reason === "string"
+                  ? localResponseRecord.open_doc_terminal_contract_fail_reason
+                  : null,
+              terminal_artifact: readAgentLoopAuditRecord(localResponseRecord.terminal_artifact),
               ui_terminal_source: terminalResolution.source,
               ui_backend_terminal_answer: terminalResolution.backendTerminalText,
             };
@@ -23790,14 +24450,37 @@ export function HelixAskPill({
     });
   }, [helixTimeline]);
 
+  const activeHelixTimelineFeed = useMemo(() => {
+    if (!askBusy) return [];
+    const activeTraceId = (askLiveTraceId ?? "").trim();
+    if (!activeTraceId) {
+      return helixTimelineFeed.filter(
+        (entry) => entry.status === "queued" || entry.status === "running" || entry.status === "streaming",
+      );
+    }
+    return helixTimelineFeed.filter((entry) => {
+      const entryTraceId = (entry.traceId ?? "").trim();
+      const entryMeta = readAgentLoopAuditRecord(entry.meta);
+      const entryParentTraceId = coerceText(
+        entryMeta?.parent_trace_id ??
+          entryMeta?.parentTraceId ??
+          entryMeta?.ask_trace_id ??
+          entryMeta?.askTraceId ??
+          entryMeta?.turn_id ??
+          entryMeta?.turnId,
+      ).trim();
+      return entryTraceId === activeTraceId || entryParentTraceId === activeTraceId;
+    });
+  }, [askBusy, askLiveTraceId, helixTimelineFeed]);
+
   const latestConversationBrief = useMemo(
-    () => helixTimelineFeed.find((entry) => entry.type === "conversation_brief") ?? null,
-    [helixTimelineFeed],
+    () => activeHelixTimelineFeed.find((entry) => entry.type === "conversation_brief") ?? null,
+    [activeHelixTimelineFeed],
   );
 
   const latestTimelineEvent = useMemo(
-    () => helixTimelineFeed.find((entry) => entry.type !== "conversation_brief") ?? null,
-    [helixTimelineFeed],
+    () => activeHelixTimelineFeed.find((entry) => entry.type !== "conversation_brief") ?? null,
+    [activeHelixTimelineFeed],
   );
 
   const sessionCapsuleState = useMemo(
@@ -24574,7 +25257,7 @@ export function HelixAskPill({
                 <p className="mt-0.5 whitespace-pre-wrap text-cyan-100/90">{latestConversationBrief.text}</p>
               </div>
             ) : null}
-            {userSettings.showHelixAskObserverLane ? (
+            {userSettings.showHelixAskObserverLane && (askBusy || observerLaneEvents.length > 0) ? (
               <div className="-mt-1 px-4 pb-2 text-[11px]">
                 <div className="rounded border border-cyan-400/25 bg-cyan-950/20 p-2">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Observer lane</p>
@@ -24940,15 +25623,18 @@ export function HelixAskPill({
                     {askLiveFallbackSignals.join(" | ")}
                   </p>
                 ) : null}
-                {askLiveEvents.length > 0 ? (
+                {askBusy && askLiveEvents.length > 0 ? (
                   <div className="mt-2 max-h-44 overflow-y-auto rounded border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
                     {askLiveEvents.map((entry) => {
                       const warning = isAskLiveEventWarning(entry);
+                      const superseded = isAskLiveEventSuperseded(entry);
                       return (
                         <details
                           key={entry.id}
                           className={`mb-1 rounded border px-1.5 py-1 last:mb-0 ${
-                            warning
+                            superseded
+                              ? "border-slate-700/60 bg-slate-900/30 opacity-70"
+                              : warning
                               ? "border-amber-400/40 bg-amber-950/15"
                               : "border-slate-700/70 bg-black/20"
                           }`}
@@ -25034,9 +25720,14 @@ export function HelixAskPill({
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
             const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
-            const pendingAgentRequest = readAgentLoopAuditRecord(replyDebugRecord?.pending_request);
+            const pendingAgentRequest = resolveHelixPendingInputRecord(reply, replyDebugRecord, agentLoopAudit, runtimeSummary);
             const finalComposerConsumedArtifacts = Array.isArray(replyDebugRecord?.final_composer_consumed_artifacts)
               ? replyDebugRecord.final_composer_consumed_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+              : [];
+            const jobReadyLinks = Array.isArray(replyDebugRecord?.job_ready_links)
+              ? replyDebugRecord.job_ready_links
+                  .map((entry) => readAgentLoopAuditRecord(entry))
+                  .filter((entry): entry is Record<string, unknown> => Boolean(entry?.panel_id && entry?.action_id))
               : [];
             const visibleDebugActionIds = Array.isArray(replyDebugRecord?.execution_trace)
               ? replyDebugRecord.execution_trace
@@ -25086,6 +25777,11 @@ export function HelixAskPill({
                 transcriptTerminal.backendTerminalText.trim() !== transcriptTerminal.text.trim(),
             );
             const transcriptTerminalRecord = readAgentLoopAuditRecord(runtimeSummary?.terminal);
+            const visibleTerminalKind = resolveHelixVisibleTerminalKind({
+              reply,
+              terminal: transcriptTerminalRecord,
+              extraSources: [replyDebugRecord, agentLoopAudit, runtimeSummary],
+            });
             const debugTraceOpen = Boolean(
               terminalMismatchForReply ||
                 pendingAgentRequest ||
@@ -25096,9 +25792,16 @@ export function HelixAskPill({
               transcriptTerminal.text || reply.content || reply.question || "Previous Helix Ask turn",
               180,
             );
+            const latestTurnTestId = isLatestReply ? "helix-ask-latest-turn" : undefined;
+            const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
+            const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
+            const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer" : undefined;
+            const latestCopyFinalTestId = isLatestReply ? "helix-ask-latest-copy-final" : undefined;
+            const latestDebugCopyTestId = isLatestReply ? "helix-ask-latest-debug-copy" : undefined;
             const replyCard = (
               <div
                   className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
+                  data-testid={latestTurnTestId}
                 >
                   <div
                     className={`pointer-events-none absolute inset-0 opacity-80 ${moodPalette.replyTint}`}
@@ -25126,7 +25829,10 @@ export function HelixAskPill({
                 ) : null}
                 <div className="space-y-3">
                   {reply.question ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100">
+                    <div
+                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+                      data-testid={latestQuestionTestId}
+                    >
                       <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Question</p>
                       <p className="mt-1 whitespace-pre-wrap leading-relaxed">{reply.question}</p>
                     </div>
@@ -25135,6 +25841,7 @@ export function HelixAskPill({
                     <details
                       open={askBusy}
                       className="rounded-2xl border border-sky-300/20 bg-slate-950/45 px-3 py-2 text-xs text-sky-50"
+                      data-testid={latestWorkLogTestId}
                     >
                       <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-sky-200">
                         Agent work log
@@ -25147,7 +25854,11 @@ export function HelixAskPill({
                       </summary>
                       <div className="mt-2 space-y-1.5">
                         {turnTranscriptRows.map((row, index) => (
-                          <div key={row.key} className="flex items-start gap-2 rounded-lg bg-black/15 px-2 py-1.5">
+                          <div
+                            key={row.key}
+                            className="flex items-start gap-2 rounded-lg bg-black/15 px-2 py-1.5"
+                            data-testid={isLatestReply ? "helix-ask-latest-work-log-row" : undefined}
+                          >
                             <span className="mt-0.5 rounded-full bg-sky-300/15 px-1.5 py-0.5 text-[10px] tabular-nums text-sky-100">
                               {index + 1}
                             </span>
@@ -25165,7 +25876,10 @@ export function HelixAskPill({
                       </div>
                     </details>
                   ) : null}
-                  <div className="rounded-2xl border border-cyan-300/30 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-50">
+                  <div
+                    className="rounded-2xl border border-cyan-300/30 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-50"
+                    data-testid={latestFinalAnswerTestId}
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Final answer</p>
                       <span
@@ -25181,6 +25895,33 @@ export function HelixAskPill({
                     <p className="mt-2 whitespace-pre-wrap leading-relaxed">
                       {renderHelixAskContent(transcriptAnswer)}
                     </p>
+                    {jobReadyLinks.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {jobReadyLinks.slice(0, 6).map((link, index) => {
+                          const label =
+                            typeof link.label === "string" && link.label.trim()
+                              ? link.label.trim()
+                              : `${String(link.panel_id)}.${String(link.action_id)}`;
+                          const source =
+                            typeof link.source_artifact_kind === "string" && link.source_artifact_kind.trim()
+                              ? link.source_artifact_kind.trim()
+                              : typeof link.source === "string"
+                                ? link.source
+                                : "artifact";
+                          return (
+                            <button
+                              key={`${String(link.type ?? "link")}-${String(link.panel_id)}-${String(link.action_id)}-${index}`}
+                              type="button"
+                              className="rounded-full border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100 hover:border-cyan-200/60 hover:bg-cyan-300/15"
+                              onClick={() => runJobReadyLink(link)}
+                              title={`From ${source}`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                     {hasLongText(transcriptTerminal.text || reply.content || "", HELIX_ASK_MAX_RENDER_CHARS) ? (
                       <button
                         type="button"
@@ -25231,6 +25972,15 @@ export function HelixAskPill({
                         {visibleDebugActualArtifacts.length > 0 ? (
                           <p className="mt-1">
                             Actual artifacts: {visibleDebugActualArtifacts.slice(0, 10).join(", ")}
+                          </p>
+                        ) : null}
+                        {jobReadyLinks.length > 0 ? (
+                          <p className="mt-1">
+                            Job-ready links:{" "}
+                            {jobReadyLinks
+                              .slice(0, 8)
+                              .map((link) => `${String(link.panel_id)}.${String(link.action_id)}`)
+                              .join(", ")}
                           </p>
                         ) : null}
                       </div>
@@ -25442,15 +26192,14 @@ export function HelixAskPill({
                   ) : null}
                   <p className="mt-1">
                     Terminal:{" "}
-                    {String(
-                      readAgentLoopAuditRecord(runtimeSummary?.terminal)?.kind ??
-                        readAgentLoopAuditRecord(agentLoopAudit?.terminal_contract)?.terminal_kind ??
-                        "n/a",
-                    )}
+                    {visibleTerminalKind !== "n/a"
+                      ? visibleTerminalKind
+                      : String(readAgentLoopAuditRecord(agentLoopAudit?.terminal_contract)?.terminal_kind ?? "n/a")}
                   </p>
                 </div>
               ) : null}
-              {userSettings.showHelixAskDebug &&
+              {isLatestReply &&
+              userSettings.showHelixAskDebug &&
               (replyEventLogPreview.length > 0 || objectiveReasoningTrace.length > 0) ? (
                 <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
                   <div className="flex items-center justify-between gap-2">
@@ -25596,10 +26345,16 @@ export function HelixAskPill({
                   ) : null}
                   {replyEventLogPreview.length > 0 ? (
                     <div className="mt-2 max-h-56 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
-                      {replyEventLogPreview.map((event) => (
+                      {replyEventLogPreview.map((event) => {
+                        const superseded = isAskLiveEventSuperseded(event);
+                        return (
                         <details
                           key={`${reply.id}-reasoning-log-${event.id}`}
-                          className="mb-1 rounded border border-slate-700/70 bg-black/20 px-1.5 py-1 last:mb-0"
+                          className={`mb-1 rounded border px-1.5 py-1 last:mb-0 ${
+                            superseded
+                              ? "border-slate-700/60 bg-slate-900/30 opacity-70"
+                              : "border-slate-700/70 bg-black/20"
+                          }`}
                         >
                           <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
                             {formatAskLiveEventLogLine(event)}
@@ -25608,13 +26363,15 @@ export function HelixAskPill({
                             {buildAskLiveEventLogDetailPayload(event)}
                           </pre>
                         </details>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
               ) : null}
                   </div>
                 </details>
+              {isLatestReply ? (
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
                 <span>
                   Saved in Helix Console
@@ -25626,26 +26383,26 @@ export function HelixAskPill({
                     onClick={() => void handleCopyReply(reply)}
                     className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-200"
                     aria-label="Copy response"
+                    data-testid={latestCopyFinalTestId}
                   >
                     Copy
                   </button>
                   {userSettings.showHelixAskDebug ? (
                     <button
                       type="button"
-                      onClick={() => void handleCopyReplyMasterDebug(reply.id, replyMasterEventClockPayload)}
+                      onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                       disabled={
-                        !replyMasterEventClockPayload ||
                         typeof navigator === "undefined" ||
                         typeof navigator.clipboard?.writeText !== "function"
                       }
                       className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                        replyMasterEventClockPayload &&
                         typeof navigator !== "undefined" &&
                         typeof navigator.clipboard?.writeText === "function"
                           ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
                           : "border-slate-600 text-slate-500"
                       }`}
                       aria-label="Debug copy"
+                      data-testid={latestDebugCopyTestId}
                     >
                       {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Unified Debug Copy"}
                     </button>
@@ -25679,6 +26436,7 @@ export function HelixAskPill({
                   ) : null}
                 </div>
               </div>
+              ) : null}
                 </div>
               </div>
               );
@@ -25703,7 +26461,30 @@ export function HelixAskPill({
                     expand
                   </span>
                 </summary>
-                <div className="mt-3 opacity-90">{replyCard}</div>
+                <div className="mt-3 opacity-90">
+                  {replyCard}
+                  {userSettings.showHelixAskDebug ? (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
+                        disabled={
+                          typeof navigator === "undefined" ||
+                          typeof navigator.clipboard?.writeText !== "function"
+                        }
+                        className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
+                          typeof navigator !== "undefined" &&
+                          typeof navigator.clipboard?.writeText === "function"
+                            ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+                            : "border-slate-600 text-slate-500"
+                        }`}
+                        aria-label="Debug copy previous turn"
+                      >
+                        {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Unified Debug Copy"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </details>
             );
             })}
