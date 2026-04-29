@@ -22,9 +22,14 @@ import {
 type DesktopTaskbarProps = {
   onOpenPanel?: (panelId: string) => void;
   showStart?: boolean;
+  showWindowTabs?: boolean;
 };
 
-export function DesktopTaskbar({ onOpenPanel, showStart = true }: DesktopTaskbarProps) {
+export function DesktopTaskbar({
+  onOpenPanel,
+  showStart = true,
+  showWindowTabs = true
+}: DesktopTaskbarProps) {
   const { open } = useDesktopStore();
   const handleOpenTaskbarPanel = React.useCallback(() => open("taskbar"), [open]);
 
@@ -46,7 +51,11 @@ export function DesktopTaskbar({ onOpenPanel, showStart = true }: DesktopTaskbar
         <div className="relative flex w-full items-center gap-3">
           {showStart ? <HelixStartLauncher onOpenPanel={onOpenPanel} /> : null}
           <div className="flex-1 overflow-hidden">
-            <TaskbarShelf variant="fixed" onOpenFloatingTaskbar={handleOpenTaskbarPanel} />
+            <TaskbarShelf
+              variant="fixed"
+              showWindowTabs={showWindowTabs}
+              onOpenFloatingTaskbar={handleOpenTaskbarPanel}
+            />
           </div>
         </div>
       </div>

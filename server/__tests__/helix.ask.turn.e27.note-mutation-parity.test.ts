@@ -115,7 +115,7 @@ describe("helix ask E27 note mutation parity", () => {
       .expect(200);
 
     expect(answerText(locateAppend.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the centerline alpha location\\.`));
-    expect(answerText(locateAppend.body)).toMatch(/Location:\s+\/docs\/.+?:L\d+(?:-L\d+)?/i);
+    expect(answerText(locateAppend.body)).toMatch(/Location:\s*\n- .+?, L\d+(?:-L\d+)?\n\s+Path: \/docs\/.+?:L\d+(?:-L\d+)?/i);
     expect(locateAppend.body?.final_composer_source).toBe("note_update_receipt");
     expect(stepArtifacts(locateAppend.body).some((artifact) => artifact?.kind === "doc_location_matches")).toBe(true);
     expect(stepArtifacts(locateAppend.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
@@ -160,7 +160,7 @@ describe("helix ask E27 note mutation parity", () => {
     expect(finalPacket).toBeTruthy();
     const finalText = answerText(finalPacket);
     expect(finalText).toMatch(new RegExp(`^Updated ${noteTitle} with the centerline alpha location\\.`));
-    expect(finalText).toMatch(/Location:\s+\/docs\/.+?:L\d+(?:-L\d+)?/i);
+    expect(finalText).toMatch(/Location:\s*\n- .+?, L\d+(?:-L\d+)?\n\s+Path: \/docs\/.+?:L\d+(?:-L\d+)?/i);
     expect(finalText).not.toMatch(/^Reminder:\s*Review/i);
     expect(finalPacket?.terminal_artifact?.text).toBe(finalText);
     expect(finalPacket?.latest_result_artifact?.text).toBe(finalText);

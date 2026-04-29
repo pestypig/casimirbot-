@@ -785,6 +785,7 @@ export default function DesktopPage() {
         <DesktopTaskbar
           onOpenPanel={openPanelUniversal}
           showStart={!workstationEnabled}
+          showWindowTabs={!workstationEnabled}
         />
       </div>
 

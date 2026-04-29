@@ -48,8 +48,10 @@ describe("helix ask E26 latest doc selection", () => {
     expect(response.body?.latest_doc_contract_pass).toBe(true);
     expect(answerText(response.body)).toContain(selection?.selected_path);
     expect(answerText(response.body)).toContain("Opened latest verified NHM2 warp solve candidate:");
+    expect(answerText(response.body)).toMatch(/Document:\n- .+\n\s+Path: \/docs\//);
     expect(answerText(response.body)).not.toMatch(/^Opened document:/);
-    expect(answerText(response.body)).toContain(`Skipped stale latest alias: ${staleLatestAlias}`);
+    expect(answerText(response.body)).toContain("Skipped stale latest alias:");
+    expect(answerText(response.body)).toContain(`Path: ${staleLatestAlias}`);
   }, 60000);
 
   it("exposes latest-doc debug fields for open latest turns", async () => {
@@ -82,7 +84,8 @@ describe("helix ask E26 latest doc selection", () => {
       })
       .expect(200);
 
-    expect(answerText(response.body)).toContain(`Opened document: ${explicitPath}`);
+    expect(answerText(response.body)).toContain("Opened document:");
+    expect(answerText(response.body)).toContain(`Path: ${explicitPath}`);
     expect(answerText(response.body)).not.toContain("latest verified");
     expect(response.body?.latest_doc_selection).toBeUndefined();
   }, 60000);

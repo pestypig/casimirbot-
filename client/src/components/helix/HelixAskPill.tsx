@@ -5581,7 +5581,80 @@ function readHelixPendingInputRecord(value: unknown): Record<string, unknown> | 
   return null;
 }
 
+function normalizeHelixPendingTransitionMarker(value: unknown): string {
+  return coerceText(value).trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function readHelixPendingTransitionTrace(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeHelixPendingTransitionMarker(entry)).filter(Boolean);
+  }
+  const text = normalizeHelixPendingTransitionMarker(value);
+  return text ? [text] : [];
+}
+
+function hasHelixPendingCancellationMarker(record: Record<string, unknown>): boolean {
+  const pendingStatusAfter = normalizeHelixPendingTransitionMarker(
+    record.pending_status_after ?? record.pendingStatusAfter ?? record.status_after,
+  );
+  if (pendingStatusAfter === "canceled" || pendingStatusAfter === "cancelled") return true;
+
+  const pendingContext =
+    record.pending_intercepted_turn === true ||
+    Boolean(record.pending_status_before ?? record.pending_status_after) ||
+    Boolean(record.pending_request ?? record.pending_server_request ?? record.pendingRequest) ||
+    readHelixPendingTransitionTrace(record.pending_transition_trace).length > 0;
+  if (!pendingContext) return false;
+
+  const markers = [
+    record.pending_transition_reason,
+    record.pendingTransitionReason,
+    record.pending_interception_reason,
+    record.pendingInterceptionReason,
+    record.pending_resolution_reason,
+    record.pendingResolutionReason,
+    record.resolution_reason,
+    record.reason,
+    ...readHelixPendingTransitionTrace(record.pending_transition_trace),
+  ].map((entry) => normalizeHelixPendingTransitionMarker(entry));
+  return markers.some(
+    (marker) =>
+      marker === "pending_clarify_canceled" ||
+      marker === "pending_request_canceled" ||
+      marker === "request_user_input_canceled" ||
+      marker === "cancel_pending" ||
+      marker === "canceled_pending_request" ||
+      marker.includes("pending_clarify_canceled"),
+  );
+}
+
+function isHelixCanceledPendingTurn(...sources: unknown[]): boolean {
+  const stack = sources
+    .map((source) => readAgentLoopAuditRecord(source))
+    .filter((record): record is Record<string, unknown> => Boolean(record));
+  const seen = new WeakSet<object>();
+  while (stack.length > 0) {
+    const record = stack.pop();
+    if (!record || seen.has(record)) continue;
+    seen.add(record);
+    if (hasHelixPendingCancellationMarker(record)) return true;
+    [
+      record.debug,
+      record.agent_loop_audit,
+      record.turn_truth_table,
+      record.turn_runtime,
+      record.runtime_summary,
+      record.terminal,
+    ].forEach((candidate) => {
+      const nested = readAgentLoopAuditRecord(candidate);
+      if (nested && !seen.has(nested)) stack.push(nested);
+    });
+  }
+  return false;
+}
+
 function resolveHelixPendingInputRecord(...sources: unknown[]): Record<string, unknown> | null {
+  if (isHelixCanceledPendingTurn(...sources)) return null;
   for (const source of sources) {
     const record = readAgentLoopAuditRecord(source);
     if (!record) continue;
@@ -5618,6 +5691,9 @@ function resolveHelixVisibleTerminalKind(args: {
   fallback?: string;
   extraSources?: unknown[];
 }): string {
+  if (isHelixCanceledPendingTurn(args.reply, args.reply?.debug, args.terminal, ...(args.extraSources ?? []))) {
+    return "canceled";
+  }
   const pending = resolveHelixPendingInputRecord(args.reply, args.reply?.debug, ...(args.extraSources ?? []));
   if (pending) return "pending_input";
   return String(args.terminal?.kind ?? args.fallback ?? "n/a");
@@ -5693,6 +5769,32 @@ function readHelixAskTerminalText(record: Record<string, unknown> | null | undef
   if (!record) return null;
   const text = typeof record.text === "string" ? record.text.trim() : "";
   return text.length > 0 ? text : null;
+}
+
+function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | null {
+  for (const source of sources) {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) continue;
+    const direct =
+      typeof record.final_answer_source === "string" && record.final_answer_source.trim()
+        ? record.final_answer_source.trim()
+        : null;
+    if (direct) return direct.replace(/_/g, " ");
+    const truthTable = readAgentLoopAuditRecord(record.turn_truth_table);
+    const truthTerminal = readAgentLoopAuditRecord(truthTable?.terminal);
+    const truthSource =
+      typeof truthTerminal?.final_answer_source === "string" && truthTerminal.final_answer_source.trim()
+        ? truthTerminal.final_answer_source.trim()
+        : null;
+    if (truthSource) return truthSource.replace(/_/g, " ");
+    const audit = readAgentLoopAuditRecord(record.agent_loop_audit);
+    const auditSource =
+      typeof audit?.final_answer_source === "string" && audit.final_answer_source.trim()
+        ? audit.final_answer_source.trim()
+        : null;
+    if (auditSource) return auditSource.replace(/_/g, " ");
+  }
+  return null;
 }
 
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
@@ -5791,6 +5893,7 @@ function readProceduralActionLabel(value: unknown): string {
 
 function readProceduralStatusClass(status: string): string {
   if (status === "completed") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-50";
+  if (status === "canceled") return "border-slate-300/25 bg-slate-400/10 text-slate-200";
   if (status === "running") return "animate-pulse border-sky-300/35 bg-sky-400/10 text-sky-50";
   if (status === "suppressed") return "border-amber-300/35 bg-amber-400/10 text-amber-50";
   if (status === "failed") return "border-rose-300/35 bg-rose-400/10 text-rose-50";
@@ -5895,7 +5998,12 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
         ),
         160,
       ),
-      status: visibleTerminalKind === "pending_input" ? "pending_input" : "completed",
+      status:
+        visibleTerminalKind === "pending_input"
+          ? "pending_input"
+          : visibleTerminalKind === "canceled"
+            ? "canceled"
+            : "completed",
     });
   }
 
@@ -6626,6 +6734,7 @@ function buildHelixAskDebugContextSummary(
       }
     : null;
   const debugRecord = asObjectRecord(debug as unknown);
+  const canceledPendingTurn = isHelixCanceledPendingTurn(debugRecord);
   const normalizeReasonList = (value: unknown): string[] => {
     if (Array.isArray(value)) {
       return value
@@ -7057,8 +7166,9 @@ function buildHelixAskDebugContextSummary(
         ? debug.runtime_event_count
         : null,
     turn_runtime: asObjectRecord(debug?.turn_runtime ?? null),
-    pending_request: asObjectRecord(debug?.pending_request ?? debug?.pending_server_request ?? null),
-    pending_server_request: asObjectRecord(debug?.pending_server_request ?? null),
+    pending_request: canceledPendingTurn ? null : asObjectRecord(debug?.pending_request ?? debug?.pending_server_request ?? null),
+    pending_server_request: canceledPendingTurn ? null : asObjectRecord(debug?.pending_server_request ?? null),
+    pending_canceled: canceledPendingTurn,
     pending_intercepted_turn: debug?.pending_intercepted_turn === true,
     pending_interception_reason:
       typeof debug?.pending_interception_reason === "string" ? debug.pending_interception_reason : null,
@@ -8677,6 +8787,7 @@ function buildReplyMasterEventClockExport(args: {
     terminal: readAgentLoopAuditRecord(turnTruthTable?.terminal),
     extraSources: [debugRecord, turnTruthTable, agentLoopAuditForExport],
   });
+  const canceledPendingTurn = isHelixCanceledPendingTurn(args.reply, debugRecord, turnTruthTable, agentLoopAuditForExport);
   const terminalMismatch = Boolean(
     backendTerminalText &&
       visibleAnswerText &&
@@ -8903,7 +9014,8 @@ function buildReplyMasterEventClockExport(args: {
         ? args.reply.debug.model_decision_audits
         : [],
       runtime_summary: readAgentLoopAuditRecord(args.reply.debug?.turn_runtime),
-      pending_request: readAgentLoopAuditRecord(args.reply.debug?.pending_request),
+      pending_request: canceledPendingTurn ? null : readAgentLoopAuditRecord(args.reply.debug?.pending_request),
+      pending_canceled: canceledPendingTurn,
       pending_intercepted_turn: args.reply.debug?.pending_intercepted_turn === true,
       pending_interception_reason:
         typeof args.reply.debug?.pending_interception_reason === "string"
@@ -8952,6 +9064,7 @@ function buildReplyMasterEventClockExport(args: {
 function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: string): string {
   const visibleTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
   const visibleAnswerText = visibleTerminal.text || reply.content || "";
+  const canceledPendingTurn = isHelixCanceledPendingTurn(reply, reply.debug);
   return safeJsonStringify({
     schema: "helix.ask.unified_debug.v1",
     exportedAt: new Date().toISOString(),
@@ -8976,7 +9089,8 @@ function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: strin
     executionTrace: Array.isArray(reply.debug?.execution_trace) ? reply.debug.execution_trace : [],
     stepResults: Array.isArray(reply.debug?.step_results) ? reply.debug.step_results : [],
     turnEvents: Array.isArray(reply.debug?.turn_events) ? reply.debug.turn_events : [],
-    pendingServerRequest: readAgentLoopAuditRecord(reply.debug?.pending_request),
+    pendingServerRequest: canceledPendingTurn ? null : readAgentLoopAuditRecord(reply.debug?.pending_request),
+    pendingCanceled: canceledPendingTurn,
   });
 }
 
@@ -8986,6 +9100,27 @@ function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string 
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     if (parsed && typeof parsed === "object") {
+      const canceledPendingTurn = isHelixCanceledPendingTurn(reply, reply.debug, parsed, parsed.debug, parsed.agentLoop);
+      if (canceledPendingTurn) {
+        const parsedAgentLoop = readAgentLoopAuditRecord(parsed.agentLoop);
+        const parsedDebugContext = readAgentLoopAuditRecord(parsed.debugContext);
+        parsed.pendingCanceled = true;
+        parsed.agentLoop = parsedAgentLoop
+          ? {
+              ...parsedAgentLoop,
+              pending_request: null,
+              pending_canceled: true,
+            }
+          : parsed.agentLoop;
+        parsed.debugContext = parsedDebugContext
+          ? {
+              ...parsedDebugContext,
+              pending_request: null,
+              pending_server_request: null,
+              pending_canceled: true,
+            }
+          : parsed.debugContext;
+      }
       const hasVisibleAnswer =
         typeof parsed.selectedDebugFinalAnswer === "string" ||
         typeof parsed.finalAnswer === "string" ||
@@ -12915,6 +13050,47 @@ export function HelixAskPill({
     [renderHelixAskTextWithPathLinks],
   );
 
+  const renderHelixAskFinalAnswerContent = useCallback(
+    (content: unknown): ReactNode => {
+      const text = coerceText(content);
+      if (!text) return null;
+      const lines = text.replace(/\r\n/g, "\n").split("\n");
+      return (
+        <div className="mt-2 space-y-1.5 leading-relaxed">
+          {lines.map((line, index) => {
+            const trimmed = line.trim();
+            if (!trimmed) {
+              return <div key={`final-answer-blank-${index}`} className="h-2" aria-hidden="true" />;
+            }
+            const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
+            if (bulletMatch) {
+              return (
+                <div key={`final-answer-bullet-${index}`} className="flex gap-2 pl-2">
+                  <span className="mt-[0.15rem] text-cyan-300/80" aria-hidden="true">
+                    -
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {renderHelixAskContent(bulletMatch[1] ?? trimmed)}
+                  </span>
+                </div>
+              );
+            }
+            const isSectionHeader = /:$/.test(trimmed) && trimmed.length <= 80;
+            return (
+              <div
+                key={`final-answer-line-${index}`}
+                className={isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
+              >
+                {renderHelixAskContent(trimmed)}
+              </div>
+            );
+          })}
+        </div>
+      );
+    },
+    [renderHelixAskContent],
+  );
+
   const renderEnvelopeSections = useCallback(
     (sections: HelixAskResponseEnvelope["sections"], hideTitle?: string, expanded?: boolean) => {
       if (!sections || sections.length === 0) return null;
@@ -13012,9 +13188,7 @@ export function HelixAskPill({
         sections.some((section) => hasLongText(section.body, HELIX_ASK_MAX_RENDER_CHARS));
       return (
         <div className="space-y-3">
-          <p className="whitespace-pre-wrap leading-relaxed">
-            {renderHelixAskContent(answerText)}
-          </p>
+          {renderHelixAskFinalAnswerContent(answerText)}
           {hasEquationContent ? (
             <button
               type="button"
@@ -13102,6 +13276,7 @@ export function HelixAskPill({
       askExtensionOpenByReply,
       openPanelById,
       renderEnvelopeSections,
+      renderHelixAskFinalAnswerContent,
       renderHelixAskContent,
     ],
   );
@@ -23376,9 +23551,19 @@ export function HelixAskPill({
               turn_contract: localResponse.turn_contract ?? null,
               invariant_violations: localResponse.invariant_violations ?? [],
               latest_result_artifact: localResponse.latest_result_artifact ?? null,
+              selected_final_answer: localResponseRecord.selected_final_answer ?? terminalResolution.text ?? null,
+              final_answer_source: localResponseRecord.final_answer_source ?? null,
+              terminal_authority: localResponseRecord.terminal_authority ?? null,
+              fallback_applied: localResponseRecord.fallback_applied === true,
+              fallback_blocked: localResponseRecord.fallback_blocked === true,
+              fallback_block_reason:
+                typeof localResponseRecord.fallback_block_reason === "string"
+                  ? localResponseRecord.fallback_block_reason
+                  : null,
               job_ready_links: localResponse.job_ready_links ?? [],
               job_ready_links_source: localResponseRecord.job_ready_links_source ?? null,
               job_ready_links_suppressed: localResponseRecord.job_ready_links_suppressed ?? [],
+              job_ready_links_current_turn_only: localResponseRecord.job_ready_links_current_turn_only === true,
               open_doc_goal_satisfied: localResponseRecord.open_doc_goal_satisfied === true,
               open_doc_selected_path:
                 typeof localResponseRecord.open_doc_selected_path === "string" ? localResponseRecord.open_doc_selected_path : null,
@@ -25721,6 +25906,7 @@ export function HelixAskPill({
             const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
             const pendingAgentRequest = resolveHelixPendingInputRecord(reply, replyDebugRecord, agentLoopAudit, runtimeSummary);
+            const canceledPendingTurn = isHelixCanceledPendingTurn(reply, replyDebugRecord, agentLoopAudit, runtimeSummary);
             const finalComposerConsumedArtifacts = Array.isArray(replyDebugRecord?.final_composer_consumed_artifacts)
               ? replyDebugRecord.final_composer_consumed_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
               : [];
@@ -25765,6 +25951,12 @@ export function HelixAskPill({
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const expanded = Boolean(askExpandedByReply[reply.id]);
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
+            const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
+              reply,
+              replyDebugRecord,
+              agentLoopAudit,
+              runtimeSummary,
+            );
             const transcriptAnswer = clipForDisplay(
               transcriptTerminal.text || reply.content || "",
               HELIX_ASK_MAX_RENDER_CHARS,
@@ -25785,6 +25977,7 @@ export function HelixAskPill({
             const debugTraceOpen = Boolean(
               terminalMismatchForReply ||
                 pendingAgentRequest ||
+                canceledPendingTurn ||
                 String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
             );
             const isLatestReply = replyIndex === 0;
@@ -25889,12 +26082,14 @@ export function HelixAskPill({
                             : "border-emerald-300/35 bg-emerald-400/10 text-emerald-100"
                         }`}
                       >
-                        {terminalMismatchForReply ? "terminal mismatch" : `source: ${transcriptTerminal.source}`}
+                        {terminalMismatchForReply
+                          ? "terminal mismatch"
+                          : finalAnswerSourceLabel
+                            ? `source: ${finalAnswerSourceLabel}`
+                            : `source: ${transcriptTerminal.source}`}
                       </span>
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap leading-relaxed">
-                      {renderHelixAskContent(transcriptAnswer)}
-                    </p>
+                    {renderHelixAskFinalAnswerContent(transcriptAnswer)}
                     {jobReadyLinks.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {jobReadyLinks.slice(0, 6).map((link, index) => {
@@ -26187,7 +26382,13 @@ export function HelixAskPill({
                     </div>
                   ) : reply.debug?.pending_intercepted_turn ? (
                     <p className="mt-1 text-[10px] text-red-200">
-                      Pending transition: {String(reply.debug.pending_interception_reason ?? "unknown")}
+                      Pending transition:{" "}
+                      {String(
+                        reply.debug.pending_resolution_reason ??
+                          reply.debug.pending_transition_reason ??
+                          reply.debug.pending_interception_reason ??
+                          "unknown",
+                      )}
                     </p>
                   ) : null}
                   <p className="mt-1">

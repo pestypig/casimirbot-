@@ -20520,10 +20520,21 @@ const isAskTurnSimpleConversationStatusCheck = (transcript: string): boolean => 
   if (/^(?:does this|can this)\s+(?:work|respond)$/.test(normalized)) return true;
   if (
     /^(?:hello|hi|hey|yo|howdy)\b/.test(normalized) &&
+    /\b(?:respond|reply|answer)\b/.test(normalized) &&
+    /\bwithout\b[\s\S]*\b(?:workspace\s+actions?|tools?|acting|doing\s+workspace\s+actions?)\b/.test(normalized)
+  ) return true;
+  if (
+    /\b(?:respond|reply|answer)\b/.test(normalized) &&
+    /\b(?:without|no)\b[\s\S]*\b(?:workspace\s+actions?|tools?|tool\s+use|acting)\b/.test(normalized) &&
+    !/\b(?:open|go to|switch|create|make|append|copy|summari[sz]e|compare|locate|find)\b/.test(normalized)
+  ) return true;
+  if (
+    /^(?:hello|hi|hey|yo|howdy)\b/.test(normalized) &&
     (
       /\b(?:is this|is it|are we|is everything)\s+(?:working|on|live|connected|running|ok|okay)\b/.test(normalized) ||
       /\bis\s+this\s+thing\s+on\b/.test(normalized) ||
-      /\b(?:you there|are you there|can you hear me|are you awake|you awake|are you alive)\b/.test(normalized)
+      /\bstill\s+(?:working|on|live|connected|running|ok|okay)\b/.test(normalized) ||
+      /\b(?:you there|are you there|can you hear me|are you awake|you awake|are you alive|are you working)\b/.test(normalized)
     )
   ) return true;
   if (/^(?:hello|hi|hey|yo|howdy)[,\s]+(?:are\s+you\s+there|can\s+you\s+hear\s+me|are\s+you\s+awake|you\s+awake|are\s+you\s+alive)\b/.test(normalized)) return true;
@@ -20535,11 +20546,78 @@ const buildAskTurnSimpleConversationAnswer = (transcript: string): string => {
   const statusCue =
     /\b(?:is this|is it|are we|is everything)\s+(?:working|on|live|connected|running|ok|okay)\b/.test(normalized) ||
     /\bis\s+this\s+thing\s+on\b/.test(normalized) ||
-    /\b(?:you there|are you there|can you hear me|are you awake|you awake|are you alive|does this work|can this respond)\b/.test(normalized);
+    /\b(?:you there|are you there|can you hear me|are you awake|you awake|are you alive|are you working|does this work|can this respond)\b/.test(normalized);
+  const noToolCue =
+    /\b(?:respond|reply|answer)\b/.test(normalized) &&
+    /\b(?:without|no)\b[\s\S]*\b(?:workspace\s+actions?|tools?|tool\s+use|acting)\b/.test(normalized);
+  if (noToolCue) {
+    return "Yes. I can answer directly here. What would you like to do next?";
+  }
   if (!statusCue && /^(?:hello|hi|hey|yo|howdy)\b/.test(normalized)) {
     return "Hello. What would you like to work on?";
   }
   return "Yes, Helix Ask is responding. What would you like to do next?";
+};
+
+const buildAskTurnModelOnlyAnswerPrompt = (transcript: string): string =>
+  [
+    "You are Helix Ask answering a model-only conceptual question.",
+    "Do not claim workspace/document evidence unless the user explicitly provided it.",
+    "Answer directly in clear scientific language when relevant.",
+    "Keep the answer concise: 2-5 sentences or a short bullet list.",
+    "Do not mention internal routing, retrieval, tools, policies, or debug state.",
+    "",
+    `User question: ${transcript.trim()}`,
+  ].join("\n");
+
+const generateAskTurnModelOnlyAnswer = async (args: {
+  transcript: string;
+  model?: string;
+  sessionId?: string | null;
+  traceId: string;
+  personaId?: string;
+  tenantId?: string;
+}): Promise<{ text: string; source: "model_planner" | "typed_failure"; error?: string | null }> => {
+  try {
+    const timeoutMs = clampNumber(readNumber(process.env.HELIX_ASK_MODEL_ONLY_TIMEOUT_MS, 12_000), 1_000, 45_000);
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const result = await Promise.race([
+      llmLocalHandler(
+        {
+          prompt: buildAskTurnModelOnlyAnswerPrompt(args.transcript),
+          max_tokens: Math.min(HELIX_ASK_ANSWER_MAX_TOKENS, 520),
+          temperature: 0.2,
+          model: args.model,
+          metadata: { kind: "helix.ask.model_only_answer" },
+        },
+        {
+          sessionId: args.sessionId ?? undefined,
+          traceId: `${args.traceId}:model_only_answer`,
+          personaId: args.personaId,
+          tenantId: args.tenantId,
+        },
+      ),
+      new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error("model_only_answer_timeout")), timeoutMs);
+      }),
+    ]);
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+    const text = String((result as { text?: unknown })?.text ?? "").trim();
+    if (text && !isAskTurnMetaFinalAnswerText(text)) {
+      return { text, source: "model_planner", error: null };
+    }
+    return {
+      text: "I can answer this as a general conceptual question, but the model did not return a usable answer for this turn.",
+      source: "typed_failure",
+      error: "model_only_empty_answer",
+    };
+  } catch (error) {
+    return {
+      text: "I can answer this as a general conceptual question, but the model backend was unavailable for this turn.",
+      source: "typed_failure",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 };
 
 const hasConversationQuestionCue = (transcript: string): boolean => {
@@ -20794,6 +20872,14 @@ type HelixConversationPendingInputRecord = {
   candidateAction?: HelixAskTurnSelectedAction | null;
   status?: "pending" | "resolved" | "canceled" | "expired" | "aborted_turn_transition";
   pendingScope?: "artifact_gate" | "action_args" | "confirm";
+  resolutionOptions?: string[];
+  candidateOptions?: Array<{
+    rank: number;
+    title: string | null;
+    path: string;
+    validationStatus?: string | null;
+    evidenceSnippet?: string | null;
+  }>;
   originIntentHash?: string | null;
   originActionFamily?: string | null;
   expiresAtMs?: number;
@@ -20836,6 +20922,7 @@ type HelixAskTurnWorkspaceSessionSnapshot = {
   lastUpdatedAtMs: number;
 };
 const helixAskTurnWorkspaceSnapshotBySession = new Map<string, HelixAskTurnWorkspaceSessionSnapshot>();
+const helixAskTurnLastOpenedDocPathBySession = new Map<string, string>();
 const HELIX_ASK_WORKSPACE_ACTION_LEDGER_LIMIT = 20;
 
 const normalizeAskTurnWorkspaceDocPath = (value: unknown): string | null => {
@@ -21063,7 +21150,30 @@ const mergeAskTurnWorkspaceSnapshots = (args: {
   stored: HelixAskTurnWorkspaceSessionSnapshot | null;
 }): HelixAskTurnWorkspaceSessionSnapshot | null => {
   if (!args.incoming) return args.stored ? withAskTurnDocContextValidity(args.stored) : null;
-  if (!args.stored) return withAskTurnDocContextValidity(args.incoming);
+  if (!args.stored) {
+    const lastOpenedDocPath = normalizeAskTurnWorkspaceDocPath(
+      helixAskTurnLastOpenedDocPathBySession.get(args.incoming.sessionId),
+    );
+    if (lastOpenedDocPath && args.incoming.activePanel !== "docs-viewer") {
+      return withAskTurnDocContextValidity({
+        ...args.incoming,
+        activeDocPath: lastOpenedDocPath,
+        source: "last_opened_doc",
+        preservationReason: "preserved_last_opened_doc_over_non_doc_panel_snapshot",
+      });
+    }
+    return withAskTurnDocContextValidity(args.incoming);
+  }
+  const incomingDocPath = normalizeAskTurnWorkspaceDocPath(args.incoming.activeDocPath);
+  const storedDocPath = normalizeAskTurnWorkspaceDocPath(args.stored.activeDocPath);
+  const lastOpenedDocPath = normalizeAskTurnWorkspaceDocPath(
+    helixAskTurnLastOpenedDocPathBySession.get(args.incoming.sessionId) ??
+      helixAskTurnLastOpenedDocPathBySession.get(args.stored.sessionId),
+  );
+  const incomingDocPanelAuthoritative = args.incoming.activePanel === "docs-viewer";
+  const activeDocPath = incomingDocPanelAuthoritative
+    ? incomingDocPath ?? lastOpenedDocPath ?? storedDocPath
+    : lastOpenedDocPath ?? storedDocPath ?? incomingDocPath;
   const workspaceActionLedger = dedupeAskTurnWorkspaceActionLedger([
     ...(args.stored.workspaceActionLedger ?? []),
     ...(args.incoming.workspaceActionLedger ?? []),
@@ -21080,9 +21190,7 @@ const mergeAskTurnWorkspaceSnapshots = (args: {
   return withAskTurnDocContextValidity({
     ...args.stored,
     ...args.incoming,
-    activeDocPath:
-      normalizeAskTurnWorkspaceDocPath(args.incoming.activeDocPath) ??
-      normalizeAskTurnWorkspaceDocPath(args.stored.activeDocPath),
+    activeDocPath,
     activeNoteId,
     activeNoteTitle:
       normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.activeNoteTitle, activeNoteId) ??
@@ -21095,9 +21203,11 @@ const mergeAskTurnWorkspaceSnapshots = (args: {
     lastCreatedNoteBody,
     recentNotes,
     source:
-      normalizeAskTurnWorkspaceDocPath(args.incoming.activeDocPath)
+      activeDocPath && activeDocPath === incomingDocPath
         ? args.incoming.source ?? "incoming_workspace_snapshot"
-        : normalizeAskTurnWorkspaceDocPath(args.stored.activeDocPath)
+        : activeDocPath && activeDocPath === lastOpenedDocPath
+          ? "last_opened_doc"
+        : activeDocPath && activeDocPath === storedDocPath
           ? args.stored.source ?? "server_session"
           : args.incoming.source ?? args.stored.source ?? "none",
     hasNoteContext: args.incoming.hasNoteContext || args.stored.hasNoteContext,
@@ -21107,6 +21217,47 @@ const mergeAskTurnWorkspaceSnapshots = (args: {
     preservationReason: args.incoming.preservationReason ?? args.stored.preservationReason,
     lastUpdatedAtMs: Math.max(args.incoming.lastUpdatedAtMs ?? 0, args.stored.lastUpdatedAtMs ?? 0, Date.now()),
   });
+};
+
+const buildAskTurnWorkspaceRefBinding = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): Record<string, unknown> => {
+  const normalized = args.transcript.trim().toLowerCase();
+  const activeDocPath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+  const activeNoteTitle = resolveAskTurnWorkspaceNoteTitle(args.workspaceSnapshot);
+  const activeNoteId =
+    typeof args.workspaceSnapshot?.lastCreatedNoteId === "string" && args.workspaceSnapshot.lastCreatedNoteId.trim()
+      ? args.workspaceSnapshot.lastCreatedNoteId.trim()
+      : typeof args.workspaceSnapshot?.activeNoteId === "string" && args.workspaceSnapshot.activeNoteId.trim()
+        ? args.workspaceSnapshot.activeNoteId.trim()
+        : null;
+  const deicticBindings: Record<string, string> = {};
+  if (/\b(?:this|the|current|active)\s+(?:doc|document|paper)\b/.test(normalized)) {
+    deicticBindings["active_doc_reference"] = activeDocPath ? "active_doc" : "missing_active_doc";
+  }
+  if (/\b(?:this|that|the|current|active)\s+(?:note|notepad)\b/.test(normalized)) {
+    deicticBindings["active_note_reference"] = activeNoteTitle ? "active_note" : "missing_active_note";
+  }
+  const missing: string[] = [];
+  if (Object.values(deicticBindings).includes("missing_active_doc")) missing.push("active_doc_path");
+  if (Object.values(deicticBindings).includes("missing_active_note")) missing.push("active_note");
+  return {
+    activeDocPath,
+    activeDocTitle: activeDocPath ? readAskTurnDocTitleForPath(activeDocPath) : null,
+    activeDocSource: activeDocPath ? args.workspaceSnapshot?.docContextSource ?? args.workspaceSnapshot?.source ?? "workspace_snapshot" : "none",
+    activeNoteId,
+    activeNoteTitle,
+    activeNoteSource:
+      activeNoteTitle && activeNoteTitle === args.workspaceSnapshot?.lastCreatedNoteTitle
+        ? "last_created_note"
+        : activeNoteTitle
+          ? "active_note"
+          : "none",
+    deicticBindings,
+    bindingConfidence: missing.length === 0 ? "high" : "low",
+    ambiguityReason: missing.length > 0 ? `missing:${missing.join(",")}` : null,
+  };
 };
 type HelixAskTurnResultArtifact = {
   kind: string;
@@ -21429,11 +21580,37 @@ type HelixAskTurnRuntimeCapability = {
     missingArtifact: string;
   }) => HelixAskTurnRuntimeCapabilityArgResolution;
 };
+type HelixAskObservationDecision = {
+  decision: "continue" | "request_user_input" | "finalize" | "typed_failure";
+  reason: string;
+  satisfied_artifacts: string[];
+  missing_artifacts: string[];
+  unresolved_ambiguity: boolean;
+  next_capability?: {
+    capability_id: string;
+    args: Record<string, unknown>;
+    required_artifacts: string[];
+    expected_observation: {
+      kind: string;
+      summary: string;
+    };
+  } | null;
+  terminal_allowed: boolean;
+};
+type HelixAskObserveThenDecideTraceEntry = {
+  after_step_id: string;
+  decision: HelixAskObservationDecision["decision"];
+  reason: string;
+  missing_artifacts: string[];
+  next_capability_id?: string | null;
+  terminal_allowed: boolean;
+};
 type HelixAskTurnInitialCapabilityPlan = {
   plan_items: HelixAskTurnPlanStep[];
   selected_action: HelixAskTurnSelectedAction | null;
   dispatch_policy: HelixAskTurnDispatchPolicy;
   capability_selection_trace: HelixAskTurnCapabilitySelectionTraceEntry[];
+  capability_selection_result?: HelixAskCapabilitySelectionResult;
   missing_args: string[];
 };
 type HelixAskTurnCapabilitySelectionTraceEntry = {
@@ -21476,6 +21653,7 @@ type HelixAskTurnRuntime = {
     | "terminal_artifact_satisfied"
     | null;
   capability_selection_trace: HelixAskTurnCapabilitySelectionTraceEntry[];
+  observe_then_decide_trace: HelixAskObserveThenDecideTraceEntry[];
   terminal: {
     kind: "final_answer" | "final_failure" | "pending_input" | null;
     text: string | null;
@@ -21514,6 +21692,10 @@ type HelixAskTurnRuntimeSummary = {
   model_decision_llm_used?: boolean;
   model_decision_count?: number;
   model_decision_audits?: HelixAskTurnModelDecisionAudit[];
+  turn_decision_source_map?: HelixAskTurnDecisionSourceMap;
+  capability_selection_result?: HelixAskCapabilitySelectionResult;
+  tool_choice_arbitration?: HelixAskToolChoiceArbitration;
+  observe_then_decide_trace?: HelixAskObserveThenDecideTraceEntry[];
 };
 type HelixAskTurnAsyncStepDuration = {
   step_id: string;
@@ -21609,6 +21791,144 @@ type HelixAskTurnIntentFamily =
   | "notes"
   | "clipboard"
   | "workspace_generic";
+type HelixAskTurnFinalAnswerSource =
+  | "planner_terminal"
+  | "universal_composer"
+  | "artifact_synthesis"
+  | "typed_failure"
+  | "request_user_input"
+  | "no_tool_direct"
+  | "client_fallback"
+  | "legacy_fallback";
+type HelixAskTurnDecisionSource =
+  | "model_planner"
+  | "capability_registry"
+  | "artifact_policy"
+  | "phrase_detector"
+  | "legacy_fallback";
+type HelixAskTurnDecisionSourceMap = {
+  planner_source: HelixAskTurnDecisionSource;
+  dispatch_policy_source: HelixAskTurnDecisionSource;
+  selected_action_source: HelixAskTurnDecisionSource;
+  goal_frame_used?: boolean;
+  goal_frame_goal_kind?: HelixAskUniversalGoalFrame["user_goal"]["goal_kind"] | null;
+  capability_selector_source?: HelixAskCapabilitySelectionResult["source"] | null;
+  plan_step_sources: Array<{
+    step_id: string;
+    title: string;
+    source: HelixAskTurnDecisionSource;
+    reason: string;
+    capability_id?: string | null;
+    action_id?: string | null;
+    panel_id?: string | null;
+  }>;
+  continuation_sources: Array<{
+    step_id?: string | null;
+    source: HelixAskTurnDecisionSource;
+    reason: string;
+    decision: string;
+    capability_id?: string | null;
+  }>;
+  terminal_source: HelixAskTurnDecisionSource;
+  fallback_used: boolean;
+  phrase_detector_used: boolean;
+  model_planner_used: boolean;
+  capability_registry_used: boolean;
+  artifact_policy_used: boolean;
+};
+type HelixAskUniversalGoalFrame = {
+  user_goal: {
+    raw: string;
+    normalized: string;
+    goal_kind:
+      | "conversation"
+      | "open_workspace"
+      | "read_doc"
+      | "summarize_doc"
+      | "locate_in_doc"
+      | "write_note"
+      | "compare"
+      | "temporal_followup"
+      | "capability_help"
+      | "unknown";
+    confidence: number;
+  };
+  requested_outputs: Array<{
+    kind: "answer" | "doc_open" | "note_update" | "location" | "comparison" | "clarification";
+    required: boolean;
+    evidence: string[];
+  }>;
+  workspace_refs: Array<{
+    kind: "active_doc" | "doc_topic" | "doc_title" | "note_title" | "active_note" | "clipboard" | "prior_turn";
+    value: string;
+    source: "explicit" | "deictic" | "context" | "phrase_evidence" | "model";
+    confidence: number;
+  }>;
+  constraints: Array<{
+    kind: "must_use_active_context" | "must_not_mutate" | "requires_evidence" | "requires_user_choice";
+    value: string;
+    source: string;
+  }>;
+  style_modifiers: Array<{
+    value: string;
+    source_span: string;
+    applies_to: "final_answer" | "note_content" | "summary" | "unknown";
+  }>;
+  mutation_targets: Array<{
+    kind: "note" | "doc" | "clipboard" | "workspace_panel";
+    value: string;
+    resolution: "explicit" | "active" | "last_created" | "ambiguous" | "missing";
+    confidence: number;
+  }>;
+  compound_argument_partition?: {
+    source_query: string | null;
+    operation: "locate_in_doc" | "summarize_doc" | "compare" | "open_doc" | null;
+    mutation_target: {
+      kind: "note" | "clipboard" | null;
+      title: string | null;
+      pronoun_ref: string | null;
+    };
+    style_modifiers: string[];
+    confidence: "high" | "medium" | "low";
+    ambiguity: string | null;
+    source: "goal_frame" | "model_planner" | "fallback";
+    phrase_detector_authority?: "hint_only";
+  };
+  evidence_requirements: Array<{
+    artifact: string;
+    required: boolean;
+    reason: string;
+  }>;
+};
+type HelixAskCapabilitySelectionResult = {
+  capability_id: string | null;
+  args: Record<string, unknown>;
+  required_artifacts: string[];
+  expected_observation: {
+    kind: string;
+    summary: string;
+  };
+  confidence: number;
+  ambiguity: {
+    status: "none" | "low_confidence" | "missing_args" | "multiple_targets";
+    reason: string | null;
+    candidates?: Array<{
+      capability_id: string;
+      args: Record<string, unknown>;
+      confidence: number;
+      reason: string;
+    }>;
+  };
+  source: "goal_frame" | "compatibility_shim" | "model_planner";
+};
+type HelixAskToolChoiceArbitration = {
+  answer_scope: "model_only" | "workspace_grounded" | "hybrid";
+  evidence_need: "none" | "active_doc" | "search_docs" | "prior_artifact";
+  first_step: "model" | "tool" | "clarify";
+  reason: string;
+  confidence: "high" | "medium" | "low";
+  source: "goal_frame" | "model_planner" | "artifact_policy";
+};
 const HELIX_E8_INVARIANT_ASSERTIONS_FLAG =
   String(process.env.HELIX_E8_INVARIANT_ASSERTIONS ?? "1").trim().toLowerCase() !== "0";
 
@@ -21618,6 +21938,7 @@ const HELIX_ASK_TURN_CAPABILITY_ACTIONS: HelixAskTurnActionCandidate[] = [
   { panel_id: "docs-viewer", action_id: "open_doc_by_path", required_args: ["path"], optional_args: ["anchor"] },
   { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", required_args: ["topic"], optional_args: ["path"] },
   { panel_id: "docs-viewer", action_id: "search_docs", required_args: ["query"], optional_args: ["limit"] },
+  { panel_id: "docs-viewer", action_id: "validate_doc_candidates", required_args: ["query"], optional_args: ["limit"] },
   { panel_id: "docs-viewer", action_id: "verify_active_doc", required_args: [], optional_args: [] },
   { panel_id: "docs-viewer", action_id: "open_doc_and_read", required_args: ["path"], optional_args: ["anchor"] },
   { panel_id: "docs-viewer", action_id: "identify_current_doc", required_args: [], optional_args: [] },
@@ -21705,6 +22026,8 @@ const tokenizeAskTurnDocTopic = (value: string): string[] =>
 
 const normalizeAskTurnLatestDocTopicText = (value: string): string | null => {
   const cleaned = value
+    .replace(/\s+\band\s+(?:tell|show|explain|summari[sz]e|compare|answer|put|add|copy|write|save|drop|then)\b[\s\S]*$/i, " ")
+    .replace(/\s+\b(?:and|then)\s*$/i, " ")
     .replace(/[?!.;,:"'`]+/g, " ")
     .replace(
       /\b(?:go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to|pull\s+up|open|view|show|pick|grab|read|the|a|an|latest|newest|most\s+recent|recent|doc|docs|document|paper|about|on|regarding|for)\b/gi,
@@ -21983,8 +22306,9 @@ const resolveAskTurnLatestDocPathByTopic = (topic: string | null): string | null
 const buildAskTurnLatestDocAcquisitionAction = (transcript: string): HelixAskTurnSelectedAction | null => {
   const topic = resolveAskTurnLatestDocTopicArg(transcript);
   if (!topic) return null;
-  const selection = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG ? buildAskTurnLatestDocSelectionArtifact(topic) : null;
+  const selection = buildAskTurnLatestDocSelectionArtifact(topic);
   const path = selection?.selected_path ?? null;
+  if (!path) return null;
   return {
     panel_id: "docs-viewer",
     action_id: "open_latest_doc_by_topic",
@@ -21996,6 +22320,23 @@ const buildAskTurnLatestDocAcquisitionAction = (transcript: string): HelixAskTur
   };
 };
 
+const cleanAskTurnCompoundSourceQuery = (value: string): string => {
+  let cleaned = value.trim();
+  const mutationTailPatterns = [
+    /\s+\band\s+(?:then\s+)?(?:drop|put|save|add|append|write|store|stash|file|park|place|copy)\b[\s\S]*$/i,
+    /\s+\b(?:then|after\s+that|also)\s+(?:drop|put|save|add|append|write|store|stash|file|park|place|copy)\b[\s\S]*$/i,
+    /\s+\b(?:to|into|in|inside)\s+(?:that|this|the|my|active|current)?\s*(?:note|notepad|scratch|memo|pad)\b[\s\S]*$/i,
+  ];
+  for (const pattern of mutationTailPatterns) {
+    cleaned = cleaned.replace(pattern, "").trim();
+  }
+  return cleaned
+    .replace(/\b(?:that|this|the)\s+location\b$/i, "")
+    .replace(/[,.?!;:]+$/g, "")
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .trim();
+};
+
 const resolveAskTurnDocLocateQuery = (transcript: string): string | null => {
   const normalized = transcript
     .trim()
@@ -22003,6 +22344,10 @@ const resolveAskTurnDocLocateQuery = (transcript: string): string | null => {
     .replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "");
   if (!normalized) return null;
   const cues = [
+    /\bexplain\s+what\s+(.+?)\s+means?\s+in\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i,
+    /\bfind\s+(?:the\s+)?(?:part|bit|section)\s+where\s+(?:it|this|that|the\s+doc(?:ument)?|the\s+paper)?\s*(?:talks?\s+about|mentions?|references?|cites?|says?)\s+(.+?)(?:\s+\band\s+(?:drop|put|save|add|append|write|store|stash|file|park|place)\b[\s\S]*)?$/i,
+    /\b(?:grab|pull|collect)\s+(?:the\s+)?(?:part|bit|section)\s+about\s+(.+?)(?:\s+\band\s+(?:drop|put|save|add|append|write|store|stash|file|park|place)\b[\s\S]*)?$/i,
+    /\bfind\s+where\s+(?:it|this|that|the\s+doc(?:ument)?|the\s+paper)?\s*(?:says?|talks?\s+about|mentions?|references?|cites?)\s+(.+?)(?:\s+\band\s+(?:drop|put|save|add|append|write|store|stash|file|park|place)\b[\s\S]*)?$/i,
     /\bwhere\s+does\s+it\s+(?:mention|mentions|reference|references|cite|cites|say\s+about|talk\s+about)\s+(.+)$/i,
     /\bwhere\s+in\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+does\s+it\s+talk\s+about\s+(.+)$/i,
     /\bwhere\s+does\s+(?:this|that|the|current)?\s*(?:doc|document|paper)\s+(?:mention|mentions|reference|references|cite|cites|say\s+about|talk\s+about)\s+(.+)$/i,
@@ -22019,10 +22364,7 @@ const resolveAskTurnDocLocateQuery = (transcript: string): string | null => {
     const match = normalized.match(cue);
     const query = match?.[1]?.trim();
     if (query) {
-      const cleaned = query
-        .replace(/[,.?!;:]+$/g, "")
-        .replace(/^["'`]+|["'`]+$/g, "")
-        .trim();
+      const cleaned = cleanAskTurnCompoundSourceQuery(query);
       if (cleaned) return cleaned;
     }
   }
@@ -22037,18 +22379,97 @@ const resolveAskTurnTopicDocQueryArg = (transcript: string): string | null => {
   if (!normalized || /\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized)) return null;
   const patterns = [
     /\b(?:find\s+and\s+open|search\s+for\s+and\s+open|pull\s+up|open|view|show|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\s+(?:a|an|the)?\s*(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+    /\b(?:find|search|pick|select|get)\s+(?:me\s+)?(?:the\s+)?(?:best|right|top|closest|most\s+relevant)?\s*(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
   ];
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
     const rawTopic = match?.[1]
       ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
       .replace(/\s*,?\s*(?:then\s+)?tell\s+me[\s\S]*$/i, "")
+      .replace(/\s+\band\s+(?:tell|show|explain|summari[sz]e|answer|extract|give)\b[\s\S]*$/i, "")
       .replace(/[?!.;,:"'`]+$/g, "")
       .trim();
     const topic = rawTopic ? normalizeAskTurnLatestDocTopicText(rawTopic) : null;
     if (topic) return topic;
   }
   return null;
+};
+
+const HELIX_ASK_OPEN_DOC_NOUN_PATTERN = String.raw`(?:doc|docs|document|documents|paper|papers|writeup|writeups|artifact|artifacts|result|results|thing|things|report|reports|file|files)`;
+const HELIX_ASK_RECENT_DOC_PATTERN = String.raw`(?:latest|newest|freshest|most\s+recent|recent)`;
+
+const cleanupAskTurnOpenDocSearchTopic = (rawTopic: string | null | undefined): string | null => {
+  const topic = rawTopic
+    ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
+    .replace(/\s*,?\s*(?:then\s+)?tell\s+me[\s\S]*$/i, "")
+    .replace(/\s+\band\s+(?:tell|show|explain|summari[sz]e|answer|extract|give)\b[\s\S]*$/i, "")
+    .replace(new RegExp(String.raw`\b${HELIX_ASK_OPEN_DOC_NOUN_PATTERN}\b`, "gi"), " ")
+    .replace(/\b(?:that|which)\s+(?:talks?\s+about|discuss(?:es)?|covers?|mentions?|references?)\b/gi, " ")
+    .replace(/\b(?:about|on|regarding|for)\b$/gi, " ")
+    .replace(/[?!.;,:"'`]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return topic ? normalizeAskTurnLatestDocTopicText(topic) : null;
+};
+
+const resolveAskTurnRecentDocAcquisitionQueryArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!normalized) return null;
+  const hasOpenVerb = /\b(?:open|view|show|pull\s+up|bring\s+up|go\s+to|navigate\s+to|find(?:\s+me)?|search)\b/i.test(normalized);
+  if (!hasOpenVerb || !new RegExp(String.raw`\b${HELIX_ASK_RECENT_DOC_PATTERN}\b`, "i").test(normalized)) return null;
+  if (isAskTurnStrictLatestDocAcquisitionIntent(normalized)) return null;
+  const docNoun = HELIX_ASK_OPEN_DOC_NOUN_PATTERN;
+  const recent = HELIX_ASK_RECENT_DOC_PATTERN;
+  const patterns = [
+    new RegExp(String.raw`\b(?:open|view|show|pull\s+up|bring\s+up|go\s+to|navigate\s+to|find(?:\s+me)?|search)\s+(?:me\s+)?(?:the\s+)?${recent}\s+${docNoun}\s+(?:that\s+)?(?:talks?\s+about|discuss(?:es)?|covers?|mentions?|references?)\s+(.+)$`, "i"),
+    new RegExp(String.raw`\b(?:open|view|show|pull\s+up|bring\s+up|go\s+to|navigate\s+to|find(?:\s+me)?|search)\s+(?:me\s+)?(?:the\s+)?${recent}\s+${docNoun}\s+(?:about|on|regarding|for)\s+(.+)$`, "i"),
+    new RegExp(String.raw`\b(?:open|view|show|pull\s+up|bring\s+up|go\s+to|navigate\s+to|find(?:\s+me)?|search)\s+(?:me\s+)?(?:the\s+)?${recent}\s+(.+?)\s+${docNoun}\b`, "i"),
+    new RegExp(String.raw`\b(?:open|view|show|pull\s+up|bring\s+up|go\s+to|navigate\s+to|find(?:\s+me)?|search)\s+(?:me\s+)?(?:the\s+)?${recent}\s+(.+)$`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const topic = cleanupAskTurnOpenDocSearchTopic(match?.[1]);
+    if (topic) return topic;
+  }
+  return null;
+};
+
+const resolveAskTurnTitleLikeOpenDocQueryArg = (transcript: string): string | null => {
+  const normalized = transcript.trim();
+  if (!normalized || /\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized)) return null;
+  const match = normalized.match(
+    /^\s*(?:please\s+)?(?:open\s+up|open|view|show|pull\s+up|go\s+to|navigate\s+to)\s+(?!the\s+)?(.+)$/i,
+  );
+  const rawTopic = match?.[1]
+    ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
+    .replace(/\s*,?\s*(?:then\s+)?tell\s+me[\s\S]*$/i, "")
+    .replace(/[?!.;,:"'`]+$/g, "")
+    .trim();
+  if (!rawTopic) return null;
+  if (/^(?:docs?|focs?|documents?|papers?|notes?|clipboard|calculator|panel|viewer)$/i.test(rawTopic)) return null;
+  if (/^(?:the\s+)?(?:docs?|focs?|documents?|papers?)\s+(?:viewer|panel)$/i.test(rawTopic)) return null;
+  const topic = normalizeAskTurnLatestDocTopicText(rawTopic);
+  if (!topic) return null;
+  const tokens = tokenizeAskTurnDocTopic(topic).map((token) => token.toLowerCase());
+  const strongSignals = tokens.filter(
+    (token) =>
+      token === "nhm2" ||
+      token === "warp" ||
+      token === "frontier" ||
+      token === "distance" ||
+      token === "report" ||
+      token === "audit" ||
+      token === "solve" ||
+      token === "profile" ||
+      token === "clocking" ||
+      token === "target" ||
+      token === "targets" ||
+      /^0p\d+$/i.test(token) ||
+      /^20\d{2}$/.test(token),
+  );
+  if (strongSignals.length === 0) return null;
+  if (tokens.length < 2 && !tokens.some((token) => /^0p\d+$/i.test(token))) return null;
+  return topic;
 };
 
 const resolveAskTurnOpenResultDocQueryArg = (transcript: string): string | null => {
@@ -22077,7 +22498,10 @@ const resolveAskTurnOpenResultDocQueryArg = (transcript: string): string | null 
 };
 
 const resolveAskTurnOpenDocSearchQueryArg = (transcript: string): string | null =>
-  resolveAskTurnTopicDocQueryArg(transcript) ?? resolveAskTurnOpenResultDocQueryArg(transcript);
+  resolveAskTurnRecentDocAcquisitionQueryArg(transcript) ??
+  resolveAskTurnTopicDocQueryArg(transcript) ??
+  resolveAskTurnOpenResultDocQueryArg(transcript) ??
+  resolveAskTurnTitleLikeOpenDocQueryArg(transcript);
 
 const isAskTurnTopicDocAcquisitionIntent = (transcript: string): boolean =>
   Boolean(resolveAskTurnOpenDocSearchQueryArg(transcript));
@@ -22487,23 +22911,94 @@ const resolveAskTurnBareNoteSinkArg = (transcript: string): string | null => {
     return composedDestination.title;
   }
   const match = transcript.match(
-    /\b(?:put|add|save|store|stash|file|park|place|write)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
+    /\b(?:put|add|save|store|stash|file|park|place|write|drop)\b[\s\S]*\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
   );
   const target = trimAskTurnActionArgBoundaries(match?.[1] ?? "");
   if (!target) return null;
   return target.replace(/^(?:the\s+)?(?:note|notepad)\s+/i, "").trim();
 };
 
+const resolveAskTurnLayDestinationNoteSinkArg = (transcript: string): string | null => {
+  const match = transcript.match(
+    /\b(?:drop|put|save|add|append|write|store|stash|file|park|place)\s+(?:(?:that|this|it)\s+)?(?:(?:finding|result|answer|part|bit|section|location|takeaway|summary)\s+)?(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b)(.+?)\s*$/i,
+  );
+  const target = normalizeAskTurnRequestedNoteTitle(match?.[1] ?? "");
+  return target;
+};
+
 const resolveAskTurnAnyNoteSinkArg = (transcript: string): string | null =>
-  resolveAskTurnNoteTargetArg(transcript) ?? resolveAskTurnBareNoteSinkArg(transcript);
+  resolveAskTurnNoteTargetArg(transcript) ?? resolveAskTurnLayDestinationNoteSinkArg(transcript) ?? resolveAskTurnBareNoteSinkArg(transcript);
+
+const normalizeAskTurnRequestedNoteTitle = (value: string | null | undefined): string | null => {
+  const cleaned = trimAskTurnActionArgBoundaries(value ?? "")
+    .replace(/^(?:a\s+|the\s+|my\s+)?(?:note|notepad)\s+(?:called|named|titled)\s+/i, "")
+    .replace(/^(?:called|named|titled)\s+/i, "")
+    .replace(/^(?:a\s+|the\s+|my\s+)?(?:note|notepad)\s+/i, "")
+    .replace(/\s+(?:note|notepad)$/i, "")
+    .replace(/\s+(?:too|also|as\s+well|please)$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned || isAskTurnDeicticNoteTarget(cleaned) || isAskTurnInvalidResolvedNoteTitle(cleaned)) return null;
+  const key = cleaned.toLowerCase();
+  if (/^(?:a|an|the|my)?\s*(?:note|notepad)?$/.test(key)) return null;
+  if (/^(?:scratch|memo|brief|log|journal|pad)$/.test(key)) return null;
+  return cleaned;
+};
+
+const findAskTurnWorkspaceNoteTitleMatch = (
+  requestedTitle: string | null | undefined,
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null,
+): string | null => {
+  const requestedKey = normalizeAskTurnNoteTitleKey(requestedTitle);
+  if (!requestedKey) return null;
+  for (const candidate of collectAskTurnWorkspaceNoteCandidates(workspaceSnapshot)) {
+    if (normalizeAskTurnNoteTitleKey(candidate.title) === requestedKey) return candidate.title;
+  }
+  return null;
+};
+
+const findAskTurnWorkspaceNoteTitleMention = (
+  value: string | null | undefined,
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null,
+): string | null => {
+  const targetKey = normalizeAskTurnNoteTitleKey(value);
+  if (!targetKey) return null;
+  const candidates = collectAskTurnWorkspaceNoteCandidates(workspaceSnapshot)
+    .map((candidate) => ({ ...candidate, key: normalizeAskTurnNoteTitleKey(candidate.title) }))
+    .filter((candidate) => candidate.key.length > 0)
+    .sort((a, b) => b.key.length - a.key.length);
+  for (const candidate of candidates) {
+    if (targetKey === candidate.key || targetKey.endsWith(candidate.key) || targetKey.includes(candidate.key)) {
+      return candidate.title;
+    }
+  }
+  return null;
+};
+
+const resolveAskTurnSummaryBareNoteSinkArg = (
+  transcript: string,
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null,
+): string | null => {
+  const patterns = [
+    /\b(?:save|put|add|append|write|store|copy|drop|place)\b[\s\S]*?\b(?:current\s+)?(?:doc(?:ument)?|paper)?\s*summary\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b|paragraphs?\b)(.+?)\s*$/i,
+    /\b(?:summari[sz]e|explain)\b[\s\S]*?\b(?:this|the|current)?\s*(?:doc(?:ument)?|paper)?\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b|paragraphs?\b)(.+?)\s*$/i,
+  ];
+  for (const pattern of patterns) {
+    const rawTarget = pattern.exec(transcript)?.[1] ?? null;
+    const mentionedWorkspaceTitle = findAskTurnWorkspaceNoteTitleMention(rawTarget, workspaceSnapshot);
+    if (mentionedWorkspaceTitle) return mentionedWorkspaceTitle;
+    const normalized = normalizeAskTurnRequestedNoteTitle(rawTarget);
+    if (!normalized) continue;
+    return findAskTurnWorkspaceNoteTitleMatch(normalized, workspaceSnapshot) ?? normalized;
+  }
+  return null;
+};
 
 const resolveAskTurnSummaryNamedNoteSinkArg = (transcript: string): string | null => {
   const match = transcript.match(
     /\b(?:summari[sz]e|explain)\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b|paragraphs?\b)(.+?)\s*$/i,
   );
-  const target = trimAskTurnActionArgBoundaries(match?.[1] ?? "")
-    .replace(/^(?:the\s+|my\s+)?(?:note|notepad)\s+/i, "")
-    .trim();
+  const target = normalizeAskTurnRequestedNoteTitle(match?.[1] ?? "");
   if (!target || isAskTurnDeicticNoteTarget(target)) return target || null;
   const hasNoteLikeTarget =
     /\b(?:note|notepad|scratch|refs?|reference|test|log|journal|brief|memo|pad)\b/i.test(target);
@@ -22517,11 +23012,9 @@ const resolveAskTurnSummaryNamedNoteSinkArg = (transcript: string): string | nul
 
 const resolveAskTurnLocationNamedNoteSinkArg = (transcript: string): string | null => {
   const match = transcript.match(
-    /\b(?:put|add|append|save|write|store|stash|file|park|place)\b[\s\S]*?\blocation\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b)(.+?)\s*$/i,
+    /\b(?:put|add|append|save|write|store|stash|file|park|place|drop)\b[\s\S]*?\b(?:location|finding|part|bit|section)\b[\s\S]*?\b(?:to|into|in|inside)\s+(?!clipboard\b|docs?\b|documents?\b|papers?\b|sections?\b)(.+?)\s*$/i,
   );
-  const target = trimAskTurnActionArgBoundaries(match?.[1] ?? "")
-    .replace(/^(?:the\s+|my\s+)?(?:note|notepad)\s+/i, "")
-    .trim();
+  const target = normalizeAskTurnRequestedNoteTitle(match?.[1] ?? "") ?? resolveAskTurnLayDestinationNoteSinkArg(transcript);
   if (!target || isAskTurnDeicticNoteTarget(target)) return target || null;
   const hasNoteLikeTarget = /\b(?:note|notepad|scratch|refs?|reference|test|log|journal|brief|memo|pad)\b/i.test(target);
   const hasNamedSinkShape = target.split(/\s+/).filter(Boolean).length >= 2;
@@ -22554,7 +23047,12 @@ const resolveAskTurnNoteTargetWithWorkspace = (
 ): string | null => {
   const raw = resolveAskTurnAnyNoteSinkArg(transcript);
   const workspaceTitle = resolveAskTurnWorkspaceNoteTitle(workspaceSnapshot);
-  if (raw && !isAskTurnDeicticNoteTarget(raw)) {
+  if (
+    raw &&
+    !isAskTurnDeicticNoteTarget(raw) &&
+    !isAskTurnGenericDocCompareTarget(raw) &&
+    !isAskTurnInvalidResolvedNoteTitle(raw)
+  ) {
     const rawWithoutGenericNoteSuffix = raw.replace(/\s+(?:note|notepad)$/i, "").trim();
     if (workspaceTitle && rawWithoutGenericNoteSuffix && workspaceTitle.toLowerCase() === rawWithoutGenericNoteSuffix.toLowerCase()) {
       return workspaceTitle;
@@ -22569,6 +23067,10 @@ const resolveAskTurnSummaryNoteTargetWithWorkspace = (
   workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null,
 ): string | null => {
   const workspaceTitle = resolveAskTurnWorkspaceNoteTitle(workspaceSnapshot);
+  const bareSummaryTarget = resolveAskTurnSummaryBareNoteSinkArg(transcript, workspaceSnapshot);
+  if (bareSummaryTarget && !isAskTurnDeicticNoteTarget(bareSummaryTarget)) {
+    return bareSummaryTarget;
+  }
   const raw =
     resolveAskTurnNoteTargetWithWorkspace(transcript, workspaceSnapshot) ??
     resolveAskTurnSummaryNamedNoteSinkArg(transcript);
@@ -22715,9 +23217,10 @@ const isAskTurnArtifactCarryoverToNoteIntent = (transcript: string): boolean => 
   const normalized = transcript.trim().toLowerCase();
   if (!isAskTurnArtifactReferenceIntent(normalized)) return false;
   if (/\b(?:summari[sz]e|explain|compare|contrast|look|search|find|scan)\b/.test(normalized)) return false;
+  if (resolveAskTurnLayDestinationNoteSinkArg(transcript)) return true;
   return (
     /\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:to|into|in|inside)\s+(?:it|that\s+note|the\s+note|my\s+note|notes?|notepad)\b/.test(normalized) ||
-    /\b(?:put|add|append|save|store|copy|write|place)\b[\s\S]*\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:it|note|notes|notepad)\b/.test(normalized)
+    /\b(?:put|add|append|save|store|copy|write|place|drop)\b[\s\S]*\b(?:that|this|it|location|finding|result|answer|output|response)\b[\s\S]*\b(?:it|note|notes|notepad)\b/.test(normalized)
   );
 };
 
@@ -22782,6 +23285,39 @@ type HelixAskDocSearchResult = {
   score: number;
 };
 
+type HelixAskDocCandidateValidationStatus = "strong" | "ambiguous" | "weak";
+
+type HelixAskDocCandidateValidationCandidate = {
+  path: string;
+  title: string | null;
+  score: number;
+  matchedTerms: string[];
+  missingTerms: string[];
+  pathMatchedTerms: string[];
+  snippetMatchedTerms: string[];
+  recencySignal: string | null;
+  evidenceSnippet: string | null;
+  selectionReason: string;
+  validationStatus: HelixAskDocCandidateValidationStatus;
+};
+
+type HelixAskDocCandidateValidationArtifact = {
+  kind: "doc_candidate_validation";
+  query: string;
+  normalized_query?: string;
+  requiredTerms: string[];
+  hard_required_terms?: string[];
+  semantic_terms?: string[];
+  ignored_terms?: string[];
+  soft_terms?: string[];
+  selected_path: string | null;
+  selected_status: HelixAskDocCandidateValidationStatus | "none";
+  selected_reason: string;
+  needs_clarification: boolean;
+  failure_reason: string | null;
+  candidates: HelixAskDocCandidateValidationCandidate[];
+};
+
 const searchAskTurnDocsForQuery = (query: string, limit = 3): HelixAskDocSearchResult[] => {
   const tokens = filterCriticTokens(tokenizeAskQuery(query))
     .map((token) => token.toLowerCase())
@@ -22840,6 +23376,695 @@ const searchAskTurnDocsForQuery = (query: string, limit = 3): HelixAskDocSearchR
   return results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path)).slice(0, Math.max(1, limit));
 };
 
+type HelixAskTemporalTargetValidationStatus = "strong" | "ambiguous" | "weak" | "none";
+
+type HelixAskTemporalTargetResolutionStatus = "resolved" | "ambiguous" | "unresolved";
+
+const expandAskTurnTemporalTargetTermAliases = (term: string): string[] => {
+  const normalized = term.toLowerCase();
+  if (normalized === "passing" || normalized === "passed" || normalized === "pass") return ["passing", "passed", "pass"];
+  if (normalized === "solve") return ["solve", "solved", "solution", "authority", "congruent"];
+  return [normalized];
+};
+
+const askTurnTemporalTargetHaystackHasAlias = (haystack: string, alias: string): boolean => {
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, "i").test(haystack);
+};
+
+const extractAskTurnTemporalTargetTerms = (query: string): string[] =>
+  Array.from(
+    new Set(
+      tokenizeAskTurnDocTopic(query)
+        .map((token) => token.toLowerCase())
+        .filter((token) => token.length >= 3 && !["the", "right", "before", "after"].includes(token)),
+    ),
+  );
+
+const buildAskTurnTemporalTargetQueryVariants = (query: string): string[] => {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const normalized = trimmed.toLowerCase();
+  const variants = [trimmed];
+  const hasNhm2 = /\bnhm2\b/i.test(trimmed);
+  const hasSolve = /\bsolv(?:e|ed|ing)?\b/i.test(trimmed);
+  const hasPassing = /\bpass(?:ing|ed)?\b/i.test(trimmed);
+  if (hasNhm2 && hasSolve && hasPassing) {
+    variants.push(
+      "NHM2 solve passed",
+      "NHM2 solve pass",
+      "NHM2 certificate pass",
+      "NHM2 passing certificate",
+      "NHM2 passing solve certificate",
+    );
+  } else if (hasNhm2 && hasSolve) {
+    variants.push("NHM2 solve certificate", "NHM2 solve authority", "NHM2 full solve");
+  } else if (hasNhm2) {
+    variants.push("NHM2 certificate", "NHM2 audit", "NHM2 result");
+  }
+  return Array.from(new Map(variants.map((variant) => [variant.toLowerCase(), variant])).values())
+    .filter((variant) => tokenizeAskTurnDocTopic(variant).length >= 2 && !/^(?:nhm2|solve|pass|passing|passed)$/i.test(variant.trim()))
+    .slice(0, 6);
+};
+
+const scoreAskTurnTemporalTargetCandidate = (
+  query: string,
+  candidate: HelixAskDocSearchResult,
+): Record<string, unknown> & {
+  path: string;
+  title: string | null;
+  date: string | null;
+  score: number;
+  snippet: string;
+  matched_terms: string[];
+  missing_terms: string[];
+  validation_status: Exclude<HelixAskTemporalTargetValidationStatus, "none">;
+} => {
+  const requiredTerms = extractAskTurnTemporalTargetTerms(query);
+  const title = readAskTurnDocTitleForPath(candidate.path);
+  const date = extractAskTurnFilenameDate(candidate.path);
+  const identityHaystack = [candidate.path, title ?? ""].join(" ").toLowerCase();
+  const haystack = [candidate.path, title ?? "", candidate.snippet ?? ""].join(" ").toLowerCase();
+  const matchedTerms = requiredTerms.filter((term) => {
+    const aliases = expandAskTurnTemporalTargetTermAliases(term);
+    const matchHaystack = ["passing", "passed", "pass"].includes(term.toLowerCase()) ? identityHaystack : haystack;
+    return aliases.some((alias) => askTurnTemporalTargetHaystackHasAlias(matchHaystack, alias));
+  });
+  const missingTerms = requiredTerms.filter((term) => !matchedTerms.includes(term));
+  const hasNhm2 = matchedTerms.includes("nhm2") || askTurnTemporalTargetHaystackHasAlias(haystack, "nhm2");
+  const hasSolve =
+    matchedTerms.includes("solve") ||
+    expandAskTurnTemporalTargetTermAliases("solve").some((alias) => askTurnTemporalTargetHaystackHasAlias(haystack, alias));
+  const hasPassing =
+    !requiredTerms.includes("passing") ||
+    matchedTerms.includes("passing") ||
+    expandAskTurnTemporalTargetTermAliases("passing").some((alias) =>
+      askTurnTemporalTargetHaystackHasAlias(identityHaystack, alias),
+    );
+  const validationStatus: Exclude<HelixAskTemporalTargetValidationStatus, "none"> =
+    date && hasNhm2 && hasSolve && hasPassing && missingTerms.length === 0
+      ? "strong"
+      : date && hasNhm2 && hasSolve && missingTerms.length <= 1
+        ? "ambiguous"
+        : "weak";
+  return {
+    path: candidate.path,
+    title,
+    date,
+    score: candidate.score,
+    snippet: candidate.snippet,
+    matched_terms: matchedTerms,
+    missing_terms: missingTerms,
+    validation_status: validationStatus,
+  };
+};
+
+const buildAskTurnTemporalTargetResolutionAttempts = (args: {
+  query: string;
+  limit?: number;
+}): Record<string, unknown> & {
+  kind: "temporal_target_resolution_attempts";
+  original_query: string;
+  attempted_queries: string[];
+  attempts: Array<Record<string, unknown>>;
+  selected_query: string | null;
+  selected_path: string | null;
+  selected_candidate: ReturnType<typeof scoreAskTurnTemporalTargetCandidate> | null;
+  final_status: HelixAskTemporalTargetResolutionStatus;
+} => {
+  const originalQuery = args.query.trim();
+  const variants = buildAskTurnTemporalTargetQueryVariants(originalQuery);
+  const attempts: Array<Record<string, unknown>> = [];
+  let selectedQuery: string | null = null;
+  let selectedCandidate: ReturnType<typeof scoreAskTurnTemporalTargetCandidate> | null = null;
+  for (const variant of variants) {
+    const candidates = searchAskTurnDocsForQuery(variant, args.limit ?? 5);
+    const validation = validateAskTurnTemporalTargetCandidates({ query: variant, candidates });
+    attempts.push({
+      query: variant,
+      validation_status: validation.status,
+      selected_path: validation.selected?.path ?? null,
+      failure_reason: validation.failureReason,
+      missing_terms: validation.missingTerms,
+      candidates: validation.candidates,
+    });
+    if (validation.status === "strong" && validation.selected) {
+      selectedQuery = variant;
+      selectedCandidate = validation.selected;
+      break;
+    }
+  }
+  const hasAmbiguous = attempts.some((attempt) => readAskTurnString(attempt.validation_status) === "ambiguous");
+  const finalStatus: HelixAskTemporalTargetResolutionStatus = selectedCandidate
+    ? "resolved"
+    : hasAmbiguous
+      ? "ambiguous"
+      : "unresolved";
+  return {
+    kind: "temporal_target_resolution_attempts",
+    original_query: originalQuery,
+    attempted_queries: attempts.map((attempt) => readAskTurnString(attempt.query) ?? "").filter(Boolean),
+    attempts,
+    selected_query: selectedQuery,
+    selected_path: selectedCandidate?.path ?? null,
+    selected_candidate: selectedCandidate,
+    final_status: finalStatus,
+  };
+};
+
+const validateAskTurnTemporalTargetCandidates = (args: {
+  query: string;
+  candidates: HelixAskDocSearchResult[];
+}): {
+  requiredTerms: string[];
+  candidates: ReturnType<typeof scoreAskTurnTemporalTargetCandidate>[];
+  selected: ReturnType<typeof scoreAskTurnTemporalTargetCandidate> | null;
+  status: HelixAskTemporalTargetValidationStatus;
+  missingTerms: string[];
+  failureReason: string | null;
+} => {
+  const requiredTerms = extractAskTurnTemporalTargetTerms(args.query);
+  const candidates = args.candidates.map((candidate) => scoreAskTurnTemporalTargetCandidate(args.query, candidate));
+  const strongCandidates = candidates.filter((candidate) => candidate.validation_status === "strong");
+  const ambiguousCandidates = candidates.filter((candidate) => candidate.validation_status === "ambiguous");
+  if (strongCandidates.length === 1) {
+    return {
+      requiredTerms,
+      candidates,
+      selected: strongCandidates[0],
+      status: "strong",
+      missingTerms: [],
+      failureReason: null,
+    };
+  }
+  if (strongCandidates.length > 1) {
+    return {
+      requiredTerms,
+      candidates,
+      selected: null,
+      status: "ambiguous",
+      missingTerms: [],
+      failureReason: "target_ambiguous",
+    };
+  }
+  if (ambiguousCandidates.length > 0) {
+    const missingTerms = Array.from(new Set(ambiguousCandidates.flatMap((candidate) => candidate.missing_terms)));
+    return {
+      requiredTerms,
+      candidates,
+      selected: null,
+      status: "ambiguous",
+      missingTerms,
+      failureReason: "target_ambiguous",
+    };
+  }
+  if (candidates.length > 0) {
+    const missingTerms = Array.from(new Set(candidates.flatMap((candidate) => candidate.missing_terms)));
+    return {
+      requiredTerms,
+      candidates,
+      selected: null,
+      status: "weak",
+      missingTerms,
+      failureReason: "target_weak",
+    };
+  }
+  return {
+    requiredTerms,
+    candidates,
+    selected: null,
+    status: "none",
+    missingTerms: requiredTerms,
+    failureReason: "target_unresolved",
+  };
+};
+
+const buildAskTurnTemporalContextComparisonArtifact = (args: {
+  sourcePath?: unknown;
+  targetQuery?: unknown;
+  limit?: number;
+}): Record<string, unknown> => {
+  const sourcePath = normalizeAskTurnWorkspaceDocPath(args.sourcePath);
+  const targetQuery = typeof args.targetQuery === "string" ? args.targetQuery.trim() : "";
+  const sourceDate = sourcePath ? extractAskTurnFilenameDate(sourcePath) : null;
+  const sourceTitle = sourcePath ? readAskTurnDocTitleForPath(sourcePath) : null;
+  const targetAttempts = targetQuery
+    ? buildAskTurnTemporalTargetResolutionAttempts({ query: targetQuery, limit: args.limit ?? 5 })
+    : null;
+  const firstAttempt =
+    Array.isArray(targetAttempts?.attempts) && targetAttempts.attempts.length > 0
+      ? (targetAttempts.attempts[0] as Record<string, unknown>)
+      : null;
+  const allAttemptCandidates =
+    Array.isArray(targetAttempts?.attempts)
+      ? (targetAttempts.attempts as Array<Record<string, unknown>>).flatMap((attempt) =>
+          Array.isArray(attempt.candidates) ? (attempt.candidates as Array<Record<string, unknown>>) : [],
+        )
+      : [];
+  const targetCandidates = allAttemptCandidates.length > 0
+    ? allAttemptCandidates
+    : targetQuery
+      ? validateAskTurnTemporalTargetCandidates({
+          query: targetQuery,
+          candidates: searchAskTurnDocsForQuery(targetQuery, args.limit ?? 5),
+        }).candidates
+      : [];
+  const selectedTarget = targetAttempts?.selected_candidate ?? null;
+  const targetValidationStatus =
+    selectedTarget
+      ? "strong"
+      : readAskTurnString(targetAttempts?.final_status) === "ambiguous"
+        ? "ambiguous"
+        : readAskTurnString(targetAttempts?.final_status) === "unresolved"
+          ? "weak"
+          : "none";
+  const targetMissingTerms = Array.from(
+    new Set(
+      (Array.isArray(firstAttempt?.missing_terms) ? firstAttempt?.missing_terms : [])
+        .map((term) => String(term))
+        .filter(Boolean),
+    ),
+  );
+  const targetDate = selectedTarget?.date ?? null;
+  const relation =
+    sourceDate && targetDate
+      ? sourceDate < targetDate
+        ? "before"
+        : sourceDate > targetDate
+          ? "after"
+          : "same_time"
+      : "uncertain";
+  const confidence =
+    sourceDate && targetDate && targetValidationStatus === "strong"
+      ? "high"
+      : sourcePath && targetQuery && targetCandidates.length > 0
+        ? "low"
+        : "low";
+  const failureReason =
+    !sourcePath
+      ? "source_context_missing"
+      : !sourceDate
+        ? "source_date_missing"
+        : !targetQuery
+          ? "target_query_missing"
+          : targetCandidates.length === 0
+            ? "target_unresolved"
+            : targetValidationStatus === "ambiguous"
+              ? "target_ambiguous"
+              : targetValidationStatus === "weak"
+              ? "target_weak"
+              : readAskTurnString(firstAttempt?.failure_reason)
+              ? readAskTurnString(firstAttempt?.failure_reason)
+              : !targetDate
+                ? "target_date_missing"
+              : null;
+  return {
+    kind: "temporal_context_comparison",
+    source_doc_path: sourcePath,
+    source_doc_title: sourceTitle,
+    source_date: sourceDate,
+    target_query: targetQuery || null,
+    target_required_terms: extractAskTurnTemporalTargetTerms(targetQuery),
+    target_resolution_attempts: targetAttempts,
+    target_attempted_queries: targetAttempts?.attempted_queries ?? [],
+    target_candidates: targetCandidates,
+    target_doc_path: selectedTarget?.path ?? null,
+    target_doc_title: selectedTarget?.title ?? null,
+    target_date: targetDate,
+    target_validation_status: targetValidationStatus,
+    target_missing_terms: targetMissingTerms,
+    relation,
+    confidence,
+    evidence: [
+      sourcePath ? { kind: "source_doc", path: sourcePath, title: sourceTitle, date: sourceDate } : null,
+      selectedTarget
+        ? {
+            kind: "target_doc",
+            path: selectedTarget.path,
+            title: selectedTarget.title,
+            date: selectedTarget.date,
+            snippet: selectedTarget.snippet,
+          }
+        : null,
+    ].filter(Boolean),
+    failure_reason: failureReason,
+  };
+};
+
+const renderAskTurnTemporalContextComparisonFinal = (artifact: Record<string, unknown>): string => {
+  const sourcePath = normalizeAskTurnWorkspaceDocPath(artifact.source_doc_path);
+  const sourceTitle = readAskTurnString(artifact.source_doc_title);
+  const sourceDate = readAskTurnString(artifact.source_date);
+  const targetQuery = readAskTurnString(artifact.target_query) ?? "the comparison target";
+  const targetPath = normalizeAskTurnWorkspaceDocPath(artifact.target_doc_path);
+  const targetTitle = readAskTurnString(artifact.target_doc_title);
+  const targetDate = readAskTurnString(artifact.target_date);
+  const relation = readAskTurnString(artifact.relation) ?? "uncertain";
+  const confidence = readAskTurnString(artifact.confidence) ?? "low";
+  const failureReason = readAskTurnString(artifact.failure_reason);
+  const targetValidationStatus = readAskTurnString(artifact.target_validation_status) ?? "none";
+  const targetMissingTerms = Array.isArray(artifact.target_missing_terms)
+    ? (artifact.target_missing_terms as unknown[]).map((term) => String(term)).filter(Boolean)
+    : [];
+  const attemptedQueries = Array.isArray(artifact.target_attempted_queries)
+    ? (artifact.target_attempted_queries as unknown[]).map((query) => String(query)).filter(Boolean)
+    : [];
+  const candidates = Array.isArray(artifact.target_candidates)
+    ? (artifact.target_candidates as Array<Record<string, unknown>>)
+    : [];
+  if (!sourcePath) {
+    return "I need the active document context before I can compare it against another solve/event.";
+  }
+  if (!sourceDate) {
+    return `I can identify the current doc, but I cannot extract a date from it: ${sourcePath}`;
+  }
+  if (!targetPath || !targetDate || targetValidationStatus !== "strong") {
+    const seenCandidatePaths = new Set<string>();
+    const candidateLines = candidates
+      .filter((candidate) => {
+        const candidatePath = normalizeAskTurnWorkspaceDocPath(candidate.path) ?? readAskTurnString(candidate.path) ?? "";
+        if (!candidatePath || seenCandidatePaths.has(candidatePath)) return false;
+        seenCandidatePaths.add(candidatePath);
+        return true;
+      })
+      .slice(0, 3)
+      .map((candidate, index) => {
+        const pathLabel = normalizeAskTurnWorkspaceDocPath(candidate.path) ?? readAskTurnString(candidate.path) ?? "unknown path";
+        const titleLabel = readAskTurnString(candidate.title) ?? readAskTurnDocTitleForPath(pathLabel) ?? pathLabel.split("/").pop() ?? "Untitled candidate";
+        const dateLabel = readAskTurnString(candidate.date) ?? "no date";
+        const statusLabel = readAskTurnString(candidate.validation_status) ?? "unknown";
+        const missing = Array.isArray(candidate.missing_terms) && candidate.missing_terms.length > 0
+          ? `; missing evidence for ${candidate.missing_terms.join(", ")}`
+          : "";
+        return `${index + 1}. ${titleLabel} (${dateLabel}; ${statusLabel}${missing})\n   Path: ${pathLabel}`;
+      });
+    const targetIssue =
+      targetValidationStatus === "weak" || targetValidationStatus === "ambiguous"
+        ? `I can compare the current doc, ${sourceTitle ?? sourcePath} (${sourceDate}), but I could not identify a clear "${targetQuery}" target.`
+        : `I can confirm the current doc is dated ${sourceDate}, but I could not ground "${targetQuery}" to one dated target document.`;
+    return [
+      targetIssue,
+      attemptedQueries.length > 0 ? `I tried: ${attemptedQueries.join("; ")}` : null,
+      targetMissingTerms.length > 0 ? `Still missing target evidence for: ${targetMissingTerms.join(", ")}` : null,
+      candidateLines.length > 0 ? "Closest candidates:" : null,
+      ...candidateLines,
+      candidateLines.length > 0 ? "Which target should I compare against? Reply with 1, 2, 3, or paste the exact doc/path." : null,
+      failureReason ? `Status: ${failureReason}.` : null,
+    ].filter(Boolean).join("\n");
+  }
+  const answer =
+    relation === "before"
+      ? "Yes."
+      : relation === "after"
+        ? "No."
+        : relation === "same_time"
+          ? "They appear to have the same date."
+          : "Uncertain.";
+  const relationText =
+    relation === "before"
+      ? "before"
+      : relation === "after"
+        ? "after"
+        : relation === "same_time"
+          ? "on the same date as"
+          : "not conclusively ordered against";
+  return [
+    `${answer} The current document is dated ${sourceDate}, which is ${relationText} the resolved target dated ${targetDate}.`,
+    `Current doc: ${sourceTitle ? `${sourceTitle} ` : ""}${sourcePath}`,
+    `Target: ${targetTitle ? `${targetTitle} ` : ""}${targetPath}`,
+    `Confidence: ${confidence}.`,
+  ].join("\n");
+};
+
+const HELIX_ASK_DOC_CANDIDATE_STOP_TERMS = new Set([
+  "about",
+  "after",
+  "also",
+  "and",
+  "any",
+  "doc",
+  "docs",
+  "document",
+  "documents",
+  "for",
+  "from",
+  "go",
+  "into",
+  "latest",
+  "most",
+  "newest",
+  "open",
+  "paper",
+  "papers",
+  "pull",
+  "recent",
+  "show",
+  "that",
+  "the",
+  "this",
+  "to",
+  "up",
+  "view",
+]);
+
+const normalizeAskTurnDocCandidateTerm = (term: string): string => {
+  const normalized = term.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+  if (["saves", "saved", "saving"].includes(normalized)) return "save";
+  if (["profiles", "profiled", "profiling"].includes(normalized)) return "profile";
+  if (["trips"].includes(normalized)) return "trip";
+  if (["times"].includes(normalized)) return "time";
+  return normalized;
+};
+
+const buildAskTurnDocCandidateQueryProfile = (query: string): {
+  normalized_query: string;
+  requiredTerms: string[];
+  hard_required_terms: string[];
+  semantic_terms: string[];
+  ignored_terms: string[];
+  soft_terms: string[];
+} => {
+  const rawTokens = tokenizeAskTurnDocTopic(query)
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 2);
+  const ignored_terms = Array.from(
+    new Set(rawTokens.filter((token) => HELIX_ASK_DOC_CANDIDATE_STOP_TERMS.has(token))),
+  );
+  const normalizedTokens = rawTokens
+    .map(normalizeAskTurnDocCandidateTerm)
+    .filter((token) => token.length >= 3)
+    .filter((token) => !HELIX_ASK_DOC_CANDIDATE_STOP_TERMS.has(token));
+  const semantic_terms: string[] = [];
+  const normalizedText = ` ${normalizedTokens.join(" ")} `;
+  if (
+    /\b(?:save|shorten|reduce|faster)\b/.test(normalizedText) &&
+    /\b(?:trip|travel|route|mission)\b/.test(normalizedText) &&
+    /\btime\b/.test(normalizedText)
+  ) {
+    semantic_terms.push("travel time", "trip duration", "mission time", "route time", "time savings");
+  }
+  const hard_required_terms = Array.from(
+    new Set(
+      normalizedTokens.filter((token) =>
+        /^(?:nhm2|warp|profile|solve|target|clock|frontier|distance|centerline|alpha|authority|audit)$/.test(token),
+      ),
+    ),
+  );
+  const soft_terms = Array.from(
+    new Set(normalizedTokens.filter((token) => !hard_required_terms.includes(token))),
+  );
+  const requiredTerms = Array.from(new Set([...hard_required_terms, ...soft_terms]));
+  return {
+    normalized_query: Array.from(new Set([...requiredTerms, ...semantic_terms])).join(" ").trim(),
+    requiredTerms,
+    hard_required_terms,
+    semantic_terms: Array.from(new Set(semantic_terms)),
+    ignored_terms,
+    soft_terms,
+  };
+};
+
+const extractAskTurnDocCandidateValidationTerms = (query: string): string[] =>
+  buildAskTurnDocCandidateQueryProfile(query).requiredTerms;
+
+const readAskTurnDocTitleForPath = (docPath: string): string | null => {
+  const rel = docPath.replace(/^\/+/, "");
+  if (!rel.toLowerCase().startsWith("docs/")) return null;
+  const full = path.resolve(process.cwd(), rel);
+  try {
+    const text = fs.readFileSync(full, "utf8");
+    return text.match(/^\s*#\s+(.+)$/m)?.[1]?.trim() ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const renderAskTurnDocFileStemLabel = (docPath: string): string => {
+  const normalized = normalizeAskTurnWorkspaceDocPath(docPath) ?? docPath;
+  const stem = path.posix.basename(normalized).replace(/\.[a-z0-9]+$/i, "");
+  return stem
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b([a-z])/g, (match) => match.toUpperCase()) || normalized;
+};
+
+const renderAskTurnDocDisplayLabel = (docPath?: string | null): string => {
+  const normalized = docPath ? normalizeAskTurnWorkspaceDocPath(docPath) : null;
+  if (!normalized) return "Document";
+  return readAskTurnDocTitleForPath(normalized) ?? renderAskTurnDocFileStemLabel(normalized);
+};
+
+const renderAskTurnDocReferenceBlock = (args: {
+  heading: string;
+  path?: string | null;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  section?: string | null;
+  snippet?: string | null;
+}): string | null => {
+  const normalizedPath = normalizeAskTurnWorkspaceDocPath(args.path);
+  if (!normalizedPath) return null;
+  const label = renderAskTurnDocDisplayLabel(normalizedPath);
+  const lineStart = Number(args.lineStart);
+  const lineEnd = Number(args.lineEnd);
+  const hasLine = Number.isFinite(lineStart);
+  const lineLabel = hasLine
+    ? `L${lineStart}${Number.isFinite(lineEnd) && lineEnd !== lineStart ? `-L${lineEnd}` : ""}`
+    : null;
+  const section = typeof args.section === "string" && args.section.trim() ? args.section.trim() : null;
+  const snippet = typeof args.snippet === "string" ? args.snippet.replace(/\s+/g, " ").trim() : "";
+  return [
+    `${args.heading}:`,
+    `- ${label}${lineLabel ? `, ${lineLabel}` : ""}${section ? ` (${section})` : ""}`,
+    `  Path: ${normalizedPath}${lineLabel ? `:${lineLabel}` : ""}`,
+    snippet ? `  Snippet: ${clipConversationText(snippet, 220)}` : null,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+};
+
+const validateAskTurnDocCandidates = (args: {
+  query: string;
+  transcript?: string | null;
+  matches?: HelixAskDocSearchResult[] | null;
+  limit?: number;
+}): HelixAskDocCandidateValidationArtifact => {
+  const query = args.query.trim();
+  const queryProfile = buildAskTurnDocCandidateQueryProfile(query);
+  const requiredTerms = queryProfile.requiredTerms;
+  const semanticTerms = queryProfile.semantic_terms;
+  const normalizedSearchQuery = queryProfile.normalized_query || query;
+  const matches = (args.matches && args.matches.length > 0 ? args.matches : searchAskTurnDocsForQuery(normalizedSearchQuery, args.limit ?? 8)).slice(
+    0,
+    Math.max(1, args.limit ?? 8),
+  );
+  const textHasCandidateTerm = (text: string, term: string): boolean => {
+    const normalizedText = text.toLowerCase();
+    const normalizedTerm = term.toLowerCase();
+    if (normalizedText.includes(normalizedTerm)) return true;
+    const parts = normalizedTerm.split(/\s+/).filter(Boolean);
+    return parts.length > 1 && parts.every((part) => normalizedText.includes(part));
+  };
+  const candidates = matches.map((match) => {
+    const title = readAskTurnDocTitleForPath(match.path);
+    const pathText = match.path.toLowerCase();
+    const titleText = String(title ?? "").toLowerCase();
+    const snippetText = String(match.snippet ?? "").toLowerCase();
+    const pathMatchedTerms = requiredTerms.filter((term) => textHasCandidateTerm(pathText, term) || textHasCandidateTerm(titleText, term));
+    const snippetMatchedTerms = requiredTerms.filter((term) => textHasCandidateTerm(snippetText, term));
+    const semanticMatchedTerms = semanticTerms.filter(
+      (term) => textHasCandidateTerm(pathText, term) || textHasCandidateTerm(titleText, term) || textHasCandidateTerm(snippetText, term),
+    );
+    const matchedTerms = Array.from(new Set([...pathMatchedTerms, ...snippetMatchedTerms, ...semanticMatchedTerms]));
+    const missingTerms = requiredTerms.filter((term) => !matchedTerms.includes(term));
+    const recencySignal = extractAskTurnFilenameDate(match.path);
+    const hardMatchedTerms = queryProfile.hard_required_terms.filter((term) => matchedTerms.includes(term));
+    const hardMissingTerms = queryProfile.hard_required_terms.filter((term) => !hardMatchedTerms.includes(term));
+    const hasHardTerms = queryProfile.hard_required_terms.length > 0;
+    const hasSemanticFit = semanticTerms.length === 0 || semanticMatchedTerms.length > 0;
+    const hasSpecificPathFit = pathMatchedTerms.filter((term) => term !== "nhm2").length >= Math.min(2, requiredTerms.filter((term) => term !== "nhm2").length || 1);
+    const validationStatus: HelixAskDocCandidateValidationStatus =
+      requiredTerms.length > 0 &&
+      (hasHardTerms ? hardMissingTerms.length === 0 : missingTerms.length === 0) &&
+      hasSemanticFit &&
+      (hasHardTerms
+        ? missingTerms.length <= Math.max(0, queryProfile.soft_terms.length - Math.max(1, Math.ceil(queryProfile.soft_terms.length / 2)))
+        : missingTerms.length === 0) &&
+      (hasSpecificPathFit || pathMatchedTerms.length >= Math.min(2, requiredTerms.length))
+        ? "strong"
+        : (hasHardTerms ? hardMissingTerms.length === 0 : matchedTerms.length > 0) &&
+            hasSemanticFit &&
+            missingTerms.length <= Math.max(1, hasHardTerms ? queryProfile.soft_terms.length : 1)
+          ? "ambiguous"
+          : "weak";
+    const validationBoost = pathMatchedTerms.length * 8 + snippetMatchedTerms.length * 3 + semanticMatchedTerms.length * 4 + (recencySignal ? 1 : 0);
+    return {
+      path: match.path,
+      title,
+      score: match.score + validationBoost,
+      matchedTerms,
+      missingTerms,
+      pathMatchedTerms,
+      snippetMatchedTerms,
+      recencySignal,
+      evidenceSnippet: match.snippet,
+      selectionReason:
+        validationStatus === "strong"
+          ? `matched required terms: ${matchedTerms.join(", ")}`
+          : missingTerms.length > 0
+            ? `missing required terms: ${missingTerms.join(", ")}`
+            : "candidate requires clarification",
+      validationStatus,
+    } satisfies HelixAskDocCandidateValidationCandidate;
+  });
+  const ranked = [...candidates].sort((a, b) => {
+    const statusScore = (status: HelixAskDocCandidateValidationStatus) => (status === "strong" ? 2 : status === "ambiguous" ? 1 : 0);
+    const recencyDelta = extractAskTurnSortableDateFromPath(b.path) - extractAskTurnSortableDateFromPath(a.path);
+    return statusScore(b.validationStatus) - statusScore(a.validationStatus) || b.score - a.score || recencyDelta || a.path.localeCompare(b.path);
+  });
+  const strong = ranked.filter((candidate) => candidate.validationStatus === "strong");
+  const top = ranked[0] ?? null;
+  const runnerUp = ranked[1] ?? null;
+  const transcriptText = String(args.transcript ?? query);
+  const wantsNewest = /\b(?:latest|newest|most\s+recent|recent)\b/i.test(transcriptText);
+  const wantsNewestDocClarification =
+    wantsNewest && /\b(?:doc|docs|document|paper)\b/i.test(transcriptText) && !/\bresult\b/i.test(transcriptText);
+  const wantsOpenDocClarification = isAskTurnOpenDocGoalIntent(transcriptText);
+  const ambiguousStrong =
+    strong.length > 1 &&
+    runnerUp?.validationStatus === "strong" &&
+    Math.abs((top?.score ?? 0) - runnerUp.score) <= 2 &&
+    wantsNewestDocClarification;
+  const selected =
+    top?.validationStatus === "strong" && !ambiguousStrong
+      ? top
+      : !wantsNewestDocClarification && top?.validationStatus === "ambiguous"
+        ? top
+        : null;
+  const needsClarification = Boolean(
+    !selected &&
+    ranked.length > 0 &&
+    (ambiguousStrong || ranked.some((candidate) => candidate.validationStatus === "ambiguous") || wantsNewestDocClarification || wantsOpenDocClarification),
+  );
+  return {
+    kind: "doc_candidate_validation",
+    query,
+    normalized_query: normalizedSearchQuery,
+    requiredTerms,
+    hard_required_terms: queryProfile.hard_required_terms,
+    semantic_terms: semanticTerms,
+    ignored_terms: queryProfile.ignored_terms,
+    soft_terms: queryProfile.soft_terms,
+    selected_path: selected?.path ?? null,
+    selected_status: selected?.validationStatus ?? top?.validationStatus ?? "none",
+    selected_reason: selected?.selectionReason ?? (needsClarification ? "ambiguous_candidates" : "no_strong_candidate"),
+    needs_clarification: needsClarification,
+    failure_reason: selected ? null : needsClarification ? "ambiguous_doc_candidates" : "open_doc_unresolved",
+    candidates: ranked,
+  };
+};
+
 const extractAskTurnSortableDateFromPath = (docPath: string): number => {
   const match = docPath.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   if (!match) return 0;
@@ -22850,15 +24075,22 @@ const extractAskTurnSortableDateFromPath = (docPath: string): number => {
 const selectAskTurnDocSearchResultForOpen = (
   matches: HelixAskDocSearchResult[],
   transcript: string,
-): { match: HelixAskDocSearchResult; reason: "newest" | "top_ranked" } | null => {
+): { match: HelixAskDocSearchResult; reason: "latest_verified_topic_candidate" | "validated_topic_candidate" } | null => {
   if (matches.length === 0) return null;
-  const wantsNewest = /\b(?:latest|newest|most\s+recent|recent)\b/i.test(transcript);
-  if (!wantsNewest) return { match: matches[0], reason: "top_ranked" };
-  const selected = [...matches].sort((a, b) => {
-    const dateDelta = extractAskTurnSortableDateFromPath(b.path) - extractAskTurnSortableDateFromPath(a.path);
-    return dateDelta || b.score - a.score || a.path.localeCompare(b.path);
-  })[0];
-  return selected ? { match: selected, reason: "newest" } : { match: matches[0], reason: "top_ranked" };
+  const query = resolveAskTurnOpenDocSearchQueryArg(transcript) ?? transcript;
+  const validation = validateAskTurnDocCandidates({ query, transcript, matches, limit: Math.max(8, matches.length) });
+  if (validation.selected_path) {
+    const match = matches.find((candidate) => candidate.path === validation.selected_path);
+    if (match) {
+      return {
+        match,
+        reason: /\b(?:latest|newest|most\s+recent|recent)\b/i.test(transcript)
+          ? "latest_verified_topic_candidate"
+          : "validated_topic_candidate",
+      };
+    }
+  }
+  return null;
 };
 
 const buildAskTurnRetrievalSummaryForNote = (args: { query: string; transcript: string }): string => {
@@ -22897,6 +24129,18 @@ const isAskTurnOpenLatestDocIntent = (transcript: string): boolean => {
   const hasLatestCue = /\b(?:latest|newest|most\s+recent|recent)\b/.test(normalized);
   const hasDocCue = /\b(?:doc|docs|document|paper)\b/.test(normalized);
   return hasOpenCue && hasLatestCue && hasDocCue;
+};
+
+const isAskTurnStrictLatestDocAcquisitionIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!isAskTurnOpenLatestDocIntent(normalized)) return false;
+  if (
+    new RegExp(String.raw`\b${HELIX_ASK_RECENT_DOC_PATTERN}\s+${HELIX_ASK_OPEN_DOC_NOUN_PATTERN}\s+(?:about|on|regarding|for|that|which)\b`, "i").test(
+      normalized,
+    )
+  ) return false;
+  if (/\b(?:talks?\s+about|discuss(?:es)?|covers?|mentions?|references?|saves?|reducing|making|shorter)\b/i.test(normalized)) return false;
+  return Boolean(resolveAskTurnLatestDocTopicArg(normalized));
 };
 
 const isAskTurnDocNotesHybridCompareIntent = (transcript: string): boolean => {
@@ -22947,6 +24191,7 @@ const resolveAskTurnExplicitNoteTargetArg = (transcript: string): string | null 
   const explicit = transcript.match(/\b(?:note|notepad)\s+(?:called|named|titled)\s+(.+?)(?:\s*(?:,|\band\s+(?:tell|show|list|explain|summari[sz]e|compare|contrast|put|append|add|save|copy)\b|\btell\s+me\b|\bshow\s+me\b|\blist\s+the\b|\bmain\s+differences\b|\bdifferences\b|\bdeltas\b)\s*[\s\S]*|$)/i);
   const called = explicit?.[1]?.trim() ?? null;
   const fallback = called ?? resolveAskTurnCompareRightHandTargetArg(transcript);
+  if (!called && isAskTurnGenericDocCompareTarget(fallback)) return null;
   let cleaned = trimAskTurnActionArgBoundaries(fallback ?? "")
     .replace(/^(?:a\s+|the\s+|my\s+)?(?:note|notepad)\s+(?:called|named|titled)\s+/i, "")
     .replace(/^(?:called|named|titled)\s+/i, "")
@@ -23001,8 +24246,27 @@ const resolveAskTurnVerifiedNoteTarget = (args: {
   requireExistingExplicit?: boolean;
 }): HelixAskTurnVerifiedNoteTarget => {
   const explicitTitle = resolveAskTurnExplicitNoteTargetArg(args.transcript);
-  const rawTarget = resolveAskTurnAnyNoteSinkArg(args.transcript) ?? resolveAskTurnCompareRightHandTargetArg(args.transcript);
+  const rawTargetCandidate = resolveAskTurnAnyNoteSinkArg(args.transcript) ?? resolveAskTurnCompareRightHandTargetArg(args.transcript);
+  const rawTarget =
+    isAskTurnGenericDocCompareTarget(rawTargetCandidate) || isAskTurnInvalidResolvedNoteTitle(rawTargetCandidate)
+      ? null
+      : rawTargetCandidate;
   const candidates = collectAskTurnWorkspaceNoteCandidates(args.workspaceSnapshot);
+  if (
+    explicitTitle &&
+    args.workspaceSnapshot?.hasNoteContext === true &&
+    /\b(?:my|the|current|active)\s+notes?\b/i.test(explicitTitle)
+  ) {
+    const fallback = candidates[0] ?? null;
+    return {
+      title: fallback?.title ?? explicitTitle,
+      note_id: fallback?.id ?? null,
+      source: fallback?.source ?? "active_note",
+      requested_title: null,
+      verified: true,
+      missing_reason: null,
+    };
+  }
   const findCandidate = (title: string | null): (typeof candidates)[number] | null => {
     const key = normalizeAskTurnNoteTitleKey(title);
     if (!key) return null;
@@ -23098,7 +24362,9 @@ const isAskTurnInvalidResolvedNoteTitle = (value: string | null | undefined): bo
       normalized,
     ) ||
     /^(?:and|then|also|afterwards?)\b/i.test(normalized) ||
-    /^(?:tell|show|list|explain|summari[sz]e)\s+(?:me|the|main|key|differences|deltas)\b/i.test(normalized)
+    /^(?:tell|show|list|explain|summari[sz]e)\s+(?:me|the|main|key|differences|deltas)\b/i.test(normalized) ||
+    /^(?:against|with|versus|vs\.?|to)\s+(?:the\s+)?(?:doc|docs|document|paper)\b/i.test(normalized) ||
+    /\b(?:doc|docs|document|paper)\b[\s\S]*\b(?:tell|show|list|captured|main\s+point|takeaway|summary)\b/i.test(normalized)
   );
 };
 
@@ -23110,6 +24376,9 @@ const resolveAskTurnCompareNoteTargetWithWorkspace = (
   if (verified.verified && verified.title) return verified.title;
   if (verified.requested_title && verified.missing_reason === "explicit_note_not_found") return null;
   const workspaceTitle = resolveAskTurnWorkspaceNoteTitle(workspaceSnapshot);
+  if (workspaceSnapshot?.hasNoteContext === true && /\b(?:my|the|current|active)\s+notes?\b/i.test(transcript)) {
+    return workspaceTitle ?? "my notes";
+  }
   const direct = resolveAskTurnNoteTargetWithWorkspace(transcript, workspaceSnapshot);
   if (direct && !isAskTurnDeicticNoteTarget(direct) && !isAskTurnInvalidResolvedNoteTitle(direct)) return direct;
   const rightTarget = resolveAskTurnCompareRightHandTargetArg(transcript);
@@ -23302,7 +24571,9 @@ const isAskTurnCompareCopyResultToClipboardIntent = (transcript: string): boolea
 const isAskTurnSummarizeAndAddToNoteIntent = (transcript: string): boolean => {
   const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
   if (!normalized) return false;
-  const hasSummaryCue = /\b(?:summari[sz]e|explain)\b/.test(normalized);
+  const hasSummaryCue =
+    /\b(?:summari[sz]e|explain)\b/.test(normalized) ||
+    /\b(?:current\s+)?(?:doc(?:ument)?|paper)?\s*summary\b/.test(normalized);
   const hasDeltaCue = askTurnHasCompareCueOutsideProtectedArgs(transcript);
   const hasAddToNoteCue =
     /\b(?:add|append|write|put|save|copy|place)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\b(?:note|notepad)\b/.test(normalized) ||
@@ -23312,9 +24583,14 @@ const isAskTurnSummarizeAndAddToNoteIntent = (transcript: string): boolean => {
       normalized,
     );
   const hasSummaryIntoNamedNoteSinkCue = Boolean(resolveAskTurnSummaryNamedNoteSinkArg(transcript));
+  const hasSummaryIntoBareNoteSinkCue = Boolean(resolveAskTurnSummaryBareNoteSinkArg(transcript));
   return (
     hasSummaryCue &&
-    (hasSummaryIntoNoteCue || hasSummaryIntoNamedNoteSinkCue || hasAddToNoteCue || (hasDeltaCue && hasAddToNoteCue))
+    (hasSummaryIntoNoteCue ||
+      hasSummaryIntoNamedNoteSinkCue ||
+      hasSummaryIntoBareNoteSinkCue ||
+      hasAddToNoteCue ||
+      (hasDeltaCue && hasAddToNoteCue))
   );
 };
 
@@ -23363,15 +24639,19 @@ const isAskTurnDocLocateIntent = (transcript: string): boolean => {
     return false;
   }
   const hasDocCue = /\b(?:this|that|current|the)?\s*(?:doc|document|paper)\b/.test(normalized);
+  const hasLayLocateCue =
+    Boolean(locateQuery) &&
+    /\b(?:find|grab|pull|collect)\b[\s\S]*\b(?:part|bit|section|where|talks?\s+about|mentions?|says?)\b/.test(normalized);
   const hasLocationToNoteCue =
-    /\b(?:location|where)\b/.test(normalized) &&
-    (/\b(?:add|append|save|put|write|store|stash|file|park|place)\b[\s\S]*\b(?:to|into|in|inside)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(
+    /\b(?:location|where|finding|part|bit|section)\b/.test(normalized) &&
+    (/\b(?:add|append|save|put|write|store|stash|file|park|place|drop)\b[\s\S]*\b(?:to|into|in|inside)\b[\s\S]*\b(?:note|notes|notepad)\b/.test(
       normalized,
     ) ||
       Boolean(resolveAskTurnLocationNamedNoteSinkArg(transcript)));
-  if (!hasDocCue && !hasLocationToNoteCue) return false;
+  if (!hasDocCue && !hasLocationToNoteCue && !hasLayLocateCue) return false;
   return (
     hasLocationToNoteCue ||
+    hasLayLocateCue ||
     /\bwhere\b[\s\S]*\b(?:talk|mentions?|section|located?)\b/.test(normalized) ||
     /\bwhere\s+in\b/.test(normalized) ||
     /\bfind\b/.test(normalized) ||
@@ -23382,8 +24662,18 @@ const isAskTurnDocLocateIntent = (transcript: string): boolean => {
 const isAskTurnDocLocateToNoteIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!isAskTurnDocLocateIntent(transcript)) return false;
-  const hasWriteCue = /\b(?:add|append|save|put|write|store|stash|file|park|place)\b[\s\S]*\b(?:to|into|in|inside)\b/i.test(normalized);
+  const hasWriteCue = /\b(?:add|append|save|put|write|store|stash|file|park|place|drop)\b[\s\S]*\b(?:to|into|in|inside)\b/i.test(normalized);
   return hasWriteCue && Boolean(resolveAskTurnAnyNoteSinkArg(transcript) ?? resolveAskTurnLocationNamedNoteSinkArg(transcript));
+};
+
+const isAskTurnExistingNoteMutationIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim();
+  if (!normalized) return false;
+  return (
+    isAskTurnDocLocateToNoteIntent(normalized) ||
+    isAskTurnSummarizeAndAddToNoteIntent(normalized) ||
+    /\b(?:put|add|append|copy|save|store|write)\b[\s\S]{0,180}\b(?:note|notepad)\b/i.test(normalized)
+  );
 };
 
 const isAskTurnDocIdentityIntent = (transcript: string): boolean => {
@@ -23430,14 +24720,58 @@ const isAskTurnExplainIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
   return (
+    isAskTurnActiveDocUsefulnessIntent(transcript) ||
     /\b(?:explain|summari[sz]e|plain language|key claim)\b/.test(normalized) ||
     /\bwhat\s+is\s+(?:this|that)\b/.test(normalized) ||
     (HELIX_E8_14_DEICTIC_DOC_FIX_FLAG && /\bwhat\s+is\s+(?:this|that)\s+(?:doc|document|paper)\b/.test(normalized))
   );
 };
 
+const isAskTurnActiveDocUsefulnessIntent = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\bwhat\s+would\s+(?:a\s+)?(?:normal\s+person|lay(?:person|reader)|reader|user)\s+use\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+for\b/.test(normalized) ||
+    /\bwhat\s+is\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+useful\s+for\b/.test(normalized) ||
+    /\bwhy\s+does\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+matter\b/.test(normalized) ||
+    /\bexplain\s+(?:this|that|the|current)\s+(?:doc|document|paper)?\s*(?:in\s+)?(?:normal\s+words|plain\s+english|plain\s+language)\b/.test(normalized) ||
+    /\bwhat\s+should\s+i\s+use\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+for\b/.test(normalized)
+  );
+};
+
 const isAskTurnDocIdentityExplainHybridIntent = (transcript: string): boolean =>
   isAskTurnDocIdentityIntent(transcript) && isAskTurnExplainIntent(transcript);
+
+const isAskTurnContextualTemporalCompareIntent = (transcript: string): boolean => {
+  const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
+  if (!normalized) return false;
+  const hasContextPointer = /\b(?:this|that|it|that\s+doc|this\s+doc|the\s+doc)\b/.test(normalized);
+  const hasTemporalCompare = /\b(?:before|after|prior\s+to|earlier\s+than|later\s+than|predates?|postdates?|came\s+before|came\s+after)\b/.test(normalized);
+  return hasContextPointer && hasTemporalCompare;
+};
+
+const resolveAskTurnTemporalCompareTargetQuery = (transcript: string): string => {
+  const normalized = transcript.trim();
+  const patterns = [
+    /\b(?:before|after|prior\s+to|earlier\s+than|later\s+than|predates?|postdates?|came\s+before|came\s+after)\s+(?:the\s+)?(.+)$/i,
+    /\b(?:was|is|did)\s+(?:this|that|it|the\s+doc)\b[\s\S]*?\b(?:before|after)\s+(?:the\s+)?(.+)$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const value = trimAskTurnActionArgBoundaries(match?.[1] ?? "")
+      .replace(/\b(?:right|correct|yeah|yes|no)\b\s*$/i, "")
+      .replace(/[?.!]+$/g, "")
+      .trim();
+    if (value) return value;
+  }
+  return clipConversationText(
+    normalized
+      .replace(/\b(?:this|that|it|doc|document|paper|was|is|did|right|before|after|prior|earlier|later|than|came|the)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+    120,
+  );
+};
 
 type HelixAskTurnNavigationTargetPanel =
   | "docs-viewer"
@@ -23474,6 +24808,7 @@ const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily 
   const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
   if (!normalized) return "conversation";
   if (isConversationFillerTurn(normalized)) return "conversation";
+  if (isAskTurnContextualTemporalCompareIntent(transcript)) return "compare";
   if (isAskTurnDocLocateIntent(transcript) || isAskTurnDocIdentityIntent(transcript)) return "docs_nav";
   if (isAskTurnOpenLatestDocIntent(transcript) || resolveAskTurnDocPathArg(transcript)) return "docs_nav";
   if (askTurnHasCompareCueOutsideProtectedArgs(transcript)) return "compare";
@@ -23490,6 +24825,22 @@ const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily 
   }
   return "conversation";
 };
+
+const isHelixAskTurnNontrivialIntentFamily = (family: HelixAskTurnIntentFamily): boolean =>
+  family === "compare" ||
+  family === "docs_nav" ||
+  family === "notes" ||
+  family === "clipboard" ||
+  family === "workspace_generic";
+
+const hasHelixAskTurnArtifactBackedStepResult = (
+  stepResults: ReturnType<typeof buildAskTurnStepResults>,
+): boolean =>
+  stepResults.some((step) => {
+    if (step.status !== "completed") return false;
+    if (step.result_artifact && typeof step.result_artifact === "object") return true;
+    return Array.isArray(step.actual_artifacts) && step.actual_artifacts.some((artifact) => artifact !== "turn_final_text");
+  });
 
 const buildAskTurnNavigationOpenAction = (
   panelId: Exclude<HelixAskTurnNavigationTargetPanel, "ambiguous" | null>,
@@ -23677,6 +25028,11 @@ const extractPendingRequiredFieldValues = (args: {
       if (noteTitle) out.note_reference = noteTitle;
       continue;
     }
+    if (field === "selected_doc_candidate") {
+      const rank = resolveAskTurnPendingCandidateRank(args.transcript);
+      if (rank !== null) out.selected_doc_candidate = rank;
+      continue;
+    }
   }
   return out;
 };
@@ -23689,6 +25045,14 @@ const resolveAskTurnActionSelection = (args: {
 }): HelixAskTurnActionSelection => {
   const candidates = HELIX_ASK_TURN_CAPABILITY_ACTIONS;
   const normalized = args.transcript.trim().toLowerCase().replace(/\bopen\s+up\b/g, "open");
+  const universalGoalFrame = buildAskTurnUniversalGoalFrame({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot ?? null,
+  });
+  const frameRequestsNoteUpdate =
+    askTurnGoalFrameRequestsOutput(universalGoalFrame, "note_update") &&
+    Boolean(readAskTurnGoalFrameMutationTarget(universalGoalFrame, "note"));
+  const frameNoteTarget = readAskTurnGoalFrameMutationTarget(universalGoalFrame, "note");
   const switchViewerToDocFromNotes =
     /\bswitch\b[\s\S]*\bviewer\b/.test(normalized) &&
     /\b(?:see|show|view)\s+(?:it|that)\b/.test(normalized) &&
@@ -23723,8 +25087,8 @@ const resolveAskTurnActionSelection = (args: {
         candidates,
       };
     }
-    if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript)) {
-      const noteTitle = resolveAskTurnSummaryNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot);
+    if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript) && frameRequestsNoteUpdate) {
+      const noteTitle = frameNoteTarget?.value ?? resolveAskTurnSummaryNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot);
       return {
         action: {
           panel_id: "workstation-notes",
@@ -23739,6 +25103,29 @@ const resolveAskTurnActionSelection = (args: {
         valid: true,
         fail_reason: "none",
         missing_required_args: [],
+        candidates,
+      };
+    }
+    const latestTopic = resolveAskTurnLatestDocTopicArg(args.transcript);
+    if (isAskTurnStrictLatestDocAcquisitionIntent(args.transcript) && latestTopic) {
+      const latestAction = buildAskTurnLatestDocAcquisitionAction(args.transcript);
+      return {
+        action: latestAction,
+        source: "deterministic",
+        valid: true,
+        fail_reason: "none",
+        missing_required_args: [],
+        candidates,
+      };
+    }
+    if (isAskTurnTopicDocAcquisitionIntent(args.transcript)) {
+      const query = resolveAskTurnOpenDocSearchQueryArg(args.transcript);
+      return {
+        action: query ? { panel_id: "docs-viewer", action_id: "search_docs", args: { query, limit: 5 } } : null,
+        source: "deterministic",
+        valid: Boolean(query),
+        fail_reason: query ? "none" : "missing_required_args",
+        missing_required_args: query ? [] : ["query"],
         candidates,
       };
     }
@@ -23807,10 +25194,10 @@ const resolveAskTurnActionSelection = (args: {
   } else if (resolveAskTurnDocPathArg(args.transcript) && /\b(?:open|view|show|pull\s+up|read)\b/i.test(normalized)) {
     const path = resolveAskTurnDocPathArg(args.transcript);
     selected = { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: path ? { path } : {} };
-  } else if (HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG && isAskTurnOpenLatestDocIntent(args.transcript)) {
+  } else if (isAskTurnStrictLatestDocAcquisitionIntent(args.transcript) && resolveAskTurnLatestDocTopicArg(args.transcript)) {
     selected = buildAskTurnLatestDocAcquisitionAction(args.transcript);
   } else if (HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG && isAskTurnTopicDocAcquisitionIntent(args.transcript)) {
-    const query = resolveAskTurnTopicDocQueryArg(args.transcript);
+    const query = resolveAskTurnOpenDocSearchQueryArg(args.transcript);
     selected = query ? { panel_id: "docs-viewer", action_id: "search_docs", args: { query, limit: 5 } } : null;
   } else if (/\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:me\s+)?(?:over\s+)?to|move\s+me\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+(?:viewer|panel))?\b/.test(normalized)) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
@@ -23843,6 +25230,17 @@ const resolveAskTurnActionSelection = (args: {
       args: {
         ...(path ? { path } : {}),
         ...(query ? { query } : {}),
+      },
+    };
+  } else if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript) && frameRequestsNoteUpdate) {
+    const noteTitle = frameNoteTarget?.value ?? resolveAskTurnSummaryNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot);
+    selected = {
+      panel_id: "workstation-notes",
+      action_id: "append_to_note",
+      args: {
+        text: HELIX_ASK_TURN_DOC_SUMMARY_PLACEHOLDER,
+        text_kind: "doc_summary",
+        ...(noteTitle ? { title: noteTitle } : {}),
       },
     };
   } else if (isAskTurnArtifactToNoteIntent(args.transcript)) {
@@ -24196,7 +25594,15 @@ const buildAskTurnPlanSteps = (args: {
   const createCopyCompare =
     HELIX_E8_22_MULTI_INTENT_EXPANSION_FLAG && isAskTurnCreateCopyCompareIntent(args.transcript);
   const compareCopyToClipboard = isAskTurnCompareCopyResultToClipboardIntent(args.transcript);
-  const summarizeAddToNote = isAskTurnSummarizeAndAddToNoteIntent(args.transcript);
+  const goalFrameForPlan = buildAskTurnUniversalGoalFrame({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot ?? null,
+    payload: args.selectedAction ? { workspace_action: args.selectedAction } : null,
+  });
+  const summarizeAddToNote =
+    isAskTurnSummarizeAndAddToNoteIntent(args.transcript) &&
+    askTurnGoalFrameRequestsOutput(goalFrameForPlan, "note_update") &&
+    Boolean(readAskTurnGoalFrameMutationTarget(goalFrameForPlan, "note"));
   const hasWorkspaceCue =
     (HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) || HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized)) &&
     HELIX_CONVERSATION_WORKSTATION_TARGET_RE.test(normalized);
@@ -24319,6 +25725,85 @@ const buildAskTurnPlanSteps = (args: {
         status: "planned",
         title: "Compose a concise summary of recent workspace changes.",
         required_artifacts: ["workspace_change_summary"],
+        reason: null,
+      },
+    ];
+  }
+  if (isAskTurnContextualTemporalCompareIntent(args.transcript)) {
+    const activeDocPath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+    const targetQuery = resolveAskTurnTemporalCompareTargetQuery(args.transcript);
+    const targetQueryVariants = buildAskTurnTemporalTargetQueryVariants(targetQuery).slice(1, 4);
+    return [
+      {
+        id: "contextual_followup_bind_source",
+        lane: "reasoning",
+        status: "planned",
+        title: `Bind the deictic source document for: "${clipConversationText(args.transcript, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "identify_current_doc",
+          args: activeDocPath ? { path: activeDocPath } : {},
+        },
+        required_artifacts: ["source_doc_temporal_anchor"],
+        reason: null,
+      },
+      {
+        id: "contextual_followup_resolve_target",
+        lane: "workspace",
+        status: "planned",
+        title: `Resolve temporal comparison target "${clipConversationText(targetQuery, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "search_docs",
+          args: { query: targetQuery, limit: 5 },
+        },
+        required_artifacts: ["doc_search_results"],
+        reason: null,
+      },
+      ...targetQueryVariants.flatMap((variant, index): HelixAskTurnPlanStep[] => [
+        {
+          id: `temporal_target_variant_search_${index + 1}`,
+          lane: "workspace",
+          status: "planned",
+          title: `Try temporal target variant "${clipConversationText(variant, 90)}".`,
+          action: {
+            panel_id: "docs-viewer",
+            action_id: "search_docs",
+            args: { query: variant, limit: 5 },
+          },
+          required_artifacts: ["doc_search_results"],
+          reason: "observation_driven_temporal_target_variant",
+        },
+      ]),
+      {
+        id: "contextual_followup_validate_temporal_target",
+        lane: "reasoning",
+        status: "planned",
+        title: "Validate temporal target candidates across bounded query variants.",
+        action: {
+          panel_id: "reasoning",
+          action_id: "validate_temporal_target_candidate",
+          args: {
+            target_query: targetQuery,
+          },
+        },
+        required_artifacts: ["temporal_target_resolution_attempts"],
+        reason: "observation_driven_temporal_target_validation",
+      },
+      {
+        id: "contextual_followup_compose_temporal_compare",
+        lane: "reasoning",
+        status: "planned",
+        title: "Compose temporal comparison from current doc context and resolved target candidates.",
+        action: {
+          panel_id: "reasoning",
+          action_id: "compose_temporal_context_comparison",
+          args: {
+            source_path: activeDocPath,
+            target_query: targetQuery,
+          },
+        },
+        required_artifacts: ["temporal_context_comparison", "turn_final_text"],
         reason: null,
       },
     ];
@@ -24735,6 +26220,20 @@ const buildAskTurnExecutionTrace = (args: {
       produces.push("workspace_change_summary", "turn_final_text");
       return { requires, produces };
     }
+    if (step.id === "contextual_followup_bind_source") {
+      produces.push("source_doc_temporal_anchor");
+      return { requires, produces };
+    }
+    if (step.id === "contextual_followup_compose_temporal_compare") {
+      requires.push("source_doc_temporal_anchor", "doc_search_results", "temporal_target_resolution_attempts");
+      produces.push("temporal_context_comparison", "turn_final_text", "reasoning_context");
+      return { requires, produces };
+    }
+    if (step.id === "contextual_followup_validate_temporal_target") {
+      requires.push("doc_search_results");
+      produces.push("temporal_target_resolution_attempts", "reasoning_context");
+      return { requires, produces };
+    }
     if (step.id === "final_answer_compose_workspace_context_status") {
       requires.push("active_doc_path", "active_note_title");
       produces.push("workspace_context_status", "turn_final_text");
@@ -24809,6 +26308,10 @@ const buildAskTurnExecutionTrace = (args: {
       }
       if (actionId === "search_docs") {
         produces.push("doc_search_results", "retrieval_context");
+      }
+      if (actionId === "validate_doc_candidates") {
+        requires.push("doc_search_results");
+        produces.push("doc_candidate_validation");
       }
       if (actionId === "summarize_doc") {
         produces.push("doc_summary");
@@ -25045,14 +26548,25 @@ const renderAskTurnDocLocationAnswer = (args: {
     return `I could not locate "${query}" because no active document path is available.`;
   }
   if (matches.length === 0) {
-    return `No locations found for "${query}" in ${path}. Tried: ${renderAskTurnDocLocateTriedVariants(query)}.`;
+    return [
+      `No locations found for "${query}".`,
+      "",
+      renderAskTurnDocReferenceBlock({ heading: "Searched document", path }),
+      `Tried: ${renderAskTurnDocLocateTriedVariants(query)}.`,
+    ].filter((line): line is string => line !== null).join("\n");
   }
   return [
     "Locations:",
     ...matches.map((match) => {
-      const compactSnippet = match.snippet.replace(/\s+/g, " ").trim();
       const displayPath = match.path.startsWith("/") ? match.path : `/${match.path}`;
-      return `- ${displayPath}:L${match.line_start}-L${match.line_end} (${match.heading}) - ${compactSnippet}`;
+      const label = renderAskTurnDocDisplayLabel(displayPath);
+      const compactSnippet = match.snippet.replace(/\s+/g, " ").trim();
+      const lineLabel = `L${match.line_start}${match.line_end !== match.line_start ? `-L${match.line_end}` : ""}`;
+      return [
+        `- ${label}, ${lineLabel}${match.heading ? ` (${match.heading})` : ""}`,
+        `  Path: ${displayPath}:${lineLabel}`,
+        compactSnippet ? `  Snippet: ${clipConversationText(compactSnippet, 220)}` : null,
+      ].filter((line): line is string => Boolean(line)).join("\n");
     }),
   ].join("\n");
 };
@@ -25084,6 +26598,10 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           ? ["active_doc_path", "active_note_title"]
         : step.id === "workspace_change_log_inspect" || step.id === "final_answer_compose_workspace_change_summary"
           ? ["workspace_change_log"]
+        : step.id === "contextual_followup_compose_temporal_compare"
+          ? ["source_doc_temporal_anchor", "doc_search_results", "temporal_target_resolution_attempts"]
+        : step.id === "contextual_followup_validate_temporal_target"
+          ? ["doc_search_results"]
         : step.id === "reasoning_followup_doc_doc"
           ? ["doc_context"]
         : step.id.includes("reasoning_summarize_retrieval")
@@ -25107,6 +26625,8 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               ? Array.from(new Set([...workspaceContextArtifacts, "doc_summary"]))
             : actionId === "search_docs"
               ? Array.from(new Set([...workspaceContextArtifacts, "doc_search_results", "retrieval_context"]))
+            : actionId === "validate_doc_candidates"
+              ? Array.from(new Set([...workspaceContextArtifacts, "doc_candidate_validation"]))
             : actionId === "open_latest_doc_by_topic" && latestDocSelection
               ? Array.from(new Set([...workspaceContextArtifacts, "latest_doc_selection"]))
             : actionId === "locate_in_doc" && docLocationMatches.length > 0
@@ -25115,7 +26635,13 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                 ? Array.from(new Set([...workspaceContextArtifacts, "note_context", "active_note_title"]))
               : workspaceContextArtifacts
             : step.lane === "reasoning"
-            ? /reasoning_followup_doc_note_compare/i.test(step.id)
+            ? step.id === "contextual_followup_bind_source"
+              ? ["source_doc_temporal_anchor"]
+              : step.id === "contextual_followup_compose_temporal_compare"
+                ? ["temporal_context_comparison", "turn_final_text", "reasoning_context"]
+              : step.id === "contextual_followup_validate_temporal_target"
+                ? ["temporal_target_resolution_attempts", "reasoning_context"]
+              : /reasoning_followup_doc_note_compare/i.test(step.id)
               ? ["reasoning_context", "comparison_summary", "turn_final_text"]
               : step.id.includes("reasoning_summarize_retrieval")
               ? ["reasoning_context", "turn_final_text"]
@@ -25132,6 +26658,12 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               ? ["workspace_change_log"]
             : step.id === "final_answer_compose_workspace_change_summary"
               ? ["workspace_change_summary", "turn_final_text"]
+            : step.id === "contextual_followup_bind_source"
+              ? ["source_doc_temporal_anchor"]
+            : step.id === "contextual_followup_compose_temporal_compare"
+              ? ["temporal_context_comparison", "turn_final_text"]
+            : step.id === "contextual_followup_validate_temporal_target"
+              ? ["temporal_target_resolution_attempts"]
             : step.id === "planner_restate_goal"
               ? ["goal_restate"]
             : step.id === "assistant_direct_answer"
@@ -25147,12 +26679,20 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           ? ["workspace_change_log"]
         : step.id === "final_answer_compose_workspace_change_summary"
           ? ["workspace_change_summary"]
+        : step.id === "contextual_followup_bind_source"
+          ? ["source_doc_temporal_anchor"]
+        : step.id === "contextual_followup_compose_temporal_compare"
+          ? ["temporal_context_comparison"]
+        : step.id === "contextual_followup_validate_temporal_target"
+          ? ["temporal_target_resolution_attempts"]
         : /reasoning_followup_doc_note_compare/i.test(step.id)
           ? ["comparison_summary"]
         : actionId === "locate_in_doc"
         ? ["doc_location_matches"]
         : actionId === "search_docs"
           ? ["doc_search_results"]
+        : actionId === "validate_doc_candidates"
+          ? ["doc_candidate_validation"]
         : actionId === "open_latest_doc_by_topic"
           ? ["active_doc_path", "latest_doc_selection"]
         : actionId === "summarize_doc"
@@ -25207,8 +26747,14 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
             ? {
                 kind: "doc_search_results",
                 query: typeof step.action.args?.query === "string" ? step.action.args.query : null,
-                matches: searchAskTurnDocsForQuery(String(step.action.args?.query ?? ""), 3),
+                matches: searchAskTurnDocsForQuery(String(step.action.args?.query ?? ""), 8),
               }
+          : step.action?.action_id === "validate_doc_candidates"
+            ? validateAskTurnDocCandidates({
+                query: String(step.action.args?.query ?? ""),
+                transcript: String(step.action.args?.transcript ?? step.action.args?.query ?? ""),
+                limit: 8,
+              })
           : step.action?.action_id === "open_latest_doc_by_topic"
             ? latestDocSelection
           : step.action?.action_id === "summarize_doc"
@@ -25250,6 +26796,28 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                 title: step.action.args?.active_note_title ?? step.action.args?.title ?? null,
                 note_id: step.action.args?.active_note_id ?? step.action.args?.note_id ?? null,
               }
+          : step.id === "contextual_followup_bind_source"
+            ? {
+                kind: "source_doc_temporal_anchor",
+                path: normalizeAskTurnWorkspaceDocPath(step.action?.args?.path),
+                title: normalizeAskTurnWorkspaceDocPath(step.action?.args?.path)
+                  ? readAskTurnDocTitleForPath(String(step.action?.args?.path ?? ""))
+                  : null,
+                date: normalizeAskTurnWorkspaceDocPath(step.action?.args?.path)
+                  ? extractAskTurnFilenameDate(String(step.action?.args?.path ?? ""))
+                  : null,
+              }
+          : step.id === "contextual_followup_compose_temporal_compare"
+            ? buildAskTurnTemporalContextComparisonArtifact({
+                sourcePath: step.action?.args?.source_path,
+                targetQuery: step.action?.args?.target_query,
+                limit: 5,
+              })
+          : step.id === "contextual_followup_validate_temporal_target"
+            ? buildAskTurnTemporalTargetResolutionAttempts({
+                query: String(step.action?.args?.target_query ?? ""),
+                limit: 5,
+              })
           : /reasoning_followup_doc_note_compare/i.test(step.id)
             ? {
                 kind: "comparison_summary",
@@ -25408,6 +26976,7 @@ const buildAskTurnJobReadyLinkBundle = (args: {
   stepResults: ReturnType<typeof buildAskTurnStepResults>;
   workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
   latestResultArtifact?: Record<string, unknown> | null;
+  allowCopyFinalAnswerLink?: boolean;
 }): HelixAskTurnJobReadyLinkBundle => {
   const links: HelixAskTurnJobReadyLink[] = [];
   const suppressed: HelixAskTurnJobReadyLinkBundle["suppressed"] = [];
@@ -25600,7 +27169,7 @@ const buildAskTurnJobReadyLinkBundle = (args: {
     }
   }
   const latestText = readAskTurnString(args.latestResultArtifact?.text);
-  if (latestText) {
+  if (latestText && args.allowCopyFinalAnswerLink !== false) {
     push({
       id: "copy-latest-result",
       label: "Copy final answer",
@@ -25613,6 +27182,8 @@ const buildAskTurnJobReadyLinkBundle = (args: {
       source_artifact_kind: readAskTurnString(args.latestResultArtifact?.kind) ?? "turn_final_text",
       source_action_id: "write_clipboard",
     });
+  } else if (latestText) {
+    suppressed.push({ id: "copy-latest-result", reason: "no_current_turn_artifact" });
   }
   return { links, source: "current_turn_artifacts", suppressed };
 };
@@ -25621,6 +27192,7 @@ const buildAskTurnJobReadyLinks = (args: {
   stepResults: ReturnType<typeof buildAskTurnStepResults>;
   workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
   latestResultArtifact?: Record<string, unknown> | null;
+  allowCopyFinalAnswerLink?: boolean;
 }): HelixAskTurnJobReadyLink[] => buildAskTurnJobReadyLinkBundle(args).links;
 
 type HelixAskTurnObservationGroundedFinal = {
@@ -25630,12 +27202,14 @@ type HelixAskTurnObservationGroundedFinal = {
     | "doc_location_matches"
     | "latest_doc_selection"
     | "doc_summary"
+    | "doc_explain_preview"
     | "note_update_receipt"
     | "note_create_receipt"
     | "active_doc_path"
     | "workspace_context_status"
     | "workspace_change_log"
     | "doc_search_results"
+    | "doc_candidate_validation"
     | "comparison_summary"
     | "doc_note_compare_contract"
     | "note_content_unavailable"
@@ -25644,6 +27218,34 @@ type HelixAskTurnObservationGroundedFinal = {
     | "none";
   consumed_artifacts: string[];
   contract_pass: boolean;
+  fail_reason: string | null;
+};
+type HelixAskUniversalFinalComposerInput = {
+  goal_frame: HelixAskUniversalGoalFrame;
+  plan_items: HelixAskTurnPlanStep[];
+  execution_trace: HelixAskTurnPlanStep[];
+  observations: HelixAskTurnRuntimeObservation[];
+  step_results: ReturnType<typeof buildAskTurnStepResults>;
+  artifacts: Record<string, unknown>;
+  pending_request: Record<string, unknown> | null;
+  failure: {
+    error_code: string | null;
+    reason: string | null;
+  } | null;
+  observe_then_decide_trace: HelixAskObserveThenDecideTraceEntry[];
+  fallback_text: string | null;
+  transcript: string;
+  workspace_snapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+  selected_action?: HelixAskTurnSelectedAction | null;
+  runtime?: HelixAskTurnRuntimeSummary | HelixAskTurnRuntime | null;
+};
+type HelixAskUniversalFinalComposerOutput = {
+  text: string;
+  source: "universal_composer" | "pending_input" | "typed_failure" | "no_tool_direct";
+  status: "final_answer" | "pending_input" | "final_failure";
+  consumed_artifacts: string[];
+  presentation_renderer: string | null;
+  terminal_allowed: boolean;
   fail_reason: string | null;
 };
 
@@ -25678,9 +27280,15 @@ const renderAskTurnDocLocationMatchesFromArtifact = (artifact: Record<string, un
       const pathLabel = String(match.path ?? "").startsWith("/") ? String(match.path) : `/${String(match.path ?? "")}`;
       const lineStart = Number(match.line_start);
       const lineEnd = Number.isFinite(Number(match.line_end)) ? Number(match.line_end) : lineStart;
-      const heading = typeof match.heading === "string" && match.heading.trim() ? ` (${match.heading.trim()})` : "";
+      const label = renderAskTurnDocDisplayLabel(pathLabel);
+      const heading = typeof match.heading === "string" && match.heading.trim() ? match.heading.trim() : "";
       const snippet = typeof match.snippet === "string" ? match.snippet.replace(/\s+/g, " ").trim() : "";
-      return `- ${pathLabel}:L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}${heading}${snippet ? ` - ${snippet}` : ""}`;
+      const lineLabel = `L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}`;
+      return [
+        `- ${label}, ${lineLabel}${heading ? ` (${heading})` : ""}`,
+        `  Path: ${pathLabel}:${lineLabel}`,
+        snippet ? `  Snippet: ${clipConversationText(snippet, 220)}` : null,
+      ].filter((line): line is string => Boolean(line)).join("\n");
     }),
   ].join("\n");
 };
@@ -25695,7 +27303,8 @@ const renderAskTurnCompactDocLocationFromArtifact = (artifact: Record<string, un
   const pathLabel = String(firstMatch.path ?? "").startsWith("/") ? String(firstMatch.path) : `/${String(firstMatch.path ?? "")}`;
   const lineStart = Number(firstMatch.line_start);
   const lineEnd = Number.isFinite(Number(firstMatch.line_end)) ? Number(firstMatch.line_end) : lineStart;
-  return `${pathLabel}:L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}`;
+  const lineLabel = `L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}`;
+  return `${renderAskTurnDocDisplayLabel(pathLabel)}, ${lineLabel}\nPath: ${pathLabel}:${lineLabel}`;
 };
 
 const renderAskTurnTitleCase = (value: string): string =>
@@ -25800,8 +27409,10 @@ const summarizeAskTurnNoteUpdateReceiptForFinal = (args: {
   const textKind = readAskTurnString(args.noteReceiptArtifact.text_kind);
   const normalized = args.transcript.trim().toLowerCase();
   const isLocationWrite =
+    Boolean(args.docLocationArtifact) ||
     textKind === "doc_location_reminder" ||
-    /\b(?:location|where|line|section)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized);
+    /\b(?:location|where|line|section)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized) ||
+    /\b(?:drop|put|add|append|save|write|store|copy)\b[\s\S]*\blocation\b[\s\S]*\b(?:to|into|in|inside)\b/i.test(normalized);
   if (isLocationWrite) {
     const query = resolveAskTurnDocLocateQuery(args.transcript);
     const topic = (query ? query.toLowerCase() : "requested document")
@@ -25813,11 +27424,11 @@ const summarizeAskTurnNoteUpdateReceiptForFinal = (args: {
       (() => {
         const lineLabel = text?.match(/\bL\d+(?:-L\d+)?\b/i)?.[0] ?? null;
         const pathLabel = normalizeAskTurnWorkspaceDocPath(args.activeDocPath);
-        return lineLabel && pathLabel ? `${pathLabel}:${lineLabel}` : null;
+        return lineLabel && pathLabel ? `${renderAskTurnDocDisplayLabel(pathLabel)}, ${lineLabel}\nPath: ${pathLabel}:${lineLabel}` : null;
       })();
     return [
       `Updated ${args.title} with the ${topic} location.`,
-      compactLocation ? `Location: ${compactLocation}` : null,
+      compactLocation ? `\nLocation:\n${compactLocation.split("\n").map((line) => `- ${line}`).join("\n").replace(/\n- Path:/g, "\n  Path:")}` : null,
     ].filter(Boolean).join("\n");
   }
   const isSummaryWrite =
@@ -25836,7 +27447,22 @@ const isAskTurnDocSummaryDetailRequested = (transcript: string): boolean =>
     transcript,
   );
 
+const isAskTurnActiveDocConceptExplanationIntent = (transcript: string): boolean =>
+  /\bexplain\s+what\s+.+?\s+means?\s+in\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i.test(transcript);
+
+const isAskTurnActiveDocNumericExtractionIntent = (transcript: string): boolean =>
+  /\b(?:what\s+is|find|extract|tell\s+me|show\s+me|give\s+me)\b[\s\S]*\b(?:key|main|important|specific)?\s*(?:numeric|number|figure|value|result|measurement|metric|quantity|distance|speed|time|target|eta|0p\d+|0\.\d+)\b[\s\S]*\b(?:in|from)\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i.test(
+    transcript,
+  );
+
+const isAskTurnCompoundDocAnswerIntent = (transcript: string): boolean =>
+  Boolean(resolveAskTurnOpenDocSearchQueryArg(transcript)) &&
+  /\b(?:tell\s+me|answer|summari[sz]e|explain|extract|key|numeric|number|result|takeaway|what\s+is|what\s+are)\b/i.test(transcript);
+
 const isAskTurnDocAboutSummaryPrompt = (transcript: string): boolean =>
+  isAskTurnActiveDocUsefulnessIntent(transcript) ||
+  isAskTurnActiveDocConceptExplanationIntent(transcript) ||
+  isAskTurnActiveDocNumericExtractionIntent(transcript) ||
   /\b(?:what\s+is\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+about|what\s+is\s+this\s+about|summari[sz]e\s+(?:this|that|the|current)\s+(?:doc|document|paper)|explain\s+(?:this|that|the|current)\s+(?:doc|document|paper)|what\s+does\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+mean)\b/i.test(
     transcript,
   );
@@ -25857,7 +27483,11 @@ const summarizeAskTurnDocSummaryForFinal = (args: {
   const raw = readAskTurnString(args.docSummaryArtifact.text) ?? "";
   if (!raw.trim()) {
     return args.activeDocPath
-      ? `I found the active document, but no summary artifact was produced.\n\nActive doc: ${args.activeDocPath}`
+      ? [
+          "I found the active document, but no summary artifact was produced.",
+          "",
+          renderAskTurnDocReferenceBlock({ heading: "Active doc", path: args.activeDocPath }),
+        ].filter((line): line is string => line !== null).join("\n")
       : "I found the active document, but no summary artifact was produced.";
   }
   if (!args.forceConcise && isAskTurnDocSummaryDetailRequested(args.transcript)) return raw.trim();
@@ -25901,10 +27531,12 @@ const summarizeAskTurnDocSummaryForFinal = (args: {
     "Main points:",
     ...bullets.slice(0, 3).map((bullet) => `- ${bullet}`),
     activeDocPath ? "" : null,
-    activeDocPath ? `Active doc: ${activeDocPath}` : null,
+    activeDocPath ? renderAskTurnDocReferenceBlock({ heading: "Active doc", path: activeDocPath }) : null,
   ].filter((line): line is string => line !== null);
   const finalText = lines.join("\n").trim();
-  return finalText.length <= 900 ? finalText : `${finalText.slice(0, 860).trim()}...\n${activeDocPath ? `\nActive doc: ${activeDocPath}` : ""}`.trim();
+  return finalText.length <= 900
+    ? finalText
+    : `${finalText.slice(0, 860).trim()}...${activeDocPath ? `\n\n${renderAskTurnDocReferenceBlock({ heading: "Active doc", path: activeDocPath }) ?? ""}` : ""}`.trim();
 };
 
 const composeAskTurnLatestDocSelectionFinal = (args: {
@@ -25931,11 +27563,116 @@ const composeAskTurnLatestDocSelectionFinal = (args: {
     ? aliasConflict.paths.map((entry) => normalizeAskTurnWorkspaceDocPath(entry)).filter((entry): entry is string => Boolean(entry))
     : [];
   const skippedAlias = conflictPaths.find((entry) => entry !== selectedPath && /\blatest\b/i.test(entry));
-  const lines = [`Opened latest verified ${topic} candidate: ${selectedPath}`];
+  const docBlock = renderAskTurnDocReferenceBlock({ heading: "Document", path: selectedPath });
+  const lines = [
+    `Opened latest verified ${topic} candidate:`,
+    docBlock,
+  ].filter((line): line is string => line !== null);
   if (skippedAlias) {
-    lines.push(`Skipped stale latest alias: ${skippedAlias}`);
+    lines.push("");
+    lines.push("Skipped stale latest alias:");
+    lines.push(`- ${renderAskTurnDocDisplayLabel(skippedAlias)}`);
+    lines.push(`  Path: ${skippedAlias}`);
   }
   return lines.join("\n");
+};
+
+const composeAskTurnDocCandidateValidationFinal = (args: {
+  validationArtifact: Record<string, unknown>;
+  openedPath?: string | null;
+  openSelectionReason?: string | null;
+}): string | null => {
+  const selectedPath =
+    normalizeAskTurnWorkspaceDocPath(args.openedPath) ??
+    normalizeAskTurnWorkspaceDocPath(args.validationArtifact.selected_path);
+  const query = readAskTurnString(args.validationArtifact.query) ?? "the requested topic";
+  const candidates = Array.isArray(args.validationArtifact.candidates)
+    ? args.validationArtifact.candidates.filter((entry) => entry && typeof entry === "object").map((entry) => entry as Record<string, unknown>)
+    : [];
+  const selectedCandidate = selectedPath
+    ? candidates.find((candidate) => normalizeAskTurnWorkspaceDocPath(candidate.path) === selectedPath)
+    : null;
+  if (selectedPath) {
+    const reason =
+      args.openSelectionReason === "latest_verified_topic_candidate"
+        ? "latest verified topic candidate"
+        : args.openSelectionReason === "validated_topic_candidate"
+          ? "validated topic candidate"
+          : readAskTurnString(selectedCandidate?.selectionReason) ??
+            readAskTurnString(args.validationArtifact.selected_reason) ??
+            "validated topic candidate";
+    return [
+      "Opened document:",
+      renderAskTurnDocReferenceBlock({ heading: "Document", path: selectedPath }),
+      reason ? `Selection: ${reason}.` : null,
+    ].filter(Boolean).join("\n");
+  }
+  const missingTerms = candidates
+    .flatMap((candidate) => (Array.isArray(candidate.missingTerms) ? candidate.missingTerms : []))
+    .map((entry) => String(entry ?? "").trim())
+    .filter(Boolean);
+  const uniqueMissing = Array.from(new Set(missingTerms)).slice(0, 5);
+  if (args.validationArtifact.needs_clarification === true) {
+    const choices = candidates
+      .slice(0, 3)
+      .map((candidate, index) => {
+        const candidatePath = normalizeAskTurnWorkspaceDocPath(candidate.path) ?? readAskTurnString(candidate.path) ?? "unknown path";
+        const title = readAskTurnString(candidate.title) ?? renderAskTurnDocDisplayLabel(candidatePath);
+        const matched = Array.isArray(candidate.matchedTerms)
+          ? candidate.matchedTerms.map((entry) => String(entry ?? "").trim()).filter(Boolean).slice(0, 5)
+          : [];
+        const missing = Array.isArray(candidate.missingTerms)
+          ? candidate.missingTerms.map((entry) => String(entry ?? "").trim()).filter(Boolean).slice(0, 5)
+          : [];
+        const snippet = readAskTurnString(candidate.evidenceSnippet);
+        return [
+          `${index + 1}. ${title}`,
+          `   Path: ${candidatePath}`,
+          matched.length > 0 ? `   Matched: ${matched.join(", ")}` : null,
+          missing.length > 0 ? `   Missing: ${missing.join(", ")}` : null,
+          snippet ? `   Snippet: ${clipConversationText(snippet.replace(/\s+/g, " "), 160)}` : null,
+        ].filter(Boolean).join("\n");
+      });
+    return [
+      `I found multiple plausible docs for "${query}". Which one should I open?`,
+      ...choices,
+    ].join("\n");
+  }
+  return `I could not confidently identify a document for "${query}".${uniqueMissing.length > 0 ? ` Top candidates missed: ${uniqueMissing.join(", ")}.` : ""}`;
+};
+
+const buildAskTurnDocCandidatePendingOptions = (
+  validationArtifact: Record<string, unknown> | null | undefined,
+): NonNullable<HelixConversationPendingInputRecord["candidateOptions"]> => {
+  const candidates = Array.isArray(validationArtifact?.candidates)
+    ? validationArtifact.candidates.filter((entry) => entry && typeof entry === "object").map((entry) => entry as Record<string, unknown>)
+    : [];
+  return candidates
+    .slice(0, 5)
+    .map((candidate, index) => {
+      const path = normalizeAskTurnWorkspaceDocPath(candidate.path) ?? readAskTurnString(candidate.path);
+      if (!path) return null;
+      return {
+        rank: index + 1,
+        title: readAskTurnString(candidate.title) ?? renderAskTurnDocDisplayLabel(path),
+        path,
+        validationStatus: readAskTurnString(candidate.validationStatus),
+        evidenceSnippet: readAskTurnString(candidate.evidenceSnippet),
+      };
+    })
+    .filter((entry): entry is NonNullable<HelixConversationPendingInputRecord["candidateOptions"]>[number] => Boolean(entry));
+};
+
+const resolveAskTurnPendingCandidateRank = (transcript: string): number | null => {
+  const normalized = transcript.trim().toLowerCase();
+  const digitMatch = normalized.match(/\b(?:open|choose|pick|select|use|go\s+with)?\s*(?:result|candidate|option|doc|document)?\s*#?\s*([1-9])\b/i);
+  if (digitMatch?.[1]) return Number(digitMatch[1]);
+  if (/\b(?:first|top)\b/i.test(normalized)) return 1;
+  if (/\bsecond\b/i.test(normalized)) return 2;
+  if (/\bthird\b/i.test(normalized)) return 3;
+  if (/\bfourth\b/i.test(normalized)) return 4;
+  if (/\bfifth\b/i.test(normalized)) return 5;
+  return null;
 };
 
 const buildAskTurnObservationGroundedFinalAnswer = (args: {
@@ -25973,11 +27710,15 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
   const effectiveDocLocationArtifact = docLocationArtifact ?? readRuntimeArtifact("doc_location_matches");
   const noteReceiptArtifact = readAskTurnResultArtifact(args.stepResults, "note_update_receipt") ?? readRuntimeArtifact("note_update_receipt");
   const docSearchArtifact = readAskTurnResultArtifact(args.stepResults, "doc_search_results") ?? readRuntimeArtifact("doc_search_results");
+  const docCandidateValidationArtifact =
+    readAskTurnResultArtifact(args.stepResults, "doc_candidate_validation") ?? readRuntimeArtifact("doc_candidate_validation");
   const docSummaryArtifact = readAskTurnResultArtifact(args.stepResults, "doc_summary") ?? readRuntimeArtifact("doc_summary");
   const latestDocSelectionArtifact =
     readAskTurnResultArtifact(args.stepResults, "latest_doc_selection") ?? readRuntimeArtifact("latest_doc_selection");
   const comparisonSummaryArtifact =
     readAskTurnResultArtifact(args.stepResults, "comparison_summary") ?? readRuntimeArtifact("comparison_summary");
+  const temporalContextComparisonArtifact =
+    readAskTurnResultArtifact(args.stepResults, "temporal_context_comparison") ?? readRuntimeArtifact("temporal_context_comparison");
 
   if (isAskTurnCapabilityHelpIntent(args.transcript)) {
     consumed.add("capability_help_summary");
@@ -25987,6 +27728,28 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
       consumed_artifacts: Array.from(consumed),
       contract_pass: true,
       fail_reason: null,
+    };
+  }
+
+  if (isAskTurnContextualTemporalCompareIntent(args.transcript)) {
+    consumed.add("source_doc_temporal_anchor");
+    consumed.add("doc_search_results");
+    if (temporalContextComparisonArtifact) {
+      consumed.add("temporal_context_comparison");
+      return {
+        text: renderAskTurnTemporalContextComparisonFinal(temporalContextComparisonArtifact),
+        source: "temporal_context_comparison",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: readAskTurnString(temporalContextComparisonArtifact.failure_reason) === null,
+        fail_reason: readAskTurnString(temporalContextComparisonArtifact.failure_reason),
+      };
+    }
+    return {
+      text: "I could not complete the temporal comparison because the comparison artifact was not produced.",
+      source: "temporal_context_comparison",
+      consumed_artifacts: Array.from(consumed),
+      contract_pass: false,
+      fail_reason: "missing_temporal_context_comparison",
     };
   }
 
@@ -26000,7 +27763,9 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     return {
       text: [
         activeNoteTitle ? `Active note: ${activeNoteTitle}` : "Active note: unavailable in the current workspace context.",
-        activeDocPath ? `Active doc: ${activeDocPath}` : "Active doc: unavailable in the current workspace context.",
+        activeDocPath
+          ? ["Active doc:", renderAskTurnDocReferenceBlock({ heading: "Document", path: activeDocPath })].filter(Boolean).join("\n")
+          : "Active doc: unavailable in the current workspace context.",
       ].join("\n"),
       source: "workspace_context_status",
       consumed_artifacts: Array.from(consumed),
@@ -26112,6 +27877,26 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     };
   }
 
+  if (docSummaryArtifact && !noteReceiptArtifact && isAskTurnDocAboutSummaryPrompt(args.transcript)) {
+    consumed.add("doc_summary");
+    if (effectiveDocLocationArtifact && isAskTurnActiveDocConceptExplanationIntent(args.transcript)) {
+      consumed.add("doc_location_matches");
+    }
+    return {
+      text: summarizeAskTurnDocSummaryForFinal({
+        transcript: args.transcript,
+        docSummaryArtifact,
+        activeDocPath:
+          normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath) ??
+          normalizeAskTurnWorkspaceDocPath(args.selectedAction?.args?.path),
+      }),
+      source: "doc_summary",
+      consumed_artifacts: Array.from(consumed),
+      contract_pass: true,
+      fail_reason: null,
+    };
+  }
+
   if (
     effectiveDocLocationArtifact &&
     (isAskTurnDocLocateIntent(args.transcript) ||
@@ -26160,7 +27945,9 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     if (activeDocPath) {
       consumed.add("active_doc_path");
       return {
-        text: `You are currently on: ${activeDocPath}`,
+        text: ["You are currently on:", renderAskTurnDocReferenceBlock({ heading: "Document", path: activeDocPath })]
+          .filter(Boolean)
+          .join("\n"),
         source: "active_doc_path",
         consumed_artifacts: Array.from(consumed),
         contract_pass: true,
@@ -26221,6 +28008,66 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     const openedPath =
       normalizeAskTurnWorkspaceDocPath(openedStep?.action?.args?.path) ??
       normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+    if (openedPath && docSummaryArtifact && isAskTurnCompoundDocAnswerIntent(args.transcript)) {
+      consumed.add("active_doc_path");
+      consumed.add("doc_summary");
+      return {
+        text: summarizeAskTurnDocSummaryForFinal({
+          transcript: args.transcript,
+          docSummaryArtifact,
+          activeDocPath: openedPath,
+          forceConcise: !isAskTurnDocSummaryDetailRequested(args.transcript),
+        }),
+        source: "doc_summary",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: true,
+        fail_reason: null,
+      };
+    }
+    if (
+      openedPath &&
+      /\b(?:explain|summari[sz]e|plain\s+language|main\s+comparison|key\s+claim|key\s+numeric|numeric\s+result|what\s+the\s+main)\b/i.test(args.transcript)
+    ) {
+      const explainedText = buildAskTurnDocExplainText({
+        transcript: args.transcript,
+        docPath: openedPath,
+        evidenceRefs: [openedPath],
+      });
+      if (explainedText) {
+        consumed.add("active_doc_path");
+        consumed.add("doc_summary");
+        return {
+          text: explainedText,
+          source: "doc_explain_preview",
+          consumed_artifacts: Array.from(consumed),
+          contract_pass: true,
+          fail_reason: null,
+        };
+      }
+    }
+    if (docCandidateValidationArtifact) {
+      const validationOpenedPath = normalizeAskTurnWorkspaceDocPath(openedStep?.action?.args?.path);
+      const validationFinalText = composeAskTurnDocCandidateValidationFinal({
+        validationArtifact: docCandidateValidationArtifact,
+        openedPath: validationOpenedPath,
+        openSelectionReason: readAskTurnString(openedStep?.action?.args?.selection_reason),
+      });
+      if (validationFinalText) {
+        consumed.add("doc_candidate_validation");
+        if (validationOpenedPath) consumed.add("active_doc_path");
+        return {
+          text: validationFinalText,
+          source: "doc_candidate_validation",
+          consumed_artifacts: Array.from(consumed),
+          contract_pass: Boolean(validationOpenedPath),
+          fail_reason: validationOpenedPath
+            ? null
+            : docCandidateValidationArtifact.needs_clarification === true
+              ? "ambiguous_doc_candidates"
+              : "open_doc_unresolved",
+        };
+      }
+    }
     if (latestDocSelectionArtifact && openedStep?.action?.action_id === "open_latest_doc_by_topic") {
       const latestFinalText = composeAskTurnLatestDocSelectionFinal({
         transcript: args.transcript,
@@ -26256,12 +28103,17 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
       return {
         text: [
           createdNoteTitle ? `Created note: ${createdNoteTitle}.` : null,
-          `Opened document: ${openedPath}`,
-          reason === "newest"
-            ? "Selection: newest matching search result."
-            : reason === "top_ranked"
-              ? "Selection: top-ranked search result."
-              : null,
+          "Opened document:",
+          renderAskTurnDocReferenceBlock({ heading: "Document", path: openedPath }),
+          reason === "latest_verified_topic_candidate"
+            ? "Selection: latest verified topic candidate."
+            : reason === "validated_topic_candidate"
+              ? "Selection: validated topic candidate."
+              : reason === "newest"
+                ? "Selection: newest matching search result."
+                : reason === "top_ranked"
+                  ? "Selection: top-ranked search result."
+                  : null,
         ].filter(Boolean).join("\n"),
         source: "active_doc_path",
         consumed_artifacts: Array.from(consumed),
@@ -26357,6 +28209,144 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
   };
 };
 
+const collectAskTurnUniversalComposerArtifacts = (args: {
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  runtime?: HelixAskTurnRuntimeSummary | HelixAskTurnRuntime | null;
+  seed?: Record<string, unknown> | null;
+}): Record<string, unknown> => {
+  const out: Record<string, unknown> = { ...(args.seed ?? {}) };
+  for (const result of args.stepResults) {
+    const artifact =
+      result?.result_artifact && typeof result.result_artifact === "object"
+        ? (result.result_artifact as Record<string, unknown>)
+        : null;
+    const kind = readAskTurnString(artifact?.kind);
+    if (kind && !(kind in out)) out[kind] = artifact;
+    for (const actual of Array.isArray(result.actual_artifacts) ? result.actual_artifacts : []) {
+      const key = String(actual ?? "").trim();
+      if (key && !(key in out)) out[key] = artifact ?? { ok: true };
+    }
+  }
+  const observations =
+    args.runtime && typeof args.runtime === "object" && Array.isArray(args.runtime.observations)
+      ? (args.runtime.observations as HelixAskTurnRuntimeObservation[])
+      : [];
+  for (const observation of observations) {
+    const artifact =
+      observation?.result_artifact && typeof observation.result_artifact === "object"
+        ? (observation.result_artifact as Record<string, unknown>)
+        : null;
+    const kind = readAskTurnString(artifact?.kind);
+    if (kind && !(kind in out)) out[kind] = artifact;
+    for (const actual of Array.isArray(observation.actual_artifacts) ? observation.actual_artifacts : []) {
+      const key = String(actual ?? "").trim();
+      if (key && !(key in out)) out[key] = artifact ?? { ok: true };
+    }
+  }
+  return out;
+};
+
+const composeAskTurnUniversalFinalAnswer = (
+  input: HelixAskUniversalFinalComposerInput,
+): HelixAskUniversalFinalComposerOutput => {
+  const pendingPrompt = readAskTurnString(input.pending_request?.prompt);
+  if (input.pending_request) {
+    return {
+      text: pendingPrompt ?? "I need one more detail before I can continue.",
+      source: "pending_input",
+      status: "pending_input",
+      consumed_artifacts: [],
+      presentation_renderer: "pending_request_prompt",
+      terminal_allowed: false,
+      fail_reason: readAskTurnString(input.pending_request.reason) ?? "pending_request_active",
+    };
+  }
+  const latestDecision = [...input.observe_then_decide_trace].reverse()[0] ?? null;
+  if (latestDecision && latestDecision.terminal_allowed === false && latestDecision.decision !== "continue") {
+    const missing = latestDecision.missing_artifacts.filter(Boolean);
+    const text =
+      input.fallback_text && latestDecision.decision === "request_user_input"
+        ? input.fallback_text
+        : missing.length > 0
+          ? `I need ${missing.join(", ")} before I can complete that request.`
+          : "I need one more detail before I can complete that request.";
+    return {
+      text,
+      source: latestDecision.decision === "typed_failure" ? "typed_failure" : "pending_input",
+      status: latestDecision.decision === "typed_failure" ? "final_failure" : "pending_input",
+      consumed_artifacts: [],
+      presentation_renderer: "observe_then_decide_terminal_gate",
+      terminal_allowed: false,
+      fail_reason: latestDecision.reason,
+    };
+  }
+  if (input.failure) {
+    return {
+      text:
+        input.fallback_text?.trim() ||
+        `I could not complete this turn${input.failure.reason ? `: ${input.failure.reason}` : "."}`,
+      source: "typed_failure",
+      status: "final_failure",
+      consumed_artifacts: [],
+      presentation_renderer: "typed_failure",
+      terminal_allowed: false,
+      fail_reason: input.failure.error_code ?? input.failure.reason ?? "turn_failed",
+    };
+  }
+  if (input.goal_frame.user_goal.goal_kind === "conversation") {
+    return {
+      text: input.fallback_text?.trim() || "Yes. I can answer directly here.",
+      source: "no_tool_direct",
+      status: "final_answer",
+      consumed_artifacts: ["direct_answer_text"],
+      presentation_renderer: "direct_answer",
+      terminal_allowed: true,
+      fail_reason: null,
+    };
+  }
+  const grounded = buildAskTurnObservationGroundedFinalAnswer({
+    transcript: input.transcript,
+    executionTrace: input.execution_trace,
+    stepResults: input.step_results,
+    runtime: input.runtime,
+    workspaceSnapshot: input.workspace_snapshot ?? null,
+    selectedAction: input.selected_action ?? null,
+    candidateText: input.fallback_text,
+  });
+  if (grounded.text.trim() && grounded.contract_pass) {
+    return {
+      text: grounded.text.trim(),
+      source: "universal_composer",
+      status: "final_answer",
+      consumed_artifacts: grounded.consumed_artifacts,
+      presentation_renderer: grounded.source,
+      terminal_allowed: true,
+      fail_reason: null,
+    };
+  }
+  if (grounded.text.trim() && !grounded.contract_pass) {
+    const pendingLike = grounded.source === "request_user_input" || /missing|unavailable|ambiguous|which/i.test(grounded.fail_reason ?? grounded.text);
+    return {
+      text: grounded.text.trim(),
+      source: pendingLike ? "pending_input" : "typed_failure",
+      status: pendingLike ? "pending_input" : "final_failure",
+      consumed_artifacts: grounded.consumed_artifacts,
+      presentation_renderer: grounded.source,
+      terminal_allowed: false,
+      fail_reason: grounded.fail_reason ?? "composer_contract_failed",
+    };
+  }
+  return {
+    text: "I could not complete this turn because the authoritative terminal artifact was missing.",
+    source: "typed_failure",
+    status: "final_failure",
+    consumed_artifacts: Object.keys(input.artifacts),
+    presentation_renderer: null,
+    terminal_allowed: false,
+    fail_reason: "authoritative_terminal_missing",
+  };
+};
+
 const collectAskTurnBlockedMissingArtifacts = (executionTrace: HelixAskTurnPlanStep[]): string[] => {
   const out = new Set<string>();
   for (const step of executionTrace) {
@@ -26428,6 +28418,89 @@ const hasAskTurnTerminalArtifactSatisfied = (args: {
   return satisfied.some((artifact) => HELIX_ASK_TERMINAL_ARTIFACT_KINDS.has(String(artifact ?? "").trim()));
 };
 
+const hasAskTurnRuntimeArtifact = (
+  runtime: HelixAskTurnRuntime | HelixAskTurnRuntimeSummary | null | undefined,
+  artifactKind: string,
+): boolean => {
+  const kind = artifactKind.trim();
+  if (!kind || !runtime || typeof runtime !== "object") return false;
+  if ("artifact_store" in runtime && runtime.artifact_store && typeof runtime.artifact_store === "object" && kind in runtime.artifact_store) {
+    return true;
+  }
+  if (Array.isArray((runtime as HelixAskTurnRuntimeSummary).artifact_keys)) {
+    if ((runtime as HelixAskTurnRuntimeSummary).artifact_keys.includes(kind)) return true;
+  }
+  if (Array.isArray((runtime as HelixAskTurnRuntimeSummary).satisfied_artifacts)) {
+    if ((runtime as HelixAskTurnRuntimeSummary).satisfied_artifacts.includes(kind)) return true;
+  }
+  return false;
+};
+
+const hasAskTurnExistingNoteMutationObjectiveSatisfied = (args: {
+  transcript: string;
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  runtime?: HelixAskTurnRuntime | HelixAskTurnRuntimeSummary | null;
+}): boolean => {
+  if (!isAskTurnExistingNoteMutationIntent(args.transcript)) return false;
+  const hasNoteUpdate =
+    hasAskTurnRuntimeArtifact(args.runtime, "note_update_receipt") ||
+    args.stepResults.some((result) => {
+      const actualArtifacts = Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [];
+      if (actualArtifacts.some((artifact) => String(artifact ?? "").trim() === "note_update_receipt")) return true;
+      const artifact = result.result_artifact && typeof result.result_artifact === "object" ? result.result_artifact as Record<string, unknown> : null;
+      return readAskTurnString(artifact?.kind) === "note_update_receipt";
+    });
+  if (!hasNoteUpdate) return false;
+  if (isAskTurnDocLocateToNoteIntent(args.transcript)) {
+    return (
+      hasAskTurnRuntimeArtifact(args.runtime, "doc_location_matches") ||
+      args.stepResults.some((result) => {
+        const actualArtifacts = Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [];
+        return actualArtifacts.some((artifact) => String(artifact ?? "").trim() === "doc_location_matches");
+      })
+    );
+  }
+  if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript)) {
+    return (
+      hasAskTurnRuntimeArtifact(args.runtime, "doc_summary") ||
+      hasAskTurnRuntimeArtifact(args.runtime, "reasoning_summary") ||
+      args.stepResults.some((result) => {
+        const actualArtifacts = Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [];
+        return actualArtifacts.some((artifact) => ["doc_summary", "reasoning_summary"].includes(String(artifact ?? "").trim()));
+      })
+    );
+  }
+  return true;
+};
+
+const hasAskTurnOpenDocObjectiveSatisfied = (args: {
+  transcript: string;
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  runtime?: HelixAskTurnRuntime | HelixAskTurnRuntimeSummary | null;
+}): boolean => {
+  if (!isAskTurnOpenDocGoalIntent(args.transcript)) return false;
+  const requestsAdditionalWork =
+    isAskTurnExistingNoteMutationIntent(args.transcript) ||
+    isAskTurnDocLocateToNoteIntent(args.transcript) ||
+    isAskTurnSummarizeAndAddToNoteIntent(args.transcript) ||
+    isAskTurnDocAboutSummaryPrompt(args.transcript) ||
+    /\b(?:summari[sz]e|explain|compare|where|locate|mention|copy|append|put|takeaway)\b/i.test(args.transcript);
+  if (requestsAdditionalWork) return false;
+  const hasOpenedDocStep = args.stepResults.some((result) => {
+    const actualArtifacts = Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [];
+    if (!actualArtifacts.some((artifact) => String(artifact ?? "").trim() === "active_doc_path")) return false;
+    const action = result.artifact && typeof result.artifact === "object" ? result.artifact as HelixAskTurnSelectedAction : null;
+    if (action?.panel_id !== "docs-viewer") return false;
+    if (!["open_doc", "open_doc_by_path", "open_latest_doc_by_topic"].includes(action.action_id)) return false;
+    return Boolean(normalizeAskTurnWorkspaceDocPath(action.args?.path));
+  });
+  if (hasOpenedDocStep) return true;
+  return (
+    hasAskTurnRuntimeArtifact(args.runtime, "active_doc_path") &&
+    hasAskTurnRuntimeArtifact(args.runtime, "latest_doc_selection")
+  );
+};
+
 const hasCompletedAskTurnDocSearchStep = (executionTrace: HelixAskTurnPlanStep[]): boolean =>
   executionTrace.some(
     (step) =>
@@ -26442,8 +28515,19 @@ const filterAskTurnLatestDocSearchFallbackMissingArtifacts = (args: {
   missingArtifacts: string[];
   hasDocSearchResults: boolean;
 }): string[] => {
-  if (!args.hasDocSearchResults || !isAskTurnOpenLatestDocIntent(args.transcript)) return args.missingArtifacts;
-  return args.missingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context");
+  const isOpenDocGoal = isAskTurnOpenDocGoalIntent(args.transcript);
+  const requestsSummary =
+    isAskTurnDocAboutSummaryPrompt(args.transcript) ||
+    isAskTurnSummarizeAndAddToNoteIntent(args.transcript) ||
+    /\b(?:summari[sz]e|explain|takeaway)\b/i.test(args.transcript);
+  let filtered = args.missingArtifacts;
+  if (args.hasDocSearchResults && isAskTurnOpenLatestDocIntent(args.transcript)) {
+    filtered = filtered.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context");
+  }
+  if (isOpenDocGoal && !requestsSummary) {
+    filtered = filtered.filter((artifact) => artifact !== "doc_summary");
+  }
+  return filtered;
 };
 
 const buildAskTurnExecutionLifecycle = (executionTrace: HelixAskTurnPlanStep[]): HelixAskTurnExecutionLifecycleEvent[] => {
@@ -26503,6 +28587,7 @@ const createAskTurnRuntime = (args: {
     runtime_loop_iteration_count: 0,
     runtime_loop_stop_reason: null,
     capability_selection_trace: [],
+    observe_then_decide_trace: [],
     terminal: args.pendingServerRequest
       ? {
           kind: "pending_input",
@@ -26568,7 +28653,975 @@ const summarizeAskTurnRuntime = (runtime: HelixAskTurnRuntime): HelixAskTurnRunt
   runtime_loop_iteration_count: runtime.runtime_loop_iteration_count,
   runtime_loop_stop_reason: runtime.runtime_loop_stop_reason,
   capability_selection_trace: runtime.capability_selection_trace.slice(-24),
+  observe_then_decide_trace: runtime.observe_then_decide_trace.slice(-48),
   terminal: runtime.terminal,
+  };
+};
+
+const mapAskTurnRuntimeStepSource = (source: unknown, reason?: unknown): HelixAskTurnDecisionSource => {
+  const normalizedSource = typeof source === "string" ? source.trim() : "";
+  const normalizedReason = typeof reason === "string" ? reason.trim() : "";
+  if (normalizedReason.includes("model_decision")) return "model_planner";
+  if (normalizedSource === "capability_registry") return "capability_registry";
+  if (normalizedSource === "artifact_policy") return "artifact_policy";
+  if (normalizedSource === "fallback") return "legacy_fallback";
+  return "phrase_detector";
+};
+
+const mapAskTurnTerminalDecisionSource = (
+  finalAnswerSource?: HelixAskTurnFinalAnswerSource | string | null,
+): HelixAskTurnDecisionSource => {
+  if (finalAnswerSource === "legacy_fallback" || finalAnswerSource === "client_fallback") return "legacy_fallback";
+  if (
+    finalAnswerSource === "universal_composer" ||
+    finalAnswerSource === "artifact_synthesis" ||
+    finalAnswerSource === "typed_failure" ||
+    finalAnswerSource === "request_user_input"
+  ) return "artifact_policy";
+  return "model_planner";
+};
+
+const pushUniqueAskTurnGoalFrameRef = <T extends { kind: string; value: string }>(
+  entries: T[],
+  entry: T,
+): void => {
+  const key = `${entry.kind}:${entry.value}`.toLowerCase();
+  if (entries.some((candidate) => `${candidate.kind}:${candidate.value}`.toLowerCase() === key)) return;
+  entries.push(entry);
+};
+
+const readAskTurnGoalFrameString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const extractAskTurnQuotedTitle = (transcript: string): string | null => {
+  const match = transcript.match(/["“”']([^"“”']{3,180})["“”']/);
+  return match?.[1]?.trim() || null;
+};
+
+const buildAskTurnCompoundArgumentPartition = (args: {
+  transcript: string;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): HelixAskUniversalGoalFrame["compound_argument_partition"] => {
+  const raw = args.transcript.trim();
+  const sourceQuery = resolveAskTurnDocLocateQuery(raw);
+  const noteTitle =
+    resolveAskTurnNoteTargetWithWorkspace(raw, args.workspaceSnapshot ?? null) ??
+    resolveAskTurnLocationNamedNoteSinkArg(raw) ??
+    (isAskTurnDeicticNoteTarget(resolveAskTurnAnyNoteSinkArg(raw))
+      ? resolveAskTurnWorkspaceNoteTitle(args.workspaceSnapshot ?? null)
+      : null);
+  const notePronoun = isAskTurnDeicticNoteTarget(resolveAskTurnAnyNoteSinkArg(raw))
+    ? resolveAskTurnAnyNoteSinkArg(raw)
+    : null;
+  const operation: HelixAskUniversalGoalFrame["compound_argument_partition"]["operation"] =
+    isAskTurnDocLocateIntent(raw)
+      ? "locate_in_doc"
+      : /\b(?:summari[sz]e|takeaway|plain-language)\b/i.test(raw)
+        ? "summarize_doc"
+        : /\b(?:compare|contrast|versus|vs\.?)\b/i.test(raw)
+          ? "compare"
+          : isAskTurnOpenDocGoalIntent(raw)
+            ? "open_doc"
+            : null;
+  const styleModifiers = [
+    ...raw.matchAll(/\b(?:normal words|plain language|plain-language|simple terms|short|brief|concise|quick)\b/gi),
+  ].map((match) => match[0].toLowerCase());
+  const hasMutationCue = /\b(?:drop|put|save|add|append|write|store|stash|file|park|place|copy)\b[\s\S]*\b(?:note|notepad|scratch|memo|pad)\b/i.test(raw);
+  if (!sourceQuery && !noteTitle && !hasMutationCue && !operation && styleModifiers.length === 0) return undefined;
+  const contaminated =
+    Boolean(sourceQuery) &&
+    /\b(?:add|append|put|write|save|store|stash|file|park|place|copy)\b[\s\S]*\b(?:note|notepad|scratch|memo|pad)\b/i.test(sourceQuery ?? "");
+  const ambiguity =
+    operation === "locate_in_doc" && !sourceQuery
+      ? "missing_source_query"
+      : hasMutationCue && !noteTitle
+        ? "missing_mutation_target"
+        : contaminated
+          ? "source_query_contains_mutation_tail"
+          : null;
+  return {
+    source_query: sourceQuery,
+    operation,
+    mutation_target: {
+      kind: noteTitle || notePronoun || hasMutationCue ? "note" : null,
+      title: noteTitle,
+      pronoun_ref: notePronoun,
+    },
+    style_modifiers: Array.from(new Set(styleModifiers)),
+    confidence: ambiguity ? "low" : sourceQuery && (noteTitle || !hasMutationCue) ? "high" : "medium",
+    ambiguity,
+    source: "goal_frame",
+    phrase_detector_authority: "hint_only",
+  };
+};
+
+const buildAskTurnUniversalGoalFrame = (args: {
+  transcript: string;
+  payload?: Record<string, unknown> | null;
+  workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
+}): HelixAskUniversalGoalFrame => {
+  const raw = args.transcript.trim();
+  const normalized = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  const workspaceSnapshot = args.workspaceSnapshot ?? null;
+  const payload = args.payload ?? {};
+  const selectedAction =
+    payload.workspace_action && typeof payload.workspace_action === "object"
+      ? (payload.workspace_action as Record<string, unknown>)
+      : payload.planner_contract &&
+          typeof payload.planner_contract === "object" &&
+          (payload.planner_contract as Record<string, unknown>).selected_action &&
+          typeof (payload.planner_contract as Record<string, unknown>).selected_action === "object"
+        ? ((payload.planner_contract as Record<string, unknown>).selected_action as Record<string, unknown>)
+        : null;
+  const actionId = readAskTurnGoalFrameString(selectedAction?.action_id);
+  const panelId = readAskTurnGoalFrameString(selectedAction?.panel_id);
+  const requestedOutputs: HelixAskUniversalGoalFrame["requested_outputs"] = [];
+  const workspaceRefs: HelixAskUniversalGoalFrame["workspace_refs"] = [];
+  const constraints: HelixAskUniversalGoalFrame["constraints"] = [];
+  const styleModifiers: HelixAskUniversalGoalFrame["style_modifiers"] = [];
+  const mutationTargets: HelixAskUniversalGoalFrame["mutation_targets"] = [];
+  const evidenceRequirements: HelixAskUniversalGoalFrame["evidence_requirements"] = [];
+  const compoundArgumentPartition = buildAskTurnCompoundArgumentPartition({
+    transcript: raw,
+    workspaceSnapshot,
+  });
+  const pushRequestedOutput = (
+    kind: HelixAskUniversalGoalFrame["requested_outputs"][number]["kind"],
+    evidence: string,
+    required = true,
+  ): void => {
+    if (requestedOutputs.some((entry) => entry.kind === kind)) {
+      const existing = requestedOutputs.find((entry) => entry.kind === kind);
+      if (existing && !existing.evidence.includes(evidence)) existing.evidence.push(evidence);
+      return;
+    }
+    requestedOutputs.push({ kind, required, evidence: [evidence] });
+  };
+  const pushEvidenceRequirement = (artifact: string, reason: string, required = true): void => {
+    if (evidenceRequirements.some((entry) => entry.artifact === artifact)) return;
+    evidenceRequirements.push({ artifact, required, reason });
+  };
+  const activeDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSnapshot?.activeDocPath);
+  const activeNoteTitle = readAskTurnGoalFrameString(workspaceSnapshot?.activeNoteTitle);
+  const explicitDocPath = resolveAskTurnDocPathArg(raw);
+  if (explicitDocPath) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "doc_title",
+      value: explicitDocPath,
+      source: "explicit",
+      confidence: 0.95,
+    });
+  }
+  const quotedTitle = extractAskTurnQuotedTitle(raw);
+  if (quotedTitle) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: /\bnote|scratch|memo|pad\b/i.test(quotedTitle) ? "note_title" : "doc_title",
+      value: quotedTitle,
+      source: "explicit",
+      confidence: 0.86,
+    });
+  }
+  const latestTopic = resolveAskTurnLatestDocTopicArg(raw);
+  if (latestTopic) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "doc_topic",
+      value: latestTopic,
+      source: "phrase_evidence",
+      confidence: 0.78,
+    });
+  }
+  const openDocSearchTopic = resolveAskTurnOpenDocSearchQueryArg(raw);
+  if (openDocSearchTopic) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "doc_topic",
+      value: openDocSearchTopic,
+      source: "phrase_evidence",
+      confidence: 0.8,
+    });
+  }
+  const docAboutMatch = raw.match(/\b(?:open|view|show|pull\s+up|find|search)\s+(?:a\s+|the\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i);
+  if (docAboutMatch?.[1]) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "doc_topic",
+      value: docAboutMatch[1].trim(),
+      source: "phrase_evidence",
+      confidence: 0.72,
+    });
+  }
+  if (/\b(?:this|current|active)\s+(?:doc|docs|document|paper)\b/i.test(raw) || /\bwhat\s+is\s+this\s+doc\b/i.test(raw)) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "active_doc",
+      value: activeDocPath ?? "active_doc",
+      source: "deictic",
+      confidence: activeDocPath ? 0.9 : 0.45,
+    });
+    constraints.push({
+      kind: "must_use_active_context",
+      value: "active_doc",
+      source: "deictic_doc_reference",
+    });
+  }
+  const simpleStatusPhrase = /\b(?:is\s+this\s+working|is\s+this\s+thing\s+on|are\s+you\s+awake)\b/i.test(raw);
+  if (
+    !simpleStatusPhrase &&
+    /\b(?:that|this|it)\b/i.test(raw) &&
+    !/\b(?:that|this|it)\s+(?:doc|document|paper|note)\b/i.test(raw)
+  ) {
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "prior_turn",
+      value: "deictic_artifact",
+      source: "deictic",
+      confidence: 0.55,
+    });
+  }
+  const notePhraseIntent =
+    /\b(?:note|notepad|scratch|memo|pad)\b/i.test(raw) &&
+    /\b(?:create|make|append|add|put|drop|copy|save|write|takeaway|summary|compare|contrast)\b/i.test(raw);
+  const explicitNoteTarget =
+    resolveAskTurnSummaryNoteTargetWithWorkspace(raw, workspaceSnapshot) ??
+    resolveAskTurnCompareNoteTargetWithWorkspace(raw, workspaceSnapshot) ??
+    resolveAskTurnNoteTargetWithWorkspace(raw, workspaceSnapshot);
+  if (explicitNoteTarget && notePhraseIntent) {
+    const source =
+      activeNoteTitle && explicitNoteTarget.toLowerCase() === activeNoteTitle.toLowerCase()
+        ? "context"
+        : "phrase_evidence";
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "note_title",
+      value: explicitNoteTarget,
+      source,
+      confidence: source === "context" ? 0.82 : 0.78,
+    });
+  }
+  const noteMutationIntent =
+    /\b(?:note|notepad|scratch|memo|pad)\b/i.test(raw) &&
+    /\b(?:create|make|append|add|put|drop|copy|save|write|takeaway|summary)\b/i.test(raw);
+  if (noteMutationIntent || panelId === "workstation-notes") {
+    const resolution =
+      explicitNoteTarget && activeNoteTitle && explicitNoteTarget.toLowerCase() === activeNoteTitle.toLowerCase()
+        ? "active"
+        : explicitNoteTarget
+          ? "explicit"
+          : readAskTurnGoalFrameString(workspaceSnapshot?.lastCreatedNoteTitle)
+            ? "last_created"
+            : "missing";
+    const value =
+      explicitNoteTarget ??
+      readAskTurnGoalFrameString(workspaceSnapshot?.lastCreatedNoteTitle) ??
+      activeNoteTitle ??
+      "note_target";
+    mutationTargets.push({
+      kind: "note",
+      value,
+      resolution,
+      confidence: resolution === "missing" ? 0.3 : 0.82,
+    });
+    if (resolution === "active" && activeNoteTitle) {
+      pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+        kind: "active_note",
+        value: activeNoteTitle,
+        source: "context",
+        confidence: 0.9,
+      });
+    }
+    pushRequestedOutput("note_update", "note_mutation_phrase");
+    pushEvidenceRequirement("note_update_receipt", "note mutation requires an update receipt");
+  }
+  if (/\b(?:normal words|plain language|simple terms|non[-\s]?technical|lay(?:person)? terms)\b/i.test(raw)) {
+    const match = raw.match(/\b(?:normal words|plain language|simple terms|non[-\s]?technical|lay(?:person)? terms)\b/i);
+    styleModifiers.push({
+      value: match?.[0]?.trim() ?? "plain language",
+      source_span: match?.[0]?.trim() ?? "plain language",
+      applies_to: noteMutationIntent ? "note_content" : "final_answer",
+    });
+  }
+  if (/\b(?:brief|concise|short|quick)\b/i.test(raw)) {
+    const match = raw.match(/\b(?:brief|concise|short|quick)\b/i);
+    styleModifiers.push({
+      value: match?.[0]?.trim() ?? "concise",
+      source_span: match?.[0]?.trim() ?? "concise",
+      applies_to: "final_answer",
+    });
+  }
+  const summarizeIntent =
+    /\b(?:summari[sz]e|explain|what\s+is\s+this\s+(?:doc|document|paper)\s+about|what\s+is\s+this\s+about|takeaway)\b/i.test(raw) ||
+    isAskTurnActiveDocNumericExtractionIntent(raw) ||
+    isAskTurnCompoundDocAnswerIntent(raw) ||
+    actionId === "summarize_doc" ||
+    actionId === "explain_paper";
+  const explicitCurrentDocLocateIntent =
+    /\bwhere\s+(?:in|does)\s+(?:this|that|the|current|active)?\s*(?:doc|document|paper|it)\b/i.test(raw) ||
+    /\b(?:locate|find)\s+.+?\s+in\s+(?:this|that|the|current|active)?\s*(?:doc|document|paper)\b/i.test(raw) ||
+    /\bfind\s+(?:the\s+)?(?:part|bit|section)\s+where\s+(?:it|this|that|the\s+doc(?:ument)?|the\s+paper)\b/i.test(raw) ||
+    /\b(?:this|that|current|active)\s+(?:doc|document|paper)\b[\s\S]*\b(?:mention|mentions|talks?\s+about|references?|cites?|says?)\b/i.test(raw) ||
+    /\b(?:centerline|alpha)\b[\s\S]*\blocation\b/i.test(raw);
+  const locateIntent =
+    !openDocSearchTopic &&
+    explicitCurrentDocLocateIntent &&
+    /\b(?:where|locate|find|mention|mentions|talks?\s+about|location)\b/i.test(raw) &&
+    /\b(?:doc|document|paper|this|current|active|centerline|alpha|line|section|location)\b/i.test(raw);
+  const compareIntent = /\b(?:compare|contrast|difference|differences|delta|deltas|versus|vs\.?)\b/i.test(raw);
+  const temporalIntent = /\b(?:before|after|earlier|later|passing|passed|right\?)\b/i.test(raw) && /\b(?:this|that|was|solve|doc|paper)\b/i.test(raw);
+  const capabilityHelpIntent = /\b(?:what\s+can\s+(?:i|we)\s+do|how\s+can\s+you\s+help|what\s+can\s+helix\s+ask\s+do|what\s+can\s+this\s+workspace\s+agent\s+do)\b/i.test(raw);
+  const openIntent =
+    Boolean(openDocSearchTopic) ||
+    /\b(?:open|view|show|go\s+to|navigate\s+to|pull\s+up|bring\s+up)\b/i.test(raw) ||
+    actionId === "open_doc_by_path" ||
+    actionId === "open_latest_doc_by_topic" ||
+    actionId === "search_docs";
+  const conversationIntent =
+    !summarizeIntent &&
+    !locateIntent &&
+    !compareIntent &&
+    !temporalIntent &&
+    !capabilityHelpIntent &&
+    !openIntent &&
+    !noteMutationIntent &&
+    /\b(?:hello|hi|hey|is\s+this\s+working|are\s+you\s+awake|is\s+this\s+thing\s+on)\b/i.test(raw);
+  if (summarizeIntent) {
+    pushRequestedOutput("answer", "summary_or_explain_phrase");
+    pushEvidenceRequirement("doc_summary", "summary/explanation requires a grounded document summary artifact");
+  }
+  if (locateIntent) {
+    pushRequestedOutput("location", "locate_phrase");
+    pushEvidenceRequirement("doc_location_matches", "location prompts require doc match artifacts");
+  }
+  if (compareIntent) {
+    pushRequestedOutput("comparison", "compare_phrase");
+    pushEvidenceRequirement("comparison_summary", "comparison prompts require comparison artifacts");
+  }
+  if (temporalIntent) {
+    pushRequestedOutput("answer", "temporal_followup_phrase");
+    pushEvidenceRequirement("temporal_context_comparison", "temporal follow-ups require source/target date evidence");
+    constraints.push({
+      kind: "requires_evidence",
+      value: "temporal_target_resolution",
+      source: "temporal_followup_phrase",
+    });
+  }
+  if (capabilityHelpIntent) {
+    pushRequestedOutput("answer", "capability_help_phrase");
+    pushEvidenceRequirement("capability_help_summary", "capability help requires registry-grounded capability summary", false);
+  }
+  if (openIntent) {
+    pushRequestedOutput("doc_open", "open_workspace_phrase");
+    pushEvidenceRequirement("opened_doc", "open requests require an opened document or typed unresolved-doc failure");
+  }
+  if (requestedOutputs.length === 0) pushRequestedOutput("answer", conversationIntent ? "conversation_phrase" : "default_answer");
+  const goalKind: HelixAskUniversalGoalFrame["user_goal"]["goal_kind"] =
+    capabilityHelpIntent
+      ? "capability_help"
+      : temporalIntent
+        ? "temporal_followup"
+        : compareIntent
+          ? "compare"
+          : locateIntent
+            ? "locate_in_doc"
+            : summarizeIntent
+              ? "summarize_doc"
+              : noteMutationIntent
+                ? "write_note"
+                : openIntent
+                  ? "open_workspace"
+                  : conversationIntent
+                    ? "conversation"
+                    : "unknown";
+  const confidence =
+    goalKind === "unknown"
+      ? 0.35
+      : actionId
+        ? 0.86
+        : conversationIntent || capabilityHelpIntent || temporalIntent
+          ? 0.78
+          : 0.7;
+  return {
+    user_goal: {
+      raw,
+      normalized,
+      goal_kind: goalKind,
+      confidence,
+    },
+    requested_outputs: requestedOutputs,
+    workspace_refs: workspaceRefs,
+    constraints,
+    style_modifiers: styleModifiers,
+    mutation_targets: mutationTargets,
+    ...(compoundArgumentPartition ? { compound_argument_partition: compoundArgumentPartition } : {}),
+    evidence_requirements: evidenceRequirements,
+  };
+};
+
+const askTurnGoalFrameRequestsOutput = (
+  frame: HelixAskUniversalGoalFrame | null | undefined,
+  kind: HelixAskUniversalGoalFrame["requested_outputs"][number]["kind"],
+): boolean => Boolean(frame?.requested_outputs?.some((entry) => entry.kind === kind && entry.required !== false));
+
+const isAskTurnConceptualQuestion = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!normalized) return false;
+  return (
+    /\b(?:background question|conceptual question|what\s+is|what\s+are|define|explain|why\s+(?:would|does|is|are|can)|how\s+(?:does|do|would|can))\b/i.test(normalized) &&
+    !/\b(?:open|go\s+to|navigate|pull\s+up|create|make|append|add|copy|save|write|put|drop|compare|where\s+(?:in|does)|locate)\b/i.test(normalized)
+  );
+};
+
+const buildAskTurnToolChoiceArbitration = (args: {
+  frame: HelixAskUniversalGoalFrame;
+  transcript: string;
+}): HelixAskToolChoiceArbitration => {
+  const frame = args.frame;
+  const transcript = args.transcript.trim();
+  const hasActiveDocRef = frame.workspace_refs.some((entry) => entry.kind === "active_doc");
+  const hasDocTopicRef = frame.workspace_refs.some((entry) => entry.kind === "doc_topic" || entry.kind === "doc_title");
+  const hasMutationTarget = frame.mutation_targets.length > 0;
+  const wantsOpen = askTurnGoalFrameRequestsOutput(frame, "doc_open") || frame.user_goal.goal_kind === "open_workspace";
+  const wantsWorkspaceEvidence =
+    wantsOpen ||
+    hasMutationTarget ||
+    frame.user_goal.goal_kind === "summarize_doc" ||
+    frame.user_goal.goal_kind === "locate_in_doc" ||
+    frame.user_goal.goal_kind === "compare" ||
+    frame.user_goal.goal_kind === "temporal_followup";
+  const conceptual = isAskTurnConceptualQuestion(transcript);
+  if (conceptual && !hasActiveDocRef && !hasDocTopicRef && !hasMutationTarget) {
+    return {
+      answer_scope: "model_only",
+      evidence_need: "none",
+      first_step: "model",
+      reason: "conceptual_question_without_workspace_anchor",
+      confidence: "high",
+      source: "goal_frame",
+    };
+  }
+  if (conceptual && hasActiveDocRef) {
+    return {
+      answer_scope: "hybrid",
+      evidence_need: "active_doc",
+      first_step: "tool",
+      reason: "conceptual_question_with_active_doc_anchor",
+      confidence: "medium",
+      source: "goal_frame",
+    };
+  }
+  if (wantsOpen || (hasDocTopicRef && frame.user_goal.goal_kind === "open_workspace")) {
+    return {
+      answer_scope: "workspace_grounded",
+      evidence_need: "search_docs",
+      first_step: "tool",
+      reason: "document_acquisition_requires_workspace_search",
+      confidence: "high",
+      source: "goal_frame",
+    };
+  }
+  if (wantsWorkspaceEvidence || hasActiveDocRef) {
+    return {
+      answer_scope: "workspace_grounded",
+      evidence_need: hasActiveDocRef ? "active_doc" : "prior_artifact",
+      first_step: "tool",
+      reason: "workspace_goal_requires_artifact_observation",
+      confidence: frame.user_goal.confidence >= 0.75 ? "high" : "medium",
+      source: "goal_frame",
+    };
+  }
+  return {
+    answer_scope: "model_only",
+    evidence_need: "none",
+    first_step: "model",
+    reason: frame.user_goal.goal_kind === "conversation" ? "conversation_no_tool_needed" : "no_workspace_anchor_detected",
+    confidence: frame.user_goal.goal_kind === "conversation" ? "high" : "medium",
+    source: "goal_frame",
+  };
+};
+
+const readAskTurnGoalFrameMutationTarget = (
+  frame: HelixAskUniversalGoalFrame | null | undefined,
+  kind: HelixAskUniversalGoalFrame["mutation_targets"][number]["kind"],
+): HelixAskUniversalGoalFrame["mutation_targets"][number] | null =>
+  frame?.mutation_targets?.find((entry) => entry.kind === kind && entry.resolution !== "missing") ?? null;
+
+const buildAskTurnCapabilitySelectionResult = (args: {
+  frame: HelixAskUniversalGoalFrame;
+  payload?: Record<string, unknown> | null;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  source?: HelixAskCapabilitySelectionResult["source"];
+}): HelixAskCapabilitySelectionResult => {
+  const frame = args.frame;
+  const payload = args.payload ?? {};
+  const selectedAction =
+    args.selectedAction ??
+    (payload.workspace_action && typeof payload.workspace_action === "object"
+      ? (payload.workspace_action as HelixAskTurnSelectedAction)
+      : payload.planner_contract &&
+          typeof payload.planner_contract === "object" &&
+          (payload.planner_contract as Record<string, unknown>).selected_action &&
+          typeof (payload.planner_contract as Record<string, unknown>).selected_action === "object"
+        ? ((payload.planner_contract as Record<string, unknown>).selected_action as HelixAskTurnSelectedAction)
+        : null);
+  const requiredArtifacts = frame.evidence_requirements
+    .filter((entry) => entry.required !== false)
+    .map((entry) => entry.artifact);
+  const activeDocRef = frame.workspace_refs.find((entry) => entry.kind === "active_doc");
+  const docTopicRef = frame.workspace_refs.find((entry) => entry.kind === "doc_topic");
+  const noteTarget = readAskTurnGoalFrameMutationTarget(frame, "note");
+  const noteRef = frame.workspace_refs.find((entry) => entry.kind === "note_title" || entry.kind === "active_note");
+  const base = (partial: Partial<HelixAskCapabilitySelectionResult>): HelixAskCapabilitySelectionResult => ({
+    capability_id: null,
+    args: {},
+    required_artifacts: requiredArtifacts,
+    expected_observation: {
+      kind: "direct_answer",
+      summary: "Answer directly without workspace mutation.",
+    },
+    confidence: frame.user_goal.confidence,
+    ambiguity: { status: "none", reason: null },
+    source: args.source ?? "goal_frame",
+    ...partial,
+  });
+  if (frame.user_goal.goal_kind === "conversation") {
+    return base({
+      capability_id: null,
+      required_artifacts: [],
+      expected_observation: { kind: "direct_answer", summary: "Direct conversational answer." },
+      confidence: Math.max(frame.user_goal.confidence, 0.78),
+    });
+  }
+  if (frame.user_goal.goal_kind === "summarize_doc" || frame.user_goal.goal_kind === "read_doc") {
+    return base({
+      capability_id: "docs-viewer.summarize_doc",
+      args: activeDocRef?.value && activeDocRef.value !== "active_doc" ? { path: activeDocRef.value } : {},
+      required_artifacts: Array.from(new Set(["doc_summary", ...requiredArtifacts])),
+      expected_observation: {
+        kind: "doc_summary",
+        summary: askTurnGoalFrameRequestsOutput(frame, "note_update") && noteTarget
+          ? `Summarize active document, then update note "${noteTarget.value}".`
+          : "Summarize the active document without workspace mutation.",
+      },
+      confidence: activeDocRef ? 0.86 : 0.68,
+      ambiguity: activeDocRef
+        ? { status: "none", reason: null }
+        : { status: "missing_args", reason: "active_doc_path_missing" },
+    });
+  }
+  if (frame.user_goal.goal_kind === "locate_in_doc") {
+    return base({
+      capability_id: "docs-viewer.locate_in_doc",
+      args: activeDocRef?.value && activeDocRef.value !== "active_doc" ? { path: activeDocRef.value } : {},
+      required_artifacts: Array.from(new Set(["doc_location_matches", ...requiredArtifacts])),
+      expected_observation: { kind: "doc_location_matches", summary: "Locate matching snippets in the active document." },
+      confidence: activeDocRef ? 0.82 : 0.62,
+      ambiguity: activeDocRef
+        ? { status: "none", reason: null }
+        : { status: "missing_args", reason: "active_doc_path_missing" },
+    });
+  }
+  if (frame.user_goal.goal_kind === "compare") {
+    return base({
+      capability_id: "workspace_context.compare",
+      args: {
+        ...(activeDocRef?.value ? { active_doc_path: activeDocRef.value } : {}),
+        ...(noteRef?.value ? { note_title: noteRef.value } : {}),
+      },
+      required_artifacts: Array.from(new Set(["comparison_summary", ...requiredArtifacts])),
+      expected_observation: { kind: "comparison_summary", summary: "Compare typed document and note/workspace artifacts." },
+      confidence: activeDocRef && noteRef ? 0.84 : 0.58,
+      ambiguity: activeDocRef && noteRef
+        ? { status: "none", reason: null }
+        : { status: "missing_args", reason: !activeDocRef ? "active_doc_path_missing" : "note_target_missing" },
+    });
+  }
+  if (frame.user_goal.goal_kind === "open_workspace") {
+    const selectedActionCapability = selectedAction ? `${selectedAction.panel_id}.${selectedAction.action_id}` : null;
+    const selectedActionIsAuthoritativeDocOpen =
+      selectedAction?.panel_id === "docs-viewer" &&
+      ["open_doc_by_path", "open_latest_doc_by_topic", "open_doc", "open_doc_and_read"].includes(selectedAction.action_id);
+    return base({
+      capability_id: selectedActionIsAuthoritativeDocOpen
+        ? selectedActionCapability
+        : docTopicRef
+          ? "docs-viewer.search_docs"
+          : selectedActionCapability ?? "workspace.open",
+      args: selectedActionIsAuthoritativeDocOpen
+        ? (selectedAction?.args ?? {})
+        : docTopicRef
+          ? { query: docTopicRef.value, limit: 5 }
+          : (selectedAction?.args ?? {}),
+      required_artifacts: Array.from(new Set(requiredArtifacts.length ? requiredArtifacts : ["workspace_context"])),
+      expected_observation: { kind: "workspace_action_result", summary: "Open or navigate to the requested workspace target." },
+      confidence: docTopicRef || selectedAction ? 0.74 : 0.52,
+      ambiguity: docTopicRef || selectedAction
+        ? { status: "none", reason: null }
+        : { status: "missing_args", reason: "workspace_target_missing" },
+    });
+  }
+  if (frame.user_goal.goal_kind === "write_note") {
+    return base({
+      capability_id: noteTarget ? "workstation-notes.append_to_note" : null,
+      args: noteTarget ? { title: noteTarget.value } : {},
+      required_artifacts: Array.from(new Set(["note_update_receipt", ...requiredArtifacts])),
+      expected_observation: { kind: "note_update_receipt", summary: "Update the resolved note target." },
+      confidence: noteTarget ? 0.8 : 0.35,
+      ambiguity: noteTarget
+        ? { status: "none", reason: null }
+        : { status: "missing_args", reason: "note_target_missing" },
+    });
+  }
+  if (frame.user_goal.goal_kind === "temporal_followup") {
+    return base({
+      capability_id: "reasoning.resolve_temporal_context",
+      args: activeDocRef?.value ? { source_path: activeDocRef.value } : {},
+      required_artifacts: Array.from(new Set(["temporal_context_comparison", ...requiredArtifacts])),
+      expected_observation: { kind: "temporal_context_comparison", summary: "Resolve temporal target evidence before answering." },
+      confidence: activeDocRef ? 0.76 : 0.52,
+      ambiguity: activeDocRef
+        ? { status: "low_confidence", reason: "target_event_requires_resolution" }
+        : { status: "missing_args", reason: "source_doc_missing" },
+    });
+  }
+  return base({
+    capability_id: selectedAction ? `${selectedAction.panel_id}.${selectedAction.action_id}` : null,
+    args: selectedAction?.args ?? {},
+    required_artifacts: requiredArtifacts,
+    expected_observation: { kind: "unknown", summary: "No confident goal-frame capability selected." },
+    confidence: selectedAction ? 0.5 : 0.3,
+    ambiguity: { status: selectedAction ? "low_confidence" : "missing_args", reason: "goal_kind_unknown" },
+    source: selectedAction ? "compatibility_shim" : (args.source ?? "goal_frame"),
+  });
+};
+
+const capabilityIdFromAskTurnStep = (step: HelixAskTurnPlanStep | null | undefined): string | null => {
+  const action = step?.action;
+  if (action?.panel_id && action?.action_id) return `${action.panel_id}.${action.action_id}`;
+  if (step?.lane === "reasoning") return "reasoning.followup";
+  return null;
+};
+
+const buildAskTurnObservationDecision = (args: {
+  runtime: HelixAskTurnRuntime;
+  goalFrame: HelixAskUniversalGoalFrame;
+  capabilitySelection: HelixAskCapabilitySelectionResult | null;
+  completedStep: HelixAskTurnPlanStep | null;
+  stepResults: ReturnType<typeof buildAskTurnStepResults>;
+  nextPlannedStep?: HelixAskTurnPlanStep | null;
+}): HelixAskObservationDecision => {
+  const missingArtifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+    transcript: args.goalFrame.user_goal.raw,
+    missingArtifacts: Array.from(
+      new Set([
+        ...collectAskTurnMissingRequiredArtifacts(args.runtime),
+        ...collectAskTurnUnsatisfiedResultArtifacts(args.stepResults),
+      ]),
+    ).filter(Boolean),
+    hasDocSearchResults: "doc_search_results" in args.runtime.artifact_store,
+  });
+  const satisfiedArtifacts = Array.from(
+    new Set([
+      ...args.runtime.satisfied_artifacts,
+      ...args.stepResults.flatMap((result) =>
+        Array.isArray(result.actual_artifacts)
+          ? result.actual_artifacts.map((artifact) => String(artifact ?? "").trim()).filter(Boolean)
+          : [],
+      ),
+      ...Object.keys(args.runtime.artifact_store),
+    ]),
+  ).sort();
+  const pendingRequest = args.runtime.pending_request;
+  if (args.completedStep?.id === "request_user_input" || args.completedStep?.lane === "conversation" && args.completedStep?.reason === "missing_required_args") {
+    return {
+      decision: "request_user_input",
+      reason: "request_user_input_step_observed",
+      satisfied_artifacts: satisfiedArtifacts,
+      missing_artifacts: missingArtifacts,
+      unresolved_ambiguity: true,
+      next_capability: null,
+      terminal_allowed: false,
+    };
+  }
+  const ambiguityStatus = args.capabilitySelection?.ambiguity?.status ?? "none";
+  const unresolvedAmbiguity =
+    Boolean(pendingRequest) ||
+    (ambiguityStatus !== "none" && ambiguityStatus !== "low_confidence" && missingArtifacts.length > 0);
+  const nextStep =
+    args.nextPlannedStep ??
+    (args.runtime.last_decision?.kind === "continue" ? args.runtime.last_decision.next_step : null);
+  const nextCapabilityId = capabilityIdFromAskTurnStep(nextStep);
+  const terminalAllowed = missingArtifacts.length === 0 && !pendingRequest && !unresolvedAmbiguity;
+  if (pendingRequest || unresolvedAmbiguity) {
+    return {
+      decision: "request_user_input",
+      reason: pendingRequest ? "pending_request_active" : `unresolved_ambiguity:${ambiguityStatus}`,
+      satisfied_artifacts: satisfiedArtifacts,
+      missing_artifacts: missingArtifacts,
+      unresolved_ambiguity: true,
+      next_capability: null,
+      terminal_allowed: false,
+    };
+  }
+  if (missingArtifacts.length > 0) {
+    return {
+      decision: nextStep ? "continue" : "request_user_input",
+      reason: nextStep ? `missing_artifacts_next_capability:${missingArtifacts.join(",")}` : `missing_artifacts:${missingArtifacts.join(",")}`,
+      satisfied_artifacts: satisfiedArtifacts,
+      missing_artifacts: missingArtifacts,
+      unresolved_ambiguity: false,
+      next_capability: nextStep && nextCapabilityId
+        ? {
+            capability_id: nextCapabilityId,
+            args: nextStep.action?.args ?? {},
+            required_artifacts: Array.isArray(nextStep.required_artifacts) ? nextStep.required_artifacts : [],
+            expected_observation: {
+              kind: Array.isArray(nextStep.required_artifacts) && nextStep.required_artifacts[0]
+                ? nextStep.required_artifacts[0]
+                : "workspace_observation",
+              summary: nextStep.title,
+            },
+          }
+        : null,
+      terminal_allowed: false,
+    };
+  }
+  if (nextStep && nextCapabilityId) {
+    return {
+      decision: "continue",
+      reason: "next_planned_step_available",
+      satisfied_artifacts: satisfiedArtifacts,
+      missing_artifacts: [],
+      unresolved_ambiguity: false,
+      next_capability: {
+        capability_id: nextCapabilityId,
+        args: nextStep.action?.args ?? {},
+        required_artifacts: Array.isArray(nextStep.required_artifacts) ? nextStep.required_artifacts : [],
+        expected_observation: {
+          kind: Array.isArray(nextStep.required_artifacts) && nextStep.required_artifacts[0]
+            ? nextStep.required_artifacts[0]
+            : "workspace_observation",
+          summary: nextStep.title,
+        },
+      },
+      terminal_allowed: false,
+    };
+  }
+  if (args.completedStep?.status === "failed" || args.runtime.failed_subgoals.length > 0) {
+    return {
+      decision: "typed_failure",
+      reason: args.completedStep?.reason ?? "failed_subgoal_observed",
+      satisfied_artifacts: satisfiedArtifacts,
+      missing_artifacts: missingArtifacts,
+      unresolved_ambiguity: false,
+      next_capability: null,
+      terminal_allowed: false,
+    };
+  }
+  return {
+    decision: "finalize",
+    reason: "all_required_artifacts_satisfied",
+    satisfied_artifacts: satisfiedArtifacts,
+    missing_artifacts: [],
+    unresolved_ambiguity: false,
+    next_capability: null,
+    terminal_allowed: terminalAllowed,
+  };
+};
+
+const buildAskTurnDecisionSourceMap = (args: {
+  payload: Record<string, unknown>;
+  finalAnswerSource?: HelixAskTurnFinalAnswerSource | string | null;
+}): HelixAskTurnDecisionSourceMap => {
+  const payload = args.payload;
+  const plannerRecord =
+    payload.planner_contract && typeof payload.planner_contract === "object"
+      ? (payload.planner_contract as Record<string, unknown>)
+      : null;
+  const runtimeSummary =
+    payload.turn_runtime && typeof payload.turn_runtime === "object"
+      ? (payload.turn_runtime as Record<string, unknown>)
+      : null;
+  const planItems = Array.isArray(plannerRecord?.plan_items)
+    ? (plannerRecord.plan_items as Array<Record<string, unknown>>)
+    : Array.isArray(payload.execution_trace)
+      ? (payload.execution_trace as Array<Record<string, unknown>>)
+      : [];
+  const appendedSteps = Array.isArray(runtimeSummary?.appended_steps)
+    ? (runtimeSummary.appended_steps as Array<Record<string, unknown>>)
+    : [];
+  const appendedById = new Map(
+    appendedSteps
+      .map((entry) => [String(entry.step_id ?? "").trim(), entry] as const)
+      .filter(([stepId]) => Boolean(stepId)),
+  );
+  const capabilityTrace = Array.isArray(payload.capability_selection_trace)
+    ? (payload.capability_selection_trace as Array<Record<string, unknown>>)
+    : Array.isArray(runtimeSummary?.capability_selection_trace)
+      ? (runtimeSummary.capability_selection_trace as Array<Record<string, unknown>>)
+      : [];
+  const selectedCapabilityIds = new Set(
+    capabilityTrace
+      .map((entry) => (typeof entry.selected_capability === "string" ? entry.selected_capability.trim() : ""))
+      .filter(Boolean),
+  );
+  const modelAudits = Array.isArray(payload.model_decision_audits)
+    ? (payload.model_decision_audits as Array<Record<string, unknown>>)
+    : Array.isArray(runtimeSummary?.model_decision_audits)
+      ? (runtimeSummary.model_decision_audits as Array<Record<string, unknown>>)
+      : [];
+  const modelStepIds = new Set(
+    modelAudits
+      .map((entry) => (typeof entry.next_step_id === "string" ? entry.next_step_id.trim() : ""))
+      .filter(Boolean),
+  );
+  const modelPlannerUsed = payload.model_decision_llm_used === true || modelAudits.some((entry) => entry.used_llm === true);
+  const finalAnswerSource =
+    args.finalAnswerSource ??
+    (typeof payload.final_answer_source === "string" ? payload.final_answer_source : null);
+  const universalGoalFrame =
+    payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+      ? (payload.universal_goal_frame as HelixAskUniversalGoalFrame)
+      : null;
+  const capabilitySelectionResult =
+    payload.capability_selection_result && typeof payload.capability_selection_result === "object"
+      ? (payload.capability_selection_result as HelixAskCapabilitySelectionResult)
+      : null;
+  const terminalSource = mapAskTurnTerminalDecisionSource(finalAnswerSource);
+  const selectionSource = typeof plannerRecord?.selection_source === "string" ? plannerRecord.selection_source : null;
+  const selectedAction =
+    payload.workspace_action && typeof payload.workspace_action === "object"
+      ? (payload.workspace_action as Record<string, unknown>)
+      : plannerRecord?.selected_action && typeof plannerRecord.selected_action === "object"
+        ? (plannerRecord.selected_action as Record<string, unknown>)
+        : null;
+  const hasSelectedCapabilityTrace = selectedCapabilityIds.size > 0;
+  const selectedActionSource: HelixAskTurnDecisionSource =
+    terminalSource === "legacy_fallback"
+      ? "legacy_fallback"
+      : !selectedAction
+        ? "model_planner"
+        : selectionSource === "llm"
+          ? "model_planner"
+          : hasSelectedCapabilityTrace
+            ? "capability_registry"
+            : "phrase_detector";
+  const dispatchPolicy = typeof plannerRecord?.dispatch_policy === "string"
+    ? plannerRecord.dispatch_policy
+    : typeof payload.dispatch_policy === "string"
+      ? payload.dispatch_policy
+      : null;
+  const dispatchPolicySource: HelixAskTurnDecisionSource =
+    terminalSource === "legacy_fallback"
+      ? "legacy_fallback"
+      : dispatchPolicy === "needs_user_input"
+        ? "artifact_policy"
+        : selectedActionSource === "capability_registry"
+          ? "capability_registry"
+          : selectedAction
+            ? "phrase_detector"
+            : "model_planner";
+  const plannerSource: HelixAskTurnDecisionSource =
+    terminalSource === "legacy_fallback"
+      ? "legacy_fallback"
+      : selectionSource === "llm" || modelPlannerUsed || !selectedAction
+        ? "model_planner"
+        : selectedActionSource;
+  const planStepSources = planItems.map((step) => {
+    const stepId = String(step.id ?? step.step_id ?? "").trim();
+    const action = step.action && typeof step.action === "object" ? (step.action as Record<string, unknown>) : null;
+    const appended = appendedById.get(stepId);
+    const capabilityId =
+      typeof appended?.capability_id === "string"
+        ? appended.capability_id
+        : action
+          ? `${String(action.panel_id ?? "")}.${String(action.action_id ?? "")}`.replace(/^\./, "").replace(/\.$/, "")
+          : null;
+    const capabilityIdText = String(capabilityId ?? "");
+    const actionId = typeof action?.action_id === "string" ? action.action_id : null;
+    const panelId = typeof action?.panel_id === "string" ? action.panel_id : null;
+    const matchesSelectedCapability =
+      selectedCapabilityIds.has(capabilityIdText) ||
+      (panelId === "docs-viewer" &&
+        actionId === "locate_in_doc" &&
+        Array.from(selectedCapabilityIds).some((entry) => entry.startsWith("docs-viewer.locate_in_doc"))) ||
+      (panelId === "workstation-notes" &&
+        actionId === "append_to_note" &&
+        selectedCapabilityIds.has("workstation-notes.append_to_note"));
+    const source = modelStepIds.has(stepId)
+      ? "model_planner"
+      : appended
+        ? mapAskTurnRuntimeStepSource(appended.source, appended.reason)
+        : matchesSelectedCapability
+          ? "capability_registry"
+          : action
+            ? "phrase_detector"
+            : plannerSource;
+    return {
+      step_id: stepId || "unknown_step",
+      title: typeof step.title === "string" ? step.title : stepId || "Untitled step",
+      source,
+      reason:
+        typeof appended?.reason === "string"
+          ? appended.reason
+          : typeof step.reason === "string"
+            ? step.reason
+            : source === "phrase_detector"
+              ? "deterministic_action_selection"
+              : "planner_step",
+      capability_id: capabilityId || null,
+      action_id: actionId,
+      panel_id: panelId,
+    };
+  });
+  const generalControllerDecisions = Array.isArray(payload.general_controller_decisions)
+    ? (payload.general_controller_decisions as Array<Record<string, unknown>>)
+    : [];
+  const continuationSources = [
+    ...generalControllerDecisions.map((entry) => ({
+      step_id: null,
+      source:
+        entry.source === "llm"
+          ? "model_planner" as HelixAskTurnDecisionSource
+          : entry.decision === "request_user_input" || entry.decision === "finalize" || entry.reason === "terminal_artifact_satisfied"
+            ? "artifact_policy" as HelixAskTurnDecisionSource
+            : entry.source === "fallback"
+              ? "legacy_fallback" as HelixAskTurnDecisionSource
+              : "capability_registry" as HelixAskTurnDecisionSource,
+      reason: typeof entry.reason === "string" ? entry.reason : "general_controller_decision",
+      decision: typeof entry.decision === "string" ? entry.decision : "unknown",
+      capability_id: typeof entry.selected_capability === "string" ? entry.selected_capability : null,
+    })),
+    ...modelAudits.map((entry) => ({
+      step_id: typeof entry.step_id === "string" ? entry.step_id : null,
+      source: entry.used_llm === true ? "model_planner" as HelixAskTurnDecisionSource : "artifact_policy" as HelixAskTurnDecisionSource,
+      reason: typeof entry.summary === "string" ? entry.summary : "model_decision_audit",
+      decision: typeof entry.action === "string" ? entry.action : "unknown",
+      capability_id: typeof entry.next_capability === "string" ? entry.next_capability : null,
+    })),
+  ];
+  const sourceValues = [
+    plannerSource,
+    dispatchPolicySource,
+    selectedActionSource,
+    terminalSource,
+    ...planStepSources.map((entry) => entry.source),
+    ...continuationSources.map((entry) => entry.source),
+  ];
+  const fallbackUsed =
+    terminalSource === "legacy_fallback" ||
+    finalAnswerSource === "legacy_fallback" ||
+    finalAnswerSource === "client_fallback" ||
+    payload.final_answer_source === "legacy_fallback" ||
+    payload.final_answer_source === "client_fallback";
+  return {
+    planner_source: plannerSource,
+    dispatch_policy_source: dispatchPolicySource,
+    selected_action_source: selectedActionSource,
+    goal_frame_used: Boolean(universalGoalFrame),
+    goal_frame_goal_kind: universalGoalFrame?.user_goal?.goal_kind ?? null,
+    capability_selector_source: capabilitySelectionResult?.source ?? null,
+    plan_step_sources: planStepSources,
+    continuation_sources: continuationSources,
+    terminal_source: terminalSource,
+    fallback_used: fallbackUsed,
+    phrase_detector_used: sourceValues.includes("phrase_detector"),
+    model_planner_used: sourceValues.includes("model_planner"),
+    capability_registry_used: sourceValues.includes("capability_registry"),
+    artifact_policy_used: sourceValues.includes("artifact_policy"),
   };
 };
 
@@ -26647,7 +29700,11 @@ const evaluateAskTurnRuntimeAfterObservation = (args: {
   for (const artifact of collectAskTurnUnsatisfiedResultArtifacts(args.stepResults ?? [])) {
     requiredArtifacts.add(artifact);
   }
-  const missingArtifacts = Array.from(requiredArtifacts).filter((artifact) => !(artifact in args.runtime.artifact_store));
+  const missingArtifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+    transcript: args.transcript,
+    missingArtifacts: Array.from(requiredArtifacts).filter((artifact) => !(artifact in args.runtime.artifact_store)),
+    hasDocSearchResults: "doc_search_results" in args.runtime.artifact_store,
+  });
   if (missingArtifacts.length > 0) {
     const proposal =
       HELIX_E10_3_RUNTIME_APPEND_STEP_FLAG && canAskTurnRuntimeResolveBlockedArtifacts(missingArtifacts)
@@ -26840,12 +29897,17 @@ const composeAskTurnFinalAnswerFromObservations = (args: {
     if (openedPath) {
       const reason = readAskTurnString(openedAction?.args?.selection_reason);
       return [
-        `Opened document: ${openedPath}`,
-        reason === "newest"
-          ? "Selection: newest matching search result."
-          : reason === "top_ranked"
-            ? "Selection: top-ranked search result."
-            : null,
+        "Opened document:",
+        renderAskTurnDocReferenceBlock({ heading: "Document", path: openedPath }),
+        reason === "latest_verified_topic_candidate"
+          ? "Selection: latest verified topic candidate."
+          : reason === "validated_topic_candidate"
+            ? "Selection: validated topic candidate."
+            : reason === "newest"
+              ? "Selection: newest matching search result."
+              : reason === "top_ranked"
+                ? "Selection: top-ranked search result."
+                : null,
       ].filter(Boolean).join("\n");
     }
     if (docSearchArtifact && docSearchMatches.length === 0) {
@@ -27329,16 +30391,26 @@ const selectAskTurnInitialCapabilityPlan = (args: {
   sessionId?: string | null;
   workspaceSnapshot?: HelixAskTurnWorkspaceSessionSnapshot | null;
   selectedAction?: HelixAskTurnSelectedAction | null;
+  universalGoalFrame?: HelixAskUniversalGoalFrame | null;
 }): HelixAskTurnInitialCapabilityPlan | null => {
   if (!HELIX_E10_13_REGISTRY_INITIAL_PLAN_FLAG) return null;
   const normalized = args.transcript.trim().toLowerCase();
+  const universalGoalFrame =
+    args.universalGoalFrame ??
+    buildAskTurnUniversalGoalFrame({
+      transcript: args.transcript,
+      workspaceSnapshot: args.workspaceSnapshot ?? null,
+      payload: args.selectedAction ? { workspace_action: args.selectedAction } : null,
+    });
+  const frameRequestsNoteUpdate = askTurnGoalFrameRequestsOutput(universalGoalFrame, "note_update");
+  const frameNoteTarget = readAskTurnGoalFrameMutationTarget(universalGoalFrame, "note");
   const wantsNotes = /\b(?:open|go\s+to|switch\s+(?:over\s+)?to|show)\s+(?:up\s+)?(?:my\s+)?(?:notes?|notepad)\b/i.test(normalized);
   const wantsDocs = /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
   const topicDocQuery =
     resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
-    resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
-    (isAskTurnTopicQualifiedLatestDocIntent(args.transcript) ? resolveAskTurnLatestDocTopicArg(args.transcript) : null);
+    resolveAskTurnOpenDocSearchQueryArg(args.transcript);
   const wantsTopicDocAcquisition = Boolean(topicDocQuery);
+  const wantsDocAnswerAfterAcquisition = isAskTurnCompoundDocAnswerIntent(args.transcript);
   const wantsClipboard = /\b(?:read|open|show|check)\s+(?:the\s+)?clipboard\b/i.test(normalized);
   const wantsLocate = isAskTurnDocLocateIntent(args.transcript);
   const wantsLocateToNote = isAskTurnDocLocateToNoteIntent(args.transcript);
@@ -27352,21 +30424,29 @@ const selectAskTurnInitialCapabilityPlan = (args: {
   const wantsArtifactCarryoverToNote = isAskTurnArtifactCarryoverToNoteIntent(args.transcript) || isAskTurnSafeDefaultPreserveToNoteIntent(args.transcript);
   const wantsAppendNote =
     /\b(?:append|add|put|save|write)\b[\s\S]*\b(?:to|into|in)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized) &&
+    frameRequestsNoteUpdate &&
     !isAskTurnArtifactToNoteIntent(args.transcript);
   const wantsListNotes = /\b(?:list|show)\s+(?:my\s+)?notes\b/i.test(normalized);
   const wantsSetActiveNote = /\b(?:switch(?:\s+over)?|open|select|set active|go)\b[\s\S]*\b(?:note|notepad)\b/i.test(normalized) && !wantsCreateNote && !wantsAppendNote && !wantsNotes;
   const wantsDocIdentity = isAskTurnDocIdentityIntent(args.transcript) && !isAskTurnDocIdentityExplainHybridIntent(args.transcript);
   const wantsSummarizeDoc =
+    isAskTurnActiveDocUsefulnessIntent(args.transcript) ||
+    isAskTurnActiveDocNumericExtractionIntent(args.transcript) ||
     /\bsummari[sz]e\b[\s\S]*\b(?:this\s+)?(?:doc|document|paper)\b/i.test(normalized) ||
+    /\bexplain\s+what\s+.+?\s+means?\s+in\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i.test(normalized) ||
     /\bwhat\s+is\s+(?:this|that|the|current)\s+(?:doc|document|paper)\s+about\b/i.test(normalized) ||
     /\bwhat\s+is\s+this\s+about\b/i.test(normalized);
-  const wantsSummarizeToNote = isAskTurnSummarizeAndAddToNoteIntent(args.transcript);
+  const wantsSummarizeToNote =
+    isAskTurnSummarizeAndAddToNoteIntent(args.transcript) &&
+    frameRequestsNoteUpdate &&
+    Boolean(frameNoteTarget);
   const wantsCopyResultClipboard =
     isAskTurnArtifactToClipboardIntent(args.transcript) && /\blatest\s+(?:result|answer|finding|output|response)\b/i.test(normalized);
   const wantsCopyResultNote =
     isAskTurnArtifactToNoteIntent(args.transcript) && /\blatest\s+(?:result|answer|finding|output|response)\b/i.test(normalized);
   const wantsCompositeWorkspaceContextStatus = isAskTurnCompositeWorkspaceContextStatusIntent(args.transcript);
   const wantsWorkspaceChangeSummary = isAskTurnWorkspaceChangeSummaryIntent(args.transcript);
+  const wantsContextualTemporalCompare = isAskTurnContextualTemporalCompareIntent(args.transcript);
   if (
     !wantsNotes &&
     !wantsDocs &&
@@ -27387,7 +30467,8 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     !wantsCopyResultClipboard &&
     !wantsCopyResultNote &&
     !wantsCompositeWorkspaceContextStatus &&
-    !wantsWorkspaceChangeSummary
+    !wantsWorkspaceChangeSummary &&
+    !wantsContextualTemporalCompare
   ) return null;
   const runtime = createAskTurnRuntime({
     turnId: "initial-capability-plan",
@@ -27494,9 +30575,137 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     if (proposal) planItems.push(proposal.step);
     return proposal;
   };
+  if (wantsContextualTemporalCompare) {
+    const activeDocPath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+    const targetQuery = resolveAskTurnTemporalCompareTargetQuery(args.transcript);
+    const targetQueryVariants = activeDocPath ? buildAskTurnTemporalTargetQueryVariants(targetQuery).slice(1, 4) : [];
+    planItems.push(
+      {
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "contextual_followup_bind_source"),
+        lane: "reasoning",
+        status: "planned",
+        title: `Bind the deictic source document for: "${clipConversationText(args.transcript, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "identify_current_doc",
+          args: activeDocPath ? { path: activeDocPath } : {},
+        },
+        required_artifacts: ["source_doc_temporal_anchor"],
+        reason: null,
+      },
+      {
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: [...planItems, {} as HelixAskTurnPlanStep] }, "contextual_followup_resolve_target"),
+        lane: "workspace",
+        status: "planned",
+        title: `Resolve temporal comparison target "${clipConversationText(targetQuery, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "search_docs",
+          args: { query: targetQuery, limit: 5 },
+        },
+        required_artifacts: ["doc_search_results"],
+        reason: null,
+      },
+      ...targetQueryVariants.map((variant, index): HelixAskTurnPlanStep => ({
+        id: buildAskTurnRuntimeRepairStepId(
+          { ...runtime, plan_items: [...planItems, ...Array.from({ length: 2 + index }, () => ({} as HelixAskTurnPlanStep))] },
+          `temporal_target_variant_search_${index + 1}`,
+        ),
+        lane: "workspace",
+        status: "planned",
+        title: `Try temporal target variant "${clipConversationText(variant, 90)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "search_docs",
+          args: { query: variant, limit: 5 },
+        },
+        required_artifacts: ["doc_search_results"],
+        reason: "observation_driven_temporal_target_variant",
+      })),
+      ...(activeDocPath
+        ? [
+            {
+              id: buildAskTurnRuntimeRepairStepId(
+                {
+                  ...runtime,
+                  plan_items: [
+                    ...planItems,
+                    ...Array.from({ length: 2 + targetQueryVariants.length }, () => ({} as HelixAskTurnPlanStep)),
+                  ],
+                },
+                "contextual_followup_validate_temporal_target",
+              ),
+              lane: "reasoning" as const,
+              status: "planned" as const,
+              title: "Validate temporal target candidates across bounded query variants.",
+              action: {
+                panel_id: "reasoning",
+                action_id: "validate_temporal_target_candidate",
+                args: {
+                  target_query: targetQuery,
+                },
+              },
+              required_artifacts: ["temporal_target_resolution_attempts"],
+              reason: "observation_driven_temporal_target_validation",
+            },
+          ]
+        : []),
+      {
+        id: buildAskTurnRuntimeRepairStepId(
+          {
+            ...runtime,
+            plan_items: [
+              ...planItems,
+              ...Array.from({ length: 2 + targetQueryVariants.length + (activeDocPath ? 1 : 0) }, () => ({} as HelixAskTurnPlanStep)),
+            ],
+          },
+          "contextual_followup_compose_temporal_compare",
+        ),
+        lane: "reasoning",
+        status: "planned",
+        title: "Compose temporal comparison from current doc context and resolved target candidates.",
+        action: {
+          panel_id: "reasoning",
+          action_id: "compose_temporal_context_comparison",
+          args: {
+            source_path: activeDocPath,
+            target_query: targetQuery,
+          },
+        },
+        required_artifacts: ["temporal_context_comparison", "turn_final_text"],
+        reason: null,
+      },
+    );
+    capabilitySelectionTrace.push(
+      {
+        missing_artifact: "source_doc_temporal_anchor",
+        candidate_capabilities: ["workspace_context_snapshot.inspect"],
+        selected_capability: "workspace_context_snapshot.inspect",
+        reject_reasons: [],
+      },
+      {
+        missing_artifact: "doc_search_results",
+        candidate_capabilities: ["docs-viewer.search_docs"],
+        selected_capability: "docs-viewer.search_docs",
+        reject_reasons: [],
+      },
+      {
+        missing_artifact: "temporal_context_comparison",
+        candidate_capabilities: ["reasoning.compose_temporal_context_comparison"],
+        selected_capability: "reasoning.compose_temporal_context_comparison",
+        reject_reasons: [],
+      },
+    );
+  }
   if (wantsNotes) pushProposal("note_context");
   if (wantsTopicDocAcquisition && topicDocQuery) {
-    const searchMatches = searchAskTurnDocsForQuery(topicDocQuery, 5);
+    const searchMatches = searchAskTurnDocsForQuery(topicDocQuery, 8);
+    const candidateValidation = validateAskTurnDocCandidates({
+      query: topicDocQuery,
+      transcript: args.transcript,
+      matches: searchMatches,
+      limit: 8,
+    });
     const selectedSearchResult = selectAskTurnDocSearchResultForOpen(searchMatches, args.transcript);
     const searchAction: HelixAskTurnSelectedAction = {
       panel_id: "docs-viewer",
@@ -27518,12 +30727,31 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       selected_capability: "docs-viewer.search_docs",
       reject_reasons: [],
     });
+    planItems.push({
+      id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_validate_doc_candidates"),
+      lane: "workspace",
+      status: "planned",
+      title: `Validate doc candidates for "${clipConversationText(topicDocQuery, 90)}".`,
+      action: {
+        panel_id: "docs-viewer",
+        action_id: "validate_doc_candidates",
+        args: { query: topicDocQuery, limit: 8, transcript: args.transcript },
+      },
+      required_artifacts: ["doc_candidate_validation"],
+      reason: null,
+    });
+    capabilitySelectionTrace.push({
+      missing_artifact: "doc_candidate_validation",
+      candidate_capabilities: ["docs-viewer.validate_doc_candidates"],
+      selected_capability: "docs-viewer.validate_doc_candidates",
+      reject_reasons: [],
+    });
     if (selectedSearchResult?.match.path) {
       planItems.push({
         id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_open_search_result"),
         lane: "workspace",
         status: "planned",
-        title: `Open ${selectedSearchResult.reason === "newest" ? "newest" : "top-ranked"} doc result for "${clipConversationText(topicDocQuery, 90)}".`,
+        title: `Open ${selectedSearchResult.reason === "latest_verified_topic_candidate" ? "latest verified" : "validated"} doc result for "${clipConversationText(topicDocQuery, 90)}".`,
         action: {
           panel_id: "docs-viewer",
           action_id: "open_doc_by_path",
@@ -27531,6 +30759,9 @@ const selectAskTurnInitialCapabilityPlan = (args: {
             path: selectedSearchResult.match.path,
             query: topicDocQuery,
             selection_reason: selectedSearchResult.reason,
+            candidate_validation_status:
+              candidateValidation.candidates.find((candidate) => candidate.path === selectedSearchResult.match.path)?.validationStatus ??
+              null,
           },
         },
         required_artifacts: ["active_doc_path"],
@@ -27542,6 +30773,50 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         selected_capability: "docs-viewer.open_doc_by_path",
         reject_reasons: [],
       });
+      if (wantsDocAnswerAfterAcquisition) {
+        planItems.push(
+          {
+            id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_summarize_opened_search_result"),
+            lane: "workspace",
+            status: "planned",
+            title: `Extract answer from opened doc for "${clipConversationText(args.transcript, 90)}".`,
+            action: {
+              panel_id: "docs-viewer",
+              action_id: "summarize_doc",
+              args: {
+                path: selectedSearchResult.match.path,
+                query: topicDocQuery,
+                requested_output: "answer_from_opened_doc",
+              },
+            },
+            required_artifacts: ["doc_summary"],
+            reason: "compound_doc_acquisition_answer",
+          },
+          {
+            id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "reasoning_followup_opened_doc_answer"),
+            lane: "reasoning",
+            status: "planned",
+            title: `Compose answer from opened document artifacts for "${clipConversationText(args.transcript, 90)}".`,
+            action: null,
+            required_artifacts: ["doc_summary", "turn_final_text"],
+            reason: "compound_doc_acquisition_answer",
+          },
+        );
+        capabilitySelectionTrace.push(
+          {
+            missing_artifact: "doc_summary",
+            candidate_capabilities: ["docs-viewer.summarize_doc"],
+            selected_capability: "docs-viewer.summarize_doc",
+            reject_reasons: [],
+          },
+          {
+            missing_artifact: "turn_final_text",
+            candidate_capabilities: ["reasoning.followup"],
+            selected_capability: "reasoning.followup",
+            reject_reasons: [],
+          },
+        );
+      }
     }
   } else if (wantsDocs) {
     pushProposal("doc_context");
@@ -27868,6 +31143,32 @@ const selectAskTurnInitialCapabilityPlan = (args: {
   if (wantsSetActiveNote) pushCapability("workstation-notes.set_active_note");
   if (wantsDocIdentity) pushCapability("docs-viewer.identify_current_doc");
   if (wantsSummarizeDoc) {
+    const activeDocConceptQuery = resolveAskTurnDocLocateQuery(args.transcript);
+    if (activeDocConceptQuery && /\b(?:explain|means?)\b/i.test(args.transcript)) {
+      const activePath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
+      planItems.push({
+        id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_locate_concept"),
+        lane: "workspace",
+        status: "planned",
+        title: `Locate active-document concept "${clipConversationText(activeDocConceptQuery, 80)}".`,
+        action: {
+          panel_id: "docs-viewer",
+          action_id: "locate_in_doc",
+          args: {
+            query: activeDocConceptQuery,
+            ...(activePath ? { path: activePath } : {}),
+          },
+        },
+        required_artifacts: ["doc_location_matches"],
+        reason: "active_doc_concept_anchor",
+      });
+      capabilitySelectionTrace.push({
+        missing_artifact: "doc_location_matches",
+        candidate_capabilities: ["docs-viewer.locate_in_doc"],
+        selected_capability: "docs-viewer.locate_in_doc",
+        reject_reasons: [],
+      });
+    }
     pushCapability("docs-viewer.summarize_doc");
     planItems.push({
       id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "reasoning_followup"),
@@ -27885,6 +31186,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     });
     if (wantsSummarizeToNote) {
       const title =
+        frameNoteTarget?.value ??
         resolveAskTurnSummaryNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot) ??
         (typeof args.workspaceSnapshot?.activeNoteTitle === "string" ? args.workspaceSnapshot.activeNoteTitle : null);
       if (!title) {
@@ -28030,6 +31332,11 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     selected_action: firstWorkspaceAction,
     dispatch_policy: planItems.some((step) => step.lane === "reasoning") ? "workspace_context_reasoning" : "workspace_only",
     capability_selection_trace: capabilitySelectionTrace,
+    capability_selection_result: buildAskTurnCapabilitySelectionResult({
+      frame: universalGoalFrame,
+      selectedAction: firstWorkspaceAction,
+      source: "goal_frame",
+    }),
     missing_args: Array.from(missingArgs).filter(Boolean),
   };
 };
@@ -28916,6 +32223,16 @@ const executeAskTurnIncrementalRuntimeLoop = (args: {
   const generalControllerDecisions: HelixAskGeneralControllerAudit[] = [];
   const queuedSteps = args.plannedSteps.map((step) => ({ ...step }));
   const availableArtifacts = new Set<string>(Object.keys(runtime.artifact_store));
+  const goalFrame = buildAskTurnUniversalGoalFrame({
+    transcript: args.transcript,
+    workspaceSnapshot: args.workspaceSnapshot ?? null,
+    payload: args.selectedAction ? { workspace_action: args.selectedAction } : null,
+  });
+  const capabilitySelection = buildAskTurnCapabilitySelectionResult({
+    frame: goalFrame,
+    selectedAction: args.selectedAction ?? null,
+    source: "goal_frame",
+  });
   let iterations = 0;
   emitTurnEvent({
     type: "model_decision_started",
@@ -29019,6 +32336,30 @@ const executeAskTurnIncrementalRuntimeLoop = (args: {
     if (runtime.capability_selection_trace.length > capabilitySelectionTrace.length) {
       capabilitySelectionTrace = [...runtime.capability_selection_trace];
     }
+    const observationDecision = buildAskTurnObservationDecision({
+      runtime,
+      goalFrame,
+      capabilitySelection,
+      completedStep: executedStep,
+      stepResults,
+      nextPlannedStep:
+        queuedSteps[0] ??
+        (runtime.last_decision?.kind === "continue" ? runtime.last_decision.next_step : null),
+    });
+    runtime = {
+      ...runtime,
+      observe_then_decide_trace: [
+        ...runtime.observe_then_decide_trace,
+        {
+          after_step_id: plannedStep.id,
+          decision: observationDecision.decision,
+          reason: observationDecision.reason,
+          missing_artifacts: observationDecision.missing_artifacts,
+          next_capability_id: observationDecision.next_capability?.capability_id ?? null,
+          terminal_allowed: observationDecision.terminal_allowed,
+        },
+      ],
+    };
     emitTurnEvent({
       type: "item_completed",
       at_ms: Date.now(),
@@ -29074,7 +32415,11 @@ const executeAskTurnIncrementalRuntimeLoop = (args: {
     if (executedStep.status === "failed" && !hasQueuedRecoveryStep) break;
   }
   if (queuedSteps.length === 0 && runtime.last_decision?.kind === "continue") {
-    const missingRequiredArtifacts = collectAskTurnMissingRequiredArtifacts(runtime);
+    const missingRequiredArtifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+      transcript: args.transcript,
+      missingArtifacts: collectAskTurnMissingRequiredArtifacts(runtime),
+      hasDocSearchResults: "doc_search_results" in runtime.artifact_store,
+    });
     const decision: HelixAskTurnRuntimeDecision = {
       kind: missingRequiredArtifacts.length > 0 ? "final_failure" : "final_answer",
       text:
@@ -29314,6 +32659,20 @@ const resolveAskTurnModelDecisionCapabilityStep = (args: {
     args.audit.operational_step_appended = false;
     return null;
   }
+  if (
+    capabilityId === "workstation-notes.create_note" &&
+    isAskTurnExistingNoteMutationIntent(args.transcript) &&
+    !isAskTurnCreateNoteIntent(args.transcript) &&
+    hasAskTurnExistingNoteMutationObjectiveSatisfied({
+      transcript: args.transcript,
+      stepResults: [],
+      runtime: args.runtime,
+    })
+  ) {
+    args.audit.error_code = "objective_already_satisfied_blocked_create_note";
+    args.audit.operational_step_appended = false;
+    return null;
+  }
   const actionCandidate =
     HELIX_ASK_TURN_CAPABILITY_ACTIONS.find((candidate) => `${candidate.panel_id}.${candidate.action_id}` === capabilityId) ?? null;
   const runtimeCapability =
@@ -29426,10 +32785,21 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
   await Promise.resolve();
   const result = executeAskTurnIncrementalRuntimeLoop(args);
   const modelDecisionAudits: HelixAskTurnModelDecisionAudit[] = [];
-  const terminalArtifactSatisfied = hasAskTurnTerminalArtifactSatisfied({
-    stepResults: result.stepResults,
-    runtime: result.runtime,
-  });
+  const terminalArtifactSatisfied =
+    hasAskTurnTerminalArtifactSatisfied({
+      stepResults: result.stepResults,
+      runtime: result.runtime,
+    }) ||
+    hasAskTurnExistingNoteMutationObjectiveSatisfied({
+      transcript: args.transcript,
+      stepResults: result.stepResults,
+      runtime: result.runtime,
+    }) ||
+    hasAskTurnOpenDocObjectiveSatisfied({
+      transcript: args.transcript,
+      stepResults: result.stepResults,
+      runtime: result.runtime,
+    });
   if (shouldUseAskTurnModelDecisionLlm({
     transcript: args.transcript,
     terminalKind: args.terminalKind,
@@ -29716,6 +33086,11 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
     hasDocSearchResults: finalAvailableArtifacts.has("doc_search_results"),
   });
   if (missingRequiredArtifacts.length > 0 && result.runtime.terminal.kind !== "pending_input") {
+    const temporalContextComparisonArtifact =
+      result.runtime.artifact_store?.temporal_context_comparison &&
+      typeof result.runtime.artifact_store.temporal_context_comparison === "object"
+        ? (result.runtime.artifact_store.temporal_context_comparison as Record<string, unknown>)
+        : null;
     const docLocateVariantExhausted =
       missingRequiredArtifacts.includes("doc_location_matches") &&
       result.runtime.plan_items.some(
@@ -29724,7 +33099,15 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
           step.action.action_id === "locate_in_doc" &&
           step.action.args?.locate_strategy === "variant",
       );
-    const decision: HelixAskTurnRuntimeDecision = docLocateVariantExhausted
+    const decision: HelixAskTurnRuntimeDecision =
+      isAskTurnContextualTemporalCompareIntent(args.transcript) && temporalContextComparisonArtifact
+      ? {
+          kind: "final_failure",
+          text: renderAskTurnTemporalContextComparisonFinal(temporalContextComparisonArtifact),
+          error_code: readAskTurnString(temporalContextComparisonArtifact.failure_reason) ?? "temporal_context_comparison_failed",
+          reason: readAskTurnString(temporalContextComparisonArtifact.failure_reason) ?? "temporal_context_comparison_failed",
+        }
+      : docLocateVariantExhausted
       ? {
           kind: "final_answer",
           text: renderAskTurnDocLocationAnswer({
@@ -30117,7 +33500,8 @@ const buildAskTurnHybridReasoningFinalText = (args: {
     );
   }
   if (isAskTurnDocIdentityIntent(args.transcript)) {
-    return `You are currently on: ${context.docLabel}`;
+    const docBlock = renderAskTurnDocReferenceBlock({ heading: "Document", path: context.docLabel });
+    return docBlock ? ["You are currently on:", docBlock].join("\n") : `You are currently on: ${context.docLabel}`;
   }
   return `Completed reasoning for "${clipped}" using current workspace context.${evidenceSummary}`;
 };
@@ -30274,8 +33658,12 @@ const inferAskTurnDocFileType = (pathLike: string | null | undefined): string =>
   return ext ? `.${ext} file` : "unknown file type";
 };
 
-const buildAskTurnDocIdentityWithTypeText = (docLabel: string): string =>
-  `You are viewing: ${docLabel}. File type: ${inferAskTurnDocFileType(docLabel)}.`;
+const buildAskTurnDocIdentityWithTypeText = (docLabel: string): string => {
+  const docBlock = renderAskTurnDocReferenceBlock({ heading: "Document", path: docLabel });
+  return docBlock
+    ? ["You are viewing:", docBlock, `File type: ${inferAskTurnDocFileType(docLabel)}.`].join("\n")
+    : `You are viewing: ${docLabel}. File type: ${inferAskTurnDocFileType(docLabel)}.`;
+};
 
 const readAskTurnDocMarkdownPreview = (pathLike: string | null | undefined): string | null => {
   const normalized = normalizeAskTurnDocRoute(String(pathLike ?? "").trim()).replace(/^\/+/, "");
@@ -30474,7 +33862,8 @@ const repairReasoningFinalByIntent = (args: {
       ? `Grounded refs: ${(args.evidenceRefs ?? []).slice(0, 3).join(", ")}.`
       : "";
   if (args.intent === "doc_identity") {
-    return `You are currently on: ${context.docLabel}`;
+    const docBlock = renderAskTurnDocReferenceBlock({ heading: "Document", path: context.docLabel });
+    return docBlock ? ["You are currently on:", docBlock].join("\n") : `You are currently on: ${context.docLabel}`;
   }
   if (args.intent === "doc_identity_plus_type") {
     return buildAskTurnDocIdentityWithTypeText(context.docLabel);
@@ -31176,7 +34565,9 @@ const repairAskTurnFinalAnswerContract = (args: {
     const activeDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSnapshot?.activeDocPath);
     const summary = [
       activeNoteTitle ? `Active note: ${activeNoteTitle}` : "Active note: unavailable in the current workspace context.",
-      activeDocPath ? `Active doc: ${activeDocPath}` : "Active doc: unavailable in the current workspace context.",
+      activeDocPath
+        ? ["Active doc:", renderAskTurnDocReferenceBlock({ heading: "Document", path: activeDocPath })].filter(Boolean).join("\n")
+        : "Active doc: unavailable in the current workspace context.",
     ].join("\n");
     if (validateAskTurnFinalAnswerContract({ family: args.family, text: summary }).pass) return summary;
   }
@@ -31381,7 +34772,7 @@ const buildAskTurnAssistantAnswerFromState = (args: {
         : "No active document is available in the current workspace context. File type: unknown file type.";
     }
     return path
-      ? `You are viewing: ${path}`
+      ? ["You are viewing:", renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
       : "No active document is available in the current workspace context.";
   }
   if (action?.panel_id === "docs-viewer" || action?.action_id === "locate_in_doc") {
@@ -31409,13 +34800,19 @@ const buildAskTurnAssistantAnswerFromState = (args: {
     }
     if (action.action_id === "open_latest_doc_by_topic") {
       const topic = readAskTurnActionArgString(action, ["topic", "query"]) ?? "document";
-      return path ? `Opened latest ${topic} document: ${path}` : `Opened latest ${topic} document.`;
+      return path
+        ? [`Opened latest ${topic} document:`, renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
+        : `Opened latest ${topic} document.`;
     }
     if (action.action_id === "open_doc" || action.action_id === "open_doc_by_path") {
-      return path ? `Opened document: ${path}` : "Opened the requested document.";
+      return path
+        ? ["Opened document:", renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
+        : "Opened the requested document.";
     }
     if (action.action_id === "identify_current_doc") {
-      return path ? `You are viewing: ${path}` : "No active document is available in the current workspace context.";
+      return path
+        ? ["You are viewing:", renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
+        : "No active document is available in the current workspace context.";
     }
     if (action.action_id === "locate_in_doc" && !/^locations:/i.test(args.currentText.trim())) {
       const query = readAskTurnActionArgString(action, ["query", "topic", "find"]) ?? "the requested topic";
@@ -31423,7 +34820,8 @@ const buildAskTurnAssistantAnswerFromState = (args: {
       if (embeddedLocations) {
         return embeddedLocations;
       }
-      return [`Locations:`, `- Searched ${path ?? "the active document"} for "${query}".`, args.currentText].join("\n");
+      const searched = path ? renderAskTurnDocReferenceBlock({ heading: "Searched document", path }) : null;
+      return [`Locations:`, `- Searched the active document for "${query}".`, searched, args.currentText].filter(Boolean).join("\n");
     }
   }
   if (action?.panel_id === "workstation-notes" && action.action_id === "append_to_note") {
@@ -31511,13 +34909,17 @@ const resolveAskTurnObservationGroundedFinal = (args: {
     if (action.action_id === "open_latest_doc_by_topic") {
       const topic = typeof action.args?.topic === "string" && action.args.topic.trim() ? action.args.topic.trim() : "document";
       return {
-        text: path ? `Opened latest ${topic} document: ${path}` : `Could not resolve the latest ${topic} document.`,
+        text: path
+          ? [`Opened latest ${topic} document:`, renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
+          : `Could not resolve the latest ${topic} document.`,
         finalStatus: path ? "final_answer" : "final_failure",
         errorCode: path ? undefined : "latest_doc_not_resolved",
       };
     }
     return {
-      text: path ? `Opened document: ${path}` : "No active document in Docs Viewer.",
+      text: path
+        ? ["Opened document:", renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
+        : "No active document in Docs Viewer.",
       finalStatus: path ? "final_answer" : "final_failure",
       errorCode: path ? undefined : "no_active_doc",
     };
@@ -31549,7 +34951,9 @@ const resolveAskTurnObservationGroundedFinal = (args: {
       return {
         text: [
           `Updated ${title} with the ${query} location.`,
-          path && lineLabel ? `Location: ${path}:${lineLabel}` : null,
+          path && lineLabel
+            ? `\nLocation:\n- ${renderAskTurnDocDisplayLabel(path)}, ${lineLabel}\n  Path: ${path}:${lineLabel}`
+            : null,
         ].filter(Boolean).join("\n"),
         finalStatus: "final_answer",
       };
@@ -80000,6 +83404,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     if (executionBundle.runtime) {
       asyncRuntimeSummary = summarizeAskTurnRuntime(executionBundle.runtime);
+      asyncRuntimeSummary.missing_required_artifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+        transcript: transcriptSeed,
+        missingArtifacts: asyncRuntimeSummary.missing_required_artifacts,
+        hasDocSearchResults:
+          asyncRuntimeSummary.satisfied_artifacts.includes("doc_search_results") ||
+          "doc_search_results" in executionBundle.runtime.artifact_store,
+      });
     }
   };
   const attachAskTurnAsyncMetadataToPayload = (payload: Record<string, unknown>): void => {
@@ -80069,6 +83480,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     if (payload.general_controller_decision_count === undefined) {
       payload.general_controller_decision_count = generalControllerDecisions.length;
     }
+    const observeThenDecideTrace = asyncRuntimeSummary?.observe_then_decide_trace ?? [];
+    if (payload.observe_then_decide_trace === undefined) {
+      payload.observe_then_decide_trace = observeThenDecideTrace;
+    }
+    if (payload.observe_then_decide_count === undefined) {
+      payload.observe_then_decide_count = observeThenDecideTrace.length;
+    }
     const pendingControllerDecision = generalControllerDecisions.find((entry) => entry.decision === "request_user_input");
     if (hasPendingControllerRequest && pendingControllerDecision) {
       payload.general_controller_final_decision = pendingControllerDecision.decision;
@@ -80101,6 +83519,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           hasPendingControllerRequest && pendingControllerDecision
             ? pendingControllerDecision.reason
             : pendingControllerDecision?.reason ?? generalControllerDecisions[generalControllerDecisions.length - 1]?.reason ?? null,
+        observe_then_decide_trace: observeThenDecideTrace,
       };
     }
   };
@@ -80303,6 +83722,64 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     payload.input_max_chars = inputMaxChars;
     payload.input_chunk_count = inputChunkCount;
     payload.input_chunk_strategy = inputChunkStrategy;
+    const attachUniversalGoalFrame = (): void => {
+      const workspaceSnapshot =
+        payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
+          ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
+          : workspaceSessionSnapshot;
+      const frame =
+        payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+          ? (payload.universal_goal_frame as HelixAskUniversalGoalFrame)
+          : buildAskTurnUniversalGoalFrame({
+              transcript: options?.questionSeed ?? transcriptSeed,
+              payload,
+              workspaceSnapshot,
+            });
+      payload.universal_goal_frame = frame;
+      if (frame.compound_argument_partition) {
+        payload.compound_argument_partition = frame.compound_argument_partition;
+      }
+      const toolChoiceArbitration =
+        payload.tool_choice_arbitration && typeof payload.tool_choice_arbitration === "object"
+          ? (payload.tool_choice_arbitration as HelixAskToolChoiceArbitration)
+          : buildAskTurnToolChoiceArbitration({
+              frame,
+              transcript: options?.questionSeed ?? transcriptSeed,
+            });
+      payload.tool_choice_arbitration = toolChoiceArbitration;
+      if (!payload.capability_selection_result || typeof payload.capability_selection_result !== "object") {
+        const plannerRecord =
+          payload.planner_contract && typeof payload.planner_contract === "object"
+            ? (payload.planner_contract as Record<string, unknown>)
+            : null;
+        const selectedAction =
+          payload.workspace_action && typeof payload.workspace_action === "object"
+            ? (payload.workspace_action as HelixAskTurnSelectedAction)
+            : plannerRecord?.selected_action && typeof plannerRecord.selected_action === "object"
+              ? (plannerRecord.selected_action as HelixAskTurnSelectedAction)
+              : null;
+        payload.capability_selection_result = buildAskTurnCapabilitySelectionResult({
+          frame,
+          payload,
+          selectedAction,
+          source: "goal_frame",
+        });
+      }
+      if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
+        (payload.turn_runtime as Record<string, unknown>).universal_goal_frame = frame;
+        (payload.turn_runtime as Record<string, unknown>).capability_selection_result = payload.capability_selection_result;
+        (payload.turn_runtime as Record<string, unknown>).tool_choice_arbitration = toolChoiceArbitration;
+      }
+      if ((incoming as { debug?: unknown }).debug === true || (payload.debug && typeof payload.debug === "object")) {
+        payload.debug = {
+          ...(payload.debug && typeof payload.debug === "object" ? (payload.debug as Record<string, unknown>) : {}),
+          universal_goal_frame: frame,
+          ...(frame.compound_argument_partition ? { compound_argument_partition: frame.compound_argument_partition } : {}),
+          capability_selection_result: payload.capability_selection_result,
+          tool_choice_arbitration: toolChoiceArbitration,
+        };
+      }
+    };
     const attachRuntimeSummary = (terminalText: string | null, failed?: boolean): void => {
       if (!HELIX_E10_1_TURN_RUNTIME_FLAG || payload.turn_runtime !== undefined) return;
       const plannerRecord =
@@ -80393,7 +83870,28 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.turn_runtime = summarizeAskTurnRuntime(runtime);
       if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
         const runtimeRecord = payload.turn_runtime as Record<string, unknown>;
+        const hasRuntimeDocSearchResults =
+          Array.isArray(runtimeRecord.satisfied_artifacts) &&
+          (runtimeRecord.satisfied_artifacts as unknown[]).some((artifact) => String(artifact ?? "") === "doc_search_results");
+        if (Array.isArray(runtimeRecord.missing_required_artifacts)) {
+          runtimeRecord.missing_required_artifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
+            transcript: options?.questionSeed ?? transcriptSeed,
+            missingArtifacts: (runtimeRecord.missing_required_artifacts as unknown[])
+              .map((artifact) => String(artifact ?? "").trim())
+              .filter(Boolean),
+            hasDocSearchResults: hasRuntimeDocSearchResults || "doc_search_results" in runtime.artifact_store,
+          });
+        }
         runtimeRecord.async_executor_used = payload.async_executor_used === true;
+        if (payload.universal_goal_frame && typeof payload.universal_goal_frame === "object") {
+          runtimeRecord.universal_goal_frame = payload.universal_goal_frame;
+        }
+        if (payload.capability_selection_result && typeof payload.capability_selection_result === "object") {
+          runtimeRecord.capability_selection_result = payload.capability_selection_result;
+        }
+        payload.observe_then_decide_trace = Array.isArray(runtimeRecord.observe_then_decide_trace)
+          ? runtimeRecord.observe_then_decide_trace
+          : [];
         runtimeRecord.async_step_count =
           typeof payload.async_step_count === "number" && Number.isFinite(payload.async_step_count)
             ? payload.async_step_count
@@ -80490,7 +83988,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         }
       }
     };
-    const attachTurnTruthTable = (terminalText: string | null, terminalSource: "backend" | "runtime" | "fallback"): void => {
+    const attachTurnTruthTable = (
+      terminalText: string | null,
+      terminalSource: "backend" | "runtime" | "fallback",
+      finalAnswerSource?: HelixAskTurnFinalAnswerSource,
+    ): void => {
       const plannerRecord =
         payload.planner_contract && typeof payload.planner_contract === "object"
           ? (payload.planner_contract as Record<string, unknown>)
@@ -80607,6 +84109,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
                 : null,
           text: resolvedTerminalText,
           source: resolvedTerminalSource,
+          final_answer_source:
+            finalAnswerSource ??
+            (typeof payload.final_answer_source === "string"
+              ? (payload.final_answer_source as HelixAskTurnFinalAnswerSource)
+              : resolvedTerminalSource === "fallback"
+                ? "legacy_fallback"
+                : "planner_terminal"),
           contract: {
             family:
               typeof payload.final_answer_contract_family === "string"
@@ -80625,6 +84134,18 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           },
         },
         invariant_violations: Array.isArray(payload.invariant_violations) ? payload.invariant_violations : [],
+        universal_goal_frame:
+          payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+            ? payload.universal_goal_frame
+            : null,
+        capability_selection_result:
+          payload.capability_selection_result && typeof payload.capability_selection_result === "object"
+            ? payload.capability_selection_result
+            : null,
+        turn_decision_source_map:
+          payload.turn_decision_source_map && typeof payload.turn_decision_source_map === "object"
+            ? payload.turn_decision_source_map
+            : null,
         event_audit: {
           backend_event_count: Array.isArray(payload.turn_events) ? payload.turn_events.length : 0,
           visible_event_count: Array.isArray(payload.turn_transcript_events) ? payload.turn_transcript_events.length : 0,
@@ -80641,10 +84162,32 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         },
       };
       payload.turn_truth_table = truthTable;
+      payload.selected_final_answer = resolvedTerminalText;
+      if (finalAnswerSource || typeof payload.final_answer_source !== "string") {
+        payload.final_answer_source =
+          finalAnswerSource ??
+          (resolvedTerminalSource === "fallback" ? "legacy_fallback" : "planner_terminal");
+      }
+      payload.terminal_authority = resolvedTerminalSource === "fallback" ? "server" : resolvedTerminalSource;
       if ((incoming as { debug?: unknown }).debug === true || (payload.debug && typeof payload.debug === "object")) {
         payload.debug = {
           ...(payload.debug && typeof payload.debug === "object" ? (payload.debug as Record<string, unknown>) : {}),
           turn_truth_table: truthTable,
+          turn_decision_source_map:
+            payload.turn_decision_source_map && typeof payload.turn_decision_source_map === "object"
+              ? payload.turn_decision_source_map
+              : null,
+          selected_final_answer: resolvedTerminalText,
+          final_answer_source: payload.final_answer_source,
+          terminal_authority: payload.terminal_authority,
+          universal_goal_frame:
+            payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+              ? payload.universal_goal_frame
+              : null,
+          capability_selection_result:
+            payload.capability_selection_result && typeof payload.capability_selection_result === "object"
+              ? payload.capability_selection_result
+              : null,
         };
       }
     };
@@ -80714,6 +84257,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           payload.latest_result_artifact && typeof payload.latest_result_artifact === "object"
             ? payload.latest_result_artifact
             : null,
+        selected_final_answer:
+          typeof payload.selected_final_answer === "string" ? payload.selected_final_answer : null,
+        final_answer_source:
+          typeof payload.final_answer_source === "string" ? payload.final_answer_source : null,
+        terminal_authority:
+          typeof payload.terminal_authority === "string" ? payload.terminal_authority : null,
+        fallback_applied: payload.fallback_applied === true,
+        fallback_blocked: payload.fallback_blocked === true,
+        fallback_block_reason:
+          typeof payload.fallback_block_reason === "string" ? payload.fallback_block_reason : null,
         final_answer_contract: {
           family:
             typeof payload.final_answer_contract_family === "string" ? payload.final_answer_contract_family : null,
@@ -80738,11 +84291,24 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         final_answer_contract_repair_applied: payload.final_answer_contract_repair_applied === true,
         turn_truth_table:
           payload.turn_truth_table && typeof payload.turn_truth_table === "object" ? payload.turn_truth_table : null,
+        universal_goal_frame:
+          payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+            ? payload.universal_goal_frame
+            : null,
+        capability_selection_result:
+          payload.capability_selection_result && typeof payload.capability_selection_result === "object"
+            ? payload.capability_selection_result
+            : null,
+        turn_decision_source_map:
+          payload.turn_decision_source_map && typeof payload.turn_decision_source_map === "object"
+            ? payload.turn_decision_source_map
+            : null,
         turn_transcript_events: Array.isArray(payload.turn_transcript_events) ? payload.turn_transcript_events : [],
         turn_transcript_source:
           typeof payload.turn_transcript_source === "string" ? payload.turn_transcript_source : null,
       };
     };
+    attachUniversalGoalFrame();
     if (status >= 400) {
       payload.final_status = "final_failure";
       payload.terminal_error_code = String(payload.terminal_error_code ?? payload.error ?? `http_${status}`);
@@ -80770,8 +84336,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.terminal_contract_version = "v1";
       attachAskTurnAsyncMetadataToPayload(payload);
       attachRuntimeSummary(failureTerminalText, true);
+      payload.turn_decision_source_map = buildAskTurnDecisionSourceMap({
+        payload,
+        finalAnswerSource: "typed_failure",
+      });
+      if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
+        (payload.turn_runtime as Record<string, unknown>).turn_decision_source_map = payload.turn_decision_source_map;
+      }
       attachAskTurnEventsToPayload(payload, failureTerminalText, "final_failure");
-      attachTurnTruthTable(failureTerminalText, "backend");
+      payload.final_answer_source = "typed_failure";
+      attachTurnTruthTable(failureTerminalText, "backend", "typed_failure");
       attachAgentLoopAudit();
       normalizeAskTurnTopLevelEnvelope(payload, status);
       return res.status(status).json(payload);
@@ -80781,6 +84355,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.answer = "";
     }
     const candidateText = extractHelixAskResponseTextForHistory(payload);
+    const terminalFallbackSeedMissing =
+      !candidateText || HELIX_ASK_INVALID_TERMINAL_TEXT_RE.test(candidateText);
     let finalText = ensureAskTurnTerminalText(candidateText, options?.questionSeed ?? transcriptSeed);
     const questionSeed = (options?.questionSeed ?? transcriptSeed).trim();
     if (payload.final_status === "final_failure" || payload.response_type === "final_failure") {
@@ -80826,8 +84402,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.terminal_contract_version = "v1";
       attachAskTurnAsyncMetadataToPayload(payload);
       attachRuntimeSummary(failureTerminalText, true);
+      payload.turn_decision_source_map = buildAskTurnDecisionSourceMap({
+        payload,
+        finalAnswerSource: "typed_failure",
+      });
+      if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
+        (payload.turn_runtime as Record<string, unknown>).turn_decision_source_map = payload.turn_decision_source_map;
+      }
       attachAskTurnEventsToPayload(payload, failureTerminalText, "final_failure");
-      attachTurnTruthTable(failureTerminalText, "backend");
+      payload.final_answer_source = "typed_failure";
+      attachTurnTruthTable(failureTerminalText, "backend", "typed_failure");
       attachAgentLoopAudit();
       normalizeAskTurnTopLevelEnvelope(payload, status);
       return res.status(status).json(payload);
@@ -80839,7 +84423,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           : null;
       const activeDocPath = typeof snapshot?.activeDocPath === "string" ? snapshot.activeDocPath.trim() : "";
       finalText = activeDocPath
-        ? `You are currently on: ${activeDocPath}`
+        ? ["You are currently on:", renderAskTurnDocReferenceBlock({ heading: "Document", path: activeDocPath })]
+            .filter(Boolean)
+            .join("\n")
         : "No active doc in workspace context. Open a doc first or provide a doc path.";
     }
     finalText = buildAskTurnAssistantAnswerFromState({
@@ -80964,6 +84550,43 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.open_doc_goal_satisfied = Boolean(selectedPath);
       payload.open_doc_selected_path = selectedPath;
       payload.open_doc_selection_reason = readAskTurnString(openDocAction?.args?.selection_reason);
+      if (sessionId && selectedPath) {
+        helixAskTurnLastOpenedDocPathBySession.set(sessionId, selectedPath);
+      }
+      const docCandidateValidationArtifactFromStep = Array.isArray(payload.step_results)
+        ? (payload.step_results as Array<Record<string, unknown>>)
+            .map((step) =>
+              step?.result_artifact && typeof step.result_artifact === "object"
+                ? (step.result_artifact as Record<string, unknown>)
+                : null,
+            )
+            .find((artifact) => artifact?.kind === "doc_candidate_validation")
+        : null;
+      if (docCandidateValidationArtifactFromStep) {
+        const candidates = Array.isArray(docCandidateValidationArtifactFromStep.candidates)
+          ? docCandidateValidationArtifactFromStep.candidates
+          : [];
+        payload.doc_candidate_validation = docCandidateValidationArtifactFromStep;
+        payload.doc_candidate_validation_query = readAskTurnString(docCandidateValidationArtifactFromStep.query);
+        payload.doc_candidate_validation_normalized_query = readAskTurnString(docCandidateValidationArtifactFromStep.normalized_query);
+        payload.doc_candidate_validation_required_terms = Array.isArray(docCandidateValidationArtifactFromStep.requiredTerms)
+          ? docCandidateValidationArtifactFromStep.requiredTerms
+          : [];
+        payload.doc_candidate_validation_hard_required_terms = Array.isArray(docCandidateValidationArtifactFromStep.hard_required_terms)
+          ? docCandidateValidationArtifactFromStep.hard_required_terms
+          : [];
+        payload.doc_candidate_validation_semantic_terms = Array.isArray(docCandidateValidationArtifactFromStep.semantic_terms)
+          ? docCandidateValidationArtifactFromStep.semantic_terms
+          : [];
+        payload.doc_candidate_validation_ignored_terms = Array.isArray(docCandidateValidationArtifactFromStep.ignored_terms)
+          ? docCandidateValidationArtifactFromStep.ignored_terms
+          : [];
+        payload.doc_candidate_validation_count = candidates.length;
+        payload.doc_candidate_validation_selected_path = readAskTurnString(docCandidateValidationArtifactFromStep.selected_path);
+        payload.doc_candidate_validation_selected_status = readAskTurnString(docCandidateValidationArtifactFromStep.selected_status);
+        payload.doc_candidate_validation_failure_reason = readAskTurnString(docCandidateValidationArtifactFromStep.failure_reason);
+        payload.doc_candidate_validation_needs_clarification = docCandidateValidationArtifactFromStep.needs_clarification === true;
+      }
       payload.open_doc_terminal_contract_pass = Boolean(
         selectedPath && /^Opened (?:document|latest\b[\s\S]*\bdocument):/i.test(finalText),
       );
@@ -80996,6 +84619,21 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.latest_doc_selection = latestDocSelectionArtifact;
         payload.latest_doc_candidate_count = candidates.length;
         payload.latest_doc_selected_path = readAskTurnString(latestDocSelectionArtifact.selected_path);
+        const latestSelectedPath = normalizeAskTurnWorkspaceDocPath(payload.latest_doc_selected_path);
+        if (sessionId && latestSelectedPath) {
+          helixAskTurnLastOpenedDocPathBySession.set(sessionId, latestSelectedPath);
+        }
+        if (latestSelectedPath && payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object") {
+          const snapshot = payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot;
+          snapshot.activeDocPath = latestSelectedPath;
+          snapshot.source = "latest_doc_selection";
+          snapshot.preservationReason = "updated_by_latest_doc_selection";
+          const validSnapshot = withAskTurnDocContextValidity(snapshot);
+          payload.workspace_context_snapshot = validSnapshot;
+          if (sessionId) {
+            helixAskTurnWorkspaceSnapshotBySession.set(sessionId, validSnapshot);
+          }
+        }
         payload.latest_doc_selected_rank =
           typeof latestDocSelectionArtifact.selected_rank === "number"
             ? latestDocSelectionArtifact.selected_rank
@@ -81020,6 +84658,21 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.latest_doc_selection = unresolvedLatestSelection;
         payload.latest_doc_candidate_count = unresolvedLatestSelection.candidates.length;
         payload.latest_doc_selected_path = unresolvedLatestSelection.selected_path;
+        const unresolvedSelectedPath = normalizeAskTurnWorkspaceDocPath(unresolvedLatestSelection.selected_path);
+        if (sessionId && unresolvedSelectedPath) {
+          helixAskTurnLastOpenedDocPathBySession.set(sessionId, unresolvedSelectedPath);
+        }
+        if (unresolvedSelectedPath && payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object") {
+          const snapshot = payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot;
+          snapshot.activeDocPath = unresolvedSelectedPath;
+          snapshot.source = "latest_doc_selection";
+          snapshot.preservationReason = "updated_by_latest_doc_selection";
+          const validSnapshot = withAskTurnDocContextValidity(snapshot);
+          payload.workspace_context_snapshot = validSnapshot;
+          if (sessionId) {
+            helixAskTurnWorkspaceSnapshotBySession.set(sessionId, validSnapshot);
+          }
+        }
         payload.latest_doc_selected_rank = unresolvedLatestSelection.selected_rank;
         payload.latest_doc_selection_confidence = unresolvedLatestSelection.confidence;
         payload.latest_doc_selection_conflicts = unresolvedLatestSelection.conflicts;
@@ -81104,11 +84757,84 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       finalText = terminalPendingPrompt;
       payload.response_type = "pending_input";
     }
-    if (isAskTurnOpenDocGoalIntent(questionSeed) && payload.open_doc_goal_satisfied === false) {
-      resolvedFinalStatus = "final_failure";
-      payload.terminal_error_code = "open_doc_unresolved";
+    const unresolvedDocCandidateValidation = Array.isArray(payload.step_results)
+      ? readAskTurnResultArtifact(payload.step_results as ReturnType<typeof buildAskTurnStepResults>, "doc_candidate_validation")
+      : null;
+    const unresolvedDocCandidatePendingOptions = buildAskTurnDocCandidatePendingOptions(unresolvedDocCandidateValidation);
+    const hasClarifiableDocCandidate = unresolvedDocCandidatePendingOptions.some(
+      (option) => option.validationStatus === "strong" || option.validationStatus === "ambiguous",
+    );
+    if (
+      resolvedFinalStatus !== "pending_input" &&
+      isAskTurnOpenDocGoalIntent(questionSeed) &&
+      payload.open_doc_goal_satisfied === false &&
+      unresolvedDocCandidateValidation?.needs_clarification === true &&
+      hasClarifiableDocCandidate
+    ) {
+      const candidateOptions = unresolvedDocCandidatePendingOptions;
+      const prompt =
+        composeAskTurnDocCandidateValidationFinal({ validationArtifact: unresolvedDocCandidateValidation }) ??
+        "I found multiple plausible documents. Which result should I open?";
+      const requestId = `pending:${crypto.randomUUID()}`;
+      const pendingRequest = {
+        request_id: requestId,
+        kind: "clarify" as const,
+        reason: "clarify:missing_args" as const,
+        prompt,
+        required_fields: ["selected_doc_candidate"],
+        unresolved_fields: ["selected_doc_candidate"],
+        candidate_action: null,
+        pending_scope: "artifact_gate" as const,
+        status: "pending" as const,
+        resolution_options: candidateOptions.map((option) => `${option.rank}. ${option.title ?? option.path}`),
+        candidate_options: candidateOptions,
+        original_goal: questionSeed,
+      };
+      finalText = prompt;
+      resolvedFinalStatus = "pending_input";
+      payload.response_type = "pending_input";
+      payload.pending_server_request = pendingRequest;
+      payload.pending_request = pendingRequest;
+      payload.pending_status_after = "pending";
+      payload.final_answer_source = "request_user_input";
+      payload.doc_candidate_pending_options = candidateOptions;
+      if (conversationPendingKey) {
+        helixConversationPendingInputBySession.set(conversationPendingKey, {
+          turnId,
+          requestId,
+          kind: "clarify",
+          reason: "clarify:missing_args",
+          prompt,
+          createdAtMs: Date.now(),
+          requiredFields: ["selected_doc_candidate"],
+          unresolvedFields: ["selected_doc_candidate"],
+          candidateAction: null,
+          status: "pending",
+          pendingScope: "artifact_gate",
+          resolutionOptions: pendingRequest.resolution_options,
+          candidateOptions,
+          originIntentHash: `doc_candidate:${clipConversationText(questionSeed.toLowerCase(), 120)}`,
+          originActionFamily: "docs_nav",
+        });
+      }
     }
-    if (resolvedFinalStatus !== "pending_input" && asyncTerminal?.kind === "final_failure" && typeof asyncTerminal.text === "string" && asyncTerminal.text.trim()) {
+    if (isAskTurnOpenDocGoalIntent(questionSeed) && payload.open_doc_goal_satisfied === false && resolvedFinalStatus !== "pending_input") {
+      resolvedFinalStatus = "final_failure";
+      if (isAskTurnStrictLatestDocAcquisitionIntent(questionSeed)) {
+        const latestTopic = resolveAskTurnLatestDocTopicArg(questionSeed) ?? "requested";
+        finalText = `Could not resolve the latest ${latestTopic} document.`;
+        payload.terminal_error_code = "latest_doc_not_resolved";
+      } else {
+        payload.terminal_error_code = "open_doc_unresolved";
+      }
+    }
+    if (
+      resolvedFinalStatus !== "pending_input" &&
+      asyncTerminal?.kind === "final_failure" &&
+      typeof asyncTerminal.text === "string" &&
+      asyncTerminal.text.trim() &&
+      !(isAskTurnOpenDocGoalIntent(questionSeed) && payload.open_doc_goal_satisfied === false)
+    ) {
       finalText = asyncTerminal.text.trim();
       payload.terminal_error_code = asyncTerminal.error_code ?? payload.terminal_error_code ?? "runtime_final_failure";
     }
@@ -81122,6 +84848,89 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     if (forceMetaTerminalForTest) {
       finalText = `Completed reasoning for "${questionSeed}" using current workspace context. Steps: reasoning_pass.`;
+    }
+    if (isAskTurnContextualTemporalCompareIntent(questionSeed)) {
+      const temporalComparisonArtifact = Array.isArray(payload.step_results)
+        ? readAskTurnResultArtifact(payload.step_results as ReturnType<typeof buildAskTurnStepResults>, "temporal_context_comparison")
+        : null;
+      const temporalFailureReason = readAskTurnString(temporalComparisonArtifact?.failure_reason);
+      const temporalTargetStatus = readAskTurnString(temporalComparisonArtifact?.target_validation_status);
+      if (temporalComparisonArtifact && temporalFailureReason === "source_context_missing") {
+        finalText = renderAskTurnTemporalContextComparisonFinal(temporalComparisonArtifact);
+        resolvedFinalStatus = "final_failure";
+        payload.terminal_error_code = "source_context_missing";
+        payload.response_type = "final_failure";
+      }
+      if (
+        temporalComparisonArtifact &&
+        temporalFailureReason !== "source_context_missing" &&
+        (temporalFailureReason === "target_ambiguous" || temporalFailureReason === "target_weak" || temporalTargetStatus === "ambiguous" || temporalTargetStatus === "weak")
+      ) {
+        const prompt = renderAskTurnTemporalContextComparisonFinal(temporalComparisonArtifact);
+        const requestId = `pending:${crypto.randomUUID()}`;
+        const pendingRequest = {
+          request_id: requestId,
+          kind: "clarify" as const,
+          reason: "clarify:missing_args" as const,
+          prompt,
+          required_fields: ["comparison_target_doc"],
+          unresolved_fields: ["comparison_target_doc"],
+          candidate_action: payload.workspace_action && typeof payload.workspace_action === "object"
+            ? (payload.workspace_action as HelixAskTurnSelectedAction)
+            : null,
+          pending_scope: "artifact_gate" as const,
+          status: "pending" as const,
+          resolution_options: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+          original_goal: questionSeed,
+          turn_id: typeof payload.turn_id === "string" ? payload.turn_id : turnId,
+          session_id: sessionId ?? null,
+        };
+        finalText = prompt;
+        resolvedFinalStatus = "pending_input";
+        routeReasonCode = "clarify:missing_args";
+        payload.route_reason_code = routeReasonCode;
+        payload.route = routeReasonCode;
+        payload.dispatch_policy = "needs_user_input";
+        payload.response_type = "pending_input";
+        payload.pending_server_request = pendingRequest;
+        payload.pending_request = pendingRequest;
+        payload.pending_status_after = "pending";
+        payload.pending_transition_reason = "pending_request_created";
+        payload.pending_request_id = requestId;
+        payload.temporal_target_validation_status = temporalTargetStatus;
+        payload.temporal_target_validation_failure_reason = temporalFailureReason;
+        if (turnContract) {
+          turnContract.route_reason_code = routeReasonCode;
+          turnContract.dispatch_hint = false;
+          turnContract.terminal_kind = "clarify";
+          turnContract.lane = "clarify";
+        }
+        if (plannerContract) {
+          plannerContract.dispatch_policy = "needs_user_input";
+          plannerContract.selection_valid = false;
+          plannerContract.selection_fail_reason = "missing_required_args";
+          plannerContract.selection_missing_required_args = ["comparison_target_doc"];
+        }
+        if (sessionId) {
+          helixConversationPendingInputBySession.set(sessionId, {
+            turnId: typeof payload.turn_id === "string" ? payload.turn_id : turnId,
+            requestId,
+            kind: "clarify",
+            reason: "clarify:missing_args",
+            prompt,
+            createdAtMs: Date.now(),
+            requiredFields: ["comparison_target_doc"],
+            unresolvedFields: ["comparison_target_doc"],
+            candidateAction: pendingRequest.candidate_action,
+            status: "pending",
+            pendingScope: "artifact_gate",
+            resolutionOptions: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+            originIntentHash: `temporal_compare:${clipConversationText(questionSeed.toLowerCase(), 120)}`,
+            originActionFamily: "compare",
+            expiresAtMs: Date.now() + 10 * 60 * 1000,
+          });
+        }
+      }
     }
     const receiptStepResults = Array.isArray(payload.step_results)
       ? (payload.step_results as ReturnType<typeof buildAskTurnStepResults>)
@@ -81187,6 +84996,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         (noteReceiptTitle && !isAskTurnDeicticNoteTarget(noteReceiptTitle) ? noteReceiptTitle : null) ??
         resolveAskTurnNoteTargetWithWorkspace(questionSeed, receiptWorkspaceSnapshot) ??
         "the active note";
+      resolvedFinalStatus = "final_answer";
+      payload.response_type = "final_answer";
+      if (payload.terminal_error_code === "retrieval_recovery_failed") {
+        payload.retrieval_recovery_superseded_by = "note_update_receipt";
+        delete payload.terminal_error_code;
+      }
       finalText = summarizeAskTurnNoteUpdateReceiptForFinal({
         transcript: questionSeed,
         noteReceiptArtifact: terminalNoteUpdateReceipt,
@@ -81243,6 +85058,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         (noteReceiptTitle && !isAskTurnDeicticNoteTarget(noteReceiptTitle) ? noteReceiptTitle : null) ??
         resolveAskTurnNoteTargetWithWorkspace(questionSeed, receiptWorkspaceSnapshot) ??
         "the active note";
+      resolvedFinalStatus = "final_answer";
+      payload.response_type = "final_answer";
+      if (payload.terminal_error_code === "retrieval_recovery_failed") {
+        payload.retrieval_recovery_superseded_by = "note_update_receipt";
+        delete payload.terminal_error_code;
+      }
       finalText = summarizeAskTurnNoteUpdateReceiptForFinal({
         transcript: questionSeed,
         noteReceiptArtifact: terminalNoteUpdateReceipt,
@@ -81266,6 +85087,82 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     payload.final_answer_contract_repair_applied = finalAnswerContractRepairApplied;
     if (payload.final_composer_source === "note_content_unavailable" && observationFinal.text.trim()) {
       finalText = observationFinal.text.trim();
+    }
+    if (
+      !payload.pending_server_request &&
+      !isAskTurnContextualTemporalCompareIntent(questionSeed) &&
+      askTurnHasCompareCueOutsideProtectedArgs(questionSeed) &&
+      /note context is missing/i.test(finalText)
+    ) {
+      const compareNotePrompt =
+        "I need note_context before I can run that multi-step request. Provide the missing artifact, cancel pending, or start a new turn.";
+      const requestId = `pending:${crypto.randomUUID()}`;
+      const pendingRequest = {
+        request_id: requestId,
+        kind: "clarify" as const,
+        reason: "clarify:missing_args" as const,
+        prompt: compareNotePrompt,
+        required_fields: ["note_context"],
+        unresolved_fields: ["note_context"],
+        candidate_action: payload.workspace_action && typeof payload.workspace_action === "object"
+          ? (payload.workspace_action as HelixAskTurnSelectedAction)
+          : null,
+        pending_scope: "artifact_gate" as const,
+        status: "pending" as const,
+        resolution_options: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+        original_goal: questionSeed,
+        turn_id: typeof payload.turn_id === "string" ? payload.turn_id : turnId,
+        session_id: sessionId ?? null,
+      };
+      finalText = compareNotePrompt;
+      resolvedFinalStatus = "pending_input";
+      routeReasonCode = "clarify:missing_args";
+      payload.route_reason_code = routeReasonCode;
+      payload.route = routeReasonCode;
+      payload.dispatch_policy = "needs_user_input";
+      payload.dispatch = { dispatch_hint: false, reason: routeReasonCode };
+      payload.response_type = "pending_input";
+      payload.pending_server_request = pendingRequest;
+      payload.pending_request = pendingRequest;
+      payload.pending_status_after = "pending";
+      payload.pending_transition_reason = "pending_request_created";
+      payload.pending_transition_trace = Array.from(
+        new Set([...(Array.isArray(payload.pending_transition_trace) ? payload.pending_transition_trace : []), "pending_request_created"]),
+      );
+      payload.pending_request_id = requestId;
+      payload.workspace_action = null;
+      if (turnContract) {
+        turnContract.route_reason_code = routeReasonCode;
+        turnContract.dispatch_hint = false;
+        turnContract.terminal_kind = "clarify";
+        turnContract.lane = "clarify";
+      }
+      if (plannerContract) {
+        plannerContract.dispatch_policy = "needs_user_input";
+        plannerContract.selected_action = null;
+        plannerContract.selection_valid = false;
+        plannerContract.selection_fail_reason = "missing_required_args";
+        plannerContract.selection_missing_required_args = ["note_context"];
+      }
+      if (sessionId) {
+        helixConversationPendingInputBySession.set(sessionId, {
+          turnId: typeof payload.turn_id === "string" ? payload.turn_id : turnId,
+          requestId,
+          kind: "clarify",
+          reason: "clarify:missing_args",
+          prompt: compareNotePrompt,
+          createdAtMs: Date.now(),
+          requiredFields: ["note_context"],
+          unresolvedFields: ["note_context"],
+          candidateAction: pendingRequest.candidate_action,
+          status: "pending",
+          pendingScope: "artifact_gate",
+          resolutionOptions: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+          originIntentHash: `compare:${clipConversationText(questionSeed.toLowerCase(), 120)}`,
+          originActionFamily: "compare",
+          expiresAtMs: Date.now() + 10 * 60 * 1000,
+        });
+      }
     }
     const fallbackApplied = !candidateText || candidateText.trim() !== finalText;
     payload.assistant_answer = finalText;
@@ -81298,6 +85195,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.workspace_context_snapshot && typeof payload.workspace_context_snapshot === "object"
           ? (payload.workspace_context_snapshot as HelixAskTurnWorkspaceSessionSnapshot)
           : null;
+    payload.workspace_ref_binding = buildAskTurnWorkspaceRefBinding({
+      transcript: questionSeed,
+      workspaceSnapshot: finalWorkspaceSnapshot,
+    });
     const finalStepResults = enhanceAskTurnDocVsNoteCompareArtifacts({
       transcript: questionSeed,
       stepResults: Array.isArray(payload.step_results)
@@ -81306,6 +85207,142 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       workspaceSnapshot: finalWorkspaceSnapshot,
     });
     payload.step_results = finalStepResults;
+    const finalPlannerRecord =
+      payload.planner_contract && typeof payload.planner_contract === "object"
+        ? (payload.planner_contract as Record<string, unknown>)
+        : null;
+    const finalPlanItems = Array.isArray(finalPlannerRecord?.plan_items)
+      ? (finalPlannerRecord.plan_items as HelixAskTurnPlanStep[])
+      : [];
+    const finalExecutionTrace = Array.isArray(payload.execution_trace)
+      ? (payload.execution_trace as HelixAskTurnPlanStep[])
+      : [];
+    const finalRuntime =
+      asyncRuntimeSummary ?? (payload.turn_runtime && typeof payload.turn_runtime === "object"
+        ? (payload.turn_runtime as HelixAskTurnRuntimeSummary)
+        : null);
+    const finalObservations =
+      finalRuntime && typeof finalRuntime === "object" && Array.isArray(finalRuntime.observations)
+        ? (finalRuntime.observations as HelixAskTurnRuntimeObservation[])
+        : [];
+    const finalObserveThenDecideTrace = Array.isArray(payload.observe_then_decide_trace)
+      ? (payload.observe_then_decide_trace as HelixAskObserveThenDecideTraceEntry[])
+      : finalRuntime && typeof finalRuntime === "object" && Array.isArray((finalRuntime as HelixAskTurnRuntimeSummary).observe_then_decide_trace)
+        ? ((finalRuntime as HelixAskTurnRuntimeSummary).observe_then_decide_trace ?? [])
+        : [];
+    const finalGoalFrame =
+      payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+        ? (payload.universal_goal_frame as HelixAskUniversalGoalFrame)
+        : buildAskTurnUniversalGoalFrame({
+            transcript: questionSeed,
+            payload,
+            workspaceSnapshot: finalWorkspaceSnapshot,
+          });
+    if (finalGoalFrame.compound_argument_partition) {
+      payload.compound_argument_partition = finalGoalFrame.compound_argument_partition;
+    }
+    const finalPendingRequest =
+      payload.pending_server_request && typeof payload.pending_server_request === "object"
+        ? (payload.pending_server_request as Record<string, unknown>)
+        : payload.pending_request && typeof payload.pending_request === "object"
+          ? (payload.pending_request as Record<string, unknown>)
+          : null;
+    const finalFailure =
+      resolvedFinalStatus === "final_failure" || payload.terminal_error_code
+        ? {
+            error_code: readAskTurnString(payload.terminal_error_code),
+            reason: readAskTurnString(payload.final_composer_fail_reason) ?? readAskTurnString(payload.quality_contract_fail_reason),
+          }
+        : null;
+    const universalComposerOutput = composeAskTurnUniversalFinalAnswer({
+      goal_frame: finalGoalFrame,
+      plan_items: finalPlanItems,
+      execution_trace: finalExecutionTrace,
+      observations: finalObservations,
+      step_results: finalStepResults,
+      artifacts: collectAskTurnUniversalComposerArtifacts({
+        stepResults: finalStepResults,
+        runtime: finalRuntime,
+        seed:
+          payload.latest_result_artifact && typeof payload.latest_result_artifact === "object"
+            ? { turn_final_text: payload.latest_result_artifact }
+            : null,
+      }),
+      pending_request: finalPendingRequest,
+      failure: finalFailure,
+      observe_then_decide_trace: finalObserveThenDecideTrace,
+      fallback_text: finalText,
+      transcript: questionSeed,
+      workspace_snapshot: finalWorkspaceSnapshot,
+      selected_action: selectedActionForComposer,
+      runtime: finalRuntime,
+    });
+    finalText = universalComposerOutput.text;
+    resolvedFinalStatus = universalComposerOutput.status;
+    payload.response_type = universalComposerOutput.status;
+    payload.universal_goal_frame = finalGoalFrame;
+    payload.universal_final_composer = {
+      used: true,
+      source: universalComposerOutput.source,
+      status: universalComposerOutput.status,
+      consumed_artifacts: universalComposerOutput.consumed_artifacts,
+      presentation_renderer: universalComposerOutput.presentation_renderer,
+      terminal_allowed: universalComposerOutput.terminal_allowed,
+      fail_reason: universalComposerOutput.fail_reason,
+    };
+    if (universalComposerOutput.status === "final_failure" && universalComposerOutput.fail_reason) {
+      payload.terminal_error_code = payload.terminal_error_code ?? universalComposerOutput.fail_reason;
+    }
+    const finalIntentFamily = inferAskTurnIntentFamily(questionSeed);
+    const artifactBackedFinal = hasHelixAskTurnArtifactBackedStepResult(finalStepResults);
+    let finalAnswerSource: HelixAskTurnFinalAnswerSource =
+      universalComposerOutput.source === "no_tool_direct"
+        ? "no_tool_direct"
+      : resolvedFinalStatus === "pending_input"
+        ? "request_user_input"
+        : resolvedFinalStatus === "final_failure"
+          ? "typed_failure"
+          : universalComposerOutput.source === "universal_composer"
+            ? "universal_composer"
+            : artifactBackedFinal
+              ? "artifact_synthesis"
+              : terminalFallbackSeedMissing
+                ? "legacy_fallback"
+                : "planner_terminal";
+    if (
+      finalAnswerSource === "legacy_fallback" &&
+      isHelixAskTurnNontrivialIntentFamily(finalIntentFamily) &&
+      !artifactBackedFinal
+    ) {
+      finalAnswerSource = "typed_failure";
+      resolvedFinalStatus = "final_failure";
+      finalText =
+        "I could not complete this turn because the authoritative terminal artifact was missing.";
+      payload.text = finalText;
+      payload.answer = finalText;
+      payload.assistant_answer = finalText;
+      payload.response_type = "final_failure";
+      payload.terminal_error_code = "authoritative_terminal_missing";
+      payload.fallback_blocked = true;
+      payload.fallback_block_reason = "authoritative_terminal_missing";
+    }
+    payload.final_answer_source = finalAnswerSource;
+    payload.selected_final_answer = finalText;
+    payload.terminal_authority = "server";
+    payload.final_status = resolvedFinalStatus;
+    payload.terminal_truth = {
+      backend_terminal: resolvedFinalStatus,
+      visible_terminal: resolvedFinalStatus,
+      mismatch: false,
+      selected_final_answer_source: finalAnswerSource,
+    };
+    if (payload.latest_result_artifact && typeof payload.latest_result_artifact === "object") {
+      (payload.latest_result_artifact as Record<string, unknown>).text = finalText;
+    }
+    if (payload.terminal_artifact && typeof payload.terminal_artifact === "object") {
+      (payload.terminal_artifact as Record<string, unknown>).text = finalText;
+      (payload.terminal_artifact as Record<string, unknown>).kind = resolvedFinalStatus;
+    }
     const jobReadyLinkBundle = buildAskTurnJobReadyLinkBundle({
       stepResults: finalStepResults,
       workspaceSnapshot: finalWorkspaceSnapshot,
@@ -81313,10 +85350,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.latest_result_artifact && typeof payload.latest_result_artifact === "object"
           ? (payload.latest_result_artifact as Record<string, unknown>)
           : null,
+      allowCopyFinalAnswerLink: finalAnswerSource !== "no_tool_direct",
     });
     payload.job_ready_links = jobReadyLinkBundle.links;
     payload.job_ready_links_source = jobReadyLinkBundle.source;
     payload.job_ready_links_suppressed = jobReadyLinkBundle.suppressed;
+    payload.job_ready_links_current_turn_only = true;
     turnContract.terminal_text = finalText;
     turnContract.terminal_source = "terminal_artifact";
     if (sessionId && shouldStoreAskTurnLatestResultArtifact(payload)) {
@@ -81344,8 +85383,19 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       }
     }
     attachRuntimeSummary(finalText, false);
+    payload.turn_decision_source_map = buildAskTurnDecisionSourceMap({
+      payload,
+      finalAnswerSource,
+    });
+    if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
+      (payload.turn_runtime as Record<string, unknown>).turn_decision_source_map = payload.turn_decision_source_map;
+    }
     attachAskTurnEventsToPayload(payload, finalText, resolvedFinalStatus);
-    attachTurnTruthTable(finalText, fallbackApplied ? "fallback" : "backend");
+    attachTurnTruthTable(
+      finalText,
+      finalAnswerSource === "legacy_fallback" ? "fallback" : "backend",
+      finalAnswerSource,
+    );
     attachAgentLoopAudit();
     normalizeAskTurnTopLevelEnvelope(payload, status);
     return res.status(status).json(payload);
@@ -81439,6 +85489,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         candidate_action?: HelixAskTurnSelectedAction | null;
         pending_scope?: "artifact_gate" | "action_args" | "confirm";
         status?: "pending" | "resolved" | "canceled" | "expired";
+        resolution_options?: string[];
+        candidate_options?: HelixConversationPendingInputRecord["candidateOptions"];
+        original_goal?: string;
       }
     | null = null;
   const conversationPendingKey = sessionId ?? null;
@@ -81529,6 +85582,15 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
   if (!existingPendingRequest && routeDecision.routeReasonCode === "conversation:simple") {
     const directText = buildAskTurnSimpleConversationAnswer(transcript);
+    const directGoalFrame = buildAskTurnUniversalGoalFrame({
+      transcript,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    const directCapabilitySelection = buildAskTurnCapabilitySelectionResult({
+      frame: directGoalFrame,
+      selectedAction: null,
+      source: "goal_frame",
+    });
     const directPlanItems = buildAskTurnPlanSteps({
       routeReasonCode: "conversation:simple",
       pendingServerRequest: null,
@@ -81602,6 +85664,27 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       workspace_action: null,
       selected_action: null,
       response_type: "final_answer",
+      final_answer_source: "no_tool_direct",
+      selected_final_answer: directText,
+      universal_goal_frame: directGoalFrame,
+      capability_selection_result: directCapabilitySelection,
+      universal_final_composer: {
+        used: true,
+        source: "no_tool_direct",
+        status: "final_answer",
+        consumed_artifacts: ["direct_answer_text"],
+        presentation_renderer: "direct_answer",
+        terminal_allowed: true,
+        fail_reason: null,
+      },
+      terminal_authority: "server",
+      job_ready_links: [],
+      job_ready_links_source: "suppressed:no_tool_direct",
+      job_ready_links_suppressed: [
+        { id: "active-doc", reason: "no_current_turn_artifact" },
+        { id: "copy-latest-result", reason: "no_current_turn_artifact" },
+      ],
+      job_ready_links_current_turn_only: true,
       needs_confirmation: false,
       brief: {
         text: directText,
@@ -81703,11 +85786,228 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       invariant_violations: [],
     });
   }
+  const modelOnlyGoalFrame = buildAskTurnUniversalGoalFrame({
+    transcript,
+    workspaceSnapshot: workspaceSessionSnapshot,
+  });
+  const modelOnlyToolChoice = buildAskTurnToolChoiceArbitration({
+    frame: modelOnlyGoalFrame,
+    transcript,
+  });
+  if (
+    !existingPendingRequest &&
+    modelOnlyToolChoice.answer_scope === "model_only" &&
+    modelOnlyToolChoice.evidence_need === "none" &&
+    modelOnlyToolChoice.first_step === "model"
+  ) {
+    const modelOnlyAnswer = await generateAskTurnModelOnlyAnswer({
+      transcript,
+      traceId,
+      sessionId,
+      personaId,
+      tenantId: undefined,
+    });
+    const modelOnlyText = modelOnlyAnswer.text;
+    const modelOnlyCapabilitySelection = buildAskTurnCapabilitySelectionResult({
+      frame: modelOnlyGoalFrame,
+      selectedAction: null,
+      source: "model_planner",
+    });
+    const modelOnlyPlanItems: HelixAskTurnPlanStep[] = [
+      {
+        id: "model_only_reasoning",
+        lane: "reasoning",
+        status: "planned",
+        title: `Answer directly from model knowledge for: "${clipConversationText(transcript, 90)}".`,
+        reason: modelOnlyToolChoice.reason,
+      },
+    ];
+    const modelOnlyExecutionTrace = buildAskTurnExecutionTrace({
+      planSteps: modelOnlyPlanItems,
+      terminalKind: "reasoning",
+      pending: false,
+      transcript,
+      workspaceSnapshot: workspaceSessionSnapshot,
+      initialArtifacts: ["direct_answer_text", "turn_final_text"],
+    });
+    const modelOnlyExecutionLifecycle = buildAskTurnExecutionLifecycle(modelOnlyExecutionTrace);
+    const modelOnlyStepResults = buildAskTurnStepResults(modelOnlyExecutionTrace);
+    const modelOnlyTurnEvents: HelixAskTurnEvent[] = completeAskTurnIncrementalEvents({
+      turnEvents: [
+        { type: "turn_started", at_ms: Date.now(), turn_id: turnId, goal: transcript },
+        ...modelOnlyPlanItems.map((step): HelixAskTurnEvent => ({
+          type: "plan_delta",
+          at_ms: Date.now(),
+          step,
+          reason: "model_only_tool_choice",
+        })),
+        ...modelOnlyExecutionTrace.flatMap((step): HelixAskTurnEvent[] => [
+          { type: "item_started", at_ms: Date.now(), step_id: step.id, lane: step.lane, title: step.title },
+          {
+            type: "tool_result",
+            at_ms: Date.now(),
+            step_id: step.id,
+            lane: step.lane,
+            status: step.status,
+            actual_artifacts: ["reasoning_context", "direct_answer_text", "turn_final_text"],
+            expected_artifacts: ["direct_answer_text"],
+            contract_pass: modelOnlyAnswer.source === "model_planner",
+          },
+          { type: "item_completed", at_ms: Date.now(), step_id: step.id, lane: step.lane, status: step.status },
+        ]),
+      ],
+      turnId,
+      terminalText: modelOnlyText,
+      status: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+      runtimeStatus: modelOnlyAnswer.source === "typed_failure" ? "failed" : "completed",
+    });
+    for (const event of modelOnlyTurnEvents) {
+      askTurnEventSink?.emit(event);
+    }
+    return respondAskTurn(200, {
+      ok: modelOnlyAnswer.source !== "typed_failure",
+      text: modelOnlyText,
+      answer: modelOnlyText,
+      mode: "read",
+      trace_id: traceId,
+      turn_id: turnId,
+      dispatch: {
+        dispatch_hint: false,
+        reason: "model_only_tool_choice",
+      },
+      route_reason_code: "conversation:simple",
+      route: "conversation:simple",
+      lane: "conversation",
+      dispatch_policy: "direct_answer_only",
+      workspace_action: null,
+      selected_action: null,
+      response_type: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+      final_status: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+      terminal_error_code: modelOnlyAnswer.source === "typed_failure" ? "model_only_answer_unavailable" : undefined,
+      final_answer_source: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "no_tool_direct",
+      selected_final_answer: modelOnlyText,
+      universal_goal_frame: modelOnlyGoalFrame,
+      capability_selection_result: modelOnlyCapabilitySelection,
+      tool_choice_arbitration: modelOnlyToolChoice,
+      universal_final_composer: {
+        used: true,
+        source: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "no_tool_direct",
+        status: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+        consumed_artifacts: ["direct_answer_text"],
+        presentation_renderer: "direct_answer",
+        terminal_allowed: true,
+        fail_reason: modelOnlyAnswer.error ?? null,
+      },
+      terminal_authority: "server",
+      job_ready_links: [],
+      job_ready_links_source: "suppressed:no_tool_direct",
+      job_ready_links_current_turn_only: true,
+      needs_confirmation: false,
+      pending_server_request: null,
+      planner_contract: {
+        enabled: true,
+        source: "model_planner",
+        restate: `Answer the conceptual request without workspace retrieval: "${clipConversationText(transcript, 90)}".`,
+        dispatch_policy: "direct_answer_only",
+        plan_items: modelOnlyPlanItems,
+        plan_steps: modelOnlyExecutionTrace,
+        executed_step_count: modelOnlyExecutionTrace.filter((step) => step.status === "completed").length,
+        failed_step_count: modelOnlyExecutionTrace.filter((step) => step.status === "failed").length,
+        suppressed_step_count: 0,
+        action_candidates_count: HELIX_ASK_TURN_CAPABILITY_ACTIONS.length,
+        selected_action: null,
+        selection_source: "llm",
+        selection_valid: false,
+        selection_fail_reason: "none",
+        selection_missing_required_args: [],
+        planner_repair_attempted: false,
+        planner_repair_applied: false,
+        planner_repair_reason: null,
+        pending_resolution_attempted: false,
+        pending_resolution_applied: false,
+        pending_resolution_reason: null,
+        single_terminal_required: true,
+      },
+      execution_trace: modelOnlyExecutionTrace,
+      execution_lifecycle: modelOnlyExecutionLifecycle,
+      step_results: modelOnlyStepResults,
+      capability_selection_trace: [],
+      runtime_loop_mode: "batch",
+      runtime_event_count: modelOnlyTurnEvents.length,
+      turn_events: modelOnlyTurnEvents,
+      turn_runtime: {
+        status: modelOnlyAnswer.source === "typed_failure" ? "failed" : "completed",
+        open_subgoals: [],
+        completed_subgoals: modelOnlyExecutionTrace.filter((step) => step.status === "completed").map((step) => step.id),
+        failed_subgoals: modelOnlyExecutionTrace.filter((step) => step.status === "failed").map((step) => step.id),
+        observation_count: 1,
+        observations: [],
+        artifact_keys: ["reasoning_context", "direct_answer_text", "turn_final_text"],
+        required_artifacts: ["direct_answer_text"],
+        satisfied_artifacts: modelOnlyAnswer.source === "typed_failure" ? [] : ["direct_answer_text"],
+        missing_required_artifacts: modelOnlyAnswer.source === "typed_failure" ? ["direct_answer_text"] : [],
+        decision_count: 1,
+        last_decision: {
+          kind: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+          reason: modelOnlyToolChoice.reason,
+        },
+        runtime_loop_iteration_count: 0,
+        runtime_loop_stop_reason: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+        general_controller_enabled: true,
+        general_controller_decision_count: 1,
+        general_controller_final_decision: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "finalize",
+        general_controller_stop_reason: modelOnlyToolChoice.reason,
+        capability_selection_result: modelOnlyCapabilitySelection,
+        tool_choice_arbitration: modelOnlyToolChoice,
+        terminal: {
+          kind: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+          text: modelOnlyText,
+          source: "model_only_answer",
+        },
+      },
+      workspace_context_mode: reasoningContextMode,
+      workspace_context_snapshot: workspaceSessionSnapshot,
+      turn_contract: {
+        lane: "conversation",
+        terminal_kind: "conversation",
+        route_reason_code: "conversation:simple",
+        dispatch_hint: false,
+        single_terminal_required: true,
+        terminal_text: modelOnlyText,
+        terminal_source: "model_only_answer",
+      },
+      general_controller_enabled: true,
+      general_controller_decisions: [
+        {
+          decision: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "finalize",
+          source: "llm",
+          reason: modelOnlyToolChoice.reason,
+          selected_capability: null,
+          missing_required_artifacts: modelOnlyAnswer.source === "typed_failure" ? ["direct_answer_text"] : [],
+          satisfied_artifacts: modelOnlyAnswer.source === "typed_failure" ? [] : ["direct_answer_text"],
+          error_code: modelOnlyAnswer.error ?? null,
+        },
+      ],
+      general_controller_decision_count: 1,
+      general_controller_final_decision: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "finalize",
+      general_controller_stop_reason: modelOnlyToolChoice.reason,
+      latest_result_artifact: {
+        kind: "turn_final_text",
+        text: modelOnlyText,
+        turn_id: turnId,
+        trace_id: traceId,
+        created_at_ms: Date.now(),
+      },
+      invariant_violations: [],
+    });
+  }
   if (!existingPendingRequest && isAskTurnDocIdentityIntent(transcript) && !isAskTurnDocIdentityExplainHybridIntent(transcript)) {
     const activeDocPath = typeof workspaceSessionSnapshot?.activeDocPath === "string" ? workspaceSessionSnapshot.activeDocPath.trim() : "";
     if (reasoningContextMode !== "isolated" && hasValidAskTurnDocContext(workspaceSessionSnapshot)) {
       const docIdentityText = activeDocPath
-        ? `You are currently on: ${activeDocPath}`
+        ? ["You are currently on:", renderAskTurnDocReferenceBlock({ heading: "Document", path: activeDocPath })]
+            .filter(Boolean)
+            .join("\n")
         : "Docs Viewer is open, but no exact active document path is available in workspace context.";
       const docIdentityAction: HelixAskTurnSelectedAction = {
         panel_id: "docs-viewer",
@@ -82048,7 +86348,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         (!HELIX_E9_4_STRICT_PENDING_OWNERSHIP_FLAG &&
           incomingIntentFamily !== "conversation" &&
           incomingIntentFamily !== pendingOriginFamily));
-    if (incomingConversationOnly && existingPendingRequest.kind === "clarify") {
+    if (
+      incomingConversationOnly &&
+      existingPendingRequest.kind === "clarify" &&
+      existingPendingRequest.pendingScope === "confirm"
+    ) {
       if (conversationPendingKey) {
         helixConversationPendingInputBySession.delete(conversationPendingKey);
       }
@@ -82270,6 +86574,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             candidate_action: existingPendingRequest.candidateAction ?? null,
             pending_scope: existingPendingRequest.pendingScope ?? "action_args",
             status: "pending",
+            candidate_options: existingPendingRequest.candidateOptions,
           };
           recordPendingTransition("pending", "pending_clarify_unresolved");
           if (conversationPendingKey) {
@@ -82281,6 +86586,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             });
           }
         } else {
+          const selectedDocCandidateRank =
+            typeof providedValues.selected_doc_candidate === "number" ? providedValues.selected_doc_candidate : null;
+          const selectedDocCandidate =
+            selectedDocCandidateRank !== null && existingPendingRequest.candidateOptions
+              ? existingPendingRequest.candidateOptions.find((option) => option.rank === selectedDocCandidateRank) ??
+                existingPendingRequest.candidateOptions[selectedDocCandidateRank - 1] ??
+                null
+              : null;
           const resolvedTargetPanel =
             typeof providedValues.target_panel === "string"
               ? (providedValues.target_panel as
@@ -82290,7 +86603,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               : typeof providedValues.action_command === "string"
                 ? resolveAskTurnNavigationTargetPanel(providedValues.action_command, { allowBareTarget: true })
               : null;
-          if (
+          if (selectedDocCandidate?.path) {
+            resolvedPendingAction = {
+              panel_id: "docs-viewer",
+              action_id: "open_doc_by_path",
+              args: {
+                path: selectedDocCandidate.path,
+                selection_reason: "pending_doc_candidate_choice",
+                candidate_rank: selectedDocCandidate.rank,
+                candidate_validation_status: selectedDocCandidate.validationStatus ?? null,
+              },
+            };
+            pendingResolution = {
+              attempted: true,
+              applied: true,
+              reason: `pending_doc_candidate_choice_resolved:${selectedDocCandidate.rank}`,
+            };
+          } else if (
             resolvedTargetPanel === "docs-viewer" ||
             resolvedTargetPanel === "workstation-notes" ||
             resolvedTargetPanel === "workstation-clipboard-history"
@@ -82374,6 +86703,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               candidate_action: existingPendingRequest.candidateAction ?? null,
               pending_scope: existingPendingRequest.pendingScope ?? "action_args",
               status: "pending",
+              candidate_options: existingPendingRequest.candidateOptions,
             };
             recordPendingTransition("pending", "pending_clarify_still_required");
             if (conversationPendingKey) {
@@ -82947,6 +87277,35 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     });
     briefText = `Using current workspace context for: "${clipConversationText(transcript, 120)}".`;
   }
+  if (!pendingHandled && !pendingServerRequest && isAskTurnActiveDocUsefulnessIntent(transcript) && hasValidAskTurnDocContext(workspaceSessionSnapshot)) {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: "Active-document usefulness request: summarize current workspace document before answering.",
+      },
+      routeReasonCode: "dispatch:act",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "act",
+        routeReasonCode: "dispatch:act",
+      }),
+    };
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+    policyLockForSelection = "workspace_context_reasoning";
+    actionSelection = resolveAskTurnActionSelection({
+      transcript,
+      dispatchPolicy: policyLockForSelection,
+      sessionId,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    briefText = `Using the active document to answer: "${clipConversationText(transcript, 120)}".`;
+  }
   const forceDeterministicActContextReasoning =
     !pendingHandled &&
     !pendingServerRequest &&
@@ -82959,6 +87318,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       isAskTurnDocsRetrievalToNoteIntent(transcript) ||
       isAskTurnArtifactCarryoverToNoteIntent(transcript) ||
       isAskTurnSafeDefaultPreserveToNoteIntent(transcript) ||
+      isAskTurnOpenDocGoalIntent(transcript) ||
       isAskTurnDocLocateIntent(transcript));
   if (forceDeterministicActContextReasoning) {
     routeDecision = {
@@ -83152,7 +87512,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     !isAskTurnCompositeWorkspaceContextStatusIntent(transcript) &&
     !isAskTurnCreateNoteThenOpenDocIntent(transcript)
   ) {
-    if (actionSelection.fail_reason === "missing_required_args" && actionSelection.missing_required_args.length > 0) {
+    const hasGenericNotesContext =
+      isAskTurnDocVsNoteCompareIntent(transcript, workspaceSessionSnapshot) &&
+      workspaceSessionSnapshot?.hasNoteContext === true &&
+      actionSelection.missing_required_args.includes("note_title") &&
+      /\b(?:my|the|current|active)\s+notes?\b/i.test(transcript);
+    if (
+      actionSelection.fail_reason === "missing_required_args" &&
+      actionSelection.missing_required_args.length > 0 &&
+      !hasGenericNotesContext
+    ) {
       routeDecision = {
         ...routeDecision,
         classification: {
@@ -83294,6 +87663,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   let isClarifyTerminal = routeReasonCode.startsWith("clarify:") || needsConfirmation || Boolean(pendingServerRequest);
   let isSuppressedTerminal = routeReasonCode.startsWith("suppressed:") && !dispatchHint;
   let isControlConversationTerminal = routeReasonCode === "cancel:no_pending" || isAskTurnCapabilityHelpIntent(transcript);
+  const universalGoalFrameForSelection = buildAskTurnUniversalGoalFrame({
+    transcript,
+    workspaceSnapshot: workspaceSessionSnapshot,
+    payload: actionSelection.action ? { workspace_action: actionSelection.action } : null,
+  });
+  let capabilitySelectionResult: HelixAskCapabilitySelectionResult | null = null;
   let precomputedPlanSteps = buildAskTurnPlanSteps({
     routeReasonCode,
     pendingServerRequest: pendingServerRequest ? { kind: pendingServerRequest.kind } : null,
@@ -83310,11 +87685,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           sessionId,
           workspaceSnapshot: workspaceSessionSnapshot,
           selectedAction: actionSelection.action,
+          universalGoalFrame: universalGoalFrameForSelection,
         })
       : null;
   if (initialCapabilityPlan && initialCapabilityPlan.missing_args.length === 0) {
     precomputedPlanSteps = initialCapabilityPlan.plan_items;
     initialCapabilitySelectionTrace = initialCapabilityPlan.capability_selection_trace;
+    capabilitySelectionResult = initialCapabilityPlan.capability_selection_result ?? null;
     actionSelection = {
       ...actionSelection,
       action: initialCapabilityPlan.selected_action,
@@ -83480,10 +87857,22 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   const rawBlockedMissingArtifacts = Array.from(
     new Set([...collectAskTurnBlockedMissingArtifacts(executionTrace), ...collectAskTurnUnsatisfiedResultArtifacts(stepResults)]),
   );
+  if (
+    !isAskTurnContextualTemporalCompareIntent(transcript) &&
+    askTurnHasCompareCueOutsideProtectedArgs(transcript) &&
+    !isAskTurnDocDocCompareIntent(transcript) &&
+    !resolveAskTurnCompareNoteTargetWithWorkspace(transcript, workspaceSessionSnapshot) &&
+    workspaceSessionSnapshot?.hasNoteContext !== true &&
+    !rawBlockedMissingArtifacts.includes("note_context")
+  ) {
+    rawBlockedMissingArtifacts.push("note_context");
+  }
   const completedDocSearchFallback =
     isAskTurnOpenLatestDocIntent(transcript) && hasCompletedAskTurnDocSearchStep(executionTrace);
   const blockedMissingArtifacts = isAskTurnCapabilityHelpIntent(transcript)
     ? []
+    : isAskTurnContextualTemporalCompareIntent(transcript)
+    ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "temporal_target_resolution_attempts")
     : completedDocSearchFallback
     ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context")
     : rawBlockedMissingArtifacts;
@@ -83506,7 +87895,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     isHybridReasoningTerminal = false;
     isActTerminal = false;
     executionTerminalKind = "clarify";
-    briefText = `I need ${blockedMissingArtifacts.join(", ")} before I can run that multi-step request.`;
+    const blockedArtifactText = blockedMissingArtifacts.join(", ");
+    briefText = `I need ${blockedArtifactText} before I can run that multi-step request. Provide the missing artifact, cancel pending, or start a new turn.`;
     pendingServerRequest = {
       request_id: `pending:${crypto.randomUUID()}`,
       kind: "clarify",
@@ -83517,6 +87907,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       candidate_action: actionSelection.action ?? null,
       pending_scope: "artifact_gate",
       status: "pending",
+      resolution_options: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+      original_goal: transcript,
     };
     recordPendingTransition("pending", "pending_request_created");
     pendingRequestId = pendingServerRequest.request_id;
@@ -83533,6 +87925,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         candidateAction: actionSelection.action ?? null,
         status: "pending",
         pendingScope: "artifact_gate",
+        resolutionOptions: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
         originIntentHash: incomingIntentHash,
         originActionFamily: incomingIntentFamily,
         expiresAtMs: Date.now() + 10 * 60 * 1000,
@@ -83731,8 +88124,38 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       helixAskTurnWorkspaceSnapshotBySession.set(sessionId, latestWorkspaceSnapshot);
     }
   }
-  const attachWorkspaceContextSnapshot =
+  let attachWorkspaceContextSnapshot =
     HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG && reasoningContextMode !== "isolated" ? latestWorkspaceSnapshot : null;
+  const lastOpenedDocPathForSession = sessionId
+    ? normalizeAskTurnWorkspaceDocPath(helixAskTurnLastOpenedDocPathBySession.get(sessionId))
+    : null;
+  if (
+    attachWorkspaceContextSnapshot &&
+    lastOpenedDocPathForSession &&
+    attachWorkspaceContextSnapshot.activePanel !== "docs-viewer"
+  ) {
+    attachWorkspaceContextSnapshot = withAskTurnDocContextValidity({
+      ...attachWorkspaceContextSnapshot,
+      activeDocPath: lastOpenedDocPathForSession,
+      source: "last_opened_doc",
+      preservationReason: "preserved_last_opened_doc_over_non_doc_panel_snapshot",
+    });
+    latestWorkspaceSnapshot = attachWorkspaceContextSnapshot;
+    if (sessionId) {
+      helixAskTurnWorkspaceSnapshotBySession.set(sessionId, attachWorkspaceContextSnapshot);
+    }
+  }
+  const attachedActiveDocPath = normalizeAskTurnWorkspaceDocPath(attachWorkspaceContextSnapshot?.activeDocPath);
+  const completedDocOpenStep = executionTrace.some(
+    (step) =>
+      step.status === "completed" &&
+      step.lane === "workspace" &&
+      step.action?.panel_id === "docs-viewer" &&
+      ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(step.action.action_id),
+  );
+  if (sessionId && attachedActiveDocPath && (completedDocOpenStep || isAskTurnOpenLatestDocIntent(transcript))) {
+    helixAskTurnLastOpenedDocPathBySession.set(sessionId, attachedActiveDocPath);
+  }
   const observationGroundedFinal = resolveAskTurnObservationGroundedFinal({
     action: actionSelection.action,
     executionTrace,
@@ -84606,6 +89029,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
   }
   if (!responseNoteReceiptArtifact) {
+    const responseActionEnvelope =
+      responsePayload.action_envelope && typeof responsePayload.action_envelope === "object"
+        ? (responsePayload.action_envelope as Record<string, unknown>)
+        : null;
+    const workstationActions = Array.isArray(responseActionEnvelope?.workstation_actions)
+      ? (responseActionEnvelope.workstation_actions as HelixAskTurnSelectedAction[])
+      : [];
     const appendAction = [...workstationActions]
       .reverse()
       .find(
@@ -84677,16 +89107,65 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     const lineMatch = responseText.match(/\bL\d+(?:-L\d+)?\b/i)?.[0] ?? null;
     responseText = [
       `Updated ${resolvedTitle} with the ${query} location.`,
-      activePath && lineMatch ? `Location: ${activePath}:${lineMatch}` : null,
+      activePath && lineMatch
+        ? `\nLocation:\n- ${renderAskTurnDocDisplayLabel(activePath)}, ${lineMatch}\n  Path: ${activePath}:${lineMatch}`
+        : null,
     ].filter(Boolean).join("\n");
+  }
+  if (
+    !pendingServerRequest &&
+    !isAskTurnContextualTemporalCompareIntent(transcript) &&
+    askTurnHasCompareCueOutsideProtectedArgs(transcript) &&
+    /note context is missing/i.test(responseText)
+  ) {
+    routeReasonCode = "clarify:missing_args";
+    dispatchHint = false;
+    const compareNotePrompt =
+      "I need note_context before I can run that multi-step request. Provide the missing artifact, cancel pending, or start a new turn.";
+    pendingServerRequest = {
+      request_id: `pending:${crypto.randomUUID()}`,
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: compareNotePrompt,
+      required_fields: ["note_context"],
+      unresolved_fields: ["note_context"],
+      candidate_action: actionSelection.action ?? null,
+      pending_scope: "artifact_gate",
+      status: "pending",
+      resolution_options: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+      original_goal: transcript,
+    };
+    recordPendingTransition("pending", "pending_request_created");
+    pendingRequestId = pendingServerRequest.request_id;
+    pendingStatusAfter = "pending";
+    responseText = compareNotePrompt;
+    if (conversationPendingKey) {
+      helixConversationPendingInputBySession.set(conversationPendingKey, {
+        turnId,
+        requestId: pendingServerRequest.request_id,
+        kind: pendingServerRequest.kind,
+        reason: pendingServerRequest.reason,
+        prompt: pendingServerRequest.prompt,
+        createdAtMs: Date.now(),
+        requiredFields: ["note_context"],
+        unresolvedFields: ["note_context"],
+        candidateAction: actionSelection.action ?? null,
+        status: "pending",
+        pendingScope: "artifact_gate",
+        resolutionOptions: ["resolve_with_next_message", "cancel_pending", "start_new_turn"],
+        originIntentHash: incomingIntentHash,
+        originActionFamily: "compare",
+        expiresAtMs: Date.now() + 10 * 60 * 1000,
+      });
+    }
   }
   if (HELIX_E10_27_INCREMENTAL_TURN_RUNTIME_FLAG) {
     turnEvents = completeAskTurnIncrementalEvents({
       turnEvents,
       turnId,
       terminalText: responseText,
-      status: "final_answer",
-      runtimeStatus: "completed",
+      status: pendingServerRequest ? "pending_input" : "final_answer",
+      runtimeStatus: pendingServerRequest ? "pending_input" : "completed",
     });
   }
   responsePayload.text = responseText;
@@ -84733,6 +89212,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   responsePayload.pending_transition_reason = pendingTransitionReason;
   responsePayload.pending_transition_trace = pendingTransitionTrace;
   responsePayload.pending_request_id = pendingRequestId;
+  responsePayload.pending_server_request = pendingServerRequest;
   responsePayload.pending_resolution_attempted = pendingResolution.attempted;
   responsePayload.pending_resolution_applied = pendingResolution.applied;
   responsePayload.pending_resolution_reason = pendingResolution.reason;
@@ -84753,6 +89233,18 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   responsePayload.model_decision_count = modelDecisionAudits.length;
   responsePayload.model_decision_audits = modelDecisionAudits;
   responsePayload.capability_selection_trace = capabilitySelectionTrace;
+  responsePayload.universal_goal_frame = universalGoalFrameForSelection;
+  responsePayload.capability_selection_result =
+    capabilitySelectionResult ??
+    buildAskTurnCapabilitySelectionResult({
+      frame: universalGoalFrameForSelection,
+      payload: responsePayload,
+      selectedAction: actionSelection.action,
+      source: "goal_frame",
+    });
+  if (universalGoalFrameForSelection.compound_argument_partition) {
+    responsePayload.compound_argument_partition = universalGoalFrameForSelection.compound_argument_partition;
+  }
   responsePayload.invariant_violations = invariantViolations;
   responsePayload.workspace_context_mode = reasoningContextMode;
   responsePayload.workspace_context_snapshot = attachWorkspaceContextSnapshot;

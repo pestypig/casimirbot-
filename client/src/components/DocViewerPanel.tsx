@@ -508,7 +508,7 @@ export function DocViewerPanel() {
   );
 
   return (
-    <div className="flex h-full w-full bg-slate-950/90 text-slate-100">
+    <div className="flex h-full w-full min-w-0 overflow-hidden bg-slate-950/90 text-slate-100">
       <DirectoryRail
         entries={grouped}
         total={DOC_MANIFEST.length}
@@ -518,7 +518,7 @@ export function DocViewerPanel() {
         onQueryChange={setQuery}
         onSelect={viewDoc}
       />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <PanelHeader
           mode={mode}
           entry={currentEntry}
@@ -532,7 +532,11 @@ export function DocViewerPanel() {
           canRejoinLiveRead={isAutoReading && mode === "directory" && Boolean(currentPath)}
           onRejoinLiveRead={rejoinLiveRead}
         />
-        <div ref={contentRef} className="flex-1 overflow-y-auto">
+        <div
+          ref={contentRef}
+          className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden"
+          style={{ scrollbarGutter: "stable" }}
+        >
           {mode === "directory" ? (
             <DirectoryView recent={recentEntries} onOpen={viewDoc} />
           ) : loading ? (
@@ -555,7 +559,7 @@ export function DocViewerPanel() {
             </div>
           ) : currentEntry ? (
             <article
-              className="prose prose-invert max-w-none px-6 py-6"
+              className="prose prose-invert max-w-none overflow-x-hidden px-6 py-6 [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto"
               onClick={handleDocMathClick}
               dangerouslySetInnerHTML={{ __html: html }}
             />
@@ -601,7 +605,7 @@ function DirectoryRail({
   }, [currentRoute, query, entries]);
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-white/10 bg-slate-950/60">
+    <aside className="flex h-full w-80 shrink-0 flex-col border-r border-white/10 bg-slate-950/60">
       <div className="border-b border-white/10 p-3">
         <div className="flex items-center gap-2 rounded-lg border border-white/10 px-2">
           <Search className="h-4 w-4 text-slate-400" />
@@ -640,8 +644,8 @@ function DirectoryRail({
                       )}
                       onClick={() => onSelect(entry.route)}
                     >
-                      <p className="text-sm font-medium leading-tight">{entry.title}</p>
-                      <p className="text-[11px] text-slate-400">{entry.relativePath}</p>
+                      <p className="break-words text-sm font-medium leading-tight">{entry.title}</p>
+                      <p className="break-all text-[11px] text-slate-400">{entry.relativePath}</p>
                     </button>
                   </li>
                 );
@@ -700,10 +704,10 @@ function PanelHeader({
       : "Browse every note, digest, and ethos memo from the repo.";
 
   return (
-    <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-      <div>
-        <p className="text-[11px] uppercase tracking-wide text-slate-400">{subtitle}</p>
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
+    <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[11px] uppercase tracking-wide text-slate-400">{subtitle}</p>
+        <h2 className="truncate text-lg font-semibold text-white">{title}</h2>
         {isAutoReading ? (
           <p className="mt-0.5 text-[11px] text-cyan-200">Reading aloud with Auntie Dottie...</p>
         ) : null}
@@ -717,7 +721,7 @@ function PanelHeader({
           <p className="mt-0.5 text-[11px] text-amber-300">Read-aloud stopped: {autoReadError}</p>
         ) : null}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {isAutoReading ? (
           <Button variant="destructive" size="sm" onClick={onStopAutoRead}>
             Stop Reading

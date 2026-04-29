@@ -56,7 +56,15 @@ export type Nhm2PhaseTopologyArtifact = {
     patternMax_mps: number | null;
     patternMaxOverC: number | null;
     superluminalPatternObserved: boolean;
+    matchedDefectSpeedMax_mps: number | null;
     transportInterpretation: "pattern_only_no_energy_or_signal_claim";
+  };
+
+  seams: {
+    seamBand01: number;
+    defectsNearSeams: number;
+    seamConcentration: number;
+    maxSectorPhaseJump_rad: number;
   };
 
   phaseSpace: {
@@ -72,6 +80,21 @@ export type Nhm2PhaseTopologyArtifact = {
     defectDensityFail: number;
     closeOppositePairsReview: number;
     maxSeamJumpReview_rad: number;
+  };
+
+  researchBasis: {
+    phaseSingularityRefs: string[];
+    qiGuardrailRefs: string[];
+    casimirContextRefs: string[];
+    claimLimitations: string[];
+  };
+
+  claimLimit: {
+    metricSourceAdmitted: false;
+    energyTransportAdmitted: false;
+    signalTransportAdmitted: false;
+    strobePatternDiagnosticAdmitted: true;
+    uncertainty: "experimental_analogy_not_validated_metric_source";
   };
 
   notes: string[];

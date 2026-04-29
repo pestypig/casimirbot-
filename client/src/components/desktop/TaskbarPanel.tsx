@@ -32,9 +32,14 @@ export default function TaskbarPanel() {
 export type TaskbarShelfProps = {
   variant?: "fixed" | "panel";
   onOpenFloatingTaskbar?: () => void;
+  showWindowTabs?: boolean;
 };
 
-export function TaskbarShelf({ variant = "panel", onOpenFloatingTaskbar }: TaskbarShelfProps) {
+export function TaskbarShelf({
+  variant = "panel",
+  onOpenFloatingTaskbar,
+  showWindowTabs = true
+}: TaskbarShelfProps) {
   const {
     windows,
     open,
@@ -160,7 +165,7 @@ export function TaskbarShelf({ variant = "panel", onOpenFloatingTaskbar }: Taskb
       }`}
     >
       <div className="flex flex-1 items-center gap-2 overflow-x-auto pr-4">
-        {runningEntries.map((panel) => renderIcon(panel))}
+        {showWindowTabs ? runningEntries.map((panel) => renderIcon(panel)) : null}
       </div>
       <div className="ml-auto flex items-center gap-3">
         <TaskbarSettings

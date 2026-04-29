@@ -257,6 +257,7 @@ import { appendPhaseCalibrationLog } from "./utils/phase-calibration.ts";
 import { slewPump } from "./instruments/pump.ts";
 import { slewPumpMultiTone } from "./instruments/pump-multitone.ts";
 import { analyzeNhm2PhaseTopology } from "./energy/phase-topology.ts";
+import { applyNhm2PhaseTopologyGate } from "./energy/phase-topology-gate.ts";
 import {
   computeSectorPhaseOffsets,
   applyPhaseScheduleToPulses,
@@ -17274,18 +17275,7 @@ export async function calculateEnergyPipeline(
   }
   refreshNhm2StrictSignalReadiness(state);
   refreshNhm2ObserverAudit(state);
-  if (
-    process.env.NHM2_PHASE_TOPOLOGY_GATE === "1" &&
-    state.nhm2PhaseTopology?.status === "fail"
-  ) {
-    if (state.overallStatus !== "CRITICAL") {
-      state.overallStatus = "WARNING";
-    }
-    (state as any).topologyGuardrail = {
-      status: "fail",
-      reason: "phase topology fail; sector strobe not admissible for certified strobe-pattern claim",
-    };
-  }
+  applyNhm2PhaseTopologyGate(state as any);
   // Canonical Natario payload now mirrors solved warp metric output.
   // Legacy inverse/proxy Natario is retained under `natarioLegacy` for diagnostics.
   (state as any).natario = buildNatarioRuntimePayload(
