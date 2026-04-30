@@ -45,6 +45,7 @@ let shouldRetryVoicePlaybackDirectAttempt: typeof import("@/components/helix/Hel
 let shouldTreatVoicePlaybackErrorAsEnded: typeof import("@/components/helix/HelixAskPill").shouldTreatVoicePlaybackErrorAsEnded;
 let resolveVoicePlaybackAttemptPath: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackAttemptPath;
 let shouldBypassVoicePlaybackGraph: typeof import("@/components/helix/HelixAskPill").shouldBypassVoicePlaybackGraph;
+let shouldAutoSpeakAnswerForTurn: typeof import("@/components/helix/HelixAskPill").shouldAutoSpeakAnswerForTurn;
 let resolveInitialMicArmState: typeof import("@/components/helix/HelixAskPill").resolveInitialMicArmState;
 let shouldStopReadAloudOnButtonPress: typeof import("@/components/helix/HelixAskPill").shouldStopReadAloudOnButtonPress;
 let formatReadAloudButtonLabel: typeof import("@/components/helix/HelixAskPill").formatReadAloudButtonLabel;
@@ -122,6 +123,7 @@ beforeAll(async () => {
     shouldTreatVoicePlaybackErrorAsEnded,
     resolveVoicePlaybackAttemptPath,
     shouldBypassVoicePlaybackGraph,
+    shouldAutoSpeakAnswerForTurn,
     resolveInitialMicArmState,
     shouldStopReadAloudOnButtonPress,
     formatReadAloudButtonLabel,
@@ -296,6 +298,44 @@ describe("HelixAskPill mic-first surface contract", () => {
 });
 
 describe("HelixAskPill mic helper behavior", () => {
+  it("auto-speaks sealed final answers when the voice lane is armed", () => {
+    expect(
+      shouldAutoSpeakAnswerForTurn({
+        micArmState: "on",
+        inputSource: "manual",
+        voiceMode: "standard",
+        answerAuthority: "final",
+        toolIntent: "none",
+        finalTimelineType: "reasoning_final",
+      }),
+    ).toBe(true);
+    expect(
+      shouldAutoSpeakAnswerForTurn({
+        micArmState: "on",
+        inputSource: "voice_auto",
+        answerAuthority: "sealed_final",
+        toolIntent: "none",
+        finalTimelineType: "reasoning_final",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps automatic answer narration out of muted, non-final, and tool-only turns", () => {
+    const base = {
+      micArmState: "on" as const,
+      inputSource: "voice_auto" as const,
+      answerAuthority: "final" as const,
+      finalTimelineType: "reasoning_final",
+    };
+
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, micArmState: "off" })).toBe(false);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, userMuted: true })).toBe(false);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, answerAuthority: "provisional" })).toBe(false);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, toolIntent: "tool_only" })).toBe(false);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, toolIntent: "explicit_voice_tool" })).toBe(false);
+    expect(shouldAutoSpeakAnswerForTurn({ ...base, finalTimelineType: "action_receipt" })).toBe(false);
+  });
+
   it("defaults a fresh voice session to armed while respecting an explicit off setting", () => {
     expect(resolveInitialMicArmState(null)).toBe("on");
     expect(resolveInitialMicArmState(undefined)).toBe("on");

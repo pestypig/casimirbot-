@@ -5034,6 +5034,25 @@ export function shouldAutoSpeakVoiceDecisionLifecycle(
   return false;
 }
 
+export type VoiceAutoSpeakAnswerToolIntent = "none" | "tool_only" | "explicit_voice_tool";
+
+export function shouldAutoSpeakAnswerForTurn(args: {
+  micArmState: MicArmState;
+  inputSource?: ReasoningAttemptSource | null;
+  voiceMode?: string | null;
+  userMuted?: boolean;
+  answerAuthority?: VoicePlaybackIntentAuthority | "sealed_final" | "provisional" | null;
+  toolIntent?: VoiceAutoSpeakAnswerToolIntent | null;
+  finalTimelineType?: "reasoning_final" | "action_receipt" | string | null;
+}): boolean {
+  if (args.micArmState !== "on") return false;
+  if (args.userMuted) return false;
+  if (args.finalTimelineType && args.finalTimelineType !== "reasoning_final") return false;
+  if (args.toolIntent === "tool_only" || args.toolIntent === "explicit_voice_tool") return false;
+  if (args.answerAuthority !== "final" && args.answerAuthority !== "sealed_final") return false;
+  return args.inputSource === "voice_auto" || args.inputSource === "manual";
+}
+
 export function isGenericQueuedVoiceAcknowledgement(text: string): boolean {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return false;
@@ -18531,7 +18550,17 @@ export function HelixAskPill({
                 ...(timelineDebugContext ? { helixDebugContext: timelineDebugContext } : {}),
               }),
             });
-            if (attempt.source === "voice_auto" && finalTimelineEntry.type === "reasoning_final") {
+            if (
+              shouldAutoSpeakAnswerForTurn({
+                micArmState: micArmStateRef.current,
+                inputSource: attempt.source,
+                voiceMode: missionContextControls.voiceMode,
+                userMuted: false,
+                answerAuthority: "final",
+                toolIntent: "none",
+                finalTimelineType: finalTimelineEntry.type,
+              })
+            ) {
               const voiceTurnKey = attempt.traceId ?? attempt.id;
               // Older suppressed attempts can leave a stale turn-level suppression flag behind.
               // Clear it here so the authoritative sealed final for this turn can be spoken.

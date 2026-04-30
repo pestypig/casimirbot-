@@ -174,6 +174,43 @@ describe("applyLatestWinsVoiceQueue", () => {
     expect(next.droppedUtteranceIds.sort()).toEqual(["brief-turn-c-r1", "receipt-turn-c-r1"]);
     expect(next.pendingPreemptPolicy).toBe("pending_regen");
   });
+
+  it("does not drop manual read-aloud queued for a different reply when a tool receipt arrives", () => {
+    const manual = createVoicePlaybackUtterance({
+      utteranceId: "manual-read-reply-1",
+      turnKey: "manual:reply-1",
+      kind: "manual_read_aloud",
+      authority: "final",
+      source: "manual",
+      replyId: "reply-1",
+      revision: 1,
+      text: "Manual read aloud should remain queued.",
+      eventId: "reply-1",
+      enqueuedAtMs: 1,
+    });
+    const incoming = createVoicePlaybackUtterance({
+      utteranceId: "receipt-turn-c-r1",
+      turnKey: "turn-c",
+      kind: "tool_receipt",
+      authority: "final",
+      source: "workstation",
+      revision: 1,
+      text: "Tool receipt voice output.",
+      eventId: "tool-event-1",
+      enqueuedAtMs: 2,
+    });
+    const next = applyLatestWinsVoiceQueue({
+      queue: [manual],
+      incoming,
+      active: null,
+    });
+
+    expect(next.queue.map((entry) => entry.utteranceId)).toEqual([
+      "manual-read-reply-1",
+      "receipt-turn-c-r1",
+    ]);
+    expect(next.droppedUtteranceIds).toEqual([]);
+  });
 });
 
 describe("trimVoicePlaybackQueue", () => {
