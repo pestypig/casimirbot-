@@ -21277,6 +21277,19 @@ type HelixTurnArtifact = {
   goal_hash: string;
   payload: unknown;
 };
+type HelixAskRejectedTerminalCandidate = {
+  artifact_id?: string;
+  kind?: string;
+  owner_turn_id?: string;
+  source_scope?: HelixTurnArtifactSourceScope | string;
+  rejection_reason:
+    | "wrong_turn"
+    | "wrong_goal_kind"
+    | "ambient_workspace_context"
+    | "insufficient_artifact_shape"
+    | "stale_prior_artifact"
+    | "pending_request_missing";
+};
 type HelixAskTurnSatisfactionReport = {
   satisfied: boolean;
   terminal_kind: "final_answer" | "pending_input" | "final_failure";
@@ -21292,6 +21305,7 @@ type HelixAskTurnSatisfactionReport = {
   missing_artifacts: string[];
   missing_reason?: string;
   confidence: "high" | "medium" | "low";
+  rejected_terminal_candidates?: HelixAskRejectedTerminalCandidate[];
 };
 type HelixAskTurnJobReadyLink = {
   id: string;
@@ -28526,6 +28540,59 @@ const readAskTurnLedgerArtifact = (
   kinds: string[],
 ): HelixTurnArtifact | null => artifacts.find((artifact) => kinds.includes(artifact.kind)) ?? null;
 
+const readAskTurnArtifactPayloadRecord = (artifact: HelixTurnArtifact): Record<string, unknown> | null =>
+  artifact.payload && typeof artifact.payload === "object" ? (artifact.payload as Record<string, unknown>) : null;
+
+const askTurnArtifactHasNonemptyText = (artifact: HelixTurnArtifact): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Boolean(
+    readAskTurnString(payload?.answer_text)?.trim() ||
+      readAskTurnString(payload?.plain_language_summary)?.trim() ||
+      readAskTurnString(payload?.text)?.trim(),
+  );
+};
+
+const askTurnArtifactHasEvidenceSnippets = (artifact: HelixTurnArtifact): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Array.isArray(payload?.snippets) && payload.snippets.length > 0;
+};
+
+const askTurnArtifactHasNumericValues = (artifact: HelixTurnArtifact): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Array.isArray(payload?.values) && payload.values.length > 0;
+};
+
+const askTurnArtifactHasSourcePath = (artifact: HelixTurnArtifact): boolean => {
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  return Boolean(readAskTurnString(payload?.source_path)?.trim() || readAskTurnString(payload?.path)?.trim());
+};
+
+const isAskTurnSufficientTerminalArtifact = (args: {
+  artifact: HelixTurnArtifact;
+  wantsNumeric: boolean;
+  wantsConcept: boolean;
+}): boolean => {
+  const { artifact, wantsNumeric, wantsConcept } = args;
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  const answerKind = readAskTurnString(payload?.answer_kind) ?? readAskTurnString(payload?.kind);
+  if (wantsNumeric) {
+    if (artifact.kind !== "doc_numeric_answer" && !(artifact.kind === "focused_doc_answer" && answerKind === "numeric")) {
+      return false;
+    }
+    return askTurnArtifactHasNumericValues(artifact) && askTurnArtifactHasSourcePath(artifact) && askTurnArtifactHasEvidenceSnippets(artifact);
+  }
+  if (wantsConcept) {
+    if (
+      artifact.kind !== "doc_concept_explanation" &&
+      !(artifact.kind === "focused_doc_answer" && answerKind === "concept_explanation")
+    ) {
+      return false;
+    }
+    return askTurnArtifactHasNonemptyText(artifact) && askTurnArtifactHasSourcePath(artifact) && askTurnArtifactHasEvidenceSnippets(artifact);
+  }
+  return true;
+};
+
 const evaluateTurnSatisfaction = (args: {
   goalFrame: HelixAskUniversalGoalFrame;
   currentTurnArtifacts: HelixTurnArtifact[];
@@ -28540,6 +28607,7 @@ const evaluateTurnSatisfaction = (args: {
       missing_artifacts: [],
       missing_reason: readAskTurnString(args.pendingServerRequest.reason) ?? "pending_request_active",
       confidence: "high",
+      rejected_terminal_candidates: [],
     };
   }
   const goalKind = args.goalFrame.user_goal.goal_kind;
@@ -28571,7 +28639,22 @@ const evaluateTurnSatisfaction = (args: {
             ? ["focused_doc_answer", "doc_concept_explanation"]
             : ["focused_doc_answer", "doc_summary"]
       : ["turn_final_text", "focused_doc_answer", "doc_summary"];
-  const terminalArtifact = readAskTurnLedgerArtifact(args.currentTurnArtifacts, terminalKinds);
+  const rejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [];
+  const terminalArtifact =
+    args.currentTurnArtifacts.find((artifact) => {
+      if (!terminalKinds.includes(artifact.kind)) return false;
+      const sufficient = isAskTurnSufficientTerminalArtifact({ artifact, wantsNumeric, wantsConcept });
+      if (!sufficient) {
+        rejectedTerminalCandidates.push({
+          artifact_id: artifact.artifact_id,
+          kind: artifact.kind,
+          owner_turn_id: artifact.turn_id,
+          source_scope: artifact.source_scope,
+          rejection_reason: "insufficient_artifact_shape",
+        });
+      }
+      return sufficient;
+    }) ?? null;
   if (terminalArtifact) {
     return {
       satisfied: true,
@@ -28586,6 +28669,7 @@ const evaluateTurnSatisfaction = (args: {
             : "artifact_synthesis",
       missing_artifacts: [],
       confidence: "high",
+      rejected_terminal_candidates: rejectedTerminalCandidates,
     };
   }
   const missing = terminalKinds.filter((kind) => !args.currentTurnArtifacts.some((artifact) => artifact.kind === kind));
@@ -28596,6 +28680,7 @@ const evaluateTurnSatisfaction = (args: {
     missing_artifacts: missing,
     missing_reason: missing.length > 0 ? `missing:${missing.join(",")}` : "terminal_artifact_unavailable",
     confidence: "medium",
+    rejected_terminal_candidates: rejectedTerminalCandidates,
   };
 };
 
@@ -85660,29 +85745,58 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             reason: readAskTurnString(payload.final_composer_fail_reason) ?? readAskTurnString(payload.quality_contract_fail_reason),
           }
         : null;
-    const universalComposerOutput = composeAskTurnUniversalFinalAnswer({
-      goal_frame: finalGoalFrame,
-      plan_items: finalPlanItems,
-      execution_trace: finalExecutionTrace,
-      observations: finalObservations,
-      step_results: finalStepResults,
-      artifacts: collectAskTurnUniversalComposerArtifacts({
-        stepResults: finalStepResults,
-        runtime: finalRuntime,
-        seed:
-          payload.latest_result_artifact && typeof payload.latest_result_artifact === "object"
-            ? { turn_final_text: payload.latest_result_artifact }
-            : null,
-      }),
-      pending_request: finalPendingRequest,
-      failure: finalFailure,
-      observe_then_decide_trace: finalObserveThenDecideTrace,
-      fallback_text: finalText,
-      transcript: questionSeed,
-      workspace_snapshot: finalWorkspaceSnapshot,
-      selected_action: selectedActionForComposer,
-      runtime: finalRuntime,
-    });
+    const finalToolChoiceRecord =
+      payload.tool_choice_arbitration && typeof payload.tool_choice_arbitration === "object"
+        ? (payload.tool_choice_arbitration as Record<string, unknown>)
+        : null;
+    const forceModelOnlyTerminal =
+      readAskTurnString(finalToolChoiceRecord?.answer_scope) === "model_only" &&
+      readAskTurnString(finalToolChoiceRecord?.evidence_need) === "none" &&
+      readAskTurnString(finalToolChoiceRecord?.first_step) === "model";
+    const modelOnlySelectedFinal =
+      readAskTurnString(payload.selected_final_answer) ??
+      readAskTurnString(payload.assistant_answer) ??
+      readAskTurnString(payload.answer) ??
+      readAskTurnString(payload.text);
+    const universalComposerOutput: HelixAskUniversalFinalComposerOutput = forceModelOnlyTerminal
+      ? {
+          text: ensureAskTurnTerminalText(modelOnlySelectedFinal ?? finalText, questionSeed),
+          source:
+            readAskTurnString(payload.final_answer_source) === "typed_failure"
+              ? "typed_failure"
+              : "no_tool_direct",
+          status:
+            readAskTurnString(payload.final_answer_source) === "typed_failure"
+              ? "final_failure"
+              : "final_answer",
+          consumed_artifacts: ["direct_answer_text"],
+          presentation_renderer: "direct_answer",
+          terminal_allowed: true,
+          fail_reason: null,
+        }
+      : composeAskTurnUniversalFinalAnswer({
+          goal_frame: finalGoalFrame,
+          plan_items: finalPlanItems,
+          execution_trace: finalExecutionTrace,
+          observations: finalObservations,
+          step_results: finalStepResults,
+          artifacts: collectAskTurnUniversalComposerArtifacts({
+            stepResults: finalStepResults,
+            runtime: finalRuntime,
+            seed:
+              payload.latest_result_artifact && typeof payload.latest_result_artifact === "object"
+                ? { turn_final_text: payload.latest_result_artifact }
+                : null,
+          }),
+          pending_request: finalPendingRequest,
+          failure: finalFailure,
+          observe_then_decide_trace: finalObserveThenDecideTrace,
+          fallback_text: finalText,
+          transcript: questionSeed,
+          workspace_snapshot: finalWorkspaceSnapshot,
+          selected_action: selectedActionForComposer,
+          runtime: finalRuntime,
+        });
     finalText = universalComposerOutput.text;
     resolvedFinalStatus = universalComposerOutput.status;
     const currentTurnArtifacts = collectAskTurnCurrentTurnLedgerArtifacts({
@@ -85734,12 +85848,60 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         });
       }
     }
+    const finalSatisfactionGoalFrame: HelixAskUniversalGoalFrame = forceModelOnlyTerminal
+      ? {
+          ...finalGoalFrame,
+          user_goal: {
+            ...finalGoalFrame.user_goal,
+            goal_kind: "conversation",
+            confidence: Math.max(finalGoalFrame.user_goal.confidence, 0.9),
+          },
+        }
+      : finalGoalFrame;
     const finalSatisfactionReport = evaluateTurnSatisfaction({
-      goalFrame: finalGoalFrame,
+      goalFrame: finalSatisfactionGoalFrame,
       currentTurnArtifacts,
       workspaceState: finalWorkspaceSnapshot,
       pendingServerRequest: finalPendingRequest,
     });
+    const rejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [
+      ...(finalSatisfactionReport.rejected_terminal_candidates ?? []),
+    ];
+    if (forceModelOnlyTerminal) {
+      for (const artifact of currentTurnArtifacts) {
+        if (
+          [
+            "doc_summary",
+            "focused_doc_answer",
+            "doc_numeric_answer",
+            "doc_concept_explanation",
+            "doc_location_matches",
+            "comparison_summary",
+            "doc_vs_note_compare",
+            "note_update_receipt",
+            "active_doc_path",
+          ].includes(artifact.kind)
+        ) {
+          rejectedTerminalCandidates.push({
+            artifact_id: artifact.artifact_id,
+            kind: artifact.kind,
+            owner_turn_id: artifact.turn_id,
+            source_scope: artifact.source_scope,
+            rejection_reason: "wrong_goal_kind",
+          });
+        }
+      }
+      const ambientActiveDocPath = normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath);
+      if (ambientActiveDocPath) {
+        rejectedTerminalCandidates.push({
+          artifact_id: "workspace_context_snapshot.activeDocPath",
+          kind: "active_doc_path",
+          owner_turn_id: "workspace_state",
+          source_scope: "workspace_state",
+          rejection_reason: "ambient_workspace_context",
+        });
+      }
+    }
     const rejectedPriorArtifacts: Array<Record<string, unknown>> = [];
     const fallbackLooksLikePriorCompare =
       /\b(?:compared|key differences|missing from note|already in note|doc-vs-note)\b/i.test(finalText) &&
@@ -85766,6 +85928,31 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         finalText = "I could not complete this turn because a pending-input state was requested without a pending server request.";
       }
     }
+    const focusedAnswerKind = classifyAskTurnFocusedDocAnswerKind(questionSeed);
+    const focusedTerminalMissing =
+      !forceModelOnlyTerminal &&
+      resolvedFinalStatus === "final_answer" &&
+      !finalSatisfactionReport.satisfied &&
+      (focusedAnswerKind === "numeric" || focusedAnswerKind === "concept_explanation") &&
+      (finalSatisfactionReport.missing_artifacts.some((kind) =>
+        ["focused_doc_answer", "doc_numeric_answer", "doc_concept_explanation"].includes(kind),
+      ) ||
+        rejectedTerminalCandidates.some((candidate) => candidate.rejection_reason === "insufficient_artifact_shape"));
+    if (focusedTerminalMissing) {
+      const activeDocPath = normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath);
+      const missingCode =
+        focusedAnswerKind === "numeric" ? "numeric_result_unavailable" : "concept_explanation_unavailable";
+      const referenceBlock = activeDocPath
+        ? `\n${renderAskTurnDocReferenceBlock({ heading: "Source", path: activeDocPath })}`
+        : "";
+      resolvedFinalStatus = "final_failure";
+      payload.response_type = "final_failure";
+      payload.terminal_error_code = missingCode;
+      finalText =
+        focusedAnswerKind === "numeric"
+          ? `I found document context, but I could not extract a supported numeric result for this turn.${referenceBlock}\nCause: ${missingCode}.`
+          : `I found document context, but I could not produce a sourced plain-language concept explanation for this turn.${referenceBlock}\nCause: ${missingCode}.`;
+    }
     payload.response_type = universalComposerOutput.status;
     if (payload.response_type !== resolvedFinalStatus) payload.response_type = resolvedFinalStatus;
     payload.universal_goal_frame = finalGoalFrame;
@@ -85779,7 +85966,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       fail_reason: universalComposerOutput.fail_reason,
     };
     payload.current_turn_artifact_ledger = currentTurnArtifacts;
-    payload.satisfaction_report = finalSatisfactionReport;
+    payload.satisfaction_report = {
+      ...finalSatisfactionReport,
+      rejected_terminal_candidates: rejectedTerminalCandidates,
+    };
+    payload.rejected_terminal_candidates = rejectedTerminalCandidates;
     payload.final_artifact_scope =
       finalSatisfactionReport.terminal_artifact_id || resolvedFinalStatus === "final_answer"
         ? "current_turn"
@@ -86365,6 +86556,18 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     for (const event of modelOnlyTurnEvents) {
       askTurnEventSink?.emit(event);
     }
+    const modelOnlyTerminalArtifactId = `${turnId}:model_only_reasoning:direct_answer_text:1`;
+    const modelOnlyRejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [];
+    const modelOnlyAmbientActiveDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSessionSnapshot?.activeDocPath);
+    if (modelOnlyAmbientActiveDocPath) {
+      modelOnlyRejectedTerminalCandidates.push({
+        artifact_id: "workspace_context_snapshot.activeDocPath",
+        kind: "active_doc_path",
+        owner_turn_id: "workspace_state",
+        source_scope: "workspace_state",
+        rejection_reason: "ambient_workspace_context",
+      });
+    }
     return respondAskTurn(200, {
       ok: modelOnlyAnswer.source !== "typed_failure",
       text: modelOnlyText,
@@ -86387,6 +86590,39 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       terminal_error_code: modelOnlyAnswer.source === "typed_failure" ? "model_only_answer_unavailable" : undefined,
       final_answer_source: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "no_tool_direct",
       selected_final_answer: modelOnlyText,
+      final_artifact_scope: "current_turn",
+      terminal_artifact_kind: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "direct_answer_text",
+      terminal_artifact_id: modelOnlyTerminalArtifactId,
+      terminal_artifact_owner_turn_id: turnId,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: modelOnlyTerminalArtifactId,
+          turn_id: turnId,
+          producer_item_id: "model_only_reasoning",
+          kind: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "direct_answer_text",
+          created_at_ms: Date.now(),
+          source_scope: "current_turn",
+          goal_hash: hashAskTurnGoalFrame(modelOnlyGoalFrame),
+          payload: {
+            kind: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "direct_answer_text",
+            text: modelOnlyText,
+            answer_text: modelOnlyText,
+            error: modelOnlyAnswer.error ?? null,
+          },
+        },
+      ],
+      satisfaction_report: {
+        satisfied: modelOnlyAnswer.source !== "typed_failure",
+        terminal_kind: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
+        terminal_artifact_id: modelOnlyTerminalArtifactId,
+        terminal_artifact_kind: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "direct_answer_text",
+        terminal_source: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "direct_answer_text",
+        missing_artifacts: modelOnlyAnswer.source === "typed_failure" ? ["direct_answer_text"] : [],
+        missing_reason: modelOnlyAnswer.error ?? null,
+        confidence: modelOnlyAnswer.source === "typed_failure" ? "medium" : "high",
+        rejected_terminal_candidates: modelOnlyRejectedTerminalCandidates,
+      },
+      rejected_terminal_candidates: modelOnlyRejectedTerminalCandidates,
       universal_goal_frame: modelOnlyGoalFrame,
       capability_selection_result: modelOnlyCapabilitySelection,
       tool_choice_arbitration: modelOnlyToolChoice,

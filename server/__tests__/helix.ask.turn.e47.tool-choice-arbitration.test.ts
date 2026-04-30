@@ -39,6 +39,40 @@ describe("helix ask E47 tool-choice arbitration", () => {
     expect(answerText(response.body)).not.toMatch(/retrieval recovery|current document|No active document/i);
   }, 60000);
 
+  it("does not let ambient active-doc context hijack conceptual versus questions", async () => {
+    const app = createApp();
+    const activePath = "/docs/research/nhm2-frontier-distance-report.md";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Can you explain proper time vs coordinate time in simple terms?",
+        mode: "read",
+        debug: true,
+        sessionId: `e47-conceptual-vs-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "docs",
+          activeDocPath: activePath,
+          docViewer: {
+            currentPath: activePath,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.tool_choice_arbitration?.answer_scope).toBe("model_only");
+    expect(response.body?.tool_choice_arbitration?.evidence_need).toBe("none");
+    expect(response.body?.terminal_artifact_kind).not.toBe("doc_summary");
+    expect(answerText(response.body)).not.toMatch(/Explained\s+\/docs|Compared\s+\//i);
+    expect(response.body?.rejected_terminal_candidates ?? []).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "active_doc_path",
+          rejection_reason: "ambient_workspace_context",
+        }),
+      ]),
+    );
+  }, 60000);
+
   it("keeps active-doc concept explanations workspace grounded and seeds a concept locate step", async () => {
     const app = createApp();
     const activePath =

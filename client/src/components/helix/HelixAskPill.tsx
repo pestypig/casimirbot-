@@ -9025,6 +9025,9 @@ function buildReplyMasterEventClockExport(args: {
       current_turn_artifact_ledger: Array.isArray(args.reply.debug?.current_turn_artifact_ledger)
         ? args.reply.debug.current_turn_artifact_ledger
         : [],
+      rejected_terminal_candidates: Array.isArray(args.reply.debug?.rejected_terminal_candidates)
+        ? args.reply.debug.rejected_terminal_candidates
+        : [],
       rejected_prior_artifacts: Array.isArray(args.reply.debug?.rejected_prior_artifacts)
         ? args.reply.debug.rejected_prior_artifacts
         : [],
@@ -23613,6 +23616,9 @@ export function HelixAskPill({
                   : null,
               current_turn_artifact_ledger: Array.isArray(localResponseRecord.current_turn_artifact_ledger)
                 ? localResponseRecord.current_turn_artifact_ledger
+                : [],
+              rejected_terminal_candidates: Array.isArray(localResponseRecord.rejected_terminal_candidates)
+                ? localResponseRecord.rejected_terminal_candidates
                 : [],
               rejected_prior_artifacts: Array.isArray(localResponseRecord.rejected_prior_artifacts)
                 ? localResponseRecord.rejected_prior_artifacts

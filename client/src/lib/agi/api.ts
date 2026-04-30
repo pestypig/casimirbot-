@@ -229,6 +229,7 @@ export type LocalAskResponse = {
   final_artifact_scope?: string | null;
   satisfaction_report?: Record<string, unknown> | null;
   current_turn_artifact_ledger?: unknown[];
+  rejected_terminal_candidates?: unknown[];
   rejected_prior_artifacts?: unknown[];
   agent_loop_summary?: string;
   ok?: boolean;
