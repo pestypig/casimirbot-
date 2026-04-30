@@ -99,7 +99,11 @@ function collectPanelIdsFromStructure(
   }
 }
 
-export default function DesktopPage() {
+export default function DesktopPage({
+  layoutVariant = "desktop",
+}: {
+  layoutVariant?: "desktop" | "mobile";
+}) {
   const { windows, registerFromManifest, open } = useDesktopStore();
   const workstationMode = useWorkstationLayoutStore((state) => state.mode);
   const { userSettings, updateSettings } = useHelixStartSettings();
@@ -133,7 +137,8 @@ export default function DesktopPage() {
   const allowAutoOpen = false;
   const workstationEnabledFlag =
     String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_SHELL ?? "1") !== "0";
-  const workstationEnabled = workstationEnabledFlag && workstationMode === "workstation";
+  const workstationEnabled =
+    workstationEnabledFlag && (workstationMode === "workstation" || layoutVariant === "mobile");
 
   const openPanelUniversal = useCallback(
     (panelId: string) => {
@@ -750,7 +755,10 @@ export default function DesktopPage() {
         </div>
 
         {workstationEnabled ? (
-          <HelixWorkstationShell onOpenPanel={openPanelUniversal} />
+          <HelixWorkstationShell
+            layoutVariant={layoutVariant}
+            onOpenPanel={openPanelUniversal}
+          />
         ) : (
           <>
             <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
@@ -782,11 +790,13 @@ export default function DesktopPage() {
           </>
         )}
 
-        <DesktopTaskbar
-          onOpenPanel={openPanelUniversal}
-          showStart={!workstationEnabled}
-          showWindowTabs={!workstationEnabled}
-        />
+        {layoutVariant === "desktop" ? (
+          <DesktopTaskbar
+            onOpenPanel={openPanelUniversal}
+            showStart={!workstationEnabled}
+            showWindowTabs={!workstationEnabled}
+          />
+        ) : null}
       </div>
 
       <HelixSettingsDialogContent

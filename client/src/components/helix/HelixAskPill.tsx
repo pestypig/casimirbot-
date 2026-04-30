@@ -13404,16 +13404,39 @@ export function HelixAskPill({
       if (typeof window !== "undefined") {
         (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
       }
-      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-        return;
-      }
+      let copied = false;
       try {
-        await navigator.clipboard.writeText(exportPayload);
+        if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+          await navigator.clipboard.writeText(exportPayload);
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+      if (!copied && typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.value = exportPayload;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+          copied = document.execCommand("copy");
+        } catch {
+          copied = false;
+        } finally {
+          document.body.removeChild(textarea);
+        }
+      }
+      if (copied) {
         setCopiedReplyMasterDebugId(reply.id);
         window.setTimeout(() => {
           setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
         }, 1400);
-      } catch {
+      } else {
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
             "clipboard_write_failed";
@@ -26674,12 +26697,10 @@ export function HelixAskPill({
                       type="button"
                       onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                       disabled={
-                        typeof navigator === "undefined" ||
-                        typeof navigator.clipboard?.writeText !== "function"
+                        typeof window === "undefined"
                       }
                       className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                        typeof navigator !== "undefined" &&
-                        typeof navigator.clipboard?.writeText === "function"
+                        typeof window !== "undefined"
                           ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
                           : "border-slate-600 text-slate-500"
                       }`}
@@ -26751,12 +26772,10 @@ export function HelixAskPill({
                         type="button"
                         onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                         disabled={
-                          typeof navigator === "undefined" ||
-                          typeof navigator.clipboard?.writeText !== "function"
+                          typeof window === "undefined"
                         }
                         className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                          typeof navigator !== "undefined" &&
-                          typeof navigator.clipboard?.writeText === "function"
+                          typeof window !== "undefined"
                             ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
                             : "border-slate-600 text-slate-500"
                         }`}

@@ -6,23 +6,34 @@ import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 export function HelixAskDock({
   widthPx,
   collapsed,
+  placement = "side",
   onOpenPanel,
   onOpenConversation,
 }: {
-  widthPx: number;
+  widthPx: number | string;
   collapsed: boolean;
+  placement?: "side" | "bottom";
   onOpenPanel: (panelId: PanelDefinition["id"]) => void;
   onOpenConversation: (sessionId: string) => void;
 }) {
   const toggleChatDock = useWorkstationLayoutStore((state) => state.toggleChatDock);
+  const isBottomPlacement = placement === "bottom";
 
   return (
     <aside
-      className="relative z-20 h-full min-h-0 border-l border-white/10 bg-slate-950/80 backdrop-blur"
+      className={`relative z-20 min-h-0 bg-slate-950/80 backdrop-blur ${
+        isBottomPlacement
+          ? "h-full w-full border-t border-white/10"
+          : "h-full border-l border-white/10"
+      }`}
       style={{ width: widthPx }}
     >
-      <div className="flex h-full min-h-0 flex-col px-2 py-2">
-        <div className="mb-2 flex items-center justify-between">
+      <div
+        className={`flex h-full min-h-0 flex-col px-2 ${
+          isBottomPlacement ? "pb-2 pt-1" : "py-2"
+        }`}
+      >
+        <div className={`${isBottomPlacement ? "mb-1" : "mb-2"} flex items-center justify-between`}>
           <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Helix Ask</span>
           <button
             type="button"

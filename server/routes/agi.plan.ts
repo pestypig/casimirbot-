@@ -20657,10 +20657,14 @@ const generateAskTurnModelOnlyAnswer = async (args: {
       error: "model_only_empty_answer",
     };
   } catch (error) {
+    const errorText = error instanceof Error ? error.message : String(error);
     return {
-      text: "I can answer this as a general conceptual question, but the model backend was unavailable for this turn.",
+      text:
+        errorText === "model_only_answer_timeout" || errorText === "model_only_answer_repair_timeout"
+          ? "I can answer this as a general conceptual question, but the direct model-only answer timed out for this turn."
+          : "I can answer this as a general conceptual question, but the model backend was unavailable for this turn.",
       source: "typed_failure",
-      error: error instanceof Error ? error.message : String(error),
+      error: errorText,
     };
   }
 };
@@ -23338,11 +23342,19 @@ const maskAskTurnProtectedArgumentSpansForIntent = (transcript: string): string 
   );
 };
 
+const askTurnHasExplicitWorkspaceCompareOperand = (normalizedTranscript: string): boolean =>
+  /\/(?:docs|notes|artifacts)\//i.test(normalizedTranscript) ||
+  /\b(?:doc|docs|document|paper|note|notes|notepad|scratch|memo|pad|workspace)\b/i.test(normalizedTranscript) ||
+  /\b(?:this|that|the|current|active)\s+(?:doc|document|paper|note|notepad|scratch|memo|pad)\b/i.test(normalizedTranscript) ||
+  /\b(?:against|with|to)\s+(?:the\s+)?(?:doc|docs|document|paper|note|notes|notepad|scratch|memo|pad)\b/i.test(
+    normalizedTranscript,
+  );
+
 const isAskTurnConceptualVsQuestion = (transcript: string): boolean => {
-  const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).toLowerCase();
-  if (!/\b(?:versus|vs\.?)\b/i.test(normalized)) return false;
-  if (!/\b(?:what\s+is|what\s+are|define|explain|why|how|difference\s+between)\b/i.test(normalized)) return false;
-  return !/\b(?:doc|docs|document|paper|note|notepad|scratch|memo|pad|compare\s+(?:this|that|the|current|active)|against\s+(?:note|doc|document|paper)|with\s+(?:note|doc|document|paper))\b/i.test(
+  const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).toLowerCase().replace(/\s+/g, " ");
+  if (!/\b(?:versus|vs\.?|difference\s+between|compare|contrast)\b/i.test(normalized)) return false;
+  if (askTurnHasExplicitWorkspaceCompareOperand(normalized)) return false;
+  return /\b(?:what\s+is|what\s+are|define|explain|why|how|difference\s+between|simple\s+words|simple\s+terms|plain\s+english|plain\s+language|basically|is\s+that|proper\s+time|coordinate\s+time|clock\s+riding|clock\s+rides|traveler\s+clock|coordinate\s+label|background\s+question|conceptual\s+question)\b/i.test(
     normalized,
   );
 };
@@ -28715,6 +28727,33 @@ const askTurnArtifactHasSourcePath = (artifact: HelixTurnArtifact): boolean => {
 const extractAskTurnScientificNumericTokens = (transcript: string): string[] =>
   Array.from(new Set(Array.from(transcript.matchAll(/\b\d+p\d+\b|\b\d+\.\d+\b/gi)).map((match) => match[0].trim()).filter(Boolean)));
 
+const normalizeAskTurnScientificNumericTokens = (tokens: string[]): string[] => {
+  const normalized = new Set<string>();
+  for (const rawToken of tokens) {
+    const token = rawToken.trim();
+    if (!token) continue;
+    normalized.add(token);
+    if (token.includes("p")) {
+      const decimal = token.replace(/p/gi, ".");
+      normalized.add(decimal);
+      normalized.add(`alpha ${token}`);
+      normalized.add(`alpha ${decimal}`);
+      normalized.add(`alpha=${decimal}`);
+      normalized.add(`α ${decimal}`);
+      continue;
+    }
+    if (token.includes(".")) {
+      const pForm = token.replace(/\./g, "p");
+      normalized.add(pForm);
+      normalized.add(`alpha ${token}`);
+      normalized.add(`alpha ${pForm}`);
+      normalized.add(`alpha=${token}`);
+      normalized.add(`α ${token}`);
+    }
+  }
+  return Array.from(normalized);
+};
+
 const classifyAskTurnScientificGoal = (
   transcript: string,
 ): {
@@ -28725,8 +28764,9 @@ const classifyAskTurnScientificGoal = (
 } | null => {
   const normalized = transcript.trim();
   if (!/\bnhm2\b/i.test(normalized) || !/\balpha\b/i.test(normalized)) return null;
-  const numericTokens = extractAskTurnScientificNumericTokens(normalized);
-  if (numericTokens.length === 0) return null;
+  const rawNumericTokens = extractAskTurnScientificNumericTokens(normalized);
+  if (rawNumericTokens.length === 0) return null;
+  const numericTokens = normalizeAskTurnScientificNumericTokens(rawNumericTokens);
   const asksNumeric =
     /\b(?:key\s+numeric\s+result|numeric\s+result|frontier\s+distance|\bdistance\b|\bvalue\b|\bvalues\b|how\s+much|result\s+for\s+alpha|tell\s+me\s+the\s+key\s+numeric)\b/i.test(
       normalized,
@@ -28743,10 +28783,37 @@ const classifyAskTurnScientificGoal = (
     classifier_reasons: [
       "nhm2_anchor",
       "alpha_anchor",
-      `numeric_tokens:${numericTokens.join(",")}`,
+      `numeric_tokens:${rawNumericTokens.join(",")}`,
+      `normalized_numeric_tokens:${numericTokens.join(",")}`,
       asksNumeric ? "numeric_request" : "concept_explanation_request",
     ],
   };
+};
+
+const resolveAskTurnScientificMissingCode = (
+  kind: "numeric" | "concept_explanation" | HelixAskCanonicalGoalKind | null | undefined,
+): "numeric_result_unavailable" | "concept_explanation_unavailable" | null => {
+  if (kind === "numeric" || kind === "doc_scientific_numeric") return "numeric_result_unavailable";
+  if (kind === "concept_explanation" || kind === "doc_scientific_concept") return "concept_explanation_unavailable";
+  return null;
+};
+
+const renderAskTurnScientificMissingFinalText = (args: {
+  code: "numeric_result_unavailable" | "concept_explanation_unavailable";
+  sourcePath?: string | null;
+  candidateCount?: number | null;
+}): string => {
+  const referenceBlock = args.sourcePath
+    ? `\n${renderAskTurnDocReferenceBlock({ heading: "Source", path: args.sourcePath })}`
+    : "";
+  const candidateText =
+    typeof args.candidateCount === "number" && Number.isFinite(args.candidateCount)
+      ? ` Candidates considered: ${Math.max(0, Math.trunc(args.candidateCount))}.`
+      : "";
+  if (args.code === "numeric_result_unavailable") {
+    return `I found or attempted NHM2 scientific source acquisition, but I could not extract a supported numeric result with values, source path, and snippets for this turn.${candidateText}${referenceBlock}\nCause: numeric_result_unavailable.`;
+  }
+  return `I found or attempted NHM2 scientific source acquisition, but I could not produce a sourced plain-language explanation with source path and snippets for this turn.${candidateText}${referenceBlock}\nCause: concept_explanation_unavailable.`;
 };
 
 const buildAskTurnCanonicalGoalFrame = (args: {
@@ -84968,7 +85035,17 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         runtimeTerminalText && !isGenericAskTurnTerminalText(runtimeTerminalText) ? runtimeTerminalText : null;
       const substantiveTerminalCandidate =
         terminalCandidate && !isGenericAskTurnTerminalText(terminalCandidate) ? terminalCandidate : null;
+      const scientificTerminalErrorCode = readAskTurnString(payload.terminal_error_code);
+      const scientificTerminalErrorText =
+        scientificTerminalErrorCode === "numeric_result_unavailable" ||
+        scientificTerminalErrorCode === "concept_explanation_unavailable"
+          ? renderAskTurnScientificMissingFinalText({
+              code: scientificTerminalErrorCode,
+              sourcePath: readAskTurnWorkspaceSnapshotPath(payload),
+            })
+          : null;
       const resolvedTerminalText =
+        scientificTerminalErrorText ??
         substantivePayloadText ??
         substantiveLatestResultText ??
         substantiveRuntimeTerminalText ??
@@ -85095,6 +85172,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       };
       payload.turn_truth_table = truthTable;
       payload.selected_final_answer = resolvedTerminalText;
+      if (scientificTerminalErrorText) {
+        payload.text = scientificTerminalErrorText;
+        payload.answer = scientificTerminalErrorText;
+        payload.assistant_answer = scientificTerminalErrorText;
+      }
       if (finalAnswerSource || typeof payload.final_answer_source !== "string") {
         payload.final_answer_source =
           finalAnswerSource ??
@@ -86532,29 +86614,68 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       }
     }
     const focusedAnswerKind = classifyAskTurnFocusedDocAnswerKind(questionSeed);
+    const scientificMissingCode = resolveAskTurnScientificMissingCode(canonicalGoalFrame.goal_kind);
+    const hasValidScientificTerminal =
+      scientificMissingCode === "numeric_result_unavailable"
+        ? currentTurnArtifacts.some((artifact: HelixTurnArtifact) =>
+            isAskTurnSufficientTerminalArtifact({ artifact, wantsNumeric: true, wantsConcept: false }),
+          )
+      : scientificMissingCode === "concept_explanation_unavailable"
+        ? currentTurnArtifacts.some((artifact: HelixTurnArtifact) =>
+            isAskTurnSufficientTerminalArtifact({ artifact, wantsNumeric: false, wantsConcept: true }),
+          )
+        : false;
+    const existingScientificTypedFailure =
+      finalSatisfactionReport.terminal_artifact_kind === "typed_failure" &&
+      scientificMissingCode &&
+      readAskTurnString(payload.terminal_error_code) === scientificMissingCode;
+    if (existingScientificTypedFailure && scientificMissingCode && !finalText.includes(scientificMissingCode)) {
+      finalText = renderAskTurnScientificMissingFinalText({
+        code: scientificMissingCode,
+        sourcePath: normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath),
+      });
+      payload.text = finalText;
+      payload.answer = finalText;
+      payload.assistant_answer = finalText;
+      payload.selected_final_answer = finalText;
+      payload.scientific_extraction_failed = true;
+      payload.scientific_extraction_fail_reason = scientificMissingCode;
+    }
     const focusedTerminalMissing =
       !forceModelOnlyTerminal &&
-      resolvedFinalStatus === "final_answer" &&
-      !finalSatisfactionReport.satisfied &&
-      (focusedAnswerKind === "numeric" || focusedAnswerKind === "concept_explanation") &&
-      (finalSatisfactionReport.missing_artifacts.some((kind) =>
-        ["focused_doc_answer", "doc_numeric_answer", "doc_concept_explanation"].includes(kind),
-      ) ||
-        rejectedTerminalCandidates.some((candidate) => candidate.rejection_reason === "insufficient_artifact_shape"));
+      !existingScientificTypedFailure &&
+      !hasValidScientificTerminal &&
+      (Boolean(scientificMissingCode) ||
+        (resolvedFinalStatus === "final_answer" &&
+          (focusedAnswerKind === "numeric" || focusedAnswerKind === "concept_explanation"))) &&
+      (!finalSatisfactionReport.satisfied ||
+        resolvedFinalStatus === "final_failure" ||
+        resolvedFinalStatus === "pending_input") &&
+      (Boolean(scientificMissingCode) ||
+        readAskTurnString(payload.terminal_error_code) === "retrieval_recovery_failed" ||
+        finalSatisfactionReport.missing_artifacts.some((kind: string) =>
+          ["focused_doc_answer", "doc_numeric_answer", "doc_concept_explanation"].includes(kind),
+        ) ||
+        rejectedTerminalCandidates.some(
+          (candidate: HelixAskRejectedTerminalCandidate) => candidate.rejection_reason === "insufficient_artifact_shape",
+        ));
     if (focusedTerminalMissing) {
       const activeDocPath = normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath);
       const missingCode =
-        focusedAnswerKind === "numeric" ? "numeric_result_unavailable" : "concept_explanation_unavailable";
-      const referenceBlock = activeDocPath
-        ? `\n${renderAskTurnDocReferenceBlock({ heading: "Source", path: activeDocPath })}`
-        : "";
+        scientificMissingCode ?? (focusedAnswerKind === "numeric" ? "numeric_result_unavailable" : "concept_explanation_unavailable");
+      const priorTerminalErrorCode = readAskTurnString(payload.terminal_error_code);
       resolvedFinalStatus = "final_failure";
       payload.response_type = "final_failure";
       payload.terminal_error_code = missingCode;
-      finalText =
-        focusedAnswerKind === "numeric"
-          ? `I found document context, but I could not extract a supported numeric result for this turn.${referenceBlock}\nCause: ${missingCode}.`
-          : `I found document context, but I could not produce a sourced plain-language concept explanation for this turn.${referenceBlock}\nCause: ${missingCode}.`;
+      payload.scientific_extraction_failed = true;
+      payload.scientific_extraction_fail_reason = missingCode;
+      payload.retrieval_recovery_superseded_by = priorTerminalErrorCode === "retrieval_recovery_failed"
+        ? missingCode
+        : payload.retrieval_recovery_superseded_by;
+      finalText = renderAskTurnScientificMissingFinalText({
+        code: missingCode,
+        sourcePath: activeDocPath,
+      });
       currentTurnArtifacts = mergeAskTurnLedgerArtifacts([
         ...currentTurnArtifacts,
         {
@@ -86748,6 +86869,30 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     payload.canonical_goal_frame = canonicalGoalFrame;
     payload.terminal_consistency_check = terminalConsistencyCheck;
+    const finalScientificMissingCode = resolveAskTurnScientificMissingCode(canonicalGoalFrame.goal_kind);
+    if (
+      finalScientificMissingCode &&
+      (readAskTurnString(payload.terminal_error_code) === finalScientificMissingCode ||
+        finalSatisfactionReport.missing_reason === finalScientificMissingCode ||
+        finalSatisfactionReport.terminal_artifact_kind === "typed_failure") &&
+      !finalText.includes(finalScientificMissingCode)
+    ) {
+      finalText = renderAskTurnScientificMissingFinalText({
+        code: finalScientificMissingCode,
+        sourcePath: normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath),
+      });
+      payload.text = finalText;
+      payload.answer = finalText;
+      payload.assistant_answer = finalText;
+      payload.scientific_extraction_failed = true;
+      payload.scientific_extraction_fail_reason = finalScientificMissingCode;
+      if (payload.latest_result_artifact && typeof payload.latest_result_artifact === "object") {
+        (payload.latest_result_artifact as Record<string, unknown>).text = finalText;
+      }
+      if (payload.terminal_artifact && typeof payload.terminal_artifact === "object") {
+        (payload.terminal_artifact as Record<string, unknown>).text = finalText;
+      }
+    }
     payload.final_answer_source = finalAnswerSource;
     payload.selected_final_answer = finalText;
     payload.terminal_authority = "server";
@@ -86818,6 +86963,37 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       finalAnswerSource === "legacy_fallback" ? "fallback" : "backend",
       finalAnswerSource,
     );
+    const responseBoundaryScientificCode = readAskTurnString(payload.terminal_error_code);
+    if (
+      responseBoundaryScientificCode === "numeric_result_unavailable" ||
+      responseBoundaryScientificCode === "concept_explanation_unavailable"
+    ) {
+      const responseBoundaryScientificText = renderAskTurnScientificMissingFinalText({
+        code: responseBoundaryScientificCode,
+        sourcePath: normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath),
+      });
+      finalText = responseBoundaryScientificText;
+      payload.text = responseBoundaryScientificText;
+      payload.answer = responseBoundaryScientificText;
+      payload.assistant_answer = responseBoundaryScientificText;
+      payload.selected_final_answer = responseBoundaryScientificText;
+      payload.final_answer_source = "typed_failure";
+      payload.response_type = "final_failure";
+      payload.final_status = "final_failure";
+      payload.terminal_artifact_kind = "typed_failure";
+      payload.scientific_extraction_failed = true;
+      payload.scientific_extraction_fail_reason = responseBoundaryScientificCode;
+      if (payload.latest_result_artifact && typeof payload.latest_result_artifact === "object") {
+        (payload.latest_result_artifact as Record<string, unknown>).text = responseBoundaryScientificText;
+      }
+      if (payload.terminal_artifact && typeof payload.terminal_artifact === "object") {
+        (payload.terminal_artifact as Record<string, unknown>).text = responseBoundaryScientificText;
+      }
+      if (payload.turn_truth_table && typeof payload.turn_truth_table === "object") {
+        (payload.turn_truth_table as Record<string, unknown>).selected_final_answer = responseBoundaryScientificText;
+        (payload.turn_truth_table as Record<string, unknown>).final_answer_source = "typed_failure";
+      }
+    }
     attachAgentLoopAudit();
     normalizeAskTurnTopLevelEnvelope(payload, status);
     return res.status(status).json(payload);
@@ -87304,6 +87480,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       askTurnEventSink?.emit(event);
     }
     const modelOnlyTerminalArtifactId = `${turnId}:model_only_reasoning:direct_answer_text:1`;
+    const modelOnlyTerminalErrorCode =
+      modelOnlyAnswer.error === "model_only_answer_timeout" || modelOnlyAnswer.error === "model_only_answer_repair_timeout"
+        ? "model_only_direct_answer_timeout"
+        : "model_only_answer_unavailable";
     const modelOnlyRejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [];
     const modelOnlyAmbientActiveDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSessionSnapshot?.activeDocPath);
     if (modelOnlyAmbientActiveDocPath) {
@@ -87350,7 +87530,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       selected_action: null,
       response_type: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
       final_status: modelOnlyAnswer.source === "typed_failure" ? "final_failure" : "final_answer",
-      terminal_error_code: modelOnlyAnswer.source === "typed_failure" ? "model_only_answer_unavailable" : undefined,
+      terminal_error_code: modelOnlyAnswer.source === "typed_failure" ? modelOnlyTerminalErrorCode : undefined,
       final_answer_source: modelOnlyAnswer.source === "typed_failure" ? "typed_failure" : "no_tool_direct",
       selected_final_answer: modelOnlyText,
       final_artifact_scope: "current_turn",
@@ -90136,15 +90316,26 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       clearTimeout(recoveryTimeoutHandle);
     }
     if (upstreamResult === "timeout") {
-      const recoveryFailureText =
-        "I could not summarize the current document because retrieval recovery did not complete before the turn deadline. Try reopening the document or ask me to identify the current doc first.";
+      const timeoutScientificGoal = classifyAskTurnScientificGoal(transcript);
+      const timeoutScientificCode = resolveAskTurnScientificMissingCode(timeoutScientificGoal?.kind);
+      const recoveryFailureText = timeoutScientificCode
+        ? renderAskTurnScientificMissingFinalText({ code: timeoutScientificCode })
+        : "I could not summarize the current document because retrieval recovery did not complete before the turn deadline. Try reopening the document or ask me to identify the current doc first.";
       const recoveryFailureStep: HelixAskTurnPlanStep = {
-        id: "retrieval_recovery_failed",
+        id: timeoutScientificCode ?? "retrieval_recovery_failed",
         lane: "reasoning",
-        title: "Stop retrieval recovery and return a typed failure",
+        title: timeoutScientificCode
+          ? "Stop scientific extraction and return a typed failure"
+          : "Stop retrieval recovery and return a typed failure",
         status: "failed",
-        reason: "retrieval_recovery_failed",
-        required_artifacts: ["doc_summary"],
+        reason: timeoutScientificCode ?? "retrieval_recovery_failed",
+        required_artifacts: [
+          timeoutScientificGoal?.kind === "numeric"
+            ? "doc_numeric_answer"
+            : timeoutScientificGoal?.kind === "concept_explanation"
+              ? "doc_concept_explanation"
+              : "doc_summary",
+        ],
       };
       const timeoutExecutionTrace = [...executionTrace, recoveryFailureStep];
       const timeoutStepResults = buildAskTurnStepResults(timeoutExecutionTrace);
@@ -90165,10 +90356,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         route_reason_code: routeReasonCode,
         response_type: "final_failure",
         final_status: "final_failure",
-        terminal_error_code: "retrieval_recovery_failed",
+        terminal_error_code: timeoutScientificCode ?? "retrieval_recovery_failed",
         retrieval_attempted: true,
-        retrieval_fail_reason: "retrieval_recovery_failed",
-        retrieval_recovery_failed: true,
+        retrieval_fail_reason: timeoutScientificCode ?? "retrieval_recovery_failed",
+        retrieval_recovery_failed: !timeoutScientificCode,
+        scientific_extraction_failed: Boolean(timeoutScientificCode),
+        scientific_extraction_fail_reason: timeoutScientificCode ?? null,
+        normalized_scientific_numeric_tokens: timeoutScientificGoal?.numeric_tokens ?? [],
         retrieval_recovery_timeout_ms: recoveryTimeoutMs,
         retrieval_recovery_error_count: 1,
         needs_retrieval: false,

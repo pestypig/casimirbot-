@@ -29,7 +29,6 @@ import EssenceRenderPage from "@/pages/essence-render";
 import AgiRefineryDashboard from "@/pages/agi-refinery";
 import { useQiStream } from "@/hooks/useQiStream";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
-import MobileStartPage from "@/pages/mobile-start";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 import RouteBootSplash from "@/components/RouteBootSplash";
 
@@ -112,7 +111,7 @@ function StartRoute() {
     return (
       <RouteBootSplash
         message="Preparing your Helix workspace..."
-        detail="Routing to mobile start"
+        detail="Routing to mobile workstation"
       />
     );
   }
@@ -148,7 +147,7 @@ function DesktopRoute() {
 function MobileRoute() {
   return (
     <LumaWhispersProvider>
-      <MobileStartPage />
+      <DesktopPage layoutVariant="mobile" />
     </LumaWhispersProvider>
   );
 }

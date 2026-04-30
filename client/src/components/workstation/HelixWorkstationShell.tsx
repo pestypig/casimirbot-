@@ -9,8 +9,10 @@ const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
 
 export function HelixWorkstationShell({
   onOpenPanel,
+  layoutVariant = "desktop",
 }: {
   onOpenPanel: (panelId: PanelDefinition["id"]) => void;
+  layoutVariant?: "desktop" | "mobile";
 }) {
   const chatDock = useWorkstationLayoutStore((state) => state.chatDock);
   const setChatDockWidth = useWorkstationLayoutStore((state) => state.setChatDockWidth);
@@ -23,6 +25,28 @@ export function HelixWorkstationShell({
   );
 
   const visibleWidth = chatDock.collapsed ? 56 : chatDock.widthPx;
+
+  if (layoutVariant === "mobile") {
+    return (
+      <div
+        className="relative z-10 grid h-full min-h-0 w-full"
+        style={{
+          gridTemplateRows: chatDock.collapsed
+            ? "minmax(0, 1fr) 56px"
+            : "minmax(0, 1fr) minmax(300px, 46dvh)",
+        }}
+      >
+        <WorkstationStage layoutVariant="mobile" />
+        <HelixAskDock
+          widthPx="100%"
+          collapsed={chatDock.collapsed}
+          placement="bottom"
+          onOpenPanel={onOpenPanel}
+          onOpenConversation={handleOpenConversation}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
