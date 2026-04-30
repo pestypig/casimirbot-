@@ -20944,6 +20944,14 @@ type HelixConversationPendingInputRecord = {
 };
 
 const helixConversationPendingInputBySession = new Map<string, HelixConversationPendingInputRecord>();
+export const __testHelixAskPendingInputStore = {
+  set(sessionId: string, record: Record<string, unknown>): void {
+    helixConversationPendingInputBySession.set(sessionId, record as HelixConversationPendingInputRecord);
+  },
+  delete(sessionId: string): void {
+    helixConversationPendingInputBySession.delete(sessionId);
+  },
+};
 type HelixAskTurnReasoningContextMode = "attached" | "isolated";
 type HelixAskTurnWorkspaceActionLedgerEntry = {
   turn_id: string | null;
@@ -21352,6 +21360,7 @@ type HelixAskCanonicalGoalKind =
   | "model_only_concept"
   | "workspace_help"
   | "latest_doc_navigation"
+  | "doc_equation_location"
   | "doc_evidence_location"
   | "doc_scientific_numeric"
   | "doc_scientific_concept"
@@ -21376,6 +21385,7 @@ type HelixAskCanonicalAnswerScope =
 type HelixAskRequiredTerminalKind =
   | "direct_answer_text"
   | "doc_open_receipt"
+  | "doc_equation_location"
   | "doc_evidence_location"
   | "doc_numeric_answer"
   | "doc_concept_explanation"
@@ -21456,6 +21466,8 @@ type HelixAskRetrievalRequiredSignal = {
     | "latest_doc"
     | "doc_path"
     | "source_path"
+    | "equation_location"
+    | "calculator_usable_formula"
     | "evidence_location"
     | "table_row"
     | "numeric_value"
@@ -21518,11 +21530,35 @@ type HelixAskTurnScopeContract = {
 type HelixAskRetrievalQueryIntegrity = {
   original_prompt: string;
   exact_anchors: string[];
+  required_terms?: string[];
   generated_queries: string[];
   placeholder_detected: boolean;
   preserved_anchor_count: number;
+  preserved_required_terms?: string[];
+  missing_required_terms?: string[];
+  failure_reason?: "placeholder_query" | "anchor_loss" | "equation_target_loss" | "calculator_target_loss";
   missing_anchors: string[];
   valid: boolean;
+};
+type HelixAskDocumentSeekingIntent = {
+  required: boolean;
+  terms: string[];
+  reason: string;
+};
+type HelixAskEquationRetrievalIntent = {
+  turn_id: string;
+  required: boolean;
+  strength: "hard" | "soft" | "none";
+  requested_outputs: Array<"document" | "paper" | "source_path" | "equation_location" | "calculator_usable_formula">;
+  anchors: {
+    corpus_terms: string[];
+    equation_terms: string[];
+    calculator_terms: string[];
+    document_terms: string[];
+    exact_tokens: string[];
+  };
+  negative_scope_blocked: boolean;
+  reasons: string[];
 };
 type HelixAskNoToolContaminationCheck = {
   turn_id: string;
@@ -21551,7 +21587,7 @@ type HelixAskEvidenceTargetRequest = {
   artifact_ids: string[];
   location_kind: "token" | "table" | "field" | "row" | "formula" | "source_path";
   binding_mode: "exact" | "all_required" | "nearest_with_caveat";
-  requested_output: "location" | "numeric_value" | "concept_explanation" | "latest_doc" | "note_mutation";
+  requested_output: "location" | "numeric_value" | "concept_explanation" | "latest_doc" | "note_mutation" | "equation_location";
 };
 type HelixAskTurnJobReadyLink = {
   id: string;
@@ -22635,6 +22671,8 @@ const resolveAskTurnDocLocateQuery = (transcript: string): string | null => {
     .replace(/[?]+$/g, "")
     .replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "");
   if (!normalized) return null;
+  const equationQuery = buildAskTurnEquationRetrievalQuery(normalized);
+  if (equationQuery) return equationQuery;
   const cues = [
     /\bexplain\s+what\s+(.+?)\s+means?\s+in\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i,
     /\bfind\s+(?:the\s+)?(?:part|bit|section)\s+where\s+(?:it|this|that|the\s+doc(?:ument)?|the\s+paper)?\s*(?:talks?\s+about|mentions?|references?|cites?|says?)\s+(.+?)(?:\s+\band\s+(?:drop|put|save|add|append|write|store|stash|file|park|place)\b[\s\S]*)?$/i,
@@ -22808,7 +22846,17 @@ const isAskTurnOpenDocSearchIntent = (transcript: string): boolean =>
 const isAskTurnOpenDocGoalIntent = (transcript: string): boolean =>
   isAskTurnOpenDocSearchIntent(transcript) ||
   isAskTurnOpenLatestDocIntent(transcript) ||
-  isAskTurnTopicQualifiedLatestDocIntent(transcript);
+  isAskTurnTopicQualifiedLatestDocIntent(transcript) ||
+  /\b(?:find|get|locate|open|view|show|pull\s+up|bring\s+up)\b[\s\S]{0,80}\b(?:doc|docs|document|paper|file|source|audit|artifact)\b[\s\S]{0,80}\b(?:about|on|for|related\s+to|matching)\b/i.test(
+    transcript,
+  );
+
+const isAskTurnReadAloudRequested = (transcript: string): boolean =>
+  /\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,80}\b(?:aloud|out\s+loud|to\s+me|this|it|the\s+(?:doc|document|file|source|audit|artifact))\b/i.test(
+    transcript,
+  ) ||
+  /\b(?:read|speak|say|narrate)\s+(?:it|this|the\s+(?:doc|document|file|source|audit|artifact))\b/i.test(transcript) ||
+  /\b(?:read|speak|say|narrate)\s+aloud\b/i.test(transcript);
 
 const isAskTurnCapabilityHelpIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
@@ -24814,6 +24862,7 @@ const isAskTurnDocVsNoteCompareIntent = (
 ): boolean => {
   const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
   if (!normalized) return false;
+  if (isAskTurnOpenDocGoalIntent(transcript)) return false;
   if (!askTurnHasCompareCueOutsideProtectedArgs(transcript)) return false;
   if (!/\b(?:doc|docs|document|paper|this|current|active)\b/.test(normalized)) return false;
   if (isAskTurnDocNotesHybridCompareIntent(transcript)) return true;
@@ -25225,7 +25274,7 @@ const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily 
   if (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict) return "workspace_generic";
   if (isAskTurnContextualTemporalCompareIntent(transcript)) return "compare";
   if (isAskTurnDocLocateIntent(transcript) || isAskTurnDocIdentityIntent(transcript)) return "docs_nav";
-  if (isAskTurnOpenLatestDocIntent(transcript) || resolveAskTurnDocPathArg(transcript)) return "docs_nav";
+  if (isAskTurnOpenDocGoalIntent(transcript) || isAskTurnOpenLatestDocIntent(transcript) || resolveAskTurnDocPathArg(transcript)) return "docs_nav";
   if (askTurnHasCompareCueOutsideProtectedArgs(transcript)) return "compare";
   if (
     /\b(?:go\s+to|navigate\s+to|move\s+me\s+(?:over\s+)?to|jump\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on|open|show|view|switch\s+to)\b/.test(normalized) &&
@@ -25239,6 +25288,22 @@ const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily 
     return "workspace_generic";
   }
   return "conversation";
+};
+
+const HELIX_ASK_MODEL_ONLY_CONCEPT_QUESTION_RE =
+  /\b(?:what\s+(?:is|are|does)|what's|define|definition|meaning\s+of|explain|how\s+(?:does|do|is|are)|why\s+(?:does|do|is|are))\b/i;
+const HELIX_ASK_WORKSPACE_RELATIVE_QUESTION_RE =
+  /\b(?:this|that|active|current|open|opened|selected)\s+(?:doc|document|paper|note|file|page)\b|\b(?:doc|document|paper|note|workspace|viewer|panel|clipboard|calculator|file|folder|path|selection|screen)\b/i;
+
+const isAskTurnModelOnlyConceptQuestion = (transcript: string): boolean => {
+  const normalized = transcript.trim();
+  if (!normalized) return false;
+  if (!HELIX_ASK_MODEL_ONLY_CONCEPT_QUESTION_RE.test(normalized)) return false;
+  if (HELIX_ASK_WORKSPACE_RELATIVE_QUESTION_RE.test(normalized)) return false;
+  if (shouldPreferWorkspaceDispatch(normalized)) return false;
+  if (HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized)) return false;
+  if (HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized)) return false;
+  return true;
 };
 
 const isHelixAskTurnNontrivialIntentFamily = (family: HelixAskTurnIntentFamily): boolean =>
@@ -27024,6 +27089,17 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
     const docLocationMatches = docLocationTargetRequest
       ? enrichAskTurnDocEvidenceMatches(findAskTurnDocLocationMatchesForAction(step.action), docLocationTargetRequest)
       : findAskTurnDocLocationMatchesForAction(step.action);
+    const docEquationLocationPayload =
+      step.action?.action_id === "locate_in_doc"
+        ? buildAskTurnDocEquationLocationPayload({
+            turnId: "step-result",
+            transcript: String(step.action.args?.target_transcript ?? step.action.args?.query ?? step.title ?? ""),
+            query: readAskTurnString(step.action.args?.query),
+            sourcePath: readAskTurnString(step.action.args?.path),
+            matches: docLocationMatches as Array<HelixAskDocLocationMatch & Record<string, unknown>>,
+          })
+        : null;
+    const docEquationLocationValidation = validateAskTurnDocEquationLocationArtifact(docEquationLocationPayload);
     const latestDocSelection =
       step.action?.action_id === "open_latest_doc_by_topic"
         ? buildAskTurnLatestDocSelectionArtifact(
@@ -27087,10 +27163,15 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               ? Array.from(new Set([...workspaceContextArtifacts, "doc_candidate_validation"]))
             : actionId === "open_latest_doc_by_topic" && latestDocSelection
               ? Array.from(new Set([...workspaceContextArtifacts, "latest_doc_selection", "doc_open_receipt"]))
-            : actionId === "open_doc_by_path" && hasActionDocPath
+            : (actionId === "open_doc_by_path" || actionId === "open_doc_and_read") && hasActionDocPath
               ? Array.from(new Set([...workspaceContextArtifacts, "doc_open_receipt"]))
             : actionId === "locate_in_doc" && docLocationMatches.length > 0
-              ? Array.from(new Set([...workspaceContextArtifacts, "doc_location_matches", "doc_evidence_location"]))
+              ? Array.from(new Set([
+                  ...workspaceContextArtifacts,
+                  "doc_location_matches",
+                  "doc_evidence_location",
+                  ...(docEquationLocationValidation.valid ? ["doc_equation_location"] : []),
+                ]))
               : actionId === "list_notes"
                 ? Array.from(new Set([...workspaceContextArtifacts, "note_context", "active_note_title"]))
               : workspaceContextArtifacts
@@ -27148,14 +27229,16 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
         : /reasoning_followup_doc_note_compare/i.test(step.id)
           ? ["comparison_summary"]
         : actionId === "locate_in_doc"
-        ? ["doc_location_matches"]
+        ? docLocationTargetRequest?.requested_output === "equation_location"
+          ? ["doc_equation_location"]
+          : ["doc_location_matches"]
         : actionId === "search_docs"
           ? ["doc_search_results"]
         : actionId === "validate_doc_candidates"
           ? ["doc_candidate_validation"]
         : actionId === "open_latest_doc_by_topic"
           ? ["active_doc_path", "latest_doc_selection", "doc_open_receipt"]
-        : actionId === "open_doc_by_path"
+        : actionId === "open_doc_by_path" || actionId === "open_doc_and_read"
           ? ["active_doc_path", "doc_open_receipt"]
         : actionId === "summarize_doc"
           ? step.action?.args?.requested_output === "doc_numeric_answer"
@@ -27206,7 +27289,21 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               text: buildAskTurnCapabilityHelpSummary(null),
             }
           : step.action?.action_id === "locate_in_doc"
-          ? {
+          ? docLocationTargetRequest?.requested_output === "equation_location"
+            ? {
+                ...(docEquationLocationPayload ?? {
+                  kind: "doc_equation_location",
+                  turn_id: "step-result",
+                  query: readAskTurnString(step.action.args?.query) ?? null,
+                  source_path: normalizeAskTurnWorkspaceDocPath(step.action.args?.path) ?? null,
+                  snippets: [],
+                  matched_terms: [],
+                  equation_markers: [],
+                  confidence: "low",
+                }),
+                equation_location_validation: docEquationLocationValidation,
+              }
+            : {
               kind: expectedArtifacts.includes("doc_evidence_location") ? "doc_evidence_location" : "doc_location_matches",
               query: readAskTurnString(step.action.args?.query) ?? null,
               target_request: docLocationTargetRequest,
@@ -27824,6 +27921,44 @@ const renderAskTurnDocLocationMatchesFromArtifact = (artifact: Record<string, un
   ].join("\n");
 };
 
+const renderAskTurnDocEquationLocationFromArtifact = (artifact: Record<string, unknown> | null): string | null => {
+  const validation = validateAskTurnDocEquationLocationArtifact(artifact);
+  if (!validation.valid) return null;
+  const sourcePath = normalizeAskTurnWorkspaceDocPath(artifact?.source_path);
+  if (!sourcePath) return null;
+  const snippets = Array.isArray(artifact?.snippets)
+    ? artifact.snippets.filter((snippet): snippet is Record<string, unknown> => Boolean(snippet && typeof snippet === "object"))
+    : [];
+  const firstEquationSnippet = snippets.find((snippet) => Boolean(snippet.equation_like)) ?? snippets[0];
+  if (!firstEquationSnippet) return null;
+  const lineStart = Number(firstEquationSnippet.line_start);
+  const lineEnd = Number.isFinite(Number(firstEquationSnippet.line_end)) ? Number(firstEquationSnippet.line_end) : lineStart;
+  const hasLines = Number.isFinite(lineStart);
+  const lineLabel = hasLines ? `L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}` : null;
+  const title = readAskTurnString(artifact?.source_title) ?? readAskTurnDocTitleForPath(sourcePath) ?? renderAskTurnDocDisplayLabel(sourcePath);
+  const markers = Array.isArray(artifact?.equation_markers)
+    ? artifact.equation_markers.map((entry) => String(entry ?? "").trim()).filter(Boolean).slice(0, 8)
+    : [];
+  const matched = Array.isArray(artifact?.matched_terms)
+    ? artifact.matched_terms.map((entry) => String(entry ?? "").trim()).filter(Boolean).slice(0, 8)
+    : [];
+  const text = readAskTurnString(firstEquationSnippet.text)?.replace(/\s+/g, " ").trim() ?? "";
+  return [
+    "Equation-bearing source:",
+    "",
+    `Document: ${title}`,
+    `Path: ${sourcePath}${lineLabel ? `:${lineLabel}` : ""}`,
+    lineLabel ? `Lines: ${lineLabel}` : null,
+    matched.length > 0 ? `Matched: ${matched.join(", ")}` : null,
+    markers.length > 0 ? `Equation markers: ${markers.join(", ")}` : null,
+    "",
+    "Snippet:",
+    clipConversationText(text, 360),
+    "",
+    "Open location 1",
+  ].filter((line): line is string => line !== null).join("\n");
+};
+
 const renderAskTurnCompactDocLocationFromArtifact = (artifact: Record<string, unknown> | null): string | null => {
   const matches = Array.isArray(artifact?.matches) ? artifact.matches : [];
   const firstMatch = matches
@@ -28369,6 +28504,8 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     observationRetrievalSignal.required &&
     (observationRetrievalSignal.requested_outputs.includes("evidence_location") ||
       observationRetrievalSignal.requested_outputs.includes("table_row"));
+  const requiresEquationLocation =
+    observationRetrievalSignal.required && observationRetrievalSignal.requested_outputs.includes("equation_location");
   const hasCompletedAction = (actionId: string): boolean =>
     args.executionTrace.some((step) => step.status === "completed" && step.action?.action_id === actionId);
   const docLocationArtifact =
@@ -28394,6 +28531,8 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
   };
   const effectiveDocLocationArtifact =
     docLocationArtifact ?? readRuntimeArtifact("doc_evidence_location") ?? readRuntimeArtifact("doc_location_matches");
+  const docEquationLocationArtifact =
+    readAskTurnResultArtifact(args.stepResults, "doc_equation_location") ?? readRuntimeArtifact("doc_equation_location");
   const noteReceiptArtifact = readAskTurnResultArtifact(args.stepResults, "note_update_receipt") ?? readRuntimeArtifact("note_update_receipt");
   const docSearchArtifact = readAskTurnResultArtifact(args.stepResults, "doc_search_results") ?? readRuntimeArtifact("doc_search_results");
   const docCandidateValidationArtifact =
@@ -28457,6 +28596,30 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
       consumed_artifacts: Array.from(consumed),
       contract_pass: Boolean(activeNoteTitle || activeDocPath),
       fail_reason: activeNoteTitle || activeDocPath ? null : "missing_workspace_context_status",
+    };
+  }
+
+  if (requiresEquationLocation) {
+    const rendered = renderAskTurnDocEquationLocationFromArtifact(docEquationLocationArtifact);
+    if (rendered) {
+      consumed.add("doc_equation_location");
+      return {
+        text: rendered,
+        source: "doc_equation_location",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: true,
+        fail_reason: null,
+      };
+    }
+    return {
+      text: renderAskTurnScientificMissingFinalText({
+        code: "equation_source_unavailable",
+        sourcePath: normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath),
+      }),
+      source: "typed_failure",
+      consumed_artifacts: Array.from(consumed),
+      contract_pass: false,
+      fail_reason: "equation_source_unavailable",
     };
   }
 
@@ -28737,7 +28900,7 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
         (step) =>
           step.status === "completed" &&
           step.action?.panel_id === "docs-viewer" &&
-          ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic"].includes(step.action.action_id),
+          ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(step.action.action_id),
       );
     const openedPath =
       normalizeAskTurnWorkspaceDocPath(openedStep?.action?.args?.path) ??
@@ -29277,6 +29440,108 @@ const extractAskTurnExactAnchorSet = (args: {
   };
 };
 
+const classifyAskTurnDocumentSeekingIntent = (transcript: string): HelixAskDocumentSeekingIntent => {
+  const raw = transcript.trim();
+  const terms = uniqueAskTurnStrings([
+    /\bfind\s+me\s+(?:a|an|the)?\s*(?:paper|doc|document|source|report)\b/i.test(raw) ? "find_document" : null,
+    /\b(?:find|search|point\s+me\s+at|get\s+me\s+to|show\s+me|locate)\b[\s\S]*\b(?:paper|doc|document|source|report)\b/i.test(raw) ? "document_action" : null,
+    /\b(?:paper|doc|document|source|report)\s+with\b/i.test(raw) ? "document_with_constraint" : null,
+    /\bwhere\s+in\s+the\s+docs?\b/i.test(raw) ? "where_in_docs" : null,
+    /\bsource\s+path\b/i.test(raw) ? "source_path" : null,
+  ]);
+  return {
+    required: terms.length > 0,
+    terms,
+    reason: terms.length > 0 ? "document_seeking_phrase" : "no_document_seeking_phrase",
+  };
+};
+
+const extractAskTurnEquationRequiredTerms = (transcript: string): {
+  corpusTerms: string[];
+  equationTerms: string[];
+  calculatorTerms: string[];
+  documentTerms: string[];
+} => {
+  const raw = transcript.trim();
+  return {
+    corpusTerms: uniqueAskTurnStrings([/\bNHM2\b/i.test(raw) ? "NHM2" : null]),
+    equationTerms: uniqueAskTurnStrings([
+      /\bequations?\b/i.test(raw) ? "equations" : null,
+      /\bformulas?\b/i.test(raw) ? "formulas" : null,
+      /\bexpressions?\b/i.test(raw) ? "expression" : null,
+      /\bderivations?\b/i.test(raw) ? "derivation" : null,
+    ]),
+    calculatorTerms: uniqueAskTurnStrings([
+      /\bscientific\s+calculator\b/i.test(raw) ? "scientific calculator" : null,
+      /\bcalculator\b/i.test(raw) ? "calculator" : null,
+      /\busable\b/i.test(raw) ? "usable" : null,
+    ]),
+    documentTerms: uniqueAskTurnStrings([
+      /\bpapers?\b/i.test(raw) ? "paper" : null,
+      /\bdocs?\b/i.test(raw) ? "doc" : null,
+      /\bdocuments?\b/i.test(raw) ? "document" : null,
+      /\bsources?\b/i.test(raw) ? "source" : null,
+      /\breports?\b/i.test(raw) ? "report" : null,
+    ]),
+  };
+};
+
+const buildAskTurnEquationRetrievalIntent = (args: {
+  turnId: string;
+  transcript: string;
+}): HelixAskEquationRetrievalIntent => {
+  const raw = args.transcript.trim();
+  const negativeDecision = classifyAskTurnNegativeScopeDecision(raw);
+  const negativeScopeBlocked = negativeDecision.scope === "model_only" || negativeDecision.scope === "disallow_workspace_lookup";
+  const documentIntent = classifyAskTurnDocumentSeekingIntent(raw);
+  const terms = extractAskTurnEquationRequiredTerms(raw);
+  const hasEquationTerm = terms.equationTerms.length > 0 || /\b(?:equation|formula|expression|derivation)\b/i.test(raw);
+  const hasCalculatorTerm = terms.calculatorTerms.length > 0;
+  const required = documentIntent.required && (hasEquationTerm || hasCalculatorTerm) && !negativeScopeBlocked;
+  const exactTokens = extractAskTurnExactAnchorSet({ turnId: args.turnId, transcript: raw }).must_preserve;
+  return {
+    turn_id: args.turnId,
+    required,
+    strength: required ? "hard" : documentIntent.required && (hasEquationTerm || hasCalculatorTerm) ? "soft" : "none",
+    requested_outputs: required
+      ? uniqueAskTurnStrings([
+          "document",
+          terms.documentTerms.includes("paper") ? "paper" : null,
+          "source_path",
+          "equation_location",
+          hasCalculatorTerm ? "calculator_usable_formula" : null,
+        ]) as HelixAskEquationRetrievalIntent["requested_outputs"]
+      : [],
+    anchors: {
+      corpus_terms: terms.corpusTerms,
+      equation_terms: terms.equationTerms.length ? terms.equationTerms : hasEquationTerm ? ["equation", "formula"] : [],
+      calculator_terms: terms.calculatorTerms,
+      document_terms: terms.documentTerms,
+      exact_tokens: exactTokens,
+    },
+    negative_scope_blocked: negativeScopeBlocked,
+    reasons: uniqueAskTurnStrings([
+      documentIntent.required ? documentIntent.reason : null,
+      hasEquationTerm ? "equation_term" : null,
+      hasCalculatorTerm ? "calculator_term" : null,
+      negativeScopeBlocked ? "negative_scope_blocked" : null,
+    ]),
+  };
+};
+
+const buildAskTurnEquationRetrievalQuery = (transcript: string): string | null => {
+  const intent = buildAskTurnEquationRetrievalIntent({ turnId: "equation-query", transcript });
+  if (intent.strength === "none") return null;
+  const terms = uniqueAskTurnStrings([
+    ...intent.anchors.corpus_terms,
+    ...intent.anchors.equation_terms,
+    ...intent.anchors.calculator_terms,
+    ...intent.anchors.document_terms,
+    ...intent.anchors.exact_tokens.slice(0, 4),
+  ]);
+  return terms.length > 0 ? terms.join(" ") : null;
+};
+
 const classifyAskTurnNegativeScopeDecision = (transcript: string): HelixAskNegativeScopeDecision => {
   const raw = transcript.trim();
   const phraseSpecs: Array<{ scope: HelixAskNegativeScopeDecision["scope"]; pattern: RegExp; label: string }> = [
@@ -29364,6 +29629,7 @@ const validateAskTurnRetrievalQueryIntegrity = (args: {
   prompt: string;
   exactAnchors: string[];
   queries: string[];
+  requiredTerms?: string[];
 }): HelixAskRetrievalQueryIntegrity => {
   const placeholders = /\b(?:the\s+requested\s+topic|requested\s+topic|the\s+topic|target\s+topic|requested\s+concept|requested\s+anchor)\b/i;
   const generatedQueries = args.queries.map((query) => query.trim()).filter(Boolean);
@@ -29372,14 +29638,38 @@ const validateAskTurnRetrievalQueryIntegrity = (args: {
     generatedQueries.some((query) => buildAskTurnAnchorVariants(anchor).some((variant) => askTurnTextIncludesFoldedToken(query, variant))),
   );
   const missing = args.exactAnchors.filter((anchor) => !preserved.includes(anchor));
+  const requiredTerms = uniqueAskTurnStrings(args.requiredTerms ?? []);
+  const preservedRequiredTerms = requiredTerms.filter((term) =>
+    generatedQueries.some((query) => buildAskTurnAnchorVariants(term).some((variant) => askTurnTextIncludesFoldedToken(query, variant))),
+  );
+  const missingRequiredTerms = requiredTerms.filter((term) => !preservedRequiredTerms.includes(term));
+  const hasEquationRequirement = requiredTerms.some((term) => /\b(?:equation|formula|expression|derivation)s?\b/i.test(term));
+  const hasCalculatorRequirement = requiredTerms.some((term) => /\b(?:calculator|scientific\s+calculator|usable)\b/i.test(term));
+  const failureReason: HelixAskRetrievalQueryIntegrity["failure_reason"] =
+    placeholderDetected
+      ? "placeholder_query"
+      : hasEquationRequirement && !preservedRequiredTerms.some((term) => /\b(?:equation|formula|expression|derivation)s?\b/i.test(term))
+        ? "equation_target_loss"
+        : hasCalculatorRequirement && !preservedRequiredTerms.some((term) => /\b(?:calculator|scientific\s+calculator|usable)\b/i.test(term))
+          ? "calculator_target_loss"
+          : args.exactAnchors.length > 0 && preserved.length === 0
+            ? "anchor_loss"
+            : undefined;
   return {
     original_prompt: args.prompt,
     exact_anchors: args.exactAnchors,
+    required_terms: requiredTerms,
     generated_queries: generatedQueries,
     placeholder_detected: placeholderDetected,
     preserved_anchor_count: preserved.length,
+    preserved_required_terms: preservedRequiredTerms,
+    missing_required_terms: missingRequiredTerms,
+    failure_reason: failureReason,
     missing_anchors: missing,
-    valid: !placeholderDetected && (args.exactAnchors.length === 0 || preserved.length > 0),
+    valid:
+      !placeholderDetected &&
+      (args.exactAnchors.length === 0 || preserved.length > 0) &&
+      (requiredTerms.length === 0 || missingRequiredTerms.length === 0),
   };
 };
 
@@ -29400,9 +29690,17 @@ const checkAskTurnNoToolContamination = (args: {
     { label: "Locations", pattern: /^Locations\s*:/im },
     { label: "Opened document", pattern: /\bOpened\s+document\s*:/i },
     { label: "Updated note", pattern: /\bUpdated\s+note\b/i },
+    { label: "Searched document", pattern: /^Searched\s+documents?\s*:/im },
+    { label: "No locations found", pattern: /\bNo\s+locations?\s+found\b/i },
+    { label: "Tried variants", pattern: /^Tried\s*:/im },
+    { label: "Open result", pattern: /\bOpen\s+(?:result|location)\b/i },
     { label: "Document block", pattern: /^Document\s*:/im },
-    { label: "docs path", pattern: /(?:^|\s)Path:\s*\/docs\/|\/docs\//i },
+    { label: "docs path", pattern: /(?:^|\s)Path:\s*(?:\/?docs\/)|\/docs\//i },
+    { label: "Source path", pattern: /^Source\s+path\s*:/im },
+    { label: "Matched", pattern: /^Matched\s*:/im },
     { label: "Snippet", pattern: /^Snippet\s*:/im },
+    { label: "doc_location_matches", pattern: /\bdoc_location_matches\b/i },
+    { label: "doc_evidence_location", pattern: /\bdoc_evidence_location\b/i },
     { label: "doc_summary", pattern: /\bdoc_summary\b/i },
     { label: "note_update_receipt", pattern: /\bnote_update_receipt\b/i },
   ];
@@ -29496,6 +29794,8 @@ const buildAskTurnRetrievalRequiredSignal = (args: {
     general_reasoning_only: /\b(?:general\s+reasoning|concept\s+check\s+only|general\s+concept\s+only|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(raw),
   };
   const anchors = extractAskTurnRetrievalSignalAnchors(raw);
+  const documentSeekingIntent = classifyAskTurnDocumentSeekingIntent(raw);
+  const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: raw });
   const exactAnchors = anchors.exact_anchors ?? [];
   const requestedOutputs = new Set<HelixAskRetrievalRequiredSignal["requested_outputs"][number]>();
   const reasons: string[] = [];
@@ -29511,6 +29811,19 @@ const buildAskTurnRetrievalRequiredSignal = (args: {
   if (/\b(?:best\s+(?:doc|document|paper)|best\s+matching\s+(?:audit\s+)?doc|document\s+that\s+contains|point\s+me\s+at|get\s+me\s+to|where\s+in\s+the\s+docs?|find\s+where|source\s+path|nearby\s+fields|table\s+row|audit\s+doc)\b/i.test(raw)) {
     add("doc_path", "explicit_doc_evidence_phrase");
     add("source_path", "explicit_doc_evidence_phrase");
+  }
+  if (documentSeekingIntent.required) {
+    add("doc_path", "document_seeking_phrase");
+    add("source_path", "document_seeking_phrase");
+  }
+  if (equationIntent.required) {
+    add("equation_location", "equation_bearing_source_phrase");
+    add("calculator_usable_formula", "equation_bearing_source_phrase");
+    add("source_path", "equation_bearing_source_phrase");
+    const corpus = new Set([...(anchors.corpus ?? []), ...equationIntent.anchors.corpus_terms]);
+    if (corpus.size > 0) anchors.corpus = Array.from(corpus);
+    const exact = new Set([...(anchors.exact_anchors ?? []), ...equationIntent.anchors.exact_tokens]);
+    if (exact.size > 0) anchors.exact_anchors = Array.from(exact);
   }
   if (/\b(?:where\s+in|find\s+where|nearby\s+fields|table\s+row|mentions?|Expected\s+Target\s+Table)\b/i.test(raw)) {
     add("evidence_location", "evidence_location_phrase");
@@ -29548,11 +29861,11 @@ const buildAskTurnRetrievalRequiredSignal = (args: {
   const explicitWorkspaceRequest =
     requestedOutputs.size > 0 &&
     (/\b(?:doc|docs|document|paper|source|path|table|row|field|audit)\b/i.test(raw) || hasScientificAnchor);
-  const required = (args.observerNeedsRetrieval || explicitWorkspaceRequest) && !backgroundOnly && !noWorkspaceLookup;
+  const required = (args.observerNeedsRetrieval || explicitWorkspaceRequest || equationIntent.required) && !backgroundOnly && !noWorkspaceLookup;
   const source: HelixAskRetrievalRequiredSignal["source"] =
     args.observerNeedsRetrieval
       ? "observer_lane"
-      : explicitWorkspaceRequest
+      : explicitWorkspaceRequest || equationIntent.required
         ? hasScientificAnchor
           ? "scientific_anchor_classifier"
           : "explicit_user_request"
@@ -29609,7 +29922,9 @@ const buildAskTurnEvidenceTargetRequest = (args: {
   const requiredExactTokens = Array.from(new Set([...artifactIds, ...formulaTokens, ...exactAnchorSet.must_preserve]));
   const requestedOutput =
     args.requestedOutput ??
-    (/\b(?:numeric|value|reported)\b/i.test(raw)
+    (buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: raw }).strength !== "none"
+      ? "equation_location"
+      : /\b(?:numeric|value|reported)\b/i.test(raw)
       ? "numeric_value"
       : /\b(?:mean|means|explain|concept|formula)\b/i.test(raw)
         ? "concept_explanation"
@@ -29720,16 +30035,113 @@ const validateAskTurnDocEvidenceLocationArtifact = (artifact: Record<string, unk
   return { valid: failures.length === 0, failures };
 };
 
+const collectAskTurnEquationMarkers = (text: string): string[] => {
+  const markers = new Set<string>();
+  const specs: Array<[string, RegExp]> = [
+    ["=", /=/],
+    ["≈", /≈/],
+    ["∝", /∝/],
+    ["tau", /\btau\b/i],
+    ["τ", /τ/],
+    ["alpha", /\balpha\b/i],
+    ["α", /α/],
+    ["equation", /\bequations?\b/i],
+    ["formula", /\bformulas?\b/i],
+    ["expression", /\bexpressions?\b/i],
+    ["derivation", /\bderivations?\b/i],
+    ["coordinateTimeS", /\bcoordinateTimeS\b/i],
+    ["tau_expected", /\btau_expected\b/i],
+  ];
+  for (const [label, pattern] of specs) {
+    if (pattern.test(text)) markers.add(label);
+  }
+  if (/\b[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*=/.test(text)) markers.add("function_expression");
+  return Array.from(markers);
+};
+
+const isAskTurnEquationLikeLine = (line: string): boolean => collectAskTurnEquationMarkers(line).length > 0;
+
+const buildAskTurnDocEquationLocationPayload = (args: {
+  turnId: string;
+  transcript: string;
+  query?: string | null;
+  sourcePath?: string | null;
+  sourceTitle?: string | null;
+  matches: Array<HelixAskDocLocationMatch & Record<string, unknown>>;
+}): Record<string, unknown> | null => {
+  const intent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: args.transcript });
+  if (intent.strength === "none") return null;
+  const snippets = args.matches
+    .map((match) => {
+      const text = readAskTurnString(match.snippet) ?? "";
+      const markers = collectAskTurnEquationMarkers(text);
+      return {
+        text,
+        line_start: typeof match.line_start === "number" ? match.line_start : undefined,
+        line_end: typeof match.line_end === "number" ? match.line_end : undefined,
+        equation_like: markers.length > 0,
+        calculator_usable: markers.some((marker) => ["=", "tau", "tau_expected", "coordinateTimeS", "function_expression"].includes(marker)),
+        matched_equation_markers: markers,
+        matched_target_terms: uniqueAskTurnStrings([
+          ...intent.anchors.corpus_terms,
+          ...intent.anchors.equation_terms,
+          ...intent.anchors.calculator_terms,
+        ]).filter((term) => askTurnTextIncludesFoldedToken(text, term)),
+      };
+    })
+    .filter((snippet) => snippet.text.trim());
+  return {
+    kind: "doc_equation_location",
+    turn_id: args.turnId,
+    query: args.query ?? buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript,
+    source_path: normalizeAskTurnWorkspaceDocPath(args.sourcePath) ?? normalizeAskTurnWorkspaceDocPath(args.matches[0]?.path) ?? null,
+    source_title: args.sourceTitle ?? (args.sourcePath ? readAskTurnDocTitleForPath(args.sourcePath) : null),
+    target_terms: {
+      corpus_terms: intent.anchors.corpus_terms,
+      equation_terms: intent.anchors.equation_terms,
+      calculator_terms: intent.anchors.calculator_terms,
+    },
+    matched_terms: uniqueAskTurnStrings(
+      snippets.flatMap((snippet) => snippet.matched_target_terms).concat(intent.anchors.corpus_terms),
+    ),
+    equation_markers: uniqueAskTurnStrings(snippets.flatMap((snippet) => snippet.matched_equation_markers)),
+    snippets,
+    confidence: snippets.some((snippet) => snippet.equation_like) ? "high" : "low",
+  };
+};
+
+const validateAskTurnDocEquationLocationArtifact = (artifact: Record<string, unknown> | null): { valid: boolean; failures: string[] } => {
+  const failures: string[] = [];
+  if (!artifact) return { valid: false, failures: ["artifact_missing"] };
+  if (!normalizeAskTurnWorkspaceDocPath(artifact.source_path)) failures.push("source_path_missing");
+  const snippets = Array.isArray(artifact.snippets)
+    ? artifact.snippets.filter((snippet): snippet is Record<string, unknown> => Boolean(snippet && typeof snippet === "object"))
+    : [];
+  if (snippets.length === 0) failures.push("snippets_missing");
+  const matchedTerms = Array.isArray(artifact.matched_terms) ? artifact.matched_terms.map((term) => String(term ?? "")) : [];
+  if (!matchedTerms.some((term) => /\bNHM2\b/i.test(term))) failures.push("corpus_term_missing");
+  const hasEquationSnippet = snippets.some((snippet) => {
+    const text = readAskTurnString(snippet.text) ?? "";
+    const markers = Array.isArray(snippet.matched_equation_markers)
+      ? snippet.matched_equation_markers.map((marker) => String(marker ?? "")).filter(Boolean)
+      : collectAskTurnEquationMarkers(text);
+    return Boolean(snippet.equation_like) && markers.length > 0;
+  });
+  if (!hasEquationSnippet) failures.push("equation_like_snippet_missing");
+  return { valid: failures.length === 0, failures };
+};
+
 const resolveAskTurnScientificMissingCode = (
   kind: "numeric" | "concept_explanation" | HelixAskCanonicalGoalKind | null | undefined,
-): "numeric_result_unavailable" | "concept_explanation_unavailable" | null => {
+): "numeric_result_unavailable" | "concept_explanation_unavailable" | "equation_source_unavailable" | null => {
+  if (kind === "doc_equation_location") return "equation_source_unavailable";
   if (kind === "numeric" || kind === "doc_scientific_numeric") return "numeric_result_unavailable";
   if (kind === "concept_explanation" || kind === "doc_scientific_concept") return "concept_explanation_unavailable";
   return null;
 };
 
 const renderAskTurnScientificMissingFinalText = (args: {
-  code: "numeric_result_unavailable" | "concept_explanation_unavailable";
+  code: "numeric_result_unavailable" | "concept_explanation_unavailable" | "equation_source_unavailable";
   sourcePath?: string | null;
   candidateCount?: number | null;
 }): string => {
@@ -29742,6 +30154,9 @@ const renderAskTurnScientificMissingFinalText = (args: {
       : "";
   if (args.code === "numeric_result_unavailable") {
     return `I found or attempted NHM2 scientific source acquisition, but I could not extract a supported numeric result with values, source path, and snippets for this turn.${candidateText}${referenceBlock}\nCause: numeric_result_unavailable.`;
+  }
+  if (args.code === "equation_source_unavailable") {
+    return `I searched for an NHM2 source with equation-bearing snippets, but no current-turn doc_equation_location artifact satisfied the equation/source contract.${candidateText}${referenceBlock}\nCause: equation_source_unavailable.`;
   }
   return `I found or attempted NHM2 scientific source acquisition, but I could not produce a sourced plain-language explanation with source path and snippets for this turn.${candidateText}${referenceBlock}\nCause: concept_explanation_unavailable.`;
 };
@@ -29824,6 +30239,7 @@ const buildAskTurnCanonicalGoalFrame = (args: {
     transcript,
     retrievalSignal,
   });
+  const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript });
   if (scopeContract.answer_scope === "model_only") {
     return {
       turn_id: args.turnId,
@@ -29872,6 +30288,25 @@ const buildAskTurnCanonicalGoalFrame = (args: {
   }
   if (retrievalSignal.required && retrievalSignal.strength === "hard") {
     const corpusAnchors = retrievalSignal.anchors.corpus ?? [];
+    if (equationIntent.required || retrievalSignal.requested_outputs.includes("equation_location")) {
+      return {
+        turn_id: args.turnId,
+        goal_kind: "doc_equation_location",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_equation_location",
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+        corpus_anchors: corpusAnchors.length ? corpusAnchors : equationIntent.anchors.corpus_terms,
+        numeric_tokens: [],
+        concept_tokens: [
+          ...equationIntent.anchors.equation_terms,
+          ...equationIntent.anchors.calculator_terms,
+          ...equationIntent.anchors.document_terms,
+        ],
+        confidence: "high",
+        classifier_reasons: uniqueAskTurnStrings([...retrievalSignal.reasons, ...equationIntent.reasons]),
+      };
+    }
     if (retrievalSignal.requested_outputs.includes("latest_doc") || retrievalSignal.requested_outputs.includes("open_document")) {
       return {
         turn_id: args.turnId,
@@ -30186,6 +30621,8 @@ const evaluateTurnSatisfaction = (args: {
       ? ["direct_answer_text"]
       : canonicalGoal.goal_kind === "latest_doc_navigation"
         ? ["doc_open_receipt"]
+      : canonicalGoal.goal_kind === "doc_equation_location"
+        ? ["doc_equation_location"]
       : canonicalGoal.goal_kind === "doc_evidence_location"
         ? ["doc_evidence_location", "doc_location_matches"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
@@ -30229,6 +30666,8 @@ const evaluateTurnSatisfaction = (args: {
       ? ["doc_summary", "focused_doc_answer", "doc_numeric_answer", "doc_concept_explanation", "comparison_summary", "note_update_receipt"]
       : canonicalGoal.goal_kind === "latest_doc_navigation"
         ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
+      : canonicalGoal.goal_kind === "doc_equation_location"
+        ? ["direct_answer_text", "doc_summary", "doc_location_matches", "doc_evidence_location", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_evidence_location"
         ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
@@ -30263,6 +30702,8 @@ const evaluateTurnSatisfaction = (args: {
       const evidenceValidation =
         canonicalGoal.goal_kind === "doc_evidence_location" && ["doc_evidence_location", "doc_location_matches"].includes(artifact.kind)
           ? validateAskTurnDocEvidenceLocationArtifact(readAskTurnArtifactPayloadRecord(artifact))
+          : canonicalGoal.goal_kind === "doc_equation_location" && artifact.kind === "doc_equation_location"
+            ? validateAskTurnDocEquationLocationArtifact(readAskTurnArtifactPayloadRecord(artifact))
           : { valid: true, failures: [] };
       if (!sufficient || !evidenceValidation.valid) {
         rejectedTerminalCandidates.push({
@@ -30464,6 +30905,7 @@ const HELIX_ASK_TERMINAL_ARTIFACT_KINDS = new Set([
   "workspace_change_summary",
   "capability_help_summary",
   "doc_summary",
+  "doc_equation_location",
   "reasoning_summary",
   "direct_answer_text",
   "final_failure",
@@ -30572,7 +31014,7 @@ const hasAskTurnOpenDocObjectiveSatisfied = (args: {
     if (!actualArtifacts.some((artifact) => String(artifact ?? "").trim() === "active_doc_path")) return false;
     const action = result.artifact && typeof result.artifact === "object" ? result.artifact as HelixAskTurnSelectedAction : null;
     if (action?.panel_id !== "docs-viewer") return false;
-    if (!["open_doc", "open_doc_by_path", "open_latest_doc_by_topic"].includes(action.action_id)) return false;
+    if (!["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(action.action_id)) return false;
     return Boolean(normalizeAskTurnWorkspaceDocPath(action.args?.path));
   });
   if (hasOpenedDocStep) return true;
@@ -30595,6 +31037,7 @@ const filterAskTurnLatestDocSearchFallbackMissingArtifacts = (args: {
   transcript: string;
   missingArtifacts: string[];
   hasDocSearchResults: boolean;
+  hasDocOpenReceipt?: boolean;
 }): string[] => {
   const isOpenDocGoal = isAskTurnOpenDocGoalIntent(args.transcript);
   const requestsSummary =
@@ -30607,6 +31050,11 @@ const filterAskTurnLatestDocSearchFallbackMissingArtifacts = (args: {
   }
   if (isOpenDocGoal && !requestsSummary) {
     filtered = filtered.filter((artifact) => artifact !== "doc_summary");
+  }
+  if (isOpenDocGoal && args.hasDocOpenReceipt && !requestsSummary) {
+    filtered = filtered.filter(
+      (artifact) => !["active_doc_path", "doc_context", "doc_evidence_location", "doc_location_matches"].includes(artifact),
+    );
   }
   return filtered;
 };
@@ -30794,15 +31242,19 @@ const buildAskTurnCompoundArgumentPartition = (args: {
   const notePronoun = isAskTurnDeicticNoteTarget(resolveAskTurnAnyNoteSinkArg(raw))
     ? resolveAskTurnAnyNoteSinkArg(raw)
     : null;
+  const docAcquisitionPhraseIntent =
+    /\b(?:find|get|locate|open|view|show|pull\s+up|bring\s+up)\b[\s\S]{0,80}\b(?:doc|docs|document|paper|file|source|audit|artifact)\b[\s\S]{0,80}\b(?:about|on|for|related\s+to|matching)\b/i.test(
+      raw,
+    );
   const operation: NonNullable<HelixAskUniversalGoalFrame["compound_argument_partition"]>["operation"] =
-    isAskTurnDocLocateIntent(raw)
+    isAskTurnOpenDocGoalIntent(raw) || docAcquisitionPhraseIntent
+      ? "open_doc"
+      : isAskTurnDocLocateIntent(raw)
       ? "locate_in_doc"
       : /\b(?:summari[sz]e|takeaway|plain-language)\b/i.test(raw)
         ? "summarize_doc"
         : /\b(?:compare|contrast|versus|vs\.?)\b/i.test(raw)
-          ? "compare"
-          : isAskTurnOpenDocGoalIntent(raw)
-            ? "open_doc"
+            ? "compare"
             : null;
   const styleModifiers = [
     ...raw.matchAll(/\b(?:normal words|plain language|plain-language|simple terms|short|brief|concise|quick)\b/gi),
@@ -30888,6 +31340,7 @@ const buildAskTurnUniversalGoalFrame = (args: {
     turnId: "goal-frame",
     transcript: raw,
   });
+  const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: "goal-frame", transcript: raw });
   const panelControlIntent = classifyAskTurnPanelControlIntent(raw);
   const activeNoteTitle = readAskTurnGoalFrameString(workspaceSnapshot?.activeNoteTitle);
   const explicitDocPath = resolveAskTurnDocPathArg(raw);
@@ -30926,6 +31379,11 @@ const buildAskTurnUniversalGoalFrame = (args: {
       confidence: 0.8,
     });
   }
+  const docAcquisitionPhraseIntent =
+    /\b(?:find|get|locate|open|view|show|pull\s+up|bring\s+up)\b[\s\S]{0,80}\b(?:doc|docs|document|paper|file|source|audit|artifact)\b[\s\S]{0,80}\b(?:about|on|for|related\s+to|matching)\b/i.test(
+      raw,
+    );
+  const docAcquisitionIntent = Boolean(openDocSearchTopic) || isAskTurnOpenDocGoalIntent(raw) || docAcquisitionPhraseIntent;
   if (scientificGoal) {
     pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
       kind: "doc_topic",
@@ -30943,19 +31401,28 @@ const buildAskTurnUniversalGoalFrame = (args: {
     );
   }
   if (retrievalRequiredSignal.required) {
-    const query = raw;
+    const query = equationIntent.required ? buildAskTurnEquationRetrievalQuery(raw) ?? raw : raw;
     pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
       kind: "doc_topic",
       value: query,
       source: "phrase_evidence",
       confidence: 0.88,
     });
+    if (retrievalRequiredSignal.requested_outputs.includes("equation_location") || equationIntent.required) {
+      pushRequestedOutput("location", "retrieval_required:equation_location");
+      pushEvidenceRequirement("doc_equation_location", "equation-bearing document requests require equation-like source evidence");
+      pushEvidenceRequirement("doc_candidate_validation", "equation-bearing document requests require candidate validation");
+    }
     if (retrievalRequiredSignal.requested_outputs.includes("latest_doc")) {
       pushRequestedOutput("doc_open", "retrieval_required:latest_doc");
       pushEvidenceRequirement("doc_candidate_validation", "retrieval-required latest-doc requests require candidate validation");
       pushEvidenceRequirement("opened_doc", "retrieval-required latest-doc requests require an opened document receipt");
     }
-    if (retrievalRequiredSignal.requested_outputs.includes("evidence_location") || retrievalRequiredSignal.requested_outputs.includes("table_row")) {
+    if (
+      !docAcquisitionIntent &&
+      (retrievalRequiredSignal.requested_outputs.includes("evidence_location") ||
+        retrievalRequiredSignal.requested_outputs.includes("table_row"))
+    ) {
       pushRequestedOutput("location", "retrieval_required:evidence_location");
       pushEvidenceRequirement("doc_location_matches", "retrieval-required location requests require located document evidence");
     }
@@ -30969,7 +31436,7 @@ const buildAskTurnUniversalGoalFrame = (args: {
     }
     if (
       !retrievalRequiredSignal.requested_outputs.some((output) =>
-        output === "latest_doc" || output === "evidence_location" || output === "table_row" || output === "numeric_value" || output === "concept_explanation",
+        output === "latest_doc" || output === "equation_location" || output === "evidence_location" || output === "table_row" || output === "numeric_value" || output === "concept_explanation",
       )
     ) {
       pushRequestedOutput("doc_open", "retrieval_required:source_doc");
@@ -31108,11 +31575,14 @@ const buildAskTurnUniversalGoalFrame = (args: {
     /\b(?:this|that|current|active)\s+(?:doc|document|paper)\b[\s\S]*\b(?:mention|mentions|talks?\s+about|references?|cites?|says?)\b/i.test(raw) ||
     /\b(?:centerline|alpha)\b[\s\S]*\blocation\b/i.test(raw);
   const locateIntent =
-    !openDocSearchTopic &&
+    !docAcquisitionIntent &&
     explicitCurrentDocLocateIntent &&
     /\b(?:where|locate|find|mention|mentions|talks?\s+about|location)\b/i.test(raw) &&
     /\b(?:doc|document|paper|this|current|active|centerline|alpha|line|section|location)\b/i.test(raw);
-  const compareIntent = /\b(?:compare|contrast|difference|differences|delta|deltas|versus|vs\.?)\b/i.test(raw) && !isAskTurnConceptualVsQuestion(raw);
+  const compareIntent =
+    !docAcquisitionIntent &&
+    /\b(?:compare|contrast|difference|differences|delta|deltas|versus|vs\.?)\b/i.test(raw) &&
+    !isAskTurnConceptualVsQuestion(raw);
   const temporalIntent = /\b(?:before|after|earlier|later|passing|passed|right\?)\b/i.test(raw) && /\b(?:this|that|was|solve|doc|paper)\b/i.test(raw);
   const capabilityHelpIntent = /\b(?:what\s+can\s+(?:i|we)\s+do|how\s+can\s+you\s+help|what\s+can\s+helix\s+ask\s+do|what\s+can\s+this\s+workspace\s+agent\s+do)\b/i.test(raw);
   const openIntent =
@@ -31120,9 +31590,10 @@ const buildAskTurnUniversalGoalFrame = (args: {
     (retrievalRequiredSignal.requested_outputs.includes("latest_doc") ||
       retrievalRequiredSignal.requested_outputs.includes("open_document") ||
       Boolean(scientificGoal && !activeDocPath) ||
-      Boolean(openDocSearchTopic) ||
+      docAcquisitionIntent ||
       /\b(?:open|view|show|go\s+to|navigate\s+to|get\s+me\s+to|point\s+me\s+at|pull\s+up|bring\s+up)\b/i.test(raw) ||
       actionId === "open_doc_by_path" ||
+      actionId === "open_doc_and_read" ||
       actionId === "open_latest_doc_by_topic" ||
       actionId === "search_docs");
   const conversationIntent =
@@ -31177,6 +31648,8 @@ const buildAskTurnUniversalGoalFrame = (args: {
   const goalKind: HelixAskUniversalGoalFrame["user_goal"]["goal_kind"] =
     panelControlIntent?.confidence === "high" && !panelControlIntent.conflict
       ? "panel_control"
+      : retrievalRequiredSignal.required && retrievalRequiredSignal.requested_outputs.includes("equation_location")
+        ? "locate_in_doc"
       : retrievalRequiredSignal.required &&
           (retrievalRequiredSignal.requested_outputs.includes("latest_doc") ||
             retrievalRequiredSignal.requested_outputs.includes("open_document"))
@@ -31193,6 +31666,8 @@ const buildAskTurnUniversalGoalFrame = (args: {
       ? "open_workspace"
       : capabilityHelpIntent
       ? "capability_help"
+      : docAcquisitionIntent || openIntent
+        ? "open_workspace"
       : temporalIntent
         ? "temporal_followup"
         : compareIntent
@@ -31203,9 +31678,7 @@ const buildAskTurnUniversalGoalFrame = (args: {
               ? "summarize_doc"
               : noteMutationIntent
                 ? "write_note"
-                : openIntent
-                  ? "open_workspace"
-                  : conversationIntent
+                : conversationIntent
                     ? "conversation"
                     : "unknown";
   const confidence =
@@ -32107,7 +32580,7 @@ const composeAskTurnFinalAnswerFromObservations = (args: {
         Array.isArray(observation.actual_artifacts) &&
         observation.actual_artifacts.includes("active_doc_path") &&
         action?.panel_id === "docs-viewer" &&
-        ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic"].includes(action.action_id)
+        ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(action.action_id)
       );
     });
     const openedAction = openedReceipt?.artifact as HelixAskTurnSelectedAction | null | undefined;
@@ -32648,16 +33121,18 @@ const selectAskTurnInitialCapabilityPlan = (args: {
   const topicDocQuery =
     (wantsCreateNoteBasic
       ? null
-      : resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
+      : buildAskTurnEquationRetrievalQuery(args.transcript) ??
+        resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
         resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
         (retrievalRequiredSignal.required
-      ? args.transcript
+      ? buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript
           : null));
   const wantsTopicDocAcquisition = Boolean(topicDocQuery);
-  const wantsRetrievalRequiredPlan = retrievalRequiredSignal.required && Boolean(topicDocQuery);
-  const wantsDocAnswerAfterAcquisition = isAskTurnCompoundDocAnswerIntent(args.transcript);
+  const openDocGoalIntent = isAskTurnOpenDocGoalIntent(args.transcript);
+  const wantsRetrievalRequiredPlan = retrievalRequiredSignal.required && Boolean(topicDocQuery) && !openDocGoalIntent;
+  const wantsDocAnswerAfterAcquisition = isAskTurnCompoundDocAnswerIntent(args.transcript) && !openDocGoalIntent;
   const wantsClipboard = /\b(?:read|open|show|check)\s+(?:the\s+)?clipboard\b/i.test(normalized);
-  const wantsLocate = isAskTurnDocLocateIntent(args.transcript);
+  const wantsLocate = isAskTurnDocLocateIntent(args.transcript) && !openDocGoalIntent;
   const wantsLocateToNote = isAskTurnDocLocateToNoteIntent(args.transcript);
   const wantsDocNotesCompare =
     isAskTurnDocNotesHybridCompareIntent(args.transcript) ||
@@ -33044,7 +33519,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         title: `Open ${selectedSearchResult.reason === "latest_verified_topic_candidate" ? "latest verified" : "validated"} doc result for "${clipConversationText(topicDocQuery, 90)}".`,
         action: {
           panel_id: "docs-viewer",
-          action_id: "open_doc_by_path",
+          action_id: isAskTurnReadAloudRequested(args.transcript) ? "open_doc_and_read" : "open_doc_by_path",
           args: {
             path: selectedSearchResult.match.path,
             query: topicDocQuery,
@@ -33057,10 +33532,13 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         required_artifacts: ["active_doc_path"],
         reason: null,
       });
+      const openDocCapability = isAskTurnReadAloudRequested(args.transcript)
+        ? "docs-viewer.open_doc_and_read"
+        : "docs-viewer.open_doc_by_path";
       capabilitySelectionTrace.push({
         missing_artifact: "active_doc_path",
-        candidate_capabilities: ["docs-viewer.open_doc_by_path"],
-        selected_capability: "docs-viewer.open_doc_by_path",
+        candidate_capabilities: [openDocCapability],
+        selected_capability: openDocCapability,
         reject_reasons: [],
       });
       if (
@@ -33068,18 +33546,22 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         wantsRetrievalRequiredPlan ||
         retrievalRequiredSignal.requested_outputs.includes("numeric_value") ||
         retrievalRequiredSignal.requested_outputs.includes("concept_explanation") ||
+        retrievalRequiredSignal.requested_outputs.includes("equation_location") ||
         retrievalRequiredSignal.requested_outputs.includes("evidence_location") ||
         retrievalRequiredSignal.requested_outputs.includes("table_row")
       ) {
         if (
+          retrievalRequiredSignal.requested_outputs.includes("equation_location") ||
           retrievalRequiredSignal.requested_outputs.includes("evidence_location") ||
           retrievalRequiredSignal.requested_outputs.includes("table_row")
         ) {
           const locateQuery =
-            retrievalRequiredSignal.anchors.artifact_ids?.[0] ??
-            retrievalRequiredSignal.anchors.table_names?.[0] ??
-            retrievalRequiredSignal.anchors.alpha_tokens?.[0] ??
-            topicDocQuery;
+            retrievalRequiredSignal.requested_outputs.includes("equation_location")
+              ? buildAskTurnEquationRetrievalQuery(args.transcript) ?? topicDocQuery
+              : (retrievalRequiredSignal.anchors.artifact_ids?.[0] ??
+                retrievalRequiredSignal.anchors.table_names?.[0] ??
+                retrievalRequiredSignal.anchors.alpha_tokens?.[0] ??
+                topicDocQuery);
           planItems.push({
             id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_locate_retrieval_evidence"),
             lane: "workspace",
@@ -33097,15 +33579,23 @@ const selectAskTurnInitialCapabilityPlan = (args: {
                   turnId: "initial-capability-plan",
                   transcript: args.transcript,
                   query: locateQuery,
-                  requestedOutput: "location",
+                  requestedOutput: retrievalRequiredSignal.requested_outputs.includes("equation_location")
+                    ? "equation_location"
+                    : "location",
                 }),
               },
             },
-            required_artifacts: ["doc_evidence_location"],
-            reason: "retrieval_required_evidence_location",
+            required_artifacts: retrievalRequiredSignal.requested_outputs.includes("equation_location")
+              ? ["doc_equation_location"]
+              : ["doc_evidence_location"],
+            reason: retrievalRequiredSignal.requested_outputs.includes("equation_location")
+              ? "retrieval_required_equation_location"
+              : "retrieval_required_evidence_location",
           });
           capabilitySelectionTrace.push({
-            missing_artifact: "doc_evidence_location",
+            missing_artifact: retrievalRequiredSignal.requested_outputs.includes("equation_location")
+              ? "doc_equation_location"
+              : "doc_evidence_location",
             candidate_capabilities: ["docs-viewer.locate_in_doc"],
             selected_capability: "docs-viewer.locate_in_doc",
             reject_reasons: [],
@@ -33147,6 +33637,8 @@ const selectAskTurnInitialCapabilityPlan = (args: {
               ? ["doc_numeric_answer"]
               : retrievalRequiredSignal.requested_outputs.includes("concept_explanation")
                 ? ["doc_concept_explanation"]
+                : retrievalRequiredSignal.requested_outputs.includes("equation_location")
+                  ? ["doc_equation_location"]
                 : retrievalRequiredSignal.requested_outputs.includes("evidence_location") || retrievalRequiredSignal.requested_outputs.includes("table_row")
                   ? ["doc_evidence_location"]
                   : ["doc_summary"],
@@ -34770,6 +35262,7 @@ const executeAskTurnIncrementalRuntimeLoop = (args: {
       transcript: args.transcript,
       missingArtifacts: collectAskTurnMissingRequiredArtifacts(runtime),
       hasDocSearchResults: "doc_search_results" in runtime.artifact_store,
+      hasDocOpenReceipt: "doc_open_receipt" in runtime.artifact_store || "active_doc_path" in runtime.artifact_store,
     });
     const decision: HelixAskTurnRuntimeDecision = {
       kind: missingRequiredArtifacts.length > 0 ? "final_failure" : "final_answer",
@@ -35435,6 +35928,7 @@ const executeAskTurnAsyncRuntimeLoop = async (args: {
     transcript: args.transcript,
     missingArtifacts: collectAskTurnMissingRequiredArtifacts(result.runtime),
     hasDocSearchResults: finalAvailableArtifacts.has("doc_search_results"),
+    hasDocOpenReceipt: finalAvailableArtifacts.has("doc_open_receipt") || finalAvailableArtifacts.has("active_doc_path"),
   });
   if (missingRequiredArtifacts.length > 0 && result.runtime.terminal.kind !== "pending_input") {
     const temporalContextComparisonArtifact =
@@ -37155,7 +37649,7 @@ const buildAskTurnAssistantAnswerFromState = (args: {
         ? [`Opened latest ${topic} document:`, renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
         : `Opened latest ${topic} document.`;
     }
-    if (action.action_id === "open_doc" || action.action_id === "open_doc_by_path") {
+    if (action.action_id === "open_doc" || action.action_id === "open_doc_by_path" || action.action_id === "open_doc_and_read") {
       return path
         ? ["Opened document:", renderAskTurnDocReferenceBlock({ heading: "Document", path })].filter(Boolean).join("\n")
         : "Opened the requested document.";
@@ -85900,6 +86394,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         hasDocSearchResults:
           asyncRuntimeSummary.satisfied_artifacts.includes("doc_search_results") ||
           "doc_search_results" in executionBundle.runtime.artifact_store,
+        hasDocOpenReceipt:
+          asyncRuntimeSummary.satisfied_artifacts.includes("doc_open_receipt") ||
+          asyncRuntimeSummary.satisfied_artifacts.includes("active_doc_path") ||
+          "doc_open_receipt" in executionBundle.runtime.artifact_store ||
+          "active_doc_path" in executionBundle.runtime.artifact_store,
       });
     }
   };
@@ -86246,6 +86745,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         turnId: activeTurnIdForDebug,
         transcript: options?.questionSeed ?? transcriptSeed,
       });
+      const documentSeekingIntent = classifyAskTurnDocumentSeekingIntent(options?.questionSeed ?? transcriptSeed);
+      const equationRetrievalIntent = buildAskTurnEquationRetrievalIntent({
+        turnId: activeTurnIdForDebug,
+        transcript: options?.questionSeed ?? transcriptSeed,
+      });
       const turnScopeContract = buildAskTurnScopeContract({
         turnId: activeTurnIdForDebug,
         transcript: options?.questionSeed ?? transcriptSeed,
@@ -86254,11 +86758,18 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const locateQueryForIntegrity = resolveAskTurnDocLocateQuery(options?.questionSeed ?? transcriptSeed);
       payload.negative_scope_decision = negativeScopeDecision;
       payload.exact_anchor_set = exactAnchorSet;
+      payload.document_seeking_intent = documentSeekingIntent;
+      payload.equation_retrieval_intent = equationRetrievalIntent;
       payload.turn_scope_contract = turnScopeContract;
-      if (exactAnchorSet.must_preserve.length > 0 || locateQueryForIntegrity) {
+      if (exactAnchorSet.must_preserve.length > 0 || locateQueryForIntegrity || equationRetrievalIntent.strength !== "none") {
         payload.retrieval_query_integrity = validateAskTurnRetrievalQueryIntegrity({
           prompt: options?.questionSeed ?? transcriptSeed,
           exactAnchors: exactAnchorSet.must_preserve,
+          requiredTerms: uniqueAskTurnStrings([
+            ...equationRetrievalIntent.anchors.corpus_terms,
+            ...equationRetrievalIntent.anchors.equation_terms,
+            ...equationRetrievalIntent.anchors.calculator_terms,
+          ]),
           queries: [locateQueryForIntegrity ?? ""],
         });
       }
@@ -86435,6 +86946,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         const hasRuntimeDocSearchResults =
           Array.isArray(runtimeRecord.satisfied_artifacts) &&
           (runtimeRecord.satisfied_artifacts as unknown[]).some((artifact) => String(artifact ?? "") === "doc_search_results");
+        const hasRuntimeDocOpenReceipt =
+          Array.isArray(runtimeRecord.satisfied_artifacts) &&
+          (runtimeRecord.satisfied_artifacts as unknown[]).some((artifact) =>
+            ["doc_open_receipt", "active_doc_path"].includes(String(artifact ?? "")),
+          );
         if (Array.isArray(runtimeRecord.missing_required_artifacts)) {
           runtimeRecord.missing_required_artifacts = filterAskTurnLatestDocSearchFallbackMissingArtifacts({
             transcript: options?.questionSeed ?? transcriptSeed,
@@ -86442,6 +86958,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               .map((artifact) => String(artifact ?? "").trim())
               .filter(Boolean),
             hasDocSearchResults: hasRuntimeDocSearchResults || "doc_search_results" in runtime.artifact_store,
+            hasDocOpenReceipt:
+              hasRuntimeDocOpenReceipt || "doc_open_receipt" in runtime.artifact_store || "active_doc_path" in runtime.artifact_store,
           });
         }
         runtimeRecord.async_executor_used = payload.async_executor_used === true;
@@ -86609,7 +87127,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const scientificTerminalErrorCode = readAskTurnString(payload.terminal_error_code);
       const scientificTerminalErrorText =
         scientificTerminalErrorCode === "numeric_result_unavailable" ||
-        scientificTerminalErrorCode === "concept_explanation_unavailable"
+        scientificTerminalErrorCode === "concept_explanation_unavailable" ||
+        scientificTerminalErrorCode === "equation_source_unavailable"
           ? renderAskTurnScientificMissingFinalText({
               code: scientificTerminalErrorCode,
               sourcePath: readAskTurnWorkspaceSnapshotPath(payload),
@@ -87260,7 +87779,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             const artifact = step?.artifact && typeof step.artifact === "object" ? (step.artifact as Record<string, unknown>) : null;
             return (
               artifact?.panel_id === "docs-viewer" &&
-              ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic"].includes(String(artifact?.action_id ?? "")) &&
+              ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(String(artifact?.action_id ?? "")) &&
               Array.isArray(step?.actual_artifacts) &&
               (step.actual_artifacts as unknown[]).includes("active_doc_path")
             );
@@ -88594,6 +89113,22 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.terminal_artifact_kind = "typed_failure";
       payload.final_artifact_scope = "current_turn";
     }
+    if (
+      canonicalGoalFrame.goal_kind === "doc_equation_location" &&
+      resolvedFinalStatus !== "pending_input" &&
+      !finalText.includes("equation_source_unavailable")
+    ) {
+      finalText = renderAskTurnScientificMissingFinalText({
+        code: "equation_source_unavailable",
+        sourcePath: normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath),
+      });
+      resolvedFinalStatus = "final_failure";
+      finalAnswerSource = "typed_failure";
+      payload.response_type = "final_failure";
+      payload.terminal_error_code = "equation_source_unavailable";
+      payload.terminal_artifact_kind = "typed_failure";
+      payload.final_artifact_scope = "current_turn";
+    }
     payload.final_answer_source = finalAnswerSource;
     payload.selected_final_answer = finalText;
     payload.terminal_authority = "server";
@@ -88667,7 +89202,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     const responseBoundaryScientificCode = readAskTurnString(payload.terminal_error_code);
     if (
       responseBoundaryScientificCode === "numeric_result_unavailable" ||
-      responseBoundaryScientificCode === "concept_explanation_unavailable"
+      responseBoundaryScientificCode === "concept_explanation_unavailable" ||
+      responseBoundaryScientificCode === "equation_source_unavailable"
     ) {
       const responseBoundaryScientificText = renderAskTurnScientificMissingFinalText({
         code: responseBoundaryScientificCode,
@@ -89780,6 +90316,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       !shouldPreferWorkspaceDispatch(transcript) &&
       !HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalizedTranscript) &&
       !HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalizedTranscript);
+    const incomingModelOnlyConceptQuestion =
+      incomingIntentFamily === "conversation" &&
+      !confirmed &&
+      !rejected &&
+      isAskTurnModelOnlyConceptQuestion(transcript);
     const newPromptIsExecutableGoal =
       shouldPreferWorkspaceDispatch(transcript) ||
       isAskTurnDocIdentityIntent(transcript) ||
@@ -89796,9 +90337,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           incomingIntentFamily !== "conversation" &&
           incomingIntentFamily !== pendingOriginFamily));
     if (
-      incomingConversationOnly &&
+      (incomingConversationOnly || incomingModelOnlyConceptQuestion) &&
       existingPendingRequest.kind === "clarify" &&
-      existingPendingRequest.pendingScope === "confirm"
+      (existingPendingRequest.pendingScope === "confirm" || incomingModelOnlyConceptQuestion)
     ) {
       if (conversationPendingKey) {
         helixConversationPendingInputBySession.delete(conversationPendingKey);
@@ -91345,6 +91886,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   );
   if (
     !isAskTurnContextualTemporalCompareIntent(transcript) &&
+    !isAskTurnOpenDocGoalIntent(transcript) &&
     askTurnHasCompareCueOutsideProtectedArgs(transcript) &&
     !isAskTurnDocDocCompareIntent(transcript) &&
     !resolveAskTurnCompareNoteTargetWithWorkspace(transcript, workspaceSessionSnapshot) &&
@@ -91355,12 +91897,28 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   }
   const completedDocSearchFallback =
     isAskTurnOpenLatestDocIntent(transcript) && hasCompletedAskTurnDocSearchStep(executionTrace);
+  const completedDocAcquisitionOnly = hasAskTurnOpenDocObjectiveSatisfied({
+    transcript,
+    stepResults,
+  });
+  const completedOpenDocStepForBlockedArtifacts =
+    isAskTurnOpenDocGoalIntent(transcript) &&
+    executionTrace.some(
+      (step) =>
+        step.status === "completed" &&
+        step.action?.panel_id === "docs-viewer" &&
+        ["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(step.action.action_id),
+    );
   const blockedMissingArtifacts = isAskTurnCapabilityHelpIntent(transcript)
     ? []
     : retrievalRequiredHard
     ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context")
     : isAskTurnContextualTemporalCompareIntent(transcript)
     ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "temporal_target_resolution_attempts")
+    : completedDocAcquisitionOnly || completedOpenDocStepForBlockedArtifacts
+    ? rawBlockedMissingArtifacts.filter(
+        (artifact) => !["active_doc_path", "doc_context", "doc_evidence_location", "doc_location_matches"].includes(artifact),
+      )
     : completedDocSearchFallback
     ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context")
     : rawBlockedMissingArtifacts;
@@ -92625,6 +93183,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   if (
     !pendingServerRequest &&
     !isAskTurnContextualTemporalCompareIntent(transcript) &&
+    !isAskTurnOpenDocGoalIntent(transcript) &&
     askTurnHasCompareCueOutsideProtectedArgs(transcript) &&
     /note context is missing/i.test(responseText)
   ) {

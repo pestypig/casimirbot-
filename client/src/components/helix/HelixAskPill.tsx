@@ -5072,6 +5072,42 @@ export function shouldAutoSpeakAnswerForTurn(args: {
   return args.inputSource === "voice_auto" || args.inputSource === "manual";
 }
 
+export function shouldPreserveAuthoritativeTerminalOverEvidenceGate(args: {
+  evidenceGateBlocked: boolean;
+  dispatchPolicy?: string | null;
+  routeReasonCode?: string | null;
+  hasCompletedWorkspaceTool?: boolean;
+  hasTerminalText?: boolean;
+  hasPendingRequest?: boolean;
+}): boolean {
+  if (!args.evidenceGateBlocked) return false;
+  if (!args.hasTerminalText) return false;
+  if (args.hasPendingRequest) return true;
+  if (
+    (args.dispatchPolicy === "workspace_only" || args.dispatchPolicy === "workspace_context_reasoning") &&
+    args.routeReasonCode === "dispatch:act" &&
+    args.hasCompletedWorkspaceTool
+  ) {
+    return true;
+  }
+  return args.dispatchPolicy === "direct_answer_only" && args.routeReasonCode === "conversation:simple";
+}
+
+export function shouldSuppressVoiceForTerminalState(args: {
+  dispatchPolicy?: string | null;
+  routeReasonCode?: string | null;
+  terminalKind?: string | null;
+  finalAnswerSource?: string | null;
+  hasPendingRequest?: boolean;
+}): boolean {
+  if (args.hasPendingRequest) return true;
+  if (args.dispatchPolicy === "needs_user_input") return true;
+  if (args.routeReasonCode?.startsWith("clarify:")) return true;
+  if (args.terminalKind === "final_failure" || args.terminalKind === "typed_failure") return true;
+  if (args.finalAnswerSource === "typed_failure") return true;
+  return false;
+}
+
 export function isGenericQueuedVoiceAcknowledgement(text: string): boolean {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return false;
@@ -24122,14 +24158,41 @@ export function HelixAskPill({
             const record = step as Record<string, unknown>;
             return record.lane === "workspace" && record.status === "completed";
           });
-          const authoritativeWorkspaceTerminal =
-            (localDispatchPolicy === "workspace_only" || localDispatchPolicy === "workspace_context_reasoning") &&
-            localRouteReason === "dispatch:act" &&
-            hasCompletedWorkspaceTool &&
-            Boolean(terminalResolutionForFinal.backendTerminalText || terminalResolutionForFinal.text) &&
-            !localResponseForTerminal?.pending_server_request &&
-            !localResponseForTerminal?.pending_request;
-          if (evidenceGateDecision.blocked && !authoritativeWorkspaceTerminal) {
+          const hasPendingRequestForTerminal = Boolean(
+            localResponseRecord.pending_server_request ||
+              localResponseRecord.pending_request ||
+              plannerRecord?.pending_request,
+          );
+          const preserveAuthoritativeTerminal = shouldPreserveAuthoritativeTerminalOverEvidenceGate({
+            evidenceGateBlocked: evidenceGateDecision.blocked,
+            dispatchPolicy: localDispatchPolicy,
+            routeReasonCode: localRouteReason,
+            hasCompletedWorkspaceTool,
+            hasTerminalText: Boolean(terminalResolutionForFinal.backendTerminalText || terminalResolutionForFinal.text),
+            hasPendingRequest: hasPendingRequestForTerminal,
+          });
+          const terminalArtifactForVoice = readAgentLoopAuditRecord(
+            localResponseRecord.terminal_artifact ?? localResponseRecord.latest_result_artifact,
+          );
+          const turnTruthTableForVoice = readAgentLoopAuditRecord(localResponseRecord.turn_truth_table);
+          const truthTerminalForVoice = readAgentLoopAuditRecord(turnTruthTableForVoice?.terminal);
+          const terminalKindForVoice =
+            (typeof localResponseRecord.terminal_artifact_kind === "string" && localResponseRecord.terminal_artifact_kind.trim()) ||
+            (typeof terminalArtifactForVoice?.kind === "string" && terminalArtifactForVoice.kind.trim()) ||
+            (typeof truthTerminalForVoice?.kind === "string" && truthTerminalForVoice.kind.trim()) ||
+            null;
+          const finalAnswerSourceForVoice =
+            (typeof localResponseRecord.final_answer_source === "string" && localResponseRecord.final_answer_source.trim()) ||
+            (typeof truthTerminalForVoice?.final_answer_source === "string" && truthTerminalForVoice.final_answer_source.trim()) ||
+            null;
+          const suppressVoiceForTerminalState = shouldSuppressVoiceForTerminalState({
+            dispatchPolicy: localDispatchPolicy,
+            routeReasonCode: localRouteReason,
+            terminalKind: terminalKindForVoice,
+            finalAnswerSource: finalAnswerSourceForVoice,
+            hasPendingRequest: hasPendingRequestForTerminal,
+          });
+          if (evidenceGateDecision.blocked && !preserveAuthoritativeTerminal) {
             appendSyntheticLiveEvent(
               buildNeedsRetrievalPlanEvent({
                 source: "run_ask",
@@ -24253,6 +24316,8 @@ export function HelixAskPill({
             directReplyIdForAutoSpeak &&
             responseText &&
             !manualAttempt &&
+            (!evidenceGateDecision.blocked || preserveAuthoritativeTerminal) &&
+            !suppressVoiceForTerminalState &&
             shouldAutoSpeakAnswerForTurn({
               micArmState: voiceAutoSpeakArmedAtTurnStart ? "on" : "off",
               inputSource: "manual",

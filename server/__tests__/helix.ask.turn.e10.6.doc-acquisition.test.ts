@@ -84,6 +84,58 @@ describe("helix ask turn e10.6 doc acquisition", () => {
     expect(response.body?.open_doc_selected_path).toMatch(/^\/docs\/.*\.md$/);
   });
 
+  it("treats versus inside a requested doc topic as acquisition, not note comparison", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, can you find me a doc about NHM2 shift versus lapse decomposition",
+        mode: "read",
+        sessionId: `e106-versus-topic-${Date.now()}`,
+      })
+      .expect(200);
+
+    const actions = (response.body?.execution_trace ?? []).map((step: any) => step?.action).filter(Boolean);
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.dispatch_policy).not.toBe("needs_user_input");
+    expect(response.body?.pending_server_request).toBeFalsy();
+    expect(response.body?.workspace_action?.panel_id).toBe("docs-viewer");
+    expect(response.body?.workspace_action?.action_id).toBe("search_docs");
+    expect(response.body?.workspace_action?.args?.query).toMatch(/shift/i);
+    expect(response.body?.workspace_action?.args?.query).toMatch(/lapse/i);
+    expect(response.body?.universal_goal_frame?.user_goal?.goal_kind).not.toBe("compare");
+    expect(
+      (response.body?.universal_goal_frame?.requested_outputs ?? []).some((output: any) => output?.kind === "doc_open"),
+    ).toBe(true);
+    expect(response.body?.universal_goal_frame?.compound_argument_partition?.operation).toBe("open_doc");
+    expect(response.body?.planner_contract?.selection_missing_required_args ?? []).not.toContain("note_title");
+    expect(actions.some((action: any) => action?.panel_id === "docs-viewer" && action?.action_id === "search_docs")).toBe(true);
+    expect(actions.some((action: any) => action?.panel_id === "docs-viewer" && action?.action_id === "open_doc_by_path")).toBe(true);
+    expect(response.body?.text).toMatch(/(?:Opened document:|Explained \/docs\/.*shift-vs-lapse-decomposition.*\.md)/i);
+    expect(response.body?.text).not.toMatch(/note named "shift"|Which note should I compare/i);
+    expect(response.body?.open_doc_goal_satisfied).toBe(true);
+  });
+
+  it("preserves read-aloud intent through topic-doc acquisition continuation", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open a doc about NHM2 shift versus lapse decomposition and then read it aloud",
+        mode: "read",
+        sessionId: `e106-versus-topic-read-${Date.now()}`,
+      })
+      .expect(200);
+
+    const actions = (response.body?.execution_trace ?? []).map((step: any) => step?.action).filter(Boolean);
+    expect(response.body?.route_reason_code).toBe("dispatch:act");
+    expect(response.body?.pending_server_request).toBeFalsy();
+    expect(actions.some((action: any) => action?.panel_id === "docs-viewer" && action?.action_id === "search_docs")).toBe(true);
+    expect(actions.some((action: any) => action?.panel_id === "docs-viewer" && action?.action_id === "open_doc_and_read")).toBe(true);
+    expect(response.body?.open_doc_goal_satisfied).toBe(true);
+    expect(response.body?.text).toMatch(/(?:Opened document:|Explained \/docs\/.*shift-vs-lapse-decomposition.*\.md)/i);
+  });
+
   it("opens a topical light-crossing document instead of stopping at search results", async () => {
     const app = createApp();
     const response = await request(app)

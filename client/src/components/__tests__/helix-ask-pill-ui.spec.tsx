@@ -46,6 +46,8 @@ let shouldTreatVoicePlaybackErrorAsEnded: typeof import("@/components/helix/Heli
 let resolveVoicePlaybackAttemptPath: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackAttemptPath;
 let shouldBypassVoicePlaybackGraph: typeof import("@/components/helix/HelixAskPill").shouldBypassVoicePlaybackGraph;
 let shouldAutoSpeakAnswerForTurn: typeof import("@/components/helix/HelixAskPill").shouldAutoSpeakAnswerForTurn;
+let shouldPreserveAuthoritativeTerminalOverEvidenceGate: typeof import("@/components/helix/HelixAskPill").shouldPreserveAuthoritativeTerminalOverEvidenceGate;
+let shouldSuppressVoiceForTerminalState: typeof import("@/components/helix/HelixAskPill").shouldSuppressVoiceForTerminalState;
 let resolveInitialMicArmState: typeof import("@/components/helix/HelixAskPill").resolveInitialMicArmState;
 let shouldStopReadAloudOnButtonPress: typeof import("@/components/helix/HelixAskPill").shouldStopReadAloudOnButtonPress;
 let formatReadAloudButtonLabel: typeof import("@/components/helix/HelixAskPill").formatReadAloudButtonLabel;
@@ -124,6 +126,8 @@ beforeAll(async () => {
     resolveVoicePlaybackAttemptPath,
     shouldBypassVoicePlaybackGraph,
     shouldAutoSpeakAnswerForTurn,
+    shouldPreserveAuthoritativeTerminalOverEvidenceGate,
+    shouldSuppressVoiceForTerminalState,
     resolveInitialMicArmState,
     shouldStopReadAloudOnButtonPress,
     formatReadAloudButtonLabel,
@@ -242,10 +246,13 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("does not let evidence gating overwrite authoritative workspace terminals", () => {
     const source = fs.readFileSync(pillPath, "utf8");
-    expect(source).toContain("authoritativeWorkspaceTerminal");
-    expect(source).toMatch(/evidenceGateDecision\.blocked && !authoritativeWorkspaceTerminal/);
-    expect(source).toContain('localDispatchPolicy === "workspace_only"');
-    expect(source).toContain('localRouteReason === "dispatch:act"');
+    expect(source).toContain("shouldPreserveAuthoritativeTerminalOverEvidenceGate");
+    expect(source).toContain("preserveAuthoritativeTerminal");
+    expect(source).toMatch(/evidenceGateDecision\.blocked && !preserveAuthoritativeTerminal/);
+    expect(source).toContain('args.dispatchPolicy === "workspace_only"');
+    expect(source).toContain('args.routeReasonCode === "dispatch:act"');
+    expect(source).toContain('args.dispatchPolicy === "direct_answer_only"');
+    expect(source).toContain('args.routeReasonCode === "conversation:simple"');
     expect(source).toContain("runtimeObservationsForTerminal");
     expect(source).toContain("runtimeSummaryRecord?.observations");
   });
@@ -343,6 +350,75 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(shouldAutoSpeakAnswerForTurn({ ...base, toolIntent: "tool_only" })).toBe(false);
     expect(shouldAutoSpeakAnswerForTurn({ ...base, toolIntent: "explicit_voice_tool" })).toBe(false);
     expect(shouldAutoSpeakAnswerForTurn({ ...base, finalTimelineType: "action_receipt" })).toBe(false);
+  });
+
+  it("preserves authoritative terminal answers over stale client evidence-gate fallbacks", () => {
+    expect(
+      shouldPreserveAuthoritativeTerminalOverEvidenceGate({
+        evidenceGateBlocked: true,
+        dispatchPolicy: "direct_answer_only",
+        routeReasonCode: "conversation:simple",
+        hasTerminalText: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveAuthoritativeTerminalOverEvidenceGate({
+        evidenceGateBlocked: true,
+        dispatchPolicy: "workspace_only",
+        routeReasonCode: "dispatch:act",
+        hasCompletedWorkspaceTool: true,
+        hasTerminalText: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveAuthoritativeTerminalOverEvidenceGate({
+        evidenceGateBlocked: true,
+        dispatchPolicy: "direct_answer_only",
+        routeReasonCode: "conversation:simple",
+        hasTerminalText: true,
+        hasPendingRequest: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveAuthoritativeTerminalOverEvidenceGate({
+        evidenceGateBlocked: true,
+        dispatchPolicy: "workspace_only",
+        routeReasonCode: "dispatch:act",
+        hasCompletedWorkspaceTool: false,
+        hasTerminalText: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("suppresses voice playback for pending and failed terminal states", () => {
+    expect(
+      shouldSuppressVoiceForTerminalState({
+        dispatchPolicy: "needs_user_input",
+        routeReasonCode: "clarify:missing_args",
+        hasPendingRequest: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSuppressVoiceForTerminalState({
+        dispatchPolicy: "direct_answer_only",
+        routeReasonCode: "conversation:simple",
+        terminalKind: "final_failure",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSuppressVoiceForTerminalState({
+        dispatchPolicy: "direct_answer_only",
+        routeReasonCode: "conversation:simple",
+        finalAnswerSource: "typed_failure",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSuppressVoiceForTerminalState({
+        dispatchPolicy: "direct_answer_only",
+        routeReasonCode: "conversation:simple",
+        terminalKind: "final_answer",
+      }),
+    ).toBe(false);
   });
 
   it("defaults a fresh voice session to armed while respecting an explicit off setting", () => {

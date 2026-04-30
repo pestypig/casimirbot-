@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
+import { __testHelixAskPendingInputStore, planRouter } from "../routes/agi.plan";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -65,6 +65,39 @@ describe("helix ask turn e8.14.1 artifact-gate pending escape", () => {
     expect(hello.body?.pending_server_request?.kind).toBe("clarify");
     expect(hello.body?.pending_transition_trace).not.toContain("artifact_gate_conversation_escape_abort");
   });
+
+  it("clears artifact-gate pending for unrelated model-only concept questions", async () => {
+    const app = createApp();
+    const sessionId = "e8141-model-only-concept";
+    __testHelixAskPendingInputStore.set(sessionId, {
+      turnId: "ask:previous-artifact-gate",
+      requestId: "pending:previous-artifact-gate",
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: 'I could not find a note named "lap laps? Opposition". Which note should I compare with the active document?',
+      createdAtMs: Date.now(),
+      requiredFields: ["note_title"],
+      unresolvedFields: ["note_title"],
+      candidateAction: null,
+      status: "pending",
+      pendingScope: "artifact_gate",
+      originIntentHash: "compare:compare active document with missing note",
+      originActionFamily: "compare",
+      expiresAtMs: Date.now() + 10 * 60 * 1000,
+    });
+
+    const concept = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, what is a refraction index?",
+        mode: "read",
+        sessionId,
+      })
+      .expect(200);
+
+    expect(concept.body?.route_reason_code).not.toBe("clarify:missing_args");
+    expect(concept.body?.pending_server_request ?? null).toBeNull();
+  }, 60000);
 
   it("keeps artifact-gate pending active for same compare intent family", async () => {
     const app = createApp();
