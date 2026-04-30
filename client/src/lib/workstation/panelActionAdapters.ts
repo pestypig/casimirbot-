@@ -996,8 +996,16 @@ export function executeHelixPanelAction(
           mode: solveResult.mode,
           normalized_expression: solveResult.normalized_expression,
           result_text: solveResult.result_text,
+          result_latex: solveResult.result_latex ?? "",
           variable: solveResult.variable,
           steps_count: solveResult.steps.length,
+          steps: solveResult.steps,
+          trace: solveResult.trace,
+          route: solveResult.trace.route,
+          engine: solveResult.trace.engine,
+          sourceOfTruth: solveResult.trace.sourceOfTruth,
+          capabilityClass: solveResult.trace.capabilityClass,
+          warnings: solveResult.trace.warnings,
           error: solveResult.error ?? null,
         },
       };
@@ -1023,6 +1031,7 @@ export function executeHelixPanelAction(
         artifact: {
           copied: true,
           text: resultText,
+          trace: scientificState.lastSolve?.trace ?? null,
         },
       };
     }

@@ -9,7 +9,7 @@ import {
   SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT,
   type ScientificCalculatorMathPickedDetail,
 } from "@/lib/scientific-calculator/events";
-import { runScientificSolve } from "@/lib/scientific-calculator/solver";
+import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 
 function renderMathHtml(value: string, displayMode: boolean): string {
@@ -25,6 +25,21 @@ function renderMathHtml(value: string, displayMode: boolean): string {
   } catch {
     return "";
   }
+}
+
+function resolveSolveTrace(lastSolve: { trace?: ScientificSolveTrace; input_latex?: string } | null): ScientificSolveTrace {
+  if (lastSolve?.trace) return lastSolve.trace;
+  const traceId = `scicalc:legacy:${Date.now().toString(36)}`;
+  return {
+    traceId,
+    runId: traceId,
+    route: "scientific-calculator/legacy-result",
+    engine: "nerdamer",
+    sourceOfTruth: "scientific_calculator",
+    capabilityClass: "symbolic_algebra",
+    artifactPath: null,
+    warnings: ["This result was restored from an older calculator state without trace metadata."],
+  };
 }
 
 export default function ScientificCalculatorPanel() {
@@ -68,6 +83,8 @@ export default function ScientificCalculatorPanel() {
     () => renderMathHtml(lastSolve?.result_latex ?? "", true),
     [lastSolve?.result_latex],
   );
+  const inputPreviewHtml = useMemo(() => renderMathHtml(input, true), [input]);
+  const solveTrace = useMemo(() => resolveSolveTrace(lastSolve), [lastSolve]);
 
   return (
     <div className="h-full w-full overflow-auto bg-slate-950/90 p-4 text-slate-100">
@@ -84,6 +101,25 @@ export default function ScientificCalculatorPanel() {
           onChange={(event) => setInput(event.target.value)}
           placeholder="Example: t_{\\text{proper}} = t_{\\text{shift-driven}} + \\Delta t_{\\text{lapse-driven}}"
         />
+        <div className="grid gap-2 lg:grid-cols-2">
+          <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Scientific Preview</div>
+            {inputPreviewHtml ? (
+              <div
+                className="overflow-x-auto rounded border border-slate-800 bg-slate-900/70 px-2 py-2 text-slate-100"
+                dangerouslySetInnerHTML={{ __html: inputPreviewHtml }}
+              />
+            ) : (
+              <div className="text-xs text-slate-500">No renderable math yet.</div>
+            )}
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Normalized Expression</div>
+            <div className="break-words font-mono text-xs text-slate-200">
+              {lastSolve?.normalized_expression || "Solve to inspect normalized form."}
+            </div>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={handlePasteClipboard}>
             Paste from Clipboard
@@ -136,6 +172,37 @@ export default function ScientificCalculatorPanel() {
                 />
               ) : null}
               <div className="font-mono text-slate-100">{lastSolve.result_text || lastSolve.error || "n/a"}</div>
+            </div>
+            <div className="rounded-md border border-slate-800 bg-slate-950/50 p-3 text-xs">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Trace</div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="border-slate-600 text-slate-200">
+                  {solveTrace.route}
+                </Badge>
+                <Badge variant="outline" className="border-slate-600 text-slate-200">
+                  {solveTrace.engine}
+                </Badge>
+                <Badge variant="outline" className="border-slate-600 text-slate-200">
+                  {solveTrace.capabilityClass}
+                </Badge>
+              </div>
+              <div className="mt-2 break-all font-mono text-[11px] text-slate-300">
+                traceId: {solveTrace.traceId}
+              </div>
+              {solveTrace.delegatedTo ? (
+                <div className="mt-1 font-mono text-[11px] text-cyan-200">
+                  delegatedTo: {solveTrace.delegatedTo}
+                </div>
+              ) : null}
+              {solveTrace.warnings.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {solveTrace.warnings.map((warning, index) => (
+                    <div key={`${warning}:${index}`} className="text-[11px] text-amber-200">
+                      {warning}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {stepItems.length > 0 ? (
               <div className="space-y-2">

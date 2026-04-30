@@ -301,6 +301,14 @@ describe("panelActionAdapters", () => {
     expect(solve.ok).toBe(true);
     expect(typeof solve.artifact?.result_text).toBe("string");
     expect((solve.artifact?.steps_count as number) > 0).toBe(true);
+    expect(Array.isArray(solve.artifact?.steps)).toBe(true);
+    expect(solve.artifact?.trace).toEqual(
+      expect.objectContaining({
+        route: "scientific-calculator/nerdamer",
+        engine: "nerdamer",
+        sourceOfTruth: "scientific_calculator",
+      }),
+    );
 
     const copyResult = executeHelixPanelAction(
       {
@@ -338,5 +346,31 @@ describe("panelActionAdapters", () => {
     expect(typeof solve.artifact?.result_text).toBe("string");
     expect(String(solve.artifact?.result_text).length).toBeGreaterThan(0);
     expect(String(solve.artifact?.error ?? "")).not.toContain("eqn.split");
+  });
+
+  it("marks GR-class scientific requests as backend-only with trace metadata", () => {
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_with_steps",
+        args: {
+          latex: "Compute the Einstein tensor and QI guardrail for the Natario warp.metric T00 route.",
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(solve.ok).toBe(false);
+    expect(solve.artifact?.sourceOfTruth).toBe("einstein_backend");
+    expect(solve.artifact?.capabilityClass).toBe("gr_warp_physics");
+    expect(solve.artifact?.trace).toEqual(
+      expect.objectContaining({
+        delegatedTo: "/api/physics/warp/calculator",
+      }),
+    );
   });
 });

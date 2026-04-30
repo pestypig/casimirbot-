@@ -318,6 +318,15 @@ describe("HelixAskPill mic helper behavior", () => {
         finalTimelineType: "reasoning_final",
       }),
     ).toBe(true);
+    expect(
+      shouldAutoSpeakAnswerForTurn({
+        micArmState: "on",
+        inputSource: "manual",
+        answerAuthority: "final",
+        toolIntent: "workspace_terminal_summary",
+        finalTimelineType: "workspace_terminal_summary",
+      }),
+    ).toBe(true);
   });
 
   it("keeps automatic answer narration out of muted, non-final, and tool-only turns", () => {
@@ -382,6 +391,32 @@ describe("HelixAskPill mic helper behavior", () => {
     });
     expect(task.key).toContain("manual_read_aloud");
     expect(task.key).toContain("reply-1");
+  });
+
+  it("preserves latched voice-session final answer playback intent", () => {
+    const task = mapVoicePlaybackIntentToTask({
+      kind: "final",
+      authority: "final",
+      source: "agent_loop",
+      turnKey: "ask:turn-1",
+      revision: 2,
+      text: "Final answer from the direct ask path.",
+      traceId: "ask:turn-1",
+      eventId: "reply-2",
+      replyId: "reply-2",
+      allowMicOffPlayback: true,
+      briefSource: "none",
+      finalSource: "normal_reasoning",
+    });
+
+    expect(task).toMatchObject({
+      kind: "final",
+      authority: "final",
+      source: "agent_loop",
+      turnKey: "ask:turn-1",
+      replyId: "reply-2",
+      allowMicOffPlayback: true,
+    });
   });
 
   it("parses close-this-panel phrasing into close_active_panel action", () => {

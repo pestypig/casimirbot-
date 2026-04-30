@@ -35,6 +35,7 @@ export type VoicePlaybackChunk = {
   authority?: VoicePlaybackIntentAuthority;
   source?: VoicePlaybackIntentSource;
   replyId?: string;
+  allowMicOffPlayback?: boolean;
   revision: number;
   chunkIndex: number;
   chunkCount: number;
@@ -48,6 +49,7 @@ export type VoicePlaybackUtterance = {
   authority?: VoicePlaybackIntentAuthority;
   source?: VoicePlaybackIntentSource;
   replyId?: string;
+  allowMicOffPlayback?: boolean;
   revision: number;
   text: string;
   chunks: string[];
@@ -64,6 +66,7 @@ export type VoicePlaybackMetrics = {
   authority?: VoicePlaybackIntentAuthority;
   source?: VoicePlaybackIntentSource;
   replyId?: string;
+  allowMicOffPlayback?: boolean;
   chunkCount: number;
   enqueueToFirstAudioMs: number | null;
   synthDurationsMs: number[];
@@ -218,6 +221,7 @@ export function createVoicePlaybackUtterance(input: {
   authority?: VoicePlaybackIntentAuthority;
   source?: VoicePlaybackIntentSource;
   replyId?: string;
+  allowMicOffPlayback?: boolean;
   revision: number;
   text: string;
   traceId?: string;
@@ -233,6 +237,7 @@ export function createVoicePlaybackUtterance(input: {
     authority: input.authority,
     source: input.source,
     replyId: input.replyId,
+    allowMicOffPlayback: input.allowMicOffPlayback,
     revision: Math.max(1, Math.floor(input.revision)),
     text: normalizeWhitespace(input.text),
     chunks,

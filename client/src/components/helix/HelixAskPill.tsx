@@ -1966,6 +1966,7 @@ export type VoiceAutoSpeakTask = {
   authority?: VoicePlaybackIntentAuthority;
   source?: VoicePlaybackIntentSource;
   replyId?: string;
+  allowMicOffPlayback?: boolean;
   briefSource?: "llm" | "none";
   finalSource?: "normal_reasoning" | "strict_gate_override";
 };
@@ -1979,6 +1980,7 @@ export type VoicePlaybackUtteranceIntent = {
   traceId?: string;
   eventId: string;
   replyId?: string;
+  allowMicOffPlayback?: boolean;
   source: VoicePlaybackIntentSource;
   briefSource?: "llm" | "none";
   finalSource?: "normal_reasoning" | "strict_gate_override";
@@ -2021,6 +2023,7 @@ export function mapVoicePlaybackIntentToTask(intent: VoicePlaybackUtteranceInten
     authority: intent.authority,
     source: intent.source,
     replyId: intent.replyId,
+    allowMicOffPlayback: intent.allowMicOffPlayback,
     briefSource: intent.briefSource,
     finalSource: intent.finalSource,
   };
@@ -2028,6 +2031,12 @@ export function mapVoicePlaybackIntentToTask(intent: VoicePlaybackUtteranceInten
 
 function isManualVoicePlaybackUtterance(utterance: Pick<VoicePlaybackUtterance, "kind" | "source"> | null | undefined): boolean {
   return utterance?.kind === "manual_read_aloud" || utterance?.source === "manual";
+}
+
+function canPlayVoiceUtteranceWithMicOff(
+  utterance: Pick<VoicePlaybackUtterance, "kind" | "source" | "allowMicOffPlayback"> | null | undefined,
+): boolean {
+  return isManualVoicePlaybackUtterance(utterance) || utterance?.allowMicOffPlayback === true;
 }
 
 type VoiceUtteranceTimelineMeta = {
@@ -5034,7 +5043,11 @@ export function shouldAutoSpeakVoiceDecisionLifecycle(
   return false;
 }
 
-export type VoiceAutoSpeakAnswerToolIntent = "none" | "tool_only" | "explicit_voice_tool";
+export type VoiceAutoSpeakAnswerToolIntent =
+  | "none"
+  | "tool_only"
+  | "explicit_voice_tool"
+  | "workspace_terminal_summary";
 
 export function shouldAutoSpeakAnswerForTurn(args: {
   micArmState: MicArmState;
@@ -5043,12 +5056,18 @@ export function shouldAutoSpeakAnswerForTurn(args: {
   userMuted?: boolean;
   answerAuthority?: VoicePlaybackIntentAuthority | "sealed_final" | "provisional" | null;
   toolIntent?: VoiceAutoSpeakAnswerToolIntent | null;
-  finalTimelineType?: "reasoning_final" | "action_receipt" | string | null;
+  finalTimelineType?: "reasoning_final" | "action_receipt" | "workspace_terminal_summary" | string | null;
 }): boolean {
   if (args.micArmState !== "on") return false;
   if (args.userMuted) return false;
-  if (args.finalTimelineType && args.finalTimelineType !== "reasoning_final") return false;
   if (args.toolIntent === "tool_only" || args.toolIntent === "explicit_voice_tool") return false;
+  if (
+    args.finalTimelineType &&
+    args.finalTimelineType !== "reasoning_final" &&
+    args.finalTimelineType !== "workspace_terminal_summary"
+  ) {
+    return false;
+  }
   if (args.answerAuthority !== "final" && args.answerAuthority !== "sealed_final") return false;
   return args.inputSource === "voice_auto" || args.inputSource === "manual";
 }
@@ -14647,10 +14666,10 @@ export function HelixAskPill({
     try {
       while (voiceAutoSpeakQueueRef.current.length > 0) {
         const nextQueuedUtterance = voiceAutoSpeakQueueRef.current[0];
-        if (micArmStateRef.current !== "on" && !isManualVoicePlaybackUtterance(nextQueuedUtterance)) break;
+        if (micArmStateRef.current !== "on" && !canPlayVoiceUtteranceWithMicOff(nextQueuedUtterance)) break;
         const utterance = voiceAutoSpeakQueueRef.current.shift();
         if (!utterance || utterance.chunks.length === 0) continue;
-        const manualUtterance = isManualVoicePlaybackUtterance(utterance);
+        const micGateBypassUtterance = canPlayVoiceUtteranceWithMicOff(utterance);
         if (
           utterance.kind === "final" &&
           voiceSuppressedFinalTurnKeysRef.current.has(utterance.turnKey)
@@ -14724,6 +14743,7 @@ export function HelixAskPill({
           authority: utterance.authority,
           source: utterance.source,
           replyId: utterance.replyId,
+          allowMicOffPlayback: utterance.allowMicOffPlayback,
           chunkCount: utterance.chunks.length,
           enqueueToFirstAudioMs: null,
           synthDurationsMs: [],
@@ -14739,7 +14759,7 @@ export function HelixAskPill({
         let yieldedForTurnClose = false;
         let turnCloseYieldDelayMs = VOICE_PLAYBACK_TRANSCRIBE_WAIT_POLL_MS;
         for (let chunkIndex = 0; chunkIndex < utterance.chunks.length; chunkIndex += 1) {
-          if (micArmStateRef.current !== "on" && !manualUtterance) {
+          if (micArmStateRef.current !== "on" && !micGateBypassUtterance) {
             metrics.cancelReason = "mic_off";
             break;
           }
@@ -14748,7 +14768,7 @@ export function HelixAskPill({
             break;
           }
           const waitStartMs = Date.now();
-          while (!manualUtterance && micArmStateRef.current === "on") {
+          while (!micGateBypassUtterance && micArmStateRef.current === "on") {
             const transcribeBusy =
               voiceBargeHoldActiveRef.current ||
               voiceTranscribeBusyRef.current ||
@@ -14771,6 +14791,7 @@ export function HelixAskPill({
               : Number.POSITIVE_INFINITY;
           if (
             utterance.kind === "final" &&
+            !micGateBypassUtterance &&
             (turnCloseTrafficActive || sinceLastSpeechMs < VOICE_TURN_CLOSE_SILENCE_MS)
           ) {
             pushVoiceChunkTimelineEvent({
@@ -14805,7 +14826,7 @@ export function HelixAskPill({
                 );
             break;
           }
-          if (micArmStateRef.current !== "on" && !manualUtterance) {
+          if (micArmStateRef.current !== "on" && !micGateBypassUtterance) {
             metrics.cancelReason = "mic_off";
             break;
           }
@@ -14820,6 +14841,7 @@ export function HelixAskPill({
             authority: utterance.authority,
             source: utterance.source,
             replyId: utterance.replyId,
+            allowMicOffPlayback: utterance.allowMicOffPlayback,
             revision: utterance.revision,
             chunkIndex,
             chunkCount: utterance.chunks.length,
@@ -15197,7 +15219,7 @@ export function HelixAskPill({
 
   const enqueueVoiceAutoSpeakTask = useCallback(
     (task: VoiceAutoSpeakTask): boolean => {
-      if (micArmStateRef.current !== "on" && task.source !== "manual") return false;
+      if (micArmStateRef.current !== "on" && task.source !== "manual" && task.allowMicOffPlayback !== true) return false;
       if (task.kind === "final" && voiceSuppressedFinalTurnKeysRef.current.has(task.turnKey)) {
         pushVoiceChunkTimelineEvent({
           kind: "chunk_drop",
@@ -15255,6 +15277,7 @@ export function HelixAskPill({
         authority: task.authority,
         source: task.source,
         replyId: task.replyId,
+        allowMicOffPlayback: task.allowMicOffPlayback,
         revision: task.revision,
         text,
         traceId: task.traceId,
@@ -18575,6 +18598,7 @@ export function HelixAskPill({
                 text: outputText,
                 traceId: attempt.traceId,
                 eventId: finalTimelineEntry.id,
+                allowMicOffPlayback: attempt.source === "voice_auto",
                 briefSource: attempt.conversationBriefSource ?? "none",
                 finalSource,
               });
@@ -23595,6 +23619,7 @@ export function HelixAskPill({
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
       const traceId = runAskTurnId;
+      const voiceAutoSpeakArmedAtTurnStart = micArmStateRef.current === "on";
       const manualAttempt = manualDispatchHint
         ? createReasoningAttempt({
             prompt: trimmed,
@@ -24170,6 +24195,7 @@ export function HelixAskPill({
             proof: responseProof,
             debug: responseDebugForReply,
           });
+          let directReplyIdForAutoSpeak: string | null = null;
           if (briefOnlyReply) {
             patchHelixTimelineEntry(manualBriefTimelineEntry.id, {
               status: "done",
@@ -24184,6 +24210,7 @@ export function HelixAskPill({
             });
           } else {
             const replyId = crypto.randomUUID();
+            directReplyIdForAutoSpeak = replyId;
             setAskReplies((prev) =>
               [
                 {
@@ -24206,6 +24233,52 @@ export function HelixAskPill({
                 ...prev,
               ].slice(0, 3),
             );
+          }
+          const responseEnvelopeRecord =
+            responseEnvelope && typeof responseEnvelope === "object"
+              ? (responseEnvelope as Record<string, unknown>)
+              : null;
+          const responseEnvelopeWorkstationActions = responseEnvelopeRecord?.workstation_actions;
+          const responseWorkstationActionCount = Array.isArray(responseEnvelopeWorkstationActions)
+            ? responseEnvelopeWorkstationActions.length
+            : 0;
+          const directAnswerHasWorkspaceAction = responseMode === "act" || responseWorkstationActionCount > 0;
+          const directAnswerTimelineType = directAnswerHasWorkspaceAction
+            ? "workspace_terminal_summary"
+            : "reasoning_final";
+          const directAnswerToolIntent: VoiceAutoSpeakAnswerToolIntent = directAnswerHasWorkspaceAction
+            ? "workspace_terminal_summary"
+            : "none";
+          if (
+            directReplyIdForAutoSpeak &&
+            responseText &&
+            !manualAttempt &&
+            shouldAutoSpeakAnswerForTurn({
+              micArmState: voiceAutoSpeakArmedAtTurnStart ? "on" : "off",
+              inputSource: "manual",
+              voiceMode: missionContextControls.voiceMode,
+              userMuted: false,
+              answerAuthority: "final",
+              toolIntent: directAnswerToolIntent,
+              finalTimelineType: directAnswerTimelineType,
+            })
+          ) {
+            voiceSuppressedFinalTurnKeysRef.current.delete(traceId);
+            const finalRevision = bumpVoiceTurnRevision(traceId, "final");
+            enqueueVoicePlaybackIntent({
+              kind: "final",
+              authority: "final",
+              source: "agent_loop",
+              turnKey: traceId,
+              revision: finalRevision.revision,
+              text: responseText,
+              traceId,
+              eventId: directReplyIdForAutoSpeak,
+              replyId: directReplyIdForAutoSpeak,
+              allowMicOffPlayback: true,
+              briefSource: "none",
+              finalSource: "normal_reasoning",
+            });
           }
           if (sessionId) {
             addMessage(sessionId, { role: "assistant", content: responseText });
@@ -24416,6 +24489,7 @@ export function HelixAskPill({
       applyWorkstationActionsFromPayload,
       appendSyntheticLiveEvent,
       askBusy,
+      bumpVoiceTurnRevision,
       conversationGovernor.completion_score.score,
       conversationGovernor.floor_owner,
       createReasoningAttempt,
@@ -24427,6 +24501,7 @@ export function HelixAskPill({
       canEmitTurnTerminalOutcome,
       ensureReasoningTimelineEntry,
       ensureExplicitReasoningPlan,
+      enqueueVoicePlaybackIntent,
       enqueueReasoningAttempt,
       formatReasoningAttemptDetail,
       getHelixAskSessionId,
@@ -24448,6 +24523,7 @@ export function HelixAskPill({
       updateReasoningAttempt,
       updateMoodFromText,
       unresolvedPendingRequestCountForTurn,
+      missionContextControls.voiceMode,
       preferredResponseLanguage,
       userSettings.showHelixAskDebug,
     ],

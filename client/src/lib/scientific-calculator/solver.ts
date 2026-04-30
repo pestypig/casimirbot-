@@ -4,6 +4,25 @@ import "nerdamer/Calculus";
 import "nerdamer/Solve";
 
 export type ScientificSolveMode = "expression" | "equation";
+export type ScientificCapabilityClass =
+  | "arithmetic"
+  | "symbolic_algebra"
+  | "latex_parse"
+  | "calculus"
+  | "gr_warp_physics"
+  | "unsupported";
+
+export type ScientificSolveTrace = {
+  traceId: string;
+  runId: string;
+  route: string;
+  engine: "nerdamer" | "warp_full_solve" | "unsupported";
+  sourceOfTruth: "scientific_calculator" | "einstein_backend" | "unsupported";
+  capabilityClass: ScientificCapabilityClass;
+  artifactPath: string | null;
+  delegatedTo?: string | null;
+  warnings: string[];
+};
 
 export type ScientificSolveStep = {
   id: string;
@@ -21,8 +40,59 @@ export type ScientificSolveResult = {
   result_text: string;
   result_latex?: string;
   steps: ScientificSolveStep[];
+  trace: ScientificSolveTrace;
   error?: string;
 };
+
+function makeTraceId(prefix = "scicalc"): string {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${prefix}:${Date.now().toString(36)}:${random}`;
+}
+
+function classifyScientificCapability(input: string): ScientificCapabilityClass {
+  const normalized = input.toLowerCase();
+  if (
+    /\b(?:einstein\s+tensor|nat[aá]rio|qi\s+guardrail|quantum\s+inequality|full[-\s]?solve|warp[-\s]?full|rho\s*source|stress[-\s]?energy)\b/i.test(input) ||
+    /g_\{?\\?mu\\?nu\}?|t_\{?00\}?|g4_qi|warp\.metric/i.test(input)
+  ) {
+    return "gr_warp_physics";
+  }
+  if (/\\frac\s*\{\s*d\s*\}\s*\{\s*d|diff\s*\(|differentiat|derivative/.test(normalized)) return "calculus";
+  if (/\\|[\{\}\^_]/.test(input)) return "latex_parse";
+  if (/[a-z]/i.test(input)) return "symbolic_algebra";
+  return "arithmetic";
+}
+
+function buildTrace(input: string, warnings: string[] = []): ScientificSolveTrace {
+  const capabilityClass = classifyScientificCapability(input);
+  const traceId = makeTraceId(capabilityClass === "gr_warp_physics" ? "scicalc-delegate" : "scicalc");
+  if (capabilityClass === "gr_warp_physics") {
+    return {
+      traceId,
+      runId: traceId,
+      route: "scientific-calculator/capability-router",
+      engine: "unsupported",
+      sourceOfTruth: "einstein_backend",
+      capabilityClass,
+      delegatedTo: "/api/physics/warp/calculator",
+      artifactPath: null,
+      warnings: [
+        "Input was classified as GR/warp physics; use the warp/full-solve backend for a traceable result.",
+        ...warnings,
+      ],
+    };
+  }
+  return {
+    traceId,
+    runId: traceId,
+    route: "scientific-calculator/nerdamer",
+    engine: "nerdamer",
+    sourceOfTruth: "scientific_calculator",
+    capabilityClass,
+    artifactPath: null,
+    warnings,
+  };
+}
 
 function asNonEmpty(value: string): string {
   return value.trim();
@@ -98,6 +168,7 @@ function inferPrimaryEquationVariable(lhsExpr: string, fallbackExpr: string): st
 
 export function runScientificSolve(inputLatex: string, withSteps: boolean): ScientificSolveResult {
   const input = asNonEmpty(inputLatex);
+  const trace = buildTrace(input);
   if (!input) {
     return {
       ok: false,
@@ -108,11 +179,36 @@ export function runScientificSolve(inputLatex: string, withSteps: boolean): Scie
       result_text: "",
       result_latex: "",
       steps: [],
+      trace,
       error: "No equation input provided.",
     };
   }
 
   try {
+    if (trace.capabilityClass === "gr_warp_physics") {
+      return {
+        ok: false,
+        mode: input.includes("=") ? "equation" : "expression",
+        input_latex: input,
+        normalized_expression: input,
+        variable: null,
+        result_text: "This calculation requires the warp/full-solve backend.",
+        result_latex: "",
+        steps: withSteps
+          ? [
+              { id: "input", label: "Input", value: input, latex: input },
+              {
+                id: "capability_route",
+                label: "Capability Route",
+                value: "GR/warp physics is backend-only; delegate to /api/physics/warp/calculator.",
+              },
+            ]
+          : [],
+        trace,
+        error: "backend_required",
+      };
+    }
+
     const steps: ScientificSolveStep[] = [];
     const pushStep = (id: string, label: string, value: string, latex?: string) => {
       if (!withSteps) return;
@@ -195,6 +291,7 @@ export function runScientificSolve(inputLatex: string, withSteps: boolean): Scie
         result_text: resultText,
         result_latex: resultLatex,
         steps,
+        trace,
       };
     }
 
@@ -223,6 +320,7 @@ export function runScientificSolve(inputLatex: string, withSteps: boolean): Scie
       result_text: evaluated,
       result_latex: evaluatedLatex,
       steps,
+      trace,
     };
   } catch (error) {
     return {
@@ -234,6 +332,7 @@ export function runScientificSolve(inputLatex: string, withSteps: boolean): Scie
       result_text: "",
       result_latex: "",
       steps: [],
+      trace: buildTrace(input, [error instanceof Error ? error.message : String(error)]),
       error: error instanceof Error ? error.message : String(error),
     };
   }

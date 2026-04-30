@@ -62,6 +62,7 @@ describe("applyLatestWinsVoiceQueue", () => {
       authority: "final",
       source: "manual",
       replyId: "reply-1",
+      allowMicOffPlayback: true,
       revision: 1,
       text: "Read this answer aloud.",
       eventId: "reply-1",
@@ -72,6 +73,7 @@ describe("applyLatestWinsVoiceQueue", () => {
     expect(utterance.authority).toBe("final");
     expect(utterance.source).toBe("manual");
     expect(utterance.replyId).toBe("reply-1");
+    expect(utterance.allowMicOffPlayback).toBe(true);
   });
 
   it("replaces queued brief for same turn and clears stale queued briefs from prior turns", () => {
