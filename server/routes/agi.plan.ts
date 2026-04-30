@@ -21341,6 +21341,8 @@ type HelixAskRejectedTerminalCandidate = {
 };
 type HelixAskCanonicalGoalKind =
   | "model_only_concept"
+  | "latest_doc_navigation"
+  | "doc_evidence_location"
   | "doc_scientific_numeric"
   | "doc_scientific_concept"
   | "doc_summary"
@@ -21362,6 +21364,8 @@ type HelixAskCanonicalAnswerScope =
   | "failure";
 type HelixAskRequiredTerminalKind =
   | "direct_answer_text"
+  | "doc_open_receipt"
+  | "doc_evidence_location"
   | "doc_numeric_answer"
   | "doc_concept_explanation"
   | "doc_summary"
@@ -21417,6 +21421,40 @@ type HelixAskTurnSatisfactionReport = {
   missing_reason?: string;
   confidence: "high" | "medium" | "low";
   rejected_terminal_candidates?: HelixAskRejectedTerminalCandidate[];
+};
+type HelixAskRetrievalRequiredSignal = {
+  turn_id: string;
+  required: boolean;
+  source:
+    | "observer_lane"
+    | "goal_classifier"
+    | "scientific_anchor_classifier"
+    | "explicit_user_request"
+    | "none";
+  strength: "hard" | "soft" | "none";
+  reasons: string[];
+  negative_scope?: {
+    background_only: boolean;
+    no_workspace_lookup: boolean;
+  };
+  requested_outputs: Array<
+    | "latest_doc"
+    | "doc_path"
+    | "source_path"
+    | "evidence_location"
+    | "table_row"
+    | "numeric_value"
+    | "concept_explanation"
+    | "open_document"
+  >;
+  anchors: {
+    corpus?: string[];
+    variables?: string[];
+    alpha_tokens?: string[];
+    artifact_ids?: string[];
+    table_names?: string[];
+    dimensions?: string[];
+  };
 };
 type HelixAskTurnJobReadyLink = {
   id: string;
@@ -24265,6 +24303,16 @@ const selectAskTurnDocSearchResultForOpen = (
       };
     }
   }
+  if (/\b(?:latest|newest|most\s+recent|recent)\b/i.test(transcript)) {
+    const latestStrong = validation.candidates.find((candidate) => candidate.validationStatus === "strong");
+    const match = latestStrong ? matches.find((candidate) => candidate.path === latestStrong.path) : null;
+    if (match) {
+      return {
+        match,
+        reason: "latest_verified_topic_candidate",
+      };
+    }
+  }
   return null;
 };
 
@@ -25316,6 +25364,10 @@ const resolveAskTurnActionSelection = (args: {
     workspaceSnapshot: args.workspaceSnapshot ?? null,
   });
   const panelControlIntent = classifyAskTurnPanelControlIntent(args.transcript);
+  const retrievalRequiredSignal = buildAskTurnRetrievalRequiredSignal({
+    turnId: "initial-capability-plan",
+    transcript: args.transcript,
+  });
   if (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict) {
     return {
       action: {
@@ -26909,15 +26961,22 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           ? step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
             ? Array.from(new Set([...workspaceContextArtifacts, "note_context", "note_update_receipt"]))
             : actionId === "summarize_doc"
-              ? Array.from(new Set([...workspaceContextArtifacts, "doc_summary"]))
+              ? Array.from(new Set([
+                  ...workspaceContextArtifacts,
+                  "doc_summary",
+                  ...(step.action?.args?.requested_output === "doc_numeric_answer" ? ["doc_numeric_answer"] : []),
+                  ...(step.action?.args?.requested_output === "doc_concept_explanation" ? ["doc_concept_explanation"] : []),
+                ]))
             : actionId === "search_docs"
               ? Array.from(new Set([...workspaceContextArtifacts, "doc_search_results", "retrieval_context"]))
             : actionId === "validate_doc_candidates"
               ? Array.from(new Set([...workspaceContextArtifacts, "doc_candidate_validation"]))
             : actionId === "open_latest_doc_by_topic" && latestDocSelection
-              ? Array.from(new Set([...workspaceContextArtifacts, "latest_doc_selection"]))
+              ? Array.from(new Set([...workspaceContextArtifacts, "latest_doc_selection", "doc_open_receipt"]))
+            : actionId === "open_doc_by_path" && hasActionDocPath
+              ? Array.from(new Set([...workspaceContextArtifacts, "doc_open_receipt"]))
             : actionId === "locate_in_doc" && docLocationMatches.length > 0
-              ? Array.from(new Set([...workspaceContextArtifacts, "doc_location_matches"]))
+              ? Array.from(new Set([...workspaceContextArtifacts, "doc_location_matches", "doc_evidence_location"]))
               : actionId === "list_notes"
                 ? Array.from(new Set([...workspaceContextArtifacts, "note_context", "active_note_title"]))
               : workspaceContextArtifacts
@@ -26981,9 +27040,15 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
         : actionId === "validate_doc_candidates"
           ? ["doc_candidate_validation"]
         : actionId === "open_latest_doc_by_topic"
-          ? ["active_doc_path", "latest_doc_selection"]
+          ? ["active_doc_path", "latest_doc_selection", "doc_open_receipt"]
+        : actionId === "open_doc_by_path"
+          ? ["active_doc_path", "doc_open_receipt"]
         : actionId === "summarize_doc"
-          ? ["doc_summary"]
+          ? step.action?.args?.requested_output === "doc_numeric_answer"
+            ? ["doc_numeric_answer"]
+            : step.action?.args?.requested_output === "doc_concept_explanation"
+              ? ["doc_concept_explanation"]
+              : ["doc_summary"]
         : isAskTurnPanelControlOpenAction(step.action)
           ? ["workspace_action_receipt"]
         : actionId === "copy_receipt_to_note" || actionId === "append_to_note"
@@ -27028,9 +27093,18 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
             }
           : step.action?.action_id === "locate_in_doc"
           ? {
-              kind: "doc_location_matches",
+              kind: expectedArtifacts.includes("doc_evidence_location") ? "doc_evidence_location" : "doc_location_matches",
               matches: docLocationMatches,
               match_count: docLocationMatches.length,
+              source_path: docLocationMatches[0]?.path ?? normalizeAskTurnWorkspaceDocPath(step.action.args?.path) ?? null,
+              snippets: docLocationMatches.map((match) => ({
+                text: match.snippet,
+                line_start: match.line_start,
+                line_end: match.line_end,
+                section: match.heading,
+              })),
+              matched_terms: typeof step.action.args?.query === "string" ? [step.action.args.query] : [],
+              confidence: docLocationMatches.length > 0 ? "high" : "low",
             }
           : step.action?.action_id === "search_docs"
             ? {
@@ -27046,9 +27120,45 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               })
           : step.action?.action_id === "open_latest_doc_by_topic"
             ? latestDocSelection
-          : step.action?.action_id === "summarize_doc"
+          : step.action?.action_id === "open_doc_by_path"
             ? {
-                kind: "doc_summary",
+                kind: "doc_open_receipt",
+                path: resolveAskTurnWorkspaceActionDocPath(step.action),
+                title: resolveAskTurnWorkspaceActionDocPath(step.action)
+                  ? readAskTurnDocTitleForPath(String(resolveAskTurnWorkspaceActionDocPath(step.action)))
+                  : null,
+                selected_reason: readAskTurnString(step.action.args?.selection_reason) ?? "open_doc_by_path",
+                message: resolveAskTurnWorkspaceActionDocPath(step.action)
+                  ? `Opened document: ${readAskTurnDocTitleForPath(String(resolveAskTurnWorkspaceActionDocPath(step.action))) ?? resolveAskTurnWorkspaceActionDocPath(step.action)}`
+                  : "Document open attempted, but no path was available.",
+              }
+          : step.action?.action_id === "summarize_doc"
+            ? step.action.args?.requested_output === "doc_numeric_answer"
+              ? {
+                  kind: "doc_numeric_answer",
+                  query: typeof step.action.args?.query === "string" ? step.action.args.query : "",
+                  requested_variables: extractAskTurnRetrievalSignalAnchors(String(step.action.args?.query ?? "")).variables ?? [],
+                  matched_fields: [],
+                  row_anchors: extractAskTurnRetrievalSignalAnchors(String(step.action.args?.query ?? "")).dimensions ?? [],
+                  alpha_tokens: extractAskTurnRetrievalSignalAnchors(String(step.action.args?.query ?? "")).alpha_tokens ?? [],
+                  source_path: resolveAskTurnWorkspaceActionDocPath(step.action),
+                  snippets: [],
+                  extraction_method: "nearest_anchor_match",
+                  confidence: "low",
+                }
+              : step.action.args?.requested_output === "doc_concept_explanation"
+                ? {
+                    kind: "doc_concept_explanation",
+                    query: typeof step.action.args?.query === "string" ? step.action.args.query : "",
+                    concept: "scientific concept",
+                    answer_text: "",
+                    plain_language_summary: "",
+                    source_path: resolveAskTurnWorkspaceActionDocPath(step.action),
+                    snippets: [],
+                    confidence: "low",
+                  }
+                : {
+                  kind: "doc_summary",
                 path: resolveAskTurnWorkspaceActionDocPath(step.action),
                 text:
                   buildAskTurnDocExplainText({
@@ -27058,7 +27168,7 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                   (resolveAskTurnWorkspaceActionDocPath(step.action)
                     ? `Summary unavailable for ${resolveAskTurnWorkspaceActionDocPath(step.action)}.`
                     : "Summary unavailable because no active document path was provided."),
-              }
+                }
           : step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
             ? {
                 kind: "note_update_receipt",
@@ -28912,6 +29022,117 @@ const classifyAskTurnScientificGoal = (
   };
 };
 
+const extractAskTurnRetrievalSignalAnchors = (transcript: string): HelixAskRetrievalRequiredSignal["anchors"] => {
+  const anchors: HelixAskRetrievalRequiredSignal["anchors"] = {};
+  const corpus = Array.from(new Set((transcript.match(/\bNHM2\b/gi) ?? []).map(() => "NHM2")));
+  const alphaTokens = Array.from(
+    new Set(
+      [
+        ...(transcript.match(/\b0p\d+\b/gi) ?? []),
+        ...(transcript.match(/\b0\.\d+\b/g) ?? []).map((entry) => entry.replace(".", "p")),
+        ...(transcript.match(/\balpha[_\s-]*(?:0p\d+|0\.\d+)\b/gi) ?? []),
+      ]
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  );
+  const variableCandidates = [
+    "tau_expected",
+    "solverClampHeadroom",
+    "wallSafetyMargin",
+    "coordinateTimeS",
+    "missionTime",
+    "wallSafety",
+    "solverHealth",
+  ].filter((name) => new RegExp(`\\b${name}\\b`, "i").test(transcript));
+  const artifactIds = Array.from(new Set(transcript.match(/\bstage1_centerline_alpha_[a-z0-9_]+/gi) ?? []));
+  const tableNames = /\bExpected\s+Target\s+Table\b/i.test(transcript) ? ["Expected Target Table"] : [];
+  const dimensions = Array.from(new Set(transcript.match(/\b\d+\s*\^\s*3\b/g) ?? [])).map((entry) => entry.replace(/\s+/g, ""));
+  if (corpus.length) anchors.corpus = corpus;
+  if (variableCandidates.length) anchors.variables = variableCandidates;
+  if (alphaTokens.length) anchors.alpha_tokens = alphaTokens;
+  if (artifactIds.length) anchors.artifact_ids = artifactIds;
+  if (tableNames.length) anchors.table_names = tableNames;
+  if (dimensions.length) anchors.dimensions = dimensions;
+  return anchors;
+};
+
+const buildAskTurnRetrievalRequiredSignal = (args: {
+  turnId: string;
+  transcript: string;
+  observerNeedsRetrieval?: boolean;
+}): HelixAskRetrievalRequiredSignal => {
+  const raw = args.transcript.trim();
+  const backgroundOnly = /\b(?:background\s+only|concept\s+background\s+only|general\s+explanation\s+only)\b/i.test(raw);
+  const noWorkspaceLookup = /\b(?:no\s+workspace\s+lookup|do\s+not\s+search\s+docs?|don'?t\s+search\s+docs?|without\s+relying\s+on\s+(?:any\s+)?(?:casimirbot\s+)?docs?)\b/i.test(raw);
+  const negativeScope = {
+    background_only: backgroundOnly,
+    no_workspace_lookup: noWorkspaceLookup,
+  };
+  const anchors = extractAskTurnRetrievalSignalAnchors(raw);
+  const requestedOutputs = new Set<HelixAskRetrievalRequiredSignal["requested_outputs"][number]>();
+  const reasons: string[] = [];
+  const add = (output: HelixAskRetrievalRequiredSignal["requested_outputs"][number], reason: string): void => {
+    requestedOutputs.add(output);
+    if (!reasons.includes(reason)) reasons.push(reason);
+  };
+  if (args.observerNeedsRetrieval) add("source_path", "observer_lane:needs_retrieval");
+  if (/\b(?:latest|newest|most\s+recent)\s+(?:doc|docs|document|paper)\b/i.test(raw)) {
+    add("latest_doc", "latest_doc_phrase");
+    add("open_document", "latest_doc_phrase");
+  }
+  if (/\b(?:best\s+(?:doc|document|paper)|best\s+matching\s+(?:audit\s+)?doc|document\s+that\s+contains|point\s+me\s+at|get\s+me\s+to|where\s+in\s+the\s+docs?|find\s+where|source\s+path|nearby\s+fields|table\s+row|audit\s+doc)\b/i.test(raw)) {
+    add("doc_path", "explicit_doc_evidence_phrase");
+    add("source_path", "explicit_doc_evidence_phrase");
+  }
+  if (/\b(?:where\s+in|find\s+where|nearby\s+fields|table\s+row|mentions?|Expected\s+Target\s+Table)\b/i.test(raw)) {
+    add("evidence_location", "evidence_location_phrase");
+  }
+  if (/\bExpected\s+Target\s+Table\b/i.test(raw)) {
+    add("table_row", "expected_target_table_phrase");
+  }
+  if (/\b(?:reported\s+for|numeric\s+(?:target\s+)?value|tell\s+me\s+the\s+numeric|what\s+numeric|values?\s+are\s+reported)\b/i.test(raw)) {
+    add("numeric_value", "numeric_value_phrase");
+  }
+  if (/\b(?:what\s+does|explain)\b[\s\S]*\b(?:mean|concept|formula|tau_expected|alpha)\b/i.test(raw) && /\b(?:current\s+)?NHM2|current\s+(?:doc|document|paper)|tau_expected|alpha\s*(?:0p\d+|0\.\d+)/i.test(raw)) {
+    add("concept_explanation", "scientific_concept_phrase");
+  }
+  const hasScientificAnchor =
+    /\bNHM2\b/i.test(raw) ||
+    /\b(?:alpha\s*)?(?:0p\d+|0\.\d+)\b/i.test(raw) ||
+    /\b(?:tau_expected|solverClampHeadroom|wallSafetyMargin|stage1_centerline_alpha_|96\s*\^\s*3|trip[-\s]?time|transport[-\s]?time|Expected\s+Target\s+Table)\b/i.test(raw);
+  if (hasScientificAnchor && requestedOutputs.size > 0) {
+    if (!reasons.includes("scientific_anchor_classifier")) reasons.push("scientific_anchor_classifier");
+  }
+  const explicitWorkspaceRequest =
+    requestedOutputs.size > 0 &&
+    (/\b(?:doc|docs|document|paper|source|path|table|row|field|audit)\b/i.test(raw) || hasScientificAnchor);
+  const required = (args.observerNeedsRetrieval || explicitWorkspaceRequest) && !backgroundOnly && !noWorkspaceLookup;
+  const source: HelixAskRetrievalRequiredSignal["source"] =
+    args.observerNeedsRetrieval
+      ? "observer_lane"
+      : explicitWorkspaceRequest
+        ? hasScientificAnchor
+          ? "scientific_anchor_classifier"
+          : "explicit_user_request"
+        : "none";
+  return {
+    turn_id: args.turnId,
+    required,
+    source,
+    strength: required ? "hard" : requestedOutputs.size > 0 ? "soft" : "none",
+    reasons: required ? reasons : [...reasons, ...(backgroundOnly ? ["negative_scope:background_only"] : []), ...(noWorkspaceLookup ? ["negative_scope:no_workspace_lookup"] : [])],
+    negative_scope: negativeScope,
+    requested_outputs: Array.from(requestedOutputs),
+    anchors,
+  };
+};
+
+const isAskTurnNoWorkspaceBackgroundScope = (transcript: string): boolean => {
+  const signal = buildAskTurnRetrievalRequiredSignal({ turnId: "scope-check", transcript });
+  return Boolean(signal.negative_scope?.background_only || signal.negative_scope?.no_workspace_lookup);
+};
+
 const resolveAskTurnScientificMissingCode = (
   kind: "numeric" | "concept_explanation" | HelixAskCanonicalGoalKind | null | undefined,
 ): "numeric_result_unavailable" | "concept_explanation_unavailable" | null => {
@@ -28987,8 +29208,78 @@ const buildAskTurnCanonicalGoalFrame = (args: {
   goalFrame: HelixAskUniversalGoalFrame;
   toolChoice?: HelixAskToolChoiceArbitration | null;
   pendingServerRequest?: Record<string, unknown> | null;
+  retrievalRequiredSignal?: HelixAskRetrievalRequiredSignal | null;
 }): HelixAskCanonicalGoalFrame => {
   const transcript = args.goalFrame.user_goal.raw;
+  const retrievalSignal =
+    args.retrievalRequiredSignal ??
+    buildAskTurnRetrievalRequiredSignal({
+      turnId: args.turnId,
+      transcript,
+    });
+  if (retrievalSignal.required && retrievalSignal.strength === "hard") {
+    const corpusAnchors = retrievalSignal.anchors.corpus ?? [];
+    if (retrievalSignal.requested_outputs.includes("latest_doc") || retrievalSignal.requested_outputs.includes("open_document")) {
+      return {
+        turn_id: args.turnId,
+        goal_kind: "latest_doc_navigation",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_open_receipt",
+        allows_workspace_context: false,
+        allows_prior_artifacts: false,
+        corpus_anchors: corpusAnchors,
+        numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
+        concept_tokens: [],
+        confidence: "high",
+        classifier_reasons: retrievalSignal.reasons,
+      };
+    }
+    if (retrievalSignal.requested_outputs.includes("evidence_location") || retrievalSignal.requested_outputs.includes("table_row")) {
+      return {
+        turn_id: args.turnId,
+        goal_kind: "doc_evidence_location",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_evidence_location",
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+        corpus_anchors: corpusAnchors,
+        numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
+        concept_tokens: retrievalSignal.anchors.table_names ?? [],
+        confidence: "high",
+        classifier_reasons: retrievalSignal.reasons,
+      };
+    }
+    if (retrievalSignal.requested_outputs.includes("numeric_value")) {
+      return {
+        turn_id: args.turnId,
+        goal_kind: "doc_scientific_numeric",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_numeric_answer",
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+        corpus_anchors: corpusAnchors,
+        numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
+        concept_tokens: retrievalSignal.anchors.variables ?? [],
+        confidence: "high",
+        classifier_reasons: retrievalSignal.reasons,
+      };
+    }
+    if (retrievalSignal.requested_outputs.includes("concept_explanation")) {
+      return {
+        turn_id: args.turnId,
+        goal_kind: "doc_scientific_concept",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_concept_explanation",
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+        corpus_anchors: corpusAnchors,
+        numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
+        concept_tokens: [...(retrievalSignal.anchors.variables ?? []), ...(retrievalSignal.anchors.table_names ?? [])],
+        confidence: "high",
+        classifier_reasons: retrievalSignal.reasons,
+      };
+    }
+  }
   const scientific = classifyAskTurnScientificGoal(transcript);
   if (scientific?.kind === "numeric") {
     return {
@@ -29241,6 +29532,10 @@ const evaluateTurnSatisfaction = (args: {
   const terminalKinds =
     canonicalGoal.goal_kind === "model_only_concept"
       ? ["direct_answer_text"]
+      : canonicalGoal.goal_kind === "latest_doc_navigation"
+        ? ["doc_open_receipt"]
+      : canonicalGoal.goal_kind === "doc_evidence_location"
+        ? ["doc_evidence_location", "doc_location_matches"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
         ? ["doc_numeric_answer"]
       : canonicalGoal.goal_kind === "doc_scientific_concept"
@@ -29280,6 +29575,10 @@ const evaluateTurnSatisfaction = (args: {
   const rejectedKindsForCanonicalGoal =
     canonicalGoal.goal_kind === "model_only_concept"
       ? ["doc_summary", "focused_doc_answer", "doc_numeric_answer", "doc_concept_explanation", "comparison_summary", "note_update_receipt"]
+      : canonicalGoal.goal_kind === "latest_doc_navigation"
+        ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
+      : canonicalGoal.goal_kind === "doc_evidence_location"
+        ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
         ? ["doc_summary", "focused_doc_answer", "direct_answer_text", "comparison_summary"]
       : canonicalGoal.goal_kind === "doc_scientific_concept"
@@ -29929,6 +30228,10 @@ const buildAskTurnUniversalGoalFrame = (args: {
   };
   const activeDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSnapshot?.activeDocPath);
   const scientificGoal = classifyAskTurnScientificGoal(raw);
+  const retrievalRequiredSignal = buildAskTurnRetrievalRequiredSignal({
+    turnId: "goal-frame",
+    transcript: raw,
+  });
   const panelControlIntent = classifyAskTurnPanelControlIntent(raw);
   const activeNoteTitle = readAskTurnGoalFrameString(workspaceSnapshot?.activeNoteTitle);
   const explicitDocPath = resolveAskTurnDocPathArg(raw);
@@ -29982,6 +30285,45 @@ const buildAskTurnUniversalGoalFrame = (args: {
         ? "numeric scientific questions require focused numeric extraction"
         : "scientific concept questions require sourced plain-language explanation",
     );
+  }
+  if (retrievalRequiredSignal.required) {
+    const query = raw;
+    pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
+      kind: "doc_topic",
+      value: query,
+      source: "phrase_evidence",
+      confidence: 0.88,
+    });
+    if (retrievalRequiredSignal.requested_outputs.includes("latest_doc")) {
+      pushRequestedOutput("doc_open", "retrieval_required:latest_doc");
+      pushEvidenceRequirement("doc_candidate_validation", "retrieval-required latest-doc requests require candidate validation");
+      pushEvidenceRequirement("opened_doc", "retrieval-required latest-doc requests require an opened document receipt");
+    }
+    if (retrievalRequiredSignal.requested_outputs.includes("evidence_location") || retrievalRequiredSignal.requested_outputs.includes("table_row")) {
+      pushRequestedOutput("location", "retrieval_required:evidence_location");
+      pushEvidenceRequirement("doc_location_matches", "retrieval-required location requests require located document evidence");
+    }
+    if (retrievalRequiredSignal.requested_outputs.includes("numeric_value")) {
+      pushRequestedOutput("answer", "retrieval_required:numeric_value");
+      pushEvidenceRequirement("doc_numeric_answer", "retrieval-required numeric requests require target-bound numeric extraction");
+    }
+    if (retrievalRequiredSignal.requested_outputs.includes("concept_explanation")) {
+      pushRequestedOutput("answer", "retrieval_required:concept_explanation");
+      pushEvidenceRequirement("doc_concept_explanation", "retrieval-required concept requests require source-backed explanation");
+    }
+    if (
+      !retrievalRequiredSignal.requested_outputs.some((output) =>
+        output === "latest_doc" || output === "evidence_location" || output === "table_row" || output === "numeric_value" || output === "concept_explanation",
+      )
+    ) {
+      pushRequestedOutput("doc_open", "retrieval_required:source_doc");
+      pushEvidenceRequirement("doc_candidate_validation", "retrieval-required document requests require candidate validation");
+    }
+    constraints.push({
+      kind: "requires_evidence",
+      value: "retrieval_required",
+      source: retrievalRequiredSignal.source,
+    });
   }
   const docAboutMatch = raw.match(/\b(?:open|view|show|pull\s+up|find|search)\s+(?:a\s+|the\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i);
   if (docAboutMatch?.[1]) {
@@ -30119,9 +30461,11 @@ const buildAskTurnUniversalGoalFrame = (args: {
   const capabilityHelpIntent = /\b(?:what\s+can\s+(?:i|we)\s+do|how\s+can\s+you\s+help|what\s+can\s+helix\s+ask\s+do|what\s+can\s+this\s+workspace\s+agent\s+do)\b/i.test(raw);
   const openIntent =
     !panelControlIntent &&
-    (Boolean(scientificGoal && !activeDocPath) ||
+    (retrievalRequiredSignal.requested_outputs.includes("latest_doc") ||
+      retrievalRequiredSignal.requested_outputs.includes("open_document") ||
+      Boolean(scientificGoal && !activeDocPath) ||
       Boolean(openDocSearchTopic) ||
-      /\b(?:open|view|show|go\s+to|navigate\s+to|pull\s+up|bring\s+up)\b/i.test(raw) ||
+      /\b(?:open|view|show|go\s+to|navigate\s+to|get\s+me\s+to|point\s+me\s+at|pull\s+up|bring\s+up)\b/i.test(raw) ||
       actionId === "open_doc_by_path" ||
       actionId === "open_latest_doc_by_topic" ||
       actionId === "search_docs");
@@ -30177,6 +30521,18 @@ const buildAskTurnUniversalGoalFrame = (args: {
   const goalKind: HelixAskUniversalGoalFrame["user_goal"]["goal_kind"] =
     panelControlIntent?.confidence === "high" && !panelControlIntent.conflict
       ? "panel_control"
+      : retrievalRequiredSignal.required &&
+          (retrievalRequiredSignal.requested_outputs.includes("latest_doc") ||
+            retrievalRequiredSignal.requested_outputs.includes("open_document"))
+        ? "open_workspace"
+      : retrievalRequiredSignal.required &&
+          (retrievalRequiredSignal.requested_outputs.includes("evidence_location") ||
+            retrievalRequiredSignal.requested_outputs.includes("table_row"))
+        ? "locate_in_doc"
+      : retrievalRequiredSignal.required &&
+          (retrievalRequiredSignal.requested_outputs.includes("numeric_value") ||
+            retrievalRequiredSignal.requested_outputs.includes("concept_explanation"))
+        ? "summarize_doc"
       : scientificGoal && !activeDocPath
       ? "open_workspace"
       : capabilityHelpIntent
@@ -31584,6 +31940,10 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       payload: args.selectedAction ? { workspace_action: args.selectedAction } : null,
     });
   const panelControlIntent = classifyAskTurnPanelControlIntent(args.transcript);
+  const retrievalRequiredSignal = buildAskTurnRetrievalRequiredSignal({
+    turnId: "initial-capability-plan",
+    transcript: args.transcript,
+  });
   const wantsPanelControl = Boolean(
     (universalGoalFrame.user_goal.goal_kind === "panel_control" || panelControlIntent?.confidence === "high") &&
       panelControlIntent &&
@@ -31599,8 +31959,10 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
   const topicDocQuery =
     resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
-    resolveAskTurnOpenDocSearchQueryArg(args.transcript);
+    resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
+    (retrievalRequiredSignal.required ? args.transcript : null);
   const wantsTopicDocAcquisition = Boolean(topicDocQuery);
+  const wantsRetrievalRequiredPlan = retrievalRequiredSignal.required && Boolean(topicDocQuery);
   const wantsDocAnswerAfterAcquisition = isAskTurnCompoundDocAnswerIntent(args.transcript);
   const wantsClipboard = /\b(?:read|open|show|check)\s+(?:the\s+)?clipboard\b/i.test(normalized);
   const wantsLocate = isAskTurnDocLocateIntent(args.transcript);
@@ -31660,6 +32022,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     !wantsCompositeWorkspaceContextStatus &&
     !wantsWorkspaceChangeSummary &&
     !wantsContextualTemporalCompare &&
+    !wantsRetrievalRequiredPlan &&
     !wantsPanelControl
   ) return null;
   const runtime = createAskTurnRuntime({
@@ -31922,7 +32285,26 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       matches: searchMatches,
       limit: 8,
     });
-    const selectedSearchResult = selectAskTurnDocSearchResultForOpen(searchMatches, args.transcript);
+    const selectedSearchResult =
+      selectAskTurnDocSearchResultForOpen(searchMatches, args.transcript) ??
+      (retrievalRequiredSignal.requested_outputs.includes("latest_doc")
+        ? (() => {
+            const latestStrong =
+              candidateValidation.candidates.find((candidate) => candidate.validationStatus === "strong") ??
+              candidateValidation.candidates[0] ??
+              null;
+            const match = latestStrong
+              ? searchMatches.find((candidate) => candidate.path === latestStrong.path) ?? {
+                  path: latestStrong.path,
+                  line_start: 1,
+                  line_end: 1,
+                  snippet: latestStrong.evidenceSnippet,
+                  score: latestStrong.score,
+                }
+              : null;
+            return match ? { match, reason: "latest_verified_topic_candidate" as const } : null;
+          })()
+        : null);
     const searchAction: HelixAskTurnSelectedAction = {
       panel_id: "docs-viewer",
       action_id: "search_docs",
@@ -31989,7 +32371,47 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         selected_capability: "docs-viewer.open_doc_by_path",
         reject_reasons: [],
       });
-      if (wantsDocAnswerAfterAcquisition) {
+      if (
+        wantsDocAnswerAfterAcquisition ||
+        wantsRetrievalRequiredPlan ||
+        retrievalRequiredSignal.requested_outputs.includes("numeric_value") ||
+        retrievalRequiredSignal.requested_outputs.includes("concept_explanation") ||
+        retrievalRequiredSignal.requested_outputs.includes("evidence_location") ||
+        retrievalRequiredSignal.requested_outputs.includes("table_row")
+      ) {
+        if (
+          retrievalRequiredSignal.requested_outputs.includes("evidence_location") ||
+          retrievalRequiredSignal.requested_outputs.includes("table_row")
+        ) {
+          const locateQuery =
+            retrievalRequiredSignal.anchors.artifact_ids?.[0] ??
+            retrievalRequiredSignal.anchors.table_names?.[0] ??
+            retrievalRequiredSignal.anchors.alpha_tokens?.[0] ??
+            topicDocQuery;
+          planItems.push({
+            id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_locate_retrieval_evidence"),
+            lane: "workspace",
+            status: "planned",
+            title: `Locate retrieval evidence "${clipConversationText(locateQuery, 90)}" in the selected document.`,
+            action: {
+              panel_id: "docs-viewer",
+              action_id: "locate_in_doc",
+              args: {
+                query: locateQuery,
+                path: selectedSearchResult.match.path,
+                retrieval_required: true,
+              },
+            },
+            required_artifacts: ["doc_evidence_location"],
+            reason: "retrieval_required_evidence_location",
+          });
+          capabilitySelectionTrace.push({
+            missing_artifact: "doc_evidence_location",
+            candidate_capabilities: ["docs-viewer.locate_in_doc"],
+            selected_capability: "docs-viewer.locate_in_doc",
+            reject_reasons: [],
+          });
+        }
         planItems.push(
           {
             id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_summarize_opened_search_result"),
@@ -32002,11 +32424,19 @@ const selectAskTurnInitialCapabilityPlan = (args: {
               args: {
                 path: selectedSearchResult.match.path,
                 query: topicDocQuery,
-                requested_output: "answer_from_opened_doc",
+                requested_output: retrievalRequiredSignal.requested_outputs.includes("numeric_value")
+                  ? "doc_numeric_answer"
+                  : retrievalRequiredSignal.requested_outputs.includes("concept_explanation")
+                    ? "doc_concept_explanation"
+                    : "answer_from_opened_doc",
               },
             },
-            required_artifacts: ["doc_summary"],
-            reason: "compound_doc_acquisition_answer",
+            required_artifacts: retrievalRequiredSignal.requested_outputs.includes("numeric_value")
+              ? ["doc_numeric_answer"]
+              : retrievalRequiredSignal.requested_outputs.includes("concept_explanation")
+                ? ["doc_concept_explanation"]
+                : ["doc_summary"],
+            reason: wantsRetrievalRequiredPlan ? "retrieval_required_answer" : "compound_doc_acquisition_answer",
           },
           {
             id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "reasoning_followup_opened_doc_answer"),
@@ -32014,8 +32444,14 @@ const selectAskTurnInitialCapabilityPlan = (args: {
             status: "planned",
             title: `Compose answer from opened document artifacts for "${clipConversationText(args.transcript, 90)}".`,
             action: null,
-            required_artifacts: ["doc_summary"],
-            reason: "compound_doc_acquisition_answer",
+            required_artifacts: retrievalRequiredSignal.requested_outputs.includes("numeric_value")
+              ? ["doc_numeric_answer"]
+              : retrievalRequiredSignal.requested_outputs.includes("concept_explanation")
+                ? ["doc_concept_explanation"]
+                : retrievalRequiredSignal.requested_outputs.includes("evidence_location") || retrievalRequiredSignal.requested_outputs.includes("table_row")
+                  ? ["doc_evidence_location"]
+                  : ["doc_summary"],
+            reason: wantsRetrievalRequiredPlan ? "retrieval_required_answer" : "compound_doc_acquisition_answer",
           },
         );
         capabilitySelectionTrace.push(
@@ -32553,7 +32989,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       selectedAction: firstWorkspaceAction,
       source: "goal_frame",
     }),
-    missing_args: Array.from(missingArgs).filter(Boolean),
+    missing_args: wantsRetrievalRequiredPlan ? [] : Array.from(missingArgs).filter(Boolean),
   };
 };
 
@@ -84968,6 +85404,37 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               workspaceSnapshot,
             });
       payload.universal_goal_frame = frame;
+      const retrievalSignal =
+        payload.retrieval_required_signal && typeof payload.retrieval_required_signal === "object"
+          ? (payload.retrieval_required_signal as HelixAskRetrievalRequiredSignal)
+          : buildAskTurnRetrievalRequiredSignal({
+              turnId:
+                (typeof payload.turn_id === "string" && payload.turn_id.trim()) ||
+                (typeof incoming.turnId === "string" && incoming.turnId.trim()) ||
+                "unknown-turn",
+              transcript: options?.questionSeed ?? transcriptSeed,
+            });
+      payload.retrieval_required_signal = retrievalSignal;
+      if (
+        (payload.dispatch_policy === "direct_answer_only" ||
+          payload.route_reason_code === "conversation:simple" ||
+          payload.route === "conversation:simple") &&
+        readAskTurnWorkspaceSnapshotPath(payload)
+      ) {
+        const rejectedRepairs = Array.isArray(payload.rejected_final_answer_repairs)
+          ? (payload.rejected_final_answer_repairs as unknown[])
+          : [];
+        if (!JSON.stringify(rejectedRepairs).includes("ambient_workspace_context_for_direct_answer_turn")) {
+          payload.rejected_final_answer_repairs = [
+            ...rejectedRepairs,
+            {
+              kind: "active_doc_preview",
+              source_path: readAskTurnWorkspaceSnapshotPath(payload),
+              reason: "ambient_workspace_context_for_direct_answer_turn",
+            },
+          ];
+        }
+      }
       if (frame.compound_argument_partition) {
         payload.compound_argument_partition = frame.compound_argument_partition;
       }
@@ -84978,6 +85445,21 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               frame,
               transcript: options?.questionSeed ?? transcriptSeed,
             });
+      if (
+        retrievalSignal.required &&
+        retrievalSignal.strength === "hard" &&
+        !retrievalSignal.negative_scope?.background_only &&
+        !retrievalSignal.negative_scope?.no_workspace_lookup &&
+        toolChoiceArbitration.answer_scope === "model_only" &&
+        toolChoiceArbitration.evidence_need === "none" &&
+        toolChoiceArbitration.first_step === "model"
+      ) {
+        payload.planner_retrieval_conflict = {
+          code: "observer_retrieval_planner_conflict",
+          retrieval_required_signal: retrievalSignal,
+          rejected_tool_choice: toolChoiceArbitration,
+        };
+      }
       payload.tool_choice_arbitration = toolChoiceArbitration;
       if (!payload.capability_selection_result || typeof payload.capability_selection_result !== "object") {
         const plannerRecord =
@@ -85006,6 +85488,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.debug = {
           ...(payload.debug && typeof payload.debug === "object" ? (payload.debug as Record<string, unknown>) : {}),
           universal_goal_frame: frame,
+          retrieval_required_signal: retrievalSignal,
           ...(frame.compound_argument_partition ? { compound_argument_partition: frame.compound_argument_partition } : {}),
           capability_selection_result: payload.capability_selection_result,
           tool_choice_arbitration: toolChoiceArbitration,
@@ -86080,16 +86563,17 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     payload.final_composer_contract_pass = observationFinal.contract_pass;
     payload.final_composer_fail_reason = observationFinal.fail_reason;
     const finalQualityIntentFamily = classifyAskTurnQualityIntentFamily(questionSeed);
+    const finalQualityRepairAllowed = !isAskTurnNoWorkspaceBackgroundScope(questionSeed);
     const observationGroundedTerminal = Boolean(observationFinal.text.trim() && observationFinal.source !== "turn_final_text");
     const noteReceiptTerminal = Boolean(buildAskTurnModelAppendedNoteReceiptText(payload, questionSeed));
-    const finalQualityValidation = noteReceiptTerminal || observationGroundedTerminal
+    const finalQualityValidation = noteReceiptTerminal || observationGroundedTerminal || !finalQualityRepairAllowed
       ? { pass: true, fail_reason: null as string | null }
       : validateReasoningFinalByIntent({
           intent: finalQualityIntentFamily,
           text: finalText,
           transcript: questionSeed,
         });
-    if (!finalQualityValidation.pass && finalQualityIntentFamily !== "other") {
+    if (finalQualityRepairAllowed && !finalQualityValidation.pass && finalQualityIntentFamily !== "other") {
       const repairedFinalText = repairReasoningFinalByIntent({
         intent: finalQualityIntentFamily,
         transcript: questionSeed,
@@ -86426,7 +86910,25 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     if (resolvedFinalStatus === "pending_input") {
       finalAnswerContractValidation = { pass: true, fail_reason: null };
     }
-    if (!finalAnswerContractValidation.pass && resolvedFinalStatus !== "final_failure" && resolvedFinalStatus !== "pending_input") {
+    const directAnswerRepairQuarantined =
+      payload.dispatch_policy === "direct_answer_only" ||
+      payload.route_reason_code === "conversation:simple" ||
+      payload.route === "conversation:simple";
+    if (directAnswerRepairQuarantined && !finalAnswerContractValidation.pass) {
+      const rejectedRepairs = Array.isArray(payload.rejected_final_answer_repairs)
+        ? (payload.rejected_final_answer_repairs as unknown[])
+        : [];
+      payload.rejected_final_answer_repairs = [
+        ...rejectedRepairs,
+        {
+          kind: "active_doc_preview",
+          source_path: readAskTurnWorkspaceSnapshotPath(payload),
+          reason: "ambient_workspace_context_for_direct_answer_turn",
+        },
+      ];
+      finalAnswerContractValidation = { pass: true, fail_reason: null };
+    }
+    if (!directAnswerRepairQuarantined && !finalAnswerContractValidation.pass && resolvedFinalStatus !== "final_failure" && resolvedFinalStatus !== "pending_input") {
       finalAnswerContractRepairAttempted = true;
       const repairedFinalText = repairAskTurnFinalAnswerContract({
         family: finalAnswerContractFamily,
@@ -87076,6 +87578,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           : selectedTerminalKind === canonicalGoalFrame.required_terminal_kind ||
             (canonicalGoalFrame.goal_kind === "doc_vs_note_compare" &&
               ["comparison_summary", "doc_vs_note_compare"].includes(String(selectedTerminalKind ?? ""))) ||
+            (canonicalGoalFrame.goal_kind === "doc_evidence_location" &&
+              ["doc_evidence_location", "doc_location_matches"].includes(String(selectedTerminalKind ?? ""))) ||
             (canonicalGoalFrame.goal_kind === "doc_summary" && ["doc_summary", "focused_doc_answer", "active_doc_path"].includes(String(selectedTerminalKind ?? ""))) ||
             (canonicalGoalFrame.goal_kind === "doc_open" && ["doc_summary", "focused_doc_answer", "active_doc_path"].includes(String(selectedTerminalKind ?? "")));
     if (!requiredKindSatisfied) {
@@ -87459,9 +87963,22 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   const incomingIntentFamily = inferAskTurnIntentFamily(transcript);
   const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
   const earlyPanelControlIntent = classifyAskTurnPanelControlIntent(transcript);
+  const retrievalRequiredSignal = buildAskTurnRetrievalRequiredSignal({
+    turnId,
+    transcript,
+    observerNeedsRetrieval: /needs[_\s-]?retrieval/i.test(
+      JSON.stringify((routeDecision as unknown as Record<string, unknown>).explorationPacket ?? {}),
+    ),
+  });
+  const retrievalRequiredHard =
+    retrievalRequiredSignal.required &&
+    retrievalRequiredSignal.strength === "hard" &&
+    !retrievalRequiredSignal.negative_scope?.background_only &&
+    !retrievalRequiredSignal.negative_scope?.no_workspace_lookup;
   if (
     !existingPendingRequest &&
     routeDecision.routeReasonCode === "conversation:simple" &&
+    !retrievalRequiredHard &&
     !(earlyPanelControlIntent?.confidence === "high" && !earlyPanelControlIntent.conflict)
   ) {
     const directText = buildAskTurnSimpleConversationAnswer(transcript);
@@ -87696,6 +88213,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       : rawModelOnlyGoalFrame;
   if (
     !existingPendingRequest &&
+    !retrievalRequiredHard &&
     modelOnlyToolChoice.answer_scope === "model_only" &&
     modelOnlyToolChoice.evidence_need === "none" &&
     modelOnlyToolChoice.first_step === "model"
@@ -88965,6 +89483,28 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
 
   let routeReasonCode = routeDecision.routeReasonCode;
   let dispatchHint = Boolean(routeDecision.classification.dispatch_hint);
+  if (!pendingHandled && !pendingServerRequest && retrievalRequiredHard) {
+    routeDecision = {
+      ...routeDecision,
+      classification: {
+        ...routeDecision.classification,
+        mode: "act",
+        confidence: Math.max(routeDecision.classification.confidence, 0.9),
+        dispatch_hint: true,
+        clarify_needed: false,
+        reason: `Retrieval-required signal forced workspace retrieval: ${retrievalRequiredSignal.reasons.join(", ")}`,
+      },
+      routeReasonCode: "dispatch:act",
+      explorationTurn: false,
+      explorationPacket: buildConversationExplorationPacket({
+        transcript,
+        mode: "act",
+        routeReasonCode: "dispatch:act",
+      }),
+    };
+    routeReasonCode = "dispatch:act";
+    dispatchHint = true;
+  }
   const pendingResolvedToAct =
     pendingHandled &&
     pendingResolution.applied &&
@@ -88973,9 +89513,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   let policyLockForSelection =
     pendingServerRequest
       ? "needs_user_input"
-      : ((pendingResolvedToAct ? "workspace_only" : dispatchPolicyLock) ?? (routeReasonCode === "dispatch:act"
+      : (retrievalRequiredHard
+        ? "workspace_context_reasoning"
+        : ((pendingResolvedToAct ? "workspace_only" : dispatchPolicyLock) ?? (routeReasonCode === "dispatch:act"
           ? "workspace_only"
-          : inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null })));
+          : inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null }))));
   let plannerRepair: HelixAskTurnPlannerRepairState = {
     attempted: false,
     applied: false,
@@ -88987,6 +89529,21 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     sessionId,
     workspaceSnapshot: workspaceSessionSnapshot,
   });
+  if (retrievalRequiredHard && !pendingServerRequest) {
+    actionSelection = {
+      action: {
+        panel_id: "docs-viewer",
+        action_id: "search_docs",
+        args: { query: transcript, limit: 5, retrieval_required: true },
+      },
+      source: "deterministic",
+      valid: true,
+      fail_reason: "none",
+      missing_required_args: [],
+      candidates: [],
+    };
+    policyLockForSelection = "workspace_context_reasoning";
+  }
   const currentDocPathToDeicticNote = isAskTurnCurrentDocIdentityToDeicticNoteIntent(transcript);
   if (!pendingHandled && !pendingServerRequest && currentDocPathToDeicticNote) {
     const resolvedNoteTitle = resolveAskTurnNoteTargetWithWorkspace(transcript, workspaceSessionSnapshot);
@@ -89838,6 +90395,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     isAskTurnOpenLatestDocIntent(transcript) && hasCompletedAskTurnDocSearchStep(executionTrace);
   const blockedMissingArtifacts = isAskTurnCapabilityHelpIntent(transcript)
     ? []
+    : retrievalRequiredHard
+    ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "active_doc_path" && artifact !== "doc_context")
     : isAskTurnContextualTemporalCompareIntent(transcript)
     ? rawBlockedMissingArtifacts.filter((artifact) => artifact !== "temporal_target_resolution_attempts")
     : completedDocSearchFallback
@@ -90462,10 +91021,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         "Needs retrieval before final comparison: I need concrete evidence references from docs/notes context."
       : renderedFinal.text;
     const qualityIntentFamily = classifyAskTurnQualityIntentFamily(transcript);
+    const qualityRepairAllowed = !isAskTurnNoWorkspaceBackgroundScope(transcript);
     let qualityContractPass = true;
     let qualityContractRepairAttempted = false;
     let qualityContractFailReason: string | null = null;
-    if (!needsRetrieval) {
+    if (!needsRetrieval && qualityRepairAllowed) {
       const qualityValidation = validateReasoningFinalByIntent({
         intent: qualityIntentFamily,
         text: hybridText,
@@ -90954,7 +91514,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   let qualityContractPass = true;
   let qualityContractRepairAttempted = false;
   let qualityContractFailReason: string | null = null;
-  if (!needsRetrieval) {
+  const qualityRepairAllowed = !isAskTurnNoWorkspaceBackgroundScope(transcript);
+  if (!needsRetrieval && qualityRepairAllowed) {
     const qualityValidation = validateReasoningFinalByIntent({
       intent: qualityIntentFamily,
       text: responseText,
