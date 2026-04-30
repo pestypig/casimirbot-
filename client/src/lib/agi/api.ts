@@ -18,6 +18,11 @@ import {
   parseReasoningTheaterConfigPayload,
   type ReasoningTheaterConfigResponse,
 } from "@/lib/helix/reasoning-theater-config";
+import {
+  hashVoiceDiagnosticText,
+  recordVoiceCallDiagnostic,
+  type VoiceCallDiagnosticSnapshot,
+} from "@/lib/helix/voice-call-diagnostics";
 import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
 import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
 import { useResonanceStore } from "@/store/useResonanceStore";
@@ -980,7 +985,7 @@ export type VoiceSpeakPayload = {
   utteranceId?: string;
   chunkIndex?: number;
   chunkCount?: number;
-  chunkKind?: "brief" | "final";
+  chunkKind?: "brief" | "final" | "tool_receipt" | "manual_read_aloud";
   turnKey?: string;
   dedupe_key?: string;
 };
@@ -1250,6 +1255,33 @@ export type ConversationTurnResponse = {
   details?: Record<string, unknown>;
 };
 
+const createVoiceCallDiagnosticId = (kind: "speak" | "transcribe", startedAtMs: number): string => {
+  const random =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  return `${kind}:${startedAtMs}:${random}`;
+};
+
+const sanitizeVoiceCallError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/\s+/g, " ").trim().slice(0, 320);
+};
+
+const recordVoiceCall = (
+  input: Omit<VoiceCallDiagnosticSnapshot, "id" | "endedAtMs" | "durationMs"> & {
+    startedAtMs: number;
+  },
+): void => {
+  const endedAtMs = Date.now();
+  recordVoiceCallDiagnostic({
+    ...input,
+    id: createVoiceCallDiagnosticId(input.kind, input.startedAtMs),
+    endedAtMs,
+    durationMs: Math.max(0, endedAtMs - input.startedAtMs),
+  });
+};
+
 async function asJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
@@ -1330,43 +1362,98 @@ export async function speakVoice(
   payload: VoiceSpeakPayload,
   options?: { signal?: AbortSignal },
 ): Promise<VoiceSpeakResponse> {
-  const response = await fetch("/api/voice/speak", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, audio/wav, audio/mpeg",
-    },
-    body: JSON.stringify(payload),
-    signal: options?.signal,
-  });
-  const headerSnapshot = {
-    provider: response.headers.get("x-voice-provider"),
-    profile: response.headers.get("x-voice-profile"),
-    cache: (response.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
-    normalizationBenchmark: response.headers.get("x-voice-normalization-benchmark"),
-    normalizationSkipReason: response.headers.get("x-voice-normalization-skip-reason"),
+  const startedAtMs = Date.now();
+  const baseDiagnostic = {
+    kind: "speak" as const,
+    endpoint: "/api/voice/speak" as const,
+    startedAtMs,
+    traceId: payload.traceId ?? null,
+    missionId: payload.missionId ?? null,
+    eventId: payload.eventId ?? null,
+    utteranceId: payload.utteranceId ?? null,
+    turnKey: payload.turnKey ?? null,
+    mode: payload.mode ?? null,
+    priority: payload.priority ?? null,
+    textLength: typeof payload.text === "string" ? payload.text.length : null,
+    textHash: hashVoiceDiagnosticText(payload.text),
   };
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  if (contentType.includes("application/json")) {
-    const json = (await response.json().catch(() => ({}))) as VoiceSpeakJsonResponse;
-    return {
-      kind: "json",
+  let response: Response | null = null;
+  try {
+    response = await fetch("/api/voice/speak", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, audio/wav, audio/mpeg",
+      },
+      body: JSON.stringify(payload),
+      signal: options?.signal,
+    });
+    const headerSnapshot = {
+      provider: response.headers.get("x-voice-provider"),
+      profile: response.headers.get("x-voice-profile"),
+      cache: (response.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
+      normalizationBenchmark: response.headers.get("x-voice-normalization-benchmark"),
+      normalizationSkipReason: response.headers.get("x-voice-normalization-skip-reason"),
+    };
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (contentType.includes("application/json")) {
+      const json = (await response.json().catch(() => ({}))) as VoiceSpeakJsonResponse;
+      recordVoiceCall({
+        ...baseDiagnostic,
+        ok: response.ok,
+        status: response.status,
+        responseKind: "json",
+        contentType,
+        providerHeader: headerSnapshot.provider,
+        profileHeader: headerSnapshot.profile,
+        cacheHeader: headerSnapshot.cache,
+        error: response.ok ? null : json.message ?? json.error ?? response.statusText ?? "Voice request failed",
+      });
+      return {
+        kind: "json",
+        status: response.status,
+        payload: json,
+        headers: headerSnapshot,
+      };
+    }
+    const blob = await response.blob();
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText || "Voice request failed"}`);
+    }
+    recordVoiceCall({
+      ...baseDiagnostic,
+      ok: true,
       status: response.status,
-      payload: json,
+      responseKind: "audio",
+      contentType: contentType || blob.type || "application/octet-stream",
+      providerHeader: headerSnapshot.provider,
+      profileHeader: headerSnapshot.profile,
+      cacheHeader: headerSnapshot.cache,
+      audioBytes: blob.size,
+      audioMimeType: contentType || blob.type || null,
+      error: null,
+    });
+    return {
+      kind: "audio",
+      status: response.status,
+      mimeType: contentType || blob.type || "application/octet-stream",
+      blob,
       headers: headerSnapshot,
     };
+  } catch (error) {
+    recordVoiceCall({
+      ...baseDiagnostic,
+      ok: false,
+      status: response?.status ?? null,
+      responseKind: "error",
+      contentType: response?.headers.get("content-type")?.toLowerCase() ?? null,
+      providerHeader: response?.headers.get("x-voice-provider") ?? null,
+      profileHeader: response?.headers.get("x-voice-profile") ?? null,
+      cacheHeader: (response?.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
+      error: sanitizeVoiceCallError(error),
+    });
+    throw error;
   }
-  const blob = await response.blob();
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText || "Voice request failed"}`);
-  }
-  return {
-    kind: "audio",
-    status: response.status,
-    mimeType: contentType || blob.type || "application/octet-stream",
-    blob,
-    headers: headerSnapshot,
-  };
 }
 
 const extensionForAudioMime = (mimeType: string): string => {
@@ -1380,6 +1467,21 @@ const extensionForAudioMime = (mimeType: string): string => {
 };
 
 export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<VoiceTranscribeResponse> {
+  const startedAtMs = Date.now();
+  const baseDiagnostic = {
+    kind: "transcribe" as const,
+    endpoint: "/api/voice/transcribe" as const,
+    startedAtMs,
+    traceId: payload.traceId ?? null,
+    missionId: payload.missionId ?? null,
+    responseKind: "json" as const,
+    audioBytes: payload.audio.size,
+    audioMimeType: payload.audio.type?.trim() || "audio/webm",
+    audioDurationMs:
+      typeof payload.durationMs === "number" && Number.isFinite(payload.durationMs)
+        ? Math.max(0, Math.round(payload.durationMs))
+        : null,
+  };
   const form = new FormData();
   const audioMimeType = payload.audio.type?.trim() || "audio/webm";
   const filename = payload.filename?.trim() || `helix-voice-input.${extensionForAudioMime(audioMimeType)}`;
@@ -1415,15 +1517,36 @@ export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<
     form.set("confirm_block_reason", payload.confirm_block_reason.trim());
   }
 
-  const response = await fetch("/api/voice/transcribe", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-    },
-    body: form,
-  });
+  let response: Response | null = null;
+  try {
+    response = await fetch("/api/voice/transcribe", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+      },
+      body: form,
+    });
 
-  return asJson<VoiceTranscribeResponse>(response);
+    const result = await asJson<VoiceTranscribeResponse>(response);
+    recordVoiceCall({
+      ...baseDiagnostic,
+      ok: true,
+      status: response.status,
+      contentType: response.headers.get("content-type")?.toLowerCase() ?? null,
+      error: null,
+    });
+    return result;
+  } catch (error) {
+    recordVoiceCall({
+      ...baseDiagnostic,
+      ok: false,
+      status: response?.status ?? null,
+      responseKind: "error",
+      contentType: response?.headers.get("content-type")?.toLowerCase() ?? null,
+      error: sanitizeVoiceCallError(error),
+    });
+    throw error;
+  }
 }
 
 export async function runConversationTurn(

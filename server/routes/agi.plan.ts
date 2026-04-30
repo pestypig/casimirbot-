@@ -20542,6 +20542,9 @@ const isAskTurnSimpleConversationStatusCheck = (transcript: string): boolean => 
 };
 
 const buildAskTurnSimpleConversationAnswer = (transcript: string): string => {
+  if (isAskTurnWorkspaceHelpIntent(transcript)) {
+    return buildAskTurnWorkspaceHelpAnswer();
+  }
   const normalized = transcript.trim().toLowerCase().replace(/\s+/g, " ");
   const statusCue =
     /\b(?:is this|is it|are we|is everything)\s+(?:working|on|live|connected|running|ok|okay)\b/.test(normalized) ||
@@ -20575,6 +20578,12 @@ const buildAskTurnModelOnlyAnswerPrompt = (transcript: string): string =>
 const isAskTurnModelOnlyWorkspaceLeak = (text: string): boolean =>
   /(?:^|\n)\s*(?:Explained|Opened|Compared)\s+\/(?:docs|research|artifacts)\b/i.test(text) ||
   /\/docs\/|\/artifacts\/|Document:\s*\/|Active doc:\s*\/|Source:\s*\/docs/i.test(text);
+
+const isAskTurnNonSubstantiveDirectAnswer = (text: string): boolean => {
+  const normalized = text.trim();
+  if (!normalized) return true;
+  return /I couldn.?t produce a final answer for that turn|Please retry once/i.test(normalized);
+};
 
 const generateAskTurnModelOnlyAnswer = async (args: {
   transcript: string;
@@ -21341,6 +21350,7 @@ type HelixAskRejectedTerminalCandidate = {
 };
 type HelixAskCanonicalGoalKind =
   | "model_only_concept"
+  | "workspace_help"
   | "latest_doc_navigation"
   | "doc_evidence_location"
   | "doc_scientific_numeric"
@@ -21455,6 +21465,20 @@ type HelixAskRetrievalRequiredSignal = {
     table_names?: string[];
     dimensions?: string[];
   };
+};
+type HelixAskEvidenceTargetRequest = {
+  turn_id: string;
+  query: string;
+  required_exact_tokens: string[];
+  optional_tokens: string[];
+  table_names: string[];
+  field_names: string[];
+  row_anchors: string[];
+  alpha_tokens: string[];
+  artifact_ids: string[];
+  location_kind: "token" | "table" | "field" | "row" | "formula" | "source_path";
+  binding_mode: "exact" | "all_required" | "nearest_with_caveat";
+  requested_output: "location" | "numeric_value" | "concept_explanation" | "latest_doc" | "note_mutation";
 };
 type HelixAskTurnJobReadyLink = {
   id: string;
@@ -23370,7 +23394,7 @@ const shouldStoreAskTurnLatestResultArtifact = (payload: Record<string, unknown>
 
 const resolveAskTurnCreateNoteTitleArg = (transcript: string): string | null => {
   const createMatch = transcript.match(
-    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note(?:\s+(?:called|named|titled?)\s+)?(.+?)(?:\s*,|\s+\band\s+(?:then|put|add|save|write|copy|store|append)\b|\s+\bthen\b|\s+\bafter that\b|\s+\bwhile\b|\s+\balso\b|$)/i,
+    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note(?:\s+(?:called|named|titled?)\s+)?(.+?)(?:\s*,|\s+\bwith\b|\s+\bfrom\b|\s+\busing\b|\s+\band\s+(?:then|put|add|save|write|copy|store|append)\b|\s+\bthen\b|\s+\bafter that\b|\s+\bwhile\b|\s+\balso\b|$)/i,
   );
   const value = trimAskTurnProtectedTitleArgBoundaries(createMatch?.[1] ?? "");
   if (value) return value;
@@ -26911,7 +26935,18 @@ const renderAskTurnDocLocationAnswer = (args: {
 
 const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
   executionTrace.map((step) => {
-    const docLocationMatches = findAskTurnDocLocationMatchesForAction(step.action);
+    const docLocationTargetRequest =
+      step.action?.action_id === "locate_in_doc"
+        ? buildAskTurnEvidenceTargetRequest({
+            turnId: "step-result",
+            transcript: String(step.action.args?.target_transcript ?? step.action.args?.query ?? step.title ?? ""),
+            query: readAskTurnString(step.action.args?.query),
+            requestedOutput: "location",
+          })
+        : null;
+    const docLocationMatches = docLocationTargetRequest
+      ? enrichAskTurnDocEvidenceMatches(findAskTurnDocLocationMatchesForAction(step.action), docLocationTargetRequest)
+      : findAskTurnDocLocationMatchesForAction(step.action);
     const latestDocSelection =
       step.action?.action_id === "open_latest_doc_by_topic"
         ? buildAskTurnLatestDocSelectionArtifact(
@@ -26958,7 +26993,9 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
     const producedArtifacts =
       step.status === "completed"
         ? step.lane === "workspace"
-          ? step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
+          ? step.action?.action_id === "copy_receipt_to_note" ||
+            step.action?.action_id === "append_to_note" ||
+            step.action?.action_id === "create_note"
             ? Array.from(new Set([...workspaceContextArtifacts, "note_context", "note_update_receipt"]))
             : actionId === "summarize_doc"
               ? Array.from(new Set([
@@ -27051,7 +27088,7 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               : ["doc_summary"]
         : isAskTurnPanelControlOpenAction(step.action)
           ? ["workspace_action_receipt"]
-        : actionId === "copy_receipt_to_note" || actionId === "append_to_note"
+        : actionId === "copy_receipt_to_note" || actionId === "append_to_note" || actionId === "create_note"
           ? ["note_update_receipt"]
           : step.action?.panel_id === "docs-viewer" &&
               ["summarize_doc", "identify_current_doc", "verify_active_doc", "summarize_section", "explain_paper"].includes(actionId ?? "")
@@ -27094,6 +27131,8 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           : step.action?.action_id === "locate_in_doc"
           ? {
               kind: expectedArtifacts.includes("doc_evidence_location") ? "doc_evidence_location" : "doc_location_matches",
+              query: readAskTurnString(step.action.args?.query) ?? null,
+              target_request: docLocationTargetRequest,
               matches: docLocationMatches,
               match_count: docLocationMatches.length,
               source_path: docLocationMatches[0]?.path ?? normalizeAskTurnWorkspaceDocPath(step.action.args?.path) ?? null,
@@ -27182,11 +27221,20 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               }
           : step.action?.action_id === "create_note"
             ? {
-                kind: "note_create_receipt",
+                kind: "note_update_receipt",
                 panel_id: step.action.panel_id,
                 action_id: step.action.action_id,
                 note_id: step.action.args?.note_id ?? null,
                 title: step.action.args?.title ?? step.action.args?.name ?? null,
+                note_title: step.action.args?.title ?? step.action.args?.name ?? null,
+                note_path:
+                  step.action.args?.note_path ??
+                  step.action.args?.path ??
+                  (step.action.args?.title || step.action.args?.name
+                    ? `/notes/${String(step.action.args?.title ?? step.action.args?.name).trim().replace(/\s+/g, "-").toLowerCase()}.md`
+                    : null),
+                action: "create",
+                inserted_source_paths: [],
                 status: step.status,
               }
           : step.action?.action_id === "list_notes"
@@ -27599,6 +27647,7 @@ type HelixAskTurnObservationGroundedFinal = {
   source:
     | "capability_help_summary"
     | "doc_location_matches"
+    | "doc_evidence_location"
     | "latest_doc_selection"
     | "doc_summary"
     | "doc_explain_preview"
@@ -27684,10 +27733,14 @@ const renderAskTurnDocLocationMatchesFromArtifact = (artifact: Record<string, un
       const label = renderAskTurnDocDisplayLabel(pathLabel);
       const heading = typeof match.heading === "string" && match.heading.trim() ? match.heading.trim() : "";
       const snippet = typeof match.snippet === "string" ? match.snippet.replace(/\s+/g, " ").trim() : "";
+      const matched = Array.isArray(match.matched_required_tokens)
+        ? match.matched_required_tokens.map((entry) => String(entry).trim()).filter(Boolean)
+        : [];
       const lineLabel = `L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}`;
       return [
         `- ${label}, ${lineLabel}${heading ? ` (${heading})` : ""}`,
         `  Path: ${pathLabel}:${lineLabel}`,
+        matched.length > 0 ? `  Matched: ${matched.join(", ")}` : null,
         snippet ? `  Snippet: ${clipConversationText(snippet, 220)}` : null,
       ].filter((line): line is string => Boolean(line)).join("\n");
     }),
@@ -28231,9 +28284,19 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
 }): HelixAskTurnObservationGroundedFinal => {
   const consumed = new Set<string>();
   const normalized = args.transcript.trim().toLowerCase();
+  const observationRetrievalSignal = buildAskTurnRetrievalRequiredSignal({
+    turnId: "observation-final",
+    transcript: args.transcript,
+  });
+  const requiresEvidenceLocation =
+    observationRetrievalSignal.required &&
+    (observationRetrievalSignal.requested_outputs.includes("evidence_location") ||
+      observationRetrievalSignal.requested_outputs.includes("table_row"));
   const hasCompletedAction = (actionId: string): boolean =>
     args.executionTrace.some((step) => step.status === "completed" && step.action?.action_id === actionId);
-  const docLocationArtifact = readAskTurnResultArtifact(args.stepResults, "doc_location_matches");
+  const docLocationArtifact =
+    readAskTurnResultArtifact(args.stepResults, "doc_evidence_location") ??
+    readAskTurnResultArtifact(args.stepResults, "doc_location_matches");
   const runtimeObservations =
     args.runtime && typeof args.runtime === "object" && Array.isArray(args.runtime.observations)
       ? (args.runtime.observations as HelixAskTurnRuntimeObservation[])
@@ -28252,7 +28315,8 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     }
     return fallback;
   };
-  const effectiveDocLocationArtifact = docLocationArtifact ?? readRuntimeArtifact("doc_location_matches");
+  const effectiveDocLocationArtifact =
+    docLocationArtifact ?? readRuntimeArtifact("doc_evidence_location") ?? readRuntimeArtifact("doc_location_matches");
   const noteReceiptArtifact = readAskTurnResultArtifact(args.stepResults, "note_update_receipt") ?? readRuntimeArtifact("note_update_receipt");
   const docSearchArtifact = readAskTurnResultArtifact(args.stepResults, "doc_search_results") ?? readRuntimeArtifact("doc_search_results");
   const docCandidateValidationArtifact =
@@ -28481,18 +28545,30 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
   if (
     effectiveDocLocationArtifact &&
     (isAskTurnDocLocateIntent(args.transcript) ||
+      requiresEvidenceLocation ||
       /\blocations:\s*/i.test(String(args.candidateText ?? "")) ||
       hasCompletedAction("locate_in_doc"))
   ) {
     const rendered = renderAskTurnDocLocationMatchesFromArtifact(effectiveDocLocationArtifact);
-    if (rendered) {
+    const validation = validateAskTurnDocEvidenceLocationArtifact(effectiveDocLocationArtifact);
+    if (rendered && (!requiresEvidenceLocation || validation.valid)) {
       consumed.add("doc_location_matches");
       return {
         text: rendered,
-        source: "doc_location_matches",
+        source: readAskTurnString(effectiveDocLocationArtifact.kind) === "doc_evidence_location" ? "doc_evidence_location" : "doc_location_matches",
         consumed_artifacts: Array.from(consumed),
         contract_pass: true,
         fail_reason: null,
+      };
+    }
+    if (requiresEvidenceLocation) {
+      consumed.add("doc_location_matches");
+      return {
+        text: "I found candidate documents, but no current-turn location artifact proved the requested target.",
+        source: "doc_evidence_location",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: false,
+        fail_reason: validation.failures.join(",") || "doc_evidence_location_unavailable",
       };
     }
   }
@@ -28724,6 +28800,17 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
         fail_reason: "open_doc_unresolved",
       };
     }
+  }
+
+  if (docSearchArtifact && requiresEvidenceLocation) {
+    consumed.add("doc_search_results");
+    return {
+      text: "I found candidate documents, but no current-turn location artifact proved the requested target.",
+      source: "doc_evidence_location",
+      consumed_artifacts: Array.from(consumed),
+      contract_pass: false,
+      fail_reason: "doc_evidence_location_unavailable",
+    };
   }
 
   if (docSearchArtifact) {
@@ -29133,6 +29220,151 @@ const isAskTurnNoWorkspaceBackgroundScope = (transcript: string): boolean => {
   return Boolean(signal.negative_scope?.background_only || signal.negative_scope?.no_workspace_lookup);
 };
 
+const isAskTurnWorkspaceHelpIntent = (transcript: string): boolean =>
+  /\bwhat\s+can\s+you\s+(?:help\s+me\s+do|do|help\s+with)\b[\s\S]*\b(?:workspace|helix|here)\b/i.test(transcript.trim()) ||
+  /\bhow\s+do\s+i\s+use\s+(?:this\s+)?(?:workspace|helix\s+ask)\b/i.test(transcript.trim());
+
+const buildAskTurnWorkspaceHelpAnswer = (): string =>
+  [
+    "I can help you work across the Helix workspace:",
+    "- Open or find the latest docs and papers by topic.",
+    "- Locate source paths, line spans, snippets, tables, fields, and named anchors inside docs.",
+    "- Summarize the current document and explain what specific sections mean.",
+    "- Create or update workstation notes with summaries, source paths, and located evidence.",
+    "- Compare docs against notes and call out what is captured, missing, or unsupported.",
+    "- Answer background-only questions without using workspace lookup when you ask for that scope.",
+    "- Ask for clarification when a document, note, or target is ambiguous.",
+  ].join("\n");
+
+const buildAskTurnEvidenceTargetRequest = (args: {
+  turnId: string;
+  transcript: string;
+  query?: string | null;
+  requestedOutput?: HelixAskEvidenceTargetRequest["requested_output"];
+}): HelixAskEvidenceTargetRequest => {
+  const raw = args.transcript.trim();
+  const query = String(args.query ?? raw).trim();
+  const anchors = extractAskTurnRetrievalSignalAnchors(raw);
+  const artifactIds = anchors.artifact_ids ?? [];
+  const alphaTokens = anchors.alpha_tokens ?? [];
+  const tableNames = anchors.table_names ?? [];
+  const fieldNames = anchors.variables ?? [];
+  const rowAnchors = anchors.dimensions ?? [];
+  const formulaTokens = Array.from(new Set(raw.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*=\s*[^\s,;.]+/g) ?? []));
+  const requiredExactTokens = Array.from(new Set([...artifactIds, ...formulaTokens]));
+  const requestedOutput =
+    args.requestedOutput ??
+    (/\b(?:numeric|value|reported)\b/i.test(raw)
+      ? "numeric_value"
+      : /\b(?:mean|means|explain|concept|formula)\b/i.test(raw)
+        ? "concept_explanation"
+        : /\b(?:latest|newest|most\s+recent)\b/i.test(raw)
+          ? "latest_doc"
+          : "location");
+  const locationKind: HelixAskEvidenceTargetRequest["location_kind"] =
+    tableNames.length > 0
+      ? "table"
+      : fieldNames.length > 0
+        ? "field"
+        : rowAnchors.length > 0
+          ? "row"
+          : formulaTokens.length > 0
+            ? "formula"
+            : /\bsource\s+path\b/i.test(raw)
+              ? "source_path"
+              : "token";
+  const bindingMode: HelixAskEvidenceTargetRequest["binding_mode"] =
+    requiredExactTokens.length > 0 ? "exact" : tableNames.length > 0 || alphaTokens.length > 0 || fieldNames.length > 0 || rowAnchors.length > 0 ? "all_required" : "nearest_with_caveat";
+  return {
+    turn_id: args.turnId,
+    query,
+    required_exact_tokens: requiredExactTokens,
+    optional_tokens: [],
+    table_names: tableNames,
+    field_names: fieldNames,
+    row_anchors: rowAnchors,
+    alpha_tokens: alphaTokens,
+    artifact_ids: artifactIds,
+    location_kind: locationKind,
+    binding_mode: bindingMode,
+    requested_output: requestedOutput,
+  };
+};
+
+const askTurnTextIncludesFoldedToken = (text: string, token: string): boolean => {
+  const normalizedText = text.toLowerCase();
+  const normalizedToken = token.toLowerCase();
+  const foldedText = normalizedText.replace(/[._\-\s]+/g, "");
+  const foldedToken = normalizedToken.replace(/[._\-\s]+/g, "");
+  return normalizedText.includes(normalizedToken) || (foldedToken.length > 0 && foldedText.includes(foldedToken));
+};
+
+const enrichAskTurnDocEvidenceMatches = (
+  matches: HelixAskDocLocationMatch[],
+  targetRequest: HelixAskEvidenceTargetRequest,
+): Array<HelixAskDocLocationMatch & Record<string, unknown>> =>
+  matches.map((match) => {
+    const snippet = String(match.snippet ?? "");
+    const matchedRequiredTokens = targetRequest.required_exact_tokens.filter((token) => askTurnTextIncludesFoldedToken(snippet, token));
+    const missingRequiredTokens = targetRequest.required_exact_tokens.filter((token) => !matchedRequiredTokens.includes(token));
+    const matchedAlphaTokens = targetRequest.alpha_tokens.filter((token) => askTurnTextIncludesFoldedToken(snippet, token));
+    const matchedFields = targetRequest.field_names.filter((field) => askTurnTextIncludesFoldedToken(snippet, field));
+    const matchedRowAnchors = targetRequest.row_anchors.filter((anchor) => askTurnTextIncludesFoldedToken(snippet, anchor));
+    const matchedTables = targetRequest.table_names.filter((table) => askTurnTextIncludesFoldedToken(snippet, table) || askTurnTextIncludesFoldedToken(String(match.heading ?? ""), table));
+    const requiredExactOk = missingRequiredTokens.length === 0;
+    const tableOk = targetRequest.table_names.length === 0 || matchedTables.length > 0;
+    const alphaOk = targetRequest.alpha_tokens.length === 0 || matchedAlphaTokens.length > 0;
+    const fieldOk = targetRequest.field_names.length === 0 || matchedFields.length > 0;
+    const rowOk = targetRequest.row_anchors.length === 0 || matchedRowAnchors.length > 0;
+    const bindingStatus =
+      requiredExactOk && tableOk && alphaOk && fieldOk && rowOk
+        ? targetRequest.binding_mode === "exact"
+          ? "exact"
+          : "all_required_present"
+        : matchedRequiredTokens.length > 0 || matchedAlphaTokens.length > 0 || matchedTables.length > 0 || matchedFields.length > 0 || matchedRowAnchors.length > 0
+          ? "partial"
+          : "failed";
+    return {
+      ...match,
+      target_request: targetRequest,
+      matched_required_tokens: [...matchedRequiredTokens, ...matchedAlphaTokens, ...matchedTables],
+      missing_required_tokens: missingRequiredTokens,
+      matched_fields: matchedFields,
+      matched_row_anchors: matchedRowAnchors,
+      table_name: matchedTables[0] ?? null,
+      snippet,
+      binding_status: bindingStatus,
+      confidence: bindingStatus === "exact" || bindingStatus === "all_required_present" ? "high" : bindingStatus === "partial" ? "low" : "low",
+    };
+  });
+
+const validateAskTurnDocEvidenceLocationArtifact = (artifact: Record<string, unknown> | null): { valid: boolean; failures: string[] } => {
+  const failures: string[] = [];
+  if (!artifact) return { valid: false, failures: ["artifact_missing"] };
+  const sourcePath = normalizeAskTurnWorkspaceDocPath(artifact.source_path);
+  if (!sourcePath) failures.push("source_path_missing");
+  const target = artifact.target_request && typeof artifact.target_request === "object"
+    ? (artifact.target_request as HelixAskEvidenceTargetRequest)
+    : null;
+  const matches = Array.isArray(artifact.matches)
+    ? artifact.matches.filter((match): match is Record<string, unknown> => Boolean(match && typeof match === "object"))
+    : [];
+  if (matches.length === 0) failures.push("matches_missing");
+  const successfulMatch = matches.some((match) => {
+    const snippet = readAskTurnString(match.snippet) ?? "";
+    if (!snippet) return false;
+    const missingRequired = Array.isArray(match.missing_required_tokens) ? match.missing_required_tokens : [];
+    if (target?.binding_mode === "exact" && missingRequired.length > 0) return false;
+    if (target?.table_names?.length && !target.table_names.some((table) => askTurnTextIncludesFoldedToken(snippet, table) || askTurnTextIncludesFoldedToken(readAskTurnString(match.section) ?? readAskTurnString(match.heading) ?? "", table))) return false;
+    if (target?.alpha_tokens?.length && !target.alpha_tokens.some((token) => askTurnTextIncludesFoldedToken(snippet, token))) return false;
+    if (target?.field_names?.length && !target.field_names.every((field) => askTurnTextIncludesFoldedToken(snippet, field))) return false;
+    if (target?.row_anchors?.length && !target.row_anchors.some((anchor) => askTurnTextIncludesFoldedToken(snippet, anchor))) return false;
+    return true;
+  });
+  if (!successfulMatch) failures.push("required_target_not_bound");
+  return { valid: failures.length === 0, failures };
+};
+
 const resolveAskTurnScientificMissingCode = (
   kind: "numeric" | "concept_explanation" | HelixAskCanonicalGoalKind | null | undefined,
 ): "numeric_result_unavailable" | "concept_explanation_unavailable" | null => {
@@ -29318,7 +29550,7 @@ const buildAskTurnCanonicalGoalFrame = (args: {
   ) {
     return {
       turn_id: args.turnId,
-      goal_kind: "model_only_concept",
+      goal_kind: isAskTurnWorkspaceHelpIntent(transcript) ? "workspace_help" : "model_only_concept",
       answer_scope: "model_only",
       required_terminal_kind: "direct_answer_text",
       allows_workspace_context: false,
@@ -29530,7 +29762,7 @@ const evaluateTurnSatisfaction = (args: {
     output.kind === "answer" && output.evidence.some((entry) => /\b(?:explain|normal|plain|concept|meaning)\b/i.test(entry)),
   ) || canonicalGoal.goal_kind === "doc_scientific_concept";
   const terminalKinds =
-    canonicalGoal.goal_kind === "model_only_concept"
+    canonicalGoal.goal_kind === "model_only_concept" || canonicalGoal.goal_kind === "workspace_help"
       ? ["direct_answer_text"]
       : canonicalGoal.goal_kind === "latest_doc_navigation"
         ? ["doc_open_receipt"]
@@ -29573,7 +29805,7 @@ const evaluateTurnSatisfaction = (args: {
       : ["turn_final_text", "focused_doc_answer", "doc_summary"];
   const rejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [];
   const rejectedKindsForCanonicalGoal =
-    canonicalGoal.goal_kind === "model_only_concept"
+    canonicalGoal.goal_kind === "model_only_concept" || canonicalGoal.goal_kind === "workspace_help"
       ? ["doc_summary", "focused_doc_answer", "doc_numeric_answer", "doc_concept_explanation", "comparison_summary", "note_update_receipt"]
       : canonicalGoal.goal_kind === "latest_doc_navigation"
         ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
@@ -29608,7 +29840,11 @@ const evaluateTurnSatisfaction = (args: {
         );
       }
       const sufficient = isAskTurnSufficientTerminalArtifact({ artifact, wantsNumeric, wantsConcept });
-      if (!sufficient) {
+      const evidenceValidation =
+        canonicalGoal.goal_kind === "doc_evidence_location" && ["doc_evidence_location", "doc_location_matches"].includes(artifact.kind)
+          ? validateAskTurnDocEvidenceLocationArtifact(readAskTurnArtifactPayloadRecord(artifact))
+          : { valid: true, failures: [] };
+      if (!sufficient || !evidenceValidation.valid) {
         rejectedTerminalCandidates.push({
           artifact_id: artifact.artifact_id,
           kind: artifact.kind,
@@ -29617,7 +29853,7 @@ const evaluateTurnSatisfaction = (args: {
           rejection_reason: "insufficient_artifact_shape",
         });
       }
-      return sufficient;
+      return sufficient && evidenceValidation.valid;
     }) ?? null;
   if (terminalArtifact) {
     return {
@@ -31957,10 +32193,15 @@ const selectAskTurnInitialCapabilityPlan = (args: {
   const wantsDocs =
     !wantsPanelControl &&
     /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
+  const wantsCreateNoteBasic = /\b(?:create|make|new|start)\s+(?:a\s+)?(?:(?:workstation|scratch|research|scientist)\s+)?note\b/i.test(normalized);
   const topicDocQuery =
-    resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
-    resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
-    (retrievalRequiredSignal.required ? args.transcript : null);
+    (wantsCreateNoteBasic
+      ? null
+      : resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
+        resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
+        (retrievalRequiredSignal.required
+      ? args.transcript
+          : null));
   const wantsTopicDocAcquisition = Boolean(topicDocQuery);
   const wantsRetrievalRequiredPlan = retrievalRequiredSignal.required && Boolean(topicDocQuery);
   const wantsDocAnswerAfterAcquisition = isAskTurnCompoundDocAnswerIntent(args.transcript);
@@ -31971,7 +32212,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     isAskTurnDocNotesHybridCompareIntent(args.transcript) ||
     isAskTurnDocVsNoteCompareIntent(args.transcript, args.workspaceSnapshot);
   const wantsDocsRetrievalToNote = isAskTurnDocsRetrievalToNoteIntent(args.transcript);
-  const wantsCreateNote = /\b(?:create|make|new|start)\s+(?:a\s+)?note\b/i.test(normalized);
+  const wantsCreateNote = wantsCreateNoteBasic;
   const wantsCurrentDocPathToNote =
     isAskTurnCurrentDocIdentityTransferIntent(args.transcript) && isAskTurnArtifactToNoteIntent(args.transcript);
   const wantsArtifactCarryoverToNote = isAskTurnArtifactCarryoverToNoteIntent(args.transcript) || isAskTurnSafeDefaultPreserveToNoteIntent(args.transcript);
@@ -32400,6 +32641,13 @@ const selectAskTurnInitialCapabilityPlan = (args: {
                 query: locateQuery,
                 path: selectedSearchResult.match.path,
                 retrieval_required: true,
+                target_transcript: args.transcript,
+                target_request: buildAskTurnEvidenceTargetRequest({
+                  turnId: "initial-capability-plan",
+                  transcript: args.transcript,
+                  query: locateQuery,
+                  requestedOutput: "location",
+                }),
               },
             },
             required_artifacts: ["doc_evidence_location"],
@@ -84897,6 +85145,57 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.text = rewrittenText;
       }
     }
+    const normalizedCanonicalGoal =
+      payload.canonical_goal_frame && typeof payload.canonical_goal_frame === "object"
+        ? (payload.canonical_goal_frame as Record<string, unknown>)
+        : null;
+    const topLevelText = readAskTurnString(payload.selected_final_answer) ?? readAskTurnString(payload.text);
+    if (
+      readAskTurnString(normalizedCanonicalGoal?.answer_scope) === "model_only" &&
+      topLevelText &&
+      isAskTurnNonSubstantiveDirectAnswer(topLevelText)
+    ) {
+      const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+      const ledgerDirectAnswer =
+        ledger
+          .map((entry) => {
+            if (!entry || typeof entry !== "object") return null;
+            const record = entry as Record<string, unknown>;
+            if (readAskTurnString(record.kind) !== "direct_answer_text") return null;
+            const artifactPayload = record.payload && typeof record.payload === "object"
+              ? (record.payload as Record<string, unknown>)
+              : null;
+            return readAskTurnString(artifactPayload?.answer_text) ?? readAskTurnString(artifactPayload?.text);
+          })
+          .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text))) ?? null;
+      const runtimeTerminal =
+        payload.turn_runtime && typeof payload.turn_runtime === "object" &&
+        (payload.turn_runtime as Record<string, unknown>).terminal &&
+        typeof (payload.turn_runtime as Record<string, unknown>).terminal === "object"
+          ? ((payload.turn_runtime as Record<string, unknown>).terminal as Record<string, unknown>)
+          : null;
+      const runtimeTerminalText = readAskTurnString(runtimeTerminal?.text);
+      const replacement =
+        ledgerDirectAnswer ??
+        (runtimeTerminalText && !isAskTurnNonSubstantiveDirectAnswer(runtimeTerminalText) ? runtimeTerminalText : null);
+      if (replacement) {
+        payload.text = replacement;
+        payload.answer = replacement;
+        payload.assistant_answer = replacement;
+        payload.selected_final_answer = replacement;
+        payload.final_answer_source = "no_tool_direct";
+        payload.response_type = "final_answer";
+        payload.final_status = "final_answer";
+        delete payload.terminal_error_code;
+        if (payload.latest_result_artifact && typeof payload.latest_result_artifact === "object") {
+          (payload.latest_result_artifact as Record<string, unknown>).text = replacement;
+        }
+        if (payload.terminal_artifact && typeof payload.terminal_artifact === "object") {
+          (payload.terminal_artifact as Record<string, unknown>).text = replacement;
+          (payload.terminal_artifact as Record<string, unknown>).kind = "final_answer";
+        }
+      }
+    }
   };
   const resolveAskTurnTerminalSourceStepId = (payload: Record<string, unknown>): string | null => {
     const runtimeSummary =
@@ -87158,7 +87457,29 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       readAskTurnString(finalToolChoiceRecord?.answer_scope) === "model_only" &&
       readAskTurnString(finalToolChoiceRecord?.evidence_need) === "none" &&
       readAskTurnString(finalToolChoiceRecord?.first_step) === "model";
+    const modelOnlyLedgerFinal = (() => {
+      const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+      for (const entry of ledger) {
+        if (!entry || typeof entry !== "object") continue;
+        const record = entry as Record<string, unknown>;
+        if (readAskTurnString(record.kind) !== "direct_answer_text") continue;
+        const artifactPayload = record.payload && typeof record.payload === "object" ? (record.payload as Record<string, unknown>) : null;
+        const text =
+          readAskTurnString(artifactPayload?.answer_text) ??
+          readAskTurnString(artifactPayload?.text) ??
+          readAskTurnString(record.text);
+        if (text && !isAskTurnNonSubstantiveDirectAnswer(text)) return text;
+      }
+      const runtimeTerminal =
+        finalRuntime && typeof finalRuntime === "object" && finalRuntime.terminal && typeof finalRuntime.terminal === "object"
+          ? (finalRuntime.terminal as Record<string, unknown>)
+          : null;
+      const runtimeText = readAskTurnString(runtimeTerminal?.text);
+      if (runtimeText && !isAskTurnNonSubstantiveDirectAnswer(runtimeText)) return runtimeText;
+      return null;
+    })();
     const modelOnlySelectedFinal =
+      modelOnlyLedgerFinal ??
       readAskTurnString(payload.selected_final_answer) ??
       readAskTurnString(payload.assistant_answer) ??
       readAskTurnString(payload.answer) ??
@@ -87677,6 +87998,39 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         (payload.terminal_artifact as Record<string, unknown>).text = finalText;
       }
     }
+    if (canonicalGoalFrame.answer_scope === "model_only" && isAskTurnNonSubstantiveDirectAnswer(finalText)) {
+      const ledgerDirectAnswer =
+        currentTurnArtifacts
+          .map((artifact) => {
+            if (artifact.kind !== "direct_answer_text") return null;
+            const artifactPayload = readAskTurnArtifactPayloadRecord(artifact);
+            return (
+              readAskTurnString(artifactPayload?.answer_text) ??
+              readAskTurnString(artifactPayload?.text)
+            );
+          })
+          .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text))) ?? null;
+      const runtimeTerminalText =
+        finalRuntime && typeof finalRuntime === "object" && finalRuntime.terminal && typeof finalRuntime.terminal === "object"
+          ? readAskTurnString((finalRuntime.terminal as Record<string, unknown>).text)
+          : null;
+      const modelOnlyReplacement =
+        ledgerDirectAnswer ??
+        (runtimeTerminalText && !isAskTurnNonSubstantiveDirectAnswer(runtimeTerminalText) ? runtimeTerminalText : null);
+      if (modelOnlyReplacement) {
+        finalText = modelOnlyReplacement;
+        resolvedFinalStatus = "final_answer";
+        finalAnswerSource = "no_tool_direct";
+        payload.response_type = "final_answer";
+        delete payload.terminal_error_code;
+      } else {
+        finalText = "I could not produce a substantive direct answer for this background-only turn.";
+        resolvedFinalStatus = "final_failure";
+        finalAnswerSource = "typed_failure";
+        payload.response_type = "final_failure";
+        payload.terminal_error_code = "direct_answer_unavailable";
+      }
+    }
     payload.final_answer_source = finalAnswerSource;
     payload.selected_final_answer = finalText;
     payload.terminal_authority = "server";
@@ -87979,6 +88333,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     !existingPendingRequest &&
     routeDecision.routeReasonCode === "conversation:simple" &&
     !retrievalRequiredHard &&
+    !isAskTurnNoWorkspaceBackgroundScope(transcript) &&
     !(earlyPanelControlIntent?.confidence === "high" && !earlyPanelControlIntent.conflict)
   ) {
     const directText = buildAskTurnSimpleConversationAnswer(transcript);
@@ -88218,13 +88573,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     modelOnlyToolChoice.evidence_need === "none" &&
     modelOnlyToolChoice.first_step === "model"
   ) {
-    const modelOnlyAnswer = await generateAskTurnModelOnlyAnswer({
-      transcript,
-      traceId,
-      sessionId,
-      personaId,
-      tenantId: undefined,
-    });
+    let modelOnlyAnswer: { text: string; source: "model_planner" | "typed_failure"; error?: string | null } =
+      isAskTurnWorkspaceHelpIntent(transcript)
+        ? { text: buildAskTurnWorkspaceHelpAnswer(), source: "model_planner", error: null }
+        : await generateAskTurnModelOnlyAnswer({
+            transcript,
+            traceId,
+            sessionId,
+            personaId,
+            tenantId: undefined,
+          });
+    if (modelOnlyAnswer.source !== "typed_failure" && isAskTurnNonSubstantiveDirectAnswer(modelOnlyAnswer.text)) {
+      modelOnlyAnswer = {
+        text: "I could not produce a substantive direct answer for this background-only turn.",
+        source: "typed_failure",
+        error: "direct_answer_unavailable",
+      };
+    }
     const modelOnlyText = modelOnlyAnswer.text;
     const modelOnlyCapabilitySelection = buildAskTurnCapabilitySelectionResult({
       frame: modelOnlyGoalFrame,
@@ -88284,7 +88649,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     const modelOnlyTerminalArtifactId = `${turnId}:model_only_reasoning:direct_answer_text:1`;
     const modelOnlyTerminalErrorCode =
-      modelOnlyAnswer.error === "model_only_answer_timeout" || modelOnlyAnswer.error === "model_only_answer_repair_timeout"
+      modelOnlyAnswer.error === "direct_answer_unavailable"
+        ? "direct_answer_unavailable"
+      : modelOnlyAnswer.error === "model_only_answer_timeout" || modelOnlyAnswer.error === "model_only_answer_repair_timeout"
         ? "model_only_direct_answer_timeout"
         : "model_only_answer_unavailable";
     const modelOnlyRejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [];

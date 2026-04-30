@@ -67,7 +67,7 @@ const requestSchema = z.object({
   utteranceId: z.string().trim().max(200).optional(),
   chunkIndex: z.number().int().nonnegative().max(4096).optional(),
   chunkCount: z.number().int().positive().max(4096).optional(),
-  chunkKind: z.enum(["brief", "final"]).optional(),
+  chunkKind: z.enum(["brief", "final", "tool_receipt", "manual_read_aloud"]).optional(),
   turnKey: z.string().trim().max(200).optional(),
   textCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
   voiceCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
@@ -1282,6 +1282,23 @@ const translateToEnglish = async (args: {
   });
 };
 
+const unavailableVoiceSpeakEnvelope = (
+  res: Response,
+  message: string,
+  details: Record<string, unknown>,
+  traceId: string | undefined,
+) => {
+  return res.status(200).json({
+    ok: true,
+    suppressed: true,
+    dryRun: true,
+    reason: "voice_unavailable",
+    message,
+    details,
+    ...(traceId ? { traceId } : {}),
+  });
+};
+
 const runVoiceTranscription = async (args: {
   file: Express.Multer.File;
   payload: VoiceTranscribeRequest;
@@ -2116,10 +2133,8 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (elevenLabsRequested && !elevenLabsConfig) {
-    return errorEnvelope(
+    return unavailableVoiceSpeakEnvelope(
       res,
-      503,
-      "voice_unavailable",
       "ElevenLabs voice service is not configured.",
       {
         providerConfigured: false,
@@ -2131,10 +2146,8 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (!elevenLabsRequested && !baseUrl) {
-    return errorEnvelope(
+    return unavailableVoiceSpeakEnvelope(
       res,
-      503,
-      "voice_unavailable",
       "Voice service is not configured.",
       { providerConfigured: false, provider },
       traceId,

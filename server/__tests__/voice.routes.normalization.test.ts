@@ -85,6 +85,37 @@ describe("voice routes normalization", () => {
     vi.unstubAllGlobals();
   });
 
+  it("returns a no-audio JSON result when speak backend is not configured", async () => {
+    delete process.env.TTS_BASE_URL;
+    process.env.VOICE_PROXY_DRY_RUN = "0";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const app = await buildApp();
+    const response = await request(app)
+      .post("/api/voice/speak")
+      .send({
+        text: "test output",
+        mode: "briefing",
+        priority: "info",
+        format: "wav",
+      })
+      .expect(200);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.body).toMatchObject({
+      ok: true,
+      suppressed: true,
+      dryRun: true,
+      reason: "voice_unavailable",
+      message: "Voice service is not configured.",
+      details: {
+        providerConfigured: false,
+        provider: "local-chatterbox",
+      },
+    });
+  });
+
   it("normalizes quiet wav responses before returning speech audio", async () => {
     const source = buildSineWav(0.08);
     const fetchMock = vi.fn(async () => {

@@ -1,3 +1,10 @@
+import type { VoiceCallDiagnosticSnapshot } from "@/lib/helix/voice-call-diagnostics";
+import type {
+  VoicePlaybackIntentAuthority,
+  VoicePlaybackIntentSource,
+  VoicePlaybackUtteranceKind,
+} from "@/lib/helix/voice-playback";
+
 export type VoiceCaptureWarningCode = "loopback_source" | "flat_signal" | "recorder_stalled";
 
 export type VoiceCaptureCheckpointStatus = "idle" | "ok" | "warn" | "error";
@@ -32,7 +39,10 @@ export type VoiceCaptureSegmentSnapshot = {
 export type VoicePlaybackDiagnosticsSnapshot = {
   utteranceId: string;
   turnKey: string;
-  kind: "brief" | "final";
+  kind: VoicePlaybackUtteranceKind;
+  authority?: VoicePlaybackIntentAuthority;
+  source?: VoicePlaybackIntentSource;
+  replyId?: string | null;
   chunkCount: number;
   enqueueToFirstAudioMs: number | null;
   synthDurationsMs: number[];
@@ -155,6 +165,9 @@ export type VoiceLaneTimelineDebugEvent = {
   turnKey?: string | null;
   attemptId?: string | null;
   utteranceId?: string | null;
+  utteranceAuthority?: VoicePlaybackIntentAuthority | null;
+  utteranceSource?: VoicePlaybackIntentSource | null;
+  replyId?: string | null;
   chunkIndex?: number | null;
   chunkCount?: number | null;
   text?: string | null;
@@ -216,6 +229,7 @@ export type VoiceCaptureDiagnosticsSnapshot = {
   };
   playback?: VoicePlaybackDiagnosticsSnapshot | null;
   playbackOutput?: VoicePlaybackOutputDiagnosticsSnapshot | null;
+  voiceCalls?: VoiceCallDiagnosticSnapshot[];
   timelineEvents?: VoiceLaneTimelineDebugEvent[];
 };
 

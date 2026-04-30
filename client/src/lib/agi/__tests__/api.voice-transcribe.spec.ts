@@ -3,15 +3,21 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 let transcribeVoice: typeof import("@/lib/agi/api").transcribeVoice;
 let runConversationTurn: typeof import("@/lib/agi/api").runConversationTurn;
 let askLocal: typeof import("@/lib/agi/api").askLocal;
+let getVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").getVoiceCallDiagnosticsSnapshot;
+let clearVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").clearVoiceCallDiagnosticsSnapshot;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({ transcribeVoice, runConversationTurn, askLocal } = await import("@/lib/agi/api"));
+  ({ getVoiceCallDiagnosticsSnapshot, clearVoiceCallDiagnosticsSnapshot } = await import(
+    "@/lib/helix/voice-call-diagnostics"
+  ));
 });
 
 describe("transcribeVoice", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearVoiceCallDiagnosticsSnapshot();
   });
 
   it("uploads multipart audio and parses the JSON response", async () => {
@@ -64,6 +70,21 @@ describe("transcribeVoice", () => {
       missionId: "mission-1",
       engine: "faster_whisper_local",
     });
+    const calls = getVoiceCallDiagnosticsSnapshot();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      kind: "transcribe",
+      endpoint: "/api/voice/transcribe",
+      ok: true,
+      status: 200,
+      responseKind: "json",
+      traceId: "trace-1",
+      missionId: "mission-1",
+      audioBytes: 11,
+      audioMimeType: "audio/webm",
+      audioDurationMs: 1200,
+    });
+    expect(JSON.stringify(calls[0])).not.toContain("Captured transcript");
   });
 });
 

@@ -1,15 +1,21 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 let speakVoice: typeof import("@/lib/agi/api").speakVoice;
+let getVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").getVoiceCallDiagnosticsSnapshot;
+let clearVoiceCallDiagnosticsSnapshot: typeof import("@/lib/helix/voice-call-diagnostics").clearVoiceCallDiagnosticsSnapshot;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({ speakVoice } = await import("@/lib/agi/api"));
+  ({ getVoiceCallDiagnosticsSnapshot, clearVoiceCallDiagnosticsSnapshot } = await import(
+    "@/lib/helix/voice-call-diagnostics"
+  ));
 });
 
 describe("speakVoice", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearVoiceCallDiagnosticsSnapshot();
   });
 
   it("maps payload and parses JSON responses", async () => {
@@ -52,6 +58,21 @@ describe("speakVoice", () => {
       voiceMode: "normal",
     });
     expect(res.kind).toBe("json");
+    const calls = getVoiceCallDiagnosticsSnapshot();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      kind: "speak",
+      endpoint: "/api/voice/speak",
+      ok: true,
+      status: 200,
+      responseKind: "json",
+      traceId: "trace-1",
+      missionId: "mission-1",
+      eventId: "event-1",
+      textLength: "Read this".length,
+    });
+    expect(calls[0]?.textHash).toBeTruthy();
+    expect(JSON.stringify(calls[0])).not.toContain("Read this");
   });
 
   it("parses audio blob responses", async () => {
@@ -67,5 +88,13 @@ describe("speakVoice", () => {
 
     const res = await speakVoice({ text: "audio" });
     expect(res.kind).toBe("audio");
+    expect(getVoiceCallDiagnosticsSnapshot()[0]).toMatchObject({
+      kind: "speak",
+      ok: true,
+      status: 200,
+      responseKind: "audio",
+      audioBytes: 11,
+      audioMimeType: "audio/wav",
+    });
   });
 });

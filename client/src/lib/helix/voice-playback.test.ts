@@ -40,7 +40,7 @@ describe("applyLatestWinsVoiceQueue", () => {
   const make = (
     utteranceId: string,
     turnKey: string,
-    kind: "brief" | "final",
+    kind: "brief" | "final" | "tool_receipt" | "manual_read_aloud",
     revision = 1,
     text = "test",
   ) =>
@@ -53,6 +53,26 @@ describe("applyLatestWinsVoiceQueue", () => {
       eventId: utteranceId,
       enqueuedAtMs: 1,
     });
+
+  it("preserves explicit authority, source, and reply metadata on utterances", () => {
+    const utterance = createVoicePlaybackUtterance({
+      utteranceId: "manual-read-reply-1",
+      turnKey: "manual:reply-1",
+      kind: "manual_read_aloud",
+      authority: "final",
+      source: "manual",
+      replyId: "reply-1",
+      revision: 1,
+      text: "Read this answer aloud.",
+      eventId: "reply-1",
+      enqueuedAtMs: 1,
+    });
+
+    expect(utterance.kind).toBe("manual_read_aloud");
+    expect(utterance.authority).toBe("final");
+    expect(utterance.source).toBe("manual");
+    expect(utterance.replyId).toBe("reply-1");
+  });
 
   it("replaces queued brief for same turn and clears stale queued briefs from prior turns", () => {
     const queue = [
@@ -132,6 +152,27 @@ describe("applyLatestWinsVoiceQueue", () => {
       "final-turn-c-r3",
     ]);
     expect(next.droppedUtteranceIds.sort()).toEqual(["final-turn-c-r1", "final-turn-c-r2"]);
+  });
+
+  it("treats tool receipts as authoritative same-turn replacements", () => {
+    const queue = [
+      make("brief-turn-c-r1", "turn-c", "brief", 1),
+      make("receipt-turn-c-r1", "turn-c", "tool_receipt", 1),
+      make("final-turn-z-r1", "turn-z", "final", 1),
+    ];
+    const incoming = make("receipt-turn-c-r2", "turn-c", "tool_receipt", 2);
+    const next = applyLatestWinsVoiceQueue({
+      queue,
+      incoming,
+      active: make("final-active-turn-c-r1", "turn-c", "final", 1),
+    });
+
+    expect(next.queue.map((entry) => entry.utteranceId)).toEqual([
+      "final-turn-z-r1",
+      "receipt-turn-c-r2",
+    ]);
+    expect(next.droppedUtteranceIds.sort()).toEqual(["brief-turn-c-r1", "receipt-turn-c-r1"]);
+    expect(next.pendingPreemptPolicy).toBe("pending_regen");
   });
 });
 

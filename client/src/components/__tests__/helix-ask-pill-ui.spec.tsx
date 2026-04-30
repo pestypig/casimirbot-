@@ -45,6 +45,11 @@ let shouldRetryVoicePlaybackDirectAttempt: typeof import("@/components/helix/Hel
 let shouldTreatVoicePlaybackErrorAsEnded: typeof import("@/components/helix/HelixAskPill").shouldTreatVoicePlaybackErrorAsEnded;
 let resolveVoicePlaybackAttemptPath: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackAttemptPath;
 let shouldBypassVoicePlaybackGraph: typeof import("@/components/helix/HelixAskPill").shouldBypassVoicePlaybackGraph;
+let resolveInitialMicArmState: typeof import("@/components/helix/HelixAskPill").resolveInitialMicArmState;
+let shouldStopReadAloudOnButtonPress: typeof import("@/components/helix/HelixAskPill").shouldStopReadAloudOnButtonPress;
+let formatReadAloudButtonLabel: typeof import("@/components/helix/HelixAskPill").formatReadAloudButtonLabel;
+let buildManualReadAloudVoiceIntent: typeof import("@/components/helix/HelixAskPill").buildManualReadAloudVoiceIntent;
+let mapVoicePlaybackIntentToTask: typeof import("@/components/helix/HelixAskPill").mapVoicePlaybackIntentToTask;
 let normalizeVoiceCommandLaneEnvelope: typeof import("@/components/helix/HelixAskPill").normalizeVoiceCommandLaneEnvelope;
 let resolveReasoningAttemptTimelineText: typeof import("@/components/helix/HelixAskPill").resolveReasoningAttemptTimelineText;
 let describeVoiceCommandAction: typeof import("@/components/helix/HelixAskPill").describeVoiceCommandAction;
@@ -117,6 +122,11 @@ beforeAll(async () => {
     shouldTreatVoicePlaybackErrorAsEnded,
     resolveVoicePlaybackAttemptPath,
     shouldBypassVoicePlaybackGraph,
+    resolveInitialMicArmState,
+    shouldStopReadAloudOnButtonPress,
+    formatReadAloudButtonLabel,
+    buildManualReadAloudVoiceIntent,
+    mapVoicePlaybackIntentToTask,
     normalizeVoiceCommandLaneEnvelope,
     resolveReasoningAttemptTimelineText,
     describeVoiceCommandAction,
@@ -286,6 +296,54 @@ describe("HelixAskPill mic-first surface contract", () => {
 });
 
 describe("HelixAskPill mic helper behavior", () => {
+  it("defaults a fresh voice session to armed while respecting an explicit off setting", () => {
+    expect(resolveInitialMicArmState(null)).toBe("on");
+    expect(resolveInitialMicArmState(undefined)).toBe("on");
+    expect(resolveInitialMicArmState("on")).toBe("on");
+    expect(resolveInitialMicArmState("off")).toBe("off");
+  });
+
+  it("formats read-aloud as a start-stop toggle", () => {
+    expect(shouldStopReadAloudOnButtonPress("idle")).toBe(false);
+    expect(shouldStopReadAloudOnButtonPress("requesting")).toBe(true);
+    expect(shouldStopReadAloudOnButtonPress("playing")).toBe(true);
+    expect(formatReadAloudButtonLabel("idle")).toBe("Read aloud");
+    expect(formatReadAloudButtonLabel("requesting")).toBe("Stop reading (requesting)");
+    expect(formatReadAloudButtonLabel("playing")).toBe("Stop reading (playing)");
+    expect(formatReadAloudButtonLabel("dry-run")).toBe("Read aloud (dry-run)");
+    expect(formatReadAloudButtonLabel("error")).toBe("Read aloud (error)");
+  });
+
+  it("maps manual read-aloud into a final manual voice playback task", () => {
+    const intent = buildManualReadAloudVoiceIntent({
+      text: "Read this answer aloud.",
+      replyId: "reply-1",
+      traceId: "trace-1",
+    });
+    const task = mapVoicePlaybackIntentToTask(intent);
+
+    expect(intent).toMatchObject({
+      kind: "manual_read_aloud",
+      authority: "final",
+      source: "manual",
+      turnKey: "manual:reply-1",
+      revision: 1,
+      eventId: "reply-1",
+      replyId: "reply-1",
+      traceId: "trace-1",
+    });
+    expect(task).toMatchObject({
+      kind: "manual_read_aloud",
+      authority: "final",
+      source: "manual",
+      replyId: "reply-1",
+      turnKey: "manual:reply-1",
+      revision: 1,
+    });
+    expect(task.key).toContain("manual_read_aloud");
+    expect(task.key).toContain("reply-1");
+  });
+
   it("parses close-this-panel phrasing into close_active_panel action", () => {
     expect(parseWorkstationActionCommand("close this panel")).toEqual({ action: "close_active_panel" });
     expect(parseWorkstationActionCommand("close doc")).toEqual({ action: "close_active_panel" });

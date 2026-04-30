@@ -1,4 +1,13 @@
-export type VoicePlaybackUtteranceKind = "brief" | "final";
+export type VoicePlaybackUtteranceKind = "brief" | "final" | "tool_receipt" | "manual_read_aloud";
+
+export type VoicePlaybackIntentAuthority =
+  | "provisional"
+  | "final"
+  | "suppressed"
+  | "cancelled"
+  | "dry_run";
+
+export type VoicePlaybackIntentSource = "agent_loop" | "manual" | "workstation" | "observer";
 
 export type VoicePlaybackPlayState =
   | "queued"
@@ -23,6 +32,9 @@ export type VoicePlaybackChunk = {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  authority?: VoicePlaybackIntentAuthority;
+  source?: VoicePlaybackIntentSource;
+  replyId?: string;
   revision: number;
   chunkIndex: number;
   chunkCount: number;
@@ -33,6 +45,9 @@ export type VoicePlaybackUtterance = {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  authority?: VoicePlaybackIntentAuthority;
+  source?: VoicePlaybackIntentSource;
+  replyId?: string;
   revision: number;
   text: string;
   chunks: string[];
@@ -46,6 +61,9 @@ export type VoicePlaybackMetrics = {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  authority?: VoicePlaybackIntentAuthority;
+  source?: VoicePlaybackIntentSource;
+  replyId?: string;
   chunkCount: number;
   enqueueToFirstAudioMs: number | null;
   synthDurationsMs: number[];
@@ -197,6 +215,9 @@ export function createVoicePlaybackUtterance(input: {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  authority?: VoicePlaybackIntentAuthority;
+  source?: VoicePlaybackIntentSource;
+  replyId?: string;
   revision: number;
   text: string;
   traceId?: string;
@@ -209,6 +230,9 @@ export function createVoicePlaybackUtterance(input: {
     utteranceId: input.utteranceId,
     turnKey: input.turnKey,
     kind: input.kind,
+    authority: input.authority,
+    source: input.source,
+    replyId: input.replyId,
     revision: Math.max(1, Math.floor(input.revision)),
     text: normalizeWhitespace(input.text),
     chunks,
@@ -255,7 +279,7 @@ export function applyLatestWinsVoiceQueue(input: {
         dropped.add(entry.utteranceId);
         return false;
       }
-      if (entry.kind === "final" && entry.revision <= input.incoming.revision) {
+      if (entry.revision <= input.incoming.revision) {
         dropped.add(entry.utteranceId);
         return false;
       }
@@ -268,7 +292,7 @@ export function applyLatestWinsVoiceQueue(input: {
       ) {
         pendingPreemptPolicy = "pending_final";
       } else if (
-        input.active.kind === "final" &&
+        input.active.kind !== "brief" &&
         input.incoming.revision > input.active.revision
       ) {
         pendingPreemptPolicy = "pending_regen";

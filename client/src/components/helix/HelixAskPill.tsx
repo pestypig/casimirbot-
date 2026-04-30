@@ -100,6 +100,11 @@ import {
   type VoiceLaneTimelineDebugEvent,
 } from "@/lib/helix/voice-capture-diagnostics";
 import {
+  getVoiceCallDiagnosticsSnapshot,
+  subscribeVoiceCallDiagnostics,
+  type VoiceCallDiagnosticSnapshot,
+} from "@/lib/helix/voice-call-diagnostics";
+import {
   advanceReasoningTheaterFrontierTracker,
   clampFrontierMeterPct,
   createReasoningTheaterFrontierTrackerState,
@@ -120,6 +125,8 @@ import {
   trimVoicePlaybackQueue,
   type VoicePlaybackCancelReason,
   type VoicePlaybackChunk,
+  type VoicePlaybackIntentAuthority,
+  type VoicePlaybackIntentSource,
   type VoicePlaybackMetrics,
   type VoicePreemptPolicy,
   type VoicePlaybackUtterance,
@@ -145,6 +152,10 @@ import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
 
+export function resolveInitialMicArmState(persisted: string | null | undefined): MicArmState {
+  return persisted === "off" ? "off" : "on";
+}
+
 export function transitionReadAloudState(
   current: ReadAloudPlaybackState,
   event: "request" | "audio" | "dry-run" | "error" | "stop" | "ended",
@@ -155,6 +166,17 @@ export function transitionReadAloudState(
   if (event === "error") return "error";
   if (event === "stop" || event === "ended") return "idle";
   return current;
+}
+
+export function shouldStopReadAloudOnButtonPress(state: ReadAloudPlaybackState): boolean {
+  return state === "requesting" || state === "playing";
+}
+
+export function formatReadAloudButtonLabel(state: ReadAloudPlaybackState): string {
+  if (shouldStopReadAloudOnButtonPress(state)) return `Stop reading (${state})`;
+  if (state === "dry-run") return "Read aloud (dry-run)";
+  if (state === "error") return "Read aloud (error)";
+  return "Read aloud";
 }
 
 const SPEAK_TEXT_MAX_CHARS = 600;
@@ -1933,7 +1955,7 @@ type VoiceConfirmedTurn = {
   translationUncertain: boolean;
 };
 
-type VoiceAutoSpeakTask = {
+export type VoiceAutoSpeakTask = {
   key: string;
   kind: VoicePlaybackUtteranceKind;
   turnKey: string;
@@ -1941,13 +1963,79 @@ type VoiceAutoSpeakTask = {
   text: string;
   traceId?: string;
   eventId: string;
+  authority?: VoicePlaybackIntentAuthority;
+  source?: VoicePlaybackIntentSource;
+  replyId?: string;
   briefSource?: "llm" | "none";
   finalSource?: "normal_reasoning" | "strict_gate_override";
 };
 
+export type VoicePlaybackUtteranceIntent = {
+  kind: VoicePlaybackUtteranceKind;
+  authority: VoicePlaybackIntentAuthority;
+  turnKey: string;
+  revision: number;
+  text: string;
+  traceId?: string;
+  eventId: string;
+  replyId?: string;
+  source: VoicePlaybackIntentSource;
+  briefSource?: "llm" | "none";
+  finalSource?: "normal_reasoning" | "strict_gate_override";
+};
+
+export function buildManualReadAloudVoiceIntent(input: {
+  text: string;
+  replyId: string;
+  traceId?: string | null;
+  turnKey?: string | null;
+}): VoicePlaybackUtteranceIntent {
+  const turnKey = input.turnKey?.trim() || `manual:${input.replyId}`;
+  return {
+    kind: "manual_read_aloud",
+    authority: "final",
+    turnKey,
+    revision: 1,
+    text: input.text,
+    traceId: input.traceId?.trim() || undefined,
+    eventId: input.replyId,
+    replyId: input.replyId,
+    source: "manual",
+  };
+}
+
+export function mapVoicePlaybackIntentToTask(intent: VoicePlaybackUtteranceIntent): VoiceAutoSpeakTask {
+  return {
+    key: buildVoiceAutoSpeakUtteranceId([
+      intent.kind,
+      intent.traceId ?? intent.turnKey,
+      intent.eventId,
+      intent.replyId,
+    ]),
+    kind: intent.kind,
+    turnKey: intent.turnKey,
+    revision: intent.revision,
+    text: intent.text,
+    traceId: intent.traceId,
+    eventId: intent.eventId,
+    authority: intent.authority,
+    source: intent.source,
+    replyId: intent.replyId,
+    briefSource: intent.briefSource,
+    finalSource: intent.finalSource,
+  };
+}
+
+function isManualVoicePlaybackUtterance(utterance: Pick<VoicePlaybackUtterance, "kind" | "source"> | null | undefined): boolean {
+  return utterance?.kind === "manual_read_aloud" || utterance?.source === "manual";
+}
+
 type VoiceUtteranceTimelineMeta = {
   briefSource: "llm" | "none" | null;
   finalSource: "normal_reasoning" | "strict_gate_override" | null;
+  authority: VoicePlaybackIntentAuthority | null;
+  source: VoicePlaybackIntentSource | null;
+  replyId: string | null;
   hlcMs: number | null;
   seq: number | null;
   revision: number | null;
@@ -8142,7 +8230,7 @@ function readEventMetaString(
 
 type UnifiedDebugEventRow = {
   index: number;
-  channel: "ask_live" | "voice_timeline" | "observer_lane";
+  channel: "ask_live" | "voice_timeline" | "voice_call" | "observer_lane";
   id: string;
   tsMs: number | null;
   tool: string | null;
@@ -8308,6 +8396,9 @@ function sanitizeVoiceDiagnosticsForExport(
           utteranceId: snapshot.playback.utteranceId,
           turnKey: snapshot.playback.turnKey,
           kind: snapshot.playback.kind,
+          authority: snapshot.playback.authority ?? null,
+          source: snapshot.playback.source ?? null,
+          replyId: snapshot.playback.replyId ?? null,
           chunkCount: snapshot.playback.chunkCount,
           enqueueToFirstAudioMs: snapshot.playback.enqueueToFirstAudioMs ?? null,
           totalPlaybackMs: snapshot.playback.totalPlaybackMs ?? null,
@@ -8331,6 +8422,36 @@ function sanitizeVoiceDiagnosticsForExport(
           audioGraphAttached: snapshot.playbackOutput.audioGraphAttached,
         }
       : null,
+    voiceCalls: Array.isArray(snapshot.voiceCalls)
+      ? snapshot.voiceCalls.slice(-80).map((call) => ({
+          id: call.id,
+          kind: call.kind,
+          endpoint: call.endpoint,
+          startedAtMs: call.startedAtMs,
+          endedAtMs: call.endedAtMs,
+          durationMs: call.durationMs,
+          ok: call.ok,
+          status: call.status,
+          responseKind: call.responseKind,
+          contentType: call.contentType,
+          traceId: call.traceId,
+          missionId: call.missionId,
+          eventId: call.eventId ?? null,
+          utteranceId: call.utteranceId ?? null,
+          turnKey: call.turnKey ?? null,
+          mode: call.mode ?? null,
+          priority: call.priority ?? null,
+          providerHeader: call.providerHeader ?? null,
+          profileHeader: call.profileHeader ?? null,
+          cacheHeader: call.cacheHeader ?? null,
+          textLength: call.textLength ?? null,
+          textHash: call.textHash ?? null,
+          audioBytes: call.audioBytes ?? null,
+          audioMimeType: call.audioMimeType ?? null,
+          audioDurationMs: call.audioDurationMs ?? null,
+          error: call.error ?? null,
+        }))
+      : [],
     timelineEvents: timeline.map((event) => ({
       id: event.id,
       atMs: event.atMs,
@@ -8340,6 +8461,10 @@ function sanitizeVoiceDiagnosticsForExport(
       traceId: event.traceId ?? null,
       turnKey: event.turnKey ?? null,
       attemptId: event.attemptId ?? null,
+      utteranceId: event.utteranceId ?? null,
+      utteranceAuthority: event.utteranceAuthority ?? null,
+      utteranceSource: event.utteranceSource ?? null,
+      replyId: event.replyId ?? null,
       detail: event.detail ?? null,
       text: event.text ?? null,
     })),
@@ -8644,8 +8769,49 @@ function buildReplyMasterEventClockExport(args: {
           turnKey: event.turnKey ?? null,
           attemptId: event.attemptId ?? null,
           stage: event.kind ?? null,
-          detail: event.detail ?? null,
+          detail: [
+            event.detail ?? null,
+            event.utteranceAuthority ? `authority:${event.utteranceAuthority}` : null,
+            event.utteranceSource ? `source:${event.utteranceSource}` : null,
+            event.replyId ? `reply:${event.replyId}` : null,
+          ].filter(Boolean).join(" | ") || null,
           text: summarizeVoiceDebugText(event.text ?? event.detail ?? event.kind ?? "voice timeline event", 280),
+        };
+      })
+    : [];
+  const voiceCallRows: UnifiedDebugEventRow[] = Array.isArray(args.voiceDiagnostics?.voiceCalls)
+    ? args.voiceDiagnostics.voiceCalls.slice(-80).map((call, idx) => {
+        if (call.traceId) traceIds.add(call.traceId);
+        if (call.turnKey) turnKeys.add(call.turnKey);
+        return {
+          index: idx + 1,
+          channel: "voice_call" as const,
+          id: call.id,
+          tsMs: Number.isFinite(call.startedAtMs) ? call.startedAtMs : null,
+          tool: call.endpoint,
+          traceId: call.traceId ?? null,
+          turnKey: call.turnKey ?? null,
+          attemptId: null,
+          stage: `${call.kind}:${call.responseKind}`,
+          detail: [
+            `status:${call.status ?? "n/a"}`,
+            `duration:${call.durationMs}ms`,
+            call.providerHeader ? `provider:${call.providerHeader}` : null,
+            call.profileHeader ? `profile:${call.profileHeader}` : null,
+            call.cacheHeader ? `cache:${call.cacheHeader}` : null,
+            call.error ? `error:${call.error}` : null,
+          ]
+            .filter(Boolean)
+            .join(" | "),
+          text: summarizeVoiceDebugText(
+            [
+              call.kind === "speak" ? `text:${call.textLength ?? 0} chars hash:${call.textHash ?? "n/a"}` : null,
+              call.kind === "transcribe" ? `audio:${call.audioBytes ?? 0} bytes ${call.audioMimeType ?? "n/a"}` : null,
+            ]
+              .filter(Boolean)
+              .join(" | "),
+            280,
+          ),
         };
       })
     : [];
@@ -8671,7 +8837,7 @@ function buildReplyMasterEventClockExport(args: {
     })
     .filter((row): row is UnifiedDebugEventRow => row !== null)
     .slice(-160);
-  const unifiedTimeline: UnifiedDebugEventRow[] = [...askRows, ...observerRows, ...voiceRows]
+  const unifiedTimeline: UnifiedDebugEventRow[] = [...askRows, ...observerRows, ...voiceRows, ...voiceCallRows]
     .sort((left, right) => {
       const leftTs = left.tsMs ?? Number.MAX_SAFE_INTEGER;
       const rightTs = right.tsMs ?? Number.MAX_SAFE_INTEGER;
@@ -8918,6 +9084,7 @@ function buildReplyMasterEventClockExport(args: {
       askLiveRows: askRows.length,
       observerRows: observerRows.length,
       voiceTimelineRows: voiceRows.length,
+      voiceCallRows: voiceCallRows.length,
       traceIds: selectedTraceIds.size,
       sessionTraceIds: traceIds.size,
       turnKeys: selectedTurnKeys.size,
@@ -11407,12 +11574,11 @@ export function HelixAskPill({
     });
   }, []);
   const [micArmState, setMicArmState] = useState<MicArmState>(() => {
-    if (typeof window === "undefined") return "off";
+    if (typeof window === "undefined") return "on";
     try {
-      const persisted = window.localStorage.getItem(MIC_PERSIST_KEY);
-      return persisted === "on" ? "on" : "off";
+      return resolveInitialMicArmState(window.localStorage.getItem(MIC_PERSIST_KEY));
     } catch {
-      return "off";
+      return "on";
     }
   });
   const micArmStateRef = useRef<MicArmState>(micArmState);
@@ -14461,9 +14627,11 @@ export function HelixAskPill({
     voiceAutoSpeakRunningRef.current = true;
     try {
       while (voiceAutoSpeakQueueRef.current.length > 0) {
-        if (micArmStateRef.current !== "on") break;
+        const nextQueuedUtterance = voiceAutoSpeakQueueRef.current[0];
+        if (micArmStateRef.current !== "on" && !isManualVoicePlaybackUtterance(nextQueuedUtterance)) break;
         const utterance = voiceAutoSpeakQueueRef.current.shift();
         if (!utterance || utterance.chunks.length === 0) continue;
+        const manualUtterance = isManualVoicePlaybackUtterance(utterance);
         if (
           utterance.kind === "final" &&
           voiceSuppressedFinalTurnKeysRef.current.has(utterance.turnKey)
@@ -14534,6 +14702,9 @@ export function HelixAskPill({
           utteranceId: utterance.utteranceId,
           turnKey: utterance.turnKey,
           kind: utterance.kind,
+          authority: utterance.authority,
+          source: utterance.source,
+          replyId: utterance.replyId,
           chunkCount: utterance.chunks.length,
           enqueueToFirstAudioMs: null,
           synthDurationsMs: [],
@@ -14549,7 +14720,7 @@ export function HelixAskPill({
         let yieldedForTurnClose = false;
         let turnCloseYieldDelayMs = VOICE_PLAYBACK_TRANSCRIBE_WAIT_POLL_MS;
         for (let chunkIndex = 0; chunkIndex < utterance.chunks.length; chunkIndex += 1) {
-          if (micArmStateRef.current !== "on") {
+          if (micArmStateRef.current !== "on" && !manualUtterance) {
             metrics.cancelReason = "mic_off";
             break;
           }
@@ -14558,7 +14729,7 @@ export function HelixAskPill({
             break;
           }
           const waitStartMs = Date.now();
-          while (micArmStateRef.current === "on") {
+          while (!manualUtterance && micArmStateRef.current === "on") {
             const transcribeBusy =
               voiceBargeHoldActiveRef.current ||
               voiceTranscribeBusyRef.current ||
@@ -14615,7 +14786,7 @@ export function HelixAskPill({
                 );
             break;
           }
-          if (micArmStateRef.current !== "on") {
+          if (micArmStateRef.current !== "on" && !manualUtterance) {
             metrics.cancelReason = "mic_off";
             break;
           }
@@ -14627,6 +14798,9 @@ export function HelixAskPill({
             utteranceId: utterance.utteranceId,
             turnKey: utterance.turnKey,
             kind: utterance.kind,
+            authority: utterance.authority,
+            source: utterance.source,
+            replyId: utterance.replyId,
             revision: utterance.revision,
             chunkIndex,
             chunkCount: utterance.chunks.length,
@@ -14642,6 +14816,9 @@ export function HelixAskPill({
             chunkIndex: chunk.chunkIndex,
             chunkCount: chunk.chunkCount,
             text: chunk.text,
+            utteranceAuthority: utterance.authority ?? null,
+            utteranceSource: utterance.source ?? null,
+            replyId: utterance.replyId ?? null,
           });
           const currentController = new AbortController();
           voiceAutoSpeakAbortControllerRef.current = currentController;
@@ -14650,6 +14827,9 @@ export function HelixAskPill({
                 utteranceId: utterance.utteranceId,
                 turnKey: utterance.turnKey,
                 kind: utterance.kind,
+                authority: utterance.authority,
+                source: utterance.source,
+                replyId: utterance.replyId,
                 revision: utterance.revision,
                 chunkIndex: chunkIndex + 1,
                 chunkCount: utterance.chunks.length,
@@ -14744,7 +14924,7 @@ export function HelixAskPill({
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
             });
-            await playVoiceAudioBlob({ blob: currentResult.blob, awaitPlayback: true });
+            await playVoiceAudioBlob({ blob: currentResult.blob, replyId: utterance.replyId, awaitPlayback: true });
             lastChunkEndedAtMs = Date.now();
             pushVoiceChunkTimelineEvent({
               kind: "chunk_play_end",
@@ -14842,7 +15022,7 @@ export function HelixAskPill({
                 chunkCount: nextChunk.chunkCount,
                 detail: "prefetched",
               });
-              await playVoiceAudioBlob({ blob: prefetched.blob, awaitPlayback: true });
+              await playVoiceAudioBlob({ blob: prefetched.blob, replyId: utterance.replyId, awaitPlayback: true });
               lastChunkEndedAtMs = Date.now();
               pushVoiceChunkTimelineEvent({
                 kind: "chunk_play_end",
@@ -14932,6 +15112,12 @@ export function HelixAskPill({
                 authorityRejectStage: "stream",
               });
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
+              if (utterance.replyId) {
+                setReadAloudByReply((prev) => ({
+                  ...prev,
+                  [utterance.replyId as string]: transitionReadAloudState(prev[utterance.replyId as string] ?? "idle", "dry-run"),
+                }));
+              }
             } else {
               pushVoiceChunkTimelineEvent({
                 kind: "chunk_synth_error",
@@ -14944,6 +15130,12 @@ export function HelixAskPill({
                 detail: message,
               });
               metrics.cancelReason = metrics.cancelReason ?? "error";
+              if (utterance.replyId) {
+                setReadAloudByReply((prev) => ({
+                  ...prev,
+                  [utterance.replyId as string]: transitionReadAloudState(prev[utterance.replyId as string] ?? "idle", "error"),
+                }));
+              }
             }
             break;
           }
@@ -14986,7 +15178,7 @@ export function HelixAskPill({
 
   const enqueueVoiceAutoSpeakTask = useCallback(
     (task: VoiceAutoSpeakTask): boolean => {
-      if (micArmStateRef.current !== "on") return false;
+      if (micArmStateRef.current !== "on" && task.source !== "manual") return false;
       if (task.kind === "final" && voiceSuppressedFinalTurnKeysRef.current.has(task.turnKey)) {
         pushVoiceChunkTimelineEvent({
           kind: "chunk_drop",
@@ -15041,6 +15233,9 @@ export function HelixAskPill({
         utteranceId: task.key,
         turnKey: task.turnKey,
         kind: task.kind,
+        authority: task.authority,
+        source: task.source,
+        replyId: task.replyId,
         revision: task.revision,
         text,
         traceId: task.traceId,
@@ -15090,6 +15285,9 @@ export function HelixAskPill({
       const utteranceTimelineMeta: VoiceUtteranceTimelineMeta = {
         briefSource: task.briefSource ?? null,
         finalSource: task.finalSource ?? null,
+        authority: task.authority ?? null,
+        source: task.source ?? null,
+        replyId: task.replyId ?? null,
         hlcMs: assemblerState?.hlcMs ?? null,
         seq: assemblerState?.eventSeq ?? null,
         revision: task.revision,
@@ -15110,6 +15308,9 @@ export function HelixAskPill({
         chunkCount: nextUtterance.chunks.length,
         text: nextUtterance.text,
         detail: `${nextUtterance.kind}@r${nextUtterance.revision}`,
+        utteranceAuthority: task.authority ?? null,
+        utteranceSource: task.source ?? null,
+        replyId: task.replyId ?? null,
         briefSource: task.briefSource ?? null,
         finalSource: task.finalSource ?? null,
       });
@@ -15170,6 +15371,12 @@ export function HelixAskPill({
       pushVoiceChunkTimelineEvent,
       updateVoiceTurnRevisionState,
     ],
+  );
+
+  const enqueueVoicePlaybackIntent = useCallback(
+    (intent: VoicePlaybackUtteranceIntent): boolean =>
+      enqueueVoiceAutoSpeakTask(mapVoicePlaybackIntentToTask(intent)),
+    [enqueueVoiceAutoSpeakTask],
   );
 
   const scheduleVoiceAutoSpeakBrief = useCallback(
@@ -15233,22 +15440,17 @@ export function HelixAskPill({
         return;
       }
       const revision = bumpVoiceTurnRevision(turnKey, "brief");
-      const task: VoiceAutoSpeakTask = {
-        key: buildVoiceAutoSpeakUtteranceId([
-          "brief",
-          entry.traceId ?? entry.attemptId ?? entry.id,
-          lifecycle,
-          entry.id,
-        ]),
+      const accepted = enqueueVoicePlaybackIntent({
         kind: "brief",
+        authority: "provisional",
+        source: "agent_loop",
         turnKey,
         revision: revision.revision,
         text: textForSpeech,
         traceId: entry.traceId,
         eventId: entry.id,
         briefSource: normalizeConversationBriefSource(entry.meta?.briefSource) ?? "none",
-      };
-      const accepted = enqueueVoiceAutoSpeakTask(task);
+      });
       if (accepted && (lifecycle === "queued" || lifecycle === "running") && transcriptRevision > 0) {
         if (normalizedSpeech) {
           lifecycleLatch.set(turnKey, speechSignature);
@@ -15267,7 +15469,7 @@ export function HelixAskPill({
     },
     [
       bumpVoiceTurnRevision,
-      enqueueVoiceAutoSpeakTask,
+      enqueueVoicePlaybackIntent,
       getVoiceTurnAssemblerState,
       updateVoiceTurnAssemblerState,
     ],
@@ -15359,20 +15561,51 @@ export function HelixAskPill({
 
   const handleReadAloud = useCallback(
     async (reply: HelixAskReply) => {
+      const currentState = readAloudByReply[reply.id] ?? "idle";
+      if (shouldStopReadAloudOnButtonPress(currentState)) {
+        voiceAutoSpeakQueueRef.current = voiceAutoSpeakQueueRef.current.filter(
+          (utterance) => utterance.replyId !== reply.id,
+        );
+        stopReadAloud("manual_stop");
+        setReadAloudByReply((prev) => ({
+          ...prev,
+          [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "stop"),
+        }));
+        return;
+      }
       const text = buildCopyText(reply);
-      if (!text) return;
+      if (!text) {
+        setReadAloudByReply((prev) => ({
+          ...prev,
+          [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error"),
+        }));
+        return;
+      }
+      setReadAloudByReply((prev) => ({
+        ...prev,
+        [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "request"),
+      }));
       try {
         await primeVoiceAudioPlayback();
-        await requestVoicePlayback({
+        const accepted = enqueueVoicePlaybackIntent(buildManualReadAloudVoiceIntent({
           text,
-          eventId: reply.id,
-          markReplyId: reply.id,
-        });
+          replyId: reply.id,
+          traceId: askLiveTraceId,
+        }));
+        if (!accepted) {
+          setReadAloudByReply((prev) => ({
+            ...prev,
+            [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error"),
+          }));
+        }
       } catch {
-        // requestVoicePlayback handles state cleanup for manual read aloud.
+        setReadAloudByReply((prev) => ({
+          ...prev,
+          [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error"),
+        }));
       }
     },
-    [buildCopyText, primeVoiceAudioPlayback, requestVoicePlayback],
+    [askLiveTraceId, buildCopyText, enqueueVoicePlaybackIntent, primeVoiceAudioPlayback, readAloudByReply, stopReadAloud],
   );
 
   useEffect(() => {
@@ -18304,9 +18537,10 @@ export function HelixAskPill({
               // Clear it here so the authoritative sealed final for this turn can be spoken.
               voiceSuppressedFinalTurnKeysRef.current.delete(voiceTurnKey);
               const finalRevision = bumpVoiceTurnRevision(voiceTurnKey, "final");
-              enqueueVoiceAutoSpeakTask({
-                key: `final:${attempt.id}:${finalTimelineEntry.id}`,
+              enqueueVoicePlaybackIntent({
                 kind: "final",
+                authority: "final",
+                source: "agent_loop",
                 turnKey: voiceTurnKey,
                 revision: finalRevision.revision,
                 text: outputText,
@@ -18671,7 +18905,7 @@ export function HelixAskPill({
     createReasoningAttempt,
     ensureExplicitReasoningPlan,
     enqueueReasoningAttempt,
-    enqueueVoiceAutoSpeakTask,
+    enqueueVoicePlaybackIntent,
     ensureReasoningTimelineEntry,
     formatReasoningAttemptDetail,
     getHelixAskSessionId,
@@ -24648,6 +24882,17 @@ export function HelixAskPill({
     voiceInputState,
     voiceInputError,
   );
+  const [voiceCallDiagnostics, setVoiceCallDiagnostics] = useState<VoiceCallDiagnosticSnapshot[]>(() =>
+    getVoiceCallDiagnosticsSnapshot(),
+  );
+
+  useEffect(() => {
+    setVoiceCallDiagnostics(getVoiceCallDiagnosticsSnapshot());
+    return subscribeVoiceCallDiagnostics((snapshot) => {
+      setVoiceCallDiagnostics(snapshot);
+    });
+  }, []);
+
   const voiceDiagnosticsSnapshot = getVoiceCaptureDiagnosticsSnapshot();
   const docViewerDebugSnapshot = readDocViewerDebugSnapshot();
   const workstationLayoutDebugSnapshot = readWorkstationLayoutDebugSnapshot();
@@ -25091,6 +25336,9 @@ export function HelixAskPill({
             utteranceId: voiceAutoSpeakLastMetrics.utteranceId,
             turnKey: voiceAutoSpeakLastMetrics.turnKey,
             kind: voiceAutoSpeakLastMetrics.kind,
+            authority: voiceAutoSpeakLastMetrics.authority,
+            source: voiceAutoSpeakLastMetrics.source,
+            replyId: voiceAutoSpeakLastMetrics.replyId ?? null,
             chunkCount: voiceAutoSpeakLastMetrics.chunkCount,
             enqueueToFirstAudioMs: voiceAutoSpeakLastMetrics.enqueueToFirstAudioMs,
             synthDurationsMs: [...voiceAutoSpeakLastMetrics.synthDurationsMs],
@@ -25187,6 +25435,7 @@ export function HelixAskPill({
           compressorRelease: typeof compressor?.release?.value === "number" ? compressor.release.value : null,
         };
       })(),
+      voiceCalls: voiceCallDiagnostics.slice(-80),
       timelineEvents: voiceLaneTimelineEvents,
     });
   }, [
@@ -25202,6 +25451,7 @@ export function HelixAskPill({
     voiceRecorderMimeType,
     voiceSegmentAttempts,
     voiceAutoSpeakLastMetrics,
+    voiceCallDiagnostics,
     voiceLaneTimelineEvents,
     voiceSignalState,
     voiceTimelineDebugVersion,
@@ -26723,10 +26973,18 @@ export function HelixAskPill({
                   <button
                     type="button"
                     onClick={() => void handleReadAloud(reply)}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-200"
-                    aria-label="Read aloud"
+                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
+                      shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                        ? "border-amber-300/40 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20"
+                        : "border-white/10 bg-white/5 text-slate-400 hover:text-slate-200"
+                    }`}
+                    aria-label={
+                      shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                        ? "Stop reading"
+                        : "Read aloud"
+                    }
                   >
-                    Read aloud ({readAloudByReply[reply.id] ?? "idle"})
+                    {formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
                   </button>
                   {onOpenConversation ? (
                     <button
