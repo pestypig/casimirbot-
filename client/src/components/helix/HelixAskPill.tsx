@@ -5816,6 +5816,14 @@ function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string
   const turnContract = readAgentLoopAuditRecord(record?.turn_contract ?? debugRecord?.turn_contract ?? agentLoopAudit?.terminal_contract);
   const candidates: Array<{ source: string; text: string | null }> = [
     {
+      source: "selected_final_answer",
+      text: typeof record?.selected_final_answer === "string" ? record.selected_final_answer.trim() : null,
+    },
+    {
+      source: "debug.selected_final_answer",
+      text: typeof debugRecord?.selected_final_answer === "string" ? debugRecord.selected_final_answer.trim() : null,
+    },
+    {
       source: "terminal_artifact",
       text: readHelixAskTerminalText(terminalArtifact),
     },
@@ -5864,6 +5872,12 @@ function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string
     Boolean(candidate.text && !isInvalidTerminalAnswerText(candidate.text)),
   );
   const backendTerminalText =
+    (typeof record?.selected_final_answer === "string" && record.selected_final_answer.trim()
+      ? record.selected_final_answer.trim()
+      : null) ??
+    (typeof debugRecord?.selected_final_answer === "string" && debugRecord.selected_final_answer.trim()
+      ? debugRecord.selected_final_answer.trim()
+      : null) ??
     readHelixAskTerminalText(terminalArtifact) ??
     (typeof turnContract?.terminal_text === "string" && turnContract.terminal_text.trim()
       ? turnContract.terminal_text.trim()
@@ -8993,6 +9007,27 @@ function buildReplyMasterEventClockExport(args: {
       event_source:
         typeof args.reply.debug?.turn_transcript_source === "string" ? args.reply.debug.turn_transcript_source : null,
       terminal_mismatch: terminalMismatch,
+      selected_final_answer:
+        typeof args.reply.debug?.selected_final_answer === "string" ? args.reply.debug.selected_final_answer : null,
+      final_answer_source:
+        typeof args.reply.debug?.final_answer_source === "string" ? args.reply.debug.final_answer_source : null,
+      final_artifact_scope:
+        typeof args.reply.debug?.final_artifact_scope === "string" ? args.reply.debug.final_artifact_scope : null,
+      terminal_artifact_kind:
+        typeof args.reply.debug?.terminal_artifact_kind === "string" ? args.reply.debug.terminal_artifact_kind : null,
+      terminal_artifact_id:
+        typeof args.reply.debug?.terminal_artifact_id === "string" ? args.reply.debug.terminal_artifact_id : null,
+      terminal_artifact_owner_turn_id:
+        typeof args.reply.debug?.terminal_artifact_owner_turn_id === "string"
+          ? args.reply.debug.terminal_artifact_owner_turn_id
+          : null,
+      satisfaction_report: readAgentLoopAuditRecord(args.reply.debug?.satisfaction_report),
+      current_turn_artifact_ledger: Array.isArray(args.reply.debug?.current_turn_artifact_ledger)
+        ? args.reply.debug.current_turn_artifact_ledger
+        : [],
+      rejected_prior_artifacts: Array.isArray(args.reply.debug?.rejected_prior_artifacts)
+        ? args.reply.debug.rejected_prior_artifacts
+        : [],
       runtime_loop_mode:
         typeof args.reply.debug?.runtime_loop_mode === "string" ? args.reply.debug.runtime_loop_mode : null,
       runtime_event_count:
@@ -22688,8 +22723,11 @@ export function HelixAskPill({
             signal: controller.signal,
           });
           responseEnvelope = localResponse.envelope;
+          const terminalResolution = resolveHelixAskVisibleTerminal(localResponse);
           const envelopeAnswer = (responseEnvelope?.assistant_answer ?? responseEnvelope?.answer)?.trim() ?? "";
-          responseText = envelopeAnswer
+          responseText = terminalResolution.text
+            ? terminalResolution.text
+            : envelopeAnswer
             ? envelopeAnswer
             : stripPromptEcho(localResponse.assistant_answer ?? localResponse.text ?? "", questionText);
           responseDebug = localResponse.debug;
@@ -23553,6 +23591,32 @@ export function HelixAskPill({
               latest_result_artifact: localResponse.latest_result_artifact ?? null,
               selected_final_answer: localResponseRecord.selected_final_answer ?? terminalResolution.text ?? null,
               final_answer_source: localResponseRecord.final_answer_source ?? null,
+              final_artifact_scope:
+                typeof localResponseRecord.final_artifact_scope === "string"
+                  ? localResponseRecord.final_artifact_scope
+                  : null,
+              terminal_artifact_kind:
+                typeof localResponseRecord.terminal_artifact_kind === "string"
+                  ? localResponseRecord.terminal_artifact_kind
+                  : null,
+              terminal_artifact_id:
+                typeof localResponseRecord.terminal_artifact_id === "string"
+                  ? localResponseRecord.terminal_artifact_id
+                  : null,
+              terminal_artifact_owner_turn_id:
+                typeof localResponseRecord.terminal_artifact_owner_turn_id === "string"
+                  ? localResponseRecord.terminal_artifact_owner_turn_id
+                  : null,
+              satisfaction_report:
+                localResponseRecord.satisfaction_report && typeof localResponseRecord.satisfaction_report === "object"
+                  ? localResponseRecord.satisfaction_report
+                  : null,
+              current_turn_artifact_ledger: Array.isArray(localResponseRecord.current_turn_artifact_ledger)
+                ? localResponseRecord.current_turn_artifact_ledger
+                : [],
+              rejected_prior_artifacts: Array.isArray(localResponseRecord.rejected_prior_artifacts)
+                ? localResponseRecord.rejected_prior_artifacts
+                : [],
               terminal_authority: localResponseRecord.terminal_authority ?? null,
               fallback_applied: localResponseRecord.fallback_applied === true,
               fallback_blocked: localResponseRecord.fallback_blocked === true,

@@ -221,6 +221,15 @@ export type HaloBankActionOutput = {
 export type LocalAskResponse = {
   text: string;
   assistant_answer?: string;
+  selected_final_answer?: string | null;
+  final_answer_source?: string | null;
+  terminal_artifact_kind?: string | null;
+  terminal_artifact_id?: string | null;
+  terminal_artifact_owner_turn_id?: string | null;
+  final_artifact_scope?: string | null;
+  satisfaction_report?: Record<string, unknown> | null;
+  current_turn_artifact_ledger?: unknown[];
+  rejected_prior_artifacts?: unknown[];
   agent_loop_summary?: string;
   ok?: boolean;
   turn_id?: string | null;
@@ -1818,6 +1827,7 @@ const isInterruptedJobFallbackResponse = (response: LocalAskResponse | null | un
 
 const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const selectedFinalAnswer = typeof record.selected_final_answer === "string" ? record.selected_final_answer.trim() : "";
   const assistantAnswer = typeof record.assistant_answer === "string" ? record.assistant_answer.trim() : "";
   const rawText = typeof record.text === "string" ? record.text.trim() : "";
   const message = typeof record.message === "string" ? record.message.trim() : "";
@@ -1834,6 +1844,7 @@ const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
   const fallbackText = message || interpreterConfirmPrompt || (blockedByGate ? "Confirmation is required." : "");
   const invalidRawText = /^no final answer returned\.?$/i.test(rawText);
   const text =
+    selectedFinalAnswer ||
     assistantAnswer ||
     (rawText && !invalidRawText ? rawText : "") ||
     fallbackText ||
