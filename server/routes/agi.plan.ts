@@ -21348,6 +21348,7 @@ type HelixAskCanonicalGoalKind =
   | "locate_in_doc"
   | "note_mutation"
   | "doc_vs_note_compare"
+  | "panel_control"
   | "ambiguous"
   | "typed_failure"
   | "unknown";
@@ -21355,6 +21356,7 @@ type HelixAskCanonicalAnswerScope =
   | "model_only"
   | "current_turn_doc"
   | "current_turn_action"
+  | "current_turn_panel"
   | "current_turn_compare"
   | "pending_request"
   | "failure";
@@ -21366,6 +21368,7 @@ type HelixAskRequiredTerminalKind =
   | "doc_location_matches"
   | "note_update_receipt"
   | "comparison_summary"
+  | "workspace_action_receipt"
   | "pending_server_request"
   | "typed_failure";
 type HelixAskCanonicalGoalFrame = {
@@ -21597,6 +21600,10 @@ type HelixAskTurnSelectedAction = {
   action_id: string;
   args: Record<string, unknown>;
 };
+const isAskTurnPanelControlOpenAction = (action: HelixAskTurnSelectedAction | null | undefined): boolean =>
+  action?.action_id === "open" &&
+  (action.panel_id === "docs-viewer" || action.panel_id === "workstation-notes") &&
+  readAskTurnString(action.args?.panel_action_family) === "panel_control";
 type HelixAskTurnActionCandidate = {
   panel_id: string;
   action_id: string;
@@ -21997,13 +22004,14 @@ type HelixAskUniversalGoalFrame = {
       | "locate_in_doc"
       | "write_note"
       | "compare"
+      | "panel_control"
       | "temporal_followup"
       | "capability_help"
       | "unknown";
     confidence: number;
   };
   requested_outputs: Array<{
-    kind: "answer" | "doc_open" | "note_update" | "location" | "comparison" | "clarification";
+    kind: "answer" | "doc_open" | "note_update" | "workspace_action" | "location" | "comparison" | "clarification";
     required: boolean;
     evidence: string[];
   }>;
@@ -24947,12 +24955,101 @@ type HelixAskTurnNavigationTargetPanel =
   | "ambiguous"
   | null;
 
+type HelixAskPanelControlPanelId = "docs-viewer" | "workstation-notes";
+type HelixAskPanelControlIntent = {
+  panel_id: HelixAskPanelControlPanelId;
+  action_id: "open";
+  alias_matched: string;
+  confidence: "high" | "medium" | "low";
+  conflict: null | "doc_open" | "doc_search" | "note_open";
+};
+
+const HELIX_ASK_PANEL_CONTROL_REGISTRY: Record<
+  HelixAskPanelControlPanelId,
+  { label: string; aliases: RegExp[] }
+> = {
+  "docs-viewer": {
+    label: "Docs & Papers",
+    aliases: [
+      /\bopen\s+panel\s+docs-viewer\b/i,
+      /\bopen\s+(?:the\s+)?docs?\s+(?:and|&)\s+papers?\b/i,
+      /\bswitch\s+to\s+(?:the\s+)?docs?\s+(?:and|&)\s+papers?\s+tab\b/i,
+      /\bshow\s+(?:the\s+)?docs?\s+(?:and|&)\s+papers?\b/i,
+      /\bgo\s+to\s+papers?\b/i,
+      /\bopen\s+(?:the\s+)?reader\b/i,
+      /\bshow\s+(?:the\s+)?document\s+reader\b/i,
+      /\bopen\s+(?:the\s+)?docs?\s+viewer\b/i,
+    ],
+  },
+  "workstation-notes": {
+    label: "Workstation Notes",
+    aliases: [
+      /\bopen\s+panel\s+workstation-notes\b/i,
+      /\bopen\s+(?:the\s+)?workstation\s+notes\b/i,
+      /\bswitch\s+to\s+(?:the\s+)?notes?\s+tab\b/i,
+      /\bshow\s+(?:my\s+)?notes\b/i,
+      /\bopen\s+my\s+notes\b/i,
+      /\bgo\s+to\s+notes\b/i,
+    ],
+  },
+};
+
+const resolveAskTurnPanelControlLabel = (panelId: string | null | undefined): string =>
+  panelId === "docs-viewer"
+    ? HELIX_ASK_PANEL_CONTROL_REGISTRY["docs-viewer"].label
+    : panelId === "workstation-notes"
+      ? HELIX_ASK_PANEL_CONTROL_REGISTRY["workstation-notes"].label
+      : String(panelId ?? "Workspace panel");
+
+const classifyAskTurnPanelControlIntent = (transcript: string): HelixAskPanelControlIntent | null => {
+  const normalized = transcript.trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+  const lower = normalized.toLowerCase();
+  const docOpenOrSearch =
+    /\b(?:open|find|search)\b[\s\S]*\b(?:doc|docs|document|paper|report)\b[\s\S]*\b(?:about|on|for|named|called)\b/i.test(
+      normalized,
+    ) ||
+    /\b(?:open|view|show|read)\s+(?:this|that|the|current|active)\s+(?:doc|document|paper)\b/i.test(normalized);
+  const conflict: HelixAskPanelControlIntent["conflict"] = docOpenOrSearch
+    ? /\b(?:find|search)\b/i.test(normalized)
+      ? "doc_search"
+      : "doc_open"
+    : null;
+  for (const [panelId, spec] of Object.entries(HELIX_ASK_PANEL_CONTROL_REGISTRY) as Array<
+    [HelixAskPanelControlPanelId, (typeof HELIX_ASK_PANEL_CONTROL_REGISTRY)[HelixAskPanelControlPanelId]]
+  >) {
+    for (const alias of spec.aliases) {
+      const match = normalized.match(alias);
+      if (!match) continue;
+      return {
+        panel_id: panelId,
+        action_id: "open",
+        alias_matched: match[0],
+        confidence: conflict ? "medium" : "high",
+        conflict,
+      };
+    }
+  }
+  if (/\b(?:open|show|view|go\s+to|switch\s+to)\s+(?:the\s+)?docs?\s+tab\b/i.test(lower)) {
+    return {
+      panel_id: "docs-viewer",
+      action_id: "open",
+      alias_matched: "docs tab",
+      confidence: conflict ? "medium" : "high",
+      conflict,
+    };
+  }
+  return null;
+};
+
 const resolveAskTurnNavigationTargetPanel = (
   transcript: string,
   options?: { allowBareTarget?: boolean },
 ): HelixAskTurnNavigationTargetPanel => {
   const normalized = transcript.trim().toLowerCase().replace(/\bopen\s+up\b/g, "open");
   if (!normalized) return null;
+  const panelControlIntent = classifyAskTurnPanelControlIntent(transcript);
+  if (panelControlIntent?.confidence === "high") return panelControlIntent.panel_id;
   const switchViewerToDocFromNotes =
     /\bswitch\b[\s\S]*\bviewer\b/.test(normalized) &&
     /\b(?:see|show|view)\s+(?:it|that)\b/.test(normalized) &&
@@ -24975,6 +25072,8 @@ const inferAskTurnIntentFamily = (transcript: string): HelixAskTurnIntentFamily 
   const normalized = maskAskTurnProtectedArgumentSpansForIntent(transcript).trim().toLowerCase();
   if (!normalized) return "conversation";
   if (isConversationFillerTurn(normalized)) return "conversation";
+  const panelControlIntent = classifyAskTurnPanelControlIntent(transcript);
+  if (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict) return "workspace_generic";
   if (isAskTurnContextualTemporalCompareIntent(transcript)) return "compare";
   if (isAskTurnDocLocateIntent(transcript) || isAskTurnDocIdentityIntent(transcript)) return "docs_nav";
   if (isAskTurnOpenLatestDocIntent(transcript) || resolveAskTurnDocPathArg(transcript)) return "docs_nav";
@@ -25216,6 +25315,21 @@ const resolveAskTurnActionSelection = (args: {
     transcript: args.transcript,
     workspaceSnapshot: args.workspaceSnapshot ?? null,
   });
+  const panelControlIntent = classifyAskTurnPanelControlIntent(args.transcript);
+  if (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict) {
+    return {
+      action: {
+        panel_id: panelControlIntent.panel_id,
+        action_id: panelControlIntent.action_id,
+        args: {},
+      },
+      source: "deterministic",
+      valid: true,
+      fail_reason: "none",
+      missing_required_args: [],
+      candidates,
+    };
+  }
   const frameRequestsNoteUpdate =
     askTurnGoalFrameRequestsOutput(universalGoalFrame, "note_update") &&
     Boolean(readAskTurnGoalFrameMutationTarget(universalGoalFrame, "note"));
@@ -25641,6 +25755,8 @@ const resolveAskTurnActionSelection = (args: {
 const shouldPreferWorkspaceDispatch = (transcript: string): boolean => {
   const normalized = transcript.trim();
   if (!normalized) return false;
+  const panelControlIntent = classifyAskTurnPanelControlIntent(normalized);
+  if (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict) return true;
   const hasActionCue =
     HELIX_CONVERSATION_WORKSTATION_ACTION_RE.test(normalized) ||
     HELIX_CONVERSATION_WORKSTATION_NAV_RE.test(normalized) ||
@@ -26510,6 +26626,9 @@ const buildAskTurnExecutionTrace = (args: {
       if (actionId && ["copy_selection_to_note", "copy_receipt_to_note"].includes(actionId)) {
         produces.push("note_update_receipt");
       }
+      if (isAskTurnPanelControlOpenAction(step.action)) {
+        produces.push("workspace_action_receipt");
+      }
     }
     if (step.lane === "reasoning") {
       produces.push("reasoning_context");
@@ -26781,6 +26900,7 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
             ...(step.action?.panel_id === "docs-viewer" && hasActionDocPath ? ["doc_context", "active_doc_path"] : []),
             ...(step.action?.panel_id === "workstation-notes" ? ["note_context"] : []),
             ...(step.action?.panel_id === "workstation-clipboard-history" ? ["clipboard_context"] : []),
+            ...(isAskTurnPanelControlOpenAction(step.action) ? ["workspace_action_receipt"] : []),
           ]
         : [];
     const producedArtifacts =
@@ -26864,6 +26984,8 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           ? ["active_doc_path", "latest_doc_selection"]
         : actionId === "summarize_doc"
           ? ["doc_summary"]
+        : isAskTurnPanelControlOpenAction(step.action)
+          ? ["workspace_action_receipt"]
         : actionId === "copy_receipt_to_note" || actionId === "append_to_note"
           ? ["note_update_receipt"]
           : step.action?.panel_id === "docs-viewer" &&
@@ -28816,6 +28938,50 @@ const renderAskTurnScientificMissingFinalText = (args: {
   return `I found or attempted NHM2 scientific source acquisition, but I could not produce a sourced plain-language explanation with source path and snippets for this turn.${candidateText}${referenceBlock}\nCause: concept_explanation_unavailable.`;
 };
 
+const buildAskTurnPanelControlReceiptArtifact = (args: {
+  turnId: string;
+  goalFrame: HelixAskUniversalGoalFrame;
+  transcript: string;
+  selectedAction?: HelixAskTurnSelectedAction | null;
+  payload?: Record<string, unknown> | null;
+}): HelixTurnArtifact | null => {
+  const intent = classifyAskTurnPanelControlIntent(args.transcript);
+  const action =
+    args.selectedAction ??
+    (args.payload?.workspace_action && typeof args.payload.workspace_action === "object"
+      ? (args.payload.workspace_action as HelixAskTurnSelectedAction)
+      : null);
+  const panelId =
+    intent?.panel_id ??
+    (action?.action_id === "open" && (action.panel_id === "docs-viewer" || action.panel_id === "workstation-notes")
+      ? action.panel_id
+      : null);
+  if (!panelId) return null;
+  if (intent?.conflict) return null;
+  if (action && action.action_id !== "open") return null;
+  const label = resolveAskTurnPanelControlLabel(panelId);
+  const message = `Opening panel: ${label}.`;
+  return {
+    artifact_id: `${args.turnId}:panel_control:workspace_action_receipt`,
+    turn_id: args.turnId,
+    producer_item_id: "panel_control",
+    kind: "workspace_action_receipt",
+    created_at_ms: Date.now(),
+    source_scope: "current_turn",
+    goal_hash: hashAskTurnGoalFrame(args.goalFrame),
+    payload: {
+      kind: "workspace_action_receipt",
+      action_family: "panel_control",
+      action_id: "open",
+      target_id: panelId,
+      target_label: label,
+      status: "dispatched",
+      message,
+      created_at_ms: Date.now(),
+    },
+  };
+};
+
 const buildAskTurnCanonicalGoalFrame = (args: {
   turnId: string;
   goalFrame: HelixAskUniversalGoalFrame;
@@ -28952,6 +29118,21 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       classifier_reasons: ["universal_goal_frame:compare"],
     };
   }
+  if (goalKind === "panel_control") {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "panel_control",
+      answer_scope: "current_turn_panel",
+      required_terminal_kind: "workspace_action_receipt",
+      allows_workspace_context: false,
+      allows_prior_artifacts: false,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: [],
+      confidence: "high",
+      classifier_reasons: ["universal_goal_frame:panel_control"],
+    };
+  }
   if (goalKind === "open_workspace") {
     return {
       turn_id: args.turnId,
@@ -29068,6 +29249,8 @@ const evaluateTurnSatisfaction = (args: {
         ? ["note_update_receipt"]
       : canonicalGoal.goal_kind === "doc_vs_note_compare"
         ? ["doc_vs_note_compare", "comparison_summary"]
+      : canonicalGoal.goal_kind === "panel_control"
+        ? ["workspace_action_receipt"]
       : canonicalGoal.goal_kind === "locate_in_doc"
         ? ["doc_location_matches"]
       : canonicalGoal.goal_kind === "doc_open" || canonicalGoal.goal_kind === "doc_summary"
@@ -29101,6 +29284,8 @@ const evaluateTurnSatisfaction = (args: {
         ? ["doc_summary", "focused_doc_answer", "direct_answer_text", "comparison_summary"]
       : canonicalGoal.goal_kind === "doc_scientific_concept"
         ? ["doc_summary", "focused_doc_answer", "direct_answer_text", "comparison_summary"]
+      : canonicalGoal.goal_kind === "panel_control"
+        ? ["doc_summary", "active_doc_path", "direct_answer_text", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : [];
   for (const artifact of args.currentTurnArtifacts) {
     if (rejectedKindsForCanonicalGoal.includes(artifact.kind)) {
@@ -29116,6 +29301,13 @@ const evaluateTurnSatisfaction = (args: {
   const terminalArtifact =
     args.currentTurnArtifacts.find((artifact) => {
       if (!terminalKinds.includes(artifact.kind)) return false;
+      if (canonicalGoal.goal_kind === "panel_control") {
+        const payload = readAskTurnArtifactPayloadRecord(artifact);
+        return (
+          readAskTurnString(payload?.action_family) === "panel_control" &&
+          readAskTurnString(payload?.status) !== "failed"
+        );
+      }
       const sufficient = isAskTurnSufficientTerminalArtifact({ artifact, wantsNumeric, wantsConcept });
       if (!sufficient) {
         rejectedTerminalCandidates.push({
@@ -29737,6 +29929,7 @@ const buildAskTurnUniversalGoalFrame = (args: {
   };
   const activeDocPath = normalizeAskTurnWorkspaceDocPath(workspaceSnapshot?.activeDocPath);
   const scientificGoal = classifyAskTurnScientificGoal(raw);
+  const panelControlIntent = classifyAskTurnPanelControlIntent(raw);
   const activeNoteTitle = readAskTurnGoalFrameString(workspaceSnapshot?.activeNoteTitle);
   const explicitDocPath = resolveAskTurnDocPathArg(raw);
   if (explicitDocPath) {
@@ -29847,7 +30040,7 @@ const buildAskTurnUniversalGoalFrame = (args: {
   const noteMutationIntent =
     /\b(?:note|notepad|scratch|memo|pad)\b/i.test(raw) &&
     /\b(?:create|make|append|add|put|drop|copy|save|write|takeaway|summary)\b/i.test(raw);
-  if (noteMutationIntent || panelId === "workstation-notes") {
+  if (noteMutationIntent || (panelId === "workstation-notes" && !panelControlIntent)) {
     const resolution =
       explicitNoteTarget && activeNoteTitle && explicitNoteTarget.toLowerCase() === activeNoteTitle.toLowerCase()
         ? "active"
@@ -29925,12 +30118,13 @@ const buildAskTurnUniversalGoalFrame = (args: {
   const temporalIntent = /\b(?:before|after|earlier|later|passing|passed|right\?)\b/i.test(raw) && /\b(?:this|that|was|solve|doc|paper)\b/i.test(raw);
   const capabilityHelpIntent = /\b(?:what\s+can\s+(?:i|we)\s+do|how\s+can\s+you\s+help|what\s+can\s+helix\s+ask\s+do|what\s+can\s+this\s+workspace\s+agent\s+do)\b/i.test(raw);
   const openIntent =
-    Boolean(scientificGoal && !activeDocPath) ||
-    Boolean(openDocSearchTopic) ||
-    /\b(?:open|view|show|go\s+to|navigate\s+to|pull\s+up|bring\s+up)\b/i.test(raw) ||
-    actionId === "open_doc_by_path" ||
-    actionId === "open_latest_doc_by_topic" ||
-    actionId === "search_docs";
+    !panelControlIntent &&
+    (Boolean(scientificGoal && !activeDocPath) ||
+      Boolean(openDocSearchTopic) ||
+      /\b(?:open|view|show|go\s+to|navigate\s+to|pull\s+up|bring\s+up)\b/i.test(raw) ||
+      actionId === "open_doc_by_path" ||
+      actionId === "open_latest_doc_by_topic" ||
+      actionId === "search_docs");
   const conversationIntent =
     !summarizeIntent &&
     !locateIntent &&
@@ -29965,13 +30159,25 @@ const buildAskTurnUniversalGoalFrame = (args: {
     pushRequestedOutput("answer", "capability_help_phrase");
     pushEvidenceRequirement("capability_help_summary", "capability help requires registry-grounded capability summary", false);
   }
+  if (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict) {
+    pushRequestedOutput("workspace_action", "panel_control_phrase");
+    pushEvidenceRequirement("workspace_action_receipt", "panel navigation requires a workspace action receipt");
+    mutationTargets.push({
+      kind: "workspace_panel",
+      value: panelControlIntent.panel_id,
+      resolution: "explicit",
+      confidence: 0.95,
+    });
+  }
   if (openIntent) {
     pushRequestedOutput("doc_open", "open_workspace_phrase");
     pushEvidenceRequirement("opened_doc", "open requests require an opened document or typed unresolved-doc failure");
   }
   if (requestedOutputs.length === 0) pushRequestedOutput("answer", conversationIntent ? "conversation_phrase" : "default_answer");
   const goalKind: HelixAskUniversalGoalFrame["user_goal"]["goal_kind"] =
-    scientificGoal && !activeDocPath
+    panelControlIntent?.confidence === "high" && !panelControlIntent.conflict
+      ? "panel_control"
+      : scientificGoal && !activeDocPath
       ? "open_workspace"
       : capabilityHelpIntent
       ? "capability_help"
@@ -31377,10 +31583,20 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       workspaceSnapshot: args.workspaceSnapshot ?? null,
       payload: args.selectedAction ? { workspace_action: args.selectedAction } : null,
     });
+  const panelControlIntent = classifyAskTurnPanelControlIntent(args.transcript);
+  const wantsPanelControl = Boolean(
+    (universalGoalFrame.user_goal.goal_kind === "panel_control" || panelControlIntent?.confidence === "high") &&
+      panelControlIntent &&
+      !panelControlIntent.conflict,
+  );
   const frameRequestsNoteUpdate = askTurnGoalFrameRequestsOutput(universalGoalFrame, "note_update");
   const frameNoteTarget = readAskTurnGoalFrameMutationTarget(universalGoalFrame, "note");
-  const wantsNotes = /\b(?:open|go\s+to|switch\s+(?:over\s+)?to|show)\s+(?:up\s+)?(?:my\s+)?(?:notes?|notepad)\b/i.test(normalized);
-  const wantsDocs = /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
+  const wantsNotes =
+    !wantsPanelControl &&
+    /\b(?:open|go\s+to|switch\s+(?:over\s+)?to|show)\s+(?:up\s+)?(?:my\s+)?(?:notes?|notepad)\b/i.test(normalized);
+  const wantsDocs =
+    !wantsPanelControl &&
+    /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
   const topicDocQuery =
     resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
     resolveAskTurnOpenDocSearchQueryArg(args.transcript);
@@ -31443,7 +31659,8 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     !wantsCopyResultNote &&
     !wantsCompositeWorkspaceContextStatus &&
     !wantsWorkspaceChangeSummary &&
-    !wantsContextualTemporalCompare
+    !wantsContextualTemporalCompare &&
+    !wantsPanelControl
   ) return null;
   const runtime = createAskTurnRuntime({
     turnId: "initial-capability-plan",
@@ -31550,6 +31767,30 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     if (proposal) planItems.push(proposal.step);
     return proposal;
   };
+  if (wantsPanelControl && panelControlIntent) {
+    planItems.push({
+      id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_panel_control"),
+      lane: "workspace",
+      status: "planned",
+      title: `Open workspace panel "${resolveAskTurnPanelControlLabel(panelControlIntent.panel_id)}".`,
+      action: {
+        panel_id: panelControlIntent.panel_id,
+        action_id: "open",
+        args: {
+          panel_alias: panelControlIntent.alias_matched,
+          panel_action_family: "panel_control",
+        },
+      },
+      required_artifacts: ["workspace_action_receipt"],
+      reason: "panel_control_alias",
+    });
+    capabilitySelectionTrace.push({
+      missing_artifact: "workspace_action_receipt",
+      candidate_capabilities: ["workspace.panel_control.open"],
+      selected_capability: "workspace.panel_control.open",
+      reject_reasons: [],
+    });
+  }
   if (wantsContextualTemporalCompare) {
     const activeDocPath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
     const targetQuery = resolveAskTurnTemporalCompareTargetQuery(args.transcript);
@@ -85103,10 +85344,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           kind:
             payload.final_status === "final_failure" || payload.response_type === "final_failure"
               ? "final_failure"
-              : typeof runtimeTerminal?.kind === "string"
-              ? runtimeTerminal.kind
               : typeof payload.final_status === "string"
                 ? payload.final_status
+              : typeof runtimeTerminal?.kind === "string"
+                ? runtimeTerminal.kind
                 : null,
           text: resolvedTerminalText,
           source: resolvedTerminalSource,
@@ -86541,6 +86782,18 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       toolChoice: finalToolChoiceRecord as HelixAskToolChoiceArbitration | null,
       pendingServerRequest: finalPendingRequest,
     });
+    if (canonicalGoalFrame.goal_kind === "panel_control") {
+      const panelReceipt = buildAskTurnPanelControlReceiptArtifact({
+        turnId: activeTurnId,
+        goalFrame: finalSatisfactionGoalFrame,
+        transcript: questionSeed,
+        selectedAction: selectedActionForComposer,
+        payload,
+      });
+      if (panelReceipt) {
+        currentTurnArtifacts = mergeAskTurnLedgerArtifacts([...currentTurnArtifacts, panelReceipt]);
+      }
+    }
     let finalSatisfactionReport = evaluateTurnSatisfaction({
       goalFrame: finalSatisfactionGoalFrame,
       canonicalGoalFrame,
@@ -86706,6 +86959,24 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         rejected_terminal_candidates: rejectedTerminalCandidates,
       };
     }
+    if (canonicalGoalFrame.goal_kind === "panel_control" && finalSatisfactionReport.satisfied) {
+      const panelReceipt = currentTurnArtifacts.find(
+        (artifact) =>
+          artifact.kind === "workspace_action_receipt" &&
+          readAskTurnString(readAskTurnArtifactPayloadRecord(artifact)?.action_family) === "panel_control",
+      );
+      const panelReceiptPayload = panelReceipt ? readAskTurnArtifactPayloadRecord(panelReceipt) : null;
+      const panelReceiptMessage = readAskTurnString(panelReceiptPayload?.message);
+      if (panelReceiptMessage) {
+        finalText = panelReceiptMessage;
+        resolvedFinalStatus = "final_answer";
+        payload.text = finalText;
+        payload.answer = finalText;
+        payload.assistant_answer = finalText;
+        delete payload.terminal_error_code;
+        payload.panel_action_receipt = panelReceiptPayload;
+      }
+    }
     payload.response_type = universalComposerOutput.status;
     if (payload.response_type !== resolvedFinalStatus) payload.response_type = resolvedFinalStatus;
     payload.universal_goal_frame = finalGoalFrame;
@@ -86731,6 +87002,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           ? "prior_turn"
           : "none";
     payload.terminal_artifact_kind = finalSatisfactionReport.terminal_artifact_kind ?? null;
+    if (
+      canonicalGoalFrame.goal_kind === "panel_control" &&
+      finalSatisfactionReport.terminal_artifact_kind === "workspace_action_receipt"
+    ) {
+      payload.terminal_artifact_subkind = "panel_action_receipt";
+    }
     payload.terminal_artifact_owner_turn_id =
       finalSatisfactionReport.terminal_artifact_id ? (typeof payload.turn_id === "string" ? payload.turn_id : turnId) : null;
     payload.terminal_artifact_id = finalSatisfactionReport.terminal_artifact_id ?? null;
@@ -86754,6 +87031,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               : terminalFallbackSeedMissing
                 ? "legacy_fallback"
                 : "planner_terminal";
+    if (canonicalGoalFrame.goal_kind === "panel_control" && finalSatisfactionReport.satisfied) {
+      finalAnswerSource = "artifact_synthesis";
+    }
     if (
       finalAnswerSource === "legacy_fallback" &&
       isHelixAskTurnNontrivialIntentFamily(finalIntentFamily) &&
@@ -87178,7 +87458,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   };
   const incomingIntentFamily = inferAskTurnIntentFamily(transcript);
   const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
-  if (!existingPendingRequest && routeDecision.routeReasonCode === "conversation:simple") {
+  const earlyPanelControlIntent = classifyAskTurnPanelControlIntent(transcript);
+  if (
+    !existingPendingRequest &&
+    routeDecision.routeReasonCode === "conversation:simple" &&
+    !(earlyPanelControlIntent?.confidence === "high" && !earlyPanelControlIntent.conflict)
+  ) {
     const directText = buildAskTurnSimpleConversationAnswer(transcript);
     const directGoalFrame = buildAskTurnUniversalGoalFrame({
       transcript,
