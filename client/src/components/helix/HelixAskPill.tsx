@@ -9031,6 +9031,8 @@ function buildReplyMasterEventClockExport(args: {
       rejected_prior_artifacts: Array.isArray(args.reply.debug?.rejected_prior_artifacts)
         ? args.reply.debug.rejected_prior_artifacts
         : [],
+      canonical_goal_frame: readAgentLoopAuditRecord(args.reply.debug?.canonical_goal_frame),
+      terminal_consistency_check: readAgentLoopAuditRecord(args.reply.debug?.terminal_consistency_check),
       runtime_loop_mode:
         typeof args.reply.debug?.runtime_loop_mode === "string" ? args.reply.debug.runtime_loop_mode : null,
       runtime_event_count:
@@ -23623,6 +23625,15 @@ export function HelixAskPill({
               rejected_prior_artifacts: Array.isArray(localResponseRecord.rejected_prior_artifacts)
                 ? localResponseRecord.rejected_prior_artifacts
                 : [],
+              canonical_goal_frame:
+                localResponseRecord.canonical_goal_frame && typeof localResponseRecord.canonical_goal_frame === "object"
+                  ? localResponseRecord.canonical_goal_frame
+                  : null,
+              terminal_consistency_check:
+                localResponseRecord.terminal_consistency_check &&
+                typeof localResponseRecord.terminal_consistency_check === "object"
+                  ? localResponseRecord.terminal_consistency_check
+                  : null,
               terminal_authority: localResponseRecord.terminal_authority ?? null,
               fallback_applied: localResponseRecord.fallback_applied === true,
               fallback_blocked: localResponseRecord.fallback_blocked === true,

@@ -231,6 +231,8 @@ export type LocalAskResponse = {
   current_turn_artifact_ledger?: unknown[];
   rejected_terminal_candidates?: unknown[];
   rejected_prior_artifacts?: unknown[];
+  canonical_goal_frame?: unknown;
+  terminal_consistency_check?: unknown;
   agent_loop_summary?: string;
   ok?: boolean;
   turn_id?: string | null;
