@@ -1,5 +1,5 @@
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
-import { WorkstationSplitNode } from "@/components/workstation/WorkstationSplitNode";
+import { WorkstationPanelGroupBox } from "@/components/workstation/WorkstationPanelGroupBox";
 
 export function WorkstationStage({
   layoutVariant = "desktop",
@@ -12,7 +12,7 @@ export function WorkstationStage({
 
   return (
     <main className={`min-h-0 min-w-0 overflow-hidden ${stagePadding}`}>
-      <WorkstationSplitNode node={root} />
+      <WorkstationPanelGroupBox groupId={root.groupId} />
     </main>
   );
 }

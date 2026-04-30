@@ -22,8 +22,6 @@ function summarizeAction(action: HelixWorkstationAction): string {
       return "focus previous panel";
     case "reopen_last_closed_panel":
       return "reopen last closed panel";
-    case "split_active_group":
-      return `split active group ${action.direction}`;
     case "open_settings":
       return `open settings${action.tab ? ` (${action.tab})` : ""}`;
     case "set_chat_dock":

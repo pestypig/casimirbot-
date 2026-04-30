@@ -1,11 +1,10 @@
 ﻿import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Settings } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { DesktopWindow } from "@/components/desktop/DesktopWindow";
 import { DesktopTaskbar } from "@/components/desktop/DesktopTaskbar";
 import { HelixWorkstationShell } from "@/components/workstation/HelixWorkstationShell";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import SplashCursor from "@/components/SplashCursor";
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
@@ -337,14 +336,6 @@ export default function DesktopPage({
             publish({ ok: true, message: `Reopened ${reopened.panelId}.` });
             return;
           }
-          case "split_active_group":
-            if (workstationEnabled) {
-              store.splitActiveGroup(action.direction);
-              publish({ ok: true });
-              return;
-            }
-            publish({ ok: false, message: "Split active group ignored outside workstation mode." });
-            return;
           case "open_settings":
             openSettings(action.tab ?? "preferences");
             publish({ ok: true });
@@ -739,21 +730,6 @@ export default function DesktopPage({
         className="mood-transition-scope relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100"
       >
         <SurfaceStack recipe={wallpaperRecipe} />
-        <div className="pointer-events-none absolute left-0 right-0 top-4 flex items-center justify-end gap-2 pr-4">
-          <p className="hidden text-xs uppercase tracking-[0.25em] text-slate-400 md:block">
-            Helix Controls
-          </p>
-          <DialogTrigger asChild>
-            <button
-              aria-label="Open Helix Start settings"
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </button>
-          </DialogTrigger>
-        </div>
-
         {workstationEnabled ? (
           <HelixWorkstationShell
             layoutVariant={layoutVariant}

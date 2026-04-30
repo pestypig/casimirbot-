@@ -2,7 +2,7 @@ import React from "react";
 import { marked, type MarkedOptions } from "marked";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BookOpen, Folder, Link2, Search } from "lucide-react";
+import { ArrowLeft, Folder, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -145,7 +145,6 @@ export function DocViewerPanel() {
     currentPath,
     anchor,
     pendingAutoReadNonce,
-    recent,
     viewDirectory,
     viewDoc,
     clearPendingAutoRead,
@@ -476,14 +475,6 @@ export function DocViewerPanel() {
     return DOC_MANIFEST.filter((entry) => entry.searchText.includes(queryValue));
   }, [queryValue]);
   const grouped = React.useMemo(() => groupByFolder(filteredEntries), [filteredEntries]);
-  const recentEntries = React.useMemo(
-    () =>
-      recent
-        .map((route) => findDocEntry(route))
-        .filter(Boolean) as DocManifestEntry[],
-    [recent],
-  );
-
   const handleDocMathClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
@@ -509,65 +500,69 @@ export function DocViewerPanel() {
 
   return (
     <div className="flex h-full w-full min-w-0 overflow-hidden bg-slate-950/90 text-slate-100">
-      <DirectoryRail
-        entries={grouped}
-        total={DOC_MANIFEST.length}
-        filteredCount={filteredEntries.length}
-        currentRoute={currentPath}
-        query={query}
-        onQueryChange={setQuery}
-        onSelect={viewDoc}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <PanelHeader
-          mode={mode}
-          entry={currentEntry}
-          anchor={anchor}
-          isAutoReading={isAutoReading}
-          autoReadError={autoReadError}
-          proceduralStatus={proceduralStatus}
-          readProgress={readProgress}
-          onStopAutoRead={stopAutoRead}
-          onShowDirectory={handleShowDirectory}
-          canRejoinLiveRead={isAutoReading && mode === "directory" && Boolean(currentPath)}
-          onRejoinLiveRead={rejoinLiveRead}
+      {mode === "directory" ? (
+        <DirectoryRail
+          entries={grouped}
+          total={DOC_MANIFEST.length}
+          filteredCount={filteredEntries.length}
+          currentRoute={currentPath}
+          query={query}
+          onQueryChange={setQuery}
+          onSelect={viewDoc}
+          variant="full"
         />
-        <div
-          ref={contentRef}
-          className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden"
-          style={{ scrollbarGutter: "stable" }}
-        >
-          {mode === "directory" ? (
-            <DirectoryView recent={recentEntries} onOpen={viewDoc} />
-          ) : loading ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">
-              Loading document…
-            </div>
-          ) : error ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-              <p className="text-sm text-amber-300">Unable to load the document.</p>
-              <p className="text-xs text-slate-400">{error}</p>
-              {currentEntry && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => viewDoc(currentEntry.route, anchor)}
-                >
-                  Retry
-                </Button>
-              )}
-            </div>
-          ) : currentEntry ? (
-            <article
-              className="prose prose-invert max-w-none overflow-x-hidden px-6 py-6 [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto"
-              onClick={handleDocMathClick}
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
-          ) : (
-            <DirectoryView recent={recentEntries} onOpen={viewDoc} />
-          )}
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <PanelHeader
+            mode={mode}
+            entry={currentEntry}
+            anchor={anchor}
+            isAutoReading={isAutoReading}
+            autoReadError={autoReadError}
+            proceduralStatus={proceduralStatus}
+            readProgress={readProgress}
+            onStopAutoRead={stopAutoRead}
+            onShowDirectory={handleShowDirectory}
+            canRejoinLiveRead={false}
+            onRejoinLiveRead={rejoinLiveRead}
+          />
+          <div
+            ref={contentRef}
+            className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden"
+            style={{ scrollbarGutter: "stable" }}
+          >
+            {loading ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                Loading document…
+              </div>
+            ) : error ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                <p className="text-sm text-amber-300">Unable to load the document.</p>
+                <p className="text-xs text-slate-400">{error}</p>
+                {currentEntry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => viewDoc(currentEntry.route, anchor)}
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
+            ) : currentEntry ? (
+              <article
+                className="prose prose-invert max-w-none overflow-x-hidden px-6 py-6 [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto"
+                onClick={handleDocMathClick}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
+                Select a document from the directory to open the reader.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -585,6 +580,7 @@ type DirectoryRailProps = {
   query: string;
   onQueryChange: (value: string) => void;
   onSelect: (path: string) => void;
+  variant?: "rail" | "full";
 };
 
 function DirectoryRail({
@@ -595,8 +591,10 @@ function DirectoryRail({
   query,
   onQueryChange,
   onSelect,
+  variant = "rail",
 }: DirectoryRailProps) {
   const entryRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const isFull = variant === "full";
   React.useEffect(() => {
     if (!currentRoute) return;
     const target = entryRefs.current[currentRoute];
@@ -605,7 +603,12 @@ function DirectoryRail({
   }, [currentRoute, query, entries]);
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-r border-white/10 bg-slate-950/60">
+    <aside
+      className={cn(
+        "flex h-full shrink-0 flex-col bg-slate-950/60",
+        isFull ? "w-full" : "w-80 border-r border-white/10"
+      )}
+    >
       <div className="border-b border-white/10 p-3">
         <div className="flex items-center gap-2 rounded-lg border border-white/10 px-2">
           <Search className="h-4 w-4 text-slate-400" />
@@ -620,7 +623,7 @@ function DirectoryRail({
           Showing {filteredCount} of {total} files.
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 py-3">
+      <div className={cn("flex-1 overflow-y-auto px-2 py-3", isFull && "px-3")}>
         {entries.map((group) => (
           <div key={group.label} className="mb-4">
             <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-500">
@@ -705,6 +708,15 @@ function PanelHeader({
 
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onShowDirectory}
+        aria-label="Back to docs and digests"
+        className="h-9 w-9 shrink-0 rounded-full border border-white/10 text-slate-100 hover:bg-white/10 hover:text-cyan-100"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[11px] uppercase tracking-wide text-slate-400">{subtitle}</p>
         <h2 className="truncate text-lg font-semibold text-white">{title}</h2>
@@ -732,63 +744,8 @@ function PanelHeader({
             Rejoin Live Read
           </Button>
         ) : null}
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onShowDirectory}
-        >
-          Directory
-        </Button>
-        {mode === "doc" && entry && (
-          <a
-            href={makeDocHref(entry.route, anchor)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-white/20 px-3 py-1.5 text-sm text-slate-100 transition hover:border-cyan-400 hover:text-cyan-100"
-          >
-            <Link2 className="h-3.5 w-3.5" />
-            Open Tab
-          </a>
-        )}
       </div>
     </header>
-  );
-}
-
-type DirectoryViewProps = {
-  recent: DocManifestEntry[];
-  onOpen: (path: string) => void;
-};
-
-function DirectoryView({ recent, onOpen }: DirectoryViewProps) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center text-slate-300">
-      <BookOpen className="h-10 w-10 text-cyan-300" />
-      <div>
-        <h3 className="text-lg font-semibold text-white">Browse docs & digests</h3>
-        <p className="text-sm text-slate-400">
-          Use the directory rail to the left or search for a Ford–Roman brief, ethos memo, or sweep note.
-        </p>
-      </div>
-      {recent.length > 0 && (
-        <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
-          <p className="text-[11px] uppercase tracking-wide text-slate-400">Recent files</p>
-          <ul className="mt-2 space-y-1.5">
-            {recent.map((entry) => (
-              <li key={entry.id}>
-                <button
-                  className="w-full rounded-lg border border-white/5 px-3 py-2 text-left text-sm text-slate-200 transition hover:border-cyan-400/50 hover:text-white"
-                  onClick={() => onOpen(entry.route)}
-                >
-                  <div className="font-semibold">{entry.title}</div>
-                  <div className="text-[11px] text-slate-400">{entry.relativePath}</div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -3,7 +3,6 @@ import type { SettingsTab } from "@/hooks/useHelixStartSettings";
 export const HELIX_WORKSTATION_ACTION_SCHEMA_VERSION = "helix.workstation.action/v1";
 export const HELIX_WORKSTATION_ACTION_EVENT = "helix-workstation-action";
 
-type WorkstationSplitDirection = "row" | "column";
 type WorkstationDrawerSnap = "peek" | "half" | "full";
 type WorkstationJobWorkflow = "observable_research_pipeline";
 type WorkstationJobPayload = {
@@ -50,11 +49,6 @@ export type HelixWorkstationAction =
   | {
       schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
       action: "reopen_last_closed_panel";
-    }
-  | {
-      schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
-      action: "split_active_group";
-      direction: WorkstationSplitDirection;
     }
   | {
       schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
@@ -141,17 +135,6 @@ function coerceAction(value: unknown): HelixWorkstationAction | null {
     return {
       schema_version: HELIX_WORKSTATION_ACTION_SCHEMA_VERSION,
       action,
-    };
-  }
-
-  if (action === "split_active_group") {
-    const directionRaw = normalizeActionName(record.direction);
-    const direction: WorkstationSplitDirection =
-      directionRaw === "column" || directionRaw === "down" ? "column" : "row";
-    return {
-      schema_version: HELIX_WORKSTATION_ACTION_SCHEMA_VERSION,
-      action,
-      direction,
     };
   }
 

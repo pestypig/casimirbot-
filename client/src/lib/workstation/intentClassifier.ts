@@ -37,7 +37,7 @@ const CALCULATOR_STEP_WORDS = /\b(?:step|steps|step-by-step|work)\b/i;
 const CLIPBOARD_WORDS = /\b(?:clipboard|paste)\b/i;
 
 const WORKSTATION_INTENT_WORDS =
-  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|split|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|clipboard|paste)\b/i;
+  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|clipboard|paste)\b/i;
 const CLOSE_VERB_WORDS = /\b(?:close|shut|dismiss|remove|x\s*out|get\s+rid\s+of)\b/i;
 const PANEL_TARGET_WORDS =
   /\b(?:tab|tabs|panel|panels|doc|docs|document|documents|paper|papers|window|windows)\b/i;

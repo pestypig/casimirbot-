@@ -371,7 +371,6 @@ export default function MobileStartPage() {
             });
             return;
           case "set_chat_dock":
-          case "split_active_group":
           case "reopen_last_closed_panel":
             publish({ ok: false, message: `${action.action} is not supported on mobile.` });
             return;

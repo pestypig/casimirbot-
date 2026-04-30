@@ -12,7 +12,6 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const activeGroupId = useWorkstationLayoutStore((state) => state.activeGroupId);
   const setActivePanel = useWorkstationLayoutStore((state) => state.setActivePanel);
   const closePanelFromGroup = useWorkstationLayoutStore((state) => state.closePanelFromGroup);
-  const splitActiveGroup = useWorkstationLayoutStore((state) => state.splitActiveGroup);
   const openPanelInGroup = useWorkstationLayoutStore((state) => state.openPanelInGroup);
   const focusGroup = useWorkstationLayoutStore((state) => state.focusGroup);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -191,14 +190,6 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
             </div>
           </div>
         ) : null}
-        <button
-          type="button"
-          className="rounded border border-white/15 bg-black/25 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
-          onClick={() => splitActiveGroup("row")}
-          aria-label="Split right"
-        >
-          split
-        </button>
       </div>
     </div>
   );

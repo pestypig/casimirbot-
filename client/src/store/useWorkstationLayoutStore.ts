@@ -12,16 +12,10 @@ export type WorkstationPanelGroup = {
 };
 
 export type WorkstationLayoutNode =
-  | {
-      type: "group";
-      groupId: string;
-    }
-  | {
-      type: "split";
-      direction: "row" | "column";
-      ratio: number;
-      children: [WorkstationLayoutNode, WorkstationLayoutNode];
-    };
+  {
+    type: "group";
+    groupId: string;
+  };
 
 type WorkstationClosedPanelEntry = {
   panelId: string;
@@ -54,7 +48,6 @@ type WorkstationLayoutState = {
   closeActivePanel: () => WorkstationClosedPanelEntry | null;
   focusAdjacentPanel: (direction: "next" | "previous") => { groupId: string; panelId: string } | null;
   reopenLastClosedPanel: () => WorkstationClosedPanelEntry | null;
-  splitActiveGroup: (direction: "row" | "column") => void;
   focusGroup: (groupId: string) => void;
   setMobileDrawerOpen: (open: boolean) => void;
   toggleMobileDrawer: () => void;
@@ -81,7 +74,7 @@ const ensureRoot = (
   root: WorkstationLayoutNode | null | undefined,
   activeGroupId: string,
 ): WorkstationLayoutNode => {
-  if (root && typeof root === "object" && "type" in root) {
+  if (root && typeof root === "object" && root.type === "group" && typeof root.groupId === "string") {
     return root;
   }
   return {
@@ -99,25 +92,6 @@ const ensureGroups = (
     normalized[activeGroupId] = createGroup(activeGroupId, "Primary");
   }
   return normalized;
-};
-
-const replaceGroupNode = (
-  node: WorkstationLayoutNode,
-  targetGroupId: string,
-  replacement: WorkstationLayoutNode,
-): WorkstationLayoutNode => {
-  if (node.type === "group") {
-    return node.groupId === targetGroupId ? replacement : node;
-  }
-  const left = replaceGroupNode(node.children[0], targetGroupId, replacement);
-  const right = replaceGroupNode(node.children[1], targetGroupId, replacement);
-  if (left === node.children[0] && right === node.children[1]) {
-    return node;
-  }
-  return {
-    ...node,
-    children: [left, right],
-  };
 };
 
 export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutState>()(
@@ -268,36 +242,6 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
         });
         return lastClosed;
       },
-      splitActiveGroup: (direction) =>
-        set((state) => {
-          const activeGroupId = state.activeGroupId || PRIMARY_GROUP_ID;
-          const groups = ensureGroups(state.groups, activeGroupId);
-          const nextGroupId = `group-${crypto.randomUUID()}`;
-          const nextGroups = {
-            ...groups,
-            [nextGroupId]: createGroup(nextGroupId),
-          };
-          const replacement: WorkstationLayoutNode = {
-            type: "split",
-            direction,
-            ratio: 0.5,
-            children: [
-              {
-                type: "group",
-                groupId: activeGroupId,
-              },
-              {
-                type: "group",
-                groupId: nextGroupId,
-              },
-            ],
-          };
-          return {
-            groups: nextGroups,
-            root: replaceGroupNode(ensureRoot(state.root, activeGroupId), activeGroupId, replacement),
-            activeGroupId: nextGroupId,
-          };
-        }),
       focusGroup: (groupId) =>
         set((state) => {
           if (!state.groups[groupId]) return state;
