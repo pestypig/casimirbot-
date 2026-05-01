@@ -6019,12 +6019,14 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     coerceText(replyRecord?.final_answer_source).trim() ||
     coerceText(debugRecord?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : "unknown");
+  const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const selectedFinalAnswer =
     coerceText(replyRecord?.selected_final_answer).trim() ||
     coerceText(debugRecord?.selected_final_answer).trim() ||
     coerceText(reply.assistant_answer).trim() ||
-    coerceText(reply.text).trim() ||
-    coerceText(reply.content).trim();
+    (isTypedFailure
+      ? renderTypedFailureFallback(terminalErrorCode)
+      : coerceText(reply.text).trim() || coerceText(reply.content).trim());
   const routeLabel =
     coerceText(summary?.resolved_route_label).trim() ||
     `${readHelixCanonicalGoalKind(reply)} / ${finalAnswerSource}`;
@@ -6044,12 +6046,7 @@ export function chooseVisibleFinalText(reply: HelixAskReply): string {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
   if (visible.primary_source_label.replace(/\s+/g, "_") === "typed_failure" || visible.terminal_error_code) {
-    return (
-      visible.selected_final_answer ||
-      coerceText(replyRecord?.assistant_answer).trim() ||
-      coerceText(replyRecord?.text).trim() ||
-      renderTypedFailureFallback(visible.terminal_error_code)
-    );
+    return visible.selected_final_answer || coerceText(replyRecord?.assistant_answer).trim() || renderTypedFailureFallback(visible.terminal_error_code);
   }
   return visible.selected_final_answer || coerceText(replyRecord?.text).trim() || coerceText(debugRecord?.text).trim() || "";
 }

@@ -21397,6 +21397,7 @@ type HelixAskRequiredTerminalKind =
   | "direct_answer_text"
   | "doc_open_receipt"
   | "doc_equation_location"
+  | "doc_calculator_evidence"
   | "equation_attempt_explanation"
   | "doc_evidence_synthesis_answer"
   | "doc_evidence_location"
@@ -21618,7 +21619,10 @@ type HelixAskEquationExtractionAttempt = {
     missing_terms: string[];
     formula_like_line_count: number;
     equation_markers_found: string[];
+    calculator_evidence_field_count?: number;
+    calculator_evidence_fields?: string[];
     eligible_for_equation_location: boolean;
+    eligible_for_calculator_evidence?: boolean;
     rejection_reason?: string;
   }>;
   selected_candidate_path?: string | null;
@@ -21629,10 +21633,13 @@ type HelixAskEquationExtractionAttempt = {
     text: string;
     equation_like: boolean;
     matched_equation_markers: string[];
+    calculator_evidence_like?: boolean;
+    calculator_field_names?: string[];
     rejection_reason?: string;
   }>;
   result:
     | "valid_equation_location_created"
+    | "valid_calculator_evidence_created"
     | "no_equation_like_snippets"
     | "no_eligible_candidates"
     | "query_target_loss"
@@ -27222,8 +27229,22 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           })
         : null;
     const docEquationLocationValidation = validateAskTurnDocEquationLocationArtifact(docEquationLocationPayload);
+    const docCalculatorEvidencePayload =
+      step.action?.action_id === "locate_in_doc"
+        ? buildAskTurnDocCalculatorEvidencePayload({
+            turnId: "step-result",
+            transcript: stepActionTranscript,
+            query: readAskTurnString(step.action.args?.query),
+            sourcePath: readAskTurnString(step.action.args?.path),
+            matches: docLocationMatches as Array<HelixAskDocLocationMatch & Record<string, unknown>>,
+          })
+        : null;
+    const docCalculatorEvidenceValidation = validateAskTurnDocCalculatorEvidenceArtifact(docCalculatorEvidencePayload);
     const docEquationExtractionAttempt =
-      step.action?.action_id === "locate_in_doc" && docEquationLocationPayload && !docEquationLocationValidation.valid
+      step.action?.action_id === "locate_in_doc" &&
+      docEquationLocationPayload &&
+      !docEquationLocationValidation.valid &&
+      !docCalculatorEvidenceValidation.valid
         ? buildAskTurnEquationExtractionAttemptArtifact({
             turnId: "step-result",
             producerItemId: step.id,
@@ -27232,7 +27253,9 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
             sourcePath: readAskTurnString(step.action.args?.path),
             matches: docLocationMatches as Array<HelixAskDocLocationMatch & Record<string, unknown>>,
             equationLocationPayload: docEquationLocationPayload,
+            calculatorEvidencePayload: docCalculatorEvidencePayload,
             validation: docEquationLocationValidation,
+            calculatorValidation: docCalculatorEvidenceValidation,
           })
         : null;
     const latestDocSelection =
@@ -27306,6 +27329,7 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                 "doc_location_matches",
                 "doc_evidence_location",
                 ...(docEquationLocationValidation.valid ? ["doc_equation_location"] : []),
+                ...(docCalculatorEvidenceValidation.valid ? ["doc_calculator_evidence"] : []),
                 ...(docEquationExtractionAttempt ? ["equation_extraction_attempt"] : []),
               ]))
               : actionId === "list_notes"
@@ -27366,7 +27390,11 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
           ? ["comparison_summary"]
         : actionId === "locate_in_doc"
         ? docLocationTargetRequest?.requested_output === "equation_location"
-          ? ["doc_equation_location"]
+          ? docEquationLocationValidation.valid
+            ? ["doc_equation_location"]
+            : docCalculatorEvidenceValidation.valid
+              ? ["doc_calculator_evidence"]
+              : ["doc_equation_location"]
           : ["doc_location_matches"]
         : actionId === "search_docs"
           ? ["doc_search_results"]
@@ -27440,6 +27468,20 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                   }),
                   equation_location_validation: docEquationLocationValidation,
                 }
+              : docCalculatorEvidenceValidation.valid
+                ? {
+                    ...(docCalculatorEvidencePayload ?? {
+                      kind: "doc_calculator_evidence",
+                      turn_id: "step-result",
+                      query: readAskTurnString(step.action.args?.query) ?? null,
+                      source_path: normalizeAskTurnWorkspaceDocPath(step.action.args?.path) ?? null,
+                      fields: [],
+                      derived_formula: null,
+                      confidence: "low",
+                    }),
+                    calculator_evidence_validation: docCalculatorEvidenceValidation,
+                    equation_location_validation: docEquationLocationValidation,
+                  }
               : {
                   ...(docEquationExtractionAttempt ?? {
                     kind: "equation_extraction_attempt",
@@ -28112,6 +28154,50 @@ const renderAskTurnDocEquationLocationFromArtifact = (artifact: Record<string, u
   ].filter((line): line is string => line !== null).join("\n");
 };
 
+const renderAskTurnDocCalculatorEvidenceFromArtifact = (artifact: Record<string, unknown> | null): string | null => {
+  const validation = validateAskTurnDocCalculatorEvidenceArtifact(artifact);
+  if (!validation.valid) return null;
+  const sourcePath = normalizeAskTurnWorkspaceDocPath(artifact?.source_path);
+  if (!sourcePath) return null;
+  const fields = Array.isArray(artifact?.fields)
+    ? artifact.fields.filter((field): field is Record<string, unknown> => Boolean(field && typeof field === "object"))
+    : [];
+  const firstField = fields[0] ?? null;
+  const lineStart = Number(firstField?.line_start);
+  const lineEnd = Number.isFinite(Number(firstField?.line_end)) ? Number(firstField?.line_end) : lineStart;
+  const hasLines = Number.isFinite(lineStart);
+  const lineLabel = hasLines ? `L${lineStart}${lineEnd !== lineStart ? `-L${lineEnd}` : ""}` : null;
+  const title = readAskTurnString(artifact?.source_title) ?? readAskTurnDocTitleForPath(sourcePath) ?? renderAskTurnDocDisplayLabel(sourcePath);
+  const derivedFormula = readAskTurnString(artifact?.derived_formula) ?? "proper_time = alpha * coordinate_time";
+  const interpretation = readAskTurnString(artifact?.interpretation);
+  const fieldLines = fields.slice(0, 8).map((field) => {
+    const name = readAskTurnString(field.name) ?? "field";
+    const value = readAskTurnString(field.value) ?? "";
+    const fieldLineStart = Number(field.line_start);
+    const fieldLineEnd = Number.isFinite(Number(field.line_end)) ? Number(field.line_end) : fieldLineStart;
+    const fieldLineLabel = Number.isFinite(fieldLineStart)
+      ? `L${fieldLineStart}${fieldLineEnd !== fieldLineStart ? `-L${fieldLineEnd}` : ""}`
+      : null;
+    return `- ${name} = ${value}${fieldLineLabel ? ` (${fieldLineLabel})` : ""}`;
+  });
+  return [
+    "Calculator-usable evidence:",
+    "",
+    `Document: ${title}`,
+    `Path: ${sourcePath}${lineLabel ? `:${lineLabel}` : ""}`,
+    `Evidence class: ${readAskTurnString(artifact?.evidence_class) ?? "table_key_value"}`,
+    `Derived relation: ${derivedFormula}`,
+    "",
+    "Fields:",
+    ...(fieldLines.length ? fieldLines : ["- No fields recorded."]),
+    interpretation ? "" : null,
+    interpretation ? "Interpretation:" : null,
+    interpretation,
+    "",
+    "Open location 1",
+  ].filter((line): line is string => line !== null && line !== undefined).join("\n");
+};
+
 const renderAskTurnCompactDocLocationFromArtifact = (artifact: Record<string, unknown> | null): string | null => {
   const matches = Array.isArray(artifact?.matches) ? artifact.matches : [];
   const firstMatch = matches
@@ -28686,6 +28772,8 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
     docLocationArtifact ?? readRuntimeArtifact("doc_evidence_location") ?? readRuntimeArtifact("doc_location_matches");
   const docEquationLocationArtifact =
     readAskTurnResultArtifact(args.stepResults, "doc_equation_location") ?? readRuntimeArtifact("doc_equation_location");
+  const docCalculatorEvidenceArtifact =
+    readAskTurnResultArtifact(args.stepResults, "doc_calculator_evidence") ?? readRuntimeArtifact("doc_calculator_evidence");
   const noteReceiptArtifact = readAskTurnResultArtifact(args.stepResults, "note_update_receipt") ?? readRuntimeArtifact("note_update_receipt");
   const docSearchArtifact = readAskTurnResultArtifact(args.stepResults, "doc_search_results") ?? readRuntimeArtifact("doc_search_results");
   const docCandidateValidationArtifact =
@@ -28759,6 +28847,17 @@ const buildAskTurnObservationGroundedFinalAnswer = (args: {
       return {
         text: rendered,
         source: "doc_equation_location",
+        consumed_artifacts: Array.from(consumed),
+        contract_pass: true,
+        fail_reason: null,
+      };
+    }
+    const renderedCalculatorEvidence = renderAskTurnDocCalculatorEvidenceFromArtifact(docCalculatorEvidenceArtifact);
+    if (renderedCalculatorEvidence) {
+      consumed.add("doc_calculator_evidence");
+      return {
+        text: renderedCalculatorEvidence,
+        source: "doc_calculator_evidence",
         consumed_artifacts: Array.from(consumed),
         contract_pass: true,
         fail_reason: null,
@@ -29428,7 +29527,10 @@ const buildAskTurnEquationAttemptDebugPayload = (args: {
   const equationArtifact = args.artifacts.find((artifact) => artifact.kind === "doc_equation_location");
   const equationPayload = equationArtifact ? readAskTurnArtifactPayloadRecord(equationArtifact) : null;
   const equationValidation = validateAskTurnDocEquationLocationArtifact(equationPayload);
-  if (equationIntent.strength === "none" && !attempt && !equationPayload) return null;
+  const calculatorEvidenceArtifact = args.artifacts.find((artifact) => artifact.kind === "doc_calculator_evidence");
+  const calculatorEvidencePayload = calculatorEvidenceArtifact ? readAskTurnArtifactPayloadRecord(calculatorEvidenceArtifact) : null;
+  const calculatorEvidenceValidation = validateAskTurnDocCalculatorEvidenceArtifact(calculatorEvidencePayload);
+  if (equationIntent.strength === "none" && !attempt && !equationPayload && !calculatorEvidencePayload) return null;
   const retrievalQueryIntegrity =
     args.payload?.retrieval_query_integrity && typeof args.payload.retrieval_query_integrity === "object"
       ? (args.payload.retrieval_query_integrity as Record<string, unknown>)
@@ -29464,6 +29566,11 @@ const buildAskTurnEquationAttemptDebugPayload = (args: {
       valid: equationValidation.valid,
       failures: equationValidation.failures,
       selected_artifact_id: equationArtifact?.artifact_id,
+    },
+    calculator_evidence_validation: {
+      valid: calculatorEvidenceValidation.valid,
+      failures: calculatorEvidenceValidation.failures,
+      selected_artifact_id: calculatorEvidenceArtifact?.artifact_id,
     },
   };
 };
@@ -30271,10 +30378,16 @@ const buildAskTurnEquationRetrievalIntent = (args: {
 const buildAskTurnEquationRetrievalQuery = (transcript: string): string | null => {
   const intent = buildAskTurnEquationRetrievalIntent({ turnId: "equation-query", transcript });
   if (intent.strength === "none") return null;
+  const raw = transcript.trim();
+  const nhm2CalculatorTerms =
+    /\bNHM2\b/i.test(raw) && /\b(?:calculator|usable|plug|equation|formula|relation|alpha|tau|proper\s*time)\b/i.test(raw)
+      ? ["properTimeS_expected", "coordinateTimeS", "centerlineDtauDt"]
+      : [];
   const deduped = dedupeAskTurnEquationQueryTerms([
     ...intent.anchors.corpus_terms,
     ...intent.anchors.equation_terms,
     ...intent.anchors.calculator_terms,
+    ...nhm2CalculatorTerms,
     ...intent.anchors.document_terms,
     ...intent.anchors.exact_tokens.slice(0, 4),
   ]);
@@ -30850,6 +30963,16 @@ const collectAskTurnEquationMarkers = (text: string): string[] => {
 
 const isAskTurnEquationLikeLine = (line: string): boolean => collectAskTurnEquationMarkers(line).length > 0;
 
+const isAskTurnExplicitEquationFormulaLine = (line: string): boolean => {
+  const text = line.replace(/`/g, "").replace(/\s+/g, " ").trim();
+  if (!text) return false;
+  const isMarkdownTableRow = /^\|/.test(text);
+  const hasFormulaAssignment = /\b[a-zA-Z_][a-zA-Z0-9_]*(?:\([^)]*\))?\s*=\s*[-+()a-zA-Z0-9_.*\/\s]+/.test(text);
+  const hasNamedFormulaTarget = /\b(?:properTimeS_expected|properMinusCoordinateS_expected|tau_expected|coordinateTimeS)\b/.test(text);
+  if (isMarkdownTableRow && !(hasNamedFormulaTarget && hasFormulaAssignment)) return false;
+  return hasFormulaAssignment && (hasNamedFormulaTarget || /\b(?:alpha|tau|coordinateTimeS|properTime|T)\b/.test(text));
+};
+
 const buildAskTurnDocEquationLocationPayload = (args: {
   turnId: string;
   transcript: string;
@@ -30864,11 +30987,12 @@ const buildAskTurnDocEquationLocationPayload = (args: {
     .map((match) => {
       const text = readAskTurnString(match.snippet) ?? "";
       const markers = collectAskTurnEquationMarkers(text);
+      const explicitFormula = isAskTurnExplicitEquationFormulaLine(text);
       return {
         text,
         line_start: typeof match.line_start === "number" ? match.line_start : undefined,
         line_end: typeof match.line_end === "number" ? match.line_end : undefined,
-        equation_like: markers.length > 0,
+        equation_like: explicitFormula,
         calculator_usable: markers.some((marker) => ["=", "tau", "tau_expected", "coordinateTimeS", "function_expression"].includes(marker)),
         matched_equation_markers: markers,
         matched_target_terms: uniqueAskTurnStrings([
@@ -30916,9 +31040,179 @@ const validateAskTurnDocEquationLocationArtifact = (artifact: Record<string, unk
     const markers = Array.isArray(snippet.matched_equation_markers)
       ? snippet.matched_equation_markers.map((marker) => String(marker ?? "")).filter(Boolean)
       : collectAskTurnEquationMarkers(text);
-    return Boolean(snippet.equation_like) && markers.length > 0;
+    return Boolean(snippet.equation_like) && markers.length > 0 && isAskTurnExplicitEquationFormulaLine(text);
   });
   if (!hasEquationSnippet) failures.push("equation_like_snippet_missing");
+  return { valid: failures.length === 0, failures };
+};
+
+type HelixAskCalculatorEvidenceFieldRole =
+  | "alpha"
+  | "dtau_dt"
+  | "proper_vs_coordinate_ratio"
+  | "coordinate_vs_classical_ratio"
+  | "proper_time"
+  | "coordinate_time";
+
+const classifyAskTurnCalculatorEvidenceFieldRole = (fieldName: string): HelixAskCalculatorEvidenceFieldRole | null => {
+  const folded = fieldName.trim().toLowerCase().replace(/[._\-\s]+/g, "");
+  if (!folded) return null;
+  if (/centerlinealpha$/.test(folded) || folded === "alpha") return "alpha";
+  if (/centerlinedtaudt$/.test(folded) || folded === "dtaudt" || folded.includes("dtaudt")) return "dtau_dt";
+  if (folded.includes("propervscoordinateratio")) return "proper_vs_coordinate_ratio";
+  if (folded.includes("coordinatevsclassicalratio")) return "coordinate_vs_classical_ratio";
+  if (folded.includes("propertimeestimate") || folded === "propertimes") return "proper_time";
+  if (folded.includes("coordinatetimeestimate") || folded === "coordinatetimes") return "coordinate_time";
+  return null;
+};
+
+const readAskTurnCalculatorEvidenceNumber = (value: string): number | null => {
+  const raw = value.trim().replace(/,/g, "");
+  const match = raw.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/i);
+  if (!match) return null;
+  const numeric = Number(match[0]);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const collectAskTurnCalculatorEvidenceFieldsFromSnippet = (args: {
+  sourcePath: string | null;
+  lineStart?: number;
+  lineEnd?: number;
+  snippet: string;
+}): Array<Record<string, unknown>> => {
+  const fields: Array<Record<string, unknown>> = [];
+  const addField = (name: string, value: string): void => {
+    const fieldName = name.trim();
+    const fieldValue = value.trim();
+    if (!fieldName || !fieldValue || /^-+$/.test(fieldName) || /^-+$/.test(fieldValue)) return;
+    const role = classifyAskTurnCalculatorEvidenceFieldRole(fieldName);
+    if (!role) return;
+    fields.push({
+      name: fieldName,
+      value: fieldValue,
+      numeric_value: readAskTurnCalculatorEvidenceNumber(fieldValue),
+      role,
+      source_path: args.sourcePath,
+      line_start: args.lineStart,
+      line_end: args.lineEnd,
+      snippet: `| ${fieldName} | ${fieldValue} |`,
+    });
+  };
+  const text = args.snippet.replace(/\r?\n/g, " ");
+  for (const match of text.matchAll(/\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|/g)) {
+    addField(match[1] ?? "", match[2] ?? "");
+  }
+  for (const match of text.matchAll(/\b([A-Za-z_][A-Za-z0-9_.-]*(?:Alpha|DtauDt|ratio|TimeEstimate|TimeS)?)\s*[:=]\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)/gi)) {
+    addField(match[1] ?? "", match[2] ?? "");
+  }
+  return fields;
+};
+
+const buildAskTurnDocCalculatorEvidencePayload = (args: {
+  turnId: string;
+  transcript: string;
+  query?: string | null;
+  sourcePath?: string | null;
+  sourceTitle?: string | null;
+  matches: Array<HelixAskDocLocationMatch & Record<string, unknown>>;
+}): Record<string, unknown> | null => {
+  const intent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: args.transcript });
+  if (intent.strength === "none") return null;
+  const sourcePath =
+    normalizeAskTurnWorkspaceDocPath(args.sourcePath) ?? normalizeAskTurnWorkspaceDocPath(args.matches[0]?.path) ?? null;
+  const rawFields = args.matches.flatMap((match) =>
+    collectAskTurnCalculatorEvidenceFieldsFromSnippet({
+      sourcePath: normalizeAskTurnWorkspaceDocPath(match.path) ?? sourcePath,
+      lineStart: typeof match.line_start === "number" ? match.line_start : undefined,
+      lineEnd: typeof match.line_end === "number" ? match.line_end : undefined,
+      snippet: readAskTurnString(match.snippet) ?? "",
+    }),
+  );
+  const seen = new Set<string>();
+  const fields = rawFields.filter((field) => {
+    const key = [
+      readAskTurnString(field.name)?.toLowerCase(),
+      readAskTurnString(field.value)?.toLowerCase(),
+      String(field.line_start ?? ""),
+    ].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const roles = new Set(fields.map((field) => readAskTurnString(field.role)).filter((role): role is string => Boolean(role)));
+  const alphaField = fields.find((field) => readAskTurnString(field.role) === "alpha");
+  const dtauField = fields.find((field) => readAskTurnString(field.role) === "dtau_dt");
+  const properRatioField = fields.find((field) => readAskTurnString(field.role) === "proper_vs_coordinate_ratio");
+  const coordinateRatioField = fields.find((field) => readAskTurnString(field.role) === "coordinate_vs_classical_ratio");
+  const relationBasis =
+    alphaField || dtauField
+      ? "centerline lapse evidence"
+      : properRatioField
+        ? "proper-vs-coordinate ratio evidence"
+        : null;
+  const derivedFormula =
+    alphaField || dtauField
+      ? "proper_time = alpha * coordinate_time"
+      : properRatioField
+        ? "proper_time = properVsCoordinate_ratio * coordinate_time"
+        : null;
+  const interpretation =
+    properRatioField || alphaField || dtauField
+      ? [
+          "alpha=0.7 shortens ship proper time relative to coordinate time.",
+          coordinateRatioField ? "coordinateVsClassical_ratio=1 means coordinate time is unchanged in this comparison." : null,
+        ].filter(Boolean).join(" ")
+      : null;
+  return {
+    kind: "doc_calculator_evidence",
+    evidence_kind: "calculator_evidence",
+    turn_id: args.turnId,
+    query: args.query ?? buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript,
+    source_path: sourcePath,
+    source_title: args.sourceTitle ?? (sourcePath ? readAskTurnDocTitleForPath(sourcePath) : null),
+    evidence_class: "table_key_value",
+    relation_basis: relationBasis,
+    derived_formula: derivedFormula,
+    derived_latex: derivedFormula === "proper_time = alpha * coordinate_time" ? "\\tau = \\alpha T" : null,
+    fields,
+    field_roles: Array.from(roles),
+    matched_terms: uniqueAskTurnStrings(
+      fields.map((field) => readAskTurnString(field.name)).concat(intent.anchors.corpus_terms).filter((entry): entry is string => Boolean(entry)),
+    ),
+    snippets: args.matches.map((match) => ({
+      text: readAskTurnString(match.snippet) ?? "",
+      line_start: typeof match.line_start === "number" ? match.line_start : undefined,
+      line_end: typeof match.line_end === "number" ? match.line_end : undefined,
+      calculator_evidence_like: true,
+      calculator_field_names: fields
+        .filter((field) => Number(field.line_start) === Number(match.line_start))
+        .map((field) => readAskTurnString(field.name))
+        .filter((entry): entry is string => Boolean(entry)),
+    })),
+    interpretation,
+    confidence: derivedFormula && fields.length > 0 ? "high" : "low",
+  };
+};
+
+const validateAskTurnDocCalculatorEvidenceArtifact = (artifact: Record<string, unknown> | null): { valid: boolean; failures: string[] } => {
+  const failures: string[] = [];
+  if (!artifact) return { valid: false, failures: ["artifact_missing"] };
+  if (artifact.evidence_kind !== "calculator_evidence") failures.push("evidence_kind_not_calculator_evidence");
+  if (!normalizeAskTurnWorkspaceDocPath(artifact.source_path)) failures.push("source_path_missing");
+  const fields = Array.isArray(artifact.fields)
+    ? artifact.fields.filter((field): field is Record<string, unknown> => Boolean(field && typeof field === "object"))
+    : [];
+  if (fields.length === 0) failures.push("fields_missing");
+  const roles = fields.map((field) => readAskTurnString(field.role)).filter((role): role is string => Boolean(role));
+  const hasUsableRatio =
+    roles.includes("alpha") ||
+    roles.includes("dtau_dt") ||
+    roles.includes("proper_vs_coordinate_ratio") ||
+    (roles.includes("proper_time") && roles.includes("coordinate_time"));
+  if (!hasUsableRatio) failures.push("calculator_relation_fields_missing");
+  if (!readAskTurnString(artifact.derived_formula)) failures.push("derived_formula_missing");
+  const matchedTerms = Array.isArray(artifact.matched_terms) ? artifact.matched_terms.map((term) => String(term ?? "")) : [];
+  if (!matchedTerms.some((term) => /\bNHM2\b/i.test(term))) failures.push("corpus_term_missing");
   return { valid: failures.length === 0, failures };
 };
 
@@ -30930,7 +31224,9 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
   sourcePath?: string | null;
   matches: Array<HelixAskDocLocationMatch & Record<string, unknown>>;
   equationLocationPayload?: Record<string, unknown> | null;
+  calculatorEvidencePayload?: Record<string, unknown> | null;
   validation: { valid: boolean; failures: string[] };
+  calculatorValidation?: { valid: boolean; failures: string[] };
 }): HelixAskEquationExtractionAttempt | null => {
   const intent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: args.transcript });
   if (intent.strength === "none") return null;
@@ -30944,18 +31240,29 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
     .map((match) => {
       const text = readAskTurnString(match.snippet) ?? "";
       const markers = collectAskTurnEquationMarkers(text);
+      const calculatorFields = collectAskTurnCalculatorEvidenceFieldsFromSnippet({
+        sourcePath: normalizeAskTurnWorkspaceDocPath(match.path) ?? sourcePath,
+        lineStart: typeof match.line_start === "number" ? match.line_start : undefined,
+        lineEnd: typeof match.line_end === "number" ? match.line_end : undefined,
+        snippet: text,
+      });
+      const explicitFormula = isAskTurnExplicitEquationFormulaLine(text);
       return {
         source_path: normalizeAskTurnWorkspaceDocPath(match.path) ?? sourcePath ?? "",
         line_start: typeof match.line_start === "number" ? match.line_start : undefined,
         line_end: typeof match.line_end === "number" ? match.line_end : undefined,
         text,
-        equation_like: markers.length > 0,
+        equation_like: explicitFormula,
         matched_equation_markers: markers,
-        rejection_reason: markers.length > 0 ? undefined : "no_equation_markers",
+        calculator_evidence_like: calculatorFields.length > 0,
+        calculator_field_names: calculatorFields.map((field) => readAskTurnString(field.name)).filter((entry): entry is string => Boolean(entry)),
+        rejection_reason: markers.length > 0 || calculatorFields.length > 0 ? undefined : "no_equation_or_calculator_evidence_markers",
       };
     })
     .filter((snippet) => snippet.text.trim());
   const formulaLikeLineCount = snippetsChecked.filter((snippet) => snippet.equation_like).length;
+  const calculatorFieldNames = uniqueAskTurnStrings(snippetsChecked.flatMap((snippet) => snippet.calculator_field_names ?? []));
+  const calculatorFieldCount = calculatorFieldNames.length;
   const equationMarkersFound = uniqueAskTurnStrings(snippetsChecked.flatMap((snippet) => snippet.matched_equation_markers));
   const requiredTerms = uniqueAskTurnStrings([
     ...intent.anchors.corpus_terms,
@@ -30971,6 +31278,7 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
   const matchedTerms = requiredTerms.filter((term) => askTurnTextIncludesFoldedToken(candidateText, term));
   const missingTerms = requiredTerms.filter((term) => !matchedTerms.includes(term));
   const eligible = Boolean(sourcePath && formulaLikeLineCount > 0 && args.validation.valid);
+  const calculatorEligible = Boolean(sourcePath && calculatorFieldCount > 0 && args.calculatorValidation?.valid);
   const candidatesConsidered = sourcePath
     ? [
         {
@@ -30982,20 +31290,29 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
           missing_terms: missingTerms,
           formula_like_line_count: formulaLikeLineCount,
           equation_markers_found: equationMarkersFound,
+          calculator_evidence_field_count: calculatorFieldCount,
+          calculator_evidence_fields: calculatorFieldNames,
           eligible_for_equation_location: eligible,
+          eligible_for_calculator_evidence: calculatorEligible,
           rejection_reason: eligible
             ? undefined
+            : calculatorEligible
+              ? undefined
             : formulaLikeLineCount === 0
-              ? "no_equation_like_snippets_found"
+              ? calculatorFieldCount === 0
+                ? "no_equation_like_or_calculator_evidence_snippets_found"
+                : "no_equation_like_snippets_found"
               : args.validation.failures.join(",") || "equation_location_validation_failed",
         },
       ]
     : [];
   const result: HelixAskEquationExtractionAttempt["result"] = args.validation.valid
     ? "valid_equation_location_created"
+    : args.calculatorValidation?.valid
+      ? "valid_calculator_evidence_created"
     : candidatesConsidered.length === 0
       ? "no_eligible_candidates"
-      : formulaLikeLineCount === 0
+      : formulaLikeLineCount === 0 && calculatorFieldCount === 0
         ? "no_equation_like_snippets"
         : "internal_error";
   return {
@@ -31014,7 +31331,12 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
     selected_candidate_path: sourcePath ?? null,
     snippets_checked: snippetsChecked,
     result,
-    failure_code: args.validation.valid ? undefined : "equation_source_unavailable",
+    created_artifact_id: args.validation.valid
+      ? readAskTurnString(args.equationLocationPayload?.kind) ?? "doc_equation_location"
+      : args.calculatorValidation?.valid
+        ? readAskTurnString(args.calculatorEvidencePayload?.kind) ?? "doc_calculator_evidence"
+        : undefined,
+    failure_code: args.validation.valid || args.calculatorValidation?.valid ? undefined : "equation_source_unavailable",
   };
 };
 
@@ -31662,7 +31984,7 @@ const evaluateTurnSatisfaction = (args: {
       : canonicalGoal.goal_kind === "latest_doc_navigation"
         ? ["doc_open_receipt"]
       : canonicalGoal.goal_kind === "doc_equation_location"
-        ? ["doc_equation_location"]
+        ? ["doc_equation_location", "doc_calculator_evidence"]
       : canonicalGoal.goal_kind === "equation_attempt_followup"
         ? ["equation_attempt_explanation"]
       : canonicalGoal.goal_kind === "doc_evidence_synthesis"
@@ -31752,6 +32074,8 @@ const evaluateTurnSatisfaction = (args: {
           ? validateAskTurnDocEvidenceLocationArtifact(readAskTurnArtifactPayloadRecord(artifact))
           : canonicalGoal.goal_kind === "doc_equation_location" && artifact.kind === "doc_equation_location"
             ? validateAskTurnDocEquationLocationArtifact(readAskTurnArtifactPayloadRecord(artifact))
+          : canonicalGoal.goal_kind === "doc_equation_location" && artifact.kind === "doc_calculator_evidence"
+            ? validateAskTurnDocCalculatorEvidenceArtifact(readAskTurnArtifactPayloadRecord(artifact))
           : { valid: true, failures: [] };
       if (!sufficient || !evidenceValidation.valid) {
         rejectedTerminalCandidates.push({
@@ -31954,6 +32278,7 @@ const HELIX_ASK_TERMINAL_ARTIFACT_KINDS = new Set([
   "capability_help_summary",
   "doc_summary",
   "doc_equation_location",
+  "doc_calculator_evidence",
   "reasoning_summary",
   "direct_answer_text",
   "final_failure",
@@ -32458,7 +32783,8 @@ const buildAskTurnUniversalGoalFrame = (args: {
     });
     if (retrievalRequiredSignal.requested_outputs.includes("equation_location") || equationIntent.required) {
       pushRequestedOutput("location", "retrieval_required:equation_location");
-      pushEvidenceRequirement("doc_equation_location", "equation-bearing document requests require equation-like source evidence");
+      pushEvidenceRequirement("doc_equation_location", "equation-bearing document requests require explicit formula source evidence when available");
+      pushEvidenceRequirement("doc_calculator_evidence", "calculator-usable equation requests may fall back to table/key-value evidence with a derived relation");
       pushEvidenceRequirement("doc_candidate_validation", "equation-bearing document requests require candidate validation");
     }
     if (retrievalRequiredSignal.requested_outputs.includes("latest_doc")) {
@@ -34622,6 +34948,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
                 query: locateQuery,
                 path: selectedSearchResult.match.path,
                 retrieval_required: true,
+                locate_strategy: retrievalRequiredSignal.requested_outputs.includes("equation_location") ? "variant" : "exact",
                 target_transcript: args.transcript,
                 target_request: buildAskTurnEvidenceTargetRequest({
                   turnId: "initial-capability-plan",
@@ -90653,8 +90980,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           if (artifact.kind !== "doc_equation_location") return false;
           return validateAskTurnDocEquationLocationArtifact(readAskTurnArtifactPayloadRecord(artifact)).valid;
         }) ?? null;
+      const validCalculatorEvidenceArtifact =
+        currentTurnArtifacts.find((artifact) => {
+          if (artifact.kind !== "doc_calculator_evidence") return false;
+          return validateAskTurnDocCalculatorEvidenceArtifact(readAskTurnArtifactPayloadRecord(artifact)).valid;
+        }) ?? null;
       const renderedEquationArtifact = validEquationArtifact
         ? renderAskTurnDocEquationLocationFromArtifact(readAskTurnArtifactPayloadRecord(validEquationArtifact))
+        : null;
+      const renderedCalculatorEvidenceArtifact = validCalculatorEvidenceArtifact
+        ? renderAskTurnDocCalculatorEvidenceFromArtifact(readAskTurnArtifactPayloadRecord(validCalculatorEvidenceArtifact))
         : null;
       if (validEquationArtifact && renderedEquationArtifact) {
         finalText = renderedEquationArtifact;
@@ -90665,6 +91000,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.terminal_artifact_kind = "doc_equation_location";
         payload.terminal_artifact_id = validEquationArtifact.artifact_id;
         payload.terminal_artifact_owner_turn_id = validEquationArtifact.turn_id;
+        payload.final_artifact_scope = "current_turn";
+      } else if (validCalculatorEvidenceArtifact && renderedCalculatorEvidenceArtifact) {
+        finalText = renderedCalculatorEvidenceArtifact;
+        resolvedFinalStatus = "final_answer";
+        finalAnswerSource = "artifact_synthesis";
+        payload.response_type = "final_answer";
+        delete payload.terminal_error_code;
+        payload.terminal_artifact_kind = "doc_calculator_evidence";
+        payload.terminal_artifact_id = validCalculatorEvidenceArtifact.artifact_id;
+        payload.terminal_artifact_owner_turn_id = validCalculatorEvidenceArtifact.turn_id;
         payload.final_artifact_scope = "current_turn";
       } else if (!finalText.includes("equation_source_unavailable")) {
         finalText = renderAskTurnScientificMissingFinalText({
