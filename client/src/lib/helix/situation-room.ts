@@ -11,6 +11,9 @@ export type HelixSituationSource =
 
 export type HelixSituationEventType =
   | "voice_transcript"
+  | "source_started"
+  | "source_stopped"
+  | "source_error"
   | "game_event"
   | "player_state"
   | "screen_observation"
@@ -157,4 +160,3 @@ export function reduceSituationRoomEvent(
       : state.recentTranscript,
   };
 }
-

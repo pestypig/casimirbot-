@@ -20,6 +20,7 @@ export type PanelId =
   | "resonance-orchestra"
   | "stress-map"
   | "essence-prompt-panel"
+  | "situation-room-sources"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -254,6 +255,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultPosition: { x: 220, y: 140 },
   },
   {
+    id: "situation-room-sources",
+    title: "Situation Room Sources",
+    loader: load(() => import("@/components/workstation/SituationRoomSourcesPanel")),
+    defaultSize: { w: 1040, h: 720 },
+    defaultPosition: { x: 240, y: 160 },
+    keywords: ["situation", "room", "sources", "audio", "transcript", "notes"],
+  },
+  {
     id: "workstation-clipboard-history",
     title: "Clipboard History",
     loader: load(() => import("@/components/workstation/WorkstationClipboardHistoryPanel")),
@@ -308,9 +317,9 @@ const BASE_PANELS: PanelDefinition[] = [
 const existingIds = new Set(BASE_PANELS.map((p) => p.id));
 const mergedHelix = HELIX_PANELS.filter((p) => !existingIds.has(p.id));
 
-export const panelRegistry: PanelDefinition[] = [...BASE_PANELS, ...mergedHelix].map((panel) => ({
+export const panelRegistry: PanelDefinition[] = ([...BASE_PANELS, ...mergedHelix] as PanelDefinition[]).map((panel) => ({
   ...panel,
-  workstationCapabilities: panel.workstationCapabilities ?? getWorkstationPanelCapabilities(panel.id),
+  workstationCapabilities: panel.workstationCapabilities ?? getWorkstationPanelCapabilities(panel.id) ?? undefined,
 }));
 
 export function getPanelDef(id: PanelDefinition["id"]) {

@@ -11,6 +11,7 @@ export type DisplayAudioSituationSessionOptions = {
   chunkMs?: number;
   onEvent: (event: HelixSituationEvent) => void;
   onError?: (error: Error) => void;
+  onStop?: (reason: "manual" | "track_ended") => void;
   isDottiePlaybackActive?: () => boolean;
   transcribe?: DisplayAudioTranscribe;
 };
@@ -238,7 +239,7 @@ export async function startDisplayAudioSituationSession(
   recorder.start(recorderSliceMs);
   segmentTimer = setInterval(flushSegment, chunkMs);
 
-  const stop = (): void => {
+  const stop = (reason: "manual" | "track_ended" = "manual"): void => {
     if (stopped) return;
     stopped = true;
     if (segmentTimer !== null) {
@@ -257,10 +258,11 @@ export async function startDisplayAudioSituationSession(
       // Recorder may already be stopped by the browser.
     }
     stopStreamTracks(stream);
+    options.onStop?.(reason);
   };
 
   for (const track of stream.getTracks()) {
-    track.addEventListener?.("ended", stop, { once: true });
+    track.addEventListener?.("ended", () => stop("track_ended"), { once: true });
   }
 
   return {

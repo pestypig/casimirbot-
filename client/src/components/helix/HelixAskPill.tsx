@@ -61,14 +61,8 @@ import {
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
 import {
-  startDisplayAudioSituationSession,
-  type DisplayAudioSituationSession,
-} from "@/lib/helix/display-audio-capture";
-import {
   createSituationRoomState,
-  reduceSituationRoomEvent,
   sourceLabelForSituationSource,
-  type HelixSituationEvent,
   type SituationRoomState,
 } from "@/lib/helix/situation-room";
 import {
@@ -157,6 +151,7 @@ import {
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
+import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
@@ -5283,6 +5278,15 @@ function describeVoiceInputError(error: unknown): string {
 type HelixAskReply = {
   id: string;
   content: string;
+  text?: string;
+  assistant_answer?: string;
+  selected_final_answer?: string | null;
+  final_answer_source?: string | null;
+  terminal_error_code?: string | null;
+  terminal_artifact_kind?: string | null;
+  pending_server_request?: Record<string, unknown> | null;
+  resolved_turn_summary?: Record<string, unknown> | null;
+  turn_id?: string | null;
   ok?: boolean;
   error?: string;
   message?: string;
@@ -5868,6 +5872,9 @@ function resolveHelixVisibleTerminalKind(args: {
   if (isHelixCanceledPendingTurn(args.reply, args.reply?.debug, args.terminal, ...(args.extraSources ?? []))) {
     return "canceled";
   }
+  if (args.reply) {
+    return buildVisibleResolvedTurn(args.reply).primary_terminal_label;
+  }
   const terminalKind = typeof args.terminal?.kind === "string" ? args.terminal.kind : null;
   if (terminalKind === "final_answer" || terminalKind === "final_failure") {
     return terminalKind;
@@ -5943,11 +5950,120 @@ type HelixAskVisibleTerminalResolution = {
   backendTerminalText: string | null;
 };
 
+type VisibleResolvedTurn = {
+  active_turn_id: string;
+  primary_route_label: string;
+  primary_terminal_label: "final_answer" | "final_failure" | "pending_input";
+  primary_source_label: string;
+  selected_final_answer: string;
+  terminal_error_code?: string | null;
+  pending_server_request_present: boolean;
+};
+
 function readHelixAskTerminalText(record: Record<string, unknown> | null | undefined): string | null {
   if (!record) return null;
   const text = typeof record.text === "string" ? record.text.trim() : "";
   return text.length > 0 ? text : null;
 }
+
+const stableHelixProjectionHash = (value: string): string => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
+
+const readHelixResolvedTurnSummary = (reply?: HelixAskReply | null): Record<string, unknown> | null => {
+  const record = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
+  const turnTruthTable = readAgentLoopAuditRecord(record?.turn_truth_table ?? debugRecord?.turn_truth_table);
+  return readAgentLoopAuditRecord(record?.resolved_turn_summary ?? debugRecord?.resolved_turn_summary ?? turnTruthTable?.resolved_turn_summary);
+};
+
+const readHelixCanonicalGoalKind = (reply?: HelixAskReply | null): string => {
+  const record = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
+  const canonical = readAgentLoopAuditRecord(record?.canonical_goal_frame ?? debugRecord?.canonical_goal_frame);
+  return coerceText(canonical?.goal_kind).trim() || "unknown";
+};
+
+const readHelixTopLevelPendingServerRequest = (reply?: HelixAskReply | null): Record<string, unknown> | null => {
+  const record = readAgentLoopAuditRecord(reply);
+  return readHelixPendingInputRecord(record?.pending_server_request);
+};
+
+export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedTurn {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const summary = readHelixResolvedTurnSummary(reply);
+  const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
+  const pendingPresent = Boolean(pendingRequest);
+  const statusCandidate =
+    coerceText(summary?.final_status).trim() ||
+    coerceText(readAgentLoopAuditRecord(replyRecord?.satisfaction_report ?? debugRecord?.satisfaction_report)?.terminal_kind).trim() ||
+    (pendingPresent ? "pending_input" : reply.ok === false ? "final_failure" : "final_answer");
+  const normalizedStatus: VisibleResolvedTurn["primary_terminal_label"] =
+    statusCandidate === "pending_input" && pendingPresent
+      ? "pending_input"
+      : statusCandidate === "final_failure" || (statusCandidate === "pending_input" && !pendingPresent)
+        ? "final_failure"
+        : "final_answer";
+  const terminalErrorCode =
+    coerceText(replyRecord?.terminal_error_code).trim() ||
+    coerceText(debugRecord?.terminal_error_code).trim() ||
+    coerceText(summary?.terminal_error_code).trim() ||
+    null;
+  const finalAnswerSource =
+    coerceText(replyRecord?.final_answer_source).trim() ||
+    coerceText(debugRecord?.final_answer_source).trim() ||
+    (terminalErrorCode ? "typed_failure" : "unknown");
+  const selectedFinalAnswer =
+    coerceText(replyRecord?.selected_final_answer).trim() ||
+    coerceText(debugRecord?.selected_final_answer).trim() ||
+    coerceText(reply.assistant_answer).trim() ||
+    coerceText(reply.text).trim() ||
+    coerceText(reply.content).trim();
+  const routeLabel =
+    coerceText(summary?.resolved_route_label).trim() ||
+    `${readHelixCanonicalGoalKind(reply)} / ${finalAnswerSource}`;
+  return {
+    active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
+    primary_route_label: routeLabel,
+    primary_terminal_label: normalizedStatus,
+    primary_source_label: finalAnswerSource.replace(/_/g, " "),
+    selected_final_answer: selectedFinalAnswer,
+    terminal_error_code: terminalErrorCode,
+    pending_server_request_present: pendingPresent,
+  };
+}
+
+export function chooseVisibleFinalText(reply: HelixAskReply): string {
+  const visible = buildVisibleResolvedTurn(reply);
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  if (visible.primary_source_label.replace(/\s+/g, "_") === "typed_failure" || visible.terminal_error_code) {
+    return (
+      visible.selected_final_answer ||
+      coerceText(replyRecord?.assistant_answer).trim() ||
+      coerceText(replyRecord?.text).trim() ||
+      renderTypedFailureFallback(visible.terminal_error_code)
+    );
+  }
+  return visible.selected_final_answer || coerceText(replyRecord?.text).trim() || coerceText(debugRecord?.text).trim() || "";
+}
+
+const renderTypedFailureFallback = (code?: string | null): string => {
+  const normalized = coerceText(code).trim();
+  if (normalized === "synthesis_unavailable") {
+    return "I found candidate evidence, but no current-turn synthesis artifact answered the requested conclusion.\nCause: synthesis_unavailable.";
+  }
+  if (normalized === "equation_source_unavailable") {
+    return "I looked for an equation-bearing source, but no current-turn equation artifact satisfied the source contract.\nCause: equation_source_unavailable.";
+  }
+  return normalized ? `I could not complete that turn.\nCause: ${normalized}.` : "I could not complete that turn.";
+};
 
 function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | null {
   for (const source of sources) {
@@ -5977,6 +6093,18 @@ function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | nul
 
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
   const record = readAgentLoopAuditRecord(value);
+  const replyRecord = record as HelixAskReply | null;
+  if (replyRecord?.id && replyRecord.content !== undefined) {
+    const visible = buildVisibleResolvedTurn(replyRecord);
+    const selected = chooseVisibleFinalText(replyRecord);
+    if (selected) {
+      return {
+        text: selected,
+        source: visible.primary_source_label.replace(/\s+/g, "_"),
+        backendTerminalText: visible.selected_final_answer || selected,
+      };
+    }
+  }
   const debugRecord = readAgentLoopAuditRecord(record?.debug);
   const envelopeRecord = readAgentLoopAuditRecord(record?.envelope);
   const agentLoopAudit = readAgentLoopAuditRecord(record?.agent_loop_audit ?? debugRecord?.agent_loop_audit);
@@ -6104,12 +6232,15 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   const appendedSteps = readAgentLoopAuditArray(runtimeSummary?.appended_steps);
   const terminal = readAgentLoopAuditRecord(truthTable?.terminal ?? runtimeSummary?.terminal);
   const selectedTool = readAgentLoopAuditRecord(truthTable?.selected_tool ?? agentLoopAudit?.selected_action);
-  const route = String(truthTable?.route_reason_code ?? agentLoopAudit?.route_reason_code ?? reply.debug?.server_route_reason_code ?? "n/a");
-  const policy = String(truthTable?.dispatch_policy ?? agentLoopAudit?.dispatch_policy ?? reply.debug?.server_dispatch_policy ?? "n/a");
+  const visibleResolvedTurn = buildVisibleResolvedTurn(reply);
+  const route = visibleResolvedTurn.primary_route_label;
   const visibleAnswer = typeof truthTable?.visible_answer_text === "string" ? truthTable.visible_answer_text : reply.content;
   const terminalText = typeof terminal?.text === "string" ? terminal.text : "";
   const truthMatchesVisible = Boolean(terminalText && visibleAnswer && terminalText.trim() === visibleAnswer.trim());
-  const pendingInput = resolveHelixPendingInputRecord(reply, reply.debug, truthTable, runtimeSummary, agentLoopAudit);
+  const pendingInput =
+    visibleResolvedTurn.primary_terminal_label === "pending_input" && visibleResolvedTurn.pending_server_request_present
+      ? readHelixTopLevelPendingServerRequest(reply)
+      : null;
   const visibleTerminalKind = resolveHelixVisibleTerminalKind({
     reply,
     terminal,
@@ -6208,7 +6339,7 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
         </p>
       </div>
       <p className="mt-1 text-[11px] text-cyan-100/80">
-        Route: {policy} / {route}
+        Route: {route}
         {selectedTool ? ` | Tool: ${readProceduralActionLabel(selectedTool)}` : ""}
       </p>
       <div className="mt-2 space-y-1.5">
@@ -9164,6 +9295,36 @@ function buildReplyMasterEventClockExport(args: {
     typeof resolvedTurnSummary?.resolved_route_label === "string" && resolvedTurnSummary.resolved_route_label.trim()
       ? resolvedTurnSummary.resolved_route_label
       : `${String(turnTruthTable?.dispatch_policy ?? "n/a")} / ${String(turnTruthTable?.route_reason_code ?? "n/a")}`;
+  const visibleResolvedTurn = buildVisibleResolvedTurn(args.reply);
+  const pendingVisible = visibleResolvedTurn.primary_terminal_label === "pending_input" && visibleResolvedTurn.pending_server_request_present;
+  const selectedFinalAnswerHash = stableHelixProjectionHash(visibleResolvedTurn.selected_final_answer);
+  const visibleFinalAnswerHash = stableHelixProjectionHash(visibleAnswerText);
+  const visibleProjectionViolations = [
+    visibleResolvedTurn.primary_route_label !== resolvedRouteLabel ? "route_label_mismatch" : null,
+    visibleResolvedTurn.primary_terminal_label !== (coerceText(resolvedTurnSummary?.final_status).trim() || visibleResolvedTurn.primary_terminal_label)
+      ? "terminal_label_mismatch"
+      : null,
+    visibleResolvedTurn.selected_final_answer &&
+    normalizeTerminalAnswerText(visibleResolvedTurn.selected_final_answer) !== normalizeTerminalAnswerText(visibleAnswerText)
+      ? "visible_answer_mismatch"
+      : null,
+    pendingVisible && !visibleResolvedTurn.pending_server_request_present ? "stale_pending_visible" : null,
+    visibleResolvedTurn.primary_source_label.replace(/\s+/g, "_") === "typed_failure" && /^Search results:/i.test(visibleAnswerText.trim())
+      ? "typed_failure_rendered_as_search_results"
+      : null,
+  ].filter((entry): entry is string => Boolean(entry));
+  const visibleProjectionInvariant = {
+    active_turn_id: visibleResolvedTurn.active_turn_id,
+    visible_route_label: visibleResolvedTurn.primary_route_label,
+    resolved_route_label: resolvedRouteLabel,
+    visible_terminal_label: visibleResolvedTurn.primary_terminal_label,
+    resolved_final_status: coerceText(resolvedTurnSummary?.final_status).trim() || visibleResolvedTurn.primary_terminal_label,
+    visible_final_answer_hash: visibleFinalAnswerHash,
+    selected_final_answer_hash: selectedFinalAnswerHash,
+    pending_visible: pendingVisible,
+    pending_server_request_present: visibleResolvedTurn.pending_server_request_present,
+    violations: visibleProjectionViolations,
+  };
 
   const payload = {
     schema: "helix.ask.master_event_clock.v2",
@@ -9209,6 +9370,7 @@ function buildReplyMasterEventClockExport(args: {
     debug: args.reply.debug ?? null,
     resolved_turn_summary: resolvedTurnSummary,
     route_history_debug: routeHistoryDebug,
+    visible_projection_invariant: visibleProjectionInvariant,
     equation_attempt_debug: readAgentLoopAuditRecord(
       args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
     ),
@@ -11692,6 +11854,7 @@ export function HelixAskPill({
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
+  const debugCopyInFlightRef = useRef(false);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
   );
@@ -11706,7 +11869,8 @@ export function HelixAskPill({
   >("idle");
   const [displayAudioError, setDisplayAudioError] = useState<string | null>(null);
   const [displayAudioCaptureLabel, setDisplayAudioCaptureLabel] = useState<string | null>(null);
-  const displayAudioSessionRef = useRef<DisplayAudioSituationSession | null>(null);
+  const displayAudioSourceIdRef = useRef<string | null>(null);
+  const situationRoomSourcesById = useSituationRoomStore((state) => state.sources);
   useEffect(() => {
     setSituationRoomState((prev) =>
       prev.room_id === situationRoomId ? prev : createSituationRoomState(situationRoomId),
@@ -13832,25 +13996,31 @@ export function HelixAskPill({
 
   const handleCopyReplyMasterDebug = useCallback(
     async (reply: HelixAskReply, payload: string | null | undefined) => {
-      const exportPayload = normalizeReplyMasterDebugPayload(reply, payload);
-      if (typeof window !== "undefined") {
-        (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
-      }
-      const copyResult = await copyDebugPayloadToClipboard(exportPayload);
-      if (typeof window !== "undefined") {
-        (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
-          copyResult;
-      }
-      if (copyResult.ok) {
-        setCopiedReplyMasterDebugId(reply.id);
-        window.setTimeout(() => {
-          setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
-        }, 1400);
-      } else {
+      if (debugCopyInFlightRef.current) return;
+      debugCopyInFlightRef.current = true;
+      try {
+        const exportPayload = normalizeReplyMasterDebugPayload(reply, payload);
         if (typeof window !== "undefined") {
-          (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
-            copyResult.error ?? "clipboard_write_failed";
+          (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }
+        const copyResult = await copyDebugPayloadToClipboard(exportPayload);
+        if (typeof window !== "undefined") {
+          (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
+            copyResult;
+        }
+        if (copyResult.ok) {
+          setCopiedReplyMasterDebugId(reply.id);
+          window.setTimeout(() => {
+            setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
+          }, 1400);
+        } else {
+          if (typeof window !== "undefined") {
+            (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
+              copyResult.error ?? "clipboard_write_failed";
+          }
+        }
+      } finally {
+        debugCopyInFlightRef.current = false;
       }
     },
     [],
@@ -16580,90 +16750,66 @@ export function HelixAskPill({
     [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
   );
 
-  const appendSituationRoomEvent = useCallback(
-    (event: HelixSituationEvent) => {
-      setSituationRoomState((prev) => reduceSituationRoomEvent(prev, event));
-      appendSyntheticLiveEvent({
-        id: `situation:${event.id}`,
-        tool: "situation_room",
-        ts: event.ts,
-        text:
-          event.event_type === "voice_transcript"
-            ? `${sourceLabelForSituationSource(event.source)}: ${clipText(event.text ?? "", 220)}`
-            : clipText(event.text ?? event.event_type, 220),
-        meta: {
-          room_id: event.room_id,
-          mission_id: event.mission_id ?? null,
-          thread_id: event.thread_id ?? null,
-          source: event.source,
-          event_type: event.event_type,
-          capture_session_id: event.capture_session_id ?? null,
-          chunk_index: event.chunk_index ?? null,
-          evidence_refs: event.evidence_refs,
-          situation_event: event,
-        },
-      });
-      setDisplayAudioStatus("active");
-      setDisplayAudioError(null);
-    },
-    [appendSyntheticLiveEvent],
-  );
-
   const stopDisplayAudioCapture = useCallback(() => {
-    displayAudioSessionRef.current?.stop();
-    displayAudioSessionRef.current = null;
+    const sourceId = displayAudioSourceIdRef.current;
+    if (sourceId) {
+      useSituationRoomStore.getState().stopSource(sourceId);
+    }
+    displayAudioSourceIdRef.current = null;
     setDisplayAudioStatus("idle");
     setDisplayAudioCaptureLabel(null);
   }, []);
 
   const handleDisplayAudioCaptureToggle = useCallback(() => {
-    if (displayAudioSessionRef.current) {
+    if (displayAudioSourceIdRef.current) {
       stopDisplayAudioCapture();
       return;
     }
+    useWorkstationLayoutStore.getState().openPanelInActiveGroup("situation-room-sources");
     setDisplayAudioStatus("requesting");
     setDisplayAudioError(null);
-    void startDisplayAudioSituationSession({
-      roomId: situationRoomId,
-      missionId: contextId,
-      threadId: askLiveSessionId ?? helixAskSessionRef.current ?? undefined,
-      onEvent: (event) => {
-        setDisplayAudioStatus("transcribing");
-        appendSituationRoomEvent(event);
-      },
-      onError: (error) => {
-        setDisplayAudioStatus("error");
-        setDisplayAudioError(error.message);
-        appendSyntheticLiveEvent({
-          id: `situation:error:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-          tool: "situation_room",
-          ts: new Date().toISOString(),
-          text: `Display audio capture failed: ${clipText(error.message, 180)}`,
-          meta: {
-            room_id: situationRoomId,
-            source: "display_screen_audio",
-            event_type: "capture_error",
-          },
-        });
-      },
-      isDottiePlaybackActive: () =>
-        voiceAutoSpeakRunningRef.current ||
-        (playbackAudioRef.current !== null && playbackAudioRef.current.paused === false),
-    })
-      .then((session) => {
-        displayAudioSessionRef.current = session;
+    const situationStore = useSituationRoomStore.getState();
+    const existingRoomId =
+      situationStore.active_room_id && situationStore.rooms[situationStore.active_room_id]
+        ? situationStore.active_room_id
+        : null;
+    const room = existingRoomId
+      ? situationStore.rooms[existingRoomId]
+      : situationStore.createRoom("Helix Ask Sources");
+    if (room?.room_id) {
+      situationStore.setActiveRoom(room.room_id);
+    }
+    void useSituationRoomStore
+      .getState()
+      .attachDisplayAudioSource(room?.room_id ?? situationRoomId, "Helix Ask display audio")
+      .then((source) => {
+        if (!source || source.status === "error") {
+          const message = source?.last_error ?? "Display audio capture failed.";
+          setDisplayAudioStatus("error");
+          setDisplayAudioError(message);
+          appendSyntheticLiveEvent({
+            id: `situation:error:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+            tool: "situation_room",
+            ts: new Date().toISOString(),
+            text: `Display audio capture failed: ${clipText(message, 180)}`,
+            meta: {
+              room_id: room?.room_id ?? situationRoomId,
+              source: "display_screen_audio",
+              event_type: "capture_error",
+            },
+          });
+          return;
+        }
+        displayAudioSourceIdRef.current = source.source_id;
         setDisplayAudioStatus("active");
-        setDisplayAudioCaptureLabel(sourceLabelForSituationSource(session.source));
+        setDisplayAudioCaptureLabel(source.label || sourceLabelForSituationSource(source.capture_source));
       })
       .catch((error) => {
         setDisplayAudioStatus("error");
         setDisplayAudioError(error instanceof Error ? error.message : String(error));
       });
   }, [
-    appendSituationRoomEvent,
     appendSyntheticLiveEvent,
-    askLiveSessionId,
-    contextId,
     situationRoomId,
     stopDisplayAudioCapture,
   ]);
@@ -25329,17 +25475,26 @@ export function HelixAskPill({
     voiceInputState,
     voiceInputError,
   );
+  const displayAudioSourceSnapshot = displayAudioSourceIdRef.current
+    ? situationRoomSourcesById[displayAudioSourceIdRef.current]
+    : undefined;
   const situationTranscriptPreview = useMemo(
     () =>
+      displayAudioSourceSnapshot?.transcript_preview ??
       situationRoomState.recentTranscript
         .slice(-3)
         .map((segment) => segment.text)
         .join(" ")
         .trim(),
-    [situationRoomState.recentTranscript],
+    [displayAudioSourceSnapshot?.transcript_preview, situationRoomState.recentTranscript],
   );
-  const situationSourceCount = Object.keys(situationRoomState.sources).length;
-  const displayAudioActive = displayAudioStatus === "active" || displayAudioStatus === "transcribing";
+  const situationSourceCount = displayAudioSourceSnapshot
+    ? 1
+    : Object.keys(situationRoomState.sources).length;
+  const displayAudioActive =
+    (displayAudioStatus === "active" || displayAudioStatus === "transcribing") &&
+    displayAudioSourceSnapshot?.status !== "stopped" &&
+    displayAudioSourceSnapshot?.status !== "error";
   const [voiceCallDiagnostics, setVoiceCallDiagnostics] = useState<VoiceCallDiagnosticSnapshot[]>(() =>
     getVoiceCallDiagnosticsSnapshot(),
   );
@@ -26157,7 +26312,8 @@ export function HelixAskPill({
                         Situation Room Source
                       </p>
                       <p className="mt-1 truncate text-[11px] text-cyan-50">
-                        {displayAudioCaptureLabel ?? "Display audio"} / {displayAudioStatus}
+                        {displayAudioSourceSnapshot?.label ?? displayAudioCaptureLabel ?? "Display audio"} /{" "}
+                        {displayAudioSourceSnapshot?.status ?? displayAudioStatus}
                       </p>
                     </div>
                     <span className="shrink-0 rounded border border-cyan-300/35 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
@@ -26775,7 +26931,11 @@ export function HelixAskPill({
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
             const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
-            const pendingAgentRequest = resolveHelixPendingInputRecord(reply, replyDebugRecord, agentLoopAudit, runtimeSummary);
+            const visibleResolvedTurn = buildVisibleResolvedTurn(reply);
+            const pendingAgentRequest =
+              visibleResolvedTurn.primary_terminal_label === "pending_input" && visibleResolvedTurn.pending_server_request_present
+                ? readHelixTopLevelPendingServerRequest(reply)
+                : null;
             const canceledPendingTurn = isHelixCanceledPendingTurn(reply, replyDebugRecord, agentLoopAudit, runtimeSummary);
             const finalComposerConsumedArtifacts = Array.isArray(replyDebugRecord?.final_composer_consumed_artifacts)
               ? replyDebugRecord.final_composer_consumed_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
@@ -26826,9 +26986,9 @@ export function HelixAskPill({
               replyDebugRecord,
               agentLoopAudit,
               runtimeSummary,
-            );
+            ) ?? visibleResolvedTurn.primary_source_label;
             const transcriptAnswer = clipForDisplay(
-              transcriptTerminal.text || reply.content || "",
+              chooseVisibleFinalText(reply) || transcriptTerminal.text || reply.content || "",
               HELIX_ASK_MAX_RENDER_CHARS,
               expanded,
             );
@@ -26839,11 +26999,6 @@ export function HelixAskPill({
                 transcriptTerminal.backendTerminalText.trim() !== transcriptTerminal.text.trim(),
             );
             const transcriptTerminalRecord = readAgentLoopAuditRecord(runtimeSummary?.terminal);
-            const visibleTerminalKind = resolveHelixVisibleTerminalKind({
-              reply,
-              terminal: transcriptTerminalRecord,
-              extraSources: [replyDebugRecord, agentLoopAudit, runtimeSummary],
-            });
             const debugTraceOpen = Boolean(
               terminalMismatchForReply ||
                 pendingAgentRequest ||
@@ -27176,11 +27331,7 @@ export function HelixAskPill({
                         "n/a",
                     )}{" "}
                     | Route:{" "}
-                    {String(
-                      agentLoopAudit?.route_reason_code ??
-                        reply.debug?.server_route_reason_code ??
-                        "n/a",
-                    )}
+                    {visibleResolvedTurn.primary_route_label}
                   </p>
                   {selectedAgentAction ? (
                     <p className="mt-1">
@@ -27250,7 +27401,7 @@ export function HelixAskPill({
                         </button>
                       </div>
                     </div>
-                  ) : reply.debug?.pending_intercepted_turn ? (
+                  ) : reply.debug?.pending_intercepted_turn && visibleResolvedTurn.primary_terminal_label === "pending_input" ? (
                     <p className="mt-1 text-[10px] text-red-200">
                       Pending transition:{" "}
                       {String(
@@ -27263,9 +27414,7 @@ export function HelixAskPill({
                   ) : null}
                   <p className="mt-1">
                     Terminal:{" "}
-                    {visibleTerminalKind !== "n/a"
-                      ? visibleTerminalKind
-                      : String(readAgentLoopAuditRecord(agentLoopAudit?.terminal_contract)?.terminal_kind ?? "n/a")}
+                    {visibleResolvedTurn.primary_terminal_label}
                   </p>
                 </div>
               ) : null}
@@ -27461,7 +27610,6 @@ export function HelixAskPill({
                   {userSettings.showHelixAskDebug ? (
                     <button
                       type="button"
-                      onPointerDown={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                       onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                       disabled={
                         typeof window === "undefined"
@@ -27545,7 +27693,6 @@ export function HelixAskPill({
                     <div className="mt-2 flex justify-end">
                       <button
                         type="button"
-                        onPointerDown={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                         onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                         disabled={
                           typeof window === "undefined"
