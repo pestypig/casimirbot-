@@ -20944,6 +20944,15 @@ type HelixConversationPendingInputRecord = {
 };
 
 const helixConversationPendingInputBySession = new Map<string, HelixConversationPendingInputRecord>();
+const helixAskEquationExtractionAttemptBySession = new Map<
+  string,
+  {
+    artifact_id: string;
+    turn_id: string;
+    payload: Record<string, unknown>;
+    stored_at_ms: number;
+  }
+>();
 export const __testHelixAskPendingInputStore = {
   set(sessionId: string, record: Record<string, unknown>): void {
     helixConversationPendingInputBySession.set(sessionId, record as HelixConversationPendingInputRecord);
@@ -21361,6 +21370,7 @@ type HelixAskCanonicalGoalKind =
   | "workspace_help"
   | "latest_doc_navigation"
   | "doc_equation_location"
+  | "equation_attempt_followup"
   | "doc_evidence_location"
   | "doc_scientific_numeric"
   | "doc_scientific_concept"
@@ -21386,6 +21396,7 @@ type HelixAskRequiredTerminalKind =
   | "direct_answer_text"
   | "doc_open_receipt"
   | "doc_equation_location"
+  | "equation_attempt_explanation"
   | "doc_evidence_location"
   | "doc_numeric_answer"
   | "doc_concept_explanation"
@@ -21545,6 +21556,29 @@ type HelixAskDocumentSeekingIntent = {
   required: boolean;
   terms: string[];
   reason: string;
+};
+type HelixAskEquationSemanticIntent = {
+  turn_id: string;
+  required: boolean;
+  strength: "hard" | "soft" | "none";
+  source_request: boolean;
+  calculator_use: boolean;
+  relation_request: boolean;
+  formula_request: boolean;
+  relation_terms: string[];
+  equation_terms: string[];
+  calculator_terms: string[];
+  source_terms: string[];
+  scientific_anchor_terms: string[];
+  preserved_query_terms: string[];
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+};
+type HelixAskEquationAttemptFollowupIntent = {
+  required: boolean;
+  refers_to_prior_attempt: boolean;
+  requested_explanation: "checked_candidates" | "rejection_reasons" | "queries" | "missing_requirements" | "summary";
+  matched_phrases: string[];
 };
 type HelixAskEquationRetrievalIntent = {
   turn_id: string;
@@ -29387,6 +29421,7 @@ const buildAskTurnEquationAttemptDebugPayload = (args: {
   payload?: Record<string, unknown> | null;
 }): Record<string, unknown> | null => {
   const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: "equation-debug", transcript: args.transcript });
+  const equationSemanticIntent = buildAskTurnEquationSemanticIntent({ turnId: "equation-debug", transcript: args.transcript });
   const attempt = readAskTurnEquationExtractionAttemptPayload(args.artifacts);
   const equationArtifact = args.artifacts.find((artifact) => artifact.kind === "doc_equation_location");
   const equationPayload = equationArtifact ? readAskTurnArtifactPayloadRecord(equationArtifact) : null;
@@ -29410,6 +29445,7 @@ const buildAskTurnEquationAttemptDebugPayload = (args: {
     ? attempt.candidates_considered.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
     : [];
   return {
+    equation_semantic_intent: equationSemanticIntent,
     equation_retrieval_intent: {
       required: equationIntent.required,
       requested_outputs: equationIntent.requested_outputs,
@@ -29426,6 +29462,144 @@ const buildAskTurnEquationAttemptDebugPayload = (args: {
       valid: equationValidation.valid,
       failures: equationValidation.failures,
       selected_artifact_id: equationArtifact?.artifact_id,
+    },
+  };
+};
+
+const classifyAskTurnEquationAttemptFollowupIntent = (transcript: string): HelixAskEquationAttemptFollowupIntent => {
+  const raw = transcript.trim();
+  const matchedPhrases = uniqueAskTurnStrings([
+    /\blast\s+source[-\s]?finding\s+attempt\b/i.test(raw) ? "last source-finding attempt" : null,
+    /\blast\s+equation[-\s]?source\s+attempt\b/i.test(raw) ? "last equation-source attempt" : null,
+    /\bwhat\s+was\s+checked\b/i.test(raw) ? "what was checked" : null,
+    /\bwhat\s+did\s+you\s+check\b/i.test(raw) ? "what did you check" : null,
+    /\bwhy\s+did\s+(?:it|that)\s+(?:fail|not\s+satisfy)\b/i.test(raw) ? "why did it fail" : null,
+    /\bwhat\s+source\s+did\s+you\s+try\b/i.test(raw) ? "what source did you try" : null,
+    /\bcalculator[-\s]?ready\s+equation\s+requirement\b/i.test(raw) ? "calculator-ready equation requirement" : null,
+  ]);
+  const refersToPriorAttempt =
+    /\b(?:last|previous|prior)\b/i.test(raw) ||
+    /\bsource[-\s]?finding\s+attempt\b/i.test(raw) ||
+    /\bequation[-\s]?source\s+attempt\b/i.test(raw);
+  const requestedExplanation: HelixAskEquationAttemptFollowupIntent["requested_explanation"] =
+    /\bquer(?:y|ies|ied|search(?:ed)?)\b/i.test(raw)
+      ? "queries"
+      : /\bmissing|requirement\b/i.test(raw)
+        ? "missing_requirements"
+        : /\breject|why|fail|satisfy\b/i.test(raw)
+          ? "rejection_reasons"
+          : /\bchecked|source|candidate\b/i.test(raw)
+            ? "checked_candidates"
+            : "summary";
+  const required =
+    matchedPhrases.length > 0 &&
+    (refersToPriorAttempt || /\bcalculator[-\s]?ready\s+equation\s+requirement\b/i.test(raw));
+  return {
+    required,
+    refers_to_prior_attempt: refersToPriorAttempt,
+    requested_explanation: requestedExplanation,
+    matched_phrases: matchedPhrases,
+  };
+};
+
+const rememberAskTurnEquationExtractionAttempt = (sessionId: string | null | undefined, artifacts: HelixTurnArtifact[]): void => {
+  if (!sessionId) return;
+  const artifact = artifacts.find((entry) => entry.kind === "equation_extraction_attempt");
+  if (!artifact) return;
+  const payload = readAskTurnArtifactPayloadRecord(artifact);
+  if (!payload) return;
+  helixAskEquationExtractionAttemptBySession.set(sessionId, {
+    artifact_id: artifact.artifact_id,
+    turn_id: artifact.turn_id,
+    payload,
+    stored_at_ms: Date.now(),
+  });
+};
+
+const buildAskTurnEquationAttemptExplanationArtifact = (args: {
+  turnId: string;
+  prior: {
+    artifact_id: string;
+    turn_id: string;
+    payload: Record<string, unknown>;
+  };
+}): HelixTurnArtifact => {
+  const attempt = args.prior.payload;
+  const queries = uniqueAskTurnStrings([
+    readAskTurnString(attempt.query),
+    ...(Array.isArray(attempt.normalized_queries) ? attempt.normalized_queries.map(String) : []),
+  ]);
+  const candidates = Array.isArray(attempt.candidates_considered)
+    ? attempt.candidates_considered.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
+    : [];
+  const checkedCandidates = candidates.map((candidate) => ({
+    title: readAskTurnString(candidate.title) ?? null,
+    path: normalizeAskTurnWorkspaceDocPath(candidate.path) ?? readAskTurnString(candidate.path) ?? "unknown source",
+    rejection_reason: readAskTurnString(candidate.rejection_reason) ?? "no equation-like snippet satisfied the source contract",
+    formula_like_line_count:
+      typeof candidate.formula_like_line_count === "number" ? candidate.formula_like_line_count : undefined,
+    equation_markers_found: Array.isArray(candidate.equation_markers_found)
+      ? candidate.equation_markers_found.map(String).filter(Boolean)
+      : [],
+  }));
+  const result = readAskTurnString(attempt.result) ?? "unknown";
+  const missingRequirements = uniqueAskTurnStrings([
+    result === "no_eligible_candidates" ? "eligible equation-bearing source candidate" : null,
+    result === "no_equation_like_snippets" ? "equation-like snippet with formula markers" : null,
+    result === "query_target_loss" ? "preserved equation/calculator query terms" : null,
+    checkedCandidates.length === 0 ? "candidate document evidence" : null,
+  ]);
+  const candidateLines = checkedCandidates.length
+    ? checkedCandidates.slice(0, 5).map((candidate, index) => [
+        `${index + 1}. ${candidate.title ?? candidate.path}`,
+        `   Path: ${candidate.path}`,
+        `   Why it did not satisfy: ${candidate.rejection_reason}`,
+      ].join("\n"))
+    : ["No candidate documents were recorded for that attempt."];
+  const answerText = [
+    "Here is what the last equation-source attempt checked:",
+    "",
+    "Queries:",
+    ...(queries.length ? queries.map((query) => `- ${query}`) : ["- No query was recorded."]),
+    "",
+    "Candidates:",
+    ...candidateLines,
+    "",
+    "Missing requirement:",
+    ...(missingRequirements.length ? missingRequirements.map((entry) => `- ${entry}`) : ["- The recorded attempt did not produce a valid doc_equation_location artifact."]),
+  ].join("\n");
+  return {
+    artifact_id: `${args.turnId}:equation_attempt_followup:equation_attempt_explanation`,
+    turn_id: args.turnId,
+    producer_item_id: "equation_attempt_followup",
+    kind: "equation_attempt_explanation",
+    created_at_ms: Date.now(),
+    source_scope: "current_turn",
+    goal_hash: hashAskTurnGoalFrame({
+      user_goal: {
+        raw: "equation_attempt_followup",
+        normalized: "equation_attempt_followup",
+        goal_kind: "conversation",
+        confidence: 0.92,
+      },
+      requested_outputs: [{ kind: "answer", required: true, evidence: ["equation_attempt_explanation"] }],
+      workspace_refs: [],
+      constraints: [],
+      style_modifiers: [],
+      mutation_targets: [],
+      compound_argument_partition: null,
+    } as HelixAskUniversalGoalFrame),
+    payload: {
+      kind: "equation_attempt_explanation",
+      turn_id: args.turnId,
+      source_scope: "current_turn",
+      prior_attempt_artifact_id: args.prior.artifact_id,
+      prior_attempt_turn_id: args.prior.turn_id,
+      answer_text: answerText,
+      checked_queries: queries,
+      checked_candidates: checkedCandidates,
+      missing_requirements: missingRequirements,
+      confidence: "high",
     },
   };
 };
@@ -29617,6 +29791,10 @@ const classifyAskTurnDocumentSeekingIntent = (transcript: string): HelixAskDocum
     /\bfind\s+me\s+(?:a|an|the)?\s*(?:paper|doc|document|source|report)\b/i.test(raw) ? "find_document" : null,
     /\b(?:find|search|point\s+me\s+at|get\s+me\s+to|show\s+me|locate)\b[\s\S]*\b(?:paper|doc|document|source|report)\b/i.test(raw) ? "document_action" : null,
     /\b(?:paper|doc|document|source|report)\s+with\b/i.test(raw) ? "document_with_constraint" : null,
+    /\b(?:paper|doc|document|source|report|material|reference)\b/i.test(raw) &&
+    /\b(?:find|search|point\s+me\s+to|point\s+me\s+at|get\s+me\s+to|show\s+me|locate|somewhere\s+in)\b/i.test(raw)
+      ? "source_material_action"
+      : null,
     /\bwhere\s+in\s+the\s+docs?\b/i.test(raw) ? "where_in_docs" : null,
     /\bsource\s+path\b/i.test(raw) ? "source_path" : null,
   ]);
@@ -29624,6 +29802,106 @@ const classifyAskTurnDocumentSeekingIntent = (transcript: string): HelixAskDocum
     required: terms.length > 0,
     terms,
     reason: terms.length > 0 ? "document_seeking_phrase" : "no_document_seeking_phrase",
+  };
+};
+
+const buildAskTurnEquationSemanticIntent = (args: {
+  turnId: string;
+  transcript: string;
+}): HelixAskEquationSemanticIntent => {
+  const raw = args.transcript.trim();
+  const negativeDecision = classifyAskTurnNegativeScopeDecision(raw);
+  const negativeScopeBlocked = negativeDecision.scope === "model_only" || negativeDecision.scope === "disallow_workspace_lookup";
+  const sourceTerms = uniqueAskTurnStrings([
+    /\bpapers?\b/i.test(raw) ? "paper" : null,
+    /\breports?\b/i.test(raw) ? "report" : null,
+    /\bdocs?\b/i.test(raw) ? "doc" : null,
+    /\bdocuments?\b/i.test(raw) ? "document" : null,
+    /\bsources?\b/i.test(raw) ? "source" : null,
+    /\bmaterials?\b/i.test(raw) ? "material" : null,
+    /\breferences?\b/i.test(raw) ? "reference" : null,
+    /\bpoint\s+me\s+to\b/i.test(raw) ? "point me to" : null,
+    /\bwhere\b/i.test(raw) ? "where" : null,
+    /\bfind\b/i.test(raw) ? "find" : null,
+  ]);
+  const relationTerms = uniqueAskTurnStrings([
+    /\bformula[-\s]?like\s+relation\b/i.test(raw) ? "formula-like relation" : null,
+    /\brelation\b/i.test(raw) ? "relation" : null,
+    /\bplug\s+numbers\s+into\b/i.test(raw) ? "plug numbers into" : null,
+    /\bcalculator[-\s]?ready\b/i.test(raw) ? "calculator-ready" : null,
+    /\busable\s+relation\b/i.test(raw) ? "usable relation" : null,
+  ]);
+  const equationTerms = uniqueAskTurnStrings([
+    /\bequations?\b/i.test(raw) ? "equations" : null,
+    /\bformulas?\b/i.test(raw) ? "formulas" : null,
+    /\bexpressions?\b/i.test(raw) ? "expression" : null,
+    /\bderivations?\b/i.test(raw) ? "derivation" : null,
+    ...relationTerms,
+  ]);
+  const calculatorTerms = uniqueAskTurnStrings([
+    /\bscientific\s+calculator\b/i.test(raw) ? "scientific calculator" : null,
+    /\bcalculator\b/i.test(raw) ? "calculator" : null,
+    /\bplug\s+numbers\s+into\b/i.test(raw) ? "plug numbers into" : null,
+    /\bcalculator[-\s]?ready\b/i.test(raw) ? "calculator-ready" : null,
+    /\busable\s+(?:equation|relation)\b/i.test(raw) ? "usable equation" : null,
+  ]);
+  const scientificAnchorTerms = uniqueAskTurnStrings([
+    /\bNHM2\b/i.test(raw) ? "NHM2" : null,
+    /\btau\b/i.test(raw) ? "tau" : null,
+    /\balpha\b/i.test(raw) ? "alpha" : null,
+    /\blapse\b/i.test(raw) ? "lapse" : null,
+    /\bcoordinateTimeS\b/i.test(raw) ? "coordinateTimeS" : null,
+    /\btau_expected\b/i.test(raw) ? "tau_expected" : null,
+    /\bwarp\b/i.test(raw) ? "warp" : null,
+    /\btransport[-\s]?time\b/i.test(raw) ? "transport-time" : null,
+    /\btrip[-\s]?time\b/i.test(raw) ? "trip-time" : null,
+  ]);
+  const sourceRequest = sourceTerms.length > 0;
+  const calculatorUse = calculatorTerms.length > 0;
+  const relationRequest = relationTerms.length > 0;
+  const formulaRequest = equationTerms.some((term) => /equation|formula|expression|derivation|formula-like/i.test(term));
+  const hasNhm2 = scientificAnchorTerms.some((term) => term.toLowerCase() === "nhm2");
+  const hasTauOrAlpha = scientificAnchorTerms.some((term) => /^(tau|alpha|tau_expected)$/i.test(term));
+  const hard =
+    !negativeScopeBlocked &&
+    (
+      (sourceRequest && (formulaRequest || calculatorUse || relationRequest) && hasNhm2) ||
+      (sourceRequest && relationRequest && calculatorUse) ||
+      (sourceRequest && relationRequest && hasTauOrAlpha)
+    );
+  const soft =
+    !hard &&
+    !negativeScopeBlocked &&
+    ((relationRequest && (sourceRequest || calculatorUse || hasTauOrAlpha)) || (sourceRequest && (formulaRequest || calculatorUse)));
+  const preservedQueryTerms = uniqueAskTurnStrings([
+    ...scientificAnchorTerms,
+    ...sourceTerms,
+    ...equationTerms,
+    ...calculatorTerms,
+  ]);
+  return {
+    turn_id: args.turnId,
+    required: hard,
+    strength: hard ? "hard" : soft ? "soft" : "none",
+    source_request: sourceRequest,
+    calculator_use: calculatorUse,
+    relation_request: relationRequest,
+    formula_request: formulaRequest,
+    relation_terms: relationTerms,
+    equation_terms: equationTerms,
+    calculator_terms: calculatorTerms,
+    source_terms: sourceTerms,
+    scientific_anchor_terms: scientificAnchorTerms,
+    preserved_query_terms: preservedQueryTerms,
+    confidence: hard ? "high" : soft ? "medium" : "low",
+    reasons: uniqueAskTurnStrings([
+      sourceRequest ? "source_request" : null,
+      calculatorUse ? "calculator_use" : null,
+      relationRequest ? "relation_request" : null,
+      formulaRequest ? "formula_request" : null,
+      scientificAnchorTerms.length ? "scientific_anchor_terms" : null,
+      negativeScopeBlocked ? "negative_scope_blocked" : null,
+    ]),
   };
 };
 
@@ -29641,11 +29919,15 @@ const extractAskTurnEquationRequiredTerms = (transcript: string): {
       /\bformulas?\b/i.test(raw) ? "formulas" : null,
       /\bexpressions?\b/i.test(raw) ? "expression" : null,
       /\bderivations?\b/i.test(raw) ? "derivation" : null,
+      /\bformula[-\s]?like\s+relation\b/i.test(raw) ? "formula-like relation" : null,
+      /\brelation\b/i.test(raw) ? "relation" : null,
     ]),
     calculatorTerms: uniqueAskTurnStrings([
       /\bscientific\s+calculator\b/i.test(raw) ? "scientific calculator" : null,
       /\bcalculator\b/i.test(raw) ? "calculator" : null,
       /\busable\b/i.test(raw) ? "usable" : null,
+      /\bplug\s+numbers\s+into\b/i.test(raw) ? "plug numbers into" : null,
+      /\bcalculator[-\s]?ready\b/i.test(raw) ? "calculator-ready" : null,
     ]),
     documentTerms: uniqueAskTurnStrings([
       /\bpapers?\b/i.test(raw) ? "paper" : null,
@@ -29653,6 +29935,8 @@ const extractAskTurnEquationRequiredTerms = (transcript: string): {
       /\bdocuments?\b/i.test(raw) ? "document" : null,
       /\bsources?\b/i.test(raw) ? "source" : null,
       /\breports?\b/i.test(raw) ? "report" : null,
+      /\bmaterials?\b/i.test(raw) ? "material" : null,
+      /\breferences?\b/i.test(raw) ? "reference" : null,
     ]),
   };
 };
@@ -29666,14 +29950,15 @@ const buildAskTurnEquationRetrievalIntent = (args: {
   const negativeScopeBlocked = negativeDecision.scope === "model_only" || negativeDecision.scope === "disallow_workspace_lookup";
   const documentIntent = classifyAskTurnDocumentSeekingIntent(raw);
   const terms = extractAskTurnEquationRequiredTerms(raw);
-  const hasEquationTerm = terms.equationTerms.length > 0 || /\b(?:equation|formula|expression|derivation)\b/i.test(raw);
+  const semanticIntent = buildAskTurnEquationSemanticIntent({ turnId: args.turnId, transcript: raw });
+  const hasEquationTerm = terms.equationTerms.length > 0 || /\b(?:equation|formula|expression|derivation|relation)\b/i.test(raw);
   const hasCalculatorTerm = terms.calculatorTerms.length > 0;
-  const required = documentIntent.required && (hasEquationTerm || hasCalculatorTerm) && !negativeScopeBlocked;
+  const required = (semanticIntent.required || (documentIntent.required && (hasEquationTerm || hasCalculatorTerm))) && !negativeScopeBlocked;
   const exactTokens = extractAskTurnExactAnchorSet({ turnId: args.turnId, transcript: raw }).must_preserve;
   return {
     turn_id: args.turnId,
     required,
-    strength: required ? "hard" : documentIntent.required && (hasEquationTerm || hasCalculatorTerm) ? "soft" : "none",
+    strength: required ? "hard" : semanticIntent.strength !== "none" || (documentIntent.required && (hasEquationTerm || hasCalculatorTerm)) ? "soft" : "none",
     requested_outputs: required
       ? uniqueAskTurnStrings([
           "document",
@@ -29685,14 +29970,20 @@ const buildAskTurnEquationRetrievalIntent = (args: {
       : [],
     anchors: {
       corpus_terms: terms.corpusTerms,
-      equation_terms: terms.equationTerms.length ? terms.equationTerms : hasEquationTerm ? ["equation", "formula"] : [],
-      calculator_terms: terms.calculatorTerms,
-      document_terms: terms.documentTerms,
+      equation_terms: uniqueAskTurnStrings([
+        ...(terms.equationTerms.length ? terms.equationTerms : hasEquationTerm ? ["equation", "formula"] : []),
+        ...semanticIntent.equation_terms,
+        ...semanticIntent.relation_terms,
+        ...semanticIntent.scientific_anchor_terms.filter((term) => !/^NHM2$/i.test(term)),
+      ]),
+      calculator_terms: uniqueAskTurnStrings([...terms.calculatorTerms, ...semanticIntent.calculator_terms]),
+      document_terms: uniqueAskTurnStrings([...terms.documentTerms, ...semanticIntent.source_terms]),
       exact_tokens: exactTokens,
     },
     negative_scope_blocked: negativeScopeBlocked,
     reasons: uniqueAskTurnStrings([
       documentIntent.required ? documentIntent.reason : null,
+      semanticIntent.required ? "equation_semantic_intent" : null,
       hasEquationTerm ? "equation_term" : null,
       hasCalculatorTerm ? "calculator_term" : null,
       negativeScopeBlocked ? "negative_scope_blocked" : null,
@@ -30246,6 +30537,10 @@ const collectAskTurnEquationMarkers = (text: string): string[] => {
     ["formula", /\bformulas?\b/i],
     ["expression", /\bexpressions?\b/i],
     ["derivation", /\bderivations?\b/i],
+    ["relation", /\brelations?\b/i],
+    ["formula-like", /\bformula[-\s]?like\b/i],
+    ["plug_numbers_into", /\bplug\s+numbers\s+into\b/i],
+    ["calculator-ready", /\bcalculator[-\s]?ready\b/i],
     ["coordinateTimeS", /\bcoordinateTimeS\b/i],
     ["tau_expected", /\btau_expected\b/i],
   ];
@@ -30588,6 +30883,22 @@ const buildAskTurnCanonicalGoalFrame = (args: {
     retrievalSignal,
   });
   const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript });
+  const equationFollowupIntent = classifyAskTurnEquationAttemptFollowupIntent(transcript);
+  if (equationFollowupIntent.required) {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "equation_attempt_followup",
+      answer_scope: "current_turn_action",
+      required_terminal_kind: "equation_attempt_explanation",
+      allows_workspace_context: false,
+      allows_prior_artifacts: true,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: ["equation_attempt_explanation"],
+      confidence: "high",
+      classifier_reasons: ["equation_attempt_followup", ...equationFollowupIntent.matched_phrases],
+    };
+  }
   if (scopeContract.answer_scope === "model_only") {
     return {
       turn_id: args.turnId,
@@ -30632,6 +30943,25 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       concept_tokens: [],
       confidence: "high",
       classifier_reasons: scientific.classifier_reasons,
+    };
+  }
+  if (equationIntent.required) {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "doc_equation_location",
+      answer_scope: "current_turn_doc",
+      required_terminal_kind: "doc_equation_location",
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      corpus_anchors: equationIntent.anchors.corpus_terms,
+      numeric_tokens: [],
+      concept_tokens: [
+        ...equationIntent.anchors.equation_terms,
+        ...equationIntent.anchors.calculator_terms,
+        ...equationIntent.anchors.document_terms,
+      ],
+      confidence: "high",
+      classifier_reasons: equationIntent.reasons,
     };
   }
   if (retrievalSignal.required && retrievalSignal.strength === "hard") {
@@ -30971,6 +31301,8 @@ const evaluateTurnSatisfaction = (args: {
         ? ["doc_open_receipt"]
       : canonicalGoal.goal_kind === "doc_equation_location"
         ? ["doc_equation_location"]
+      : canonicalGoal.goal_kind === "equation_attempt_followup"
+        ? ["equation_attempt_explanation"]
       : canonicalGoal.goal_kind === "doc_evidence_location"
         ? ["doc_evidence_location", "doc_location_matches"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
@@ -31015,6 +31347,8 @@ const evaluateTurnSatisfaction = (args: {
       : canonicalGoal.goal_kind === "latest_doc_navigation"
         ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_equation_location"
+        ? ["direct_answer_text", "doc_summary", "doc_location_matches", "doc_evidence_location", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
+      : canonicalGoal.goal_kind === "equation_attempt_followup"
         ? ["direct_answer_text", "doc_summary", "doc_location_matches", "doc_evidence_location", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_evidence_location"
         ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
@@ -89536,6 +89870,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     };
     payload.current_turn_artifact_ledger = currentTurnArtifacts;
     payload.equation_extraction_attempt = readAskTurnEquationExtractionAttemptPayload(currentTurnArtifacts);
+    payload.equation_semantic_intent = buildAskTurnEquationSemanticIntent({ turnId: activeTurnId, transcript: questionSeed });
     payload.equation_attempt_debug = buildAskTurnEquationAttemptDebugPayload({
       transcript: questionSeed,
       artifacts: currentTurnArtifacts,
@@ -89583,6 +89918,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
                 ? "legacy_fallback"
                 : "planner_terminal";
     if (canonicalGoalFrame.goal_kind === "panel_control" && finalSatisfactionReport.satisfied) {
+      finalAnswerSource = "artifact_synthesis";
+    }
+    if (canonicalGoalFrame.goal_kind === "equation_attempt_followup" && finalSatisfactionReport.satisfied) {
       finalAnswerSource = "artifact_synthesis";
     }
     if (
@@ -89692,6 +90030,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       };
       payload.current_turn_artifact_ledger = currentTurnArtifacts;
       payload.equation_extraction_attempt = readAskTurnEquationExtractionAttemptPayload(currentTurnArtifacts);
+      payload.equation_semantic_intent = buildAskTurnEquationSemanticIntent({ turnId: activeTurnId, transcript: questionSeed });
       payload.equation_attempt_debug = buildAskTurnEquationAttemptDebugPayload({
         transcript: questionSeed,
         artifacts: currentTurnArtifacts,
@@ -89705,6 +90044,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.terminal_artifact_kind = "typed_failure";
       payload.terminal_artifact_owner_turn_id = activeTurnId;
       payload.terminal_artifact_id = consistencyFailureArtifactId;
+    }
+    if (canonicalGoalFrame.goal_kind === "equation_attempt_followup" && finalSatisfactionReport.satisfied) {
+      const explanationArtifact = currentTurnArtifacts.find((artifact) => artifact.kind === "equation_attempt_explanation") ?? null;
+      const explanationPayload = explanationArtifact ? readAskTurnArtifactPayloadRecord(explanationArtifact) : null;
+      const explanationText =
+        readAskTurnString(explanationPayload?.answer_text) ??
+        readAskTurnString(explanationPayload?.text) ??
+        finalText;
+      finalText = explanationText;
+      resolvedFinalStatus = "final_answer";
+      finalAnswerSource = "artifact_synthesis";
+      payload.response_type = "final_answer";
+      delete payload.terminal_error_code;
+      payload.terminal_artifact_kind = "equation_attempt_explanation";
+      payload.terminal_artifact_id = explanationArtifact?.artifact_id ?? finalSatisfactionReport.terminal_artifact_id ?? null;
+      payload.terminal_artifact_owner_turn_id = explanationArtifact?.turn_id ?? activeTurnId;
+      payload.final_artifact_scope = "current_turn";
     }
     payload.canonical_goal_frame = canonicalGoalFrame;
     payload.terminal_consistency_check = terminalConsistencyCheck;
@@ -89880,6 +90236,28 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     if (payload.turn_runtime && typeof payload.turn_runtime === "object") {
       (payload.turn_runtime as Record<string, unknown>).turn_decision_source_map = payload.turn_decision_source_map;
     }
+    if (canonicalGoalFrame.goal_kind === "equation_attempt_followup") {
+      const explanationArtifact = currentTurnArtifacts.find((artifact) => artifact.kind === "equation_attempt_explanation") ?? null;
+      const explanationPayload = explanationArtifact ? readAskTurnArtifactPayloadRecord(explanationArtifact) : null;
+      const explanationText =
+        readAskTurnString(explanationPayload?.answer_text) ??
+        readAskTurnString(explanationPayload?.text) ??
+        finalText;
+      finalText = explanationText;
+      finalAnswerSource = "artifact_synthesis";
+      resolvedFinalStatus = "final_answer";
+      payload.text = explanationText;
+      payload.answer = explanationText;
+      payload.assistant_answer = explanationText;
+      payload.selected_final_answer = explanationText;
+      payload.final_answer_source = "artifact_synthesis";
+      payload.response_type = "final_answer";
+      payload.final_status = "final_answer";
+      delete payload.terminal_error_code;
+      payload.terminal_artifact_kind = explanationArtifact ? "equation_attempt_explanation" : payload.terminal_artifact_kind;
+      payload.terminal_artifact_id = explanationArtifact?.artifact_id ?? payload.terminal_artifact_id;
+      payload.terminal_artifact_owner_turn_id = explanationArtifact?.turn_id ?? payload.terminal_artifact_owner_turn_id;
+    }
     attachAskTurnEventsToPayload(payload, finalText, resolvedFinalStatus);
     attachTurnTruthTable(
       finalText,
@@ -89888,9 +90266,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     );
     const responseBoundaryScientificCode = readAskTurnString(payload.terminal_error_code);
     if (
-      responseBoundaryScientificCode === "numeric_result_unavailable" ||
-      responseBoundaryScientificCode === "concept_explanation_unavailable" ||
-      responseBoundaryScientificCode === "equation_source_unavailable"
+      canonicalGoalFrame.goal_kind !== "equation_attempt_followup" &&
+      (
+        responseBoundaryScientificCode === "numeric_result_unavailable" ||
+        responseBoundaryScientificCode === "concept_explanation_unavailable" ||
+        responseBoundaryScientificCode === "equation_source_unavailable"
+      )
     ) {
       const responseBoundaryScientificText = renderAskTurnScientificMissingFinalText({
         code: responseBoundaryScientificCode,
@@ -89924,6 +90305,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     attachAgentLoopAudit();
     normalizeAskTurnTopLevelEnvelope(payload, status);
+    rememberAskTurnEquationExtractionAttempt(
+      responseSessionId ?? (typeof incoming.sessionId === "string" ? incoming.sessionId : null),
+      Array.isArray(payload.current_turn_artifact_ledger) ? (payload.current_turn_artifact_ledger as HelixTurnArtifact[]) : [],
+    );
     return res.status(status).json(payload);
   };
   if (!transcriptSeed) {
@@ -90104,9 +90489,6 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     return null;
   };
-  const incomingIntentFamily = inferAskTurnIntentFamily(transcript);
-  const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
-  const earlyPanelControlIntent = classifyAskTurnPanelControlIntent(transcript);
   const retrievalRequiredSignal = buildAskTurnRetrievalRequiredSignal({
     turnId,
     transcript,
@@ -90114,6 +90496,136 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       JSON.stringify((routeDecision as unknown as Record<string, unknown>).explorationPacket ?? {}),
     ),
   });
+  const equationAttemptFollowupIntent = classifyAskTurnEquationAttemptFollowupIntent(transcript);
+  if (equationAttemptFollowupIntent.required && existingPendingRequest && conversationPendingKey) {
+    helixConversationPendingInputBySession.delete(conversationPendingKey);
+    existingPendingRequest = null;
+    recordPendingTransition("aborted_turn_transition", "equation_attempt_followup_overrode_stale_pending");
+  }
+  if (equationAttemptFollowupIntent.required) {
+    const priorAttempt = sessionId ? helixAskEquationExtractionAttemptBySession.get(sessionId) ?? null : null;
+    const followupGoalFrame = buildAskTurnUniversalGoalFrame({
+      transcript,
+      workspaceSnapshot: workspaceSessionSnapshot,
+    });
+    const canonicalFollowupGoalFrame = buildAskTurnCanonicalGoalFrame({
+      turnId,
+      goalFrame: followupGoalFrame,
+      pendingServerRequest: null,
+    });
+    if (!priorAttempt) {
+      const failureText = "I could not find a prior equation-source attempt in this session to inspect.";
+      const failureArtifact: HelixTurnArtifact = {
+        artifact_id: `${turnId}:equation_attempt_followup:typed_failure`,
+        turn_id: turnId,
+        producer_item_id: "equation_attempt_followup",
+        kind: "typed_failure",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: hashAskTurnGoalFrame(followupGoalFrame),
+        payload: {
+          kind: "typed_failure",
+          code: "prior_equation_attempt_unavailable",
+          message: failureText,
+        },
+      };
+      return respondAskTurn(200, {
+        ok: false,
+        text: failureText,
+        answer: failureText,
+        mode: "read",
+        trace_id: traceId,
+        turn_id: turnId,
+        route: "equation_attempt_followup / typed_failure:prior_equation_attempt_unavailable",
+        route_reason_code: "equation_attempt_followup",
+        lane: "reasoning",
+        dispatch_policy: "artifact_followup",
+        response_type: "final_failure",
+        final_status: "final_failure",
+        terminal_error_code: "prior_equation_attempt_unavailable",
+        final_answer_source: "typed_failure",
+        selected_final_answer: failureText,
+        final_artifact_scope: "current_turn",
+        terminal_artifact_kind: "typed_failure",
+        terminal_artifact_id: failureArtifact.artifact_id,
+        terminal_artifact_owner_turn_id: turnId,
+        universal_goal_frame: followupGoalFrame,
+        canonical_goal_frame: canonicalFollowupGoalFrame,
+        equation_attempt_followup_intent: equationAttemptFollowupIntent,
+        prior_context_bindings: [],
+        current_turn_artifact_ledger: [failureArtifact],
+        workspace_context_snapshot: workspaceSessionSnapshot,
+        satisfaction_report: {
+          satisfied: false,
+          terminal_kind: "final_failure",
+          terminal_artifact_id: failureArtifact.artifact_id,
+          terminal_artifact_kind: "typed_failure",
+          terminal_source: "typed_failure",
+          missing_artifacts: ["equation_attempt_explanation"],
+          missing_reason: "prior_equation_attempt_unavailable",
+          confidence: "medium",
+          rejected_terminal_candidates: [],
+        },
+      }, { questionSeed: transcript });
+    }
+    const explanationArtifact = buildAskTurnEquationAttemptExplanationArtifact({
+      turnId,
+      prior: {
+        artifact_id: priorAttempt.artifact_id,
+        turn_id: priorAttempt.turn_id,
+        payload: priorAttempt.payload,
+      },
+    });
+    const explanationPayload = readAskTurnArtifactPayloadRecord(explanationArtifact) ?? {};
+    const explanationText = readAskTurnString(explanationPayload.answer_text) ?? "Here is what the last equation-source attempt checked.";
+    return respondAskTurn(200, {
+      ok: true,
+      text: explanationText,
+      answer: explanationText,
+      mode: "read",
+      trace_id: traceId,
+      turn_id: turnId,
+      route: "equation_attempt_followup / artifact_synthesis",
+      route_reason_code: "equation_attempt_followup",
+      lane: "reasoning",
+      dispatch_policy: "artifact_followup",
+      response_type: "final_answer",
+      final_status: "final_answer",
+      final_answer_source: "artifact_synthesis",
+      selected_final_answer: explanationText,
+      final_artifact_scope: "current_turn",
+      terminal_artifact_kind: "equation_attempt_explanation",
+      terminal_artifact_id: explanationArtifact.artifact_id,
+      terminal_artifact_owner_turn_id: turnId,
+      universal_goal_frame: followupGoalFrame,
+      canonical_goal_frame: canonicalFollowupGoalFrame,
+      equation_attempt_followup_intent: equationAttemptFollowupIntent,
+      prior_context_bindings: [
+        {
+          artifact_kind: "equation_extraction_attempt",
+          artifact_id: priorAttempt.artifact_id,
+          turn_id: priorAttempt.turn_id,
+          allowed_by_goal: true,
+          reason: "equation_attempt_followup",
+        },
+      ],
+      current_turn_artifact_ledger: [explanationArtifact],
+      workspace_context_snapshot: workspaceSessionSnapshot,
+      satisfaction_report: {
+        satisfied: true,
+        terminal_kind: "final_answer",
+        terminal_artifact_id: explanationArtifact.artifact_id,
+        terminal_artifact_kind: "equation_attempt_explanation",
+        terminal_source: "artifact_synthesis",
+        missing_artifacts: [],
+        confidence: "high",
+        rejected_terminal_candidates: [],
+      },
+    }, { questionSeed: transcript });
+  }
+  const incomingIntentFamily = inferAskTurnIntentFamily(transcript);
+  const incomingIntentHash = `${incomingIntentFamily}:${clipConversationText(normalizedTranscript, 120)}`;
+  const earlyPanelControlIntent = classifyAskTurnPanelControlIntent(transcript);
   const retrievalRequiredHard =
     retrievalRequiredSignal.required &&
     retrievalRequiredSignal.strength === "hard" &&
