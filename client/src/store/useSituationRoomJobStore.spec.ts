@@ -41,7 +41,13 @@ function seedRoom() {
   return { room, source, events: [first, second] };
 }
 
-function makeTranscriptEvent(roomId: string, sourceId: string, chunkIndex: number, text: string): HelixSituationEvent {
+function makeTranscriptEvent(
+  roomId: string,
+  sourceId: string,
+  chunkIndex: number,
+  text: string,
+  meta?: Record<string, unknown>,
+): HelixSituationEvent {
   return {
     id: `room:${roomId}:source:${sourceId}:chunk:${chunkIndex}`,
     room_id: roomId,
@@ -55,6 +61,7 @@ function makeTranscriptEvent(roomId: string, sourceId: string, chunkIndex: numbe
     ts: `2026-01-01T12:00:0${chunkIndex}.000Z`,
     meta: {
       possible_tts_echo: true,
+      ...meta,
     },
   };
 }
@@ -108,6 +115,9 @@ describe("useSituationRoomJobStore", () => {
     expect(job.kind).toBe("translate");
     expect(job.source_ids).toEqual([source.source_id]);
     expect(job.target_language).toBe("es");
+    expect(job.native_language).toBe("en");
+    expect(job.input_text_policy).toBe("source_text_preferred");
+    expect(job.output_render_policy).toBe("target_language");
     expect(job.job_spec_hash).toMatch(/^job-spec:/);
   });
 
@@ -133,6 +143,90 @@ describe("useSituationRoomJobStore", () => {
     expect(outputs[0]?.derived).toBe(true);
     expect(outputs[0]?.derived_from_event_ids).toContain(events[0].id);
     expect(useSituationRoomStore.getState().events[events[0].id]?.text).toBe(events[0].text);
+  });
+
+  it("translation jobs can prefer original source text over normalized native transcript", () => {
+    const room = useSituationRoomStore.getState().createRoom("Language Room");
+    const source: SituationRoomSource = {
+      source_id: "src_spanish",
+      room_id: room.room_id,
+      label: "Spanish tab",
+      capture_source: "display_tab_audio",
+      capture_session_id: "cap_spanish",
+      status: "active",
+      chunk_index: 0,
+      started_at: "2026-05-01T12:00:00.000Z",
+    };
+    useSituationRoomStore.setState((state) => ({
+      sources: { ...state.sources, [source.source_id]: source },
+      rooms: {
+        ...state.rooms,
+        [room.room_id]: {
+          ...room,
+          source_ids: [source.source_id],
+        },
+      },
+    }));
+    const event = makeTranscriptEvent(room.room_id, source.source_id, 0, "we should wait", {
+      source_text: "debemos esperar",
+      source_language: "es",
+      language: "en",
+      translated: true,
+    });
+    useSituationRoomStore.getState().appendSituationEvent(event, source.source_id);
+    const job = useSituationRoomJobStore.getState().createJobFromSource(
+      room.room_id,
+      source.source_id,
+      "translate",
+      {
+        target_language: "es",
+        input_text_policy: "source_text_preferred",
+        output_render_policy: "target_language",
+      },
+    );
+
+    const outputs = useSituationRoomJobStore.getState().processJobNow(job.job_id);
+
+    expect(outputs[0]?.text).toContain("Target (es): debemos esperar");
+    expect(outputs[0]?.text).not.toContain("we should wait");
+    expect(outputs[0]?.meta.input_language).toBe("es");
+    expect(outputs[0]?.meta.output_language).toBe("es");
+    expect(outputs[0]?.meta.transcript_was_translated).toBe(true);
+  });
+
+  it("async translation jobs update target output through Helix Ask", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          text: "deberiamos esperar para tener resistencia al fuego",
+          selected_final_answer: "deberiamos esperar para tener resistencia al fuego",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { room, source } = seedRoom();
+    const job = useSituationRoomJobStore.getState().createJobFromSource(
+      room.room_id,
+      source.source_id,
+      "translate",
+      {
+        target_language: "es",
+        input_text_policy: "transcript_text",
+        output_render_policy: "target_language",
+      },
+    );
+
+    const outputs = await useSituationRoomJobStore.getState().processJobNowAsync(job.job_id);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agi/ask/turn",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(outputs[0]?.text).toContain("Target (es): deberiamos esperar");
+    expect(outputs[0]?.meta.model).toBe("helix-ask-translation");
+    expect(outputs[0]?.meta.translation_status).toBe("translated");
+    expect(useSituationRoomJobStore.getState().jobs[job.job_id]?.output_ids).toHaveLength(2);
   });
 
   it("does not duplicate output when the same chunk is processed repeatedly for the same job", () => {
@@ -168,7 +262,7 @@ describe("useSituationRoomJobStore", () => {
 
     const note = useSituationRoomJobStore.getState().saveJobAsNote(job.job_id);
 
-    expect(note?.body).toContain("[es]");
+    expect(note?.body).toContain("Target (es):");
     expect(note?.citations.some((citation) => citation.path.includes("/job/"))).toBe(true);
     expect(note?.citations.some((citation) => citation.path.includes("/source/"))).toBe(true);
     expect(note?.citations.every((citation) => citation.path.startsWith("situation-room://"))).toBe(true);

@@ -114,7 +114,7 @@ describe("useSituationRoomStore", () => {
     );
 
     const transcript = selectSituationRoomTranscript(useSituationRoomStore.getState(), room.room_id);
-    expect(transcript.map((event) => event.text)).toEqual(["first chunk", "second chunk"]);
+    expect(transcript.map((event: HelixSituationEvent) => event.text)).toEqual(["first chunk", "second chunk"]);
     expect(useSituationRoomStore.getState().sources[source!.source_id]?.chunk_index).toBe(2);
   });
 
@@ -128,8 +128,10 @@ describe("useSituationRoomStore", () => {
     const state = useSituationRoomStore.getState();
     expect(displayAudioMock.stops[0]).toHaveBeenCalled();
     expect(state.sources[source!.source_id]?.status).toBe("stopped");
-    const events = Object.values(state.events).filter((event) => event.source_id === source!.source_id);
-    expect(events.some((event) => event.event_type === "source_stopped")).toBe(true);
+    const events = Object.values(state.events).filter(
+      (event: HelixSituationEvent & { source_id?: string }) => event.source_id === source!.source_id,
+    );
+    expect(events.some((event: HelixSituationEvent) => event.event_type === "source_stopped")).toBe(true);
   });
 
   it("saves a room transcript as a workstation note with situation-room citations", async () => {

@@ -28,6 +28,14 @@ import {
   type AlcubierreDebugEvent,
   type AlcubierreDebugLogSnapshot,
 } from "@/lib/alcubierre-debug-log";
+import {
+  buildWorkstationDebugExport,
+  clearWorkstationDebugEvents,
+  getWorkstationDebugSnapshot,
+  subscribeWorkstationDebug,
+  type WorkstationDebugEvent,
+  type WorkstationDebugSnapshot,
+} from "@/lib/helix/workstation-debug";
 
 type Props = {
   settingsTab: SettingsTab;
@@ -180,6 +188,14 @@ export function HelixSettingsDialogContent({
               onChange={(value) => updateSettings({ showAlcubierreRenderDebugLog: value })}
             />
             {userSettings.showAlcubierreRenderDebugLog ? <AlcubierreRenderDebugLogPanel /> : null}
+            <PreferenceToggleRow
+              id="workstation-debug"
+              label="Workstation event debug"
+              description="Trace Situation Room sources, pipeline jobs, translations, and attachment events for browser UI tests."
+              checked={userSettings.showWorkstationDebug}
+              onChange={(value) => updateSettings({ showWorkstationDebug: value })}
+            />
+            {userSettings.showWorkstationDebug ? <WorkstationDebugPanel /> : null}
             <PreferenceToggleRow
               id="helix-voice-diagnostics"
               label="Voice capture diagnostics panel"
@@ -1361,6 +1377,143 @@ function AlcubierreRenderDebugLogPanel() {
                       note: {clipDiagnosticsText(event.note, 240)}
                     </p>
                   ) : null}
+                  <details className="mt-1 rounded border border-slate-700/80 bg-slate-900/70 px-2 py-1 text-slate-300">
+                    <summary className="cursor-pointer select-none uppercase tracking-[0.14em] text-slate-400">
+                      raw event payload
+                    </summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-words">{JSON.stringify(event, null, 2)}</pre>
+                  </details>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WorkstationDebugPanel() {
+  const [snapshot, setSnapshot] = React.useState<WorkstationDebugSnapshot>(() => getWorkstationDebugSnapshot());
+  const [copied, setCopied] = React.useState(false);
+  const [selectedChannel, setSelectedChannel] = React.useState<string>("all");
+  const channelSelectId = React.useId();
+
+  React.useEffect(() => {
+    setSnapshot(getWorkstationDebugSnapshot());
+    return subscribeWorkstationDebug((next) => {
+      setSnapshot(next);
+    });
+  }, []);
+
+  const channelOptions = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    snapshot.events.forEach((event) => {
+      counts.set(event.channel, (counts.get(event.channel) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .map(([channel, count]) => ({ channel, count }))
+      .sort((a, b) => a.channel.localeCompare(b.channel));
+  }, [snapshot.events]);
+
+  React.useEffect(() => {
+    if (selectedChannel === "all") return;
+    if (channelOptions.some((entry) => entry.channel === selectedChannel)) return;
+    setSelectedChannel("all");
+  }, [channelOptions, selectedChannel]);
+
+  const filteredEvents = React.useMemo(() => {
+    if (selectedChannel === "all") return snapshot.events;
+    return snapshot.events.filter((event) => event.channel === selectedChannel);
+  }, [selectedChannel, snapshot.events]);
+
+  const exportPayload = React.useMemo(
+    () => buildWorkstationDebugExport({ ...snapshot, events: filteredEvents }),
+    [filteredEvents, snapshot],
+  );
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Workstation event debug</p>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={clearWorkstationDebugEvents}
+            disabled={snapshot.events.length === 0}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              snapshot.events.length > 0
+                ? "border-amber-300/50 bg-amber-400/15 text-amber-100 hover:bg-amber-300/20"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            clear
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!exportPayload}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              exportPayload
+                ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            {copied ? "copied" : "copy events"}
+          </button>
+        </div>
+      </div>
+      <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] leading-5 text-slate-200">
+        <p>status: {snapshot.enabled ? "enabled" : "disabled"} | events: {snapshot.events.length}</p>
+        <p>browser hook: window.__helixWorkstationDebug</p>
+      </div>
+      {snapshot.events.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No workstation debug events yet. Attach a Situation Room source or run a pipeline job.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={channelSelectId} className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              Channel
+            </label>
+            <select
+              id={channelSelectId}
+              value={selectedChannel}
+              onChange={(event) => setSelectedChannel(event.target.value)}
+              className="h-7 min-w-[240px] rounded-md border border-slate-600 bg-slate-900 px-2 text-[11px] text-slate-100"
+            >
+              <option value="all">All ({snapshot.events.length})</option>
+              {channelOptions.map((entry) => (
+                <option key={entry.channel} value={entry.channel}>
+                  {entry.channel} ({entry.count})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              {filteredEvents.length} events shown
+            </p>
+          </div>
+          <div className="max-h-[36vh] space-y-2 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {[...filteredEvents]
+              .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))
+              .slice(-180)
+              .map((event: WorkstationDebugEvent) => (
+                <div key={event.id} className="rounded border border-white/10 bg-white/5 p-1.5">
+                  <p className="whitespace-pre-wrap break-words">
+                    {event.ts} | {event.channel} | {event.action} | room={event.room_id ?? "n/a"} | source=
+                    {event.source_id ?? "n/a"} | job={event.job_id ?? "n/a"}
+                  </p>
                   <details className="mt-1 rounded border border-slate-700/80 bg-slate-900/70 px-2 py-1 text-slate-300">
                     <summary className="cursor-pointer select-none uppercase tracking-[0.14em] text-slate-400">
                       raw event payload

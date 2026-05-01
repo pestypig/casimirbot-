@@ -9,6 +9,18 @@ import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import {
+  useSituationRoomStore,
+  selectSituationRoomEvents,
+  type SituationRoom,
+  type SituationRoomSource,
+} from "@/store/useSituationRoomStore";
+import {
+  useSituationRoomJobStore,
+  type SituationRoomJobKind,
+  type SituationRoomJobInputTextPolicy,
+  type SituationRoomJobOutputRenderPolicy,
+} from "@/store/useSituationRoomJobStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
@@ -60,6 +72,103 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
+}
+
+function asStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => asNonEmptyString(entry))
+      .filter((entry): entry is string => Boolean(entry));
+  }
+  const single = asNonEmptyString(value);
+  return single ? [single] : [];
+}
+
+function normalizeSituationJobKind(value: unknown): SituationRoomJobKind | null {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  if (!text) return null;
+  if (text === "translation") return "translate";
+  if (text === "summary") return "rolling_summary";
+  if (text === "actions" || text === "todos" || text === "todo") return "action_items";
+  if (
+    text === "translate" ||
+    text === "rolling_summary" ||
+    text === "action_items" ||
+    text === "prompt_composer"
+  ) {
+    return text;
+  }
+  return null;
+}
+
+function normalizeSituationInputTextPolicy(value: unknown): SituationRoomJobInputTextPolicy | undefined {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  return text === "transcript_text" || text === "source_text_preferred" || text === "source_text_only"
+    ? text
+    : undefined;
+}
+
+function normalizeSituationOutputRenderPolicy(value: unknown): SituationRoomJobOutputRenderPolicy | undefined {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  return text === "target_language" || text === "native_language" || text === "dual" ? text : undefined;
+}
+
+function resolveSituationRoom(args: Record<string, unknown>, options?: { createIfMissing?: boolean }): SituationRoom | null {
+  const situationState = useSituationRoomStore.getState();
+  const explicitRoomId = asNonEmptyString(args.room_id ?? args.roomId);
+  if (explicitRoomId && situationState.rooms[explicitRoomId]) return situationState.rooms[explicitRoomId];
+
+  const title = asNonEmptyString(args.title ?? args.room_title ?? args.roomTitle ?? args.label);
+  if (title) {
+    const normalizedTitle = title.toLowerCase();
+    const foundId = situationState.room_order.find((roomId) => {
+      const room = situationState.rooms[roomId];
+      return room?.title.trim().toLowerCase() === normalizedTitle;
+    });
+    if (foundId) return situationState.rooms[foundId] ?? null;
+  }
+
+  if (situationState.active_room_id && situationState.rooms[situationState.active_room_id]) {
+    return situationState.rooms[situationState.active_room_id];
+  }
+
+  const firstRoomId = situationState.room_order[0];
+  if (firstRoomId && situationState.rooms[firstRoomId]) return situationState.rooms[firstRoomId];
+
+  return options?.createIfMissing
+    ? useSituationRoomStore.getState().createRoom(title ?? "Situation Room")
+    : null;
+}
+
+function resolveSituationSourceIds(room: SituationRoom, args: Record<string, unknown>): string[] {
+  const situationState = useSituationRoomStore.getState();
+  const requested = asStringArray(args.source_ids ?? args.sourceIds ?? args.source_id ?? args.sourceId);
+  if (requested.length > 0) return requested.filter((sourceId) => Boolean(situationState.sources[sourceId]));
+  return room.source_ids.filter((sourceId) => Boolean(situationState.sources[sourceId]));
+}
+
+function summarizeSituationRoom(room: SituationRoom): Record<string, unknown> {
+  const state = useSituationRoomStore.getState();
+  const sources = room.source_ids
+    .map((sourceId) => state.sources[sourceId])
+    .filter((source): source is SituationRoomSource => Boolean(source));
+  return {
+    room_id: room.room_id,
+    title: room.title,
+    status: room.status,
+    source_count: sources.length,
+    event_count: room.event_ids.length,
+    transcript_count: selectSituationRoomEvents(state, room.room_id).filter(
+      (event) => event.event_type === "voice_transcript",
+    ).length,
+    sources: sources.map((source) => ({
+      source_id: source.source_id,
+      label: source.label,
+      status: source.status,
+      capture_source: source.capture_source,
+      chunk_index: source.chunk_index,
+    })),
+  };
 }
 
 function buildDeterministicNoteId(title: string, existingIds: string[]): string {
@@ -672,6 +781,255 @@ export function executeHelixPanelAction(
               updated_at: note.updated_at,
             })),
         },
+      };
+    }
+  }
+
+  if (panelId === "situation-room-sources") {
+    const args = asRecord(request.args) ?? {};
+    const situationState = useSituationRoomStore.getState();
+
+    if (actionId === "attach_display_audio_source") {
+      const room = resolveSituationRoom(args, { createIfMissing: true });
+      if (!room) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No situation room is available for the display audio source.",
+        };
+      }
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      const label = asNonEmptyString(args.label ?? args.source_label ?? args.sourceLabel) ?? undefined;
+      void useSituationRoomStore.getState().attachDisplayAudioSource(room.room_id, label);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          ...summarizeSituationRoom(room),
+          capture_picker_requested: true,
+          label: label ?? null,
+        },
+        message: `Opening display picker for ${room.title}.`,
+      };
+    }
+
+    if (actionId === "save_room_as_note") {
+      const room = resolveSituationRoom(args);
+      if (!room) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No situation room is available to save.",
+        };
+      }
+      const note = situationState.saveRoomAsNote(room.room_id);
+      context.openPanel("workstation-notes", undefined);
+      context.focusPanel("workstation-notes", undefined);
+      return {
+        ok: Boolean(note),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          ...summarizeSituationRoom(useSituationRoomStore.getState().rooms[room.room_id] ?? room),
+          note_id: note?.id ?? null,
+          note_title: note?.title ?? null,
+        },
+        message: note ? `Saved situation room "${room.title}" as a note.` : "Situation room save failed.",
+      };
+    }
+
+    if (actionId === "attach_room_to_helix_ask") {
+      const room = resolveSituationRoom(args);
+      if (!room) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No situation room is available to attach.",
+        };
+      }
+      const sourceId = asNonEmptyString(args.source_id ?? args.sourceId);
+      situationState.attachRoomToHelixAsk(room.room_id, sourceId ?? undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          ...summarizeSituationRoom(room),
+          attached_source_id: sourceId ?? null,
+        },
+        message: `Attached situation room "${room.title}" to Helix Ask.`,
+      };
+    }
+
+    if (actionId === "stop_room") {
+      const room = resolveSituationRoom(args);
+      if (!room) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No situation room is available to stop.",
+        };
+      }
+      situationState.stopRoom(room.room_id);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: summarizeSituationRoom(useSituationRoomStore.getState().rooms[room.room_id] ?? room),
+        message: `Stopped active sources for "${room.title}".`,
+      };
+    }
+  }
+
+  if (panelId === "situation-room-pipelines") {
+    const args = asRecord(request.args) ?? {};
+    const jobState = useSituationRoomJobStore.getState();
+
+    if (actionId === "create_job") {
+      const room = resolveSituationRoom(args);
+      const kind = normalizeSituationJobKind(args.kind ?? args.job_kind ?? args.jobKind ?? args.type);
+      if (!room || !kind) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: !room
+            ? "No situation room is available for a source job."
+            : "situation-room-pipelines.create_job requires kind.",
+          artifact: {
+            missing: [!room ? "room_id" : "", !kind ? "kind" : ""].filter(Boolean),
+          },
+        };
+      }
+      const sourceIds = resolveSituationSourceIds(room, args);
+      const attachmentPolicy = asNonEmptyString(args.attachment_policy ?? args.attachmentPolicy) ?? "manual_only";
+      const contextInjection =
+        asNonEmptyString(args.context_injection ?? args.contextInjection) ?? "explicit_attachment_only";
+      const job = jobState.createJob({
+        room_id: room.room_id,
+        kind,
+        source_ids: sourceIds,
+        title: asNonEmptyString(args.title ?? args.job_title ?? args.jobTitle) ?? undefined,
+        target_language: asNonEmptyString(args.target_language ?? args.targetLanguage ?? args.language) ?? undefined,
+        native_language: asNonEmptyString(args.native_language ?? args.nativeLanguage) ?? undefined,
+        input_text_policy: normalizeSituationInputTextPolicy(args.input_text_policy ?? args.inputTextPolicy),
+        output_render_policy: normalizeSituationOutputRenderPolicy(args.output_render_policy ?? args.outputRenderPolicy),
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          job_id: job.job_id,
+          room_id: job.room_id,
+          kind: job.kind,
+          source_ids: job.source_ids,
+          target_language: job.target_language ?? null,
+          native_language: job.native_language ?? null,
+          input_text_policy: job.input_text_policy,
+          output_render_policy: job.output_render_policy,
+          attachment_policy: attachmentPolicy,
+          context_injection: contextInjection,
+          derived_outputs_auto_attach: false,
+          command_lane_enabled: false,
+        },
+        message: `Created ${job.kind} job for "${room.title}".`,
+      };
+    }
+
+    if (actionId === "run_job") {
+      const jobId = asNonEmptyString(args.job_id ?? args.jobId);
+      if (!jobId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.run_job requires job_id.",
+        };
+      }
+      const outputs = jobState.processJobNow(jobId);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: Boolean(jobState.jobs[jobId]),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          job_id: jobId,
+          output_count: outputs.length,
+          output_ids: outputs.map((output) => output.output_id),
+        },
+        message: jobState.jobs[jobId] ? `Processed job ${jobId}.` : `Unknown situation room job: ${jobId}`,
+      };
+    }
+
+    if (actionId === "attach_job_to_helix_ask") {
+      const jobId = asNonEmptyString(args.job_id ?? args.jobId);
+      if (!jobId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.attach_job_to_helix_ask requires job_id.",
+        };
+      }
+      jobState.attachJobToHelixAsk(jobId);
+      return {
+        ok: Boolean(useSituationRoomJobStore.getState().jobs[jobId]),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { job_id: jobId },
+        message: `Attached job ${jobId} to Helix Ask.`,
+      };
+    }
+
+    if (actionId === "save_job_as_note") {
+      const jobId = asNonEmptyString(args.job_id ?? args.jobId);
+      if (!jobId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.save_job_as_note requires job_id.",
+        };
+      }
+      const note = jobState.saveJobAsNote(jobId);
+      context.openPanel("workstation-notes", undefined);
+      context.focusPanel("workstation-notes", undefined);
+      return {
+        ok: Boolean(note),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { job_id: jobId, note_id: note?.id ?? null, note_title: note?.title ?? null },
+        message: note ? `Saved job ${jobId} as a note.` : `No output available to save for job ${jobId}.`,
+      };
+    }
+
+    if (actionId === "stop_job") {
+      const jobId = asNonEmptyString(args.job_id ?? args.jobId);
+      if (!jobId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.stop_job requires job_id.",
+        };
+      }
+      jobState.stopJob(jobId);
+      return {
+        ok: Boolean(useSituationRoomJobStore.getState().jobs[jobId]),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { job_id: jobId, status: useSituationRoomJobStore.getState().jobs[jobId]?.status ?? null },
+        message: `Stopped job ${jobId}.`,
       };
     }
   }

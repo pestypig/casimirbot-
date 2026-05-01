@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+(globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
+
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
+import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
@@ -20,6 +25,9 @@ vi.mock("@/lib/docs/openDocPanel", () => ({
 vi.mock("@/lib/helix/ask-prompt-launch", () => ({
   launchHelixAskPrompt: hoisted.launchHelixAskPromptMock,
 }));
+vi.mock("@/lib/helix/display-audio-capture", () => ({
+  startDisplayAudioSituationSession: vi.fn(),
+}));
 
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 
@@ -31,6 +39,8 @@ describe("panelActionAdapters", () => {
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
     useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, steps: [] });
+    useSituationRoomStore.getState().reset();
+    useSituationRoomJobStore.getState().reset();
   });
 
   it("opens/focuses docs panel before applying read intent", () => {
@@ -323,6 +333,83 @@ describe("panelActionAdapters", () => {
       },
     );
     expect(copyResult.ok).toBe(true);
+  });
+
+  it("delegates Situation Room source and pipeline actions", () => {
+    const room = useSituationRoomStore.getState().createRoom("Delegation Room");
+    useSituationRoomStore.getState().appendSituationEvent({
+      id: "evt:delegation:1",
+      room_id: room.room_id,
+      source: "display_tab_audio",
+      event_type: "voice_transcript",
+      text: "Tenemos que esperar la resistencia al fuego.",
+      classification: "info",
+      evidence_refs: ["situation-room://delegation/chunk/0001"],
+      capture_session_id: "cap:delegation",
+      chunk_index: 0,
+      ts: "2026-05-01T00:00:00.000Z",
+      meta: {
+        source_text: "Tenemos que esperar la resistencia al fuego.",
+        source_language: "es",
+        translated: false,
+      },
+    });
+
+    const createJob = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "create_job",
+        args: { kind: "translate", target_language: "es" },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(createJob.ok).toBe(true);
+    expect(createJob.artifact?.room_id).toBe(room.room_id);
+    expect(createJob.artifact?.kind).toBe("translate");
+    expect(createJob.artifact?.target_language).toBe("es");
+    expect(createJob.artifact?.attachment_policy).toBe("manual_only");
+    expect(createJob.artifact?.context_injection).toBe("explicit_attachment_only");
+    expect(createJob.artifact?.derived_outputs_auto_attach).toBe(false);
+    expect(createJob.artifact?.command_lane_enabled).toBe(false);
+
+    const jobId = String(createJob.artifact?.job_id ?? "");
+    const attachRoom = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-sources",
+        action_id: "attach_room_to_helix_ask",
+        args: { room_id: room.room_id },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(attachRoom.ok).toBe(true);
+    expect(attachRoom.artifact?.room_id).toBe(room.room_id);
+
+    const runJob = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "run_job",
+        args: { job_id: jobId },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(runJob.ok).toBe(true);
+    expect(runJob.artifact?.job_id).toBe(jobId);
   });
 
   it("keeps complex ADM-style symbolic equations solvable without crashing", () => {

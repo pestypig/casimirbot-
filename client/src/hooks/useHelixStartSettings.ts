@@ -1,5 +1,6 @@
 import * as React from "react";
 import { setAlcubierreDebugLogEnabled } from "@/lib/alcubierre-debug-log";
+import { setWorkstationDebugEnabled } from "@/lib/helix/workstation-debug";
 
 export type StartSettings = {
   settingsVersion: number;
@@ -13,6 +14,7 @@ export type StartSettings = {
   showHelixVoiceCaptureDiagnostics: boolean;
   showPowerShellDebug: boolean;
   showAlcubierreRenderDebugLog: boolean;
+  showWorkstationDebug: boolean;
   powerShellScratch: string;
   preferredResponseLanguage: string;
 };
@@ -20,7 +22,7 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 9,
+  settingsVersion: 10,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   showHelixVoiceCaptureDiagnostics: false,
   showPowerShellDebug: false,
   showAlcubierreRenderDebugLog: false,
+  showWorkstationDebug: false,
   powerShellScratch: "",
   preferredResponseLanguage: "auto",
 };
@@ -62,6 +65,10 @@ export function useHelixStartSettings() {
         merged.voiceNoisyEnvironmentMode = DEFAULT_SETTINGS.voiceNoisyEnvironmentMode;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
         merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;
+        merged.showWorkstationDebug =
+          typeof parsed.showWorkstationDebug === "boolean"
+            ? parsed.showWorkstationDebug
+            : DEFAULT_SETTINGS.showWorkstationDebug;
         merged.preferredResponseLanguage =
           typeof parsed.preferredResponseLanguage === "string" && parsed.preferredResponseLanguage.trim().length > 0
             ? parsed.preferredResponseLanguage.trim()
@@ -85,6 +92,10 @@ export function useHelixStartSettings() {
   React.useEffect(() => {
     setAlcubierreDebugLogEnabled(Boolean(userSettings.showAlcubierreRenderDebugLog));
   }, [userSettings.showAlcubierreRenderDebugLog]);
+
+  React.useEffect(() => {
+    setWorkstationDebugEnabled(Boolean(userSettings.showWorkstationDebug));
+  }, [userSettings.showWorkstationDebug]);
 
   const updateSettings = React.useCallback((patch: Partial<StartSettings>) => {
     setUserSettings((prev) => ({ ...prev, ...patch }));

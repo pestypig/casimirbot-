@@ -12,6 +12,7 @@ import {
 } from "@/lib/helix/situation-room";
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
 import {
   useWorkstationNotesStore,
   type WorkstationNote,
@@ -73,7 +74,7 @@ export type SituationRoomStoredEvent = HelixSituationEvent & {
   source_id?: string;
 };
 
-type SituationRoomStoreState = {
+export type SituationRoomStoreState = {
   rooms: Record<string, SituationRoom>;
   room_order: string[];
   active_room_id?: string;
@@ -138,8 +139,8 @@ export function selectSituationRoomEvents(state: Pick<SituationRoomStoreState, "
   const room = state.rooms[roomId];
   if (!room) return [];
   return room.event_ids
-    .map((eventId) => state.events[eventId])
-    .filter(Boolean)
+    .map((eventId: string) => state.events[eventId])
+    .filter((event): event is SituationRoomStoredEvent => Boolean(event))
     .sort(compareStoredEvents);
 }
 
@@ -148,7 +149,7 @@ export function selectSituationRoomTranscript(
   roomId: string,
 ) {
   return selectSituationRoomEvents(state, roomId).filter(
-    (event) => event.event_type === "voice_transcript" && event.text?.trim(),
+    (event: SituationRoomStoredEvent) => event.event_type === "voice_transcript" && Boolean(event.text?.trim()),
   );
 }
 
@@ -178,7 +179,7 @@ const makeLifecycleEvent = (args: {
 
 const upsertRoomEventId = (room: SituationRoom, eventId: string, timestamp: string): SituationRoom => ({
   ...room,
-  event_ids: [...room.event_ids.filter((id) => id !== eventId), eventId],
+  event_ids: [...room.event_ids.filter((id: string) => id !== eventId), eventId],
   updated_at: timestamp,
 });
 
@@ -219,13 +220,13 @@ function buildRoomNote(args: {
   appendLine("## Transcript");
 
   const transcriptEvents = args.events.filter(
-    (event) => event.event_type === "voice_transcript" && event.text?.trim(),
+    (event: SituationRoomStoredEvent) => event.event_type === "voice_transcript" && Boolean(event.text?.trim()),
   );
   if (transcriptEvents.length === 0) {
     appendLine("- No transcript chunks captured.");
   } else {
     for (const event of transcriptEvents) {
-      const source = args.sources.find((entry) => entry.source_id === event.source_id);
+      const source = args.sources.find((entry: SituationRoomSource) => entry.source_id === event.source_id);
       const label = source?.label ?? sourceLabelForSituationSource(event.source);
       const chunkIndex = typeof event.chunk_index === "number" ? event.chunk_index : 0;
       const chunkLabel = chunkIndex.toString().padStart(4, "0");
@@ -253,7 +254,7 @@ function buildRoomNote(args: {
   appendLine();
   appendLine("## Room Events");
   for (const event of args.events) {
-    const source = args.sources.find((entry) => entry.source_id === event.source_id);
+    const source = args.sources.find((entry: SituationRoomSource) => entry.source_id === event.source_id);
     const label = source?.label ?? sourceLabelForSituationSource(event.source);
     appendLine(`- ${event.ts} ${label}: ${event.event_type}${event.text ? ` - ${event.text}` : ""}`);
   }
@@ -284,15 +285,15 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           created_at: createdAt,
           updated_at: createdAt,
         };
-        set((state) => ({
+        set((state: SituationRoomStoreState) => ({
           rooms: { ...state.rooms, [room.room_id]: room },
-          room_order: [room.room_id, ...state.room_order.filter((entry) => entry !== room.room_id)],
+          room_order: [room.room_id, ...state.room_order.filter((entry: string) => entry !== room.room_id)],
           active_room_id: room.room_id,
         }));
         return room;
       },
       renameRoom: (roomId, title) =>
-        set((state) => {
+        set((state: SituationRoomStoreState) => {
           const room = state.rooms[roomId];
           if (!room) return state;
           return {
@@ -307,7 +308,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           };
         }),
       setActiveRoom: (roomId) =>
-        set((state) => ({
+        set((state: SituationRoomStoreState) => ({
           active_room_id: state.rooms[roomId] ? roomId : state.active_room_id,
         })),
       attachDisplayAudioSource: async (roomId, label) => {
@@ -328,14 +329,14 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           started_at: timestamp,
         };
 
-        set((state) => ({
+        set((state: SituationRoomStoreState) => ({
           sources: { ...state.sources, [sourceId]: source },
           rooms: {
             ...state.rooms,
             [roomId]: {
               ...room,
               status: "live",
-              source_ids: [...room.source_ids.filter((entry) => entry !== sourceId), sourceId],
+              source_ids: [...room.source_ids.filter((entry: string) => entry !== sourceId), sourceId],
               updated_at: timestamp,
             },
           },
@@ -346,12 +347,12 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           const session = await startDisplayAudioSituationSession({
             roomId,
             captureSessionId,
-            onEvent: (event) => {
+            onEvent: (event: HelixSituationEvent) => {
               get().appendSituationEvent(event, sourceId);
             },
-            onError: (error) => {
+            onError: (error: Error) => {
               const message = error.message || String(error);
-              set((state) => {
+              set((state: SituationRoomStoreState) => {
                 const current = state.sources[sourceId];
                 if (!current) return state;
                 return {
@@ -379,10 +380,10 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
                 );
               }
             },
-            onStop: (reason) => {
+            onStop: (reason: "manual" | "track_ended") => {
               activeDisplaySessions.delete(sourceId);
               const stoppedAt = nowIso();
-              set((state) => {
+              set((state: SituationRoomStoreState) => {
                 const current = state.sources[sourceId];
                 if (!current) return state;
                 return {
@@ -420,7 +421,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
             capture_session_id: session.captureSessionId,
             status: "active",
           };
-          set((state) => ({
+          set((state: SituationRoomStoreState) => ({
             sources: {
               ...state.sources,
               [sourceId]: activeSource,
@@ -439,7 +440,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           const failedAt = nowIso();
-          set((state) => {
+          set((state: SituationRoomStoreState) => {
             const current = state.sources[sourceId];
             if (!current) return state;
             return {
@@ -472,7 +473,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
       },
       stopSource: (sourceId) => {
         const session = activeDisplaySessions.get(sourceId);
-        set((state) => {
+        set((state: SituationRoomStoreState) => {
           const current = state.sources[sourceId];
           if (!current) return state;
           return {
@@ -492,7 +493,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         const current = get().sources[sourceId];
         if (!current) return;
         const stoppedAt = nowIso();
-        set((state) => ({
+        set((state: SituationRoomStoreState) => ({
           sources: {
             ...state.sources,
             [sourceId]: {
@@ -519,7 +520,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         for (const sourceId of room.source_ids) {
           get().stopSource(sourceId);
         }
-        set((state) => {
+        set((state: SituationRoomStoreState) => {
           const current = state.rooms[roomId];
           if (!current) return state;
           return {
@@ -534,10 +535,10 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           };
         });
       },
-      appendSituationEvent: (event, sourceId) => {
+      appendSituationEvent: (event: HelixSituationEvent, sourceId?: string) => {
         const stored = toStoredEvent(event, sourceId);
         const timestamp = nowIso();
-        set((state) => {
+        set((state: SituationRoomStoreState) => {
           const room = state.rooms[event.room_id];
           const currentSource = sourceId ? state.sources[sourceId] : undefined;
           const nextSource =
@@ -575,6 +576,21 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         });
 
         if (event.event_type === "voice_transcript" && event.text?.trim()) {
+          pushWorkstationDebugEvent({
+            channel: "situation_room",
+            action: "voice_transcript",
+            room_id: event.room_id,
+            source_id: sourceId,
+            detail: {
+              event_id: stored.event_id,
+              capture_session_id: event.capture_session_id,
+              chunk_index: event.chunk_index,
+              capture_source: event.source,
+              source_language: event.meta?.source_language,
+              translated: event.meta?.translated === true,
+              text_chars: event.text.trim().length,
+            },
+          });
           emitHelixAskLiveEvent({
             contextId: HELIX_ASK_CONTEXT_ID.desktop,
             traceId: event.thread_id ?? event.room_id,
@@ -592,6 +608,9 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
                 capture_session_id: event.capture_session_id,
                 chunk_index: event.chunk_index,
                 capture_source: event.source,
+                source_language: event.meta?.source_language,
+                source_text: event.meta?.source_text,
+                translated: event.meta?.translated === true,
                 possible_tts_echo: event.meta?.possible_tts_echo === true,
               },
             },
@@ -604,7 +623,9 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         const state = get();
         const room = state.rooms[roomId];
         if (!room) return null;
-        const sources = room.source_ids.map((sourceId) => state.sources[sourceId]).filter(Boolean);
+        const sources = room.source_ids
+          .map((sourceId: string) => state.sources[sourceId])
+          .filter((source): source is SituationRoomSource => Boolean(source));
         const events = selectSituationRoomEvents(state, roomId);
         const noteParts = buildRoomNote({ room, sources, events });
         const noteId = `note:situation-room:${roomId}`;
@@ -617,7 +638,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           snippets: noteParts.snippets,
           trace_id: roomId,
         });
-        set((currentState) => {
+        set((currentState: SituationRoomStoreState) => {
           const current = currentState.rooms[roomId];
           if (!current) return currentState;
           return {
@@ -658,7 +679,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
               included_sources: sourceId ? [sourceId] : room.source_ids,
               recent_event_count: events.length,
               recent_transcript_count: transcript.length,
-              latest_transcript: transcript.slice(-5).map((event) => ({
+              latest_transcript: transcript.slice(-5).map((event: SituationRoomStoredEvent) => ({
                 source_id: event.source_id,
                 chunk_index: event.chunk_index,
                 text: event.text,

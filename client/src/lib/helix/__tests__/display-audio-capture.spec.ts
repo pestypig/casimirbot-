@@ -5,6 +5,7 @@ vi.hoisted(() => {
 });
 
 import { startDisplayAudioSituationSession } from "@/lib/helix/display-audio-capture";
+import type { HelixSituationEvent } from "@/lib/helix/situation-room";
 
 type FakeTrack = {
   kind: "audio" | "video";
@@ -25,11 +26,11 @@ class FakeMediaStream {
   }
 
   getAudioTracks(): FakeTrack[] {
-    return this.tracks.filter((track) => track.kind === "audio");
+    return this.tracks.filter((track: FakeTrack) => track.kind === "audio");
   }
 
   getVideoTracks(): FakeTrack[] {
-    return this.tracks.filter((track) => track.kind === "video");
+    return this.tracks.filter((track: FakeTrack) => track.kind === "video");
   }
 }
 
@@ -116,7 +117,7 @@ describe("display audio situation session", () => {
       captureSessionId: "capture-1",
       chunkMs: 5000,
       transcribe,
-      onEvent: (event) => events.push(event),
+      onEvent: (event: HelixSituationEvent) => events.push(event),
       isDottiePlaybackActive: () => true,
     });
 

@@ -12,8 +12,10 @@ import {
   selectSituationRoomEvents,
   selectSituationRoomTranscript,
   useSituationRoomStore,
+  type SituationRoom,
   type SituationRoomSource,
   type SituationRoomStoredEvent,
+  type SituationRoomStoreState,
 } from "@/store/useSituationRoomStore";
 import { cn } from "@/lib/utils";
 
@@ -116,29 +118,37 @@ function EventRow({ event }: { event: SituationRoomStoredEvent }) {
 }
 
 export default function SituationRoomSourcesPanel() {
-  const rooms = useSituationRoomStore((state) => state.rooms);
-  const roomOrder = useSituationRoomStore((state) => state.room_order);
-  const activeRoomId = useSituationRoomStore((state) => state.active_room_id);
-  const sources = useSituationRoomStore((state) => state.sources);
-  const events = useSituationRoomStore((state) => state.events);
-  const createRoom = useSituationRoomStore((state) => state.createRoom);
-  const renameRoom = useSituationRoomStore((state) => state.renameRoom);
-  const setActiveRoom = useSituationRoomStore((state) => state.setActiveRoom);
-  const attachDisplayAudioSource = useSituationRoomStore((state) => state.attachDisplayAudioSource);
-  const stopSource = useSituationRoomStore((state) => state.stopSource);
-  const stopRoom = useSituationRoomStore((state) => state.stopRoom);
-  const saveRoomAsNote = useSituationRoomStore((state) => state.saveRoomAsNote);
-  const attachRoomToHelixAsk = useSituationRoomStore((state) => state.attachRoomToHelixAsk);
+  const rooms = useSituationRoomStore((state: SituationRoomStoreState) => state.rooms);
+  const roomOrder = useSituationRoomStore((state: SituationRoomStoreState) => state.room_order);
+  const activeRoomId = useSituationRoomStore((state: SituationRoomStoreState) => state.active_room_id);
+  const sources = useSituationRoomStore((state: SituationRoomStoreState) => state.sources);
+  const events = useSituationRoomStore((state: SituationRoomStoreState) => state.events);
+  const createRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.createRoom);
+  const renameRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.renameRoom);
+  const setActiveRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.setActiveRoom);
+  const attachDisplayAudioSource = useSituationRoomStore((state: SituationRoomStoreState) => state.attachDisplayAudioSource);
+  const stopSource = useSituationRoomStore((state: SituationRoomStoreState) => state.stopSource);
+  const stopRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.stopRoom);
+  const saveRoomAsNote = useSituationRoomStore((state: SituationRoomStoreState) => state.saveRoomAsNote);
+  const attachRoomToHelixAsk = useSituationRoomStore((state: SituationRoomStoreState) => state.attachRoomToHelixAsk);
   const [selectedSourceId, setSelectedSourceId] = React.useState<string | undefined>();
   const [draftTitle, setDraftTitle] = React.useState("New Situation Room");
 
   const roomList = React.useMemo(
-    () => roomOrder.map((roomId) => rooms[roomId]).filter(Boolean),
+    () =>
+      roomOrder
+        .map((roomId: string) => rooms[roomId])
+        .filter((room): room is SituationRoom => Boolean(room)),
     [roomOrder, rooms],
   );
   const activeRoom = activeRoomId ? rooms[activeRoomId] : undefined;
   const activeSources = React.useMemo(
-    () => (activeRoom ? activeRoom.source_ids.map((sourceId) => sources[sourceId]).filter(Boolean) : []),
+    () =>
+      activeRoom
+        ? activeRoom.source_ids
+            .map((sourceId: string) => sources[sourceId])
+            .filter((source): source is SituationRoomSource => Boolean(source))
+        : [],
     [activeRoom, sources],
   );
   const roomEvents = React.useMemo(
@@ -170,7 +180,7 @@ export default function SituationRoomSourcesPanel() {
 
   const handleAttachSource = React.useCallback(() => {
     if (!activeRoom) return;
-    void attachDisplayAudioSource(activeRoom.room_id).then((source) => {
+    void attachDisplayAudioSource(activeRoom.room_id).then((source: SituationRoomSource | null) => {
       if (source) setSelectedSourceId(source.source_id);
     });
   }, [activeRoom, attachDisplayAudioSource]);
@@ -351,4 +361,3 @@ export default function SituationRoomSourcesPanel() {
     </div>
   );
 }
-

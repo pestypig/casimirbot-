@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
 import {
   selectSituationRoomEvents,
   useSituationRoomStore,
@@ -15,6 +16,7 @@ import {
 } from "@/store/useWorkstationNotesStore";
 
 const SITUATION_ROOM_JOBS_STORAGE_KEY = "situation-room-jobs:v1";
+const DEFAULT_NATIVE_LANGUAGE = "en";
 
 export type SituationRoomJobKind =
   | "translate"
@@ -37,6 +39,16 @@ export type SituationRoomJobArtifactKind =
   | "action_item"
   | "prompt_draft";
 
+export type SituationRoomJobInputTextPolicy =
+  | "transcript_text"
+  | "source_text_preferred"
+  | "source_text_only";
+
+export type SituationRoomJobOutputRenderPolicy =
+  | "target_language"
+  | "native_language"
+  | "dual";
+
 export type SituationRoomJobChunkRange = {
   source_id: string;
   from_chunk: number;
@@ -53,6 +65,9 @@ export type SituationRoomJob = {
   input_event_ids?: string[];
   chunk_ranges?: SituationRoomJobChunkRange[];
   target_language?: string;
+  native_language?: string;
+  input_text_policy: SituationRoomJobInputTextPolicy;
+  output_render_policy: SituationRoomJobOutputRenderPolicy;
   job_spec_hash: string;
   output_ids: string[];
   created_at: string;
@@ -78,6 +93,12 @@ export type SituationRoomDerivedOutput = {
   meta: {
     model?: string;
     target_language?: string;
+    output_language?: string;
+    native_language?: string;
+    input_language?: string | null;
+    input_text_policy?: SituationRoomJobInputTextPolicy;
+    output_render_policy?: SituationRoomJobOutputRenderPolicy;
+    transcript_was_translated?: boolean;
     prompt_hash?: string;
     confidence?: number;
     command_lane?: {
@@ -123,7 +144,7 @@ export type HelixTurnContextSnapshot = {
   job_outputs: Array<{ job_id: string; from_seq: number; to_seq: number; output_ids: string[] }>;
 };
 
-type CreateJobInput = {
+export type CreateJobInput = {
   room_id: string;
   kind: SituationRoomJobKind;
   title?: string;
@@ -131,6 +152,9 @@ type CreateJobInput = {
   input_event_ids?: string[];
   chunk_ranges?: SituationRoomJobChunkRange[];
   target_language?: string;
+  native_language?: string;
+  input_text_policy?: SituationRoomJobInputTextPolicy;
+  output_render_policy?: SituationRoomJobOutputRenderPolicy;
   status?: SituationRoomJobStatus;
 };
 
@@ -147,6 +171,7 @@ type SituationRoomJobStoreState = {
     input?: Partial<CreateJobInput>,
   ) => SituationRoomJob;
   processJobNow: (jobId: string) => SituationRoomDerivedOutput[];
+  processJobNowAsync: (jobId: string) => Promise<SituationRoomDerivedOutput[]>;
   appendDerivedOutput: (output: SituationRoomDerivedOutput) => SituationRoomDerivedOutput;
   stopJob: (jobId: string) => void;
   saveJobAsNote: (jobId: string) => WorkstationNote | null;
@@ -197,6 +222,19 @@ function normalizeTitle(value: string | undefined, fallback: string): string {
   return trimmed || fallback;
 }
 
+function normalizeLanguageCode(value: string | undefined, fallback: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || fallback;
+}
+
+function defaultInputTextPolicy(kind: SituationRoomJobKind): SituationRoomJobInputTextPolicy {
+  return kind === "translate" ? "source_text_preferred" : "transcript_text";
+}
+
+function defaultOutputRenderPolicy(kind: SituationRoomJobKind): SituationRoomJobOutputRenderPolicy {
+  return kind === "translate" ? "target_language" : "native_language";
+}
+
 function defaultJobTitle(kind: SituationRoomJobKind, targetLanguage?: string): string {
   switch (kind) {
     case "translate":
@@ -210,6 +248,135 @@ function defaultJobTitle(kind: SituationRoomJobKind, targetLanguage?: string): s
     default:
       return "Situation room job";
   }
+}
+
+function metaString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function eventTranscriptText(event: SituationRoomStoredEvent): string {
+  return event.text?.trim() ?? "";
+}
+
+function eventSourceText(event: SituationRoomStoredEvent): string | null {
+  return metaString(event.meta?.source_text);
+}
+
+function eventInputLanguage(event: SituationRoomStoredEvent): string | null {
+  return metaString(event.meta?.source_language) ?? metaString(event.meta?.language);
+}
+
+function resolveJobInputText(job: SituationRoomJob, event: SituationRoomStoredEvent): string {
+  const transcriptText = eventTranscriptText(event);
+  const sourceText = eventSourceText(event);
+  switch (job.input_text_policy) {
+    case "source_text_only":
+      return sourceText ?? "";
+    case "source_text_preferred":
+      return sourceText ?? transcriptText;
+    case "transcript_text":
+    default:
+      return transcriptText;
+  }
+}
+
+function outputLanguageForJob(job: SituationRoomJob): string | undefined {
+  return job.output_render_policy === "native_language" ? job.native_language : job.target_language;
+}
+
+function languageBase(value: string | null | undefined): string | null {
+  const trimmed = value?.trim().toLowerCase();
+  if (!trimmed) return null;
+  return trimmed.split(/[-_]/)[0] || trimmed;
+}
+
+function languagesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = languageBase(a);
+  const right = languageBase(b);
+  return Boolean(left && right && left === right);
+}
+
+function formatTranslationOutputText(job: SituationRoomJob, event: SituationRoomStoredEvent, translatedText: string) {
+  const targetLanguage = job.target_language ?? "target";
+  const nativeLanguage = job.native_language ?? DEFAULT_NATIVE_LANGUAGE;
+  const nativeText = eventTranscriptText(event);
+  const cleanTranslation = translatedText.trim();
+  if (job.output_render_policy === "dual") {
+    return `Target (${targetLanguage}): ${cleanTranslation}\nNative (${nativeLanguage}): ${nativeText}`;
+  }
+  if (job.output_render_policy === "native_language") {
+    return `Native (${nativeLanguage}): ${nativeText || cleanTranslation}`;
+  }
+  return `Target (${targetLanguage}): ${cleanTranslation}`;
+}
+
+function extractAskTranslationText(value: string): string {
+  return value
+    .trim()
+    .replace(/^```(?:\w+)?\s*/i, "")
+    .replace(/```$/i, "")
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .trim();
+}
+
+async function translateTextWithHelixAsk(args: {
+  text: string;
+  sourceLanguage?: string | null;
+  targetLanguage: string;
+  roomId: string;
+  jobId: string;
+}): Promise<string> {
+  const response = await fetch("/api/agi/ask/turn", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      question:
+        `Translate the transcript chunk below into ${args.targetLanguage}. ` +
+        "Return only the translated text. Preserve names, numbers, game terms, and speaker intent. " +
+        "Do not add commentary.\n\n" +
+        `Transcript chunk:\n${args.text}`,
+      traceId: args.roomId,
+      sessionId: args.jobId,
+      sourceLanguage: args.sourceLanguage ?? undefined,
+      responseLanguage: args.targetLanguage,
+      preferredResponseLanguage: args.targetLanguage,
+      mode: "read",
+      context_mode: "isolated",
+      max_tokens: Math.max(120, Math.min(900, Math.ceil(args.text.length * 1.5))),
+    }),
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        text?: unknown;
+        selected_final_answer?: unknown;
+        assistant_answer?: unknown;
+        message?: unknown;
+        error?: unknown;
+      }
+    | null;
+  if (!response.ok) {
+    const message =
+      typeof payload?.message === "string"
+        ? payload.message
+        : typeof payload?.error === "string"
+          ? payload.error
+          : `translation_request_failed:${response.status}`;
+    throw new Error(message);
+  }
+  const raw =
+    typeof payload?.selected_final_answer === "string"
+      ? payload.selected_final_answer
+      : typeof payload?.assistant_answer === "string"
+        ? payload.assistant_answer
+        : typeof payload?.text === "string"
+          ? payload.text
+          : "";
+  const translated = extractAskTranslationText(raw);
+  if (!translated) throw new Error("empty_translation_response");
+  return translated;
 }
 
 function artifactKindForJob(kind: SituationRoomJobKind): SituationRoomJobArtifactKind {
@@ -286,6 +453,10 @@ function makeOutput(args: {
     meta: {
       model: "situation-room-local-v1",
       target_language: args.job.target_language,
+      output_language: outputLanguageForJob(args.job),
+      native_language: args.job.native_language,
+      input_text_policy: args.job.input_text_policy,
+      output_render_policy: args.job.output_render_policy,
       command_lane: {
         decision: "none",
         suppression_reason: "non_user_audio_source",
@@ -298,14 +469,31 @@ function makeOutput(args: {
 function buildTranslationOutput(job: SituationRoomJob, event: SituationRoomStoredEvent, seq: number) {
   const sourceId = event.source_id ?? event.capture_session_id ?? event.source;
   const chunk = typeof event.chunk_index === "number" ? event.chunk_index : seq;
+  const targetLanguage = job.target_language ?? "target";
+  const nativeLanguage = job.native_language ?? DEFAULT_NATIVE_LANGUAGE;
+  const inputText = resolveJobInputText(job, event);
+  const nativeText = eventTranscriptText(event);
+  const inputLanguage = eventInputLanguage(event);
+  const transcriptWasTranslated = event.meta?.translated === true;
+  const text =
+    job.output_render_policy === "dual"
+      ? `Target (${targetLanguage}): ${inputText}\nNative (${nativeLanguage}): ${nativeText}`
+      : job.output_render_policy === "native_language"
+        ? `Native (${nativeLanguage}): ${nativeText || inputText}`
+        : `Target (${targetLanguage}): ${inputText}`;
   return makeOutput({
     job,
     artifactKind: "translation_chunk",
-    text: `[${job.target_language ?? "target"}] ${event.text?.trim() ?? ""}`,
+    text,
     seq,
     sourceEvent: event,
     derivedFrom: [event],
     outputId: `room:${job.room_id}:job:${job.job_id}:source:${sourceId}:chunk:${chunk}`,
+    meta: {
+      input_language: inputLanguage,
+      transcript_was_translated: transcriptWasTranslated,
+      source_text_available: Boolean(eventSourceText(event)),
+    },
   });
 }
 
@@ -420,24 +608,34 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
       createJob: (input) => {
         const timestamp = nowIso();
         const jobId = createId("job");
+        const targetLanguage = normalizeLanguageCode(input.target_language, undefined);
+        const nativeLanguage = normalizeLanguageCode(input.native_language, DEFAULT_NATIVE_LANGUAGE);
+        const inputTextPolicy = input.input_text_policy ?? defaultInputTextPolicy(input.kind);
+        const outputRenderPolicy = input.output_render_policy ?? defaultOutputRenderPolicy(input.kind);
         const specHash = buildJobSpecHash({
           room_id: input.room_id,
           kind: input.kind,
           source_ids: input.source_ids ?? [],
           input_event_ids: input.input_event_ids,
           chunk_ranges: input.chunk_ranges,
-          target_language: input.target_language,
+          target_language: targetLanguage,
+          native_language: nativeLanguage,
+          input_text_policy: inputTextPolicy,
+          output_render_policy: outputRenderPolicy,
         });
         const job: SituationRoomJob = {
           job_id: jobId,
           room_id: input.room_id,
           kind: input.kind,
-          title: normalizeTitle(input.title, defaultJobTitle(input.kind, input.target_language)),
+          title: normalizeTitle(input.title, defaultJobTitle(input.kind, targetLanguage)),
           status: input.status ?? "draft",
           source_ids: input.source_ids ?? [],
           input_event_ids: input.input_event_ids,
           chunk_ranges: input.chunk_ranges,
-          target_language: input.target_language,
+          target_language: targetLanguage,
+          native_language: nativeLanguage,
+          input_text_policy: inputTextPolicy,
+          output_render_policy: outputRenderPolicy,
           job_spec_hash: specHash,
           output_ids: [],
           created_at: timestamp,
@@ -447,6 +645,20 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
           jobs: { ...state.jobs, [jobId]: job },
           job_order: [jobId, ...state.job_order.filter((entry) => entry !== jobId)],
         }));
+        pushWorkstationDebugEvent({
+          channel: "situation_room_job",
+          action: "job_created",
+          room_id: job.room_id,
+          job_id: job.job_id,
+          detail: {
+            kind: job.kind,
+            source_ids: job.source_ids,
+            target_language: job.target_language,
+            native_language: job.native_language,
+            input_text_policy: job.input_text_policy,
+            output_render_policy: job.output_render_policy,
+          },
+        });
         return job;
       },
       createJobFromRoom: (roomId, kind, input) =>
@@ -497,6 +709,121 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
         });
         return appended;
       },
+      processJobNowAsync: async (jobId) => {
+        const initialOutputs = get().processJobNow(jobId);
+        const job = get().jobs[jobId];
+        if (!job || job.kind !== "translate" || job.output_render_policy === "native_language") {
+          return initialOutputs;
+        }
+        const targetLanguage = job.target_language?.trim();
+        if (!targetLanguage) return initialOutputs;
+        const roomEvents = selectSituationRoomEvents(useSituationRoomStore.getState(), job.room_id);
+        const eventsById = new Map(roomEvents.map((event) => [event.event_id, event]));
+        const updatedOutputs: SituationRoomDerivedOutput[] = [];
+        for (const output of initialOutputs.filter((entry) => entry.artifact_kind === "translation_chunk")) {
+          const sourceEvent = output.source_event_id ? eventsById.get(output.source_event_id) : undefined;
+          if (!sourceEvent) {
+            updatedOutputs.push(output);
+            continue;
+          }
+          const inputText = resolveJobInputText(job, sourceEvent);
+          const inputLanguage = eventInputLanguage(sourceEvent);
+          if (!inputText.trim()) {
+            const nextOutput = {
+              ...output,
+              meta: {
+                ...output.meta,
+                translation_status: "skipped_empty_input",
+              },
+            };
+            updatedOutputs.push(get().appendDerivedOutput(nextOutput));
+            continue;
+          }
+          if (languagesMatch(inputLanguage, targetLanguage)) {
+            const nextOutput = {
+              ...output,
+              text: formatTranslationOutputText(job, sourceEvent, inputText),
+              meta: {
+                ...output.meta,
+                model: "situation-room-local-v1",
+                translation_status: "source_already_target",
+              },
+            };
+            updatedOutputs.push(get().appendDerivedOutput(nextOutput));
+            continue;
+          }
+          pushWorkstationDebugEvent({
+            channel: "situation_room_translation",
+            action: "translation_request",
+            room_id: job.room_id,
+            source_id: sourceEvent.source_id,
+            job_id: job.job_id,
+            output_id: output.output_id,
+            detail: {
+              input_language: inputLanguage,
+              target_language: targetLanguage,
+              input_text_policy: job.input_text_policy,
+              output_render_policy: job.output_render_policy,
+            },
+          });
+          try {
+            const translatedText = await translateTextWithHelixAsk({
+              text: inputText,
+              sourceLanguage: inputLanguage,
+              targetLanguage,
+              roomId: job.room_id,
+              jobId: job.job_id,
+            });
+            const nextOutput = {
+              ...output,
+              text: formatTranslationOutputText(job, sourceEvent, translatedText),
+              ts: nowIso(),
+              meta: {
+                ...output.meta,
+                model: "helix-ask-translation",
+                translation_status: "translated",
+              },
+            };
+            updatedOutputs.push(get().appendDerivedOutput(nextOutput));
+            pushWorkstationDebugEvent({
+              channel: "situation_room_translation",
+              action: "translation_response",
+              room_id: job.room_id,
+              source_id: sourceEvent.source_id,
+              job_id: job.job_id,
+              output_id: output.output_id,
+              detail: {
+                target_language: targetLanguage,
+                chars: translatedText.length,
+              },
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const nextOutput = {
+              ...output,
+              meta: {
+                ...output.meta,
+                translation_status: "fallback",
+                translation_error: message,
+              },
+            };
+            updatedOutputs.push(get().appendDerivedOutput(nextOutput));
+            pushWorkstationDebugEvent({
+              channel: "situation_room_translation",
+              action: "translation_error",
+              room_id: job.room_id,
+              source_id: sourceEvent.source_id,
+              job_id: job.job_id,
+              output_id: output.output_id,
+              detail: {
+                target_language: targetLanguage,
+                error: message,
+              },
+            });
+          }
+        }
+        return updatedOutputs.length > 0 ? updatedOutputs : initialOutputs;
+      },
       appendDerivedOutput: (output) => {
         set((state) => {
           const currentJob = state.jobs[output.job_id];
@@ -505,7 +832,7 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
           return {
             outputs: {
               ...state.outputs,
-              [output.output_id]: state.outputs[output.output_id] ?? output,
+              [output.output_id]: output,
             },
             jobs: {
               ...state.jobs,
@@ -519,6 +846,22 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
               },
             },
           };
+        });
+        pushWorkstationDebugEvent({
+          channel: "situation_room_job",
+          action: "derived_output",
+          room_id: output.room_id,
+          source_id: output.source_id,
+          job_id: output.job_id,
+          output_id: output.output_id,
+          detail: {
+            artifact_kind: output.artifact_kind,
+            chunk_index: output.chunk_index,
+            seq: output.seq,
+            output_language: output.meta.output_language,
+            translation_status: output.meta.translation_status,
+            text_chars: output.text.length,
+          },
         });
         return get().outputs[output.output_id] ?? output;
       },
@@ -624,6 +967,8 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
                 output_id: output.output_id,
                 artifact_kind: output.artifact_kind,
                 derived_from_event_ids: output.derived_from_event_ids,
+                output_language: output.meta.output_language,
+                output_render_policy: output.meta.output_render_policy,
                 text: output.text,
               })),
             },
@@ -673,4 +1018,3 @@ export const useSituationRoomJobStore = create<SituationRoomJobStoreState>()(
     },
   ),
 );
-

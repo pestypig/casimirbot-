@@ -67,7 +67,7 @@ const pickDisplayAudioMimeType = (): string | undefined => {
     return undefined;
   }
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
-  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate));
+  return candidates.find((candidate: string) => MediaRecorder.isTypeSupported(candidate));
 };
 
 const stopStreamTracks = (stream: MediaStream): void => {
@@ -104,6 +104,10 @@ const buildTranscriptEvent = (args: {
     meta: {
       confidence: typeof args.result.confidence === "number" ? args.result.confidence : null,
       language: args.result.language_detected ?? args.result.source_language ?? args.result.language ?? null,
+      display_language: args.result.language ?? null,
+      source_language: args.result.source_language ?? args.result.language_detected ?? null,
+      source_text: args.result.source_text ?? null,
+      translated: args.result.translated === true,
       engine: args.result.engine ?? null,
       possible_tts_echo: args.possibleTtsEcho,
     },
@@ -172,7 +176,9 @@ export async function startDisplayAudioSituationSession(
       const headerChunk = bufferedChunks[0]?.chunk;
       const segmentChunks = bufferedChunks.slice(currentSegmentStartIndex);
       segmentStartIndex = bufferedChunks.length;
-      const audioChunks = segmentChunks.map((entry) => entry.chunk).filter((chunk) => chunk.size > 0);
+      const audioChunks = segmentChunks
+        .map((entry: { chunk: Blob; atMs: number }) => entry.chunk)
+        .filter((chunk: Blob) => chunk.size > 0);
       if (audioChunks.length === 0) return;
       const uploadMimeType = recorder.mimeType || audioChunks[0]?.type || mimeType || "audio/webm";
       const shouldPrimeWithHeader = shouldPrimeSegmentWithContainerHeader({
@@ -204,7 +210,7 @@ export async function startDisplayAudioSituationSession(
         command_lane_enabled: false,
         durationMs,
       })
-        .then((result) => {
+        .then((result: VoiceTranscribeResponse) => {
           const situationEvent = buildTranscriptEvent({
             roomId: options.roomId,
             missionId: options.missionId,
@@ -219,19 +225,19 @@ export async function startDisplayAudioSituationSession(
             options.onEvent(situationEvent);
           }
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           options.onError?.(error instanceof Error ? error : new Error(String(error)));
         });
     }, 90);
   };
 
-  recorder.ondataavailable = (event) => {
+  recorder.ondataavailable = (event: BlobEvent) => {
     if (stopped || !event.data || event.data.size <= 0) return;
     const now = Date.now();
     bufferedChunks.push({ chunk: event.data, atMs: now });
   };
 
-  recorder.onerror = (event) => {
+  recorder.onerror = (event: Event) => {
     const error = (event as unknown as { error?: Error }).error ?? new Error("Display audio recorder failed.");
     options.onError?.(error);
   };
