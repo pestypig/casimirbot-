@@ -264,12 +264,16 @@ describe("HelixAskPill mic-first surface contract", () => {
     const apiSource = fs.readFileSync(path.resolve(process.cwd(), "client/src/lib/agi/api.ts"), "utf8");
     expect(apiSource).toContain("turn_truth_table?: Record<string, unknown>");
     expect(apiSource).toContain("equation_attempt_debug?: Record<string, unknown> | null");
+    expect(apiSource).toContain("resolved_turn_summary?: Record<string, unknown> | null");
     expect(source).toContain("turn_truth_table: localResponse.turn_truth_table ?? null");
     expect(source).toContain("visible_answer_text: responseText");
     expect(source).toContain("turnTruthTable");
     expect(source).toContain("visible_answer_text: args.reply.content");
     expect(source).toContain("equation_attempt_debug");
     expect(source).toContain("terminal_failure_context");
+    expect(source).toContain("resolved_turn_summary");
+    expect(source).toContain("resolvedRouteLabel");
+    expect(source).toContain("Route: ${resolvedRouteLabel}");
   });
 
   it("uses an atomic nonempty JSON debug copy helper", async () => {

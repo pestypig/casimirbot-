@@ -9138,6 +9138,20 @@ function buildReplyMasterEventClockExport(args: {
     openDocContract,
     currentTurnActionSummary,
   };
+  const resolvedTurnSummary = readAgentLoopAuditRecord(
+    (args.reply as Record<string, unknown>).resolved_turn_summary ??
+      args.reply.debug?.resolved_turn_summary ??
+      turnTruthTable?.resolved_turn_summary,
+  );
+  const routeHistoryDebug = readAgentLoopAuditRecord(
+    (args.reply as Record<string, unknown>).route_history_debug ??
+      args.reply.debug?.route_history_debug ??
+      turnTruthTable?.route_history_debug,
+  );
+  const resolvedRouteLabel =
+    typeof resolvedTurnSummary?.resolved_route_label === "string" && resolvedTurnSummary.resolved_route_label.trim()
+      ? resolvedTurnSummary.resolved_route_label
+      : `${String(turnTruthTable?.dispatch_policy ?? "n/a")} / ${String(turnTruthTable?.route_reason_code ?? "n/a")}`;
 
   const payload = {
     schema: "helix.ask.master_event_clock.v2",
@@ -9181,6 +9195,8 @@ function buildReplyMasterEventClockExport(args: {
     },
     debugContext: args.debugContext,
     debug: args.reply.debug ?? null,
+    resolved_turn_summary: resolvedTurnSummary,
+    route_history_debug: routeHistoryDebug,
     equation_attempt_debug: readAgentLoopAuditRecord(
       args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
     ),
@@ -9213,7 +9229,7 @@ function buildReplyMasterEventClockExport(args: {
         },
     turnTruthTableSummary: [
       "TURN TRUTH TABLE",
-      `Route: ${String(turnTruthTable?.dispatch_policy ?? "n/a")} / ${String(turnTruthTable?.route_reason_code ?? "n/a")}`,
+      `Route: ${resolvedRouteLabel}`,
       `Tool: ${readProceduralActionLabel(turnTruthTable?.selected_tool)}`,
       `Terminal: ${visibleTerminalKind} | ${clipText(
         String(backendTerminalText ?? readAgentLoopAuditRecord(turnTruthTable?.terminal)?.text ?? args.reply.content ?? ""),
@@ -9454,6 +9470,11 @@ export type DebugClipboardCopyResult = {
   error?: string;
 };
 
+const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => {
+  const delayMs = [100, 250, 500, 900][Math.min(attempt, 3)] ?? 900;
+  await new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
+};
+
 export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
   const json = typeof payload === "string" ? payload : "";
   if (!json.trim()) {
@@ -9481,8 +9502,9 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
         throw new Error("clipboard_readback_unavailable");
       }
       let lastError: Error | null = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
         await navigator.clipboard.writeText(json);
+        await waitForDebugClipboardReadback(attempt);
         const confirm = await navigator.clipboard.readText().catch(() => {
           throw new Error("clipboard_readback_unavailable");
         });
@@ -9522,6 +9544,7 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
       const copied = document.execCommand("copy");
       if (copied) {
         if (typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function") {
+          await waitForDebugClipboardReadback(1);
           const confirm = await navigator.clipboard.readText().catch(() => "");
           if (confirm.trim().length === 0) {
             return {
@@ -24095,6 +24118,14 @@ export function HelixAskPill({
                 typeof localResponseRecord.equation_extraction_attempt === "object"
                   ? localResponseRecord.equation_extraction_attempt
                   : null,
+              resolved_turn_summary:
+                localResponseRecord.resolved_turn_summary && typeof localResponseRecord.resolved_turn_summary === "object"
+                  ? localResponseRecord.resolved_turn_summary
+                  : null,
+              route_history_debug:
+                localResponseRecord.route_history_debug && typeof localResponseRecord.route_history_debug === "object"
+                  ? localResponseRecord.route_history_debug
+                  : null,
               rejected_terminal_candidates: Array.isArray(localResponseRecord.rejected_terminal_candidates)
                 ? localResponseRecord.rejected_terminal_candidates
                 : [],
@@ -27244,6 +27275,7 @@ export function HelixAskPill({
                   {userSettings.showHelixAskDebug ? (
                     <button
                       type="button"
+                      onPointerDown={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                       onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                       disabled={
                         typeof window === "undefined"
@@ -27327,6 +27359,7 @@ export function HelixAskPill({
                     <div className="mt-2 flex justify-end">
                       <button
                         type="button"
+                        onPointerDown={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                         onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
                         disabled={
                           typeof window === "undefined"

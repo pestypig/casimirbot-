@@ -236,6 +236,8 @@ export type LocalAskResponse = {
   current_turn_artifact_ledger?: unknown[];
   equation_extraction_attempt?: Record<string, unknown> | null;
   equation_attempt_debug?: Record<string, unknown> | null;
+  resolved_turn_summary?: Record<string, unknown> | null;
+  route_history_debug?: Record<string, unknown> | null;
   rejected_terminal_candidates?: unknown[];
   rejected_prior_artifacts?: unknown[];
   canonical_goal_frame?: unknown;

@@ -87556,6 +87556,118 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             : resolvedTerminalText === substantiveRuntimeTerminalText || resolvedTerminalText === runtimeTerminalText
               ? "runtime"
               : terminalSource;
+      const canonicalGoalRecord =
+        payload.canonical_goal_frame && typeof payload.canonical_goal_frame === "object"
+          ? (payload.canonical_goal_frame as Record<string, unknown>)
+          : payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
+            ? (payload.universal_goal_frame as Record<string, unknown>)
+            : null;
+      const goalKind = readAskTurnString(canonicalGoalRecord?.goal_kind) ?? "unknown";
+      const terminalErrorCode = readAskTurnString(payload.terminal_error_code);
+      const pendingServerRequestObjectPresent = Boolean(
+        payload.pending_server_request && typeof payload.pending_server_request === "object",
+      );
+      const payloadFinalStatus = readAskTurnString(payload.final_status) ?? readAskTurnString(payload.response_type);
+      const pendingServerRequestPresent = payloadFinalStatus === "pending_input" && pendingServerRequestObjectPresent;
+      const terminalKind =
+        payloadFinalStatus === "pending_input" && pendingServerRequestPresent
+          ? "pending_input"
+          : payloadFinalStatus === "final_failure" || readAskTurnString(payload.response_type) === "final_failure"
+            ? "final_failure"
+            : payloadFinalStatus === "final_answer" || readAskTurnString(payload.response_type) === "final_answer"
+              ? "final_answer"
+              : readAskTurnString(runtimeTerminal?.kind) ?? null;
+      const finalStatus =
+        terminalKind === "pending_input"
+          ? "pending_input"
+          : terminalKind === "final_failure"
+            ? "final_failure"
+            : "final_answer";
+      const stalePendingServerRequest =
+        finalStatus !== "pending_input" && pendingServerRequestObjectPresent
+          ? (payload.pending_server_request as Record<string, unknown>)
+          : null;
+      if (stalePendingServerRequest) {
+        payload.stale_pending_server_request = stalePendingServerRequest;
+        payload.pending_server_request = null;
+      }
+      const resolvedFinalAnswerSource =
+        finalAnswerSource ??
+        (typeof payload.final_answer_source === "string"
+          ? (payload.final_answer_source as HelixAskTurnFinalAnswerSource)
+          : resolvedTerminalSource === "fallback"
+            ? "legacy_fallback"
+            : "planner_terminal");
+      const terminalArtifactKind = readAskTurnString(payload.terminal_artifact_kind);
+      const originalDispatchPolicy =
+        typeof payload.dispatch_policy === "string"
+          ? payload.dispatch_policy
+          : plannerRecord && typeof plannerRecord.dispatch_policy === "string"
+            ? plannerRecord.dispatch_policy
+            : null;
+      const originalRouteReasonCode = typeof payload.route_reason_code === "string" ? payload.route_reason_code : null;
+      const staleRouteCandidates: Array<Record<string, unknown>> = [];
+      if (
+        finalStatus !== "pending_input" &&
+        (originalDispatchPolicy === "needs_user_input" || originalRouteReasonCode === "clarify:missing_args")
+      ) {
+        staleRouteCandidates.push({
+          label: `${originalDispatchPolicy ?? "n/a"} / ${originalRouteReasonCode ?? "n/a"}`,
+          source: "clarification_candidate",
+          reason: "pre_terminal_route_projection",
+          rejected_reason: finalStatus === "final_failure" ? "overridden_by_final_failure" : "overridden_by_final_answer",
+        });
+      }
+      if (stalePendingServerRequest) {
+        staleRouteCandidates.push({
+          label: "needs_user_input / request_user_input",
+          source: "pending_server_request",
+          reason: "stale_pending_request_on_completed_turn",
+          rejected_reason: finalStatus === "final_failure" ? "overridden_by_final_failure" : "overridden_by_final_answer",
+        });
+      }
+      const resolvedRoute =
+        finalStatus === "pending_input"
+          ? pendingServerRequestPresent
+            ? { label: "needs_user_input / request_user_input", reason: "real_pending_server_request" }
+            : { label: "final_failure / pending_request_missing", reason: "pending_input_without_request_rewritten" }
+          : finalStatus === "final_failure"
+            ? {
+                label: `${goalKind} / typed_failure:${terminalErrorCode ?? "unknown"}`,
+                reason: "resolved_terminal_failure",
+              }
+            : { label: `${goalKind} / ${resolvedFinalAnswerSource ?? "final_answer"}`, reason: "resolved_terminal_answer" };
+      const resolvedTurnSummary = {
+        turn_id:
+          typeof payload.turn_id === "string"
+            ? payload.turn_id
+            : typeof incoming.turnId === "string"
+              ? incoming.turnId
+              : null,
+        final_status: finalStatus,
+        terminal_kind: terminalKind ?? finalStatus,
+        terminal_artifact_kind: terminalArtifactKind,
+        terminal_error_code: terminalErrorCode,
+        final_answer_source: resolvedFinalAnswerSource ?? null,
+        pending_server_request_present: pendingServerRequestPresent,
+        resolved_route_label: resolvedRoute.label,
+        resolved_route_reason: resolvedRoute.reason,
+        stale_route_candidates: staleRouteCandidates,
+      };
+      const routeHistoryDebug = {
+        initial_classifier_route: originalRouteReasonCode,
+        planner_route: originalDispatchPolicy,
+        clarification_candidate:
+          originalDispatchPolicy === "needs_user_input" || originalRouteReasonCode === "clarify:missing_args"
+            ? `${originalDispatchPolicy ?? "n/a"} / ${originalRouteReasonCode ?? "n/a"}`
+            : null,
+        terminal_route: resolvedRoute.label,
+        rejected_route_candidates: staleRouteCandidates.map((candidate) => ({
+          route: candidate.label,
+          source: candidate.source,
+          rejected_reason: candidate.rejected_reason,
+        })),
+      };
       const truthTable = {
         schema: "helix.ask.turn_truth_table.v1",
         question: (options?.questionSeed ?? transcriptSeed).trim(),
@@ -87578,6 +87690,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             : plannerRecord && typeof plannerRecord.dispatch_policy === "string"
               ? plannerRecord.dispatch_policy
               : null,
+        resolved_turn_summary: resolvedTurnSummary,
+        route_history_debug: routeHistoryDebug,
+        resolved_route_label: resolvedRoute.label,
+        resolved_route_reason: resolvedRoute.reason,
         selected_tool: selectedTool ?? null,
         plan_items: Array.isArray(plannerRecord?.plan_items) ? plannerRecord?.plan_items : [],
         execution_trace: Array.isArray(payload.execution_trace) ? payload.execution_trace : [],
@@ -87664,6 +87780,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           ),
         },
       };
+      payload.resolved_turn_summary = resolvedTurnSummary;
+      payload.route_history_debug = routeHistoryDebug;
       payload.turn_truth_table = truthTable;
       payload.selected_final_answer = resolvedTerminalText;
       if (scientificTerminalErrorText) {
@@ -87687,6 +87805,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               : null,
           selected_final_answer: resolvedTerminalText,
           final_answer_source: payload.final_answer_source,
+          resolved_turn_summary: resolvedTurnSummary,
+          route_history_debug: routeHistoryDebug,
           terminal_authority: payload.terminal_authority,
           universal_goal_frame:
             payload.universal_goal_frame && typeof payload.universal_goal_frame === "object"
