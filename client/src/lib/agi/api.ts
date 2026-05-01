@@ -1083,7 +1083,8 @@ export type VoiceCommandLaneSuppressionReason =
   | "rollout_inactive"
   | "audio_quality_low"
   | "strict_prefix_required"
-  | "log_only";
+  | "log_only"
+  | "non_user_audio_source";
 
 export type VoiceCommandLaneEnvelope = {
   version: "helix.voice.command_lane.v1" | string;
@@ -1103,6 +1104,18 @@ export type VoiceTranscribePayload = {
   language?: string;
   traceId?: string;
   missionId?: string;
+  mission_id?: string;
+  room_id?: string;
+  thread_id?: string;
+  capture_session_id?: string;
+  chunk_index?: number;
+  capture_source?:
+    | "mic"
+    | "display_tab_audio"
+    | "display_window_audio"
+    | "display_screen_audio"
+    | "system_loopback";
+  command_lane_enabled?: boolean;
   durationMs?: number;
   speaker_id?: string;
   speaker_confidence?: number;
@@ -1139,6 +1152,12 @@ export type VoiceTranscribeResponse = {
   lang_schema_version?: "helix.lang.v1" | string;
   traceId?: string | null;
   missionId?: string | null;
+  mission_id?: string | null;
+  room_id?: string | null;
+  thread_id?: string | null;
+  capture_session_id?: string | null;
+  chunk_index?: number | null;
+  capture_source?: string | null;
   engine?: string;
   essence_id?: string | null;
   interpreter?: HelixInterpreterArtifact | null;
@@ -1498,6 +1517,27 @@ export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<
   }
   if (payload.missionId?.trim()) {
     form.set("missionId", payload.missionId.trim());
+  }
+  if (payload.mission_id?.trim()) {
+    form.set("mission_id", payload.mission_id.trim());
+  }
+  if (payload.room_id?.trim()) {
+    form.set("room_id", payload.room_id.trim());
+  }
+  if (payload.thread_id?.trim()) {
+    form.set("thread_id", payload.thread_id.trim());
+  }
+  if (payload.capture_session_id?.trim()) {
+    form.set("capture_session_id", payload.capture_session_id.trim());
+  }
+  if (typeof payload.chunk_index === "number" && Number.isFinite(payload.chunk_index)) {
+    form.set("chunk_index", String(Math.max(0, Math.round(payload.chunk_index))));
+  }
+  if (payload.capture_source?.trim()) {
+    form.set("capture_source", payload.capture_source.trim());
+  }
+  if (typeof payload.command_lane_enabled === "boolean") {
+    form.set("command_lane_enabled", payload.command_lane_enabled ? "1" : "0");
   }
   if (typeof payload.durationMs === "number" && Number.isFinite(payload.durationMs)) {
     form.set("durationMs", String(Math.max(0, Math.round(payload.durationMs))));

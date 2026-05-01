@@ -218,6 +218,12 @@ describe("voice transcribe route", () => {
       confirm_block_reason: null,
       traceId: "trace-1",
       missionId: "mission-1",
+      mission_id: "mission-1",
+      room_id: null,
+      thread_id: null,
+      capture_session_id: null,
+      chunk_index: null,
+      capture_source: "mic",
       engine: "openai_transcribe",
       essence_id: "essence-1",
       interpreter: null,
@@ -815,6 +821,51 @@ describe("voice transcribe route", () => {
         confirm_required: false,
       });
     }
+  });
+
+  it("suppresses command lane for non-mic display audio sources", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "send it",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-display-audio")
+      .field("room_id", "room-1")
+      .field("thread_id", "thread-1")
+      .field("capture_session_id", "capture-1")
+      .field("chunk_index", "2")
+      .field("capture_source", "display_tab_audio")
+      .field("command_lane_enabled", "1")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      text: "send it",
+      room_id: "room-1",
+      thread_id: "thread-1",
+      capture_session_id: "capture-1",
+      chunk_index: 2,
+      capture_source: "display_tab_audio",
+      command_lane: {
+        version: "helix.voice.command_lane.v1",
+        decision: "none",
+        action: null,
+        source: "none",
+        suppression_reason: "non_user_audio_source",
+        confirm_required: false,
+      },
+    });
   });
 
   it("accepts explicit prefixed retry command in noisy social conditions", async () => {

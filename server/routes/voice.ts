@@ -34,7 +34,11 @@ import {
   type HelixAskInterpreterArtifact,
   type HelixAskInterpreterStatus,
 } from "../services/helix-ask/interpreter";
-import { runVoiceCommandArbiter } from "../services/voice-command/command-arbiter";
+import {
+  HELIX_VOICE_COMMAND_LANE_VERSION,
+  runVoiceCommandArbiter,
+  type VoiceCommandLaneResult,
+} from "../services/voice-command/command-arbiter";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -85,6 +89,37 @@ const transcribeRequestSchema = z.object({
   language: z.string().trim().min(1).max(32).optional(),
   traceId: z.string().trim().max(200).optional(),
   missionId: z.string().trim().max(200).optional(),
+  mission_id: z.string().trim().max(200).optional(),
+  room_id: z.string().trim().max(200).optional(),
+  thread_id: z.string().trim().max(200).optional(),
+  capture_session_id: z.string().trim().max(200).optional(),
+  chunk_index: z.preprocess((value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return Math.max(0, Math.round(value));
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : undefined;
+    }
+    return undefined;
+  }, z.number().int().nonnegative().max(1_000_000).optional()),
+  capture_source: z
+    .enum([
+      "mic",
+      "display_tab_audio",
+      "display_window_audio",
+      "display_screen_audio",
+      "system_loopback",
+    ])
+    .optional(),
+  command_lane_enabled: z.preprocess((value) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value > 0;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "1" || normalized === "true") return true;
+      if (normalized === "0" || normalized === "false") return false;
+    }
+    return undefined;
+  }, z.boolean().optional()),
   speaker_id: z.string().trim().min(1).max(64).optional(),
   speaker_confidence: z.preprocess((value) => {
     if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -134,6 +169,36 @@ const transcribeRequestSchema = z.object({
 });
 
 type VoiceTranscribeRequest = z.infer<typeof transcribeRequestSchema>;
+
+const resolveTranscribeMissionId = (payload: VoiceTranscribeRequest): string | undefined =>
+  payload.mission_id?.trim() || payload.missionId?.trim() || undefined;
+
+const buildSuppressedTranscribeCommandLane = (args: {
+  traceId?: string | null;
+  captureSessionId?: string | null;
+  chunkIndex?: number | null;
+  suppressionReason: "disabled" | "non_user_audio_source";
+}): VoiceCommandLaneResult => ({
+  version: HELIX_VOICE_COMMAND_LANE_VERSION,
+  decision: "none",
+  action: null,
+  confidence: null,
+  source: "none",
+  suppression_reason: args.suppressionReason,
+  strict_prefix_applied: false,
+  confirm_required: false,
+  utterance_id: [
+    args.suppressionReason,
+    args.traceId?.trim() || "trace",
+    args.captureSessionId?.trim() || "capture",
+    typeof args.chunkIndex === "number" && Number.isFinite(args.chunkIndex)
+      ? String(Math.max(0, Math.round(args.chunkIndex)))
+      : "chunk",
+  ].join(":"),
+});
+
+const shouldRunTranscribeCommandLane = (payload: VoiceTranscribeRequest): boolean =>
+  (payload.capture_source ?? "mic") === "mic" && payload.command_lane_enabled !== false;
 
 
 type VoiceProviderMode = "local_only" | "allow_remote";
@@ -1158,7 +1223,7 @@ const runHttpTask = async (args: {
   payload: VoiceTranscribeRequest;
   requestedLanguage?: string;
 }): Promise<VoiceTranscriptionHandlerResult> => {
-  const personaId = args.payload.missionId?.trim() || args.payload.traceId?.trim() || "voice.transcribe";
+  const personaId = resolveTranscribeMissionId(args.payload) || args.payload.traceId?.trim() || "voice.transcribe";
   const response = (await sttHttpHandler(
     {
       audio_url: buildInlineAudioDataUri(args.file),
@@ -1182,7 +1247,7 @@ const runEmbeddedLocalTranscribe = async (args: {
   payload: VoiceTranscribeRequest;
   requestedLanguage?: string;
 }): Promise<VoiceTranscriptionHandlerResult> => {
-  const personaId = args.payload.missionId?.trim() || args.payload.traceId?.trim() || "voice.transcribe";
+  const personaId = resolveTranscribeMissionId(args.payload) || args.payload.traceId?.trim() || "voice.transcribe";
   const result = (await sttWhisperHandler(
     {
       audio_base64: args.file.buffer.toString("base64"),
@@ -1857,22 +1922,31 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       );
     }
 
-    const commandLane = await runVoiceCommandArbiter({
-      transcript: result.text ?? "",
-      traceId: parsed.data.traceId ?? null,
-      speechProbability:
-        typeof result.speech_probability === "number"
-          ? result.speech_probability
-          : typeof parsed.data.speech_probability === "number"
-            ? parsed.data.speech_probability
-            : null,
-      snrDb:
-        typeof result.snr_db === "number"
-          ? result.snr_db
-          : typeof parsed.data.snr_db === "number"
-            ? parsed.data.snr_db
-            : null,
-    });
+    const commandLane = shouldRunTranscribeCommandLane(parsed.data)
+      ? await runVoiceCommandArbiter({
+          transcript: result.text ?? "",
+          traceId: parsed.data.traceId ?? null,
+          speechProbability:
+            typeof result.speech_probability === "number"
+              ? result.speech_probability
+              : typeof parsed.data.speech_probability === "number"
+                ? parsed.data.speech_probability
+                : null,
+          snrDb:
+            typeof result.snr_db === "number"
+              ? result.snr_db
+              : typeof parsed.data.snr_db === "number"
+                ? parsed.data.snr_db
+                : null,
+        })
+      : buildSuppressedTranscribeCommandLane({
+          traceId: parsed.data.traceId ?? null,
+          captureSessionId: parsed.data.capture_session_id ?? null,
+          chunkIndex: parsed.data.chunk_index ?? null,
+          suppressionReason:
+            (parsed.data.capture_source ?? "mic") === "mic" ? "disabled" : "non_user_audio_source",
+        });
+    const missionId = resolveTranscribeMissionId(parsed.data);
 
     return res.status(200).json({
       ok: true,
@@ -1924,7 +1998,16 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       confirm_block_reason: result.confirm_block_reason ?? parsed.data.confirm_block_reason ?? null,
       lang_schema_version: result.lang_schema_version ?? HELIX_LANG_SCHEMA_VERSION,
       traceId: parsed.data.traceId ?? null,
-      missionId: parsed.data.missionId ?? null,
+      missionId: missionId ?? null,
+      mission_id: missionId ?? null,
+      room_id: parsed.data.room_id ?? null,
+      thread_id: parsed.data.thread_id ?? null,
+      capture_session_id: parsed.data.capture_session_id ?? null,
+      chunk_index:
+        typeof parsed.data.chunk_index === "number" && Number.isFinite(parsed.data.chunk_index)
+          ? parsed.data.chunk_index
+          : null,
+      capture_source: parsed.data.capture_source ?? "mic",
       engine: result.engine,
       essence_id: result.essence_id ?? null,
       interpreter: result.interpreter ?? null,

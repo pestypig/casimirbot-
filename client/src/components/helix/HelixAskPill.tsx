@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Mic, Search, Square } from "lucide-react";
+import { BrainCircuit, Mic, Radio, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -60,6 +60,17 @@ import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
+import {
+  startDisplayAudioSituationSession,
+  type DisplayAudioSituationSession,
+} from "@/lib/helix/display-audio-capture";
+import {
+  createSituationRoomState,
+  reduceSituationRoomEvent,
+  sourceLabelForSituationSource,
+  type HelixSituationEvent,
+  type SituationRoomState,
+} from "@/lib/helix/situation-room";
 import {
   dispatchHelixWorkstationAction,
   dispatchHelixWorkstationActions,
@@ -3729,7 +3740,8 @@ export function normalizeVoiceCommandLaneEnvelope(
     payload.suppression_reason === "rollout_inactive" ||
     payload.suppression_reason === "audio_quality_low" ||
     payload.suppression_reason === "strict_prefix_required" ||
-    payload.suppression_reason === "log_only"
+    payload.suppression_reason === "log_only" ||
+    payload.suppression_reason === "non_user_audio_source"
       ? payload.suppression_reason
       : null;
   const confidence =
@@ -11685,6 +11697,21 @@ export function HelixAskPill({
   );
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
   const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
+  const situationRoomId = useMemo(() => contextId?.trim() || "helix-room", [contextId]);
+  const [situationRoomState, setSituationRoomState] = useState<SituationRoomState>(() =>
+    createSituationRoomState(situationRoomId),
+  );
+  const [displayAudioStatus, setDisplayAudioStatus] = useState<
+    "idle" | "requesting" | "active" | "transcribing" | "error"
+  >("idle");
+  const [displayAudioError, setDisplayAudioError] = useState<string | null>(null);
+  const [displayAudioCaptureLabel, setDisplayAudioCaptureLabel] = useState<string | null>(null);
+  const displayAudioSessionRef = useRef<DisplayAudioSituationSession | null>(null);
+  useEffect(() => {
+    setSituationRoomState((prev) =>
+      prev.room_id === situationRoomId ? prev : createSituationRoomState(situationRoomId),
+    );
+  }, [situationRoomId]);
   const [pendingWorkstationUserInput, setPendingWorkstationUserInput] =
     useState<PendingWorkstationUserInputRequest | null>(null);
   const pendingWorkstationUserInputRef = useRef<PendingWorkstationUserInputRequest | null>(null);
@@ -16552,6 +16579,96 @@ export function HelixAskPill({
     },
     [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
   );
+
+  const appendSituationRoomEvent = useCallback(
+    (event: HelixSituationEvent) => {
+      setSituationRoomState((prev) => reduceSituationRoomEvent(prev, event));
+      appendSyntheticLiveEvent({
+        id: `situation:${event.id}`,
+        tool: "situation_room",
+        ts: event.ts,
+        text:
+          event.event_type === "voice_transcript"
+            ? `${sourceLabelForSituationSource(event.source)}: ${clipText(event.text ?? "", 220)}`
+            : clipText(event.text ?? event.event_type, 220),
+        meta: {
+          room_id: event.room_id,
+          mission_id: event.mission_id ?? null,
+          thread_id: event.thread_id ?? null,
+          source: event.source,
+          event_type: event.event_type,
+          capture_session_id: event.capture_session_id ?? null,
+          chunk_index: event.chunk_index ?? null,
+          evidence_refs: event.evidence_refs,
+          situation_event: event,
+        },
+      });
+      setDisplayAudioStatus("active");
+      setDisplayAudioError(null);
+    },
+    [appendSyntheticLiveEvent],
+  );
+
+  const stopDisplayAudioCapture = useCallback(() => {
+    displayAudioSessionRef.current?.stop();
+    displayAudioSessionRef.current = null;
+    setDisplayAudioStatus("idle");
+    setDisplayAudioCaptureLabel(null);
+  }, []);
+
+  const handleDisplayAudioCaptureToggle = useCallback(() => {
+    if (displayAudioSessionRef.current) {
+      stopDisplayAudioCapture();
+      return;
+    }
+    setDisplayAudioStatus("requesting");
+    setDisplayAudioError(null);
+    void startDisplayAudioSituationSession({
+      roomId: situationRoomId,
+      missionId: contextId,
+      threadId: askLiveSessionId ?? helixAskSessionRef.current ?? undefined,
+      onEvent: (event) => {
+        setDisplayAudioStatus("transcribing");
+        appendSituationRoomEvent(event);
+      },
+      onError: (error) => {
+        setDisplayAudioStatus("error");
+        setDisplayAudioError(error.message);
+        appendSyntheticLiveEvent({
+          id: `situation:error:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+          tool: "situation_room",
+          ts: new Date().toISOString(),
+          text: `Display audio capture failed: ${clipText(error.message, 180)}`,
+          meta: {
+            room_id: situationRoomId,
+            source: "display_screen_audio",
+            event_type: "capture_error",
+          },
+        });
+      },
+      isDottiePlaybackActive: () =>
+        voiceAutoSpeakRunningRef.current ||
+        (playbackAudioRef.current !== null && playbackAudioRef.current.paused === false),
+    })
+      .then((session) => {
+        displayAudioSessionRef.current = session;
+        setDisplayAudioStatus("active");
+        setDisplayAudioCaptureLabel(sourceLabelForSituationSource(session.source));
+      })
+      .catch((error) => {
+        setDisplayAudioStatus("error");
+        setDisplayAudioError(error instanceof Error ? error.message : String(error));
+      });
+  }, [
+    appendSituationRoomEvent,
+    appendSyntheticLiveEvent,
+    askLiveSessionId,
+    contextId,
+    situationRoomId,
+    stopDisplayAudioCapture,
+  ]);
+
+  useEffect(() => stopDisplayAudioCapture, [stopDisplayAudioCapture]);
 
   const dispatchWorkstationActionSequence = useCallback(
     (input: {
@@ -25212,6 +25329,17 @@ export function HelixAskPill({
     voiceInputState,
     voiceInputError,
   );
+  const situationTranscriptPreview = useMemo(
+    () =>
+      situationRoomState.recentTranscript
+        .slice(-3)
+        .map((segment) => segment.text)
+        .join(" ")
+        .trim(),
+    [situationRoomState.recentTranscript],
+  );
+  const situationSourceCount = Object.keys(situationRoomState.sources).length;
+  const displayAudioActive = displayAudioStatus === "active" || displayAudioStatus === "transcribing";
   const [voiceCallDiagnostics, setVoiceCallDiagnostics] = useState<VoiceCallDiagnosticSnapshot[]>(() =>
     getVoiceCallDiagnosticsSnapshot(),
   );
@@ -25924,6 +26052,21 @@ export function HelixAskPill({
                 }`}
               />
             </button>
+            <button
+              type="button"
+              aria-label={displayAudioActive ? "Stop room source capture" : "Attach audio source to room"}
+              aria-pressed={displayAudioActive}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                displayAudioActive
+                  ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
+                  : displayAudioStatus === "requesting"
+                    ? "border-amber-300/45 bg-amber-400/12 text-amber-100"
+                    : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+              }`}
+              onClick={handleDisplayAudioCaptureToggle}
+            >
+              <Radio className={`h-4 w-4 ${displayAudioActive ? "animate-pulse" : ""}`} />
+            </button>
             <textarea
               aria-label="Ask Helix"
               aria-disabled={askBusy}
@@ -26002,6 +26145,49 @@ export function HelixAskPill({
                   }`}
                 >
                   {voiceInputStatusLabel}
+                </div>
+              </div>
+            ) : null}
+            {(displayAudioStatus !== "idle" || situationRoomState.recentEvents.length > 0) ? (
+              <div className="-mt-1 px-4 pb-2 text-[11px]">
+                <div className="rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/90">
+                        Situation Room Source
+                      </p>
+                      <p className="mt-1 truncate text-[11px] text-cyan-50">
+                        {displayAudioCaptureLabel ?? "Display audio"} / {displayAudioStatus}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded border border-cyan-300/35 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
+                      {situationSourceCount} source{situationSourceCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {displayAudioError ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-rose-100">
+                      {displayAudioError}
+                    </p>
+                  ) : situationTranscriptPreview ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-cyan-100/85">
+                      {clipText(situationTranscriptPreview, 360)}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[10px] text-cyan-100/70">
+                      Awaiting transcript chunks.
+                    </p>
+                  )}
+                  {displayAudioActive ? (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
+                        onClick={stopDisplayAudioCapture}
+                      >
+                        Stop source
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : null}

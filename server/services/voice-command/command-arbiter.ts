@@ -13,7 +13,8 @@ export type VoiceCommandLaneSuppressionReason =
   | "rollout_inactive"
   | "audio_quality_low"
   | "strict_prefix_required"
-  | "log_only";
+  | "log_only"
+  | "non_user_audio_source";
 
 export type VoiceCommandLaneResult = {
   version: typeof HELIX_VOICE_COMMAND_LANE_VERSION;

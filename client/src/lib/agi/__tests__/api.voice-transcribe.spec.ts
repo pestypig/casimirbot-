@@ -46,6 +46,12 @@ describe("transcribeVoice", () => {
       audio,
       traceId: "trace-1",
       missionId: "mission-1",
+      room_id: "room-1",
+      thread_id: "thread-1",
+      capture_session_id: "capture-1",
+      chunk_index: 3,
+      capture_source: "display_tab_audio",
+      command_lane_enabled: false,
       durationMs: 1200,
     });
 
@@ -58,6 +64,12 @@ describe("transcribeVoice", () => {
     expect(body).toBeInstanceOf(FormData);
     expect(body.get("traceId")).toBe("trace-1");
     expect(body.get("missionId")).toBe("mission-1");
+    expect(body.get("room_id")).toBe("room-1");
+    expect(body.get("thread_id")).toBe("thread-1");
+    expect(body.get("capture_session_id")).toBe("capture-1");
+    expect(body.get("chunk_index")).toBe("3");
+    expect(body.get("capture_source")).toBe("display_tab_audio");
+    expect(body.get("command_lane_enabled")).toBe("0");
     expect(body.get("durationMs")).toBe("1200");
     const audioEntry = body.get("audio") as File;
     expect(audioEntry).toBeTruthy();

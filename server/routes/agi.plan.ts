@@ -21371,6 +21371,7 @@ type HelixAskCanonicalGoalKind =
   | "latest_doc_navigation"
   | "doc_equation_location"
   | "equation_attempt_followup"
+  | "doc_evidence_synthesis"
   | "doc_evidence_location"
   | "doc_scientific_numeric"
   | "doc_scientific_concept"
@@ -21397,6 +21398,7 @@ type HelixAskRequiredTerminalKind =
   | "doc_open_receipt"
   | "doc_equation_location"
   | "equation_attempt_explanation"
+  | "doc_evidence_synthesis_answer"
   | "doc_evidence_location"
   | "doc_numeric_answer"
   | "doc_concept_explanation"
@@ -29470,15 +29472,24 @@ const classifyAskTurnEquationAttemptFollowupIntent = (transcript: string): Helix
   const raw = transcript.trim();
   const matchedPhrases = uniqueAskTurnStrings([
     /\blast\s+source[-\s]?finding\s+attempt\b/i.test(raw) ? "last source-finding attempt" : null,
+    /\b(?:that|this)\s+source[-\s]?finding\s+attempt\b/i.test(raw) ? "that source-finding attempt" : null,
     /\blast\s+equation[-\s]?source\s+attempt\b/i.test(raw) ? "last equation-source attempt" : null,
+    /\b(?:that|this)\s+(?:equation[-\s]?source\s+)?attempt\b/i.test(raw) ? "that equation-source attempt" : null,
+    /\b(?:that|this)\s+result\b/i.test(raw) ? "that result" : null,
+    /\bwhat\s+you\s+just\s+checked\b/i.test(raw) ? "what you just checked" : null,
     /\bwhat\s+was\s+checked\b/i.test(raw) ? "what was checked" : null,
     /\bwhat\s+did\s+you\s+check\b/i.test(raw) ? "what did you check" : null,
     /\bwhy\s+did\s+(?:it|that)\s+(?:fail|not\s+satisfy)\b/i.test(raw) ? "why did it fail" : null,
+    /\bwhy\s+did\s+(?:it|that)\s+not\s+satisfy\b/i.test(raw) ? "why did that not satisfy" : null,
     /\bwhat\s+source\s+did\s+you\s+try\b/i.test(raw) ? "what source did you try" : null,
+    /\bthe\s+equation\s+requirement\b/i.test(raw) ? "the equation requirement" : null,
     /\bcalculator[-\s]?ready\s+equation\s+requirement\b/i.test(raw) ? "calculator-ready equation requirement" : null,
   ]);
   const refersToPriorAttempt =
     /\b(?:last|previous|prior)\b/i.test(raw) ||
+    /\b(?:that|this)\s+(?:source[-\s]?finding\s+)?attempt\b/i.test(raw) ||
+    /\b(?:that|this)\s+result\b/i.test(raw) ||
+    /\bwhat\s+you\s+just\s+checked\b/i.test(raw) ||
     /\bsource[-\s]?finding\s+attempt\b/i.test(raw) ||
     /\bequation[-\s]?source\s+attempt\b/i.test(raw);
   const requestedExplanation: HelixAskEquationAttemptFollowupIntent["requested_explanation"] =
@@ -29493,7 +29504,7 @@ const classifyAskTurnEquationAttemptFollowupIntent = (transcript: string): Helix
             : "summary";
   const required =
     matchedPhrases.length > 0 &&
-    (refersToPriorAttempt || /\bcalculator[-\s]?ready\s+equation\s+requirement\b/i.test(raw));
+    (refersToPriorAttempt || /\b(?:calculator[-\s]?ready\s+)?equation\s+requirement\b/i.test(raw));
   return {
     required,
     refers_to_prior_attempt: refersToPriorAttempt,
@@ -29805,11 +29816,277 @@ const classifyAskTurnDocumentSeekingIntent = (transcript: string): HelixAskDocum
   };
 };
 
+type HelixAskProtectedIntentSpan = {
+  kind: "note_title" | "note_body" | "compare_note_target";
+  text: string;
+  start: number;
+  end: number;
+};
+
+type HelixAskIntentCandidate = {
+  kind:
+    | "workspace_help"
+    | "negative_scope_model_only"
+    | "note_mutation"
+    | "doc_vs_note_compare"
+    | "panel_control"
+    | "equation_attempt_followup"
+    | "doc_equation_location"
+    | "doc_evidence_synthesis"
+    | "doc_evidence_location"
+    | "model_only_concept";
+  confidence: "high" | "medium" | "low";
+  evidence: string[];
+  blocked_by?: string[];
+  source: string;
+};
+
+type HelixAskIntentArbitrationResult = {
+  selected: HelixAskIntentCandidate;
+  rejected: Array<{
+    candidate: HelixAskIntentCandidate;
+    reason:
+      | "lower_precedence"
+      | "inside_note_title"
+      | "inside_note_content"
+      | "negative_scope_blocks_workspace"
+      | "not_enough_source_terms"
+      | "requires_prior_attempt_missing"
+      | "wrong_user_goal_shape";
+  }>;
+  precedence_version: "helix.intent_precedence.e62";
+};
+
+const collectAskTurnProtectedIntentSpans = (transcript: string): HelixAskProtectedIntentSpan[] => {
+  const raw = transcript.trim();
+  const spans: HelixAskProtectedIntentSpan[] = [];
+  const noteTitleMatch = raw.match(
+    /\b(?:create|make|start|new|append\s+to|update)\s+(?:a\s+)?(?:workstation\s+)?note\s+(?:called|named|titled)?\s+(.+?)(?=\s+\b(?:with|from|using|about|that|and)\b|[.?!]?$)/i,
+  );
+  if (noteTitleMatch?.[1]) {
+    const start = noteTitleMatch.index ?? 0;
+    const titleStart = start + noteTitleMatch[0].indexOf(noteTitleMatch[1]);
+    spans.push({
+      kind: "note_title",
+      text: noteTitleMatch[1].trim(),
+      start: titleStart,
+      end: titleStart + noteTitleMatch[1].length,
+    });
+  }
+  const noteBodyMatch = raw.match(/\b(?:with|containing|that\s+has)\s+(.+)$/i);
+  if (noteBodyMatch?.[1] && /\bnote\b/i.test(raw) && /\b(?:create|make|start|new|append|update)\b/i.test(raw)) {
+    const bodyStart = (noteBodyMatch.index ?? 0) + noteBodyMatch[0].indexOf(noteBodyMatch[1]);
+    spans.push({
+      kind: "note_body",
+      text: noteBodyMatch[1].trim(),
+      start: bodyStart,
+      end: bodyStart + noteBodyMatch[1].length,
+    });
+  }
+  const compareNoteMatch = raw.match(/\bcompare\b[\s\S]{0,160}\bagainst\b[\s\S]{0,40}\bmy\s+(.+?)\s+note\b/i);
+  if (compareNoteMatch?.[1]) {
+    const start = compareNoteMatch.index ?? 0;
+    const noteStart = start + compareNoteMatch[0].indexOf(compareNoteMatch[1]);
+    spans.push({
+      kind: "compare_note_target",
+      text: compareNoteMatch[1].trim(),
+      start: noteStart,
+      end: noteStart + compareNoteMatch[1].length,
+    });
+  }
+  return spans.filter((span) => span.text.length > 0 && span.end > span.start);
+};
+
+const redactAskTurnProtectedIntentSpans = (transcript: string): string => {
+  const chars = Array.from(transcript);
+  for (const span of collectAskTurnProtectedIntentSpans(transcript)) {
+    for (let index = span.start; index < span.end && index < chars.length; index += 1) {
+      chars[index] = " ";
+    }
+  }
+  return chars.join("");
+};
+
+const isAskTurnNoteMutationPrecedenceIntent = (transcript: string): boolean =>
+  /\b(?:create|make|start|new|append|update|add|write|save|store)\b[\s\S]{0,140}\b(?:workstation\s+)?(?:note|notepad|scratch|memo)\b/i.test(
+    transcript,
+  );
+
+const isAskTurnComparePrecedenceIntent = (transcript: string): boolean =>
+  /\bcompare\b[\s\S]{0,160}\b(?:against|with|to|versus|vs\.?)\b[\s\S]{0,120}\b(?:note|notes|current\s+doc|current\s+document|doc|document)\b/i.test(
+    transcript,
+  );
+
+const isAskTurnDocEvidenceSynthesisIntent = (transcript: string): boolean =>
+  /\b(?:does\s+(?:this|the\s+current|the)\s+.*\bmean|what\s+problem\s+(?:is\s+)?(?:it|this|that)\s+(?:is\s+)?solv(?:ing|es)|tell\s+me\s+what\s+problem|why\s+does\s+it\s+matter|classif(?:y|ication)|decide\s+whether|is\s+this\s+.+\bor\s+.+\bor\s+something\s+else)\b/i.test(
+    transcript,
+  );
+
+const buildAskTurnIntentArbitration = (args: {
+  turnId: string;
+  transcript: string;
+}): HelixAskIntentArbitrationResult => {
+  const raw = args.transcript.trim();
+  const negativeDecision = classifyAskTurnNegativeScopeDecision(raw);
+  const candidates: HelixAskIntentCandidate[] = [];
+  const push = (candidate: HelixAskIntentCandidate | null): void => {
+    if (candidate) candidates.push(candidate);
+  };
+  push(
+    negativeDecision.scope === "model_only" || negativeDecision.scope === "disallow_workspace_lookup"
+      ? {
+          kind: "negative_scope_model_only",
+          confidence: "high",
+          evidence: negativeDecision.matched_phrases,
+          source: "negative_scope_classifier",
+        }
+      : null,
+  );
+  push(
+    isAskTurnWorkspaceHelpIntent(raw)
+      ? {
+          kind: "workspace_help",
+          confidence: "high",
+          evidence: ["workspace_help_phrase"],
+          source: "workspace_help_classifier",
+        }
+      : null,
+  );
+  push(
+    isAskTurnNoteMutationPrecedenceIntent(raw)
+      ? {
+          kind: "note_mutation",
+          confidence: "high",
+          evidence: ["note_mutation_phrase"],
+          source: "note_mutation_classifier",
+        }
+      : null,
+  );
+  push(
+    isAskTurnComparePrecedenceIntent(raw)
+      ? {
+          kind: "doc_vs_note_compare",
+          confidence: "high",
+          evidence: ["compare_phrase"],
+          source: "compare_classifier",
+        }
+      : null,
+  );
+  push(
+    classifyAskTurnPanelControlIntent(raw)?.confidence === "high"
+      ? {
+          kind: "panel_control",
+          confidence: "high",
+          evidence: ["panel_control_phrase"],
+          source: "panel_classifier",
+        }
+      : null,
+  );
+  const followupIntent = classifyAskTurnEquationAttemptFollowupIntent(raw);
+  push(
+    followupIntent.required
+      ? {
+          kind: "equation_attempt_followup",
+          confidence: "high",
+          evidence: followupIntent.matched_phrases,
+          source: "equation_attempt_followup_classifier",
+        }
+      : null,
+  );
+  const shieldedTranscript = redactAskTurnProtectedIntentSpans(raw);
+  const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: shieldedTranscript });
+  const protectedSpans = collectAskTurnProtectedIntentSpans(raw);
+  const protectedEquationTerms = protectedSpans.filter((span) =>
+    /\b(?:calculator|equation|formula|relation|expression|derivation)\b/i.test(span.text),
+  );
+  push(
+    equationIntent.required
+      ? {
+          kind: "doc_equation_location",
+          confidence: "high",
+          evidence: equationIntent.reasons,
+          blocked_by: protectedSpans.map((span) => span.kind),
+          source: "equation_semantic_classifier",
+        }
+      : null,
+  );
+  push(
+    equationIntent.required || protectedEquationTerms.length === 0
+      ? null
+      : {
+          kind: "doc_equation_location",
+          confidence: "low",
+          evidence: protectedEquationTerms.map((span) => `${span.kind}:${span.text}`),
+          blocked_by: protectedEquationTerms.map((span) => span.kind),
+          source: "protected_span_equation_detector",
+        },
+  );
+  push(
+    isAskTurnDocEvidenceSynthesisIntent(raw)
+      ? {
+          kind: "doc_evidence_synthesis",
+          confidence: "high",
+          evidence: ["synthesis_question_phrase"],
+          source: "synthesis_classifier",
+        }
+      : null,
+  );
+  push(
+    classifyAskTurnDocumentSeekingIntent(shieldedTranscript).required
+      ? {
+          kind: "doc_evidence_location",
+          confidence: "medium",
+          evidence: ["document_seeking_phrase"],
+          source: "document_classifier",
+        }
+      : null,
+  );
+  if (candidates.length === 0) {
+    candidates.push({
+      kind: "model_only_concept",
+      confidence: "medium",
+      evidence: ["fallback"],
+      source: "fallback",
+    });
+  }
+  const precedence: Record<HelixAskIntentCandidate["kind"], number> = {
+    negative_scope_model_only: 2,
+    workspace_help: 3,
+    note_mutation: 4,
+    doc_vs_note_compare: 5,
+    panel_control: 6,
+    equation_attempt_followup: 7,
+    doc_equation_location: 8,
+    doc_evidence_synthesis: 9,
+    doc_evidence_location: 10,
+    model_only_concept: 12,
+  };
+  const selected = [...candidates].sort((left, right) => precedence[left.kind] - precedence[right.kind])[0];
+  const rejected = candidates
+    .filter((candidate) => candidate !== selected)
+    .map((candidate) => {
+      const reason =
+        selected.kind === "negative_scope_model_only" && candidate.kind !== "model_only_concept"
+          ? "negative_scope_blocks_workspace"
+          : candidate.kind === "doc_equation_location" && candidate.blocked_by?.includes("note_title")
+            ? "inside_note_title"
+          : candidate.kind === "doc_equation_location" && candidate.blocked_by?.includes("note_body")
+            ? "inside_note_content"
+          : "lower_precedence";
+      return { candidate, reason };
+    });
+  return {
+    selected,
+    rejected,
+    precedence_version: "helix.intent_precedence.e62",
+  };
+};
+
 const buildAskTurnEquationSemanticIntent = (args: {
   turnId: string;
   transcript: string;
 }): HelixAskEquationSemanticIntent => {
-  const raw = args.transcript.trim();
+  const raw = redactAskTurnProtectedIntentSpans(args.transcript.trim());
   const negativeDecision = classifyAskTurnNegativeScopeDecision(raw);
   const negativeScopeBlocked = negativeDecision.scope === "model_only" || negativeDecision.scope === "disallow_workspace_lookup";
   const sourceTerms = uniqueAskTurnStrings([
@@ -30269,6 +30546,25 @@ const buildAskTurnRetrievalRequiredSignal = (args: {
 }): HelixAskRetrievalRequiredSignal => {
   const raw = args.transcript.trim();
   const negativeDecision = classifyAskTurnNegativeScopeDecision(raw);
+  if (isAskTurnWorkspaceHelpIntent(raw)) {
+    return {
+      turn_id: args.turnId,
+      required: false,
+      source: "none",
+      strength: "none",
+      reasons: ["workspace_help_intent"],
+      negative_scope: {
+        background_only: false,
+        no_workspace_lookup: false,
+        ignore_open_document: false,
+        no_docs: false,
+        no_source_lookup: false,
+        general_reasoning_only: false,
+      },
+      requested_outputs: [],
+      anchors: extractAskTurnRetrievalSignalAnchors(raw),
+    };
+  }
   const backgroundOnly = /\b(?:background\s+only|background\s+mode|concept\s+background\s+only|concept\s+check\s+only|general\s+concept\s+only|general\s+reasoning|just\s+answer\s+from\s+general\s+reasoning|general\s+explanation\s+only)\b/i.test(raw) ||
     negativeDecision.scope === "model_only";
   const noWorkspaceLookup = negativeDecision.scope === "model_only" || negativeDecision.scope === "disallow_workspace_lookup";
@@ -30282,7 +30578,8 @@ const buildAskTurnRetrievalRequiredSignal = (args: {
     general_reasoning_only: /\b(?:general\s+reasoning|concept\s+check\s+only|general\s+concept\s+only|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(raw),
   };
   const anchors = extractAskTurnRetrievalSignalAnchors(raw);
-  const documentSeekingIntent = classifyAskTurnDocumentSeekingIntent(raw);
+  const classifierTranscript = redactAskTurnProtectedIntentSpans(raw);
+  const documentSeekingIntent = classifyAskTurnDocumentSeekingIntent(classifierTranscript);
   const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript: raw });
   const exactAnchors = anchors.exact_anchors ?? [];
   const requestedOutputs = new Set<HelixAskRetrievalRequiredSignal["requested_outputs"][number]>();
@@ -30882,6 +31179,52 @@ const buildAskTurnCanonicalGoalFrame = (args: {
     transcript,
     retrievalSignal,
   });
+  const intentArbitration = buildAskTurnIntentArbitration({ turnId: args.turnId, transcript });
+  if (intentArbitration.selected.kind === "workspace_help") {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "workspace_help",
+      answer_scope: "model_only",
+      required_terminal_kind: "direct_answer_text",
+      allows_workspace_context: false,
+      allows_prior_artifacts: false,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: [],
+      confidence: "high",
+      classifier_reasons: ["intent_arbitration:workspace_help", ...intentArbitration.selected.evidence],
+    };
+  }
+  if (intentArbitration.selected.kind === "note_mutation") {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "note_mutation",
+      answer_scope: "current_turn_action",
+      required_terminal_kind: "note_update_receipt",
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: [],
+      confidence: "high",
+      classifier_reasons: ["intent_arbitration:note_mutation", ...intentArbitration.selected.evidence],
+    };
+  }
+  if (intentArbitration.selected.kind === "doc_vs_note_compare") {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "doc_vs_note_compare",
+      answer_scope: "current_turn_compare",
+      required_terminal_kind: "comparison_summary",
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: [],
+      confidence: "high",
+      classifier_reasons: ["intent_arbitration:doc_vs_note_compare", ...intentArbitration.selected.evidence],
+    };
+  }
   const equationIntent = buildAskTurnEquationRetrievalIntent({ turnId: args.turnId, transcript });
   const equationFollowupIntent = classifyAskTurnEquationAttemptFollowupIntent(transcript);
   if (equationFollowupIntent.required) {
@@ -30897,6 +31240,25 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       concept_tokens: ["equation_attempt_explanation"],
       confidence: "high",
       classifier_reasons: ["equation_attempt_followup", ...equationFollowupIntent.matched_phrases],
+    };
+  }
+  if (intentArbitration.selected.kind === "doc_evidence_synthesis") {
+    return {
+      turn_id: args.turnId,
+      goal_kind: "doc_evidence_synthesis",
+      answer_scope: "current_turn_doc",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      corpus_anchors: /\bNHM2\b/i.test(transcript) ? ["NHM2"] : [],
+      numeric_tokens: extractAskTurnScientificNumericTokens(transcript),
+      concept_tokens: uniqueAskTurnStrings([
+        /\bproper[-\s]?time\b/i.test(transcript) ? "proper time" : null,
+        /\bcoordinate[-\s]?time\b/i.test(transcript) ? "coordinate time" : null,
+        /\bproblem\b/i.test(transcript) ? "problem_statement" : null,
+      ]),
+      confidence: "high",
+      classifier_reasons: ["intent_arbitration:doc_evidence_synthesis", ...intentArbitration.selected.evidence],
     };
   }
   if (scopeContract.answer_scope === "model_only") {
@@ -31303,6 +31665,8 @@ const evaluateTurnSatisfaction = (args: {
         ? ["doc_equation_location"]
       : canonicalGoal.goal_kind === "equation_attempt_followup"
         ? ["equation_attempt_explanation"]
+      : canonicalGoal.goal_kind === "doc_evidence_synthesis"
+        ? ["doc_evidence_synthesis_answer"]
       : canonicalGoal.goal_kind === "doc_evidence_location"
         ? ["doc_evidence_location", "doc_location_matches"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
@@ -31350,6 +31714,8 @@ const evaluateTurnSatisfaction = (args: {
         ? ["direct_answer_text", "doc_summary", "doc_location_matches", "doc_evidence_location", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "equation_attempt_followup"
         ? ["direct_answer_text", "doc_summary", "doc_location_matches", "doc_evidence_location", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
+      : canonicalGoal.goal_kind === "doc_evidence_synthesis"
+        ? ["direct_answer_text", "doc_location_matches", "doc_evidence_location", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_evidence_location"
         ? ["direct_answer_text", "doc_summary", "focused_doc_answer", "comparison_summary", "note_update_receipt", "turn_final_text"]
       : canonicalGoal.goal_kind === "doc_scientific_numeric"
@@ -89871,6 +90237,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     payload.current_turn_artifact_ledger = currentTurnArtifacts;
     payload.equation_extraction_attempt = readAskTurnEquationExtractionAttemptPayload(currentTurnArtifacts);
     payload.equation_semantic_intent = buildAskTurnEquationSemanticIntent({ turnId: activeTurnId, transcript: questionSeed });
+    payload.intent_arbitration = buildAskTurnIntentArbitration({ turnId: activeTurnId, transcript: questionSeed });
     payload.equation_attempt_debug = buildAskTurnEquationAttemptDebugPayload({
       transcript: questionSeed,
       artifacts: currentTurnArtifacts,
@@ -89940,6 +90307,144 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.fallback_blocked = true;
       payload.fallback_block_reason = "authoritative_terminal_missing";
     }
+    if (canonicalGoalFrame.answer_scope === "model_only") {
+      const existingDirectArtifact = currentTurnArtifacts.find((artifact) => artifact.kind === "direct_answer_text") ?? null;
+      if (!existingDirectArtifact && resolvedFinalStatus !== "final_failure") {
+        if (isAskTurnNonSubstantiveDirectAnswer(finalText)) {
+          const failureArtifactId = `${activeTurnId}:model_only:typed_failure`;
+          finalText = "I could not produce a substantive direct answer for this background-only turn.";
+          resolvedFinalStatus = "final_failure";
+          finalAnswerSource = "typed_failure";
+          payload.response_type = "final_failure";
+          payload.terminal_error_code = "direct_answer_unavailable";
+          currentTurnArtifacts = mergeAskTurnLedgerArtifacts([
+            ...currentTurnArtifacts,
+            {
+              artifact_id: failureArtifactId,
+              turn_id: activeTurnId,
+              producer_item_id: "model_only_terminal_guard",
+              kind: "typed_failure",
+              created_at_ms: Date.now(),
+              source_scope: "current_turn",
+              goal_hash: hashAskTurnGoalFrame(finalSatisfactionGoalFrame),
+              payload: {
+                kind: "typed_failure",
+                error_code: "direct_answer_unavailable",
+                text: finalText,
+                answer_text: finalText,
+              },
+            },
+          ]);
+          finalSatisfactionReport = {
+            satisfied: false,
+            terminal_kind: "final_failure",
+            terminal_artifact_id: failureArtifactId,
+            terminal_artifact_kind: "typed_failure",
+            terminal_source: "typed_failure",
+            missing_artifacts: ["direct_answer_text"],
+            missing_reason: "direct_answer_unavailable",
+            confidence: "high",
+            rejected_terminal_candidates: rejectedTerminalCandidates,
+          };
+        } else {
+          const directArtifactId = `${activeTurnId}:model_only:direct_answer_text`;
+          currentTurnArtifacts = mergeAskTurnLedgerArtifacts([
+            ...currentTurnArtifacts,
+            {
+              artifact_id: directArtifactId,
+              turn_id: activeTurnId,
+              producer_item_id: "model_only_terminal_guard",
+              kind: "direct_answer_text",
+              created_at_ms: Date.now(),
+              source_scope: "current_turn",
+              goal_hash: hashAskTurnGoalFrame(finalSatisfactionGoalFrame),
+              payload: {
+                kind: "direct_answer_text",
+                text: finalText,
+                answer_text: finalText,
+              },
+            },
+          ]);
+          finalSatisfactionReport = {
+            satisfied: true,
+            terminal_kind: "final_answer",
+            terminal_artifact_id: directArtifactId,
+            terminal_artifact_kind: "direct_answer_text",
+            terminal_source: "direct_answer_text",
+            missing_artifacts: [],
+            confidence: "high",
+            rejected_terminal_candidates: rejectedTerminalCandidates,
+          };
+          resolvedFinalStatus = "final_answer";
+          finalAnswerSource = "no_tool_direct";
+          delete payload.terminal_error_code;
+        }
+      }
+    }
+    if (canonicalGoalFrame.goal_kind === "doc_evidence_synthesis" && resolvedFinalStatus !== "pending_input") {
+      const existingSynthesisArtifact = currentTurnArtifacts.find((artifact) => artifact.kind === "doc_evidence_synthesis_answer") ?? null;
+      const looksLikeOnlyLocation =
+        /^\s*(?:Locations:|Location:|Key numeric result:)/i.test(finalText) ||
+        finalText.trim().length === 0;
+      if (existingSynthesisArtifact) {
+        finalSatisfactionReport = {
+          satisfied: true,
+          terminal_kind: "final_answer",
+          terminal_artifact_id: existingSynthesisArtifact.artifact_id,
+          terminal_artifact_kind: "doc_evidence_synthesis_answer",
+          terminal_source: "artifact_synthesis",
+          missing_artifacts: [],
+          confidence: "high",
+          rejected_terminal_candidates: rejectedTerminalCandidates,
+        };
+        resolvedFinalStatus = "final_answer";
+        finalAnswerSource = "artifact_synthesis";
+        payload.terminal_artifact_kind = "doc_evidence_synthesis_answer";
+        payload.terminal_artifact_id = existingSynthesisArtifact.artifact_id;
+        payload.terminal_artifact_owner_turn_id = existingSynthesisArtifact.turn_id;
+        payload.final_artifact_scope = "current_turn";
+      } else if (looksLikeOnlyLocation || finalSatisfactionReport.terminal_artifact_kind !== "doc_evidence_synthesis_answer") {
+        const failureArtifactId = `${activeTurnId}:synthesis:typed_failure`;
+        finalText = "I found candidate evidence, but no current-turn synthesis artifact answered the requested conclusion.\nCause: synthesis_unavailable.";
+        resolvedFinalStatus = "final_failure";
+        finalAnswerSource = "typed_failure";
+        payload.response_type = "final_failure";
+        payload.terminal_error_code = "synthesis_unavailable";
+        currentTurnArtifacts = mergeAskTurnLedgerArtifacts([
+          ...currentTurnArtifacts,
+          {
+            artifact_id: failureArtifactId,
+            turn_id: activeTurnId,
+            producer_item_id: "synthesis_terminal_guard",
+            kind: "typed_failure",
+            created_at_ms: Date.now(),
+            source_scope: "current_turn",
+            goal_hash: hashAskTurnGoalFrame(finalSatisfactionGoalFrame),
+            payload: {
+              kind: "typed_failure",
+              error_code: "synthesis_unavailable",
+              text: finalText,
+              answer_text: finalText,
+            },
+          },
+        ]);
+        finalSatisfactionReport = {
+          satisfied: false,
+          terminal_kind: "final_failure",
+          terminal_artifact_id: failureArtifactId,
+          terminal_artifact_kind: "typed_failure",
+          terminal_source: "typed_failure",
+          missing_artifacts: ["doc_evidence_synthesis_answer"],
+          missing_reason: "synthesis_unavailable",
+          confidence: "high",
+          rejected_terminal_candidates: rejectedTerminalCandidates,
+        };
+        payload.terminal_artifact_kind = "typed_failure";
+        payload.terminal_artifact_id = failureArtifactId;
+        payload.terminal_artifact_owner_turn_id = activeTurnId;
+        payload.final_artifact_scope = "current_turn";
+      }
+    }
     const selectedTerminalKind = finalSatisfactionReport.terminal_artifact_kind ?? null;
     const terminalConsistencyViolations: HelixAskTerminalConsistencyCheck["violations"] = [];
     const toolChoiceScope = readAskTurnString(finalToolChoiceRecord?.answer_scope);
@@ -89965,6 +90470,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           : selectedTerminalKind === canonicalGoalFrame.required_terminal_kind ||
             (canonicalGoalFrame.goal_kind === "doc_vs_note_compare" &&
               ["comparison_summary", "doc_vs_note_compare"].includes(String(selectedTerminalKind ?? ""))) ||
+            (canonicalGoalFrame.goal_kind === "doc_evidence_synthesis" &&
+              selectedTerminalKind === "doc_evidence_synthesis_answer") ||
             (canonicalGoalFrame.goal_kind === "doc_evidence_location" &&
               ["doc_evidence_location", "doc_location_matches"].includes(String(selectedTerminalKind ?? ""))) ||
             (canonicalGoalFrame.goal_kind === "doc_summary" && ["doc_summary", "focused_doc_answer", "active_doc_path"].includes(String(selectedTerminalKind ?? ""))) ||
@@ -90031,6 +90538,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.current_turn_artifact_ledger = currentTurnArtifacts;
       payload.equation_extraction_attempt = readAskTurnEquationExtractionAttemptPayload(currentTurnArtifacts);
       payload.equation_semantic_intent = buildAskTurnEquationSemanticIntent({ turnId: activeTurnId, transcript: questionSeed });
+      payload.intent_arbitration = buildAskTurnIntentArbitration({ turnId: activeTurnId, transcript: questionSeed });
       payload.equation_attempt_debug = buildAskTurnEquationAttemptDebugPayload({
         transcript: questionSeed,
         artifacts: currentTurnArtifacts,
