@@ -23,9 +23,16 @@ export type DisplayAudioSituationSession = {
   stop: () => void;
 };
 
+type DisplayAudioCaptureSource =
+  | "display_tab_audio"
+  | "display_window_audio"
+  | "display_screen_audio";
+
 type DisplayTrackSettings = MediaTrackSettings & {
   displaySurface?: string;
 };
+
+type DisplayAudioTimer = ReturnType<typeof setTimeout>;
 
 const createCaptureSessionId = (): string => {
   const random =
@@ -41,6 +48,17 @@ export const inferDisplayAudioSource = (stream: MediaStream): HelixSituationSour
   if (displaySurface === "browser") return "display_tab_audio";
   if (displaySurface === "window" || displaySurface === "application") return "display_window_audio";
   return "display_screen_audio";
+};
+
+const shouldPrimeSegmentWithContainerHeader = (args: {
+  segmentStartIndex: number;
+  mimeType?: string | null;
+  hasHeaderChunk: boolean;
+}): boolean => {
+  if (!args.hasHeaderChunk) return false;
+  if (args.segmentStartIndex <= 0) return false;
+  const normalized = (args.mimeType ?? "").trim().toLowerCase();
+  return normalized.includes("webm") || normalized.includes("ogg");
 };
 
 const pickDisplayAudioMimeType = (): string | undefined => {
@@ -123,49 +141,93 @@ export async function startDisplayAudioSituationSession(
   const recorder = mimeType ? new MediaRecorder(audioOnlyStream, { mimeType }) : new MediaRecorder(audioOnlyStream);
   const transcribe = options.transcribe ?? transcribeVoice;
   const chunkMs = Math.max(1000, Math.round(options.chunkMs ?? 5000));
+  const recorderSliceMs = 250;
+  const bufferedChunks: Array<{ chunk: Blob; atMs: number }> = [];
 
   let chunkIndex = 0;
-  let lastChunkStartedAt = Date.now();
+  let segmentStartIndex = 0;
+  let segmentStartedAt = Date.now();
   let stopped = false;
+  let flushTimer: DisplayAudioTimer | null = null;
+  let segmentTimer: DisplayAudioTimer | null = null;
+
+  const flushSegment = (): void => {
+    if (stopped) return;
+    if (recorder.state !== "inactive") {
+      try {
+        recorder.requestData();
+      } catch {
+        // Some browsers do not support explicit flush; buffered chunks still upload on the timer.
+      }
+    }
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      if (stopped) return;
+      const currentSegmentStartIndex = segmentStartIndex;
+      const headerChunk = bufferedChunks[0]?.chunk;
+      const segmentChunks = bufferedChunks.slice(currentSegmentStartIndex);
+      segmentStartIndex = bufferedChunks.length;
+      const audioChunks = segmentChunks.map((entry) => entry.chunk).filter((chunk) => chunk.size > 0);
+      if (audioChunks.length === 0) return;
+      const uploadMimeType = recorder.mimeType || audioChunks[0]?.type || mimeType || "audio/webm";
+      const shouldPrimeWithHeader = shouldPrimeSegmentWithContainerHeader({
+        segmentStartIndex: currentSegmentStartIndex,
+        mimeType: uploadMimeType,
+        hasHeaderChunk: Boolean(headerChunk && headerChunk.size > 0),
+      });
+      const uploadChunks =
+        shouldPrimeWithHeader && headerChunk && !audioChunks.includes(headerChunk)
+          ? [headerChunk, ...audioChunks]
+          : audioChunks;
+      const audio = new Blob(uploadChunks, { type: uploadMimeType });
+      if (audio.size <= 0) return;
+      const now = Date.now();
+      const durationMs = Math.max(0, now - segmentStartedAt);
+      segmentStartedAt = now;
+      const currentChunkIndex = chunkIndex;
+      chunkIndex += 1;
+
+      void transcribe({
+        audio,
+        room_id: options.roomId,
+        mission_id: options.missionId,
+        missionId: options.missionId,
+        thread_id: options.threadId,
+        capture_session_id: captureSessionId,
+        chunk_index: currentChunkIndex,
+        capture_source: source as DisplayAudioCaptureSource,
+        command_lane_enabled: false,
+        durationMs,
+      })
+        .then((result) => {
+          const situationEvent = buildTranscriptEvent({
+            roomId: options.roomId,
+            missionId: options.missionId,
+            threadId: options.threadId,
+            captureSessionId,
+            chunkIndex: currentChunkIndex,
+            source,
+            result,
+            possibleTtsEcho: options.isDottiePlaybackActive?.() === true,
+          });
+          if (situationEvent) {
+            options.onEvent(situationEvent);
+          }
+        })
+        .catch((error) => {
+          options.onError?.(error instanceof Error ? error : new Error(String(error)));
+        });
+    }, 90);
+  };
 
   recorder.ondataavailable = (event) => {
     if (stopped || !event.data || event.data.size <= 0) return;
-    const currentChunkIndex = chunkIndex;
-    chunkIndex += 1;
     const now = Date.now();
-    const durationMs = Math.max(0, now - lastChunkStartedAt);
-    lastChunkStartedAt = now;
-
-    void transcribe({
-      audio: event.data,
-      room_id: options.roomId,
-      mission_id: options.missionId,
-      missionId: options.missionId,
-      thread_id: options.threadId,
-      capture_session_id: captureSessionId,
-      chunk_index: currentChunkIndex,
-      capture_source: source as Exclude<HelixSituationSource, "minecraft_server" | "discord_browser" | "screen_share" | "helix_ask">,
-      command_lane_enabled: false,
-      durationMs,
-    })
-      .then((result) => {
-        const situationEvent = buildTranscriptEvent({
-          roomId: options.roomId,
-          missionId: options.missionId,
-          threadId: options.threadId,
-          captureSessionId,
-          chunkIndex: currentChunkIndex,
-          source,
-          result,
-          possibleTtsEcho: options.isDottiePlaybackActive?.() === true,
-        });
-        if (situationEvent) {
-          options.onEvent(situationEvent);
-        }
-      })
-      .catch((error) => {
-        options.onError?.(error instanceof Error ? error : new Error(String(error)));
-      });
+    bufferedChunks.push({ chunk: event.data, atMs: now });
   };
 
   recorder.onerror = (event) => {
@@ -173,11 +235,20 @@ export async function startDisplayAudioSituationSession(
     options.onError?.(error);
   };
 
-  recorder.start(chunkMs);
+  recorder.start(recorderSliceMs);
+  segmentTimer = setInterval(flushSegment, chunkMs);
 
   const stop = (): void => {
     if (stopped) return;
     stopped = true;
+    if (segmentTimer !== null) {
+      clearInterval(segmentTimer);
+      segmentTimer = null;
+    }
+    if (flushTimer !== null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
     try {
       if (recorder.state !== "inactive") {
         recorder.stop();
@@ -200,4 +271,3 @@ export async function startDisplayAudioSituationSession(
     stop,
   };
 }
-

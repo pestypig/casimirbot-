@@ -60,6 +60,10 @@ class FakeMediaRecorder {
     this.state = "inactive";
   }
 
+  requestData(): void {
+    // Tests emit chunks directly; this mirrors browsers where requestData flushes pending data.
+  }
+
   emit(data: Blob): void {
     this.ondataavailable?.({ data });
   }
@@ -80,11 +84,13 @@ const installMediaGlobals = (stream: FakeMediaStream): ReturnType<typeof vi.fn> 
 
 describe("display audio situation session", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   it("requests display audio, transcribes recorder chunks, and emits situation events", async () => {
+    vi.useFakeTimers();
     const audioTrack: FakeTrack = { kind: "audio", stop: vi.fn(), addEventListener: vi.fn() };
     const videoTrack: FakeTrack = {
       kind: "video",
@@ -123,9 +129,10 @@ describe("display audio situation session", () => {
       },
     });
     expect(session.source).toBe("display_tab_audio");
-    expect(FakeMediaRecorder.instances[0]?.timeslice).toBe(5000);
+    expect(FakeMediaRecorder.instances[0]?.timeslice).toBe(250);
 
     FakeMediaRecorder.instances[0]?.emit(new Blob(["audio"], { type: "audio/webm" }));
+    await vi.advanceTimersByTimeAsync(5090);
 
     await vi.waitFor(() => expect(events).toHaveLength(1));
     expect(transcribe).toHaveBeenCalledWith(
