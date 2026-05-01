@@ -52,4 +52,44 @@ describe("helix ask E65 math evidence tool integration", () => {
     expect(answerText(response.body)).toContain("properVsCoordinate_ratio = 0.7");
     expect(answerText(response.body)).toContain("coordinateVsClassical_ratio = 1");
   }, 90000);
+
+  it("uses calculator evidence artifacts for mission-time calculator input prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Use the mission-time comparison evidence to prepare calculator inputs for alpha 0p7000.",
+        mode: "read",
+        debug: true,
+        sessionId: `e65-tool-table-inputs-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("doc_calculator_evidence");
+    expect(answerText(response.body)).toMatch(/Calculator-usable evidence/i);
+    expect(answerText(response.body)).toContain("proper_time = alpha * coordinate_time");
+    expect(answerText(response.body)).toContain("shiftLapseCenterlineDtauDt");
+    expect(answerText(response.body)).toContain("0.7");
+    const calculatorEvidence = ledger(response.body).find((artifact) => artifact?.kind === "doc_calculator_evidence");
+    expect(calculatorEvidence?.payload?.anti_brittleness_audit?.hardcoded_source_path_used).toBe(false);
+    expect(calculatorEvidence?.payload?.anti_brittleness_audit?.selected_by_score).toBe(true);
+  }, 90000);
+
+  it("uses the math evidence tool for explicit doc-path calculator relation prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open /docs/research/nhm2-frontier-distance-report.md and show me the calculator relation.",
+        mode: "read",
+        debug: true,
+        sessionId: `e65-tool-explicit-path-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("doc_equation_location");
+    expect(answerText(response.body)).toContain("/docs/research/nhm2-frontier-distance-report.md");
+    expect(answerText(response.body)).toContain("properTimeS_expected = alpha * T");
+    expect(answerText(response.body)).not.toContain("equation_source_unavailable");
+  }, 90000);
 });

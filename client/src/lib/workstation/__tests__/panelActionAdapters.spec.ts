@@ -38,7 +38,7 @@ describe("panelActionAdapters", () => {
     hoisted.launchHelixAskPromptMock.mockClear();
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
-    useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, steps: [] });
+    useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, steps: [], debugEvents: [] });
     useSituationRoomStore.getState().reset();
     useSituationRoomJobStore.getState().reset();
   });
@@ -295,6 +295,13 @@ describe("panelActionAdapters", () => {
     );
     expect(ingest.ok).toBe(true);
     expect(ingest.artifact?.latex).toBe("x^2-4=0");
+    expect(ingest.artifact?.debug_event).toEqual(
+      expect.objectContaining({
+        panel_id: "scientific-calculator",
+        action_id: "ingest_latex",
+        source: "workstation_action",
+      }),
+    );
 
     const solve = executeHelixPanelAction(
       {
@@ -319,6 +326,12 @@ describe("panelActionAdapters", () => {
         sourceOfTruth: "scientific_calculator",
       }),
     );
+    expect(solve.artifact?.debug_event).toEqual(
+      expect.objectContaining({
+        action_id: "solve_with_steps",
+        source: "workstation_action",
+      }),
+    );
 
     const copyResult = executeHelixPanelAction(
       {
@@ -333,6 +346,33 @@ describe("panelActionAdapters", () => {
       },
     );
     expect(copyResult.ok).toBe(true);
+    expect(copyResult.artifact?.debug_event).toEqual(
+      expect.objectContaining({
+        action_id: "copy_result",
+        source: "workstation_action",
+      }),
+    );
+
+    const copyDebugLog = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "copy_debug_log",
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(copyDebugLog.ok).toBe(true);
+    expect(copyDebugLog.artifact?.debug_event).toEqual(
+      expect.objectContaining({
+        action_id: "copy_debug_log",
+        source: "workstation_action",
+      }),
+    );
+    expect(String(copyDebugLog.artifact?.text)).toContain("scientific_calculator_debug_log");
   });
 
   it("delegates Situation Room source and pipeline actions", () => {

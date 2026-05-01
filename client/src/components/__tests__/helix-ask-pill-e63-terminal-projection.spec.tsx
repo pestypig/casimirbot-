@@ -99,4 +99,35 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(text).toContain("synthesis_unavailable");
     expect(text).not.toMatch(/^Search results:/);
   });
+
+  it("uses authoritative final live event text over stale typed failure projection", () => {
+    const reply = {
+      id: "turn-e63-live-final",
+      turn_id: "turn-e63-live-final",
+      content: "I looked for an NHM2 paper/document with equation-bearing snippets, but I could not find a source.",
+      selected_final_answer:
+        "I looked for an NHM2 paper/document with equation-bearing snippets, but I could not find a source.\nCause: equation_source_unavailable.",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "equation_source_unavailable",
+      pending_server_request: null,
+      liveEvents: [
+        {
+          id: "final-answer",
+          text:
+            "Final: Equation-bearing source:\nDocument: NHM2 Frontier Distance From 0p995\nPath: /docs/research/nhm2-frontier-distance-report.md:L154-L156\nSnippet:\nproperTimeS_expected = alpha * T",
+        },
+      ],
+      resolved_turn_summary: {
+        final_status: "final_failure",
+        resolved_route_label: "doc_equation_location / typed_failure:equation_source_unavailable",
+        terminal_error_code: "equation_source_unavailable",
+      },
+    };
+
+    const text = chooseVisibleFinalText(reply as never);
+
+    expect(text).toContain("properTimeS_expected = alpha * T");
+    expect(text).toContain("/docs/research/nhm2-frontier-distance-report.md");
+    expect(text).not.toContain("equation_source_unavailable");
+  });
 });

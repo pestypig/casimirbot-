@@ -5,6 +5,10 @@ import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import type { HelixAskAnswerContract } from "@/lib/helix/ask-prompt-launch";
 import type { SettingsTab } from "@/hooks/useHelixStartSettings";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import {
+  buildScientificCalculatorDebugSnapshot,
+  formatScientificCalculatorDebugLog,
+} from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
@@ -1280,6 +1284,7 @@ export function executeHelixPanelAction(
           scientificState.ingestLatex(trimmed, {
             sourcePath: "clipboard",
             anchor: null,
+            source: "clipboard",
           });
           dispatchScientificCalculatorMathPicked({
             latex: trimmed,
@@ -1303,6 +1308,7 @@ export function executeHelixPanelAction(
       const entry = scientificState.ingestLatex(latex, {
         sourcePath,
         anchor,
+        source: "workstation_action",
       });
       dispatchScientificCalculatorMathPicked({
         latex: entry.latex,
@@ -1320,6 +1326,8 @@ export function executeHelixPanelAction(
           source_path: entry.sourcePath,
           anchor: entry.anchor,
           history_id: entry.id,
+          debug_event: useScientificCalculatorStore.getState().debugEvents[0] ?? null,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
         },
       };
     }
@@ -1339,12 +1347,17 @@ export function executeHelixPanelAction(
         scientificState.ingestLatex(latexArg, {
           sourcePath: asNonEmptyString(args.source_path ?? args.path ?? args.source),
           anchor: asNonEmptyString(args.anchor),
+          source: "workstation_action",
         });
       }
       const solveResult = runScientificSolve(latex, actionId === "solve_with_steps");
-      scientificState.setSolveResult(solveResult);
+      scientificState.setSolveResult(solveResult, {
+        actionId: actionId === "solve_with_steps" ? "solve_with_steps" : "solve_expression",
+        source: "workstation_action",
+      });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
+      const latestCalculatorState = useScientificCalculatorStore.getState();
       return {
         ok: solveResult.ok,
         panel_id: panelId,
@@ -1365,6 +1378,8 @@ export function executeHelixPanelAction(
           capabilityClass: solveResult.trace.capabilityClass,
           warnings: solveResult.trace.warnings,
           error: solveResult.error ?? null,
+          debug_event: latestCalculatorState.debugEvents[0] ?? null,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(latestCalculatorState.debugEvents, 8),
         },
       };
     }
@@ -1372,16 +1387,38 @@ export function executeHelixPanelAction(
     if (actionId === "copy_result") {
       const resultText = scientificState.lastSolve?.result_text?.trim();
       if (!resultText) {
+        const debugEvent = scientificState.recordDebugEvent({
+          action_id: "copy_result",
+          source: "workstation_action",
+          ok: false,
+          message: "No calculator result available to copy.",
+        });
         return {
           ok: false,
           panel_id: panelId,
           action_id: actionId,
           message: "No calculator result available to copy.",
+          artifact: {
+            debug_event: debugEvent,
+            debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
+          },
         };
       }
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         void navigator.clipboard.writeText(resultText).catch(() => undefined);
       }
+      const debugEvent = scientificState.recordDebugEvent({
+        action_id: "copy_result",
+        source: "workstation_action",
+        ok: true,
+        input_latex: scientificState.lastSolve?.input_latex,
+        result_text: resultText,
+        normalized_expression: scientificState.lastSolve?.normalized_expression,
+        trace_id: scientificState.lastSolve?.trace.traceId ?? null,
+        route: scientificState.lastSolve?.trace.route ?? null,
+        engine: scientificState.lastSolve?.trace.engine ?? null,
+        message: "result_copied",
+      });
       return {
         ok: true,
         panel_id: panelId,
@@ -1390,18 +1427,47 @@ export function executeHelixPanelAction(
           copied: true,
           text: resultText,
           trace: scientificState.lastSolve?.trace ?? null,
+          debug_event: debugEvent,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
+        },
+      };
+    }
+
+    if (actionId === "copy_debug_log") {
+      const beforeCopy = useScientificCalculatorStore.getState().debugEvents;
+      const debugText = formatScientificCalculatorDebugLog(beforeCopy);
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        void navigator.clipboard.writeText(debugText).catch(() => undefined);
+      }
+      const debugEvent = scientificState.recordDebugEvent({
+        action_id: "copy_debug_log",
+        source: "workstation_action",
+        ok: true,
+        message: "debug_log_copied",
+      });
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          copied: true,
+          text: debugText,
+          debug_event: debugEvent,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
         },
       };
     }
 
     if (actionId === "clear_workspace") {
-      scientificState.clear();
+      scientificState.clear({ source: "workstation_action" });
       return {
         ok: true,
         panel_id: panelId,
         action_id: actionId,
         artifact: {
           cleared: true,
+          debug_event: useScientificCalculatorStore.getState().debugEvents[0] ?? null,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
         },
       };
     }

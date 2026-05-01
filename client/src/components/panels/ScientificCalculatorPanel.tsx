@@ -9,6 +9,7 @@ import {
   SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT,
   type ScientificCalculatorMathPickedDetail,
 } from "@/lib/scientific-calculator/events";
+import { formatScientificCalculatorDebugLog } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 
@@ -43,7 +44,7 @@ function resolveSolveTrace(lastSolve: { trace?: ScientificSolveTrace; input_late
 }
 
 export default function ScientificCalculatorPanel() {
-  const { currentLatex, history, lastSolve, steps, ingestLatex, setSolveResult, clear } =
+  const { currentLatex, history, lastSolve, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
     useScientificCalculatorStore();
   const [input, setInput] = useState(currentLatex);
 
@@ -58,6 +59,7 @@ export default function ScientificCalculatorPanel() {
       ingestLatex(detail.latex, {
         sourcePath: detail.sourcePath,
         anchor: detail.anchor,
+        source: detail.sourcePath === "clipboard" ? "clipboard" : "doc_viewer",
       });
     };
     window.addEventListener(SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT, onPicked as EventListener);
@@ -70,12 +72,53 @@ export default function ScientificCalculatorPanel() {
     if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
     const text = await navigator.clipboard.readText();
     if (!text.trim()) return;
-    ingestLatex(text, { sourcePath: "clipboard", anchor: null });
+    ingestLatex(text, { sourcePath: "clipboard", anchor: null, source: "clipboard" });
   };
 
   const solve = (withSteps: boolean) => {
     const result = runScientificSolve(input, withSteps);
-    setSolveResult(result);
+    setSolveResult(result, { actionId: withSteps ? "solve_with_steps" : "solve_expression", source: "panel" });
+  };
+
+  const handleCopyResult = () => {
+    const text = lastSolve?.result_text;
+    if (!text) {
+      recordDebugEvent({
+        action_id: "copy_result",
+        source: "panel",
+        ok: false,
+        message: "No calculator result available to copy.",
+      });
+      return;
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text);
+    }
+    recordDebugEvent({
+      action_id: "copy_result",
+      source: "panel",
+      ok: true,
+      result_text: text,
+      input_latex: lastSolve.input_latex,
+      normalized_expression: lastSolve.normalized_expression,
+      trace_id: lastSolve.trace.traceId,
+      route: lastSolve.trace.route,
+      engine: lastSolve.trace.engine,
+      message: "result_copied",
+    });
+  };
+
+  const handleCopyDebugLog = () => {
+    const payload = formatScientificCalculatorDebugLog(debugEvents);
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(payload);
+    }
+    recordDebugEvent({
+      action_id: "copy_debug_log",
+      source: "panel",
+      ok: true,
+      message: "debug_log_copied",
+    });
   };
 
   const stepItems = useMemo(() => steps ?? [], [steps]);
@@ -133,15 +176,14 @@ export default function ScientificCalculatorPanel() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {
-              const text = lastSolve?.result_text;
-              if (!text || typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
-              void navigator.clipboard.writeText(text);
-            }}
+            onClick={handleCopyResult}
           >
             Copy Result
           </Button>
-          <Button size="sm" variant="ghost" onClick={clear}>
+          <Button size="sm" variant="outline" onClick={handleCopyDebugLog}>
+            Copy Debug Log
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => clear()}>
             Clear
           </Button>
         </div>
@@ -236,6 +278,29 @@ export default function ScientificCalculatorPanel() {
               <div className="text-slate-500">{entry.sourcePath ?? "unknown"}{entry.anchor ? ` #${entry.anchor}` : ""}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/30 p-3">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500">Calculator Event Log</div>
+        <div className="mt-2 space-y-1" data-testid="scientific-calculator-debug-log">
+          {debugEvents.slice(0, 8).map((entry) => (
+            <div
+              key={entry.id}
+              className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1 text-[11px] text-slate-300"
+              data-testid="scientific-calculator-debug-event"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-slate-200">{entry.action_id}</span>
+                <span className={entry.ok ? "text-emerald-300" : "text-amber-200"}>{entry.ok ? "ok" : "failed"}</span>
+                <span className="text-slate-500">{entry.source}</span>
+              </div>
+              <div className="mt-1 break-all font-mono text-slate-400">
+                {entry.trace_id ?? entry.source_path ?? entry.message ?? entry.id}
+              </div>
+            </div>
+          ))}
+          {debugEvents.length === 0 ? <div className="text-xs text-slate-500">No calculator events yet.</div> : null}
         </div>
       </div>
     </div>

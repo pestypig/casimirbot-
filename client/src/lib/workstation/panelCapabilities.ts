@@ -288,6 +288,13 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "copy_debug_log",
+        title: "Copy Debug Log",
+        description: "Copy calculator event logs and workstation action trace data.",
+        risk: "low",
+        returns_artifact: true,
+      },
+      {
         id: "clear_workspace",
         title: "Clear Workspace",
         description: "Clear calculator input/result workspace state.",

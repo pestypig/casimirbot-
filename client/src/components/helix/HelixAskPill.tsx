@@ -5994,6 +5994,40 @@ const readHelixTopLevelPendingServerRequest = (reply?: HelixAskReply | null): Re
   return readHelixPendingInputRecord(record?.pending_server_request);
 };
 
+const readLatestAuthoritativeFinalLiveEventText = (reply?: HelixAskReply | null): string | null => {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply?.debug);
+  const auditRecord = readAgentLoopAuditRecord(debugRecord?.agent_loop_audit);
+  const events = [
+    ...(Array.isArray(reply?.liveEvents) ? reply.liveEvents : []),
+    ...(Array.isArray(replyRecord?.live_events) ? replyRecord.live_events : []),
+    ...(Array.isArray(debugRecord?.live_events) ? debugRecord.live_events : []),
+    ...(Array.isArray(debugRecord?.turn_transcript_events) ? debugRecord.turn_transcript_events : []),
+    ...(Array.isArray(auditRecord?.turn_transcript_events) ? auditRecord.turn_transcript_events : []),
+  ];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = readAgentLoopAuditRecord(events[index]);
+    if (!event || typeof event !== "object") continue;
+    const rawText = coerceText(event.text).trim();
+    const tool = coerceText(event.tool).trim().toLowerCase();
+    const type = coerceText(event.type).trim().toLowerCase();
+    const meta = readAgentLoopAuditRecord(event.meta);
+    const stage = coerceText(meta?.stage ?? meta?.event_stage).trim().toLowerCase();
+    const status = coerceText(meta?.status ?? meta?.terminal_status).trim().toLowerCase();
+    const isFinalEvent =
+      tool === "final" ||
+      type === "final_answer" ||
+      stage === "final_answer" ||
+      status === "final_answer" ||
+      /\bfinal_answer\b/i.test(coerceText(event.id)) ||
+      /^Final:\s*/i.test(rawText);
+    if (!isFinalEvent) continue;
+    const text = rawText.replace(/^Final:\s*/i, "").trim();
+    if (text && !isInvalidTerminalAnswerText(text)) return text;
+  }
+  return null;
+};
+
 export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedTurn {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
@@ -6020,13 +6054,18 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     coerceText(debugRecord?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : "unknown");
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
-  const selectedFinalAnswer =
+  const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
+  const selectedFinalAnswerCandidate =
     coerceText(replyRecord?.selected_final_answer).trim() ||
     coerceText(debugRecord?.selected_final_answer).trim() ||
     coerceText(reply.assistant_answer).trim() ||
     (isTypedFailure
       ? renderTypedFailureFallback(terminalErrorCode)
       : coerceText(reply.text).trim() || coerceText(reply.content).trim());
+  const selectedFinalAnswer =
+    liveFinalAnswer && (isTypedFailure || isInvalidTerminalAnswerText(selectedFinalAnswerCandidate))
+      ? liveFinalAnswer
+      : selectedFinalAnswerCandidate;
   const routeLabel =
     coerceText(summary?.resolved_route_label).trim() ||
     `${readHelixCanonicalGoalKind(reply)} / ${finalAnswerSource}`;
@@ -23663,7 +23702,21 @@ export function HelixAskPill({
       let parsedWorkstationFollowupActions: HelixWorkstationAction[] = [];
       let parsedWorkstationCommand: HelixWorkstationAction | null = null;
       let reasoningPlanPreEmitted = false;
-      const unifiedAskTurnOwnsManualDispatch = HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch;
+      const deterministicManualDecision = inferDeterministicWorkstationIntentDecision(trimmed);
+      const deterministicManualAction = deterministicManualDecision
+        ? coerceWorkstationActionFromIntentDecision(deterministicManualDecision)
+        : null;
+      const clientOwnedCalculatorAction =
+        ((deterministicManualAction?.action === "run_panel_action" ||
+          deterministicManualAction?.action === "open_panel") &&
+          deterministicManualAction.panel_id === "scientific-calculator")
+          ? deterministicManualAction
+          : null;
+      if (clientOwnedCalculatorAction) {
+        parsedWorkstationCommand = clientOwnedCalculatorAction;
+      }
+      const unifiedAskTurnOwnsManualDispatch =
+        HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch && !clientOwnedCalculatorAction;
       if (!bypassWorkstationDispatch && !unifiedAskTurnOwnsManualDispatch) {
         const pendingResolution = resolveWorkstationActionFromPendingInput(trimmed, "run_ask", runAskTurnId);
         if (pendingResolution.handled) {
@@ -26984,12 +27037,22 @@ export function HelixAskPill({
               agentLoopAudit,
               runtimeSummary,
             ) ?? visibleResolvedTurn.primary_source_label;
+            const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
+            const transcriptFinalRowText =
+              [...turnTranscriptRows]
+                .reverse()
+                .find((row) => row.label === "Final" && row.text && !isInvalidTerminalAnswerText(row.text))?.text ?? null;
+            const chosenVisibleFinalText = chooseVisibleFinalText(reply) || transcriptTerminal.text || reply.content || "";
+            const chosenVisibleFinalIsTypedFailureBoundary =
+              /\bCause:\s*(?:equation_source_unavailable|calculator_evidence_unavailable|synthesis_unavailable)\b/i.test(chosenVisibleFinalText) ||
+              /^I looked for an NHM2 paper\/document with equation-bearing snippets/i.test(chosenVisibleFinalText);
             const transcriptAnswer = clipForDisplay(
-              chooseVisibleFinalText(reply) || transcriptTerminal.text || reply.content || "",
+              transcriptFinalRowText && (visibleResolvedTurn.terminal_error_code || chosenVisibleFinalIsTypedFailureBoundary)
+                ? transcriptFinalRowText
+                : chosenVisibleFinalText,
               HELIX_ASK_MAX_RENDER_CHARS,
               expanded,
             );
-            const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
             const terminalMismatchForReply = Boolean(
               transcriptTerminal.backendTerminalText &&
                 transcriptTerminal.text &&

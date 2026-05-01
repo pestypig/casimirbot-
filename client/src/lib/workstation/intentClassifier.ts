@@ -11,6 +11,8 @@ export type WorkstationIntentDecision = {
     | "calculator_solve"
     | "calculator_solve_steps"
     | "calculator_ingest_clipboard"
+    | "calculator_copy_result"
+    | "calculator_copy_debug_log"
     | "open_panel"
     | "run_panel_action"
     | "close_active_panel"
@@ -35,9 +37,12 @@ const CALCULATOR_WORDS = /\b(?:calculator|equation|latex|formula|solve|evaluate|
 const CALCULATOR_OPEN_WORDS = /\b(?:open|show|launch)\b[\s\S]*\b(?:calculator)\b/i;
 const CALCULATOR_STEP_WORDS = /\b(?:step|steps|step-by-step|work)\b/i;
 const CLIPBOARD_WORDS = /\b(?:clipboard|paste)\b/i;
+const COPY_WORDS = /\b(?:copy|clipboard)\b/i;
+const RESULT_WORDS = /\b(?:result|answer|output)\b/i;
+const DEBUG_LOG_WORDS = /\b(?:debug|event\s+log|logs?|trace)\b/i;
 
 const WORKSTATION_INTENT_WORDS =
-  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|clipboard|paste)\b/i;
+  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|clipboard|paste|copy|result|answer|output|debug|log|trace)\b/i;
 const CLOSE_VERB_WORDS = /\b(?:close|shut|dismiss|remove|x\s*out|get\s+rid\s+of)\b/i;
 const PANEL_TARGET_WORDS =
   /\b(?:tab|tabs|panel|panels|doc|docs|document|documents|paper|papers|window|windows)\b/i;
@@ -47,6 +52,18 @@ const PREVIOUS_PANEL_WORDS =
   /\b(?:(?:prev(?:ious)?\s+(?:tab|panel))|(?:go|switch|move|focus)\s+(?:to\s+)?(?:prev(?:ious)?|back)|tab\s+to\s+the\s+left|panel\s+to\s+the\s+left|cycle\s+back)\b/i;
 const REOPEN_PANEL_WORDS =
   /\b(?:reopen|restore|undo\s+close|bring\s+back)\b[\s\S]*\b(?:tab|panel)\b/i;
+
+function extractCalculatorExpressionArg(value: string): string | null {
+  const match = value.match(/\b(?:solve|evaluate|compute|calculate)\s+(.+?)(?:\s+(?:with\s+)?(?:step|steps|step-by-step|work)\b|$)/i);
+  const raw = match?.[1]?.trim();
+  if (!raw) return null;
+  const cleaned = raw
+    .replace(/^(?:the\s+)?(?:equation|expression|latex|formula)\s+/i, "")
+    .replace(/[.?!,;:]+$/g, "")
+    .trim();
+  if (!cleaned) return null;
+  return /[=^*/+\-()_\\]|\d/.test(cleaned) ? cleaned : null;
+}
 
 export function shouldProbeWorkstationIntentClassifier(prompt: string): boolean {
   return WORKSTATION_INTENT_WORDS.test(prompt.trim());
@@ -78,13 +95,31 @@ export function inferDeterministicWorkstationIntentDecision(prompt: string): Wor
       reason: "deterministic_intent_frame:calculator_ingest_clipboard",
     };
   }
+  if (CALCULATOR_WORDS.test(normalized) && COPY_WORDS.test(normalized) && DEBUG_LOG_WORDS.test(normalized)) {
+    return {
+      intent: "calculator_copy_debug_log",
+      confidence: 0.88,
+      subgoal: "Copy the scientific calculator debug event log.",
+      reason: "deterministic_intent_frame:calculator_copy_debug_log",
+    };
+  }
+  if (CALCULATOR_WORDS.test(normalized) && COPY_WORDS.test(normalized) && RESULT_WORDS.test(normalized)) {
+    return {
+      intent: "calculator_copy_result",
+      confidence: 0.86,
+      subgoal: "Copy the latest scientific calculator result.",
+      reason: "deterministic_intent_frame:calculator_copy_result",
+    };
+  }
   if (CALCULATOR_WORDS.test(normalized) && /\b(?:solve|evaluate|compute|calculate)\b/.test(normalized)) {
+    const latex = extractCalculatorExpressionArg(trimmed) ?? extractCalculatorExpressionArg(normalized);
     return {
       intent: CALCULATOR_STEP_WORDS.test(normalized) ? "calculator_solve_steps" : "calculator_solve",
       confidence: 0.82,
       subgoal: CALCULATOR_STEP_WORDS.test(normalized)
         ? "Solve the calculator equation and return step trace."
         : "Solve the calculator equation.",
+      args: latex ? { latex } : undefined,
       reason: CALCULATOR_STEP_WORDS.test(normalized)
         ? "deterministic_intent_frame:calculator_solve_steps"
         : "deterministic_intent_frame:calculator_solve",
@@ -140,7 +175,7 @@ export function buildWorkstationIntentClassifierPrompt(prompt: string): string {
     "The user prompt may be non-English. Translate internally to English for intent selection.",
     'The "subgoal" field MUST be English machine language, even when the input is in another language.',
     "Return ONLY JSON with schema:",
-    `{"intent":"docs_read_paper|docs_summarize_doc|docs_summarize_section|docs_explain_paper|calculator_open|calculator_solve|calculator_solve_steps|calculator_ingest_clipboard|open_panel|run_panel_action|close_active_panel|focus_next_panel|focus_previous_panel|reopen_last_closed_panel|none","confidence":0..1,"subgoal":"...","args":{...},"reason":"..."}`,
+    `{"intent":"docs_read_paper|docs_summarize_doc|docs_summarize_section|docs_explain_paper|calculator_open|calculator_solve|calculator_solve_steps|calculator_ingest_clipboard|calculator_copy_result|calculator_copy_debug_log|open_panel|run_panel_action|close_active_panel|focus_next_panel|focus_previous_panel|reopen_last_closed_panel|none","confidence":0..1,"subgoal":"...","args":{...},"reason":"..."}`,
     'Use intent="docs_read_paper" when the request asks to find/open/read a paper/document on a topic.',
     'Also use intent="docs_read_paper" for phrasing like "open a panel about the sun and read it".',
     'Priority rule: when summarize/explain wording is present, prefer docs_summarize_doc/docs_summarize_section/docs_explain_paper over docs_read_paper.',
@@ -154,6 +189,8 @@ export function buildWorkstationIntentClassifierPrompt(prompt: string): string {
     'Use intent="calculator_solve" to solve/evaluate an equation without requiring a step trace.',
     'Use intent="calculator_solve_steps" when user asks for solved steps/work shown.',
     'Use intent="calculator_ingest_clipboard" to paste clipboard text into calculator.',
+    'Use intent="calculator_copy_result" to copy the latest calculator result.',
+    'Use intent="calculator_copy_debug_log" to copy calculator debug/event logs.',
     "For calculator_solve/calculator_solve_steps, include args.latex when equation text is present.",
     'Use close_active_panel, focus_next_panel, focus_previous_panel, or reopen_last_closed_panel for generic tab/panel navigation requests.',
     'Examples for close_active_panel: "get rid of the current tab", "can you shut this panel for me", "close whatever tab I am on".',
@@ -179,6 +216,8 @@ export function parseWorkstationIntentDecision(raw: string): WorkstationIntentDe
       intentRaw === "calculator_solve" ||
       intentRaw === "calculator_solve_steps" ||
       intentRaw === "calculator_ingest_clipboard" ||
+      intentRaw === "calculator_copy_result" ||
+      intentRaw === "calculator_copy_debug_log" ||
       intentRaw === "open_panel" ||
       intentRaw === "run_panel_action" ||
       intentRaw === "close_active_panel" ||
@@ -262,6 +301,14 @@ export function coerceWorkstationActionFromIntentDecision(
       panel_id: "scientific-calculator",
       action_id: "ingest_latex",
       args: { latex: "$clipboard", source_path: "clipboard" },
+    };
+  }
+  if (decision.intent === "calculator_copy_result" || decision.intent === "calculator_copy_debug_log") {
+    return {
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: decision.intent === "calculator_copy_debug_log" ? "copy_debug_log" : "copy_result",
+      args: {},
     };
   }
   if (decision.intent === "calculator_solve" || decision.intent === "calculator_solve_steps") {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWorkstationIntentClassifierPrompt,
   coerceWorkstationActionFromIntentDecision,
+  inferDeterministicWorkstationIntentDecision,
   parseWorkstationIntentDecision,
   reconcileWorkstationIntentDecisionWithPrompt,
   shouldProbeWorkstationIntentClassifier,
@@ -136,6 +137,17 @@ describe("intentClassifier", () => {
     });
 
     expect(
+      coerceWorkstationActionFromIntentDecision(
+        inferDeterministicWorkstationIntentDecision("Use the scientific calculator to solve x^2-4=0 with steps.")!,
+      ),
+    ).toEqual({
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "solve_with_steps",
+      args: { latex: "x^2-4=0" },
+    });
+
+    expect(
       coerceWorkstationActionFromIntentDecision({
         intent: "calculator_solve_steps",
         confidence: 0.8,
@@ -159,6 +171,38 @@ describe("intentClassifier", () => {
       panel_id: "scientific-calculator",
       action_id: "ingest_latex",
       args: { latex: "$clipboard", source_path: "clipboard" },
+    });
+
+    expect(inferDeterministicWorkstationIntentDecision("copy the calculator debug event log")?.intent).toBe(
+      "calculator_copy_debug_log",
+    );
+    expect(
+      coerceWorkstationActionFromIntentDecision({
+        intent: "calculator_copy_debug_log",
+        confidence: 0.88,
+        subgoal: "copy calculator debug log",
+      }),
+    ).toEqual({
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "copy_debug_log",
+      args: {},
+    });
+
+    expect(inferDeterministicWorkstationIntentDecision("copy the calculator result")?.intent).toBe(
+      "calculator_copy_result",
+    );
+    expect(
+      coerceWorkstationActionFromIntentDecision({
+        intent: "calculator_copy_result",
+        confidence: 0.86,
+        subgoal: "copy calculator result",
+      }),
+    ).toEqual({
+      action: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "copy_result",
+      args: {},
     });
   });
 

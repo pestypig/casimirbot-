@@ -34,6 +34,12 @@ const defaultPreferredKinds = (query: string): MathEvidenceKind[] => {
   if (/\b(?:mean|means|meaning|shorten|changing|change|interpret|something else)\b/i.test(query)) {
     return ["interpretive_metric", "table_key_value", "derived_relation"];
   }
+  if (
+    /\b(?:table|row|rows|key[-\s]?value|field|fields|evidence|inputs?)\b/i.test(query) &&
+    !/\b(?:equation|formula)\b/i.test(query)
+  ) {
+    return ["table_key_value", "derived_relation", "explicit_equation"];
+  }
   return ["explicit_equation", "table_key_value", "derived_relation"];
 };
 
@@ -235,6 +241,7 @@ export const runMathEvidenceTool = (input: MathEvidenceToolInput): MathEvidenceT
   let validationFailures: string[] = ["selected_artifact_missing"];
 
   const wantsInterpretation = preferredKinds[0] === "interpretive_metric";
+  const wantsTableEvidence = preferredKinds[0] === "table_key_value" || preferredKinds[0] === "derived_relation";
   for (const entry of scored) {
     const equationArtifact = buildEquationArtifact({ turnId: input.turn_id, query: input.query, targetTerms, doc: entry.doc });
     const calculatorArtifact = buildCalculatorArtifact({ turnId: input.turn_id, query: input.query, targetTerms, doc: entry.doc });
@@ -247,7 +254,9 @@ export const runMathEvidenceTool = (input: MathEvidenceToolInput): MathEvidenceT
             doc: entry.doc,
             calculatorArtifact,
           })
-        : equationArtifact ?? calculatorArtifact;
+        : wantsTableEvidence
+          ? calculatorArtifact ?? equationArtifact
+          : equationArtifact ?? calculatorArtifact;
     if (!artifact) continue;
     const validation =
       artifact.kind === "doc_equation_location"
