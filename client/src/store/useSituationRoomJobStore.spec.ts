@@ -118,6 +118,9 @@ describe("useSituationRoomJobStore", () => {
     expect(job.native_language).toBe("en");
     expect(job.input_text_policy).toBe("source_text_preferred");
     expect(job.output_render_policy).toBe("target_language");
+    expect(job.attachment_policy).toBe("manual_only");
+    expect(job.context_injection).toBe("explicit_attachment_only");
+    expect(job.command_lane_enabled).toBe(false);
     expect(job.job_spec_hash).toMatch(/^job-spec:/);
   });
 
@@ -287,9 +290,20 @@ describe("useSituationRoomJobStore", () => {
         meta: {
           kind: "situation_room_job_attachment",
           job_id: job.job_id,
+          attachment_policy: "manual_only",
+          context_injection: "explicit_attachment_only",
+          context_excerpt: expect.stringContaining("Recent source transcript"),
+          source_transcripts: expect.arrayContaining([
+            expect.objectContaining({
+              text: expect.stringContaining("fire resistance"),
+              citation_path: expect.stringContaining("situation-room://"),
+            }),
+          ]),
+          evidence_refs: expect.arrayContaining([expect.stringContaining("situation-room://")]),
         },
       },
     });
+    expect(useSituationRoomJobStore.getState().last_attached_job_id).toBe(job.job_id);
   });
 
   it("master scroll orders raw and derived events deterministically", () => {

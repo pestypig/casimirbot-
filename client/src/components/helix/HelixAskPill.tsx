@@ -152,6 +152,10 @@ import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
+import {
+  selectSituationRoomAskContextSnapshot,
+  useSituationRoomJobStore,
+} from "@/store/useSituationRoomJobStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
@@ -8894,6 +8898,13 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
   const activeNote = activeNoteId ? notesState.notes[activeNoteId] ?? null : null;
   const lastCreatedNoteId = notesState.order[0] ?? null;
   const lastCreatedNote = lastCreatedNoteId ? notesState.notes[lastCreatedNoteId] ?? null : null;
+  const situationRoomState = useSituationRoomStore.getState();
+  const situationRoomJobState = useSituationRoomJobStore.getState();
+  const situationRoomContext = selectSituationRoomAskContextSnapshot(
+    situationRoomState,
+    situationRoomJobState,
+    situationRoomJobState.last_attached_job_id,
+  );
   const recentNotes = notesState.order.slice(0, 8).flatMap((noteId) => {
     const note = notesState.notes[noteId] ?? null;
     if (!note?.title) return [];
@@ -8929,6 +8940,8 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     lastCreatedNoteBody: clipNoteBodyForAskTurn(lastCreatedNote?.body),
     recentNotes,
     hasNoteContext,
+    situationRoomContext,
+    hasSituationRoomContext: Boolean(situationRoomContext),
     hasClipboardContext: Object.values(layoutState.groups).some((group) =>
       group.panelIds.includes("workstation-clipboard-history"),
     ),
@@ -27056,7 +27069,8 @@ export function HelixAskPill({
             const terminalMismatchForReply = Boolean(
               transcriptTerminal.backendTerminalText &&
                 transcriptTerminal.text &&
-                transcriptTerminal.backendTerminalText.trim() !== transcriptTerminal.text.trim(),
+                normalizeTerminalAnswerText(transcriptTerminal.backendTerminalText) !==
+                  normalizeTerminalAnswerText(transcriptTerminal.text),
             );
             const transcriptTerminalRecord = readAgentLoopAuditRecord(runtimeSummary?.terminal);
             const debugTraceOpen = Boolean(

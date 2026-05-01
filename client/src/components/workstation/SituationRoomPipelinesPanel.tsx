@@ -1,6 +1,9 @@
 import React from "react";
 import {
+  ArrowLeft,
+  ChevronDown,
   FileText,
+  Languages,
   Link2,
   ListChecks,
   PauseCircle,
@@ -8,8 +11,23 @@ import {
   Plus,
   Save,
   ScrollText,
+  Sparkles,
+  Square,
+  Volume2,
   Workflow,
 } from "lucide-react";
+import { speakVoice } from "@/lib/agi/api";
+import {
+  draftJobFromNaturalLanguage,
+  draftJobFromRecipe,
+  labelSituationRoomLanguage,
+  type DraftSituationRoomJobSpec,
+} from "@/lib/helix/situation-room-job-drafts";
+import {
+  SITUATION_ROOM_JOB_RECIPES,
+  getSituationRoomJobRecipe,
+  type SituationRoomJobRecipeId,
+} from "@/lib/helix/situation-room-job-recipes";
 import { cn } from "@/lib/utils";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import {
@@ -18,8 +36,14 @@ import {
   type SituationRoomJob,
   type SituationRoomJobInputTextPolicy,
   type SituationRoomJobKind,
+  type SituationRoomMasterScrollRow,
   type SituationRoomJobOutputRenderPolicy,
 } from "@/store/useSituationRoomJobStore";
+
+const JOB_OUTPUT_READ_PROVIDER = "elevenlabs";
+const JOB_OUTPUT_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
+const JOB_OUTPUT_READ_CHUNK_MAX = 560;
+const JOB_OUTPUT_READ_MAX_CHARS = 12_000;
 
 const JOB_KIND_OPTIONS: Array<{ kind: SituationRoomJobKind; label: string }> = [
   { kind: "translate", label: "Translate" },
@@ -39,6 +63,114 @@ const OUTPUT_RENDER_POLICY_OPTIONS: Array<{ value: SituationRoomJobOutputRenderP
   { value: "native_language", label: "Native" },
   { value: "dual", label: "Dual" },
 ];
+
+const LANGUAGE_CHIPS = [
+  { label: "Spanish", value: "es" },
+  { label: "French", value: "fr" },
+  { label: "German", value: "de" },
+  { label: "Japanese", value: "ja" },
+  { label: "English", value: "en" },
+];
+
+type PipelinePanelPage = "inputs" | "jobs" | "output";
+
+let globalJobOutputReadController: AbortController | null = null;
+let globalJobOutputReadAudio: HTMLAudioElement | null = null;
+let globalJobOutputReadUrl: string | null = null;
+
+function stopGlobalJobOutputRead() {
+  if (globalJobOutputReadController) {
+    globalJobOutputReadController.abort();
+    globalJobOutputReadController = null;
+  }
+  if (globalJobOutputReadAudio) {
+    globalJobOutputReadAudio.pause();
+    globalJobOutputReadAudio.src = "";
+    globalJobOutputReadAudio = null;
+  }
+  if (globalJobOutputReadUrl) {
+    URL.revokeObjectURL(globalJobOutputReadUrl);
+    globalJobOutputReadUrl = null;
+  }
+}
+
+function splitSpeechChunks(source: string, maxChars: number): string[] {
+  const normalized = source.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  const chunks: string[] = [];
+  let remaining = normalized;
+  while (remaining.length > maxChars) {
+    const boundary = Math.max(
+      remaining.lastIndexOf(". ", maxChars),
+      remaining.lastIndexOf("? ", maxChars),
+      remaining.lastIndexOf("! ", maxChars),
+      remaining.lastIndexOf("; ", maxChars),
+      remaining.lastIndexOf(", ", maxChars),
+      remaining.lastIndexOf(" ", maxChars),
+    );
+    const cut = boundary > Math.floor(maxChars * 0.5) ? boundary + 1 : maxChars;
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+function playJobOutputAudio(blob: Blob, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Read aloud cancelled.", "AbortError"));
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    globalJobOutputReadUrl = url;
+    const audio = new Audio(url);
+    globalJobOutputReadAudio = audio;
+    const cleanup = () => {
+      audio.onended = null;
+      audio.onerror = null;
+      signal.removeEventListener("abort", abort);
+      if (globalJobOutputReadAudio === audio) globalJobOutputReadAudio = null;
+      if (globalJobOutputReadUrl === url) {
+        URL.revokeObjectURL(url);
+        globalJobOutputReadUrl = null;
+      }
+    };
+    const abort = () => {
+      audio.pause();
+      cleanup();
+      reject(new DOMException("Read aloud cancelled.", "AbortError"));
+    };
+    audio.onended = () => {
+      cleanup();
+      resolve();
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error("Job output audio playback failed."));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    audio.play().catch((error) => {
+      cleanup();
+      reject(error);
+    });
+  });
+}
+
+function buildJobOutputSpeechText(job: SituationRoomJob | undefined, rows: SituationRoomMasterScrollRow[]): string {
+  const lines = [
+    job ? `Job output scroll for ${job.title}.` : "Situation Room job output scroll.",
+    ...rows.flatMap((row) => {
+      if (!row.text?.trim()) return [];
+      const prefix =
+        row.kind === "derived"
+          ? `${row.event_type} output ${row.output.seq}`
+          : `${row.label}${row.chunk_index != null ? ` transcript chunk ${row.chunk_index}` : " transcript"}`;
+      return [`${prefix}. ${row.text.trim()}`];
+    }),
+  ];
+  return lines.join("\n").slice(0, JOB_OUTPUT_READ_MAX_CHARS);
+}
 
 function formatClock(value?: string): string {
   if (!value) return "not started";
@@ -156,12 +288,14 @@ export default function SituationRoomPipelinesPanel() {
   const jobs = useSituationRoomJobStore((state) => state.jobs);
   const jobOrder = useSituationRoomJobStore((state) => state.job_order);
   const outputs = useSituationRoomJobStore((state) => state.outputs);
+  const createJob = useSituationRoomJobStore((state) => state.createJob);
   const createJobFromRoom = useSituationRoomJobStore((state) => state.createJobFromRoom);
   const createJobFromSource = useSituationRoomJobStore((state) => state.createJobFromSource);
   const processJobNowAsync = useSituationRoomJobStore((state) => state.processJobNowAsync);
   const stopJob = useSituationRoomJobStore((state) => state.stopJob);
   const saveJobAsNote = useSituationRoomJobStore((state) => state.saveJobAsNote);
   const attachJobToHelixAsk = useSituationRoomJobStore((state) => state.attachJobToHelixAsk);
+  const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("inputs");
   const [selectedSourceId, setSelectedSourceId] = React.useState<string>("__room__");
   const [selectedJobId, setSelectedJobId] = React.useState<string | undefined>();
   const [jobKind, setJobKind] = React.useState<SituationRoomJobKind>("translate");
@@ -171,8 +305,21 @@ export default function SituationRoomPipelinesPanel() {
     React.useState<SituationRoomJobInputTextPolicy>("source_text_preferred");
   const [outputRenderPolicy, setOutputRenderPolicy] =
     React.useState<SituationRoomJobOutputRenderPolicy>("target_language");
+  const [selectedRecipeId, setSelectedRecipeId] =
+    React.useState<SituationRoomJobRecipeId>("translate_source");
+  const [naturalLanguagePrompt, setNaturalLanguagePrompt] = React.useState("");
+  const [draft, setDraft] = React.useState<DraftSituationRoomJobSpec | null>(null);
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  const [customLanguage, setCustomLanguage] = React.useState("");
+  const [isReadingOutput, setIsReadingOutput] = React.useState(false);
+  const [readOutputError, setReadOutputError] = React.useState<string | null>(null);
+  const [readOutputProgress, setReadOutputProgress] = React.useState<{
+    chunkIndex: number;
+    chunkCount: number;
+  } | null>(null);
   const masterScrollRef = React.useRef<HTMLDivElement | null>(null);
   const masterScrollPinnedRef = React.useRef(true);
+  const knownJobIdsRef = React.useRef<Set<string> | null>(null);
 
   const roomList = React.useMemo(
     () => roomOrder.map((roomId) => rooms[roomId]).filter(Boolean),
@@ -201,6 +348,44 @@ export default function SituationRoomPipelinesPanel() {
         : [],
     [activeRoom, jobs, outputs, roomEvents, rooms, sources],
   );
+  const selectedSource = selectedSourceId !== "__room__" ? sources[selectedSourceId] : undefined;
+  const selectedJob = selectedJobId ? jobs[selectedJobId] : undefined;
+  const draftScope = React.useMemo(
+    () => ({
+      room_id: activeRoom?.room_id ?? "",
+      selected_source_id: selectedSource?.source_id,
+      source_ids: selectedSource ? [selectedSource.source_id] : [],
+      source_label: selectedSource?.label ?? "whole room",
+    }),
+    [activeRoom?.room_id, selectedSource],
+  );
+  const focusedMasterScroll = React.useMemo((): SituationRoomMasterScrollRow[] => {
+    if (!selectedJob) return masterScroll;
+    const selectedOutputs = selectedJob.output_ids.map((outputId) => outputs[outputId]).filter(Boolean);
+    const derivedEventIds = new Set(selectedOutputs.flatMap((output) => output.derived_from_event_ids));
+    const sourceIds = new Set(selectedJob.source_ids);
+    const hasDerivedRefs = derivedEventIds.size > 0;
+    return masterScroll.filter((row) => {
+      if (row.kind === "derived") return row.job_id === selectedJob.job_id;
+      if (hasDerivedRefs) return derivedEventIds.has(row.id);
+      if (sourceIds.size === 0) return row.room_id === selectedJob.room_id;
+      return Boolean(row.source_id && sourceIds.has(row.source_id));
+    });
+  }, [masterScroll, outputs, selectedJob]);
+  const focusedMasterScrollSignature = React.useMemo(
+    () =>
+      focusedMasterScroll
+        .map((row) => {
+          const textSize = row.text?.length ?? 0;
+          const outputStatus =
+            row.kind === "derived"
+              ? `${row.output.meta.translation_status ?? ""}:${row.output.meta.output_language ?? ""}`
+              : "";
+          return `${row.id}:${row.ts}:${textSize}:${outputStatus}`;
+        })
+        .join("|"),
+    [focusedMasterScroll],
+  );
 
   React.useEffect(() => {
     if (!activeJobs.length || (selectedJobId && jobs[selectedJobId])) return;
@@ -208,17 +393,145 @@ export default function SituationRoomPipelinesPanel() {
   }, [activeJobs, jobs, selectedJobId]);
 
   React.useEffect(() => {
+    const currentIds = new Set(activeJobs.map((job) => job.job_id));
+    if (!knownJobIdsRef.current) {
+      knownJobIdsRef.current = currentIds;
+      return;
+    }
+    const newJob = activeJobs.find((job) => !knownJobIdsRef.current?.has(job.job_id));
+    knownJobIdsRef.current = currentIds;
+    if (!newJob) return;
+    setSelectedJobId(newJob.job_id);
+    masterScrollPinnedRef.current = true;
+    setPanelPage("output");
+  }, [activeJobs]);
+
+  React.useLayoutEffect(() => {
     const node = masterScrollRef.current;
     if (!node || !masterScrollPinnedRef.current) return;
     node.scrollTop = node.scrollHeight;
-  }, [masterScroll.length]);
+  }, [focusedMasterScrollSignature, panelPage, selectedJobId]);
+
+  React.useEffect(() => () => stopGlobalJobOutputRead(), []);
 
   const handleMasterScroll = React.useCallback(() => {
     const node = masterScrollRef.current;
     if (!node) return;
     const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
-    masterScrollPinnedRef.current = distanceFromBottom < 48;
+    masterScrollPinnedRef.current = distanceFromBottom <= 24;
   }, []);
+
+  const stopReadingOutput = React.useCallback(() => {
+    stopGlobalJobOutputRead();
+    setIsReadingOutput(false);
+    setReadOutputProgress(null);
+  }, []);
+
+  const handleReadOutput = React.useCallback(async () => {
+    const speechText = buildJobOutputSpeechText(selectedJob, focusedMasterScroll);
+    if (!speechText.trim()) {
+      setReadOutputError("No readable job output is available yet.");
+      return;
+    }
+    stopGlobalJobOutputRead();
+    const controller = new AbortController();
+    globalJobOutputReadController = controller;
+    const chunks = splitSpeechChunks(speechText, JOB_OUTPUT_READ_CHUNK_MAX);
+    setIsReadingOutput(true);
+    setReadOutputError(null);
+    setReadOutputProgress({ chunkIndex: 0, chunkCount: chunks.length });
+    try {
+      for (let index = 0; index < chunks.length; index += 1) {
+        if (controller.signal.aborted) throw new DOMException("Read aloud cancelled.", "AbortError");
+        setReadOutputProgress({ chunkIndex: index + 1, chunkCount: chunks.length });
+        const response = await speakVoice(
+          {
+            text: chunks[index],
+            mode: "briefing",
+            priority: "info",
+            provider: JOB_OUTPUT_READ_PROVIDER,
+            voice_profile_id: JOB_OUTPUT_READ_PROFILE_ID,
+            traceId: selectedJob?.room_id,
+            eventId: selectedJob ? `situation-room-job-output-read:${selectedJob.job_id}:${index}` : undefined,
+          },
+          { signal: controller.signal },
+        );
+        if (response.kind !== "audio") {
+          const message = response.payload.message ?? response.payload.error ?? "Voice provider returned no audio.";
+          throw new Error(message);
+        }
+        await playJobOutputAudio(response.blob, controller.signal);
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setReadOutputError(error instanceof Error ? error.message : String(error));
+      }
+    } finally {
+      if (globalJobOutputReadController === controller) globalJobOutputReadController = null;
+      setIsReadingOutput(false);
+      setReadOutputProgress(null);
+    }
+  }, [focusedMasterScroll, selectedJob]);
+
+  const updateDraft = React.useCallback(
+    (nextDraft: DraftSituationRoomJobSpec | null) => {
+      setDraft(nextDraft);
+      if (!nextDraft) return;
+      setSelectedRecipeId(nextDraft.recipe_id);
+      setJobKind(nextDraft.kind);
+      setTargetLanguage(nextDraft.args.target_language ?? "");
+      setNativeLanguage(nextDraft.args.native_language ?? "en");
+      setInputTextPolicy(nextDraft.args.input_text_policy ?? "transcript_text");
+      setOutputRenderPolicy(nextDraft.args.output_render_policy ?? "native_language");
+    },
+    [],
+  );
+
+  const createRecipeDraft = React.useCallback(
+    (recipeId: SituationRoomJobRecipeId, overrides: Partial<DraftSituationRoomJobSpec["args"]> = {}) => {
+      if (!activeRoom) return;
+      const recipe = getSituationRoomJobRecipe(recipeId);
+      updateDraft(draftJobFromRecipe(recipe, draftScope, overrides));
+    },
+    [activeRoom, draftScope, updateDraft],
+  );
+
+  const applyLanguageToDraft = React.useCallback(
+    (language: string) => {
+      setTargetLanguage(language);
+      const recipe = getSituationRoomJobRecipe("translate_source");
+      updateDraft(
+        draftJobFromRecipe(recipe, draftScope, {
+          target_language: language,
+          native_language: nativeLanguage,
+          input_text_policy: inputTextPolicy,
+          output_render_policy: outputRenderPolicy,
+        }),
+      );
+    },
+    [draftScope, inputTextPolicy, nativeLanguage, outputRenderPolicy, updateDraft],
+  );
+
+  const handleNaturalLanguageDraft = React.useCallback(() => {
+    if (!activeRoom) return;
+    const nextDraft = draftJobFromNaturalLanguage(naturalLanguagePrompt, draftScope);
+    updateDraft(nextDraft);
+  }, [activeRoom, draftScope, naturalLanguagePrompt, updateDraft]);
+
+  const handleCreateDraftJob = React.useCallback(() => {
+    if (!activeRoom || !draft || draft.missing_slots.length > 0) return;
+    const job = createJob({
+      ...draft.args,
+      room_id: activeRoom.room_id,
+      source_ids: draft.source_ids,
+      chunk_ranges: draft.chunk_ranges,
+      status: "queued",
+    });
+    setSelectedJobId(job.job_id);
+    masterScrollPinnedRef.current = true;
+    setPanelPage("output");
+    void processJobNowAsync(job.job_id);
+  }, [activeRoom, createJob, draft, processJobNowAsync]);
 
   const handleCreateJob = React.useCallback(() => {
     if (!activeRoom) return;
@@ -227,6 +540,9 @@ export default function SituationRoomPipelinesPanel() {
       native_language: nativeLanguage,
       input_text_policy: inputTextPolicy,
       output_render_policy: outputRenderPolicy,
+      attachment_policy: "manual_only" as const,
+      context_injection: "explicit_attachment_only" as const,
+      command_lane_enabled: false as const,
       status: "queued" as const,
     };
     const job =
@@ -234,6 +550,8 @@ export default function SituationRoomPipelinesPanel() {
         ? createJobFromRoom(activeRoom.room_id, jobKind, input)
         : createJobFromSource(activeRoom.room_id, selectedSourceId, jobKind, input);
     setSelectedJobId(job.job_id);
+    masterScrollPinnedRef.current = true;
+    setPanelPage("output");
     void processJobNowAsync(job.job_id);
   }, [
     activeRoom,
@@ -248,223 +566,397 @@ export default function SituationRoomPipelinesPanel() {
     targetLanguage,
   ]);
 
+  const goBack = () => {
+    if (panelPage === "output") setPanelPage("jobs");
+    else if (panelPage === "jobs") setPanelPage("inputs");
+  };
+
+  const pageTitle =
+    panelPage === "inputs" ? "Pipeline Inputs" : panelPage === "jobs" ? "Live Source Jobs" : "Job Output Scroll";
+  const pageIcon =
+    panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
+
   return (
-    <div className="grid h-full min-h-0 w-full grid-cols-1 overflow-hidden bg-slate-950/95 text-slate-100 lg:grid-cols-[250px_minmax(330px,1fr)_390px]">
-      <section className="flex min-h-0 flex-col border-b border-white/10 bg-slate-950/70 lg:border-b-0 lg:border-r">
-        <div className="border-b border-white/10 p-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Workflow className="h-4 w-4 text-cyan-300" />
-            Pipeline Inputs
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <p className="mb-2 text-[11px] font-semibold text-slate-400">Rooms</p>
-          <div className="space-y-1.5">
-            {roomList.length === 0 ? (
-              <p className="text-xs text-slate-500">No situation rooms yet.</p>
-            ) : (
-              roomList.map((room) => (
-                <button
-                  key={room.room_id}
-                  type="button"
-                  onClick={() => setActiveRoom(room.room_id)}
-                  className={cn(
-                    "w-full rounded-lg px-2 py-2 text-left text-xs transition-colors",
-                    room.room_id === activeRoomId
-                      ? "bg-cyan-500/20 text-white ring-1 ring-cyan-500/50"
-                      : "text-slate-200 hover:bg-white/5",
-                  )}
-                >
-                  <p className="truncate text-sm font-medium">{room.title}</p>
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {room.source_ids.length} source{room.source_ids.length === 1 ? "" : "s"}
-                  </p>
-                </button>
-              ))
-            )}
-          </div>
-          <p className="mb-2 mt-4 text-[11px] font-semibold text-slate-400">Sources</p>
-          <div className="space-y-1.5">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950/95 text-slate-100">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {panelPage !== "inputs" ? (
             <button
               type="button"
-              onClick={() => setSelectedSourceId("__room__")}
+              onClick={goBack}
+              className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          ) : null}
+          {pageIcon}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{pageTitle}</p>
+            <p className="truncate text-[11px] text-slate-500">
+              {activeRoom?.title ?? "No room"} / {selectedSource?.label ?? "whole room"}
+              {selectedJob ? ` / ${selectedJob.title}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-black/20 p-1 text-[11px]">
+          {(["inputs", "jobs", "output"] as PipelinePanelPage[]).map((page) => (
+            <button
+              key={page}
+              type="button"
+              onClick={() => {
+                if (page === "output" && !selectedJob) return;
+                setPanelPage(page);
+              }}
+              disabled={page === "output" && !selectedJob}
               className={cn(
-                "w-full rounded-lg px-2 py-2 text-left text-xs transition-colors",
-                selectedSourceId === "__room__"
-                  ? "bg-emerald-500/20 text-white ring-1 ring-emerald-500/50"
-                  : "text-slate-200 hover:bg-white/5",
+                "rounded px-2 py-1 capitalize transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                panelPage === page ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
               )}
             >
-              Whole room
+              {page}
             </button>
-            {activeSources.map((source) => (
-              <button
-                key={source.source_id}
-                type="button"
-                onClick={() => setSelectedSourceId(source.source_id)}
-                className={cn(
-                  "w-full rounded-lg px-2 py-2 text-left text-xs transition-colors",
-                  selectedSourceId === source.source_id
-                    ? "bg-emerald-500/20 text-white ring-1 ring-emerald-500/50"
-                    : "text-slate-200 hover:bg-white/5",
+          ))}
+        </div>
+      </header>
+
+      {panelPage === "inputs" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-2">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500">Rooms</p>
+              <div className="space-y-2">
+                {roomList.length === 0 ? (
+                  <p className="text-xs text-slate-500">No situation rooms yet.</p>
+                ) : (
+                  roomList.map((room) => (
+                    <button
+                      key={room.room_id}
+                      type="button"
+                      onClick={() => setActiveRoom(room.room_id)}
+                      className={cn(
+                        "w-full rounded-lg border px-3 py-3 text-left transition-colors",
+                        room.room_id === activeRoomId
+                          ? "border-cyan-400/60 bg-cyan-500/15 text-white"
+                          : "border-white/10 text-slate-200 hover:bg-white/5",
+                      )}
+                    >
+                      <p className="truncate text-sm font-medium">{room.title}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {room.source_ids.length} source{room.source_ids.length === 1 ? "" : "s"}
+                      </p>
+                    </button>
+                  ))
                 )}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500">Sources</p>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSourceId("__room__")}
+                  className={cn(
+                    "w-full rounded-lg border px-3 py-3 text-left transition-colors",
+                    selectedSourceId === "__room__"
+                      ? "border-emerald-400/60 bg-emerald-500/15 text-white"
+                      : "border-white/10 text-slate-200 hover:bg-white/5",
+                  )}
+                >
+                  <p className="text-sm font-medium">Whole room</p>
+                  <p className="mt-1 text-[11px] text-slate-400">Route all selected room evidence into a job.</p>
+                </button>
+                {activeSources.map((source) => (
+                  <button
+                    key={source.source_id}
+                    type="button"
+                    onClick={() => setSelectedSourceId(source.source_id)}
+                    className={cn(
+                      "w-full rounded-lg border px-3 py-3 text-left transition-colors",
+                      selectedSourceId === source.source_id
+                        ? "border-emerald-400/60 bg-emerald-500/15 text-white"
+                        : "border-white/10 text-slate-200 hover:bg-white/5",
+                    )}
+                  >
+                    <p className="truncate text-sm font-medium">{source.label}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {source.status} / chunks {source.chunk_index}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPanelPage("jobs")}
+                disabled={!activeRoom}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
               >
-                <p className="truncate text-sm font-medium">{source.label}</p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  {source.status} / chunks {source.chunk_index}
-                </p>
+                Continue to jobs
               </button>
-            ))}
+            </section>
           </div>
-        </div>
-      </section>
+        </main>
+      ) : null}
 
-      <section className="flex min-h-0 flex-col border-b border-white/10 lg:border-b-0 lg:border-r">
-        <div className="border-b border-white/10 p-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <ListChecks className="h-4 w-4 text-cyan-300" />
-            Live Source Jobs
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_110px_auto]">
-            <select
-              value={jobKind}
-              onChange={(event) => setJobKind(event.target.value as SituationRoomJobKind)}
-              className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
-            >
-              {JOB_KIND_OPTIONS.map((option) => (
-                <option key={option.kind} value={option.kind}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <input
-              value={targetLanguage}
-              onChange={(event) => setTargetLanguage(event.target.value)}
-              disabled={jobKind !== "translate"}
-              className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45"
-              aria-label="Target language"
-            />
-            <input
-              value={nativeLanguage}
-              onChange={(event) => setNativeLanguage(event.target.value)}
-              className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
-              aria-label="Native language"
-            />
-            <button
-              type="button"
-              onClick={handleCreateJob}
-              disabled={!activeRoom}
-              className="inline-flex items-center justify-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Create
-            </button>
-          </div>
-          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-            <select
-              value={inputTextPolicy}
-              onChange={(event) => setInputTextPolicy(event.target.value as SituationRoomJobInputTextPolicy)}
-              disabled={jobKind !== "translate"}
-              className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45"
-              aria-label="Translation input text policy"
-            >
-              {INPUT_TEXT_POLICY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  Input: {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={outputRenderPolicy}
-              onChange={(event) => setOutputRenderPolicy(event.target.value as SituationRoomJobOutputRenderPolicy)}
-              disabled={jobKind !== "translate"}
-              className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45"
-              aria-label="Translation output render policy"
-            >
-              {OUTPUT_RENDER_POLICY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  Output: {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {activeJobs.length === 0 ? (
-            <div className="flex h-full min-h-[240px] items-center justify-center rounded-lg border border-dashed border-white/15 bg-black/20 px-6 text-center text-sm text-slate-400">
-              Create a job to process selected room evidence. Job outputs stay separate until attached or saved.
-            </div>
-          ) : (
-            <div className="grid gap-3 xl:grid-cols-2">
-              {activeJobs.map((job) => (
-                <JobCard
-                  key={job.job_id}
-                  job={job}
-                  selected={job.job_id === selectedJobId}
-                  onSelect={() => setSelectedJobId(job.job_id)}
-                  onRun={() => {
-                    void processJobNowAsync(job.job_id);
+      {panelPage === "jobs" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-5xl space-y-4">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] font-semibold uppercase text-slate-500">Recipes</p>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {SITUATION_ROOM_JOB_RECIPES.map((recipe) => (
+                  <button
+                    key={recipe.recipe_id}
+                    type="button"
+                    onClick={() => createRecipeDraft(recipe.recipe_id)}
+                    disabled={!activeRoom}
+                    className={cn(
+                      "rounded border px-2 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                      selectedRecipeId === recipe.recipe_id
+                        ? "border-cyan-400/60 bg-cyan-500/10"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/25",
+                    )}
+                  >
+                    <p className="truncate text-xs font-semibold text-white">{recipe.title}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{recipe.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                <input
+                  value={naturalLanguagePrompt}
+                  onChange={(event) => setNaturalLanguagePrompt(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleNaturalLanguageDraft();
                   }}
-                  onStop={() => stopJob(job.job_id)}
-                  onSave={() => saveJobAsNote(job.job_id)}
-                  onAttach={() => attachJobToHelixAsk(job.job_id)}
+                  placeholder="What should this source/job do?"
+                  className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
                 />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+                <button
+                  type="button"
+                  onClick={handleNaturalLanguageDraft}
+                  disabled={!activeRoom || !naturalLanguagePrompt.trim()}
+                  className="inline-flex items-center justify-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Draft
+                </button>
+              </div>
 
-      <section className="flex min-h-0 flex-col bg-slate-950/70">
-        <div className="border-b border-white/10 p-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <ScrollText className="h-4 w-4 text-cyan-300" />
-            Master Scroll
-          </div>
-          <p className="mt-1 text-[11px] text-slate-400">
-            Raw transcript events and derived job outputs, sorted by timestamp and provenance.
-          </p>
-        </div>
-        <div
-          ref={masterScrollRef}
-          onScroll={handleMasterScroll}
-          className="min-h-0 flex-1 overflow-y-auto p-3"
-        >
-          {masterScroll.length === 0 ? (
-            <p className="text-xs text-slate-500">No raw or derived room events yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {masterScroll.map((row) => (
-                <div key={row.id} className="rounded border border-white/10 bg-black/20 px-2 py-2">
-                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                    <span>
-                      {row.kind === "derived" ? "derived" : "raw"} / {row.event_type}
-                    </span>
-                    <span>{formatClock(row.ts)}</span>
+              {draft ? (
+                <div className="mt-3 rounded-lg border border-cyan-400/25 bg-cyan-500/10 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{draft.title}</p>
+                      <p className="mt-1 text-[11px] text-cyan-100/80">
+                        Scope: {draft.source_ids.length > 0 ? selectedSource?.label ?? draft.source_ids.join(", ") : "whole room"} / attachment manual only
+                      </p>
+                      {draft.kind === "translate" ? (
+                        <p className="mt-1 text-[11px] text-slate-300">
+                          Target: {labelSituationRoomLanguage(draft.args.target_language)} / output {draft.args.output_render_policy ?? "target_language"}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCreateDraftJob}
+                      disabled={draft.missing_slots.length > 0}
+                      className="inline-flex items-center justify-center gap-1 rounded border border-cyan-300/45 bg-cyan-400/15 px-2 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Create Job
+                    </button>
                   </div>
-                  <p className="mt-1 text-xs font-medium text-slate-100">{row.label}</p>
-                  {row.text ? <p className="mt-1 text-xs leading-5 text-slate-300">{row.text}</p> : null}
-                  {row.kind === "derived" ? (
-                    <>
-                      <p className="mt-1 text-[10px] text-slate-500">
-                        language {String(row.output.meta.output_language ?? row.output.meta.target_language ?? "n/a")} /{" "}
-                        {String(row.output.meta.output_render_policy ?? "target_language")}
-                      </p>
-                      <p className="mt-1 break-all text-[10px] text-slate-500">
-                        from {row.output.derived_from_event_ids.join(", ")}
-                      </p>
-                    </>
+                  {draft.missing_slots.includes("target_language") ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Languages className="h-3.5 w-3.5 text-cyan-200" />
+                      {LANGUAGE_CHIPS.map((chip) => (
+                        <button
+                          key={chip.value}
+                          type="button"
+                          onClick={() => applyLanguageToDraft(chip.value)}
+                          className="rounded border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-slate-100 hover:bg-white/10"
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                      <input
+                        value={customLanguage}
+                        onChange={(event) => setCustomLanguage(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && customLanguage.trim()) applyLanguageToDraft(customLanguage.trim());
+                        }}
+                        placeholder="Custom"
+                        className="w-24 rounded border border-white/15 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 outline-none"
+                      />
+                    </div>
                   ) : null}
                 </div>
-              ))}
+              ) : null}
+
+              <details
+                className="mt-3 rounded-lg border border-white/10 bg-black/20"
+                open={advancedOpen}
+                onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-slate-200">
+                  Advanced
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", advancedOpen ? "rotate-180" : "")} />
+                </summary>
+                <div className="border-t border-white/10 p-3">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_110px_auto]">
+                    <select value={jobKind} onChange={(event) => setJobKind(event.target.value as SituationRoomJobKind)} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none">
+                      {JOB_KIND_OPTIONS.map((option) => (
+                        <option key={option.kind} value={option.kind}>{option.label}</option>
+                      ))}
+                    </select>
+                    <input value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label="Target language" />
+                    <input value={nativeLanguage} onChange={(event) => setNativeLanguage(event.target.value)} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none" aria-label="Native language" />
+                    <button type="button" onClick={handleCreateJob} disabled={!activeRoom} className="inline-flex items-center justify-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45">
+                      <Plus className="h-3.5 w-3.5" />
+                      Create
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <select value={inputTextPolicy} onChange={(event) => setInputTextPolicy(event.target.value as SituationRoomJobInputTextPolicy)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label="Translation input text policy">
+                      {INPUT_TEXT_POLICY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>Input: {option.label}</option>
+                      ))}
+                    </select>
+                    <select value={outputRenderPolicy} onChange={(event) => setOutputRenderPolicy(event.target.value as SituationRoomJobOutputRenderPolicy)} disabled={jobKind !== "translate"} className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45" aria-label="Translation output render policy">
+                      {OUTPUT_RENDER_POLICY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>Output: {option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </details>
+            </section>
+
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Jobs</p>
+                {selectedJob ? (
+                  <button type="button" onClick={() => { masterScrollPinnedRef.current = true; setPanelPage("output"); }} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
+                    <ScrollText className="h-3.5 w-3.5" />
+                    View output
+                  </button>
+                ) : null}
+              </div>
+              {activeJobs.length === 0 ? (
+                <div className="flex min-h-[180px] items-center justify-center rounded-lg border border-dashed border-white/15 px-6 text-center text-sm text-slate-400">
+                  Create a job to process selected room evidence. Job outputs stay separate until attached or saved.
+                </div>
+              ) : (
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {activeJobs.map((job) => (
+                    <JobCard
+                      key={job.job_id}
+                      job={job}
+                      selected={job.job_id === selectedJobId}
+                      onSelect={() => setSelectedJobId(job.job_id)}
+                      onRun={() => {
+                        setSelectedJobId(job.job_id);
+                        masterScrollPinnedRef.current = true;
+                        setPanelPage("output");
+                        void processJobNowAsync(job.job_id);
+                      }}
+                      onStop={() => stopJob(job.job_id)}
+                      onSave={() => saveJobAsNote(job.job_id)}
+                      onAttach={() => attachJobToHelixAsk(job.job_id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </main>
+      ) : null}
+
+      {panelPage === "output" ? (
+        <main className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b border-white/10 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <ScrollText className="h-4 w-4 text-cyan-300" />
+                  {selectedJob ? selectedJob.title : "Master Scroll"}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {selectedJob
+                    ? "Job-relative raw evidence and derived outputs, sorted by timestamp and provenance."
+                    : "Raw transcript events and derived job outputs, sorted by timestamp and provenance."}
+                </p>
+              </div>
+              {selectedJob ? (
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { masterScrollPinnedRef.current = true; void processJobNowAsync(selectedJob.job_id); }} className="inline-flex items-center gap-1 rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20">
+                    <Play className="h-3.5 w-3.5" />
+                    Run
+                  </button>
+                  <button type="button" onClick={() => attachJobToHelixAsk(selectedJob.job_id)} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
+                    <Link2 className="h-3.5 w-3.5" />
+                    Attach
+                  </button>
+                  <button
+                    type="button"
+                    onClick={isReadingOutput ? stopReadingOutput : handleReadOutput}
+                    disabled={focusedMasterScroll.length === 0}
+                    className="inline-flex items-center gap-1 rounded border border-violet-300/35 bg-violet-500/10 px-2 py-1 text-xs text-violet-100 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isReadingOutput ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                    {isReadingOutput ? "Stop" : "Read aloud"}
+                  </button>
+                  <button type="button" onClick={() => saveJobAsNote(selectedJob.job_id)} className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20">
+                    <Save className="h-3.5 w-3.5" />
+                    Save
+                  </button>
+                </div>
+              ) : null}
             </div>
-          )}
-        </div>
-        <div className="border-t border-white/10 p-3 text-[11px] text-slate-500">
-          <FileText className="mr-1 inline h-3.5 w-3.5" />
-          Job output is visible here but only reaches Helix Ask when explicitly attached.
-        </div>
-      </section>
+            {isReadingOutput || readOutputError ? (
+              <p className={cn("mt-2 text-[11px]", readOutputError ? "text-rose-300" : "text-violet-200")}>
+                {readOutputError ??
+                  (readOutputProgress
+                    ? `Reading job output ${readOutputProgress.chunkIndex}/${readOutputProgress.chunkCount}`
+                    : "Reading job output...")}
+              </p>
+            ) : null}
+          </div>
+          <div ref={masterScrollRef} onScroll={handleMasterScroll} className="min-h-0 flex-1 overflow-y-auto p-3">
+            {focusedMasterScroll.length === 0 ? (
+              <p className="text-xs text-slate-500">No raw or derived events for this job yet.</p>
+            ) : (
+              <div className="mx-auto max-w-4xl space-y-2">
+                {focusedMasterScroll.map((row) => (
+                  <div key={row.id} className="rounded border border-white/10 bg-black/20 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                      <span>{row.kind === "derived" ? "derived" : "raw"} / {row.event_type}</span>
+                      <span>{formatClock(row.ts)}</span>
+                    </div>
+                    <p className="mt-1 text-xs font-medium text-slate-100">{row.label}</p>
+                    {row.text ? <p className="mt-1 text-xs leading-5 text-slate-300">{row.text}</p> : null}
+                    {row.kind === "derived" ? (
+                      <>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          language {String(row.output.meta.output_language ?? row.output.meta.target_language ?? "n/a")} / {String(row.output.meta.output_render_policy ?? "target_language")}
+                        </p>
+                        <p className="mt-1 break-all text-[10px] text-slate-500">from {row.output.derived_from_event_ids.join(", ")}</p>
+                      </>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="shrink-0 border-t border-white/10 p-3 text-[11px] text-slate-500">
+            <FileText className="mr-1 inline h-3.5 w-3.5" />
+            Job output is visible here but only reaches Helix Ask when explicitly attached.
+          </div>
+        </main>
+      ) : null}
     </div>
   );
 }
