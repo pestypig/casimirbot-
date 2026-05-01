@@ -5856,9 +5856,13 @@ function resolveHelixVisibleTerminalKind(args: {
   if (isHelixCanceledPendingTurn(args.reply, args.reply?.debug, args.terminal, ...(args.extraSources ?? []))) {
     return "canceled";
   }
+  const terminalKind = typeof args.terminal?.kind === "string" ? args.terminal.kind : null;
+  if (terminalKind === "final_answer" || terminalKind === "final_failure") {
+    return terminalKind;
+  }
   const pending = resolveHelixPendingInputRecord(args.reply, args.reply?.debug, ...(args.extraSources ?? []));
   if (pending) return "pending_input";
-  return String(args.terminal?.kind ?? args.fallback ?? "n/a");
+  return String(terminalKind ?? args.fallback ?? "n/a");
 }
 
 function resolveHelixTranscriptActionLabel(event: Record<string, unknown>): string | null {
@@ -9177,6 +9181,19 @@ function buildReplyMasterEventClockExport(args: {
     },
     debugContext: args.debugContext,
     debug: args.reply.debug ?? null,
+    equation_attempt_debug: readAgentLoopAuditRecord(
+      args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
+    ),
+    terminal_failure_context: {
+      terminal_error_code:
+        typeof args.reply.debug?.terminal_error_code === "string" ? args.reply.debug.terminal_error_code : null,
+      equation_attempt_debug: readAgentLoopAuditRecord(
+        args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
+      ),
+      equation_extraction_attempt: readAgentLoopAuditRecord(
+        args.reply.equation_extraction_attempt ?? args.reply.debug?.equation_extraction_attempt,
+      ),
+    },
     turnTruthTable: turnTruthTable
       ? {
           ...turnTruthTable,
@@ -9266,6 +9283,12 @@ function buildReplyMasterEventClockExport(args: {
       current_turn_artifact_ledger: Array.isArray(args.reply.debug?.current_turn_artifact_ledger)
         ? args.reply.debug.current_turn_artifact_ledger
         : [],
+      equation_attempt_debug: readAgentLoopAuditRecord(
+        args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
+      ),
+      equation_extraction_attempt: readAgentLoopAuditRecord(
+        args.reply.equation_extraction_attempt ?? args.reply.debug?.equation_extraction_attempt,
+      ),
       rejected_terminal_candidates: Array.isArray(args.reply.debug?.rejected_terminal_candidates)
         ? args.reply.debug.rejected_terminal_candidates
         : [],
@@ -9422,6 +9445,125 @@ function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string 
   } catch {
     return buildFallbackReplyMasterDebugExport(reply, "invalid_json_payload");
   }
+}
+
+export type DebugClipboardCopyResult = {
+  ok: boolean;
+  copied_text_length: number;
+  method: "navigator.clipboard" | "textarea_fallback" | "failed";
+  error?: string;
+};
+
+export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
+  const json = typeof payload === "string" ? payload : "";
+  if (!json.trim()) {
+    return {
+      ok: false,
+      copied_text_length: 0,
+      method: "failed",
+      error: "debug_payload_empty",
+    };
+  }
+  try {
+    JSON.parse(json);
+  } catch {
+    return {
+      ok: false,
+      copied_text_length: 0,
+      method: "failed",
+      error: "debug_payload_invalid_json",
+    };
+  }
+
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+      if (typeof navigator.clipboard.readText !== "function") {
+        throw new Error("clipboard_readback_unavailable");
+      }
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await navigator.clipboard.writeText(json);
+        const confirm = await navigator.clipboard.readText().catch(() => {
+          throw new Error("clipboard_readback_unavailable");
+        });
+        if (confirm === json) {
+          return {
+            ok: true,
+            copied_text_length: json.length,
+            method: "navigator.clipboard",
+          };
+        }
+        if (confirm.trim().length === 0) {
+          lastError = new Error("clipboard_empty_after_write");
+        } else {
+          lastError = new Error("clipboard_mismatch_after_write");
+        }
+      }
+      throw lastError ?? new Error("clipboard_write_failed");
+    }
+  } catch (error) {
+    if (typeof window !== "undefined") {
+      (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
+        error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  if (typeof document !== "undefined") {
+    const textarea = document.createElement("textarea");
+    textarea.value = json;
+    textarea.setAttribute("readonly", "true");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      const copied = document.execCommand("copy");
+      if (copied) {
+        if (typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function") {
+          const confirm = await navigator.clipboard.readText().catch(() => "");
+          if (confirm.trim().length === 0) {
+            return {
+              ok: false,
+              copied_text_length: 0,
+              method: "failed",
+              error: "clipboard_empty_after_write",
+            };
+          }
+          if (confirm !== json) {
+            return {
+              ok: false,
+              copied_text_length: 0,
+              method: "failed",
+              error: "clipboard_mismatch_after_write",
+            };
+          }
+        }
+        return {
+          ok: true,
+          copied_text_length: json.length,
+          method: "textarea_fallback",
+        };
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        copied_text_length: 0,
+        method: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
+
+  return {
+    ok: false,
+    copied_text_length: 0,
+    method: "failed",
+    error: "clipboard_write_failed",
+  };
 }
 
 function isWorkstationLifecycleEvent(entry: AskLiveEventEntry): boolean {
@@ -13644,34 +13786,12 @@ export function HelixAskPill({
       if (typeof window !== "undefined") {
         (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
       }
-      let copied = false;
-      try {
-        if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
-          await navigator.clipboard.writeText(exportPayload);
-          copied = true;
-        }
-      } catch {
-        copied = false;
+      const copyResult = await copyDebugPayloadToClipboard(exportPayload);
+      if (typeof window !== "undefined") {
+        (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
+          copyResult;
       }
-      if (!copied && typeof document !== "undefined") {
-        const textarea = document.createElement("textarea");
-        textarea.value = exportPayload;
-        textarea.setAttribute("readonly", "true");
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        textarea.style.top = "0";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        try {
-          copied = document.execCommand("copy");
-        } catch {
-          copied = false;
-        } finally {
-          document.body.removeChild(textarea);
-        }
-      }
-      if (copied) {
+      if (copyResult.ok) {
         setCopiedReplyMasterDebugId(reply.id);
         window.setTimeout(() => {
           setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
@@ -13679,7 +13799,7 @@ export function HelixAskPill({
       } else {
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
-            "clipboard_write_failed";
+            copyResult.error ?? "clipboard_write_failed";
         }
       }
     },
@@ -23966,6 +24086,15 @@ export function HelixAskPill({
               current_turn_artifact_ledger: Array.isArray(localResponseRecord.current_turn_artifact_ledger)
                 ? localResponseRecord.current_turn_artifact_ledger
                 : [],
+              equation_attempt_debug:
+                localResponseRecord.equation_attempt_debug && typeof localResponseRecord.equation_attempt_debug === "object"
+                  ? localResponseRecord.equation_attempt_debug
+                  : null,
+              equation_extraction_attempt:
+                localResponseRecord.equation_extraction_attempt &&
+                typeof localResponseRecord.equation_extraction_attempt === "object"
+                  ? localResponseRecord.equation_extraction_attempt
+                  : null,
               rejected_terminal_candidates: Array.isArray(localResponseRecord.rejected_terminal_candidates)
                 ? localResponseRecord.rejected_terminal_candidates
                 : [],

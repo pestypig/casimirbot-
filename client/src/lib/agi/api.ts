@@ -234,6 +234,8 @@ export type LocalAskResponse = {
   final_artifact_scope?: string | null;
   satisfaction_report?: Record<string, unknown> | null;
   current_turn_artifact_ledger?: unknown[];
+  equation_extraction_attempt?: Record<string, unknown> | null;
+  equation_attempt_debug?: Record<string, unknown> | null;
   rejected_terminal_candidates?: unknown[];
   rejected_prior_artifacts?: unknown[];
   canonical_goal_frame?: unknown;

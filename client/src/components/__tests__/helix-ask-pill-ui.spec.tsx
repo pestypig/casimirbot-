@@ -79,6 +79,7 @@ let buildWorkstationProceduralStepEvent: typeof import("@/components/helix/Helix
 let evaluateEvidenceFinalizationGate: typeof import("@/components/helix/HelixAskPill").evaluateEvidenceFinalizationGate;
 let buildNeedsRetrievalPlanEvent: typeof import("@/components/helix/HelixAskPill").buildNeedsRetrievalPlanEvent;
 let syncDocViewerStateFromWorkstationAction: typeof import("@/components/helix/HelixAskPill").syncDocViewerStateFromWorkstationAction;
+let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill").copyDebugPayloadToClipboard;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -159,6 +160,7 @@ beforeAll(async () => {
     evaluateEvidenceFinalizationGate,
     buildNeedsRetrievalPlanEvent,
     syncDocViewerStateFromWorkstationAction,
+    copyDebugPayloadToClipboard,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -261,10 +263,71 @@ describe("HelixAskPill mic-first surface contract", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const apiSource = fs.readFileSync(path.resolve(process.cwd(), "client/src/lib/agi/api.ts"), "utf8");
     expect(apiSource).toContain("turn_truth_table?: Record<string, unknown>");
+    expect(apiSource).toContain("equation_attempt_debug?: Record<string, unknown> | null");
     expect(source).toContain("turn_truth_table: localResponse.turn_truth_table ?? null");
     expect(source).toContain("visible_answer_text: responseText");
     expect(source).toContain("turnTruthTable");
     expect(source).toContain("visible_answer_text: args.reply.content");
+    expect(source).toContain("equation_attempt_debug");
+    expect(source).toContain("terminal_failure_context");
+  });
+
+  it("uses an atomic nonempty JSON debug copy helper", async () => {
+    const originalNavigator = globalThis.navigator;
+    const writes: string[] = [];
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        clipboard: {
+          writeText: vi.fn(async (text: string) => {
+            writes.push(text);
+          }),
+          readText: vi.fn(async () => writes.at(-1) ?? ""),
+        },
+      },
+    });
+    const result = await copyDebugPayloadToClipboard(JSON.stringify({ selected_final_answer: "ok" }));
+    expect(result).toMatchObject({
+      ok: true,
+      method: "navigator.clipboard",
+    });
+    expect(result.copied_text_length).toBeGreaterThan(0);
+
+    let readAttempts = 0;
+    const retryWrites: string[] = [];
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        clipboard: {
+          writeText: vi.fn(async (text: string) => {
+            retryWrites.push(text);
+          }),
+          readText: vi.fn(async () => {
+            readAttempts += 1;
+            return readAttempts === 1 ? "" : retryWrites.at(-1) ?? "";
+          }),
+        },
+      },
+    });
+    const retryResult = await copyDebugPayloadToClipboard(JSON.stringify({ selected_final_answer: "retry ok" }));
+    expect(retryResult).toMatchObject({
+      ok: true,
+      method: "navigator.clipboard",
+    });
+    expect(readAttempts).toBe(2);
+
+    const empty = await copyDebugPayloadToClipboard("");
+    expect(empty).toMatchObject({
+      ok: false,
+      copied_text_length: 0,
+      method: "failed",
+      error: "debug_payload_empty",
+    });
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: originalNavigator,
+    });
   });
 
   it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
