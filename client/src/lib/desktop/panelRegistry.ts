@@ -21,6 +21,7 @@ export type PanelId =
   | "stress-map"
   | "essence-prompt-panel"
   | "situation-room-sources"
+  | "situation-room-pipelines"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -261,6 +262,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 1040, h: 720 },
     defaultPosition: { x: 240, y: 160 },
     keywords: ["situation", "room", "sources", "audio", "transcript", "notes"],
+  },
+  {
+    id: "situation-room-pipelines",
+    title: "Situation Room Pipelines",
+    loader: load(() => import("@/components/workstation/SituationRoomPipelinesPanel")),
+    defaultSize: { w: 1120, h: 740 },
+    defaultPosition: { x: 280, y: 180 },
+    keywords: ["situation", "room", "pipelines", "jobs", "translation", "summary", "prompt"],
   },
   {
     id: "workstation-clipboard-history",

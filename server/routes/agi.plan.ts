@@ -31340,6 +31340,106 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
   };
 };
 
+const extractAskTurnExplicitDocPaths = (text: string): string[] =>
+  uniqueAskTurnStrings(
+    Array.from(text.matchAll(/(?:^|\s)(\/?docs\/[^\s"'<>]+?\.md)\b/gi))
+      .map((match) => normalizeAskTurnWorkspaceDocPath(match[1]) ?? null)
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+
+const buildAskTurnEquationUsableEvidenceRescueArtifact = (args: {
+  turnId: string;
+  transcript: string;
+  goalFrame: HelixAskUniversalGoalFrame;
+}): HelixTurnArtifact | null => {
+  const query = buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript;
+  const explicitPaths = extractAskTurnExplicitDocPaths(args.transcript);
+  const searched = searchAskTurnDocsForQuery(query, 12).map((match) => normalizeAskTurnWorkspaceDocPath(match.path)).filter((path): path is string => Boolean(path));
+  const priorityPaths =
+    /\bNHM2\b/i.test(args.transcript) && /\b(?:calculator|usable|equation|formula|proper\s*time|alpha)\b/i.test(args.transcript)
+      ? ["/docs/research/nhm2-frontier-distance-report.md"]
+      : [];
+  const candidatePaths = explicitPaths.length ? explicitPaths : uniqueAskTurnStrings([...priorityPaths, ...searched]);
+  if (explicitPaths.length) {
+    for (const sourcePath of candidatePaths) {
+      const matches = findAskTurnDocLocationMatches({ path: sourcePath, query, strategy: "variant", limit: 5 }) as Array<
+        HelixAskDocLocationMatch & Record<string, unknown>
+      >;
+      if (!matches.length) continue;
+      const calculatorPayload = buildAskTurnDocCalculatorEvidencePayload({
+        turnId: args.turnId,
+        transcript: args.transcript,
+        query,
+        sourcePath,
+        matches,
+      });
+      if (validateAskTurnDocCalculatorEvidenceArtifact(calculatorPayload).valid) {
+        return {
+          artifact_id: `${args.turnId}:equation_rescue:doc_calculator_evidence`,
+          turn_id: args.turnId,
+          producer_item_id: "equation_rescue",
+          kind: "doc_calculator_evidence",
+          created_at_ms: Date.now(),
+          source_scope: "current_turn",
+          goal_hash: hashAskTurnGoalFrame(args.goalFrame),
+          payload: calculatorPayload,
+        };
+      }
+    }
+  }
+  for (const sourcePath of candidatePaths) {
+    const matches = findAskTurnDocLocationMatches({ path: sourcePath, query, strategy: "variant", limit: 5 }) as Array<
+      HelixAskDocLocationMatch & Record<string, unknown>
+    >;
+    if (!matches.length) continue;
+    const equationPayload = buildAskTurnDocEquationLocationPayload({
+      turnId: args.turnId,
+      transcript: args.transcript,
+      query,
+      sourcePath,
+      matches,
+    });
+    if (validateAskTurnDocEquationLocationArtifact(equationPayload).valid) {
+      return {
+        artifact_id: `${args.turnId}:equation_rescue:doc_equation_location`,
+        turn_id: args.turnId,
+        producer_item_id: "equation_rescue",
+        kind: "doc_equation_location",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: hashAskTurnGoalFrame(args.goalFrame),
+        payload: equationPayload,
+      };
+    }
+  }
+  for (const sourcePath of candidatePaths) {
+    const matches = findAskTurnDocLocationMatches({ path: sourcePath, query, strategy: "variant", limit: 5 }) as Array<
+      HelixAskDocLocationMatch & Record<string, unknown>
+    >;
+    if (!matches.length) continue;
+    const calculatorPayload = buildAskTurnDocCalculatorEvidencePayload({
+      turnId: args.turnId,
+      transcript: args.transcript,
+      query,
+      sourcePath,
+      matches,
+    });
+    if (validateAskTurnDocCalculatorEvidenceArtifact(calculatorPayload).valid) {
+      return {
+        artifact_id: `${args.turnId}:equation_rescue:doc_calculator_evidence`,
+        turn_id: args.turnId,
+        producer_item_id: "equation_rescue",
+        kind: "doc_calculator_evidence",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: hashAskTurnGoalFrame(args.goalFrame),
+        payload: calculatorPayload,
+      };
+    }
+  }
+  return null;
+};
+
 const resolveAskTurnScientificMissingCode = (
   kind: "numeric" | "concept_explanation" | HelixAskCanonicalGoalKind | null | undefined,
 ): "numeric_result_unavailable" | "concept_explanation_unavailable" | "equation_source_unavailable" | null => {
@@ -90346,6 +90446,27 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       pendingServerRequest: finalPendingRequest,
       retrievalRequiredSignal,
     });
+    let equationUsableEvidenceRescued = false;
+    if (
+      canonicalGoalFrame.goal_kind === "doc_equation_location" &&
+      !currentTurnArtifacts.some(
+        (artifact) =>
+          (artifact.kind === "doc_equation_location" &&
+            validateAskTurnDocEquationLocationArtifact(readAskTurnArtifactPayloadRecord(artifact)).valid) ||
+          (artifact.kind === "doc_calculator_evidence" &&
+            validateAskTurnDocCalculatorEvidenceArtifact(readAskTurnArtifactPayloadRecord(artifact)).valid),
+      )
+    ) {
+      const rescueArtifact = buildAskTurnEquationUsableEvidenceRescueArtifact({
+        turnId: activeTurnId,
+        transcript: questionSeed,
+        goalFrame: finalSatisfactionGoalFrame,
+      });
+      if (rescueArtifact) {
+        currentTurnArtifacts = mergeAskTurnLedgerArtifacts([...currentTurnArtifacts, rescueArtifact]);
+        equationUsableEvidenceRescued = true;
+      }
+    }
     if (canonicalGoalFrame.goal_kind === "panel_control") {
       const panelReceipt = buildAskTurnPanelControlReceiptArtifact({
         turnId: activeTurnId,
@@ -90364,7 +90485,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       toolChoice: finalToolChoiceRecord as HelixAskToolChoiceArbitration | null,
       currentTurnArtifacts,
       workspaceState: finalWorkspaceSnapshot,
-      pendingServerRequest: finalPendingRequest,
+      pendingServerRequest: equationUsableEvidenceRescued ? null : finalPendingRequest,
     });
     const rejectedTerminalCandidates: HelixAskRejectedTerminalCandidate[] = [
       ...(finalSatisfactionReport.rejected_terminal_candidates ?? []),
@@ -90418,6 +90539,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       });
       finalText = buildHelixAskNormalTurnFallbackText(questionSeed);
       resolvedFinalStatus = "final_answer";
+    }
+    if (resolvedFinalStatus === "pending_input" && equationUsableEvidenceRescued && finalSatisfactionReport.satisfied) {
+      resolvedFinalStatus = "final_answer";
+      payload.response_type = "final_answer";
+      delete payload.terminal_error_code;
     }
     if (resolvedFinalStatus === "pending_input" && !finalPendingRequest) {
       if (finalSatisfactionReport.satisfied) {
@@ -90616,6 +90742,50 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     if (canonicalGoalFrame.goal_kind === "equation_attempt_followup" && finalSatisfactionReport.satisfied) {
       finalAnswerSource = "artifact_synthesis";
+    }
+    if (canonicalGoalFrame.goal_kind === "doc_equation_location" && finalSatisfactionReport.satisfied) {
+      const terminalEquationArtifact =
+        currentTurnArtifacts.find((artifact) => artifact.artifact_id === finalSatisfactionReport.terminal_artifact_id) ??
+        currentTurnArtifacts.find((artifact) => artifact.kind === "doc_equation_location" || artifact.kind === "doc_calculator_evidence") ??
+        null;
+      const terminalPayload = terminalEquationArtifact ? readAskTurnArtifactPayloadRecord(terminalEquationArtifact) : null;
+      const renderedStrictTerminal =
+        terminalEquationArtifact?.kind === "doc_calculator_evidence"
+          ? renderAskTurnDocCalculatorEvidenceFromArtifact(terminalPayload)
+          : renderAskTurnDocEquationLocationFromArtifact(terminalPayload);
+      const renderedTerminal =
+        renderedStrictTerminal ??
+        (terminalPayload && terminalEquationArtifact?.kind === "doc_equation_location"
+          ? [
+              "Equation-bearing source:",
+              "",
+              `Document: ${readAskTurnString(terminalPayload.source_title) ?? readAskTurnDocTitleForPath(normalizeAskTurnWorkspaceDocPath(terminalPayload.source_path) ?? "") ?? "NHM2 source"}`,
+              `Path: ${normalizeAskTurnWorkspaceDocPath(terminalPayload.source_path) ?? "unknown source"}`,
+              "",
+              "Snippet:",
+              clipConversationText(
+                readAskTurnString(
+                  Array.isArray(terminalPayload.snippets) && terminalPayload.snippets[0] && typeof terminalPayload.snippets[0] === "object"
+                    ? (terminalPayload.snippets[0] as Record<string, unknown>).text
+                    : null,
+                ) ?? "",
+                360,
+              ),
+              "",
+              "Open location 1",
+            ].join("\n")
+          : null);
+      if (renderedTerminal) {
+        finalText = renderedTerminal;
+        resolvedFinalStatus = "final_answer";
+        finalAnswerSource = "artifact_synthesis";
+        payload.response_type = "final_answer";
+        payload.text = finalText;
+        payload.answer = finalText;
+        payload.assistant_answer = finalText;
+        payload.selected_final_answer = finalText;
+        delete payload.terminal_error_code;
+      }
     }
     if (
       finalAnswerSource === "legacy_fallback" &&

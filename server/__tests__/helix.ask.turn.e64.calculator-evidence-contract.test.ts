@@ -27,25 +27,6 @@ describe("helix ask E64 equation-usable evidence contract", () => {
       })
       .expect(200);
 
-    console.error("E64 explicit debug", {
-      terminal: response.body?.terminal_artifact_kind,
-      error: response.body?.terminal_error_code,
-      answer: answerText(response.body),
-      query: response.body?.equation_attempt_debug?.retrieval_query_integrity?.generated_queries?.[0],
-      artifacts: ledger(response.body).map((artifact) => artifact?.kind),
-      candidates: response.body?.equation_attempt_debug?.equation_candidate_validation?.candidates,
-      search: response.body?.doc_search_results ?? response.body?.retrieval_debug,
-      steps: response.body?.step_results?.map((step: any) => ({
-        id: step.step_id,
-        status: step.status,
-        action: step.artifact?.action_id,
-        expected: step.expected_artifacts,
-        actual: step.actual_artifacts,
-        result: step.result_artifact?.kind,
-        fail: step.contract_fail_reason,
-      })),
-    });
-
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_equation_location");
     expect(response.body?.terminal_artifact_kind).toBe("doc_equation_location");
     expect(answerText(response.body)).toMatch(/Equation-bearing source:/i);
@@ -69,23 +50,6 @@ describe("helix ask E64 equation-usable evidence contract", () => {
         sessionId: `e64-table-evidence-${Date.now()}`,
       })
       .expect(200);
-
-    console.error("E64 table debug", {
-      terminal: response.body?.terminal_artifact_kind,
-      error: response.body?.terminal_error_code,
-      answer: answerText(response.body),
-      artifacts: ledger(response.body).map((artifact) => artifact?.kind),
-      candidates: response.body?.equation_attempt_debug?.equation_candidate_validation?.candidates,
-      steps: response.body?.step_results?.map((step: any) => ({
-        id: step.step_id,
-        status: step.status,
-        action: step.artifact?.action_id,
-        expected: step.expected_artifacts,
-        actual: step.actual_artifacts,
-        result: step.result_artifact?.kind,
-        fail: step.contract_fail_reason,
-      })),
-    });
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_equation_location");
     expect(["doc_equation_location", "doc_calculator_evidence"]).toContain(response.body?.terminal_artifact_kind);

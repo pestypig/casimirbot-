@@ -8,6 +8,7 @@ describe("launchPanelPolicy", () => {
 
   it("includes situation room sources in the user launch panel list", () => {
     expect(isUserLaunchPanel("situation-room-sources")).toBe(true);
+    expect(isUserLaunchPanel("situation-room-pipelines")).toBe(true);
   });
 
   it("includes workstation clipboard and workflow timeline panels", () => {
