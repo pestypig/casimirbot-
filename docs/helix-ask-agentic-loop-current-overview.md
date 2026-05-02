@@ -7,6 +7,12 @@ This document is the current implementation map for the Helix Ask agentic loop a
 
 Companion execution handoff:
 - `docs/helix-ask-next-pass-instructions.md`
+- `docs/helix-ask-codex-loop-dedup-instructions-2026-05-02.md`
+
+2026-05-02 registry dedup finding:
+- Client dynamic tools are generated from `WORKSTATION_V1_PANEL_CAPABILITIES`, but backend turn planner candidates still use the static `WORKSTATION_DYNAMIC_TOOL_ACTIONS` list.
+- The static shared list does not cover every active Launch-panel job-ready surface (`workstation-workflow-timeline`, `agi-essence-console`, `agi-task-history`, `scientific-calculator`) and omits `docs-viewer.open_directory`.
+- Next backend work should unify the capability source before adding more agent-loop methodology.
 
 ## Codex-Clone Grounding (Methodology Baseline)
 The Helix loop is aligned to the proven codex app-server patterns:

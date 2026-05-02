@@ -1,0 +1,295 @@
+export type WorkstationDynamicToolRisk = "low" | "medium" | "high";
+
+export type WorkstationDynamicToolActionDefinition = {
+  panel_id: string;
+  action_id: string;
+  title?: string;
+  description?: string;
+  risk?: WorkstationDynamicToolRisk;
+  aliases?: string[];
+  required_args?: string[];
+  optional_args?: string[];
+  requires_confirmation?: boolean;
+  returns_artifact?: boolean;
+};
+
+export type WorkstationDynamicToolSpec = {
+  namespace: "workstation";
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  deferLoading: boolean;
+  risk: WorkstationDynamicToolRisk;
+  returns_artifact: boolean;
+  requires_confirmation: boolean;
+  panel_id: string;
+  action_id: string;
+  terminal_artifact_kind: string | null;
+  attachment_policy?: "manual_only";
+  context_injection?: "explicit_attachment_only";
+};
+
+export type WorkstationDynamicToolCallMapping =
+  | {
+      ok: true;
+      action: {
+        schema_version: "helix.workstation.action/v1";
+        action: "open_panel" | "focus_panel";
+        panel_id: string;
+      };
+    }
+  | {
+      ok: true;
+      action: {
+        schema_version: "helix.workstation.action/v1";
+        action: "run_panel_action";
+        panel_id: string;
+        action_id: string;
+        args?: Record<string, unknown>;
+      };
+    }
+  | {
+      ok: false;
+      reason: "unknown_tool" | "missing_required_args";
+      missing_required_args: string[];
+    };
+
+type PanelCapabilitiesLike = Record<
+  string,
+  {
+    actions: Array<{
+      id: string;
+      title?: string;
+      description?: string;
+      risk?: WorkstationDynamicToolRisk;
+      aliases?: string[];
+      required_args?: string[];
+      optional_args?: string[];
+      requires_confirmation?: boolean;
+      returns_artifact?: boolean;
+    }>;
+  }
+>;
+
+const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
+  "situation-room-pipelines.create_job",
+  "situation-room-pipelines.run_job",
+  "situation-room-pipelines.attach_job_to_helix_ask",
+]);
+
+export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
+  { panel_id: "docs-viewer", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "docs-viewer", action_id: "open_doc", required_args: ["path"], optional_args: ["anchor"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "open_doc_by_path", required_args: ["path"], optional_args: ["anchor"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", required_args: ["topic"], optional_args: ["path"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "search_docs", required_args: ["query"], optional_args: ["limit"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "validate_doc_candidates", required_args: ["query"], optional_args: ["limit"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "verify_active_doc", required_args: [], optional_args: [], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "open_doc_and_read", required_args: ["path"], optional_args: ["anchor"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "identify_current_doc", required_args: [], optional_args: [], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "locate_in_doc", required_args: ["query"], optional_args: ["path", "anchor"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "summarize_doc", required_args: [], optional_args: ["path", "anchor", "selected_text"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "summarize_section", required_args: [], optional_args: ["path", "anchor", "selected_text"], returns_artifact: true },
+  { panel_id: "docs-viewer", action_id: "explain_paper", required_args: [], optional_args: ["path", "anchor", "selected_text"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "workstation-notes", action_id: "create_note", required_args: [], optional_args: ["title", "topic", "body", "note_id"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "append_to_note", required_args: ["text"], optional_args: ["note_id", "title"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "set_active_note", required_args: [], optional_args: ["note_id", "title"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "rename_note", required_args: ["title"], optional_args: ["note_id", "from_title"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "delete_note", required_args: [], optional_args: ["note_id", "title", "confirmed"], requires_confirmation: true, returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "list_notes", required_args: [], optional_args: ["active_note_title", "title", "active_note_id", "note_id"], returns_artifact: true },
+  { panel_id: "workstation-clipboard-history", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "workstation-clipboard-history", action_id: "read_clipboard", required_args: [], optional_args: [], returns_artifact: true },
+  { panel_id: "workstation-clipboard-history", action_id: "write_clipboard", required_args: ["text"], optional_args: ["source"], returns_artifact: true },
+  { panel_id: "workstation-clipboard-history", action_id: "clear_history", required_args: [], optional_args: ["confirmed"], requires_confirmation: true, returns_artifact: true },
+  { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_clipboard", required_args: [], optional_args: ["receipt_id"], returns_artifact: true },
+  { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_note", required_args: [], optional_args: ["receipt_id", "note_id", "note_title"], returns_artifact: true },
+  { panel_id: "workstation-clipboard-history", action_id: "copy_selection_to_note", required_args: [], optional_args: ["note_id", "note_title"], returns_artifact: true },
+  { panel_id: "situation-room-sources", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "situation-room-sources", action_id: "attach_display_audio_source", required_args: [], optional_args: ["room_id", "label"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-sources", action_id: "save_room_as_note", required_args: [], optional_args: ["room_id"], returns_artifact: true },
+  { panel_id: "situation-room-sources", action_id: "attach_room_to_helix_ask", required_args: [], optional_args: ["room_id", "source_id"], returns_artifact: true },
+  { panel_id: "situation-room-sources", action_id: "stop_room", required_args: [], optional_args: ["room_id"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "create_job",
+    required_args: ["kind"],
+    optional_args: [
+      "room_id",
+      "source_ids",
+      "target_language",
+      "native_language",
+      "input_text_policy",
+      "output_render_policy",
+      "chunk_ranges",
+      "attachment_policy",
+      "context_injection",
+      "derived_outputs_auto_attach",
+      "command_lane_enabled",
+    ],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  { panel_id: "situation-room-pipelines", action_id: "run_job", required_args: ["job_id"], optional_args: [], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "attach_job_to_helix_ask", required_args: ["job_id"], optional_args: [], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "save_job_as_note", required_args: ["job_id"], optional_args: [], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "stop_job", required_args: ["job_id"], optional_args: [], risk: "medium", returns_artifact: true },
+];
+
+function normalizeIdentifier(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function argSchema(arg: string): Record<string, unknown> {
+  if (arg.endsWith("_ids") || arg === "source_ids") return { type: "array", items: { type: "string" } };
+  if (arg === "chunk_ranges") {
+    return {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          source_id: { type: "string" },
+          from_chunk: { type: "number" },
+          to_chunk: { type: "number" },
+        },
+        required: ["source_id", "from_chunk", "to_chunk"],
+      },
+    };
+  }
+  if (arg === "confirmed" || arg === "derived_outputs_auto_attach" || arg === "command_lane_enabled") {
+    return { type: "boolean" };
+  }
+  if (arg === "limit") return { type: "number" };
+  if (arg === "kind") return { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] };
+  if (arg === "input_text_policy") return { enum: ["transcript_text", "source_text_preferred", "source_text_only"] };
+  if (arg === "output_render_policy") return { enum: ["target_language", "native_language", "dual"] };
+  if (arg === "attachment_policy") return { enum: ["manual_only"] };
+  if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
+  return { type: "string" };
+}
+
+export function buildWorkstationToolName(panelId: string, actionId: string): string {
+  return `${normalizeIdentifier(panelId)}.${normalizeIdentifier(actionId)}`;
+}
+
+export function buildWorkstationToolInputSchema(action: WorkstationDynamicToolActionDefinition): Record<string, unknown> {
+  const required = action.required_args ?? [];
+  const optional = action.optional_args ?? [];
+  const properties: Record<string, unknown> = {};
+  for (const arg of [...required, ...optional]) properties[arg] = argSchema(arg);
+  return {
+    type: "object",
+    properties,
+    required,
+    additionalProperties: false,
+  };
+}
+
+export function resolveWorkstationToolTerminalArtifactKind(panelId: string, actionId: string): string | null {
+  if (actionId === "open") return "workspace_action_receipt";
+  if (panelId === "situation-room-sources") return "situation_room_context";
+  if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";
+  if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
+  if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
+  if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {
+    return "note_update_receipt";
+  }
+  if (panelId === "docs-viewer" && actionId !== "open") return "doc_context";
+  if (panelId === "workstation-clipboard-history" && actionId !== "open") return "clipboard_context";
+  return null;
+}
+
+export function buildWorkstationDynamicToolSpec(action: WorkstationDynamicToolActionDefinition): WorkstationDynamicToolSpec {
+  const key = `${action.panel_id}.${action.action_id}`;
+  const manualOnly = SITUATION_ROOM_MANUAL_ONLY_ACTIONS.has(key);
+  return {
+    namespace: "workstation",
+    name: buildWorkstationToolName(action.panel_id, action.action_id),
+    description:
+      action.description ??
+      `${action.action_id.replace(/_/g, " ")} on ${action.panel_id.replace(/-/g, " ")}.`,
+    inputSchema: buildWorkstationToolInputSchema(action),
+    deferLoading: action.panel_id.startsWith("situation-room") || action.panel_id === "docs-viewer",
+    risk: action.risk ?? "low",
+    returns_artifact: action.returns_artifact ?? action.action_id !== "open",
+    requires_confirmation: action.requires_confirmation ?? false,
+    panel_id: action.panel_id,
+    action_id: action.action_id,
+    terminal_artifact_kind: resolveWorkstationToolTerminalArtifactKind(action.panel_id, action.action_id),
+    ...(manualOnly
+      ? {
+          attachment_policy: "manual_only" as const,
+          context_injection: "explicit_attachment_only" as const,
+        }
+      : {}),
+  };
+}
+
+export function buildWorkstationDynamicTools(
+  actions: WorkstationDynamicToolActionDefinition[] = WORKSTATION_DYNAMIC_TOOL_ACTIONS,
+): WorkstationDynamicToolSpec[] {
+  return actions.map(buildWorkstationDynamicToolSpec);
+}
+
+export function buildWorkstationDynamicToolsFromCapabilities(
+  capabilities: PanelCapabilitiesLike,
+): WorkstationDynamicToolSpec[] {
+  const actions = Object.entries(capabilities).flatMap(([panelId, capability]) =>
+    capability.actions.map((action) => ({
+      panel_id: panelId,
+      action_id: action.id,
+      title: action.title,
+      description: action.description,
+      risk: action.risk,
+      aliases: action.aliases,
+      required_args: action.required_args ?? [],
+      optional_args: action.optional_args ?? [],
+      requires_confirmation: action.requires_confirmation,
+      returns_artifact: action.returns_artifact,
+    })),
+  );
+  return buildWorkstationDynamicTools(actions);
+}
+
+export function findWorkstationDynamicTool(
+  toolName: string,
+  tools: WorkstationDynamicToolSpec[] = buildWorkstationDynamicTools(),
+): WorkstationDynamicToolSpec | null {
+  const normalized = normalizeIdentifier(toolName);
+  return tools.find((tool) => normalizeIdentifier(tool.name) === normalized) ?? null;
+}
+
+export function mapWorkstationDynamicToolCallToAction(
+  toolName: string,
+  args: Record<string, unknown> | undefined,
+  tools: WorkstationDynamicToolSpec[] = buildWorkstationDynamicTools(),
+): WorkstationDynamicToolCallMapping {
+  const tool = findWorkstationDynamicTool(toolName, tools);
+  if (!tool) return { ok: false, reason: "unknown_tool", missing_required_args: [] };
+  const required = Array.isArray(tool.inputSchema.required) ? tool.inputSchema.required.filter((arg): arg is string => typeof arg === "string") : [];
+  const missing = required.filter((arg) => args?.[arg] === undefined || args?.[arg] === null || args?.[arg] === "");
+  if (missing.length > 0) {
+    return { ok: false, reason: "missing_required_args", missing_required_args: missing };
+  }
+  if (tool.action_id === "open") {
+    return {
+      ok: true,
+      action: {
+        schema_version: "helix.workstation.action/v1",
+        action: "open_panel",
+        panel_id: tool.panel_id,
+      },
+    };
+  }
+  return {
+    ok: true,
+    action: {
+      schema_version: "helix.workstation.action/v1",
+      action: "run_panel_action",
+      panel_id: tool.panel_id,
+      action_id: tool.action_id,
+      args,
+    },
+  };
+}

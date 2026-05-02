@@ -8,7 +8,7 @@
 centerlineAlpha = centerlineDtauDt = alpha.
 ```
 
-This creates an explicit test ladder from the confirmed full-pass anchor `stage1_centerline_alpha_0p995_v1` toward lower-alpha expected clocking targets such as `0p7000` and `0p5000`. The current lower-alpha rows remain diagnostic targets, not validated outcomes, unless their own fresh full-loop artifacts pass the promotion gates.
+This creates an explicit test ladder from the selected-profile clocking-law anchor `stage1_centerline_alpha_0p995_v1` toward lower-alpha expected clocking targets such as `0p7000` and `0p5000`. The current lower-alpha rows remain diagnostic targets, not validated outcomes, unless their own fresh full-loop artifacts pass the promotion gates.
 
 **Current anchor.** The current clocking anchor used by the sweep is:
 
@@ -45,8 +45,20 @@ fullLoopStateRaw = unavailable
 
 That means the present `0p7000` result is not a physics/gate failure yet. It is blocked earlier, at selected-transport runtime completion. The correct status is therefore:
 
+**Current artifact state.** The public/latest full-loop status should be read as review-level diagnostic evidence, not a blanket full-loop certified pass:
+
 ```text
-0p995 = confirmed full-pass anchor for the current clocking law
+full-loop latest overallState = review
+currentClaimTier = diagnostic
+highestPassingClaimTier = null
+representative blocking reasons = insufficient_provenance, policy_review_required
+0p7000 validationState = runtime_blocked
+0p7000 runtimeBlockingReason = selected_transport_timeout
+0p7000 fullLoopStateRaw = unavailable
+```
+
+```text
+0p995 = selected-profile clocking-law anchor; not a blanket full-loop certified pass
 0p7000 = expected frontier target, currently runtime-blocked
 0p5000 = deep exploratory 2x subjective-efficiency target, not validated
 ```
@@ -55,7 +67,7 @@ That means the present `0p7000` result is not a physics/gate failure yet. It is 
 
 ## Abstract
 
-**Abstract.** This document describes NHM2 as it existed in the historical baseline repository snapshot referenced by the original evidence artifacts and GitHub blob IDs used below, notably historical baseline commit `53fb0a498b38892df11cfa2831d95c2007c3c64a` in the cited paths. In repo terms, NHM2 currently comprises: a modeled mechanism layer centered on Casimir tiles and an amplification-to-mass proxy ladder; a solve-backed geometry/metric layer organized around a York-control-family proof pack and GR brick pipeline outputs; and a certified bounded output layer that publishes bounded local-comoving transport descriptors, a bounded local route-time segment extension, a target-coupled but assumption-bearing mission-time estimator/comparison, and a certified in-hull Eulerian-observer proper-acceleration profile. The repo can now answer, in bounded, contract-defined form only, the existence and magnitude of a solve-backed local shift-descriptor variation across a fixed local shell-cross sample family, a certified bounded cruise descriptor envelope for the descriptor norm `||beta_eff||`, explicitly not speed, a bounded local probe route-time worldline parameterization, explicitly not a target ETA, a target-coupled mission-time estimator and mission-time comparison where the current certified comparator is classical `tau=t`, and an in-hull Eulerian proper-acceleration profile, experienced acceleration only, not curvature gravity.
+**Historical baseline abstract.** This section preserves the original April 3 bounded-stack baseline framing. It describes NHM2 as it existed in the historical baseline repository snapshot referenced by the original evidence artifacts and GitHub blob IDs used below, notably historical baseline commit `53fb0a498b38892df11cfa2831d95c2007c3c64a` in the cited paths. In that historical baseline, NHM2 comprised: a modeled mechanism layer centered on Casimir tiles and an amplification-to-mass proxy ladder; a solve-backed geometry/metric layer organized around a York-control-family proof pack and GR brick pipeline outputs; and a certified bounded output layer that published bounded local-comoving transport descriptors, a bounded local route-time segment extension, a target-coupled but assumption-bearing mission-time estimator/comparison, and a certified in-hull Eulerian-observer proper-acceleration profile. The baseline repo could answer, in bounded, contract-defined form only, the existence and magnitude of a solve-backed local shift-descriptor variation across a fixed local shell-cross sample family, a certified bounded cruise descriptor envelope for the descriptor norm `||beta_eff||`, explicitly not speed, a bounded local probe route-time worldline parameterization, explicitly not a target ETA, a target-coupled mission-time estimator and mission-time comparison where the certified comparator was classical `tau=t`, and an in-hull Eulerian proper-acceleration profile, experienced acceleration only, not curvature gravity.
 
 What remains deferred is equally explicit in-repo: scalar/max-speed semantics; route-map ETA products; full route dynamics; speed-based SR/NR comparisons; any promotion of the mechanism lane into authoritative metric-source closure; and any global theorem-level closure on horizons or infinite-blueshift avoidance.
 
@@ -223,7 +235,7 @@ d_tau = alpha(t) dt
 tau = integral alpha(t) dt
 ```
 
-For the sweep's flat centerline target:
+For the sweep's flat centerline target under the frozen coordinate mission, frozen shift schedule, and declared observer semantics:
 
 ```text
 alpha(t) = alpha_constant
@@ -237,6 +249,8 @@ tau_expected(alpha)
   = alpha_constant * integral dt
   = alpha * coordinateTimeS
 ```
+
+This produces the expected centerline target. It is not a pass claim, and it is not a general worldline proper-time theorem for arbitrary coordinate motion or shift/lapse profiles.
 
 The corresponding expected bookkeeping quantities are:
 
@@ -255,7 +269,7 @@ where:
 T = 137755965.9171795 s
 ```
 
-**Anchor coherence solve.** For the confirmed `0p995` anchor:
+**Anchor coherence solve.** For the selected-profile `0p995` clocking-law anchor:
 
 ```text
 properTimeS_expected
@@ -340,7 +354,7 @@ This is the clean 2x subjective-efficiency target, but it remains deep explorato
 **Ladder grouping and progression strategy.** The currently meaningful groups are:
 
 ```text
-confirmed / revalidation ladder: 0p995 -> 0p7300
+selected-anchor / revalidation ladder: 0p995 -> 0p7300
 frontier bisection ladder: 0p7250 -> 0p7000
 deep exploratory ladder: 0p6500 -> 0p5000
 ```
@@ -401,6 +415,17 @@ Alpha Centauri mission-time answer: Under the repo's bounded estimator assumptio
 
 This matters because NHM2's certified bounded claims are only as strong as their reproducible provenance. The repo takes a strict stance: certification is tied to contract surfaces, checksums, and explicit evidence-state labels, and the manifest is the anchor for external auditing of latest.
 
+**May 2 artifact reproducibility boundary.** The May 2 alpha-sweep and frontier-distance JSONs are generated workspace artifacts. In this local workspace they are present under:
+
+```text
+artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-lapse-alpha-sweep-latest.json
+artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-frontier-distance-latest.json
+```
+
+Unless those generated JSONs are separately committed and published, community-facing review should treat the markdown summary as documenting the local/generated artifact state rather than assuming every underlying JSON surface is publicly fetchable from GitHub.
+
+**Source-closure status boundary.** Current source closure should stay review-level and nuanced. Global diagonal source closure is numerically tight under the current v2 comparison, including reported `relLInf = 4.6143808140791624e-10` in the reviewed artifact stream, while regional direct `T00` comparison remains diagnostic-only because the needed regional tile-effective counterpart is not authoritative. The source-closure status therefore still carries review-level caveats such as `region_basis_diagnostic_only` and `assumption_drift`; it should not be summarized as fully solved without those qualifiers.
+
 **What stronger NHM2 claims would mathematically require.** This section is intentionally a boundary statement, not a roadmap pitch.
 
 Scalar speed semantics would require a contract that defines a physically meaningful speed observable in a specified reference frame, including asymptotic or external reference conditions, and demonstrates how the shift/lapse/metric relate to that speed without relying on coordinate velocity fixed to zero by chart choice. The current worldline contract explicitly refuses speed meaning, `certifiedSpeedMeaning: false`, and therefore cannot be extended by interpretation alone.
@@ -419,7 +444,9 @@ Stronger horizon/blueshift closure would require a global optical/causal analysi
 
 **What the repo still cannot claim.** The repo still cannot claim, because it explicitly forbids claiming: any scalar max speed; any ship-speed mapping from `||beta_eff||`; any route-map ETA; any full route dynamics; any speed-based SR/NR comparison; any curvature-gravity or comfort/safety certification; any viability promotion; any mechanism-to-metric closure; and any theorem-level no-horizon/no-infinite-blueshift result. These are not conservative interpretations; they are encoded as boundary statements, non-claims, and deferred comparator lists within the certified artifacts and audits.
 
-**Final conclusion.** NHM2, as of the repo state reflected in the published bounded proof surfaces dated 2026-04-03 and the later centerline-lapse sweep framework present by 2026-05-02, is best described as a bounded, solve-backed local transport diagnostic, publication discipline, and fail-closed lapse-clock frontier framework, not as a certified warp-speed or mission-ETA system. Its mechanism layer is richly modeled and provenance-controlled, Casimir tile baseline plus material bands plus amplification ladder plus mass proxy with explicit `massMode`, but the repo's own congruence audit classifies that mechanism side as reduced-order/proxy and not promoted into authoritative metric closure. Its original bounded solve-backed metric/geometry layer produces a small-amplitude mild regime in which the certified observer-derived outputs coherently report `||beta_eff|| ~ 10^-15`, `dtau/dt=1`, zero mission-time differential on the current comparator basis, and zero in-hull Eulerian proper acceleration, while explicitly forbidding any stronger inference. Its newer lapse-clock branch preserves the same fail-closed discipline while using `stage1_centerline_alpha_0p995_v1` as a confirmed full-pass clocking anchor and computing lower-alpha expected targets, including `0p7000` at approximately `1.428571429x` subjective efficiency and `0p5000` at `2.000000000x`, without promoting them unless their own fresh full-loop artifacts pass. The current operational frontier is `stage1_centerline_alpha_0p7000_v1`, blocked at selected transport with `fullLoopStateRaw=unavailable`; therefore, the next scientific closure issue is twofold: recover selected-transport runtime completion for the lapse ladder, and continue making low-expansion / Natario-like classification falsifiable on a single authoritative brick-native surface, so that morphology and clocking labels remain tightly coupled to the solver-authoritative fields they purport to describe.
+**Final conclusion.** NHM2, as of the repo state reflected in the published bounded proof surfaces dated 2026-04-03 and the later centerline-lapse sweep framework present by 2026-05-02, is best described as a bounded, solve-backed local transport diagnostic, publication discipline, and fail-closed lapse-clock frontier framework, not as a certified warp-speed or mission-ETA system. Its mechanism layer is richly modeled and provenance-controlled, Casimir tile baseline plus material bands plus amplification ladder plus mass proxy with explicit `massMode`, but the repo's own congruence audit classifies that mechanism side as reduced-order/proxy and not promoted into authoritative metric closure. Its original bounded solve-backed metric/geometry layer produces a small-amplitude mild regime in which the certified observer-derived outputs coherently report `||beta_eff|| ~ 10^-15`, `dtau/dt=1`, zero mission-time differential on the current comparator basis, and zero in-hull Eulerian proper acceleration, while explicitly forbidding any stronger inference. Its newer lapse-clock branch preserves the same fail-closed discipline while using `stage1_centerline_alpha_0p995_v1` as a selected-profile clocking-law anchor and computing lower-alpha expected targets, including `0p7000` at approximately `1.428571429x` subjective efficiency and `0p5000` at `2.000000000x`, without promoting them unless their own fresh full-loop artifacts pass. The current operational frontier is `stage1_centerline_alpha_0p7000_v1`, blocked at selected transport with `fullLoopStateRaw=unavailable`; therefore, the next scientific closure issue is twofold: recover selected-transport runtime completion for the lapse ladder, and continue making low-expansion / Natario-like classification falsifiable on a single authoritative brick-native surface, so that morphology and clocking labels remain tightly coupled to the solver-authoritative fields they purport to describe.
+
+
 
 
 
