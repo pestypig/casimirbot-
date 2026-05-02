@@ -13,6 +13,27 @@ export type WorkstationDynamicToolActionDefinition = {
   returns_artifact?: boolean;
 };
 
+export type WorkspaceActionRegistryEntry = {
+  action_key: string;
+  family:
+    | "panel_control"
+    | "docs_viewer"
+    | "notes"
+    | "clipboard"
+    | "situation_room"
+    | "timeline"
+    | "task_history"
+    | "calculator"
+    | "console";
+  target_id: string;
+  action_id: string;
+  label: string;
+  aliases: string[];
+  terminal_receipt_required: true;
+  source: "static_registry" | "desktop_panel_manifest" | "shared_dynamic_tool_registry";
+  enabled: boolean;
+};
+
 export type WorkstationDynamicToolSpec = {
   namespace: "workstation";
   name: string;
@@ -79,6 +100,22 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
 
 export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
   { panel_id: "docs-viewer", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "docs-viewer",
+    action_id: "open_directory",
+    title: "Open docs directory",
+    description: "Open the Docs & Papers panel and show the document directory.",
+    aliases: [
+      "show the docs directory",
+      "open docs directory",
+      "show document directory",
+      "open document tree",
+      "show docs tree",
+      "open papers directory",
+    ],
+    required_args: [],
+    optional_args: [],
+  },
   { panel_id: "docs-viewer", action_id: "open_doc", required_args: ["path"], optional_args: ["anchor"], returns_artifact: true },
   { panel_id: "docs-viewer", action_id: "open_doc_by_path", required_args: ["path"], optional_args: ["anchor"], returns_artifact: true },
   { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", required_args: ["topic"], optional_args: ["path"], returns_artifact: true },
@@ -135,6 +172,130 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "attach_job_to_helix_ask", required_args: ["job_id"], optional_args: [], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "save_job_as_note", required_args: ["job_id"], optional_args: [], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "stop_job", required_args: ["job_id"], optional_args: [], risk: "medium", returns_artifact: true },
+  { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "scientific-calculator", action_id: "open", required_args: [], optional_args: [] },
+];
+
+export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
+  {
+    action_key: "docs-viewer.open",
+    family: "docs_viewer",
+    target_id: "docs-viewer",
+    action_id: "open",
+    label: "Docs & Papers",
+    aliases: ["open the docs and papers panel", "open docs viewer", "show docs and papers"],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "docs-viewer.open_directory",
+    family: "docs_viewer",
+    target_id: "docs-viewer",
+    action_id: "open_directory",
+    label: "Docs Directory",
+    aliases: [
+      "show the docs directory",
+      "open docs directory",
+      "show document directory",
+      "open document tree",
+      "show docs tree",
+      "open papers directory",
+    ],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "workstation-notes.open",
+    family: "notes",
+    target_id: "workstation-notes",
+    action_id: "open",
+    label: "Workstation Notes",
+    aliases: ["open workstation notes", "show notes", "open my notes"],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "workstation-clipboard-history.open",
+    family: "clipboard",
+    target_id: "workstation-clipboard-history",
+    action_id: "open",
+    label: "Clipboard History",
+    aliases: ["open clipboard history", "show clipboard history", "open clipboard"],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "situation-room-sources.open",
+    family: "situation_room",
+    target_id: "situation-room-sources",
+    action_id: "open",
+    label: "Situation Room Sources",
+    aliases: ["open situation room sources", "show situation room sources", "open room sources"],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "situation-room-pipelines.open",
+    family: "situation_room",
+    target_id: "situation-room-pipelines",
+    action_id: "open",
+    label: "Situation Room Pipelines",
+    aliases: ["open situation room pipelines", "show situation room pipelines", "open room pipelines"],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "workstation-workflow-timeline.open",
+    family: "timeline",
+    target_id: "workstation-workflow-timeline",
+    action_id: "open",
+    label: "Workflow Timeline",
+    aliases: ["open workflow timeline", "show workflow timeline", "open workstation workflow timeline"],
+    terminal_receipt_required: true,
+    source: "desktop_panel_manifest",
+    enabled: true,
+  },
+  {
+    action_key: "agi-essence-console.open",
+    family: "console",
+    target_id: "agi-essence-console",
+    action_id: "open",
+    label: "Essence Console",
+    aliases: ["open essence console", "open helix console", "show essence console"],
+    terminal_receipt_required: true,
+    source: "desktop_panel_manifest",
+    enabled: true,
+  },
+  {
+    action_key: "agi-task-history.open",
+    family: "task_history",
+    target_id: "agi-task-history",
+    action_id: "open",
+    label: "Task History",
+    aliases: ["open task history", "show task history", "open agi task history"],
+    terminal_receipt_required: true,
+    source: "desktop_panel_manifest",
+    enabled: true,
+  },
+  {
+    action_key: "scientific-calculator.open",
+    family: "calculator",
+    target_id: "scientific-calculator",
+    action_id: "open",
+    label: "Scientific Calculator",
+    aliases: ["open scientific calculator", "show scientific calculator", "open calculator"],
+    terminal_receipt_required: true,
+    source: "desktop_panel_manifest",
+    enabled: true,
+  },
 ];
 
 function normalizeIdentifier(value: string): string {
@@ -188,6 +349,7 @@ export function buildWorkstationToolInputSchema(action: WorkstationDynamicToolAc
 
 export function resolveWorkstationToolTerminalArtifactKind(panelId: string, actionId: string): string | null {
   if (actionId === "open") return "workspace_action_receipt";
+  if (panelId === "docs-viewer" && actionId === "open_directory") return "workspace_action_receipt";
   if (panelId === "situation-room-sources") return "situation_room_context";
   if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";

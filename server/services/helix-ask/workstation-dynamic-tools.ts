@@ -1,5 +1,6 @@
 export {
   WORKSTATION_DYNAMIC_TOOL_ACTIONS,
+  WORKSPACE_ACTION_REGISTRY,
   buildWorkstationDynamicTools,
   buildWorkstationDynamicToolSpec,
   buildWorkstationToolInputSchema,
@@ -7,6 +8,7 @@ export {
   findWorkstationDynamicTool,
   mapWorkstationDynamicToolCallToAction,
   resolveWorkstationToolTerminalArtifactKind,
+  type WorkspaceActionRegistryEntry,
   type WorkstationDynamicToolActionDefinition,
   type WorkstationDynamicToolCallMapping,
   type WorkstationDynamicToolSpec,

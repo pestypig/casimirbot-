@@ -42,6 +42,7 @@ import {
   type VoiceCommandLaneEnvelope,
   type ToolLogEvent,
 } from "@/lib/agi/api";
+import { buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog";
@@ -9374,6 +9375,13 @@ function buildReplyMasterEventClockExport(args: {
     pending_server_request_present: visibleResolvedTurn.pending_server_request_present,
     violations: visibleProjectionViolations,
   };
+  const workstationLayoutDebugSnapshot = readWorkstationLayoutDebugSnapshot();
+  const workspaceActionClientAck = buildWorkspaceActionClientAckSnapshot({
+    artifactLedger: args.reply.debug?.current_turn_artifact_ledger,
+    openPanels: Array.isArray(workstationLayoutDebugSnapshot.openPanels)
+      ? workstationLayoutDebugSnapshot.openPanels.filter((panelId): panelId is string => typeof panelId === "string")
+      : [],
+  });
 
   const payload = {
     schema: "helix.ask.master_event_clock.v2",
@@ -9416,6 +9424,8 @@ function buildReplyMasterEventClockExport(args: {
       attemptIds: [...attemptIds],
     },
     debugContext: args.debugContext,
+    workstationLayout: workstationLayoutDebugSnapshot,
+    workspace_action_client_ack: workspaceActionClientAck,
     debug: args.reply.debug ?? null,
     resolved_turn_summary: resolvedTurnSummary,
     route_history_debug: routeHistoryDebug,
@@ -9522,6 +9532,7 @@ function buildReplyMasterEventClockExport(args: {
       current_turn_artifact_ledger: Array.isArray(args.reply.debug?.current_turn_artifact_ledger)
         ? args.reply.debug.current_turn_artifact_ledger
         : [],
+      workspace_action_client_ack: workspaceActionClientAck,
       equation_attempt_debug: readAgentLoopAuditRecord(
         args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
       ),
@@ -23720,9 +23731,9 @@ export function HelixAskPill({
         ? coerceWorkstationActionFromIntentDecision(deterministicManualDecision)
         : null;
       const clientOwnedCalculatorAction =
-        ((deterministicManualAction?.action === "run_panel_action" ||
-          deterministicManualAction?.action === "open_panel") &&
-          deterministicManualAction.panel_id === "scientific-calculator")
+        deterministicManualAction?.action === "run_panel_action" &&
+          deterministicManualAction.panel_id === "scientific-calculator" &&
+          deterministicManualAction.action_id !== "open"
           ? deterministicManualAction
           : null;
       if (clientOwnedCalculatorAction) {
