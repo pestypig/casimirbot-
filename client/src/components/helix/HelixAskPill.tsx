@@ -42,7 +42,7 @@ import {
   type VoiceCommandLaneEnvelope,
   type ToolLogEvent,
 } from "@/lib/agi/api";
-import { buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
+import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog";
@@ -9376,11 +9376,41 @@ function buildReplyMasterEventClockExport(args: {
     violations: visibleProjectionViolations,
   };
   const workstationLayoutDebugSnapshot = readWorkstationLayoutDebugSnapshot();
+  const currentTurnArtifactLedger = Array.isArray(args.reply.debug?.current_turn_artifact_ledger)
+    ? args.reply.debug.current_turn_artifact_ledger
+    : [];
   const workspaceActionClientAck = buildWorkspaceActionClientAckSnapshot({
-    artifactLedger: args.reply.debug?.current_turn_artifact_ledger,
+    artifactLedger: currentTurnArtifactLedger,
     openPanels: Array.isArray(workstationLayoutDebugSnapshot.openPanels)
       ? workstationLayoutDebugSnapshot.openPanels.filter((panelId): panelId is string => typeof panelId === "string")
       : [],
+  });
+  const firstWorkspaceActionReceipt = currentTurnArtifactLedger
+    .map((artifact) => readAgentLoopAuditRecord(artifact))
+    .find((artifact) => artifact?.kind === "workspace_action_receipt");
+  const firstWorkspaceActionReceiptPayload = readAgentLoopAuditRecord(firstWorkspaceActionReceipt?.payload);
+  const firstWorkspaceActionKey =
+    typeof firstWorkspaceActionReceiptPayload?.action_key === "string"
+      ? firstWorkspaceActionReceiptPayload.action_key
+      : null;
+  const backendTurnStarted = Boolean(
+    debugRecord?.turn_id ||
+      debugRecord?.turnId ||
+      debugRecord?.canonical_goal_frame ||
+      turnTruthTable ||
+      args.reply.debug?.planner_contract,
+  );
+  const localActionFastPathAttempted =
+    normalizeTerminalAnswerText(visibleAnswerText) === normalizeTerminalAnswerText("Executed workstation action.") &&
+    !backendTurnStarted;
+  const helixAskClientBypassAudit = buildHelixAskClientBypassAudit({
+    prompt: args.reply.question ?? "",
+    activeTurnId: visibleResolvedTurn.active_turn_id ?? (typeof debugRecord?.turn_id === "string" ? debugRecord.turn_id : null),
+    localActionFastPathAttempted,
+    backendTurnStarted,
+    actionKey: firstWorkspaceActionKey,
+    selectedFinalAnswer: visibleResolvedTurn.selected_final_answer || visibleAnswerText,
+    hasWorkspaceActionReceipt: Boolean(firstWorkspaceActionReceipt),
   });
 
   const payload = {
@@ -9426,6 +9456,7 @@ function buildReplyMasterEventClockExport(args: {
     debugContext: args.debugContext,
     workstationLayout: workstationLayoutDebugSnapshot,
     workspace_action_client_ack: workspaceActionClientAck,
+    helix_ask_client_bypass_audit: helixAskClientBypassAudit,
     debug: args.reply.debug ?? null,
     resolved_turn_summary: resolvedTurnSummary,
     route_history_debug: routeHistoryDebug,
@@ -9533,6 +9564,7 @@ function buildReplyMasterEventClockExport(args: {
         ? args.reply.debug.current_turn_artifact_ledger
         : [],
       workspace_action_client_ack: workspaceActionClientAck,
+      client_bypass_audit: helixAskClientBypassAudit,
       equation_attempt_debug: readAgentLoopAuditRecord(
         args.reply.equation_attempt_debug ?? args.reply.debug?.equation_attempt_debug,
       ),

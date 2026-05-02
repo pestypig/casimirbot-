@@ -34,6 +34,22 @@ export type WorkspaceActionRegistryEntry = {
   enabled: boolean;
 };
 
+export type WorkspaceActionManifestEntry = Omit<WorkspaceActionRegistryEntry, "source"> & {
+  client_handler_key: string;
+  source: "desktop_panel_manifest" | "shared_dynamic_tool_registry" | "static_backstop";
+};
+
+export type WorkspaceActionRegistryAudit = {
+  manifest_version: string;
+  visible_panels: string[];
+  registry_targets: string[];
+  client_handlers: string[];
+  missing_from_registry: string[];
+  missing_client_handler: string[];
+  stale_registry_entries: string[];
+  verdict: "clean" | "warning" | "violation";
+};
+
 export type WorkstationDynamicToolSpec = {
   namespace: "workstation";
   name: string;
@@ -297,6 +313,85 @@ export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
     enabled: true,
   },
 ];
+
+export const WORKSPACE_ACTION_MANIFEST_VERSION = "e67.workspace-action-manifest.v1";
+
+export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
+  "docs-viewer",
+  "workstation-notes",
+  "workstation-clipboard-history",
+  "situation-room-sources",
+  "situation-room-pipelines",
+  "workstation-workflow-timeline",
+  "agi-essence-console",
+  "agi-task-history",
+  "scientific-calculator",
+] as const;
+
+export const WORKSPACE_ACTION_MANIFEST: WorkspaceActionManifestEntry[] = WORKSPACE_ACTION_REGISTRY.map((entry) => ({
+  action_key: entry.action_key,
+  family: entry.family,
+  target_id: entry.target_id,
+  action_id: entry.action_id,
+  label: entry.label,
+  aliases: entry.aliases,
+  terminal_receipt_required: entry.terminal_receipt_required,
+  client_handler_key: entry.action_key,
+  source: entry.source === "static_registry" ? "static_backstop" : entry.source,
+  enabled: entry.enabled,
+}));
+
+export const WORKSPACE_ACTION_CLIENT_HANDLER_KEYS = WORKSPACE_ACTION_MANIFEST.map((entry) => entry.client_handler_key);
+
+export function buildWorkspaceActionRegistryAudit(args?: {
+  visiblePanels?: readonly string[];
+  registry?: readonly WorkspaceActionRegistryEntry[];
+  manifest?: readonly WorkspaceActionManifestEntry[];
+  clientHandlers?: readonly string[];
+}): WorkspaceActionRegistryAudit {
+  const visiblePanels = [...(args?.visiblePanels ?? WORKSPACE_ACTION_VISIBLE_PANEL_IDS)];
+  const registry = [...(args?.registry ?? WORKSPACE_ACTION_REGISTRY)];
+  const manifest = [...(args?.manifest ?? WORKSPACE_ACTION_MANIFEST)];
+  const clientHandlers = [...(args?.clientHandlers ?? WORKSPACE_ACTION_CLIENT_HANDLER_KEYS)];
+  const enabledManifest = manifest.filter((entry) => entry.enabled);
+  const registryKeys = new Set(registry.filter((entry) => entry.enabled).map((entry) => entry.action_key));
+  const registryTargets = registry
+    .filter((entry) => entry.enabled)
+    .map((entry) => entry.action_key);
+  const manifestKeys = new Set(enabledManifest.map((entry) => entry.action_key));
+  const manifestTargets = new Set(enabledManifest.map((entry) => entry.target_id));
+  const clientHandlerKeys = new Set(clientHandlers);
+  const missingVisiblePanels = visiblePanels
+    .filter((panelId) => !manifestTargets.has(panelId))
+    .map((panelId) => `${panelId}.*`);
+  const missingManifestActions = enabledManifest
+    .filter((entry) => !registryKeys.has(entry.action_key))
+    .map((entry) => entry.action_key);
+  const missingClientHandler = enabledManifest
+    .filter((entry) => !clientHandlerKeys.has(entry.client_handler_key))
+    .map((entry) => entry.action_key);
+  const staleRegistryEntries = registry
+    .filter((entry) => entry.enabled && !manifestKeys.has(entry.action_key))
+    .map((entry) => entry.action_key);
+  const missingFromRegistry = [...missingVisiblePanels, ...missingManifestActions];
+  const verdict =
+    missingFromRegistry.length > 0 || missingClientHandler.length > 0
+      ? "violation"
+      : staleRegistryEntries.length > 0
+        ? "warning"
+        : "clean";
+
+  return {
+    manifest_version: WORKSPACE_ACTION_MANIFEST_VERSION,
+    visible_panels: visiblePanels,
+    registry_targets: registryTargets,
+    client_handlers: clientHandlers,
+    missing_from_registry: missingFromRegistry,
+    missing_client_handler: missingClientHandler,
+    stale_registry_entries: staleRegistryEntries,
+    verdict,
+  };
+}
 
 function normalizeIdentifier(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");

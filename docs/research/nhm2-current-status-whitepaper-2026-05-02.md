@@ -195,6 +195,142 @@ The cruise-envelope contract belongs to the certified bounded contract layer and
 
 Finally, the in-hull proper-acceleration contract belongs to the certified bounded contract layer but is grounded in the solve-backed metric/brick channel outputs and explicitly declares an observer family. The emitted artifact is `artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json`, contract `warp_in_hull_proper_acceleration/v1`. It reports experienced proper-acceleration magnitudes for a deterministic cabin-cross sample family for Eulerian observers, computed from brick-resolved Eulerian acceleration channels `a_geom_i = partial_i alpha / alpha` and converted to SI via `c^2`. The allowed conclusion is: under the current NHM2 constant-lapse regime, the in-hull Eulerian proper-acceleration profile is identically zero across the cabin-cross samples, with certified mode using direct brick channels and `fallbackUsed=false`. The forbidden conclusion is any curvature-gravity claim and any comfort/safety certification.
 
+## From 3+1 full-tensor semantics to NHM2 observer closure
+
+### ADM variables and the same-chart observer
+
+The mathematical hinge of the current NHM2 whitepaper is the 3+1 observer split. In the ADM/Gourgoulhon grammar used here as formalism context, a spacetime metric is decomposed into lapse `alpha`, shift `beta^i`, spatial metric `gamma_ij`, and coordinate time `t`:
+
+\[
+ds^2 =
+-\alpha^2 dt^2
++
+\gamma_{ij}(dx^i+\beta^i dt)(dx^j+\beta^j dt).
+\]
+
+The Eulerian observer normal to the spatial slices is then:
+
+\[
+n_\mu=(-\alpha,0,0,0),
+\qquad
+n^\mu=(1/\alpha,-\beta^i/\alpha).
+\]
+
+The spatial projector associated with that same foliation is:
+
+\[
+\gamma^\mu{}_\nu=\delta^\mu{}_\nu+n^\mu n_\nu.
+\]
+
+This is the formal grammar NHM2 uses to define an observer family in the declared `comoving_cartesian` chart. Gourgoulhon supplies the formalism; he does not validate NHM2.
+
+### Eulerian projections: E, J_i, and S_ij
+
+Stress-energy is not treated as a diagonal component list when the metric requires observer-facing closure. In the 3+1 split, the same-chart observer reads the tensor through the Eulerian projection family:
+
+\[
+E=T_{\mu\nu}n^\mu n^\nu,
+\]
+
+\[
+J_i=-T_{\mu\nu}n^\mu\gamma^\nu{}_i,
+\]
+
+\[
+S_{ij}=T_{\mu\nu}\gamma^\mu{}_i\gamma^\nu{}_j.
+\]
+
+Here `E` is the Eulerian energy density, `J_i` is momentum density, and `S_ij` is spatial stress. This is the grammar NHM2 uses for metric-required full-tensor observer closure: `T00` maps to `E`, `T0i` maps to `J_i`, and `Tij` maps to `S_ij`, all in the declared same chart. Earlier diagonal-only producer evidence was therefore not enough to promote missing `T0i` or off-diagonal `Tij` claims by proxy.
+
+### Reconstructing T_{mu nu} from projected quantities
+
+Given same-chart projected quantities, the coordinate tensor components are reconstructed as:
+
+\[
+T_{ij}=S_{ij},
+\]
+
+\[
+T_{0i}=-\alpha J_i+\beta^jS_{ij},
+\]
+
+\[
+T_{00}=\alpha^2E-2\alpha\beta^iJ_i+\beta^i\beta^jS_{ij}.
+\]
+
+This reconstruction is admissible only when `E`, `J_i`, and `S_ij` come from the same underlying same-chart tensor or an equivalent same-chart route. It is not admissible to stitch diagonal placeholders, mixed-chart inferences, or proxy substitutions into a full observer claim.
+
+### Why diagonal-only stress-energy was insufficient
+
+The constraint bridge explains why a diagonal-only stress proxy was not enough. In standard 3+1 notation, the Hamiltonian and momentum constraints include:
+
+\[
+{}^{(3)}R+K^2-K_{ij}K^{ij}=16\pi E,
+\]
+
+\[
+D_jK^j{}_i-D_iK=8\pi J_i.
+\]
+
+The Hamiltonian constraint can ground `E` when the geometric terms, sign conventions, and unit conventions are admitted. The momentum constraint ties `J_i` to derivatives of `K_ij`, so momentum density is not recoverable from a diagonal pressure proxy by declaration. The spatial stress family `S_ij`, especially off-diagonal shear, generally requires either evolution information for `K_ij` or an equivalent full Einstein-tensor evaluation. This is why NHM2 moved from diagonal-only observer language toward a same-chart full-tensor route.
+
+### The selected Einstein-tensor route
+
+The selected NHM2 route is geometry-first. In geometric units:
+
+\[
+G_{\mu\nu}=8\pi T_{\mu\nu},
+\]
+
+so the same-chart metric route computes:
+
+\[
+T_{\mu\nu}^{\rm geom}=G_{\mu\nu}/(8\pi).
+\]
+
+After unit conversion where applicable, the repo projects that same-chart tensor into `E`, `J_i`, and `S_ij` and evaluates the observer surfaces from that tensor. The current artifact stack records the selected metric route with `observerMetricT00RouteId = einstein_tensor_geometry_fd4_v1`, `observerMetricEmissionAdmissionStatus = admitted`, `observerMetricT0iAdmissionStatus = derivable_same_chart_from_existing_state`, and `observerMetricOffDiagonalTijAdmissionStatus = derivable_same_chart_from_existing_state`.
+
+The claim boundary is narrow. The Einstein-tensor route is a repo-internal same-chart metric-evaluation route. It is not experimental validation, physical viability, or a theorem that arbitrary NHM2 profiles pass.
+
+### Observer energy-condition gates
+
+Once a same-chart tensor is available, the observer audit can evaluate observer-facing energy-condition surfaces. The weak energy condition is expressed as:
+
+\[
+T_{\mu\nu}u^\mu u^\nu\ge0
+\]
+
+for timelike `u^mu`. The null energy condition is:
+
+\[
+T_{\mu\nu}k^\mu k^\nu\ge0
+\]
+
+for null `k^mu`. The strong energy condition is:
+
+\[
+\left(T_{\mu\nu}-\frac{1}{2}Tg_{\mu\nu}\right)u^\mu u^\nu\ge0.
+\]
+
+The dominant energy condition additionally requires the energy flux measured by any timelike observer to be causal and future-directed. NHM2's observer audit is therefore not only checking a diagonal Eulerian sample on the selected route; it evaluates observer-facing energy-condition surfaces derived from a full same-chart tensor. The current artifacts report pass-level or admitted selected-path metric and tile observer states inside the artifact stack, but the top-level full-loop artifact remains review-level diagnostic rather than a blanket full-loop certified pass.
+
+### What this does and does not prove
+
+This section connects accepted 3+1 formalism to NHM2's repository-specific tensor grammar. It does not convert literature context into NHM2 validation.
+
+The required claim boundaries are:
+
+```text
+Gourgoulhon supplies the formalism; he does not validate NHM2.
+The Einstein-tensor route is a repo-internal same-chart metric-evaluation route.
+The selected-profile clocking-law anchor is not a blanket full-loop certified pass.
+Lower-alpha rows remain expected targets until their own fresh artifacts pass.
+Source closure remains globally tight but review-level because of diagnostic-only regional T00 and assumption drift.
+The whitepaper must not claim physical viability, experimental validation, route ETA, max speed, black-hole operation, or arbitrary external-field operation.
+```
+
+Literature citations therefore carry limited roles: ADM and Gourgoulhon provide 3+1 foliation, lapse, shift, normal, projection, and constraint formalism; Alcubierre and Natario provide warp-metric context; Pfenning-Ford, Fewster-Roman, and Santiago-Schuster-Visser provide energy-condition and negative-energy caution context. Repository artifacts remain the only source for NHM2 pass, review, runtime, and frontier status.
+
 ## Why the mission-time comparison is zero and what that means
 
 **Why the current mission-time comparison is exactly zero.** The mission-time comparison's exact-zero outcome is not an omission; it is the mathematically consistent result of the chosen comparator semantics and the mild regime captured in the worldline and route-time contracts.
@@ -225,10 +361,23 @@ Gourgoulhon, 3+1 Formalism and Bases of Numerical Relativity: https://arxiv.org/
 Alcubierre, The warp drive: https://arxiv.org/abs/gr-qc/0009013
 Natario, Warp Drive With Zero Expansion: https://arxiv.org/abs/gr-qc/0110086
 Pfenning and Ford, The unphysical nature of Warp Drive: https://arxiv.org/abs/gr-qc/9702026
+Fewster and Roman, Null energy conditions in quantum field theory: https://arxiv.org/abs/gr-qc/0209036
 Santiago, Schuster, Visser, Generic warp drives violate the null energy condition: https://arxiv.org/abs/2105.03079
 ```
 
-**Step-by-step clocking derivation.** The sweep uses a centerline proper-time integral:
+**Step-by-step clocking derivation.** Start from the worldline normalization in the same 3+1 language:
+
+\[
+(d\tau/dt)^2=\alpha^2-\gamma_{ij}(v^i+\beta^i)(v^j+\beta^j).
+\]
+
+For the NHM2 sweep's frozen coordinate mission, frozen shift schedule, and declared centerline observer semantics, the centerline target is:
+
+\[
+d\tau/dt=\alpha_{\rm centerline}.
+\]
+
+The sweep therefore uses a centerline proper-time integral:
 
 ```text
 d_tau = alpha(t) dt
@@ -242,6 +391,10 @@ alpha(t) = alpha_constant
 ```
 
 Therefore:
+
+\[
+\tau_{\rm expected}(\alpha)=\alpha T.
+\]
 
 ```text
 tau_expected(alpha)

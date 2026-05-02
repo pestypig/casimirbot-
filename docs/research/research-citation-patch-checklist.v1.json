@@ -152,6 +152,19 @@
       "url": "https://arxiv.org/abs/gr-qc/9702026"
     },
     {
+      "id": "fewster_roman_2002_null_energy_conditions",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "Null energy conditions in quantum field theory",
+      "supportsClaimIds": [
+        "claim_future_mechanism_closure_hypothesis"
+      ],
+      "accessedOn": "2026-05-02",
+      "confidenceNote": "Energy-condition and quantum-field-theory caution context; does not certify NHM2 outputs.",
+      "url": "https://arxiv.org/abs/gr-qc/0209036"
+    },
+    {
       "id": "van_den_broeck_1999_natario_scaling",
       "type": "paper",
       "evidenceType": "preprint",
