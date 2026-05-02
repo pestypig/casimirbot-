@@ -1,11 +1,13 @@
 # NHM2 Lapse Alpha Sweep Status
 
-- generatedAt: 2026-04-28T18:08:35.297Z
+- generatedAt: 2026-05-02T17:16:42.275Z
 - sweepName: nhm2-centerline-lapse-efficiency-sweep-v1
 - firstFailureProfileId: stage1_centerline_alpha_0p7000_v1
 - strongestPassingProfileId: null
 - dominantFailureGate: baselineInvariance
 - summaryJson: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\nhm2-lapse-alpha-sweep-latest.json
+- frontierDistanceJson: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\nhm2-frontier-distance-latest.json
+- frontierDistanceReport: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\docs\research\nhm2-frontier-distance-report.md
 - failuresJson: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\nhm2-lapse-alpha-sweep-failures-latest.json
 - claimsJson: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\nhm2-lapse-alpha-sweep-claims-latest.json
 - claimPromotionReportJson: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\research\full-solve\selected-family\nhm2-shift-lapse\alpha-sweep\nhm2-claim-promotion-report-latest.json
@@ -37,6 +39,7 @@
 - santiago-schuster-visser-2021-210503079: Generic warp drives violate the null energy condition (https://arxiv.org/abs/2105.03079)
 - natario-closer-look-2024-springer: A Closer Look at Natario's Zero-Expansion Warp Drive (https://link.springer.com/article/10.1007/s10773-024-05700-0)
 - natario-closer-look-2025-arxiv2512: A Closer Look at Natario's Zero-Expansion Warp Drive (https://arxiv.org/abs/2512.19837)
+- adm-2004-grqc0405109: The Dynamics of General Relativity (https://arxiv.org/abs/gr-qc/0405109)
 
 ## Research Backing (Non-Proof)
 - stage1_centerline_alpha_0p7000_v1: pfenning-ford-1997-grqc9702026 [constraint_context] (https://arxiv.org/abs/gr-qc/9702026), fewster-roman-2003-prd-doi [constraint_context] (https://doi.org/10.1103/PhysRevD.67.044003), natario-closer-look-2024-springer [constraint_context] (https://link.springer.com/article/10.1007/s10773-024-05700-0)
