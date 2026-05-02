@@ -1,214 +1,80 @@
-# NHM2 Current Status in `pestypig/casimirbot-` as Implemented Today (Updated 2026-05-02)
-
-## 2026-05-02 current status addendum
-
-**Current implementation status.** This whitepaper was originally framed around the 2026-04-03 bounded NHM2 proof surfaces. As of the current local repo state, commit `3ed3408c36ae43367ea60204622e34751a523059`, the NHM2 work has advanced from a single bounded zero-differential mission-time comparison into a parameterized centerline-lapse sweep framework for the `nhm2-shift-lapse` family. The important change is methodological rather than promotional: the repo can now hold the same coordinate mission, same target-coupled schedule, same shift transport framing, and vary only the bounded centerline lapse dial,
-
-```text
-centerlineAlpha = centerlineDtauDt = alpha.
-```
-
-This creates an explicit test ladder from the selected-profile clocking-law anchor `stage1_centerline_alpha_0p995_v1` toward lower-alpha expected clocking targets such as `0p7000` and `0p5000`. The current lower-alpha rows remain diagnostic targets, not validated outcomes, unless their own fresh full-loop artifacts pass the promotion gates.
-
-**Current anchor.** The current clocking anchor used by the sweep is:
-
-```text
-profileId = stage1_centerline_alpha_0p995_v1
-centerlineAlpha = 0.995
-centerlineDtauDt = 0.995
-coordinateTimeS = 137755965.9171795
-properTimeS = 137067186.0875936
-properMinusCoordinateS = -688779.8295859098
-```
-
-This anchor is coherent with:
-
-```text
-properTimeS ~= alpha * coordinateTimeS
-properMinusCoordinateS ~= (alpha - 1) * coordinateTimeS
-```
-
-and therefore supports expected target calculations for lower alpha values. It does not, by itself, validate those lower-alpha profiles.
-
-**Artifact freshness.** The latest alpha-sweep summary and frontier-distance ledger available in this workspace were generated on `2026-05-02T17:16:42.266Z`; therefore the lower-alpha frontier status below is current to the May 2 artifact-generation run. That run recorded the blocker state and generated the frontier-distance ledger, but it was not a successful full validation of `0p7000`.
-
-**Current frontier.** The latest available alpha-sweep summary in this workspace reports one active controlled row:
-
-```text
-profileId = stage1_centerline_alpha_0p7000_v1
-centerlineAlpha = 0.7000
-validationState = runtime_blocked
-clockingTargetState = expected_not_validated
-runtimeBlockingReason = selected_transport_timeout
-fullLoopStateRaw = unavailable
-```
-
-That means the present `0p7000` result is not a physics/gate failure yet. It is blocked earlier, at selected-transport runtime completion. The correct status is therefore:
-
-**Current artifact state.** The public/latest full-loop status should be read as review-level diagnostic evidence, not a blanket full-loop certified pass:
-
-```text
-full-loop latest overallState = review
-currentClaimTier = diagnostic
-highestPassingClaimTier = null
-representative blocking reasons = insufficient_provenance, policy_review_required
-0p7000 validationState = runtime_blocked
-0p7000 runtimeBlockingReason = selected_transport_timeout
-0p7000 fullLoopStateRaw = unavailable
-```
-
-```text
-0p995 = selected-profile clocking-law anchor; not a blanket full-loop certified pass
-0p7000 = expected frontier target, currently runtime-blocked
-0p5000 = deep exploratory 2x subjective-efficiency target, not validated
-```
-
-**Current strategy.** The next scientifically meaningful progression is not to claim the full ladder, but to revalidate outward from the `0p995` anchor, recover selected transport at the `0p7000` frontier, and, if needed, bisect the interval between `0p7300` and `0p7000` using `0p7250`, `0p7200`, `0p7150`, `0p7100`, and `0p7050`. This converts the problem from a broad aspiration into a measured frontier search.
+﻿# NHM2 as a 3+1 Same-Chart Lapse-Shift Warp Metric Evaluation Framework
 
 ## Abstract
 
-**Historical baseline abstract.** This section preserves the original April 3 bounded-stack baseline framing. It describes NHM2 as it existed in the historical baseline repository snapshot referenced by the original evidence artifacts and GitHub blob IDs used below, notably historical baseline commit `53fb0a498b38892df11cfa2831d95c2007c3c64a` in the cited paths. In that historical baseline, NHM2 comprised: a modeled mechanism layer centered on Casimir tiles and an amplification-to-mass proxy ladder; a solve-backed geometry/metric layer organized around a York-control-family proof pack and GR brick pipeline outputs; and a certified bounded output layer that published bounded local-comoving transport descriptors, a bounded local route-time segment extension, a target-coupled but assumption-bearing mission-time estimator/comparison, and a certified in-hull Eulerian-observer proper-acceleration profile. The baseline repo could answer, in bounded, contract-defined form only, the existence and magnitude of a solve-backed local shift-descriptor variation across a fixed local shell-cross sample family, a certified bounded cruise descriptor envelope for the descriptor norm `||beta_eff||`, explicitly not speed, a bounded local probe route-time worldline parameterization, explicitly not a target ETA, a target-coupled mission-time estimator and mission-time comparison where the certified comparator was classical `tau=t`, and an in-hull Eulerian proper-acceleration profile, experienced acceleration only, not curvature gravity.
+This whitepaper presents NHM2 as a same-chart 3+1 lapse-shift metric-evaluation framework for studying bounded warp-like geometries in a fixed comoving Cartesian chart. The construction separates four layers: a mechanism-side Casimir-tile source model, a solve-backed shift-lapse geometry, a geometry-first Einstein-tensor stress-energy evaluator, and observer-facing energy-condition and timing diagnostics. The central mathematical move is to express the observer problem in the ADM/Gourgoulhon projection grammar: Eulerian energy density `E`, momentum density `J_i`, and spatial stress `S_ij` are defined on one foliation, reconstructed into `T_mu_nu` when needed, and tested against weak, null, strong, and dominant energy-condition surfaces. The current selected NHM2 clocking-law anchor uses a centerline lapse `alpha = 0.995`, giving the target relation `tau = alpha T` under a frozen coordinate mission and shift schedule. Lower-alpha profiles remain expected targets until their own repository-measured full-loop artifacts pass. The paper therefore claims a bounded, artifact-limited mathematical framework, not physical viability or experimental validation.
 
-What remains deferred is equally explicit in-repo: scalar/max-speed semantics; route-map ETA products; full route dynamics; speed-based SR/NR comparisons; any promotion of the mechanism lane into authoritative metric-source closure; and any global theorem-level closure on horizons or infinite-blueshift avoidance.
+## Executive scientific claim boundary
 
-The single narrowest remaining closure issue, in the repo's own falsification language, is the lack of a single brick-native, authoritative low-expansion gate, for example computed on the same authoritative surface as the solve/brick outputs rather than on any projected/constructed/proxy field, so that Natario-like low-expansion classification is falsifiable on the authoritative evolved fields and cannot silently drift into a projection-derived label.
+NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or validated lower-alpha profiles. Repository artifacts define which NHM2 rows are validated, review-level, diagnostic, runtime-blocked, or unsupported.
 
-## Introduction and scope framing
+The literature roles are intentionally narrow. Gourgoulhon / ADM provide formalism context, not NHM2 validation. Alcubierre / Natario provide warp-metric context, not NHM2 validation. Pfenning-Ford / Fewster-Roman / Santiago-Schuster-Visser provide limitation and energy-condition context, not NHM2 validation. Repository artifacts define NHM2 row status.
 
-**Introduction.** The purpose of this paper is to describe NHM2 as implemented in the repo today, using the repo's own contract surfaces and publication artifacts as the authoritative boundaries of what may be claimed. It is specifically not a feasibility advocacy document and not a status memo; it is a bottom-up description of definitions, modeling assumptions, and the precise way the implementation composes a modeled mechanism narrative, a solve-backed metric/geometry narrative, and certified bounded outputs. The critical discipline throughout is to keep these maturity layers distinct, so that a modeled mechanism parameter, even if numerically plausible, is never implicitly promoted into a solve-backed or certified mission claim. This is exactly the separation discipline repeatedly encoded in repo audits and bounded-stack boundary statements.
+The selected-profile clocking-law anchor is not a blanket full-loop certified pass. `0p7000` is runtime-blocked, not physics-failed. `0p5000` is exploratory, not validated. Source closure is globally diagonal-tight but review-level because of diagnostic-only regional `T00` and assumption drift. The Casimir source model is mechanism-side and not an experimentally grounded macroscopic stress-energy realization. Sector strobing modulates duty-averaged source strength; it is not a certified thrust law. `g` targets are local proper-acceleration targets in Earth-gravity units, not Lorentz gamma.
 
-**Mathematical and interpretive scope.** The repo's architecture, as expressed in the bounded-stack publication brief and in the code-and-evidence congruence audit, makes NHM2 a layered object rather than a single claim.
+## 1. Motivation and problem statement
 
-Modeled mechanism layer means: equations and parameterized ladders used to estimate a negative-energy budget and related proxies, tile-level vacuum energy models, hull tiling census, amplification multipliers, duty-cycle clamps, and mass proxies, including explicit provenance controls such as `massMode` and measured-force-inferred normalization. These are implemented in the Helix energy pipeline, `server/energy-pipeline.ts`, the Casimir modules, `modules/sim_core/static-casimir.ts`, `modules/core/physics-constants.ts`, and explicit mechanism documentation such as `docs/casimir-tile-mechanism.md`, `docs/mass-semantics.md`, and `docs/guarded-casimir-tile-code-mapped.md`.
+The scientific problem addressed here is narrower than a flight-ready warp-drive claim. NHM2 asks whether a bounded lapse-shift profile can be represented, evaluated, and audited in one declared chart with enough mathematical discipline that observer quantities, energy-condition surfaces, and centerline proper-time targets are not confused with coordinate artifacts or mechanism-side assumptions.
 
-Solve-backed metric/geometry layer means: quantities derived from a solver-authoritative surface, the brick pipeline and the York control family proof pack, including ADM/York-style derived channels. The repo's congruence audit is explicit that the GR pipeline exists and exports channels such as `theta = -trK`, `grad(alpha)`, and Eulerian acceleration `a_i ~ partial_i alpha / alpha`, and that Natario-like language is encoded via low-expansion/divergence checks and related diagnostics.
+That problem has three recurring failure modes. First, a shift vector can be misread as an ordinary ship speed. Second, a diagonal stress-energy proxy can be mistaken for a full observer tensor. Third, an expected clocking law such as `tau = alpha T` can be mistaken for a validated route result. The whitepaper is structured to prevent those errors: accepted equations first, NHM2 instantiation second, computation/evidence surfaces third, and artifact status last.
 
-Observer-derived quantity layer means: quantities defined only after selecting an observer family and chart semantics, for example Eulerian cabin observers in a comoving Cartesian chart, or ship-centerline local-comoving, and then computing `dtau/dt`, proper acceleration, and related quantities from solve-backed fields. This layer is explicit in the `warpWorldline` artifact and in the in-hull acceleration artifact: both name their chart and observer family and state what is being interpreted as experienced versus coordinate quantity.
+The implementation records calculations through repository artifacts. Those artifacts are not the theory itself; they are the evidence surfaces used to determine which NHM2 rows are admitted, review-level, diagnostic, runtime-blocked, or unsupported.
 
-Certified bounded contract layer means: JSON artifacts produced by specific contracts under explicit boundary statements and falsifiers, then published as latest proof surfaces and recorded in the proof-surface manifest. This includes the contracts in `shared/contracts/*` and the emitted artifacts in `artifacts/research/full-solve/*-latest.json`.
+## 2. Accepted mathematical background
 
-Publication/provenance layer means: deterministic publication semantics, `bounded_stack_latest_sequential_single_writer`, checksums, evidence-state labels, and explicit statements that provenance hardening does not widen physics claims.
+### 2.1 ADM / 3+1 foliation
 
-Within this scope, the repo also explicitly enumerates what is out of scope for current NHM2 proofs: any scalar max-speed claim; any unconstrained route-map ETA; any full route dynamics; any speed-based SR/NR comparison; any curvature gravity claim; any comfort/safety certification; and any viability promotion. These exclusions are not rhetorical; they are encoded in multiple boundary statements and contract non-claims.
-
-## Casimir tile mechanism and amplification ladder
-
-**Casimir tile mechanism from first principles.** In the repo, a tile is a unit negative-energy mechanism element, implemented as a Casimir cavity geometry plus guardrails, whose modeled per-tile energy can be aggregated across a hull tiling census to form a static budget and then fed into an amplification ladder. The mechanism note `docs/casimir-tile-mechanism.md` explicitly frames the pipeline as per-tile vacuum energy plus hull tiling plus static budget plus amplification ladder plus mass proxy via `E/c^2`, and ties those steps to the live code paths `modules/core/physics-constants.ts`, `modules/sim_core/static-casimir.ts`, and `server/energy-pipeline.ts`.
-
-At the bottom of that stack is the canonical idealized parallel-plate Casimir energy density relation, which the repo treats as the baseline static Casimir branch and then layers material corrections on top:
+The ADM / 3+1 split writes the metric in terms of lapse `alpha`, shift `beta^i`, spatial metric `gamma_ij`, and coordinate time `t`:
 
 \[
-\frac{E}{A} = -\frac{\pi^2 \hbar c}{720 a^3}.
+ds^2 = -\alpha^2 dt^2 + \gamma_{ij}(dx^i+\beta^i dt)(dx^j+\beta^j dt).
 \]
 
-This appears in repo documentation as the canonical per-area result used by the pipeline and the static Casimir module, with constants `hbar` and `c` explicitly encoded in `modules/core/physics-constants.ts` and used algebraically through a derived constant `HBAR_C`, `PHYSICS_CONSTANTS.HBAR_C`, and a prefactor `pi^2/720`, `PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR`.
+The lapse controls normal separation between neighboring slices, the shift describes how spatial coordinates slide from one slice to the next, and `gamma_ij` is the spatial metric intrinsic to a slice. NHM2 uses this grammar because it lets timing, transport descriptors, and observer projections be stated in one chart instead of mixing coordinate component claims across incompatible frames.
 
-The implemented static module `modules/sim_core/static-casimir.ts` makes the conversion from UI/pipeline units explicit: gap `a` is supplied in nanometers and converted to meters via `NM_TO_M`, and tile radius is supplied for circular-plate geometry in micrometers and converted to meters. The plate area `A` is computed as `pi r^2`, after which the ideal energy scales as `A/a^3`.
+### 2.2 Eulerian observers and proper time
 
-A key interpretive scope boundary: the repo's tile-level Casimir computations are internally mechanism-layer by definition, even though they use standard formulas, because they are not, and do not claim to be, a first-principles QFT boundary-condition solve integrated into the GR evolution. The congruence audit states this directly: Casimir energy density and dynamic amplification are implemented as parametric formulas and multipliers, and there is no closure to the GR/matter evolution.
-
-Still within mechanism scope, the repo goes beyond the ideal baseline by implementing material and regime branches. The static module defines a `MaterialModel` that can be `ideal_retarded` or Lifshitz-based, `lifshitz_drude`, `lifshitz_plasma`, `auto`, and it implements an approximate Lifshitz/Hamaker blending path for small gaps, producing an energy band rather than a single number.
-
-The repo also implements cavity/coupling and adiabatic guardrails on the mechanism side. For example, `modules/sim_core/static-casimir.ts` constructs an adiabatic guard by comparing a declared drive frequency, if present, to characteristic response scales: a material response scale from a plasma frequency and a gap scale `c/a`. This explicitly encodes that equilibrium Casimir assumptions may fail when drive is not slow relative to response scales.
-
-**Dynamic Casimir, duty cycle, and amplification ladder.** The repo's mechanism narrative then introduces a ladder of multiplicative gains and clamps that convert a static budget into an effective budget and then into a mass proxy through `E/c^2`. In the mechanism note, this ladder is described as applying a concave-geometry gain `gamma_geo^3`, a burst/quality factor `Q_burst`, a Ford-Roman duty clamp `d_eff`, and a Van den Broeck pocket compression factor `gamma_VdB`, before converting energy to mass.
-
-When the repo writes this in closed form, and wires it into the pipeline, the mass-proxy ladder is:
+For a timelike worldline, proper time satisfies:
 
 \[
-M = \frac{|U_{\rm static}| \, \gamma_{\rm geo}^{3} \, Q_{\rm burst} \, \gamma_{\rm VdB} \, d_{\rm eff} \, N}{c^2}.
+d\tau^2=-ds^2.
 \]
 
-In repo terms: `U_static` is the aggregate static energy budget; `gamma_geo` is the concave-geometry gain parameter; `Q_burst` is a burst/quality amplification factor; `gamma_VdB` is the Van den Broeck compression/gain knob; `d_eff` is an effective duty-cycle clamp motivated by quantum-inequality-style borrow-and-repay constraints; and `N` is the tile count/census multiplier, or equivalent aggregation factor, depending on whether the budget is expressed per-tile or already aggregated. This equation is explicitly identified as the exact formula wired into `server/energy-pipeline.ts` in the repo's mechanism note.
-
-The critical boundary statement for this ladder is not that it is wrong, but that it is mechanism-side: it remains a modeled ladder rather than a certified mission result. The congruence audit is explicit that this ladder is proxy-modeled and not demonstrably closed to GR/matter evolution, and therefore cannot be treated as an authoritative source term for the solve-backed metric layer without additional parity/authority closure.
-
-The repo encodes this non-promotion discipline concretely via `massMode`. In `docs/mass-semantics.md`, `massMode=MODEL_DERIVED` computes mass from the ladder without retuning, `massMode=TARGET_CALIBRATED` rescales `gamma_VdB` to hit a user-specified target mass, explicitly labeled as legacy mode, and `massMode=MEASURED_FORCE_INFERRED` applies a measured Casimir force dataset to infer a normalization factor `kCasimir` that scales `U_static` and related bands before the amplification ladder and stamps provenance fields such as `massSource=measured`, `massDatasetId`, and fit residuals.
-
-At this point, the maturity classification remains mechanism-layer: the repo is explicit that even measured-force-inferred normalization does not turn the ladder into a GR-coupled field solution; it only hardens provenance of the mechanism-side estimate.
-
-**Current certified regime versus aspirational mechanism regime.** The repo's audits force a maturity separation that is easy to lose if one reads the mechanism ladder and the solve-backed transport proofs in a single narrative voice. The aspirational mechanism story aims to support a stress-energy narrative: tiles to negative-energy budget to amplification and duty-cycle averaged stress-energy to a warp-like metric response. The repo's own congruence verdict, however, states that the mechanism side is reduced-order/proxy modeled and weakly coupled, or not coupled, to the GR-evolved metric/brick surfaces, and that parity/promotion routes are explicitly blocked by derivation-class mismatch, direct metric versus reconstructed proxy.
-
-By contrast, the current certified stack is built around solve-backed transport and observation-defined contracts. The bounded NHM2 products are explicitly framed as bounded solve-backed transport contract only and as fixed-chart descriptor envelopes, with repeated non-claims: not speed, not route ETA, not viability, not full worldline physics closure.
-
-The maturity separation is therefore not stylistic; it is a scientific status boundary. Interpreting the bounded transport stack as if it were already closed to the mechanism ladder would violate the repo's explicit congruence and certification boundaries.
-
-## From mechanism narrative to solve-backed geometry
-
-**From source narrative to warp profile narrative.** The repo's bridge from tile energy to warp profile is implemented as a modeled adapter layer with explicit non-authority boundaries. The mechanism note identifies `server/energy-pipeline.ts` as the wired location where static Casimir evaluation and the amplification ladder are computed and exposed through `/api/helix/pipeline`, including provenance fields like `massMode` and measured-force inference outputs.
-
-But the congruence audit's core warning is that these mechanism constructs are not, today, the same maturity class as the solve-backed metric layer: the repo contains a real GR brick pipeline and a real Natario-style low-expansion classification surface, while the mechanism claims are reduced-order/proxy modeled and not coupled to the GR-evolved metric/brick surfaces in a way that would justify promotion.
-
-In this paper's layer language, the connection between tile-level energy and NHM2 warp-profile parameters is therefore a modeled bridge. What is solved is not the Casimir mechanism, but a solver-defined control family whose outputs can be sampled as solve-backed shift vectors and interpreted under bounded contracts. The repo's current stance makes this explicit: the bounded stack accepts a certified local-comoving `warpWorldline` emitted by the authoritative solve producer, and the certified products are then built upward from that solve-backed worldline, without claiming it is a mechanism-closed stress-energy response.
-
-**The NHM2 full congruent solve.** In repo terms, a congruent solve is not simply that a run produced a number, but that the shape and diagnostics of the control family, the solver outputs, and the downstream contracts are internally consistent with the repo's declared semantics, York/ADM channels, Natario-like low-expansion meaning, and provenance controls. The code-and-evidence congruence audit summarizes the current overall status as mixed / partially congruent: the GR brick pipeline and low-expansion classification surfaces exist, but mechanism claims remain reduced-order/proxy modeled and not jointly solved with lapse+shift+matter closure.
-
-The York control family proof pack is the repo's unifying solve summary surface, published with both JSON and markdown. In the proof-surface manifest, it is listed as `artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json` and `docs/audits/research/warp-york-control-family-proof-pack-latest.md`, and it is included among the eight published latest proof surfaces.
-
-Within that family, the repo's own language distinguishes morphologies: Alcubierre-like strong signed control versus Natario-like low-expansion control, and it labels NHM2 as a low-expansion family, while emphasizing that the verdict is diagnostic-local, a morphology classification, not a claim of full identity with any particular external theory package.
-
-This distinction matters because it prevents an overclaim: Natario-like in the repo's current semantics means low-expansion style under the repo's diagnostic checks, not global optical properties proven safe, and not superluminal stationary warp proven. The congruence audit identifies an internal falsifier directly aligned with that discipline: compute and compare low expansion on the authoritative brick/GR surface rather than on projected/constructed shift fields; if that fails, canonical low-expansion classification collapses inside the repo's own checks.
-
-## Transport contracts in 3+1 language
-
-**The 3+1 transport language used by the repo.** The repo's bounded transport contracts are explicitly expressed in a 3+1 ADM-like decomposition vocabulary: lapse `alpha`, shift `beta^i`, and spatial metric `gamma_ij`, plus the distinction between coordinate time `t` and proper time `tau` for a declared observer family.
-
-Externally, and used here only as mathematical framing, Natario's warp-drive spacetime formalism is built by specifying a vector field that generates a shift-like structure on Euclidean slices, and he explicitly defines a warp-drive spacetime as globally hyperbolic and foliated by Euclidean 3-spaces, with Eulerian observers defined as those orthogonal to the slices.
-
-Internally, the repo uses this 3+1 vocabulary operationally through contracts and artifacts. For example, the NHM2 worldline artifact records a normalization residual relation:
+Define the coordinate velocity:
 
 \[
-\alpha^2 - \gamma_{ij}(v^i+\beta^i)(v^j+\beta^j) - (d\tau/dt)^2,
+v^i=\frac{dx^i}{dt}.
 \]
 
-which the artifact reports as identically zero in the current bounded regime, thereby encoding that the sampled worldline satisfies the declared normalization within tolerance.
-
-A key interpretive design choice is that the current bounded NHM2 comoving Cartesian chart fixes the coordinate velocity to zero by chart choice, and represents effective transport only through a solve-backed local shift descriptor. The artifact states this explicitly: `coordinateVelocityInterpretation: zero_by_chart_choice`, and `effectiveTransportInterpretation: bounded_local_comoving_descriptor_not_speed`.
-
-**Why the current certified NHM2 regime is mathematically mild.** The word mild here is not promotional; it is a mathematical description of a small-amplitude regime in which the certified outputs are expected to be nearly flat. Concretely, the certified NHM2 worldline artifact reports the norm of the effective transport descriptor, and equivalently the sampled shift-vector norms since `effectiveTransportVelocityCoord` matches `betaCoord` in the artifact, as lying in the range
+Substitute `dx^i=v^i dt` into the 3+1 line element:
 
 \[
-\min \|\beta_{\rm eff}\| \approx 3.6531\times 10^{-16}, \quad \max \|\beta_{\rm eff}\| \approx 1.9547\times 10^{-15},
+ds^2 = -\alpha^2 dt^2 + \gamma_{ij}(v^i dt+\beta^i dt)(v^j dt+\beta^j dt).
 \]
 
-with a max pairwise L2 difference of approximately `1.5934e-15` across the nine deterministic shell-cross samples.
-
-This scale is extremely small compared to the horizon-relevant heuristic threshold `|beta . n| / alpha ~ 1` that appears in both external warp-drive optics discussions and in the repo's own wall-safety diagnostics. In a constant-lapse regime with `alpha ~ 1`, small `beta` implies that `dtau/dt` may remain essentially `1` for comoving-chart observers, mission-time comparisons based on `tau=t` can legitimately report zero differential, and `partial_i alpha` may be identically zero, giving zero Eulerian proper acceleration. The repo's bounded artifacts show exactly this coherent bundle: `dtau/dt` has `min=max=1` and absolute spread `0`, mission-time comparisons are precisely zero on the certified comparator, and the in-hull proper-acceleration profile is identically zero with `fallbackUsed=false`, that is, no analytic fallback hiding under-resolution.
-
-The important non-claim is as critical as the claim: mathematical mildness does not mean nothing is happening, but it also does not permit the inference of any hidden warp advantage. The repo is explicit that bounded descriptor variation with flat `dtau/dt` is informative for bounded transport differentiation only and is not route-time or speed claims.
-
-**The bounded transport stack.** The repo's bounded transport stack is explicitly a chain of contracts, each adding derived semantics while keeping non-claims intact. The overall chain and its boundary language are summarized in `docs/research/relativistic-map-projection-brief-2026-04-02.md`, and the eight concrete proof surfaces are enumerated with checksums in `artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json`.
-
-What follows is the same chain, described in research-paper prose rather than a dashboard, and for each stage: the layer it belongs to, what it claims, exact quantity, what it does not claim, and where the evidence lives.
-
-The worldline contract belongs to the certified bounded contract layer, consuming solve-backed samples to produce an observer- and chart-declared worldline diagnostic. The governing definition is operational: sample the solve-backed shift vector field, `shiftVectorField.evaluateShiftVector`, at a deterministic local shell-cross family in a comoving Cartesian chart, declare coordinate velocity to be zero by chart choice, compute `dtau/dt` and a normalization residual, and characterize variation via descriptor norms and pairwise L2 spreads. The emitted artifact is `artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json`, contract version `warp_worldline_contract/v1`, whose boundary statement explicitly forbids route time, mission time, speed, and viability claims. Numerically, it reports `dtau/dt = 1` with zero spread, and effective transport norm support up to approximately `1.9546804721e-15`. The allowed conclusion is therefore strictly: solve-backed local shift-descriptor variation exists at the stated scale on the stated sample family in the stated chart. The forbidden stronger conclusions include any scalar speed, any route ETA, and any interpretation of `beta_eff` as a certified speed.
-
-The cruise-envelope preflight contract also belongs to the certified bounded contract layer, but it is explicitly preflight: it computes an admissible descriptor-support band for `||beta_eff||` over the certified worldline family, and it explicitly fails closed above observed support. The artifact is `artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json`, contract `warp_cruise_envelope_preflight/v1`. Its exact quantity is the bounded local transport descriptor norm `||beta_eff||`, explicitly stated as fixed-chart local descriptor support only, not a ship speed. It reports a band `[3.6531425984e-16, 1.9546804721e-15]` and includes a deliberately above-support probe at approximately `3.5480e-15` that is rejected as inadmissible, demonstrating the intended fail-closed behavior. The allowed conclusion is: within current certified evidence, the descriptor support is bounded to that band; above that band is explicitly not certified. The forbidden conclusion is again any speed, any max-speed semantics, and any route-time inference.
-
-The route-time worldline contract belongs to the certified bounded contract layer and is the first stage that introduces a time-parameterized progression `lambda in [0,1]`. Crucially, the repo defines this as a local probe route-time extension: it freezes `lambda` as a normalized bounded longitudinal progress parameter in the fixed comoving chart and uses the local shell-aft to shell-fore light-crossing horizon as its coordinate-time schedule, explicitly denying any target-coupled ETA meaning. The artifact is `artifacts/research/full-solve/nhm2-route-time-worldline-latest.json`, contract `warp_route_time_worldline/v1`. Numerically, it reports a coordinate-time span of `3.3587237719787246e-6 s` across the local probe segment, with proper time equal to coordinate time in the current regime because `dtau/dt=1` at each progression sample. The allowed conclusion is that the bounded segment parameterization is internally consistent and monotone on the declared samples; the forbidden conclusion is any mission time, any ship speed, or any statement that this is a full route dynamic.
-
-The mission-time estimator contract belongs to the certified bounded contract layer but introduces explicit estimator assumptions. The repo defines it as repeating the certified local probe route-time schedule over a deterministic committed local-rest target-distance contract, explicitly stating not a full route dynamic or a speed proof. The artifact is `artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json`, contract `warp_mission_time_estimator/v1`, consuming the worldline, preflight, and route-time artifacts plus a committed target-distance snapshot, `server/_generated/local-rest_epoch-1763696773601_r-200pc_012fd60ec17881cc.json`. The estimator's numeric output for target `alpha-cen-a` is coordinate time and ship proper time both equal to `137755965.9171795 s`, that is `4.3652231448899625 yr`, corresponding to the committed distance `4.365218089591392` light-years within rounding. The allowed conclusion is: under the estimator's declared repetition law and the committed distance snapshot, the estimated coordinate and proper times are equal and approximately the light-time. The forbidden conclusion is any certified max speed, any viability inference, or any unconstrained ETA for arbitrary targets.
-
-The mission-time comparison contract belongs to the certified bounded contract layer and compares three times: warp coordinate time, warp proper time, and a classical reference on the same estimator basis that imposes `tau=t`. The artifact is `artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json`, contract `warp_mission_time_comparison/v1`. The current certified comparator is explicitly `nhm2_classical_no_time_dilation_reference`, and speed-based NR or SR comparators are explicitly deferred. Numerically, every reported differential is exactly zero, `properMinusCoordinate_seconds = 0`, `properMinusClassical_seconds = 0`, and so on, with a declared differential tolerance of `1.377559659171795e-4 s`. The allowed conclusion is therefore precisely: no certified relativistic differential is detected under this comparator basis on this bounded estimator. The forbidden conclusion is any speed-based SR/NR comparison or any claim of warp advantage from the zero.
-
-The cruise-envelope contract belongs to the certified bounded contract layer and upgrades the preflight band into a mission-consistent envelope while keeping it explicitly non-speed. The artifact is `artifacts/research/full-solve/nhm2-cruise-envelope-latest.json`, contract `warp_cruise_envelope/v1`, and its own meaning field emphasizes that it certifies a bounded fixed-chart cruise-control descriptor envelope over `||beta_eff||` by requiring consistency across preflight, route-time, mission-time, and mission-time comparison, without introducing speed mapping. Numerically, the admissible band is the same as preflight in the current solve family, and the artifact explicitly explains why: the route-time samples already realize the full observed descriptor support. The allowed conclusion is: `||beta_eff||` is bounded to `[3.6531e-16, 1.9547e-15]` as a route- and mission-consistent descriptor envelope. The forbidden conclusion is any max-speed certificate, any route-map ETA, or any viability promotion.
-
-Finally, the in-hull proper-acceleration contract belongs to the certified bounded contract layer but is grounded in the solve-backed metric/brick channel outputs and explicitly declares an observer family. The emitted artifact is `artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json`, contract `warp_in_hull_proper_acceleration/v1`. It reports experienced proper-acceleration magnitudes for a deterministic cabin-cross sample family for Eulerian observers, computed from brick-resolved Eulerian acceleration channels `a_geom_i = partial_i alpha / alpha` and converted to SI via `c^2`. The allowed conclusion is: under the current NHM2 constant-lapse regime, the in-hull Eulerian proper-acceleration profile is identically zero across the cabin-cross samples, with certified mode using direct brick channels and `fallbackUsed=false`. The forbidden conclusion is any curvature-gravity claim and any comfort/safety certification.
-
-## From 3+1 full-tensor semantics to NHM2 observer closure
-
-### ADM variables and the same-chart observer
-
-The mathematical hinge of the current NHM2 whitepaper is the 3+1 observer split. In the ADM/Gourgoulhon grammar used here as formalism context, a spacetime metric is decomposed into lapse `alpha`, shift `beta^i`, spatial metric `gamma_ij`, and coordinate time `t`:
+Factor out `dt^2`:
 
 \[
-ds^2 =
--\alpha^2 dt^2
-+
-\gamma_{ij}(dx^i+\beta^i dt)(dx^j+\beta^j dt).
+ds^2 = \left[-\alpha^2 + \gamma_{ij}(v^i+\beta^i)(v^j+\beta^j)\right]dt^2.
 \]
 
-The Eulerian observer normal to the spatial slices is then:
+Since `d tau^2 = -ds^2`, divide by `dt^2`:
+
+\[
+\frac{d\tau^2}{dt^2}=\alpha^2-\gamma_{ij}(v^i+\beta^i)(v^j+\beta^j).
+\]
+
+Therefore:
+
+\[
+\left(\frac{d\tau}{dt}\right)^2=\alpha^2-\gamma_{ij}(v^i+\beta^i)(v^j+\beta^j).
+\]
+
+This equation is the timing gate for the centerline-lapse discussion below. It also explains why a shift descriptor is not automatically a speed: `beta^i` appears inside the proper-time normalization in a chart-dependent way and must be interpreted with the declared observer semantics.
+
+### 2.3 Stress-energy projections: E, J_i, S_ij
+
+The Eulerian observer normal to the spatial slice is:
 
 \[
 n_\mu=(-\alpha,0,0,0),
@@ -216,17 +82,13 @@ n_\mu=(-\alpha,0,0,0),
 n^\mu=(1/\alpha,-\beta^i/\alpha).
 \]
 
-The spatial projector associated with that same foliation is:
+The spatial projector associated with the same foliation is:
 
 \[
-\gamma^\mu{}_\nu=\delta^\mu{}_\nu+n^\mu n_\nu.
+\gamma^\mu{}_{\nu}=\delta^\mu{}_{\nu}+n^\mu n_\nu.
 \]
 
-This is the formal grammar NHM2 uses to define an observer family in the declared `comoving_cartesian` chart. Gourgoulhon supplies the formalism; he does not validate NHM2.
-
-### Eulerian projections: E, J_i, and S_ij
-
-Stress-energy is not treated as a diagonal component list when the metric requires observer-facing closure. In the 3+1 split, the same-chart observer reads the tensor through the Eulerian projection family:
+The observer-facing matter variables are:
 
 \[
 E=T_{\mu\nu}n^\mu n^\nu,
@@ -240,29 +102,157 @@ J_i=-T_{\mu\nu}n^\mu\gamma^\nu{}_i,
 S_{ij}=T_{\mu\nu}\gamma^\mu{}_i\gamma^\nu{}_j.
 \]
 
-Here `E` is the Eulerian energy density, `J_i` is momentum density, and `S_ij` is spatial stress. This is the grammar NHM2 uses for metric-required full-tensor observer closure: `T00` maps to `E`, `T0i` maps to `J_i`, and `Tij` maps to `S_ij`, all in the declared same chart. Earlier diagonal-only producer evidence was therefore not enough to promote missing `T0i` or off-diagonal `Tij` claims by proxy.
+`E` is Eulerian energy density, `J_i` is momentum density, and `S_ij` is spatial stress. The importance for NHM2 is direct: an observer audit cannot be reduced to a diagonal `T00` sample if the metric-required claim depends on momentum density and off-diagonal stress.
 
-### Reconstructing T_{mu nu} from projected quantities
+Gourgoulhon's 3+1 formalism sits at the hinge between geometric relativity and executable numerical relativity. Its importance for NHM2 is not rhetorical; it supplies the observer discipline, foliation language, and projection machinery needed to distinguish partial coordinate-component bookkeeping from a legitimate same-chart stress-energy tensor. In the NHM2 development record, this formalism became the mathematical compass for moving from ambiguous diagonal-only stress-energy assumptions toward an explicit geometry-first route: lapse, shift, spatial metric, Eulerian normal, projected matter variables `E`, `J_i`, `S_ij`, reconstruction of `T_mu_nu`, and observer energy-condition checks all live in one declared chart. This does not make NHM2 experimentally validated, and it does not make lower-alpha rows pass by citation. It makes the calculation auditable.
 
-Given same-chart projected quantities, the coordinate tensor components are reconstructed as:
+### 2.4 Einstein tensor route to metric-required stress-energy
 
-\[
-T_{ij}=S_{ij},
-\]
+Einstein's equation in geometric units is:
 
 \[
-T_{0i}=-\alpha J_i+\beta^jS_{ij},
+G_{\mu\nu}=8\pi T_{\mu\nu}.
 \]
+
+A geometry-first same-chart evaluator can therefore compute:
 
 \[
-T_{00}=\alpha^2E-2\alpha\beta^iJ_i+\beta^i\beta^jS_{ij}.
+T_{\mu\nu}^{\rm geom}=\frac{1}{8\pi}G_{\mu\nu}.
 \]
 
-This reconstruction is admissible only when `E`, `J_i`, and `S_ij` come from the same underlying same-chart tensor or an equivalent same-chart route. It is not admissible to stitch diagonal placeholders, mixed-chart inferences, or proxy substitutions into a full observer claim.
+Then the tensor can be projected into the observer variables:
 
-### Why diagonal-only stress-energy was insufficient
+\[
+T_{\mu\nu}^{\rm geom}\rightarrow(E,J_i,S_{ij})\rightarrow{\rm observer\ energy\ conditions}.
+\]
 
-The constraint bridge explains why a diagonal-only stress proxy was not enough. In standard 3+1 notation, the Hamiltonian and momentum constraints include:
+This is the selected mathematical route used in the current observer-closure narrative. It is repo-internal same-chart metric evaluation, not experimental validation and not a theorem that arbitrary NHM2 profiles pass.
+
+### 2.5 Energy-condition tests
+
+The weak energy condition is:
+
+\[
+{\rm WEC:}\quad T_{\mu\nu}u^\mu u^\nu\ge0
+\]
+
+for all timelike `u^mu`. The null energy condition is:
+
+\[
+{\rm NEC:}\quad T_{\mu\nu}k^\mu k^\nu\ge0
+\]
+
+for all null `k^mu`. The strong energy condition is:
+
+\[
+{\rm SEC:}\quad\left(T_{\mu\nu}-\frac12Tg_{\mu\nu}\right)u^\mu u^\nu\ge0.
+\]
+
+The dominant energy condition requires the measured energy flux vector to be causal and future-directed for every future-directed timelike observer.
+
+NHM2's observer audit is therefore not merely asking whether a single coordinate `T00` entry has a desired sign. It asks whether the stress-energy tensor, read by admissible observer families, satisfies energy-condition surfaces under the selected same-chart route.
+
+### 2.6 Warp-drive context and known limitations
+
+Alcubierre and Natario provide warp-metric context. Natario's zero-expansion framing is especially relevant because it separates low-expansion morphology from stronger optical or global-causal safety statements. Pfenning-Ford, Fewster-Roman, and Santiago-Schuster-Visser provide the cautionary context: warp-like geometries and negative-energy constructions are constrained by energy-condition and quantum-inequality issues. Those papers are not evidence that NHM2 works; they define why NHM2 must be conservative about what is tested and what is not.
+
+## 3. NHM2 construction
+
+### 3.1 Fixed hull geometry and chart
+
+NHM2 is represented as a fixed-chart construction in a declared comoving Cartesian frame. The hull and sampling families are treated as deterministic contract geometry, not as free narrative objects. This matters because the observer quantities and transport descriptors are chart-declared: the same numerical vector can carry different interpretive weight if moved between charts without an admission route.
+
+### 3.2 Shift-lapse profile family
+
+The profile family is expressed in 3+1 language. Lapse controls clocking relative to the foliation, shift supplies a local transport descriptor, and `gamma_ij` supplies the spatial metric. The NHM2 shift-lapse family is not introduced as a direct scalar velocity law. The body of the calculation asks whether a bounded lapse-shift geometry can be sampled, audited, and constrained without translating the shift into an unsupported speed claim.
+
+### 3.3 Centerline lapse dial
+
+The centerline-lapse sweep varies one dial:
+
+```text
+centerlineAlpha = centerlineDtauDt = alpha.
+```
+
+The coordinate mission, target-coupled schedule, shift transport framing, and spatial/worldline setup are held fixed. This isolates clocking from velocity: lowering `alpha` is not converted into `beta = sqrt(1-alpha^2)`, and no Lorentz-gamma speed interpretation is introduced.
+
+### 3.4 Local transport descriptor, not speed
+
+The local descriptor `beta_eff` is a bounded fixed-chart transport descriptor. It is not a scalar speed, not a maximum speed, and not a route-map ETA. In the bounded regime, this distinction is not cosmetic: the published descriptor support is very small, while the coordinate velocity of the comoving centerline is fixed by chart choice. Treating `||beta_eff||` as ship speed would violate the contract semantics.
+
+### 3.5 Cabin-frame acceleration and lapse-side timing split
+
+Eulerian cabin acceleration is a local observer quantity. For Eulerian observers, the lapse-gradient acceleration has the form:
+
+\[
+a_i=\frac{\partial_i\alpha}{\alpha}.
+\]
+
+Conversion to SI acceleration uses `c^2` when the geometric quantity is converted into `m/s^2`. This is an experienced proper-acceleration diagnostic for a declared observer family, not curvature gravity and not comfort/safety certification. The centerline-lapse clocking branch is a separate lapse-side timing calculation; it does not imply a cabin thrust law.
+
+## 4. Source-side mechanism model
+
+### 4.1 Casimir tile baseline
+
+The mechanism layer begins with the idealized parallel-plate Casimir energy per area:
+
+\[
+\frac{E}{A}=-\frac{\pi^2\hbar c}{720a^3}.
+\]
+
+For a tile with plate area `A`, the static idealized energy is:
+
+\[
+E_{\rm tile}= -\frac{\pi^2\hbar c}{720a^3}A.
+\]
+
+This is a source-model baseline, not a GR-coupled proof of macroscopic stress-energy realization. Material corrections, finite geometry, drive response, and dynamic effects are mechanism-side model choices unless and until they are admitted into a solver-authoritative stress-energy route.
+
+### 4.2 Hull-wide tile inventory and sectorization
+
+A hull-wide model aggregates many tiles. If `N` tiles are modeled with comparable static budget, a simple static aggregate has the schematic form:
+
+\[
+U_{\rm static}\sim N E_{\rm tile}.
+\]
+
+Sectorization partitions this inventory into staged groups so that not all tiles are necessarily active at the same time. This is useful for duty averaging, but it is still source-side bookkeeping unless coupled to an admitted metric source route.
+
+### 4.3 Duty averaging and sector strobing
+
+A typical duty-averaging scalar used in the source narrative is:
+
+\[
+d_{\rm eff}=d_{\rm burst}d_{\rm cycle}\left(\frac{N_{\rm concurrent}}{N_{\rm sector}}\right).
+\]
+
+The mechanism-side effective budget can then be described schematically as:
+
+\[
+U_{\rm eff}=|U_{\rm static}|\,\gamma_{\rm geo}^{3}\,Q_{\rm burst}\,\gamma_{\rm VdB}\,d_{\rm eff}.
+\]
+
+and a mass proxy can be written as:
+
+\[
+M_{\rm proxy}=\frac{U_{\rm eff}}{c^2}.
+\]
+
+Sector strobing modulates duty-averaged source strength; it is not a certified thrust law. `g` targets in this context are local proper-acceleration targets in Earth-gravity units, not Lorentz gamma.
+
+### 4.4 Why the source model remains mechanism-side
+
+The Casimir source model is mechanism-side and not an experimentally grounded macroscopic stress-energy realization. Even measured-force-inferred normalization can improve provenance of a mechanism parameter without proving that the aggregate source closes as the stress-energy tensor required by a GR metric. NHM2 therefore separates source narration from metric evaluation.
+
+### 4.5 Source closure: global diagonal tightness and regional diagnostic limits
+
+Source closure is numerically tight on the global diagonal comparison in the current evidence stack, including a reported `relLInf = 4.6143808140791624e-10`. That number should not be promoted by itself. Source closure remains review-level because regional direct `T00` comparison is diagnostic-only and assumption drift remains recorded. The safe conclusion is: global diagonal agreement is tight under the current comparison, while regional direct source closure is not yet an authoritative physical source proof.
+
+## 5. Full-tensor observer closure
+
+### 5.1 Why diagonal-only was insufficient
+
+A diagonal-only stress-energy proxy can provide energy-density-like and pressure-like bookkeeping, but it cannot by declaration supply the observer momentum density `J_i` or off-diagonal spatial stresses `S_ij`. The ADM constraints show why:
 
 \[
 {}^{(3)}R+K^2-K_{ij}K^{ij}=16\pi E,
@@ -272,334 +262,326 @@ The constraint bridge explains why a diagonal-only stress proxy was not enough. 
 D_jK^j{}_i-D_iK=8\pi J_i.
 \]
 
-The Hamiltonian constraint can ground `E` when the geometric terms, sign conventions, and unit conventions are admitted. The momentum constraint ties `J_i` to derivatives of `K_ij`, so momentum density is not recoverable from a diagonal pressure proxy by declaration. The spatial stress family `S_ij`, especially off-diagonal shear, generally requires either evolution information for `K_ij` or an equivalent full Einstein-tensor evaluation. This is why NHM2 moved from diagonal-only observer language toward a same-chart full-tensor route.
+The Hamiltonian constraint can ground `E` when geometric and convention details are admitted. The momentum constraint ties `J_i` to derivatives of `K_ij`. Off-diagonal `S_ij` generally requires evolution information or an equivalent full Einstein-tensor evaluation. Therefore, NHM2 cannot promote missing `T0i` and off-diagonal `Tij` from a diagonal producer by assertion.
 
-### The selected Einstein-tensor route
+### 5.2 Same-chart projection grammar
 
-The selected NHM2 route is geometry-first. In geometric units:
+The same-chart grammar is:
+
+\[
+E=T_{\mu\nu}n^\mu n^\nu,
+\qquad
+J_i=-T_{\mu\nu}n^\mu\gamma^\nu{}_i,
+\qquad
+S_{ij}=T_{\mu\nu}\gamma^\mu{}_i\gamma^\nu{}_j.
+\]
+
+All three quantities must be defined on the same foliation and chart. Mixed-chart inference is not an observer-closure route.
+
+### 5.3 Reconstruction of T_mu_nu
+
+Start from the standard decomposition:
+
+\[
+T_{\mu\nu}=E n_\mu n_\nu+n_\mu J_\nu+n_\nu J_\mu+S_{\mu\nu}.
+\]
+
+For spatial components, the normal has `n_i=0`, so:
+
+\[
+T_{ij}=S_{ij}.
+\]
+
+For the mixed time-space component:
+
+\[
+T_{0i}=E n_0n_i+n_0J_i+n_iJ_0+S_{0i}.
+\]
+
+Since `n_i=0`, this reduces to:
+
+\[
+T_{0i}=n_0J_i+S_{0i}.
+\]
+
+Using `n_0=-alpha` and `S_{0i}=beta^jS_{ij}` gives:
+
+\[
+T_{0i}=-\alpha J_i+\beta^jS_{ij}.
+\]
+
+For the time-time component:
+
+\[
+T_{00}=E n_0n_0+2n_0J_0+S_{00}.
+\]
+
+With:
+
+\[
+n_0=-\alpha,
+\qquad
+J_0=\beta^iJ_i,
+\qquad
+S_{00}=\beta^i\beta^jS_{ij},
+\]
+
+obtain:
+
+\[
+T_{00}=\alpha^2E-2\alpha\beta^iJ_i+\beta^i\beta^jS_{ij}.
+\]
+
+This reconstruction is admissible only if `E`, `J_i`, and `S_ij` come from the same underlying same-chart tensor or an equivalent same-chart route.
+
+### 5.4 Einstein-tensor geometry-first route
+
+The selected route is:
 
 \[
 G_{\mu\nu}=8\pi T_{\mu\nu},
+\qquad
+T_{\mu\nu}^{\rm geom}=\frac{1}{8\pi}G_{\mu\nu}.
 \]
 
-so the same-chart metric route computes:
+The route then projects the computed same-chart tensor into `E`, `J_i`, and `S_ij`, and evaluates observer energy-condition gates. In current artifact language, this selected metric observer path is identified by `einstein_tensor_geometry_fd4_v1` and same-chart derivability for `T0i` and off-diagonal `Tij`. Nevertheless, the overall full-loop state remains review-level because provenance and policy gates block blanket promotion.
+
+### 5.5 Observer energy-condition gates
+
+The observer audit checks energy-condition surfaces from the full tensor, not from a lone coordinate entry. Passing an observer audit means the selected route satisfied the implemented observer-surface checks under the declared artifact semantics. It does not mean physical viability, experimental validation, or robustness for arbitrary external fields.
+
+### 5.6 What this closure does and does not prove
+
+This closure demonstrates an auditable same-chart tensor evaluation path inside the repository evidence stack. It does not prove the physical source is realizable, that a lower-alpha profile passes, that a route ETA exists, or that any strong-field environment is safe.
+
+## 6. Centerline-lapse clocking calculation
+
+### 6.1 General 3+1 normalization
+
+From Section 2.2:
 
 \[
-T_{\mu\nu}^{\rm geom}=G_{\mu\nu}/(8\pi).
+\left(\frac{d\tau}{dt}\right)^2=\alpha^2-\gamma_{ij}(v^i+\beta^i)(v^j+\beta^j).
 \]
 
-After unit conversion where applicable, the repo projects that same-chart tensor into `E`, `J_i`, and `S_ij` and evaluates the observer surfaces from that tensor. The current artifact stack records the selected metric route with `observerMetricT00RouteId = einstein_tensor_geometry_fd4_v1`, `observerMetricEmissionAdmissionStatus = admitted`, `observerMetricT0iAdmissionStatus = derivable_same_chart_from_existing_state`, and `observerMetricOffDiagonalTijAdmissionStatus = derivable_same_chart_from_existing_state`.
+This is the general 3+1 proper-time relation for the declared chart and observer semantics.
 
-The claim boundary is narrow. The Einstein-tensor route is a repo-internal same-chart metric-evaluation route. It is not experimental validation, physical viability, or a theorem that arbitrary NHM2 profiles pass.
+### 6.2 Frozen centerline schedule
 
-### Observer energy-condition gates
-
-Once a same-chart tensor is available, the observer audit can evaluate observer-facing energy-condition surfaces. The weak energy condition is expressed as:
+For the NHM2 centerline-lapse sweep, the coordinate mission, target-coupled schedule, and shift transport framing are frozen. Under the declared centerline semantics, the target relation is:
 
 \[
-T_{\mu\nu}u^\mu u^\nu\ge0
+\frac{d\tau}{dt}=\alpha_{\rm centerline}.
 \]
 
-for timelike `u^mu`. The null energy condition is:
+This is not a general worldline theorem. It is the frozen-schedule centerline lapse target law for this experiment.
+
+### 6.3 Constant-alpha solution
+
+The expected proper time is:
 
 \[
-T_{\mu\nu}k^\mu k^\nu\ge0
+\tau(\alpha)=\int_0^T\alpha_{\rm centerline}\,dt.
 \]
 
-for null `k^mu`. The strong energy condition is:
+For constant `alpha`:
 
 \[
-\left(T_{\mu\nu}-\frac{1}{2}Tg_{\mu\nu}\right)u^\mu u^\nu\ge0.
+\tau(\alpha)=\alpha T.
 \]
 
-The dominant energy condition additionally requires the energy flux measured by any timelike observer to be causal and future-directed. NHM2's observer audit is therefore not only checking a diagonal Eulerian sample on the selected route; it evaluates observer-facing energy-condition surfaces derived from a full same-chart tensor. The current artifacts report pass-level or admitted selected-path metric and tile observer states inside the artifact stack, but the top-level full-loop artifact remains review-level diagnostic rather than a blanket full-loop certified pass.
-
-### What this does and does not prove
-
-This section connects accepted 3+1 formalism to NHM2's repository-specific tensor grammar. It does not convert literature context into NHM2 validation.
-
-The required claim boundaries are:
-
-```text
-Gourgoulhon supplies the formalism; he does not validate NHM2.
-The Einstein-tensor route is a repo-internal same-chart metric-evaluation route.
-The selected-profile clocking-law anchor is not a blanket full-loop certified pass.
-Lower-alpha rows remain expected targets until their own fresh artifacts pass.
-Source closure remains globally tight but review-level because of diagnostic-only regional T00 and assumption drift.
-The whitepaper must not claim physical viability, experimental validation, route ETA, max speed, black-hole operation, or arbitrary external-field operation.
-```
-
-Literature citations therefore carry limited roles: ADM and Gourgoulhon provide 3+1 foliation, lapse, shift, normal, projection, and constraint formalism; Alcubierre and Natario provide warp-metric context; Pfenning-Ford, Fewster-Roman, and Santiago-Schuster-Visser provide energy-condition and negative-energy caution context. Repository artifacts remain the only source for NHM2 pass, review, runtime, and frontier status.
-
-## Why the mission-time comparison is zero and what that means
-
-**Why the current mission-time comparison is exactly zero.** The mission-time comparison's exact-zero outcome is not an omission; it is the mathematically consistent result of the chosen comparator semantics and the mild regime captured in the worldline and route-time contracts.
-
-First, the comparator basis is explicitly classical `tau=t` applied to the same target-coupled estimator schedule, and the repo explicitly defers speed-based comparators. Under this comparator, if the bounded estimator reports `tau` equal to `t`, the comparison must be zero. The artifact makes this definitional: the classical reference imposes `tau=t` over the repeated certified local route-time schedule without introducing any speed-based comparator semantics.
-
-Second, the upstream worldline and route-time artifacts report `dtau/dt = 1` identically across the local sample family, and the route-time progression integrates proper-time increments equal to coordinate-time increments at each progression sample. In the current stack, the mission-time estimator repeats that local schedule; therefore, the repeated proper and coordinate time totals remain identical. This is explicitly visible in the mission-time estimator artifact: `coordinateTimeEstimate` and `properTimeEstimate` are identical, down to the same seconds field.
-
-The non-claim is crucial. The repo explicitly warns that a zero differential is a real result, not an omission, but it must not be translated into a broad warp-advantage or ETA claim. The same machinery also prevents the opposite overreach: zero differential does not prove nothing is happening, because the repo's bounded transport differentiation can still detect descriptor variation even when `dtau/dt` is flat.
-
-## Centerline-lapse sweep and frontier distance
-
-**Why this is now a separate NHM2 experiment.** The April 3 whitepaper described a bounded stack whose mission-time comparison was exactly zero because the certified comparator was classical `tau=t`, the upstream worldline had `dtau/dt=1`, and the mild shift descriptor regime did not create a certified proper-time differential. The newer NHM2 centerline-lapse sweep keeps the same bounded-stack discipline but asks a sharper diagnostic question:
-
-```text
-If the coordinate mission and shift transport schedule are frozen, and only centerlineAlpha is lowered, does the full NHM2 audit still pass and does the proper-time reduction remain lapse-driven?
-```
-
-This is not a velocity sweep. The sweep does not convert alpha into an SR beta, does not introduce `gamma = 1 / sqrt(1 - v^2/c^2)`, and does not claim local near-c kinematics. It is a bounded-lapse clocking experiment in the repo's 3+1 vocabulary.
-
-**Research basis and claim boundary.** The mathematical language is anchored in ADM / 3+1 lapse-shift formalism and numerical-relativity notation, with ADM and Gourgoulhon used as formalism context. Alcubierre and Natario remain warp-metric context. Pfenning-Ford and Santiago-Schuster-Visser remain limitation and uncertainty context. None of those papers validate an NHM2 alpha row. NHM2 pass/fail claims must still come from repository artifacts and gates.
-
-The source references currently used for this section are:
-
-```text
-ADM, The Dynamics of General Relativity: https://arxiv.org/abs/gr-qc/0405109
-Gourgoulhon, 3+1 Formalism and Bases of Numerical Relativity: https://arxiv.org/abs/gr-qc/0703035
-Alcubierre, The warp drive: https://arxiv.org/abs/gr-qc/0009013
-Natario, Warp Drive With Zero Expansion: https://arxiv.org/abs/gr-qc/0110086
-Pfenning and Ford, The unphysical nature of Warp Drive: https://arxiv.org/abs/gr-qc/9702026
-Fewster and Roman, Null energy conditions in quantum field theory: https://arxiv.org/abs/gr-qc/0209036
-Santiago, Schuster, Visser, Generic warp drives violate the null energy condition: https://arxiv.org/abs/2105.03079
-```
-
-**Step-by-step clocking derivation.** Start from the worldline normalization in the same 3+1 language:
+The proper-time difference from coordinate time is:
 
 \[
-(d\tau/dt)^2=\alpha^2-\gamma_{ij}(v^i+\beta^i)(v^j+\beta^j).
+\Delta\tau=\tau-T=(\alpha-1)T.
 \]
 
-For the NHM2 sweep's frozen coordinate mission, frozen shift schedule, and declared centerline observer semantics, the centerline target is:
+The saved days and subjective efficiency are:
 
 \[
-d\tau/dt=\alpha_{\rm centerline}.
+{\rm savedDays}(\alpha)=\frac{(1-\alpha)T}{86400},
+\qquad
+{\rm subjectiveEfficiency}=\frac{1}{\alpha}.
 \]
 
-The sweep therefore uses a centerline proper-time integral:
+### 6.4 Worked 0p995 calculation
 
-```text
-d_tau = alpha(t) dt
-tau = integral alpha(t) dt
-```
-
-For the sweep's flat centerline target under the frozen coordinate mission, frozen shift schedule, and declared observer semantics:
-
-```text
-alpha(t) = alpha_constant
-```
-
-Therefore:
+The selected-profile clocking-law anchor uses:
 
 \[
-\tau_{\rm expected}(\alpha)=\alpha T.
+T=137755965.9171795\ {\rm s},
+\qquad
+\alpha=0.995.
 \]
 
-```text
-tau_expected(alpha)
-  = integral alpha_constant dt
-  = alpha_constant * integral dt
-  = alpha * coordinateTimeS
-```
-
-This produces the expected centerline target. It is not a pass claim, and it is not a general worldline proper-time theorem for arbitrary coordinate motion or shift/lapse profiles.
-
-The corresponding expected bookkeeping quantities are:
-
-```text
-properTimeS_expected = alpha * T
-properMinusCoordinateS_expected = (alpha - 1) * T
-savedTimeS_expected = (1 - alpha) * T
-savedDays_expected = savedTimeS_expected / 86400
-subjectiveEfficiency_expected = 1 / alpha
-savedTimeMultipleVs0p995 = (1 - alpha) / 0.005
-```
-
-where:
-
-```text
-T = 137755965.9171795 s
-```
-
-**Anchor coherence solve.** For the selected-profile `0p995` clocking-law anchor:
-
-```text
-properTimeS_expected
-  = 0.995 * 137755965.9171795
-  = 137067186.0875936 s
-```
-
-and:
-
-```text
-properMinusCoordinateS_expected
-  = (0.995 - 1) * 137755965.9171795
-  = -688779.8295859098 s
-```
-
-Those match the anchor artifact values:
-
-```text
-properTimeS = 137067186.0875936
-properMinusCoordinateS = -688779.8295859098
-```
-
-This is why the anchor can be used to compute lower-alpha expected targets. It still does not validate those targets.
-
-**Frontier target solve for `0p7000`.** For `stage1_centerline_alpha_0p7000_v1`:
-
-```text
-alpha = 0.7000
-properTimeS_expected = 0.7000 * 137755965.9171795 = 96429176.1420256 s
-properMinusCoordinateS_expected = -41326789.7751539 s
-savedDays_expected = 478.319326 days
-subjectiveEfficiency_expected = 1 / 0.7000 = 1.428571429x
-savedTimeMultipleVs0p995 = 60x
-```
-
-The latest available controlled summary reports this profile as:
-
-```text
-validationState = runtime_blocked
-runtimeBlockingReason = selected_transport_timeout
-fullLoopStateRaw = unavailable
-```
-
-So `0p7000` is currently a frontier target, not a passing solve. The runtime block must be cleared before physics/gate interpretation is meaningful.
-
-**Deep target solve for `0p5000`.** For `stage1_centerline_alpha_0p5000_v1`:
-
-```text
-alpha = 0.5000
-properTimeS_expected = 0.5000 * 137755965.9171795 = 68877982.9585898 s
-properMinusCoordinateS_expected = -68877982.9585898 s
-savedDays_expected = 797.198877 days
-subjectiveEfficiency_expected = 1 / 0.5000 = 2.000000000x
-savedTimeMultipleVs0p995 = 100x
-```
-
-This is the clean 2x subjective-efficiency target, but it remains deep exploratory until the intermediate ladder and full-loop gates pass.
-
-**Expected target ladder.** The current expected target table is:
-
-| profileTag | alpha | expectedProperTimeS | expectedSavedDays | expectedSubjectiveEfficiency | savedTimeMultipleVs0p995 |
-|---|---:|---:|---:|---:|---:|
-| 0p995 | 0.995 | 137067186.087594 | 7.971989 | 1.005025126 | 1.000 |
-| 0p9800 | 0.980 | 135000846.598836 | 31.887955 | 1.020408163 | 4.000 |
-| 0p9500 | 0.950 | 130868167.621321 | 79.719888 | 1.052631579 | 10.000 |
-| 0p9000 | 0.900 | 123980369.325462 | 159.439775 | 1.111111111 | 20.000 |
-| 0p8500 | 0.850 | 117092571.029603 | 239.159663 | 1.176470588 | 30.000 |
-| 0p8000 | 0.800 | 110204772.733744 | 318.879551 | 1.250000000 | 40.000 |
-| 0p7500 | 0.750 | 103316974.437885 | 398.599438 | 1.333333333 | 50.000 |
-| 0p7300 | 0.730 | 100561855.119541 | 430.487393 | 1.369863014 | 54.000 |
-| 0p7250 | 0.725 | 99873075.289955 | 438.459382 | 1.379310345 | 55.000 |
-| 0p7200 | 0.720 | 99184295.460369 | 446.431371 | 1.388888889 | 56.000 |
-| 0p7150 | 0.715 | 98495515.630783 | 454.403360 | 1.398601399 | 57.000 |
-| 0p7100 | 0.710 | 97806735.801197 | 462.375349 | 1.408450704 | 58.000 |
-| 0p7050 | 0.705 | 97117955.971612 | 470.347337 | 1.418439716 | 59.000 |
-| 0p7000 | 0.700 | 96429176.142026 | 478.319326 | 1.428571429 | 60.000 |
-| 0p6500 | 0.650 | 89541377.846167 | 558.039214 | 1.538461538 | 70.000 |
-| 0p6000 | 0.600 | 82653579.550308 | 637.759101 | 1.666666667 | 80.000 |
-| 0p5500 | 0.550 | 75765781.254449 | 717.478989 | 1.818181818 | 90.000 |
-| 0p5000 | 0.500 | 68877982.958590 | 797.198877 | 2.000000000 | 100.000 |
-
-**Ladder grouping and progression strategy.** The currently meaningful groups are:
-
-```text
-selected-anchor / revalidation ladder: 0p995 -> 0p7300
-frontier bisection ladder: 0p7250 -> 0p7000
-deep exploratory ladder: 0p6500 -> 0p5000
-```
-
-The practical progression is:
-
-```text
-1. Preserve 0p995 as the measured clocking anchor.
-2. Revalidate known/near-known rows outward through 0p7300.
-3. Recover selected transport at 0p7000 or bisect 0p7300 -> 0p7000.
-4. Only after runtime completion, inspect clocking consistency, decomposition residual, lapseTrackedFraction, betaOverAlphaMax, wallHorizonMargin, invariant gates, and full-loop audit.
-5. Do not promote deep exploratory targets such as 0p5000 without fresh full-loop evidence.
-```
-
-The whitepaper's status therefore changes in one important way: NHM2 is no longer only a zero-differential bounded transport stack. It now also has a fail-closed lapse-clock frontier framework. But the promotion boundary is unchanged: expected clocking math is not evidence viability.
-
-## In-hull acceleration and horizon/blueshift pathologies
-
-**The in-hull acceleration result.** The in-hull proper-acceleration surface is where the repo most clearly separates three notions that are often blurred outside an audited contract system: coordinate effects, observer experience, and curvature gravity.
-
-The contract and artifact define the observer family as Eulerian cabin observers fixed to bounded cabin sample points in a comoving Cartesian chart, `observerFamily: eulerian_comoving_cabin`. The key geometric relation is the lapse-gradient acceleration for Eulerian observers:
+Substitute into `tau = alpha T`:
 
 \[
-a_i = \frac{\partial_i \alpha}{\alpha},
+\tau=0.995\times137755965.9171795=137067186.0875936\ {\rm s}.
 \]
 
-with conversion to SI units, `m/s^2`, via multiplication by `c^2`. The artifact states precisely this mapping: brick-resolved `eulerian_accel_geom_i = partial_i alpha / alpha` and converted to SI via `c^2`.
+Then:
 
-The certified sampling geometry is explicit and deterministic: a cabin-cross family with seven interior points, center, fore, aft, port, starboard, dorsal, ventral, with stated offsets and `interiorClearance`.
+\[
+\Delta\tau=(0.995-1)\times137755965.9171795=-688779.8295859\ {\rm s}.
+\]
 
-Numerically, every sample reports zero geometric acceleration vector and zero magnitude; the profile summary reports `min_mps2 = 0`, `max_mps2 = 0`, and the whole-brick acceleration and gradient maxima are also zero. Most importantly for boundedness discipline, the artifact explicitly declares `fallbackUsed: false`, and the resolution adequacy note states that this is treated as a certified constant-lapse zero-profile result rather than an under-resolved fallback case. The allowed conclusion is therefore crisp: experienced Eulerian proper acceleration across this cabin-cross sample family is zero in the current NHM2 metric path. The forbidden stronger conclusion is equally crisp: this is not a curvature-gravity certificate, and it is not comfort/safety certification by itself.
+Convert saved seconds to days:
 
-**Natário horizon/blueshift pathology and current NHM2 status.** External literature matters here only to define the mathematical issue, not to override repo evidence.
+\[
+\frac{688779.8295859}{86400}\approx7.972\ {\rm days}.
+\]
 
-In Natário's zero-expansion warp-drive analysis, he explicitly separates zero expansion from global optical properties. He states that warp-drive spacetimes may have other pathologies, such as horizons and infinite blueshifts, and in simple examples he finds horizons and shows that light rays emitted in directions approaching the horizon become increasingly blueshifted, reaching infinite blueshift at the horizon.
+This is a target-law calculation for the selected-profile centerline lapse schedule. It is not a general route-dynamics theorem, and it does not validate lower-alpha rows without their own fresh artifacts.
 
-This matters for NHM2 because the repo classifies NHM2 as Natario-like / low-expansion in its internal diagnostic vocabulary, yet the repo's own congruence audit warns that Natario-like is only as good as the authoritative-surface computation and does not, by itself, constitute a no-horizon / no-infinite-blueshift theorem.
+### 6.5 Expected lower-alpha ladder calculations
 
-What the repo currently computes that is relevant is explicitly documented in the congruence audit: the shift-plus-lapse diagnostic branch computes a wall-normal ratio `beta_outward/alpha` at the hull wall, sampling ellipsoidal normals, and reports a wall horizon margin defined as `1 - max(beta_outward/alpha)`. This is explicitly named as a diagnostic, not a theorem, and its correctness depends on the hull model and sampling placement.
+The same expected target calculation gives:
 
-In the current certified bounded NHM2 transport regime, the published shift-descriptor scale is `||beta_eff|| ~ 10^-15` and `alpha` is effectively constant, as evidenced by `dtau/dt=1` and zero in-hull lapse-gradient acceleration. Under these conditions, any wall-normal `|beta . n| / alpha` computed from the same fields would be far below the horizon-relevant threshold scale of order unity, implying a large positive wall-horizon margin in this mild regime. This is a diagnostic comfort statement about this regime's scale, not a proof of global horizon absence in any other regime. The repo itself preserves that boundary by never certifying a global no-horizon / no-infinite-blueshift theorem and by keeping the horizon-related quantity as a heuristic wall-safety diagnostic with explicit falsifiers and caveats.
+| profileTag | alpha | tau = alpha T (s) | Delta tau = (alpha - 1)T (s) | savedDays | subjectiveEfficiency | validation meaning |
+|---|---:|---:|---:|---:|---:|---|
+| 0p995 | 0.995 | 137067186.087594 | -688779.829586 | 7.971989 | 1.005025126 | selected clocking-law anchor, not blanket full-loop certified pass |
+| 0p9000 | 0.900 | 123980369.325462 | -13775596.591718 | 159.439775 | 1.111111111 | expected target unless fresh row artifacts pass |
+| 0p8000 | 0.800 | 110204772.733744 | -27551193.183436 | 318.879551 | 1.250000000 | expected target unless fresh row artifacts pass |
+| 0p7300 | 0.730 | 100561855.119541 | -37194110.797638 | 430.487393 | 1.369863014 | near-frontier target / revalidation rung |
+| 0p7000 | 0.700 | 96429176.142026 | -41326789.775154 | 478.319326 | 1.428571429 | runtime-blocked, not physics-failed |
+| 0p5000 | 0.500 | 68877982.958590 | -68877982.958590 | 797.198877 | 2.000000000 | deep exploratory, not validated |
 
-## Research conclusions, provenance, and explicit boundaries
+For `0p7000`, the calculation is:
 
-**Mission answers stated as research conclusions.** These conclusions are stated only after the mathematical setup precisely because the repo's contracts force the interpretation to follow the definitions.
+\[
+\tau=0.7000\times137755965.9171795=96429176.1420256\ {\rm s},
+\]
 
-Hull-gravity answer: In the current certified NHM2 stack, the in-hull Eulerian experienced proper-acceleration profile is identically zero across the deterministic cabin-cross sample family, with certified mode using direct solve-backed brick channels and no fallback, `fallbackUsed=false`. This is a statement about experienced proper acceleration for a declared observer family, not a statement about curvature gravity.
+\[
+\Delta\tau=-41326789.7751539\ {\rm s},
+\qquad
+{\rm savedDays}=478.319326.
+\]
 
-Cruise/max-speed answer: The repo certifies a bounded cruise envelope only in the sense of a fixed-chart descriptor band for `||beta_eff||`, with admissible band `[3.6531e-16, 1.9547e-15]`. This is explicitly not a scalar `vmax` certificate and not a speed mapping.
+For `0p5000`, the calculation is:
 
-Acceleration-profile answer: The in-hull acceleration profile is zero and is certified as such under the contract's constant-lapse adequacy criterion. This is a profile certification in a bounded geometry/observer family, not comfort/safety.
+\[
+\tau=0.5000\times137755965.9171795=68877982.9585898\ {\rm s},
+\]
 
-Relativistic-vs-nonrelativistic answer: The current mission-time comparison reports exactly zero differential because the certified comparator is classical `tau=t` on the same estimator basis, and speed-based SR/NR comparators are explicitly deferred. Therefore, no certified relativistic advantage is claimed or implied.
+\[
+\Delta\tau=-68877982.9585898\ {\rm s},
+\qquad
+{\rm savedDays}=797.198877.
+\]
 
-Alpha Centauri mission-time answer: Under the repo's bounded estimator assumptions, repeating a certified local route-time probe schedule over a deterministic committed local-rest target distance for `alpha-cen-a`, the estimated coordinate time and ship proper time are both `4.3652231448899625` years, essentially the light-time for the committed distance. This is not an unconstrained ETA surface, not a route-map product, and not speed-certified.
+### 6.6 Why lower-alpha rows are targets, not validated outcomes
 
-**Publication and provenance as part of scientific status.** The proof-surface manifest is the repo's explicit statement that publication determinism is part of what exists now scientifically, even though it does not widen physics claims. The manifest `artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json` specifies publication mode `bounded_stack_latest_sequential_single_writer`, eight proof surfaces with JSON/MD paths and checksums, and an evidence-state label `trackedRepoEvidenceStatus: repo_tracked_latest_evidence`. It also states a boundary statement: this manifest does not widen any transport, gravity, or viability claim.
+Expected clocking math says what a row should produce if the same schedule remains frozen and the centerline worldline remains flat at `d tau / dt = alpha`. Validation requires fresh artifacts: selected transport completion, profile coherence, mission coordinate invariance, proper/coordinate ratio closure, decomposition residual closure, lapse-tracked fraction, horizon margin, beta-over-alpha sanity, observer gates, source/provenance gates, and full-loop audit state.
 
-This matters because NHM2's certified bounded claims are only as strong as their reproducible provenance. The repo takes a strict stance: certification is tied to contract surfaces, checksums, and explicit evidence-state labels, and the manifest is the anchor for external auditing of latest.
+## 7. Stability, perturbation, and frontier search
 
-**May 2 artifact reproducibility boundary.** The May 2 alpha-sweep and frontier-distance JSONs are generated workspace artifacts. In this local workspace they are present under:
+### 7.1 Gate-admitted selected-profile behavior
+
+The current evidence stack admits selected same-chart observer routes and a selected-profile clocking-law anchor. This is enough to define the calculation and its artifact boundary, not enough to claim broad viability or a fully promoted ladder.
+
+### 7.2 Perturbation and reproducibility limits
+
+Reproducibility depends on artifact freshness, deterministic output paths, source manifests, and fail-closed gates. A row that lacks a fresh full-loop artifact is not silently promoted by expected math. A row blocked by selected transport is not a physics failure until the runtime layer completes and the physics gates are reached.
+
+### 7.3 0p7000 runtime frontier
+
+`stage1_centerline_alpha_0p7000_v1` is the current operational frontier target. Its expected subjective efficiency is `1.428571429x`, but its current state is runtime-blocked at selected transport. The correct interpretation is operational: recover selected-transport completion before interpreting physics gates.
+
+### 7.4 Frontier bisection strategy
+
+If `0p7300` is confirmed and `0p7000` remains blocked or failing after runtime hardening, the rational search is bisection:
+
+```text
+0p7250 -> 0p7200 -> 0p7150 -> 0p7100 -> 0p7050 -> 0p7000
+```
+
+This distinguishes an operational failure from a numerical or physical frontier and prevents jumping from the anchor directly to deep exploratory profiles.
+
+## 8. Scientific interpretation
+
+### 8.1 What NHM2 currently demonstrates
+
+The NHM2 calculation does not solve an experimentally realized Casimir material system into a flight-ready warp drive. What it solves, within the current repository evidence stack, is narrower: a same-chart metric-evaluation and observer-audit problem for a selected lapse-shift profile. The mechanism side supplies a modeled source narrative; the geometry side evaluates a lapse-shift profile; the Einstein-tensor route supplies a metric-required stress-energy tensor; observer projections evaluate energy-condition surfaces; and the centerline-lapse law computes expected proper-time reduction for frozen coordinate schedules. The current result is therefore a bounded mathematical and computational closure surface, not physical viability.
+
+### 8.2 What remains open
+
+The following remain outside the current claim:
+
+- physical source realization of the required stress-energy tensor
+- experimental validation of Casimir-tile amplification as a macroscopic GR source
+- arbitrary route dynamics
+- max speed
+- black-hole or strong external-field operation
+- arbitrary ambient curvature envelope
+- multi-mode cabin-gravity certification unless a future mode-axis artifact is published
+- lower-alpha profile validation before fresh artifacts pass
+- route ETA or speed-based SR/NR comparison
+- theorem-level no-horizon or no-infinite-blueshift closure
+
+### 8.3 Why literature context is not validation
+
+The cited GR and warp-drive literature defines the mathematical language and the known cautionary terrain. It does not certify this repository's numeric artifacts. In this whitepaper, papers provide formalism and context; repository artifacts define NHM2 row status.
+
+## Appendix A. Repository artifact status and claim-tier table
+
+The detailed implementation state belongs in an appendix because it is evidence metadata, not the scientific argument itself.
+
+| item | current status / value | interpretation boundary |
+|---|---|---|
+| current commit referenced by May 2 addendum | `3ed3408c36ae43367ea60204622e34751a523059` | current status reference used by the May 2 whitepaper addendum |
+| historical baseline commit | `53fb0a498b38892df11cfa2831d95c2007c3c64a` | April 3 bounded-stack historical baseline |
+| selectedProfileId | `stage1_centerline_alpha_0p995_v1` | selected-profile clocking-law anchor, not blanket full-loop certified pass |
+| full-loop latest overallState | `review` | top-level state remains review-level |
+| currentClaimTier | `diagnostic` | not promoted to reduced-order / physical-viability claim |
+| highestPassingClaimTier | `null` | no blanket top-level promotion |
+| representative blocking reasons | `insufficient_provenance`, `policy_review_required` | provenance/policy gates still constrain claims |
+| source_closure | globally diagonal-tight, review-level | regional direct `T00` diagnostic-only and assumption drift remain |
+| observer_audit | selected same-chart route admitted/pass in current artifact stack | repo-internal observer closure, not external validation |
+| certificate_policy_result | `pass` in current artifact stack | policy sub-surface pass does not override top-level review state |
+| 0p7000 | `runtime_blocked` due to `selected_transport_timeout` | runtime-blocked, not physics-failed |
+| 0p5000 | exploratory expected target | not validated |
+
+## Appendix B. Current generated artifact reproducibility boundary
+
+The latest alpha-sweep summary and frontier-distance ledger available in this workspace were generated on `2026-05-02T17:16:42.266Z`. In this local workspace they are present under:
 
 ```text
 artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-lapse-alpha-sweep-latest.json
 artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-frontier-distance-latest.json
 ```
 
-Unless those generated JSONs are separately committed and published, community-facing review should treat the markdown summary as documenting the local/generated artifact state rather than assuming every underlying JSON surface is publicly fetchable from GitHub.
+Unless those generated JSONs are separately committed and published, community-facing review should treat this markdown paper as documenting the local/generated artifact state rather than assuming every underlying JSON surface is publicly fetchable from GitHub.
 
-**Source-closure status boundary.** Current source closure should stay review-level and nuanced. Global diagonal source closure is numerically tight under the current v2 comparison, including reported `relLInf = 4.6143808140791624e-10` in the reviewed artifact stream, while regional direct `T00` comparison remains diagnostic-only because the needed regional tile-effective counterpart is not authoritative. The source-closure status therefore still carries review-level caveats such as `region_basis_diagnostic_only` and `assumption_drift`; it should not be summarized as fully solved without those qualifiers.
+## Appendix C. Equation-to-artifact and equation-to-claim map
 
-**What stronger NHM2 claims would mathematically require.** This section is intentionally a boundary statement, not a roadmap pitch.
+| Equation / construct | Scientific role | NHM2 use | Claim boundary |
+|---|---|---|---|
+| `ds^2=-alpha^2dt^2+gamma_ij(dx^i+beta^idt)(dx^j+beta^jdt)` | 3+1 metric split | defines lapse/shift/spatial metric language | formalism only |
+| `(d tau / dt)^2 = alpha^2 - gamma_ij(v^i+beta^i)(v^j+beta^j)` | proper-time normalization | centerline timing and worldline audit grammar | chart/observer dependent |
+| `E,J_i,S_ij` projections | observer stress-energy grammar | same-chart full-tensor observer closure | requires admitted route |
+| `T_ij`, `T_0i`, `T_00` reconstruction | reconstruct coordinate tensor components | prevents diagonal-only proxy promotion | valid only from same-chart projected quantities |
+| `G_mu_nu=8piT_mu_nu` | Einstein tensor route | geometry-first stress-energy evaluation | repo-internal evaluator, not experimental validation |
+| WEC/NEC/SEC/DEC | energy-condition tests | observer audit | passing audit is not physical viability |
+| `tau=alpha T` | frozen centerline clocking target | lapse sweep expectation | lower-alpha rows unvalidated until artifacts pass |
+| `E/A=-pi^2 hbar c/(720a^3)` | mechanism-side source model | tile energy baseline | not GR-coupled physical source proof |
+| `d_eff=d_burst d_cycle (N_concurrent/N_sector)` | duty averaging | sector strobing source strength | not a certified thrust law |
+| `a_i=partial_i alpha / alpha` | Eulerian proper acceleration | cabin-frame acceleration diagnostic | not curvature gravity or comfort/safety certification |
 
-Scalar speed semantics would require a contract that defines a physically meaningful speed observable in a specified reference frame, including asymptotic or external reference conditions, and demonstrates how the shift/lapse/metric relate to that speed without relying on coordinate velocity fixed to zero by chart choice. The current worldline contract explicitly refuses speed meaning, `certifiedSpeedMeaning: false`, and therefore cannot be extended by interpretation alone.
+## Appendix D. Source list and citation roles
 
-A nonzero relativistic differential with a speed-based comparator would require, at minimum, a certified comparator contract that introduces either a speed-based nonrelativistic reference or a flat SR reference, both of which the repo explicitly lists as deferred comparators. Without those, the comparison is intentionally restricted to `tau=t` and cannot certify relativistic advantage.
+| source | role in this paper | boundary |
+|---|---|---|
+| ADM, The Dynamics of General Relativity: https://arxiv.org/abs/gr-qc/0405109 | 3+1 Hamiltonian formalism context | does not validate NHM2 |
+| Gourgoulhon, 3+1 Formalism and Bases of Numerical Relativity: https://arxiv.org/abs/gr-qc/0703035 | foliation, lapse, shift, normal, projection, constraints | does not validate NHM2 |
+| Alcubierre, The warp drive: https://arxiv.org/abs/gr-qc/0009013 | warp-metric context | does not validate NHM2 |
+| Natario, Warp Drive With Zero Expansion: https://arxiv.org/abs/gr-qc/0110086 | low-expansion / warp context | does not validate NHM2 |
+| Pfenning and Ford, The unphysical nature of Warp Drive: https://arxiv.org/abs/gr-qc/9702026 | negative-energy and warp limitation context | does not validate NHM2 |
+| Fewster and Roman, Null energy conditions in quantum field theory: https://arxiv.org/abs/gr-qc/0209036 | energy-condition and quantum-field-theory caution context | does not validate NHM2 |
+| Santiago, Schuster, Visser, Generic warp drives violate the null energy condition: https://arxiv.org/abs/2105.03079 | generic warp-drive NEC caution context | does not validate NHM2 |
+| CasimirBot repository artifacts | implementation/evidence state | only source for NHM2 row status |
 
-Full route dynamics would require a contract that does not merely repeat a local probe schedule but models acceleration/braking phases, control-law changes, target capture, and potentially external gravitational fields. The repo's estimator explicitly states it does not add braking, cruise-envelope widening, target gravity capture, or catalog-specific control law.
+## Final conclusion
 
-Curvature-gravity claims would require certified curvature invariants, for example Riemann/Weyl scalars or tidal tensors under explicitly stated observer families, not just Eulerian lapse-gradient acceleration `a_i`. The current in-hull acceleration artifact explicitly forbids curvature-gravity certification.
-
-Comfort/safety claims would require additional contracts that map physical thresholds, accelerations, jerks, gradients, and possibly radiation/blueshift proxies, into bounded risk statements. The current artifacts explicitly forbid treating the in-hull acceleration profile as comfort/safety certification.
-
-Stronger horizon/blueshift closure would require a global optical/causal analysis, null geodesic integration or equivalent, on the certified metric family and regime, beyond a wall-normal heuristic ratio. The repo currently treats wall-normal `beta_outward/alpha` and wall horizon margin as diagnostics/guardrails, not theorems, and the congruence audit identifies brick-native low-expansion gating as the highest-leverage missing falsifier anchoring Natario-like status.
-
-**What the repo can honestly claim now.** The strongest honest current claim is: the repo has a publication-hardened, contract-defined, certified bounded NHM2 stack that samples a solve-backed shift-vector field on a deterministic local comoving shell-cross family, certifies a bounded support band for the norm `||beta_eff||` as a local transport descriptor, not speed, extends that into a bounded local probe route-time worldline parameterization, not target ETA, produces a target-coupled mission-time estimator and mission-time comparison on an explicitly assumption-bearing repeated-local-probe schedule, with a classical `tau=t` comparator and zero differential in the current regime, and certifies an in-hull Eulerian experienced proper-acceleration profile that is identically zero in the current constant-lapse regime.
-
-**What the repo still cannot claim.** The repo still cannot claim, because it explicitly forbids claiming: any scalar max speed; any ship-speed mapping from `||beta_eff||`; any route-map ETA; any full route dynamics; any speed-based SR/NR comparison; any curvature-gravity or comfort/safety certification; any viability promotion; any mechanism-to-metric closure; and any theorem-level no-horizon/no-infinite-blueshift result. These are not conservative interpretations; they are encoded as boundary statements, non-claims, and deferred comparator lists within the certified artifacts and audits.
-
-**Final conclusion.** NHM2, as of the repo state reflected in the published bounded proof surfaces dated 2026-04-03 and the later centerline-lapse sweep framework present by 2026-05-02, is best described as a bounded, solve-backed local transport diagnostic, publication discipline, and fail-closed lapse-clock frontier framework, not as a certified warp-speed or mission-ETA system. Its mechanism layer is richly modeled and provenance-controlled, Casimir tile baseline plus material bands plus amplification ladder plus mass proxy with explicit `massMode`, but the repo's own congruence audit classifies that mechanism side as reduced-order/proxy and not promoted into authoritative metric closure. Its original bounded solve-backed metric/geometry layer produces a small-amplitude mild regime in which the certified observer-derived outputs coherently report `||beta_eff|| ~ 10^-15`, `dtau/dt=1`, zero mission-time differential on the current comparator basis, and zero in-hull Eulerian proper acceleration, while explicitly forbidding any stronger inference. Its newer lapse-clock branch preserves the same fail-closed discipline while using `stage1_centerline_alpha_0p995_v1` as a selected-profile clocking-law anchor and computing lower-alpha expected targets, including `0p7000` at approximately `1.428571429x` subjective efficiency and `0p5000` at `2.000000000x`, without promoting them unless their own fresh full-loop artifacts pass. The current operational frontier is `stage1_centerline_alpha_0p7000_v1`, blocked at selected transport with `fullLoopStateRaw=unavailable`; therefore, the next scientific closure issue is twofold: recover selected-transport runtime completion for the lapse ladder, and continue making low-expansion / Natario-like classification falsifiable on a single authoritative brick-native surface, so that morphology and clocking labels remain tightly coupled to the solver-authoritative fields they purport to describe.
-
-
-
-
-
+NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy closure route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a same-chart tensor, observer projections define energy-condition gates, and the centerline-lapse law computes expected timing targets. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, or validated deep-clock rows. The immediate progression is to preserve the selected-profile clocking-law anchor, recover the `0p7000` selected-transport runtime frontier, and promote only rows whose own fresh artifacts pass.

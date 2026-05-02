@@ -99,6 +99,20 @@
       "url": "https://arxiv.org/abs/gr-qc/0110086"
     },
     {
+      "id": "adm_2008_dynamics_gr",
+      "type": "paper",
+      "evidenceType": "preprint",
+      "sourceStability": "preprint",
+      "title": "The Dynamics of General Relativity",
+      "supportsClaimIds": [
+        "claim_nhm2_alpha_sweep_clocking_isolation",
+        "claim_nhm2_locked_coordinate_schedule_invariant"
+      ],
+      "accessedOn": "2026-05-02",
+      "confidenceNote": "ADM Hamiltonian/3+1 formalism context; does not certify NHM2 outputs.",
+      "url": "https://arxiv.org/abs/gr-qc/0405109"
+    },
+    {
       "id": "gourgoulhon_2007_3plus1",
       "type": "paper",
       "evidenceType": "preprint",
@@ -243,8 +257,7 @@
         "casimirbot_repo_clone_6baffda",
         "lentz_2021_breaking_warp_barrier"
       ],
-      "uncertaintyNote": "Predictive projection only; not validated by present bounded-stack evidence."
-      ,
+      "uncertaintyNote": "Predictive projection only; not validated by present bounded-stack evidence.",
       "uncertaintyRationale": "Mechanism closure remains unresolved in this repository; literature only bounds plausible directions.",
       "scopeBoundary": "This claim is scenario-planning context and does not certify a physically admissible NHM2 transport regime."
     },
@@ -259,6 +272,7 @@
       ],
       "sourceIds": [
         "natario_2001_zero_expansion",
+        "adm_2008_dynamics_gr",
         "gourgoulhon_2007_3plus1",
         "casimirbot_repo_clone_6baffda"
       ],
@@ -288,6 +302,7 @@
       ],
       "sourceIds": [
         "casimirbot_repo_clone_6baffda",
+        "adm_2008_dynamics_gr",
         "gourgoulhon_2007_3plus1",
         "alcubierre_1994_warp_drive"
       ],
