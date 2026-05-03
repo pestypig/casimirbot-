@@ -10,6 +10,17 @@ import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type {
+  HelixAudioIdentityResult,
+  HelixAudioIdentitySessionSnapshot,
+  HelixCaptureSource,
+  HelixSpeakerAuthority,
+  HelixSpeakerLabel,
+  HelixSpeakerPolicyMode,
+  HelixSpeakerRole,
+  HelixSpeakerSegment,
+  HelixUnknownSpeakerBehavior,
+} from "@shared/helix-audio-identity";
+import type {
   ContextCapsuleReplayBundle,
   ContextCapsuleSummary,
 } from "@shared/helix-context-capsule";
@@ -1084,7 +1095,11 @@ export type VoiceCommandLaneSuppressionReason =
   | "audio_quality_low"
   | "strict_prefix_required"
   | "log_only"
-  | "non_user_audio_source";
+  | "non_user_audio_source"
+  | "speaker_not_authorized"
+  | "speaker_confidence_low"
+  | "unknown_speaker"
+  | "overlapping_speech";
 
 export type VoiceCommandLaneEnvelope = {
   version: "helix.voice.command_lane.v1" | string;
@@ -1109,16 +1124,20 @@ export type VoiceTranscribePayload = {
   thread_id?: string;
   capture_session_id?: string;
   chunk_index?: number;
-  capture_source?:
-    | "mic"
-    | "display_tab_audio"
-    | "display_window_audio"
-    | "display_screen_audio"
-    | "system_loopback";
+  capture_source?: HelixCaptureSource;
   command_lane_enabled?: boolean;
+  speaker_identity_enabled?: boolean;
+  speaker_policy_mode?: HelixSpeakerPolicyMode;
+  known_speaker_ids?: string[];
+  active_listener_speaker_ids?: string[];
+  unknown_speaker_behavior?: HelixUnknownSpeakerBehavior;
+  audio_identity_session_id?: string;
   durationMs?: number;
   speaker_id?: string;
   speaker_confidence?: number;
+  speaker_role?: HelixSpeakerRole;
+  speaker_authority?: HelixSpeakerAuthority;
+  overlapping_speech?: boolean;
   speech_probability?: number;
   snr_db?: number;
   confirm_auto_eligible?: boolean;
@@ -1145,6 +1164,14 @@ export type VoiceTranscribeResponse = {
   translation_uncertain?: boolean;
   speaker_id?: string | null;
   speaker_confidence?: number | null;
+  speaker_segments?: HelixSpeakerSegment[];
+  primary_speaker_id?: string | null;
+  speaker_role?: HelixSpeakerRole | null;
+  speaker_authority?: HelixSpeakerAuthority | null;
+  speaker_color_token?: HelixSpeakerLabel["color_token"] | null;
+  unknown_speaker_detected?: boolean;
+  audio_identity?: HelixAudioIdentityResult | null;
+  speaker_session?: HelixAudioIdentitySessionSnapshot | null;
   speech_probability?: number | null;
   snr_db?: number | null;
   confirm_auto_eligible?: boolean | null;
@@ -1539,6 +1566,27 @@ export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<
   if (typeof payload.command_lane_enabled === "boolean") {
     form.set("command_lane_enabled", payload.command_lane_enabled ? "1" : "0");
   }
+  if (typeof payload.speaker_identity_enabled === "boolean") {
+    form.set("speaker_identity_enabled", payload.speaker_identity_enabled ? "1" : "0");
+  }
+  if (payload.speaker_policy_mode) {
+    form.set("speaker_policy_mode", payload.speaker_policy_mode);
+  }
+  if (Array.isArray(payload.known_speaker_ids) && payload.known_speaker_ids.length > 0) {
+    form.set("known_speaker_ids", payload.known_speaker_ids.map((entry) => entry.trim()).filter(Boolean).join(","));
+  }
+  if (Array.isArray(payload.active_listener_speaker_ids) && payload.active_listener_speaker_ids.length > 0) {
+    form.set(
+      "active_listener_speaker_ids",
+      payload.active_listener_speaker_ids.map((entry) => entry.trim()).filter(Boolean).join(","),
+    );
+  }
+  if (payload.unknown_speaker_behavior) {
+    form.set("unknown_speaker_behavior", payload.unknown_speaker_behavior);
+  }
+  if (payload.audio_identity_session_id?.trim()) {
+    form.set("audio_identity_session_id", payload.audio_identity_session_id.trim());
+  }
   if (typeof payload.durationMs === "number" && Number.isFinite(payload.durationMs)) {
     form.set("durationMs", String(Math.max(0, Math.round(payload.durationMs))));
   }
@@ -1547,6 +1595,15 @@ export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<
   }
   if (typeof payload.speaker_confidence === "number" && Number.isFinite(payload.speaker_confidence)) {
     form.set("speaker_confidence", String(payload.speaker_confidence));
+  }
+  if (payload.speaker_role) {
+    form.set("speaker_role", payload.speaker_role);
+  }
+  if (payload.speaker_authority) {
+    form.set("speaker_authority", payload.speaker_authority);
+  }
+  if (typeof payload.overlapping_speech === "boolean") {
+    form.set("overlapping_speech", payload.overlapping_speech ? "1" : "0");
   }
   if (typeof payload.speech_probability === "number" && Number.isFinite(payload.speech_probability)) {
     form.set("speech_probability", String(payload.speech_probability));

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import type { Request, Response } from "express";
 import multer from "multer";
 import { z } from "zod";
@@ -39,6 +39,20 @@ import {
   runVoiceCommandArbiter,
   type VoiceCommandLaneResult,
 } from "../services/voice-command/command-arbiter";
+import { buildHelixAudioIdentityResult } from "../services/audio-identity/transcript-attribution";
+import {
+  applySpeakerSession,
+  getSpeakerSessionSnapshot,
+  resetSpeakerSessionRegistry,
+  resolveAudioIdentitySessionId,
+  trustSessionSpeaker,
+} from "../services/audio-identity/speaker-session";
+import type {
+  HelixAudioIdentityResult,
+  HelixSpeakerAuthority,
+  HelixSpeakerRole,
+  HelixSpeakerSegment,
+} from "../../shared/helix-audio-identity";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -85,6 +99,45 @@ const requestSchema = z.object({
 
 type VoiceRequest = z.infer<typeof requestSchema>;
 
+const booleanFormField = z.preprocess((value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "1" || normalized === "true") return true;
+    if (normalized === "0" || normalized === "false") return false;
+  }
+  return undefined;
+}, z.boolean().optional());
+
+const stringArrayFormField = z.preprocess((value) => {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((entry) => (typeof entry === "string" ? entry.split(",") : []))
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((entry): entry is string => typeof entry === "string")
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+        }
+      } catch {
+        return trimmed.split(",").map((entry) => entry.trim()).filter(Boolean);
+      }
+    }
+    return trimmed.split(",").map((entry) => entry.trim()).filter(Boolean);
+  }
+  return undefined;
+}, z.array(z.string().trim().min(1).max(120)).max(64).optional());
+
 const transcribeRequestSchema = z.object({
   language: z.string().trim().min(1).max(32).optional(),
   traceId: z.string().trim().max(200).optional(),
@@ -110,17 +163,25 @@ const transcribeRequestSchema = z.object({
       "system_loopback",
     ])
     .optional(),
-  command_lane_enabled: z.preprocess((value) => {
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") return value > 0;
-    if (typeof value === "string") {
-      const normalized = value.trim().toLowerCase();
-      if (normalized === "1" || normalized === "true") return true;
-      if (normalized === "0" || normalized === "false") return false;
-    }
-    return undefined;
-  }, z.boolean().optional()),
+  command_lane_enabled: booleanFormField,
+  speaker_identity_enabled: booleanFormField,
+  speaker_policy_mode: z
+    .enum(["profile_only", "trusted_session", "any_speaker", "transcribe_only"])
+    .optional(),
+  known_speaker_ids: stringArrayFormField,
+  active_listener_speaker_ids: stringArrayFormField,
+  unknown_speaker_behavior: z
+    .enum(["ignore", "transcribe_only", "ask_to_add"])
+    .optional(),
+  audio_identity_session_id: z.string().trim().min(1).max(200).optional(),
   speaker_id: z.string().trim().min(1).max(64).optional(),
+  speaker_role: z
+    .enum(["owner", "trusted_guest", "guest", "unknown", "device_audio"])
+    .optional(),
+  speaker_authority: z
+    .enum(["command_allowed", "command_confirm", "transcribe_only", "ignored"])
+    .optional(),
+  overlapping_speech: booleanFormField,
   speaker_confidence: z.preprocess((value) => {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string" && value.trim()) {
@@ -170,8 +231,33 @@ const transcribeRequestSchema = z.object({
 
 type VoiceTranscribeRequest = z.infer<typeof transcribeRequestSchema>;
 
+const speakerSessionTrustSchema = z.object({
+  session_id: z.string().trim().min(1).max(200).optional(),
+  audio_identity_session_id: z.string().trim().min(1).max(200).optional(),
+  capture_session_id: z.string().trim().min(1).max(200).optional(),
+  room_id: z.string().trim().max(200).optional(),
+  thread_id: z.string().trim().max(200).optional(),
+  speaker_id: z.string().trim().min(1).max(120),
+  display_name: z.string().trim().min(1).max(120).optional(),
+  role: z.enum(["owner", "trusted_guest", "guest"]).optional(),
+  authority: z
+    .enum(["command_allowed", "command_confirm", "transcribe_only", "ignored"])
+    .optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+type SpeakerSessionTrustRequest = z.infer<typeof speakerSessionTrustSchema>;
+
 const resolveTranscribeMissionId = (payload: VoiceTranscribeRequest): string | undefined =>
   payload.mission_id?.trim() || payload.missionId?.trim() || undefined;
+
+const resolveTrustRequestSessionId = (payload: SpeakerSessionTrustRequest): string =>
+  resolveAudioIdentitySessionId({
+    audioIdentitySessionId: payload.audio_identity_session_id ?? payload.session_id,
+    captureSessionId: payload.capture_session_id,
+    roomId: payload.room_id,
+    threadId: payload.thread_id,
+  });
 
 const buildSuppressedTranscribeCommandLane = (args: {
   traceId?: string | null;
@@ -1050,6 +1136,13 @@ type VoiceTranscriptionHandlerResult = {
   translation_uncertain?: boolean;
   speaker_id?: string;
   speaker_confidence?: number;
+  speaker_role?: HelixSpeakerRole;
+  speaker_authority?: HelixSpeakerAuthority;
+  speaker_segments?: HelixSpeakerSegment[];
+  audio_identity?: HelixAudioIdentityResult | null;
+  primary_speaker_id?: string | null;
+  speaker_color_token?: string | null;
+  unknown_speaker_detected?: boolean;
   speech_probability?: number;
   snr_db?: number;
   confirm_auto_eligible?: boolean;
@@ -1086,6 +1179,13 @@ type VoiceTranscriptionResult = {
   translation_uncertain?: boolean;
   speaker_id?: string;
   speaker_confidence?: number;
+  speaker_role?: HelixSpeakerRole;
+  speaker_authority?: HelixSpeakerAuthority;
+  speaker_segments?: HelixSpeakerSegment[];
+  audio_identity?: HelixAudioIdentityResult | null;
+  primary_speaker_id?: string | null;
+  speaker_color_token?: string | null;
+  unknown_speaker_detected?: boolean;
   speech_probability?: number;
   snr_db?: number;
   confirm_auto_eligible?: boolean;
@@ -1771,6 +1871,67 @@ voiceRouter.options("/transcribe", (_req, res) => {
   res.status(200).end();
 });
 
+voiceRouter.options("/speaker-session/trust", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+voiceRouter.get("/speaker-session/:sessionId", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const sessionId = req.params.sessionId?.trim();
+  if (!sessionId) {
+    return errorEnvelope(
+      res,
+      400,
+      "voice_invalid_request",
+      "Audio identity session id is required.",
+      { field: "sessionId" },
+    );
+  }
+  const snapshot = getSpeakerSessionSnapshot(sessionId);
+  if (!snapshot) {
+    return res.status(200).json({
+      ok: true,
+      session: null,
+    });
+  }
+  return res.status(200).json({
+    ok: true,
+    session: snapshot,
+  });
+});
+
+voiceRouter.post("/speaker-session/trust", express.json({ limit: "64kb" }), (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const parsed = speakerSessionTrustSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return errorEnvelope(
+      res,
+      400,
+      "voice_invalid_request",
+      "Invalid speaker session trust payload.",
+      { issues: parsed.error.flatten() },
+    );
+  }
+  const sessionId = resolveTrustRequestSessionId(parsed.data);
+  const session = trustSessionSpeaker({
+    sessionId,
+    speakerId: parsed.data.speaker_id,
+    roomId: parsed.data.room_id ?? null,
+    threadId: parsed.data.thread_id ?? null,
+    displayName: parsed.data.display_name ?? null,
+    role: parsed.data.role ?? "trusted_guest",
+    authority: parsed.data.authority ?? null,
+    confidence: parsed.data.confidence ?? null,
+  });
+  return res.status(200).json({
+    ok: true,
+    session,
+  });
+});
+
 voiceRouter.post("/transcribe", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
@@ -1922,22 +2083,89 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       );
     }
 
+    const resolvedSpeakerId = result.speaker_id ?? parsed.data.speaker_id ?? null;
+    const resolvedSpeakerConfidence =
+      typeof result.speaker_confidence === "number"
+        ? result.speaker_confidence
+        : typeof parsed.data.speaker_confidence === "number"
+          ? parsed.data.speaker_confidence
+          : null;
+    const resolvedSpeechProbability =
+      typeof result.speech_probability === "number"
+        ? result.speech_probability
+        : typeof parsed.data.speech_probability === "number"
+          ? parsed.data.speech_probability
+          : null;
+    const resolvedSnrDb =
+      typeof result.snr_db === "number"
+        ? result.snr_db
+        : typeof parsed.data.snr_db === "number"
+          ? parsed.data.snr_db
+          : null;
+    const resolvedDurationMs =
+      typeof result.duration_ms === "number"
+        ? result.duration_ms
+        : parsed.data.durationMs ?? 0;
+    const rawAudioIdentity =
+      result.audio_identity ??
+      buildHelixAudioIdentityResult({
+        speakerIdentityEnabled: parsed.data.speaker_identity_enabled ?? false,
+        captureSessionId: parsed.data.audio_identity_session_id ?? parsed.data.capture_session_id ?? null,
+        roomId: parsed.data.room_id ?? null,
+        threadId: parsed.data.thread_id ?? null,
+        chunkIndex: parsed.data.chunk_index ?? null,
+        captureSource: parsed.data.capture_source ?? "mic",
+        text: result.text ?? "",
+        language: result.language ?? parsed.data.language ?? "en",
+        durationMs: resolvedDurationMs,
+        speakerId: resolvedSpeakerId,
+        speakerConfidence: resolvedSpeakerConfidence,
+        speechProbability: resolvedSpeechProbability,
+        snrDb: resolvedSnrDb,
+        overlappingSpeech: parsed.data.overlapping_speech ?? null,
+        speakerRole: result.speaker_role ?? parsed.data.speaker_role ?? null,
+        speakerAuthority: result.speaker_authority ?? parsed.data.speaker_authority ?? null,
+        policyMode: parsed.data.speaker_policy_mode ?? null,
+        unknownSpeakerBehavior: parsed.data.unknown_speaker_behavior ?? null,
+        knownSpeakerIds: parsed.data.known_speaker_ids ?? null,
+        activeListenerSpeakerIds: parsed.data.active_listener_speaker_ids ?? null,
+      });
+    const speakerSessionId = resolveAudioIdentitySessionId({
+      audioIdentitySessionId: parsed.data.audio_identity_session_id,
+      captureSessionId: parsed.data.capture_session_id,
+      roomId: parsed.data.room_id,
+      threadId: parsed.data.thread_id,
+    });
+    const sessionApplied = rawAudioIdentity
+      ? applySpeakerSession(rawAudioIdentity, {
+          sessionId: speakerSessionId,
+          roomId: parsed.data.room_id ?? null,
+          threadId: parsed.data.thread_id ?? null,
+        })
+      : null;
+    const audioIdentity = sessionApplied?.audioIdentity ?? null;
+    const speakerSession = sessionApplied?.session ?? null;
+    const primarySpeaker = audioIdentity?.speakers.find(
+      (speaker) => speaker.speaker_id === audioIdentity.primary_speaker_id,
+    ) ?? audioIdentity?.speakers[0] ?? null;
+    const speakerSegments = Array.isArray(result.speaker_segments)
+      ? result.speaker_segments
+      : audioIdentity?.segments ?? [];
+
     const commandLane = shouldRunTranscribeCommandLane(parsed.data)
       ? await runVoiceCommandArbiter({
           transcript: result.text ?? "",
           traceId: parsed.data.traceId ?? null,
-          speechProbability:
-            typeof result.speech_probability === "number"
-              ? result.speech_probability
-              : typeof parsed.data.speech_probability === "number"
-                ? parsed.data.speech_probability
-                : null,
-          snrDb:
-            typeof result.snr_db === "number"
-              ? result.snr_db
-              : typeof parsed.data.snr_db === "number"
-                ? parsed.data.snr_db
-                : null,
+          speechProbability: resolvedSpeechProbability,
+          snrDb: resolvedSnrDb,
+          speakerId: primarySpeaker?.speaker_id ?? resolvedSpeakerId,
+          speakerConfidence: primarySpeaker?.confidence ?? resolvedSpeakerConfidence,
+          speakerRole: primarySpeaker?.role ?? result.speaker_role ?? parsed.data.speaker_role ?? null,
+          speakerAuthority:
+            primarySpeaker?.authority ?? result.speaker_authority ?? parsed.data.speaker_authority ?? null,
+          overlappingSpeech:
+            parsed.data.overlapping_speech === true ||
+            speakerSegments.some((segment) => segment.overlap === true),
         })
       : buildSuppressedTranscribeCommandLane({
           traceId: parsed.data.traceId ?? null,
@@ -1957,9 +2185,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
         typeof result.language_confidence === "number" ? result.language_confidence : null,
       code_mixed: result.code_mixed ?? false,
       duration_ms:
-        typeof result.duration_ms === "number"
-          ? result.duration_ms
-          : parsed.data.durationMs ?? 0,
+        resolvedDurationMs,
       segments: Array.isArray(result.segments) ? result.segments : [],
       source_text: result.source_text ?? null,
       source_language: result.source_language ?? null,
@@ -1970,25 +2196,21 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       dispatch_state: result.dispatch_state ?? "auto",
       needs_confirmation: result.needs_confirmation ?? false,
       translation_uncertain: result.translation_uncertain ?? false,
-      speaker_id: result.speaker_id ?? parsed.data.speaker_id ?? null,
-      speaker_confidence:
-        typeof result.speaker_confidence === "number"
-          ? result.speaker_confidence
-          : typeof parsed.data.speaker_confidence === "number"
-            ? parsed.data.speaker_confidence
-            : null,
-      speech_probability:
-        typeof result.speech_probability === "number"
-          ? result.speech_probability
-          : typeof parsed.data.speech_probability === "number"
-            ? parsed.data.speech_probability
-            : null,
-      snr_db:
-        typeof result.snr_db === "number"
-          ? result.snr_db
-          : typeof parsed.data.snr_db === "number"
-            ? parsed.data.snr_db
-            : null,
+      speaker_id: primarySpeaker?.speaker_id ?? resolvedSpeakerId,
+      speaker_confidence: primarySpeaker?.confidence ?? resolvedSpeakerConfidence,
+      speaker_segments: speakerSegments,
+      primary_speaker_id: audioIdentity?.primary_speaker_id ?? primarySpeaker?.speaker_id ?? resolvedSpeakerId,
+      speaker_role: primarySpeaker?.role ?? result.speaker_role ?? parsed.data.speaker_role ?? null,
+      speaker_authority:
+        primarySpeaker?.authority ?? result.speaker_authority ?? parsed.data.speaker_authority ?? null,
+      speaker_color_token: primarySpeaker?.color_token ?? result.speaker_color_token ?? null,
+      unknown_speaker_detected:
+        result.unknown_speaker_detected ??
+        (audioIdentity?.speakers.some((speaker) => speaker.role === "unknown") ?? false),
+      audio_identity: audioIdentity,
+      speaker_session: speakerSession,
+      speech_probability: resolvedSpeechProbability,
+      snr_db: resolvedSnrDb,
       confirm_auto_eligible:
         typeof result.confirm_auto_eligible === "boolean"
           ? result.confirm_auto_eligible
@@ -2470,6 +2692,7 @@ const resetVoiceRouteState = () => {
   tenantBudgetDaily.clear();
   voiceSpeakChunkCache.clear();
   sttBackendCooldownUntil.clear();
+  resetSpeakerSessionRegistry();
   circuitBreaker.openedUntil = 0;
   circuitBreaker.recentFailures = [];
 };

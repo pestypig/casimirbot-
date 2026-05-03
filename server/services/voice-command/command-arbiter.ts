@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import type {
+  HelixSpeakerAuthority,
+  HelixSpeakerRole,
+} from "../../../shared/helix-audio-identity";
 
 export const HELIX_VOICE_COMMAND_LANE_VERSION = "helix.voice.command_lane.v1" as const;
 
@@ -14,7 +18,11 @@ export type VoiceCommandLaneSuppressionReason =
   | "audio_quality_low"
   | "strict_prefix_required"
   | "log_only"
-  | "non_user_audio_source";
+  | "non_user_audio_source"
+  | "speaker_not_authorized"
+  | "speaker_confidence_low"
+  | "unknown_speaker"
+  | "overlapping_speech";
 
 export type VoiceCommandLaneResult = {
   version: typeof HELIX_VOICE_COMMAND_LANE_VERSION;
@@ -34,6 +42,11 @@ export type VoiceCommandArbiterInput = {
   utteranceId?: string | null;
   speechProbability?: number | null;
   snrDb?: number | null;
+  speakerId?: string | null;
+  speakerConfidence?: number | null;
+  speakerAuthority?: HelixSpeakerAuthority | null;
+  speakerRole?: HelixSpeakerRole | null;
+  overlappingSpeech?: boolean | null;
 };
 
 type VoiceCommandArbiterConfig = {
@@ -46,6 +59,7 @@ type VoiceCommandArbiterConfig = {
   noiseRiskSnrDbMax: number;
   hardMinSpeechProbability: number;
   hardMinSnrDb: number;
+  speakerMinConfidence: number;
   evaluatorModel: string;
   evaluatorMinConfidence: number;
   evaluatorTimeoutMs: number;
@@ -227,6 +241,9 @@ const readVoiceCommandArbiterConfigFromEnv = (): VoiceCommandArbiterConfig => {
     noiseRiskSnrDbMax: parseNumber(process.env.HELIX_VOICE_COMMAND_LANE_NOISE_RISK_SNR_DB_MAX, 12),
     hardMinSpeechProbability: clamp01(parseNumber(process.env.HELIX_VOICE_COMMAND_LANE_HARD_MIN_SPEECH_PROB, 0.22)),
     hardMinSnrDb: parseNumber(process.env.HELIX_VOICE_COMMAND_LANE_HARD_MIN_SNR_DB, -2),
+    speakerMinConfidence: clamp01(
+      parseNumber(process.env.HELIX_VOICE_COMMAND_LANE_SPEAKER_MIN_CONFIDENCE, 0.55),
+    ),
     evaluatorModel:
       (process.env.HELIX_VOICE_COMMAND_LANE_EVALUATOR_MODEL ?? "gpt-4o-mini").trim() ||
       "gpt-4o-mini",
@@ -570,6 +587,33 @@ const buildResult = (args: {
 const requiresStrictPrefixForAction = (action: VoiceCommandLaneAction | null): boolean =>
   action === "send" || action === "retry";
 
+const resolveSpeakerSuppressionReason = (args: {
+  input: VoiceCommandArbiterInput;
+  config: VoiceCommandArbiterConfig;
+}): VoiceCommandLaneSuppressionReason | null => {
+  if (args.input.speakerAuthority === "ignored" || args.input.speakerAuthority === "transcribe_only") {
+    return "speaker_not_authorized";
+  }
+  if (
+    args.input.speakerRole === "unknown" &&
+    args.input.speakerAuthority !== "command_allowed" &&
+    args.input.speakerAuthority !== "command_confirm"
+  ) {
+    return "unknown_speaker";
+  }
+  if (
+    typeof args.input.speakerConfidence === "number" &&
+    Number.isFinite(args.input.speakerConfidence) &&
+    args.input.speakerConfidence < args.config.speakerMinConfidence
+  ) {
+    return "speaker_confidence_low";
+  }
+  if (args.input.overlappingSpeech === true) {
+    return "overlapping_speech";
+  }
+  return null;
+};
+
 const isNoiseRiskHigh = (args: {
   speechProbability?: number | null;
   snrDb?: number | null;
@@ -649,6 +693,7 @@ export const runVoiceCommandArbiter = async (
         snrDb: input.snrDb,
         config,
       }));
+  const speakerSuppressionReason = resolveSpeakerSuppressionReason({ input, config });
 
   if (isHardLowAudioQuality({ speechProbability: input.speechProbability, snrDb: input.snrDb, config })) {
     return buildResult({
@@ -683,6 +728,18 @@ export const runVoiceCommandArbiter = async (
   }
 
   if (parser.decision === "accepted" && parser.action) {
+    if (speakerSuppressionReason) {
+      return buildResult({
+        input,
+        normalizedTranscript,
+        strictPrefixApplied,
+        decision: "suppressed",
+        action: parser.action,
+        confidence: parser.confidence,
+        source: "parser",
+        suppressionReason: speakerSuppressionReason,
+      });
+    }
     if (strictPrefixApplied && requiresStrictPrefixForAction(parser.action) && !parser.hasHelixPrefix) {
       return buildResult({
         input,
@@ -754,6 +811,18 @@ export const runVoiceCommandArbiter = async (
     });
   }
   const hasHelixPrefix = hasInlineHelixPrefix(input.transcript);
+  if (speakerSuppressionReason) {
+    return buildResult({
+      input,
+      normalizedTranscript,
+      strictPrefixApplied,
+      decision: "suppressed",
+      action: evaluator.action,
+      confidence: evaluator.confidence,
+      source: "evaluator",
+      suppressionReason: speakerSuppressionReason,
+    });
+  }
   if (
     strictPrefixApplied &&
     requiresStrictPrefixForAction(evaluator.action) &&

@@ -52,6 +52,17 @@ describe("transcribeVoice", () => {
       chunk_index: 3,
       capture_source: "display_tab_audio",
       command_lane_enabled: false,
+      speaker_identity_enabled: true,
+      speaker_policy_mode: "trusted_session",
+      known_speaker_ids: ["spk_owner"],
+      active_listener_speaker_ids: ["spk_owner"],
+      unknown_speaker_behavior: "transcribe_only",
+      audio_identity_session_id: "audio-session-1",
+      speaker_id: "spk_owner",
+      speaker_confidence: 0.92,
+      speaker_role: "owner",
+      speaker_authority: "command_allowed",
+      overlapping_speech: false,
       durationMs: 1200,
     });
 
@@ -70,6 +81,17 @@ describe("transcribeVoice", () => {
     expect(body.get("chunk_index")).toBe("3");
     expect(body.get("capture_source")).toBe("display_tab_audio");
     expect(body.get("command_lane_enabled")).toBe("0");
+    expect(body.get("speaker_identity_enabled")).toBe("1");
+    expect(body.get("speaker_policy_mode")).toBe("trusted_session");
+    expect(body.get("known_speaker_ids")).toBe("spk_owner");
+    expect(body.get("active_listener_speaker_ids")).toBe("spk_owner");
+    expect(body.get("unknown_speaker_behavior")).toBe("transcribe_only");
+    expect(body.get("audio_identity_session_id")).toBe("audio-session-1");
+    expect(body.get("speaker_id")).toBe("spk_owner");
+    expect(body.get("speaker_confidence")).toBe("0.92");
+    expect(body.get("speaker_role")).toBe("owner");
+    expect(body.get("speaker_authority")).toBe("command_allowed");
+    expect(body.get("overlapping_speech")).toBe("0");
     expect(body.get("durationMs")).toBe("1200");
     const audioEntry = body.get("audio") as File;
     expect(audioEntry).toBeTruthy();
