@@ -273,6 +273,12 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           status: "idle",
           subtitle: `${input.speaker_a_native_language} <-> ${input.speaker_b_native_language}`,
           config: { translation_pair: config },
+          runtime: {
+            event_count: 0,
+            output_count: 0,
+            last_error: null,
+            last_updated_at: timestamp,
+          },
           created_at: timestamp,
           updated_at: timestamp,
         };
@@ -285,6 +291,12 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           speaker_id: input.speaker_a_id,
           subtitle: input.speaker_a_native_language,
           config: { native_language: input.speaker_a_native_language, authority: "transcribe_only" },
+          runtime: {
+            event_count: 0,
+            output_count: 0,
+            last_error: null,
+            last_updated_at: timestamp,
+          },
           created_at: timestamp,
           updated_at: timestamp,
         };
@@ -297,6 +309,12 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           speaker_id: input.speaker_b_id,
           subtitle: input.speaker_b_native_language,
           config: { native_language: input.speaker_b_native_language, authority: "transcribe_only" },
+          runtime: {
+            event_count: 0,
+            output_count: 0,
+            last_error: null,
+            last_updated_at: timestamp,
+          },
           created_at: timestamp,
           updated_at: timestamp,
         };

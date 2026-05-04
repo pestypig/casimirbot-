@@ -109,6 +109,7 @@ type PanelCapabilitiesLike = Record<
 >;
 
 const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
+  "situation-room-pipelines.setup_from_prompt",
   "situation-room-pipelines.create_job",
   "situation-room-pipelines.run_job",
   "situation-room-pipelines.attach_job_to_helix_ask",
@@ -163,10 +164,28 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "workstation-clipboard-history", action_id: "copy_selection_to_note", required_args: [], optional_args: ["note_id", "note_title"], returns_artifact: true },
   { panel_id: "situation-room-sources", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "situation-room-sources", action_id: "attach_display_audio_source", required_args: [], optional_args: ["room_id", "label"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-sources", action_id: "attach_mic_audio_source", required_args: [], optional_args: ["room_id", "label"], risk: "medium", returns_artifact: true },
   { panel_id: "situation-room-sources", action_id: "save_room_as_note", required_args: [], optional_args: ["room_id"], returns_artifact: true },
   { panel_id: "situation-room-sources", action_id: "attach_room_to_helix_ask", required_args: [], optional_args: ["room_id", "source_id"], returns_artifact: true },
   { panel_id: "situation-room-sources", action_id: "stop_room", required_args: [], optional_args: ["room_id"], risk: "medium", returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "setup_from_prompt",
+    required_args: ["intent"],
+    optional_args: [
+      "capture_preference",
+      "room_id",
+      "source_ids",
+      "speaker_a_id",
+      "speaker_b_id",
+      "speaker_a_native_language",
+      "speaker_b_native_language",
+      "output_mode",
+    ],
+    risk: "medium",
+    returns_artifact: true,
+  },
   {
     panel_id: "situation-room-pipelines",
     action_id: "create_job",
@@ -433,6 +452,9 @@ function argSchema(arg: string): Record<string, unknown> {
   }
   if (arg === "limit") return { type: "number" };
   if (arg === "kind") return { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] };
+  if (arg === "intent") return { enum: ["translate_conversation", "monitor_conversation", "summarize_conversation"] };
+  if (arg === "capture_preference") return { enum: ["existing_source", "browser_tab_audio", "display_audio", "mic", "unknown"] };
+  if (arg === "output_mode") return { enum: ["visual_only", "voice_on_confirm", "voice_auto_direct_address"] };
   if (arg === "input_text_policy") return { enum: ["transcript_text", "source_text_preferred", "source_text_only"] };
   if (arg === "output_render_policy") return { enum: ["target_language", "native_language", "dual"] };
   if (arg === "render_policy") return { enum: ["target_language", "native_language", "dual"] };
@@ -463,6 +485,7 @@ export function buildWorkstationToolInputSchema(action: WorkstationDynamicToolAc
 export function resolveWorkstationToolTerminalArtifactKind(panelId: string, actionId: string): string | null {
   if (actionId === "open") return "workspace_action_receipt";
   if (panelId === "docs-viewer" && actionId === "open_directory") return "workspace_action_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "setup_from_prompt") return "situation_room_setup_receipt";
   if (panelId === "situation-room-sources") return "situation_room_context";
   if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";
   if (panelId === "situation-room-pipelines" && actionId === "create_graph") return "situation_room_graph";

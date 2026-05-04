@@ -71,6 +71,14 @@ export type SituationGraphNode = {
   job_id?: string;
   output_id?: string;
   config?: Record<string, unknown>;
+  runtime?: {
+    last_event_id?: string;
+    last_output_id?: string;
+    event_count?: number;
+    output_count?: number;
+    last_error?: string | null;
+    last_updated_at?: string;
+  };
   created_at: string;
   updated_at: string;
 };

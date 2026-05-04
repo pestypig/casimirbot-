@@ -26,6 +26,10 @@ import {
   type SituationRoomJobOutputRenderPolicy,
 } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
+import {
+  normalizeSituationRoomSetupActionArgs,
+  setupSituationRoomFromPrompt,
+} from "@/lib/workstation/situationRoomSetupActions";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import type {
@@ -876,6 +880,34 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (actionId === "attach_mic_audio_source") {
+      const room = resolveSituationRoom(args, { createIfMissing: true });
+      if (!room) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No situation room is available for the microphone source.",
+        };
+      }
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      const label = asNonEmptyString(args.label ?? args.source_label ?? args.sourceLabel) ?? undefined;
+      void useSituationRoomStore.getState().attachMicAudioSource(room.room_id, label);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          ...summarizeSituationRoom(room),
+          mic_permission_requested: true,
+          label: label ?? null,
+          capture_source: "mic",
+        },
+        message: `Requesting microphone permission for ${room.title}.`,
+      };
+    }
+
     if (actionId === "save_room_as_note") {
       const room = resolveSituationRoom(args);
       if (!room) {
@@ -950,6 +982,24 @@ export function executeHelixPanelAction(
   if (panelId === "situation-room-pipelines") {
     const args = asRecord(request.args) ?? {};
     const jobState = useSituationRoomJobStore.getState();
+
+    if (actionId === "setup_from_prompt") {
+      const setupArgs = normalizeSituationRoomSetupActionArgs(args);
+      const receipt = setupSituationRoomFromPrompt(setupArgs);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      if (receipt.setup_status === "needs_capture_permission") {
+        context.openPanel("situation-room-sources", undefined);
+        context.focusPanel("situation-room-sources", undefined);
+      }
+      return {
+        ok: receipt.ok,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: receipt as unknown as Record<string, unknown>,
+        message: receipt.message,
+      };
+    }
 
     if (actionId === "create_job") {
       const room = resolveSituationRoom(args);

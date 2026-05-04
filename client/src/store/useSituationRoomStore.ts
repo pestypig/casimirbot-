@@ -5,6 +5,10 @@ import {
   type DisplayAudioSituationSession,
 } from "@/lib/helix/display-audio-capture";
 import {
+  startMicAudioSituationSession,
+  type MicAudioSituationSession,
+} from "@/lib/helix/mic-audio-situation-capture";
+import {
   type HelixSituationClassification,
   type HelixSituationEvent,
   type HelixSituationSource,
@@ -84,6 +88,7 @@ export type SituationRoomStoreState = {
   renameRoom: (roomId: string, title: string) => void;
   setActiveRoom: (roomId: string) => void;
   attachDisplayAudioSource: (roomId: string, label?: string) => Promise<SituationRoomSource | null>;
+  attachMicAudioSource: (roomId: string, label?: string) => Promise<SituationRoomSource | null>;
   stopSource: (sourceId: string) => void;
   stopRoom: (roomId: string) => void;
   appendSituationEvent: (event: HelixSituationEvent, sourceId?: string) => SituationRoomStoredEvent;
@@ -93,6 +98,7 @@ export type SituationRoomStoreState = {
 };
 
 const activeDisplaySessions = new Map<string, DisplayAudioSituationSession>();
+const activeMicSessions = new Map<string, MicAudioSituationSession>();
 
 const createId = (prefix: string): string => {
   const random =
@@ -471,8 +477,150 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           return get().sources[sourceId] ?? null;
         }
       },
+      attachMicAudioSource: async (roomId, label) => {
+        const room = get().rooms[roomId];
+        if (!room) return null;
+
+        const timestamp = nowIso();
+        const sourceId = createId("src");
+        const captureSessionId = createId("cap");
+        const source: SituationRoomSource = {
+          source_id: sourceId,
+          room_id: roomId,
+          label: normalizeTitle(label, "Microphone source"),
+          capture_source: "mic",
+          capture_session_id: captureSessionId,
+          status: "requesting",
+          chunk_index: 0,
+          started_at: timestamp,
+        };
+
+        set((state: SituationRoomStoreState) => ({
+          sources: { ...state.sources, [sourceId]: source },
+          rooms: {
+            ...state.rooms,
+            [roomId]: {
+              ...room,
+              status: "live",
+              source_ids: [...room.source_ids.filter((entry: string) => entry !== sourceId), sourceId],
+              updated_at: timestamp,
+            },
+          },
+          active_room_id: roomId,
+        }));
+
+        try {
+          const session = await startMicAudioSituationSession({
+            roomId,
+            captureSessionId,
+            onEvent: (event: HelixSituationEvent) => get().appendSituationEvent(event, sourceId),
+            onError: (error: Error) => {
+              const message = error.message || String(error);
+              set((state: SituationRoomStoreState) => {
+                const current = state.sources[sourceId];
+                if (!current) return state;
+                return {
+                  sources: {
+                    ...state.sources,
+                    [sourceId]: {
+                      ...current,
+                      status: "error",
+                      last_error: message,
+                    },
+                  },
+                };
+              });
+            },
+            onStop: (reason: "manual" | "track_ended") => {
+              activeMicSessions.delete(sourceId);
+              const stoppedAt = nowIso();
+              set((state: SituationRoomStoreState) => {
+                const current = state.sources[sourceId];
+                if (!current) return state;
+                return {
+                  sources: {
+                    ...state.sources,
+                    [sourceId]: {
+                      ...current,
+                      status: "stopped",
+                      stopped_at: stoppedAt,
+                    },
+                  },
+                };
+              });
+              const current = get().sources[sourceId];
+              if (current) {
+                get().appendSituationEvent(
+                  makeLifecycleEvent({
+                    roomId,
+                    source: current,
+                    eventType: "source_stopped",
+                    text: `${current.label} stopped.`,
+                    meta: { reason },
+                  }),
+                  sourceId,
+                );
+              }
+            },
+          });
+          if (!session || typeof session.stop !== "function") {
+            throw new Error("Microphone capture session did not start.");
+          }
+          activeMicSessions.set(sourceId, session);
+          const activeSource: SituationRoomSource = {
+            ...source,
+            capture_session_id: session.captureSessionId,
+            status: "active",
+          };
+          set((state: SituationRoomStoreState) => ({
+            sources: { ...state.sources, [sourceId]: activeSource },
+          }));
+          get().appendSituationEvent(
+            makeLifecycleEvent({
+              roomId,
+              source: activeSource,
+              eventType: "source_started",
+              text: `${activeSource.label} attached.`,
+            }),
+            sourceId,
+          );
+          return activeSource;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const failedAt = nowIso();
+          set((state: SituationRoomStoreState) => {
+            const current = state.sources[sourceId];
+            if (!current) return state;
+            return {
+              sources: {
+                ...state.sources,
+                [sourceId]: {
+                  ...current,
+                  status: "error",
+                  stopped_at: failedAt,
+                  last_error: message,
+                },
+              },
+            };
+          });
+          const current = get().sources[sourceId];
+          if (current) {
+            get().appendSituationEvent(
+              makeLifecycleEvent({
+                roomId,
+                source: current,
+                eventType: "source_error",
+                text: message,
+                meta: { reason: "mic_capture_start_failed" },
+              }),
+              sourceId,
+            );
+          }
+          return get().sources[sourceId] ?? null;
+        }
+      },
       stopSource: (sourceId) => {
-        const session = activeDisplaySessions.get(sourceId);
+        const session = activeDisplaySessions.get(sourceId) ?? activeMicSessions.get(sourceId);
         set((state: SituationRoomStoreState) => {
           const current = state.sources[sourceId];
           if (!current) return state;
@@ -487,6 +635,8 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           };
         });
         if (session) {
+          activeDisplaySessions.delete(sourceId);
+          activeMicSessions.delete(sourceId);
           session.stop();
           return;
         }
@@ -693,7 +843,11 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         for (const session of activeDisplaySessions.values()) {
           session.stop();
         }
+        for (const session of activeMicSessions.values()) {
+          session.stop();
+        }
         activeDisplaySessions.clear();
+        activeMicSessions.clear();
         set({
           rooms: {},
           room_order: [],

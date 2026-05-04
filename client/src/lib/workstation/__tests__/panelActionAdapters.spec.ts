@@ -29,6 +29,9 @@ vi.mock("@/lib/helix/ask-prompt-launch", () => ({
 vi.mock("@/lib/helix/display-audio-capture", () => ({
   startDisplayAudioSituationSession: vi.fn(),
 }));
+vi.mock("@/lib/helix/mic-audio-situation-capture", () => ({
+  startMicAudioSituationSession: vi.fn(),
+}));
 
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 
@@ -501,6 +504,86 @@ describe("panelActionAdapters", () => {
       attachment_policy: "manual_only",
       context_injection: "explicit_attachment_only",
       command_lane_enabled: false,
+    });
+  });
+
+  it("delegates Situation Room setup-from-prompt and mic source actions with receipts", () => {
+    const room = useSituationRoomStore.getState().createRoom("Setup Delegation Room");
+    const source = {
+      source_id: "src:setup:display",
+      room_id: room.room_id,
+      label: "Discord tab audio",
+      capture_source: "display_tab_audio" as const,
+      capture_session_id: "cap:setup",
+      status: "active" as const,
+      chunk_index: 0,
+      started_at: "2026-05-04T00:00:00.000Z",
+    };
+    useSituationRoomStore.setState((state) => ({
+      sources: { ...state.sources, [source.source_id]: source },
+      rooms: {
+        ...state.rooms,
+        [room.room_id]: {
+          ...state.rooms[room.room_id],
+          source_ids: [source.source_id],
+        },
+      },
+    }));
+
+    const setup = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "setup_from_prompt",
+        args: {
+          intent: "translate_conversation",
+          capture_preference: "existing_source",
+          room_id: room.room_id,
+          source_ids: [source.source_id],
+          speaker_a_id: "spk_user_1",
+          speaker_b_id: "spk_friend_1",
+          speaker_a_native_language: "English",
+          speaker_b_native_language: "Spanish",
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(setup.ok).toBe(true);
+    expect(setup.artifact).toMatchObject({
+      schema: "helix.situation_setup_receipt.v1",
+      setup_status: "complete",
+      room_id: room.room_id,
+      source_ids: [source.source_id],
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+      command_lane_enabled: false,
+    });
+    expect(setup.artifact?.graph_id).toBeTruthy();
+    expect(setup.artifact?.job_ids).toHaveLength(2);
+
+    const mic = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-sources",
+        action_id: "attach_mic_audio_source",
+        args: { room_id: room.room_id, label: "Same microphone" },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(mic.ok).toBe(true);
+    expect(mic.artifact).toMatchObject({
+      mic_permission_requested: true,
+      capture_source: "mic",
+      label: "Same microphone",
     });
   });
 

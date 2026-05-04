@@ -127,6 +127,7 @@ export default function SituationRoomSourcesPanel() {
   const renameRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.renameRoom);
   const setActiveRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.setActiveRoom);
   const attachDisplayAudioSource = useSituationRoomStore((state: SituationRoomStoreState) => state.attachDisplayAudioSource);
+  const attachMicAudioSource = useSituationRoomStore((state: SituationRoomStoreState) => state.attachMicAudioSource);
   const stopSource = useSituationRoomStore((state: SituationRoomStoreState) => state.stopSource);
   const stopRoom = useSituationRoomStore((state: SituationRoomStoreState) => state.stopRoom);
   const saveRoomAsNote = useSituationRoomStore((state: SituationRoomStoreState) => state.saveRoomAsNote);
@@ -184,6 +185,13 @@ export default function SituationRoomSourcesPanel() {
       if (source) setSelectedSourceId(source.source_id);
     });
   }, [activeRoom, attachDisplayAudioSource]);
+
+  const handleAttachMicSource = React.useCallback(() => {
+    if (!activeRoom) return;
+    void attachMicAudioSource(activeRoom.room_id).then((source: SituationRoomSource | null) => {
+      if (source) setSelectedSourceId(source.source_id);
+    });
+  }, [activeRoom, attachMicAudioSource]);
 
   return (
     <div className="grid h-full min-h-0 w-full grid-cols-1 overflow-hidden bg-slate-950/95 text-slate-100 lg:grid-cols-[240px_minmax(320px,1fr)_360px]">
@@ -259,7 +267,15 @@ export default function SituationRoomSourcesPanel() {
                 className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
               >
                 <Waves className="h-3.5 w-3.5" />
-                Attach Source
+                Attach Display
+              </button>
+              <button
+                type="button"
+                onClick={handleAttachMicSource}
+                className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
+              >
+                <Radio className="h-3.5 w-3.5" />
+                Attach Mic
               </button>
               <button
                 type="button"
@@ -273,7 +289,7 @@ export default function SituationRoomSourcesPanel() {
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {activeSources.length === 0 ? (
                 <div className="flex h-full min-h-[240px] items-center justify-center rounded-lg border border-dashed border-white/15 bg-black/20 px-6 text-center text-sm text-slate-400">
-                  Attach a browser tab, window, or screen audio source to start self-writing room notes.
+                  Attach a browser tab, window, screen, or microphone audio source to start self-writing room notes.
                 </div>
               ) : (
                 <div className="grid gap-3 xl:grid-cols-2">
