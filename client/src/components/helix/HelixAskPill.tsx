@@ -9807,6 +9807,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       final_rendering_invariant: debug?.final_rendering_invariant,
     },
     equation_attempt_debug: debug?.equation_attempt_debug ?? agentLoop?.equation_attempt_debug,
+    composite_goal_frame: debug?.composite_goal_frame ?? agentLoop?.composite_goal_frame,
+    composite_execution_plan: debug?.composite_execution_plan ?? agentLoop?.composite_execution_plan,
+    composite_turn_receipt: debug?.composite_turn_receipt ?? agentLoop?.composite_turn_receipt,
+    subgoal_artifact_map: debug?.subgoal_artifact_map ?? agentLoop?.subgoal_artifact_map,
+    composite_anti_determinism_audit:
+      debug?.composite_anti_determinism_audit ?? agentLoop?.composite_anti_determinism_audit,
     pending_server_request: agentLoop?.pending_request ?? null,
     backend_debug_response_ref:
       readAgentLoopAuditRecord(debug?.debug_export_ref) ??
