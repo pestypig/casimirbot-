@@ -2,10 +2,14 @@ import {
   resolveHelixSpeakerColorToken,
   type HelixAudioIdentityResult,
   type HelixAudioIdentitySessionSnapshot,
+  type HelixCaptureSource,
   type HelixSpeakerAuthority,
   type HelixSpeakerLabel,
+  type HelixSpeakerPolicyMode,
   type HelixSpeakerRole,
+  type HelixUnknownSpeakerBehavior,
 } from "../../../shared/helix-audio-identity";
+import { resolveSpeakerAuthorityPolicy } from "./speaker-policy";
 
 type SpeakerSessionState = {
   sessionId: string;
@@ -18,10 +22,44 @@ type SpeakerSessionState = {
 
 const sessionRegistry = new Map<string, SpeakerSessionState>();
 
+const parsePositiveIntEnv = (name: string, fallback: number): number => {
+  const parsed = Number(process.env[name]);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.round(parsed));
+};
+
+const readSessionTtlMs = (): number =>
+  parsePositiveIntEnv("HELIX_AUDIO_IDENTITY_SESSION_TTL_MS", 900_000);
+
+const readMaxSessions = (): number =>
+  parsePositiveIntEnv("HELIX_AUDIO_IDENTITY_MAX_SESSIONS", 256);
+
+const readMaxSpeakersPerSession = (): number =>
+  parsePositiveIntEnv("HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION", 16);
+
 const cloneSpeaker = (speaker: HelixSpeakerLabel): HelixSpeakerLabel => ({ ...speaker });
 
 const normalizeSessionId = (value: string | null | undefined): string =>
   value?.trim() || "capture_session_unknown";
+
+export const pruneExpiredSpeakerSessions = (nowMs = Date.now()): void => {
+  const ttlMs = readSessionTtlMs();
+  for (const [sessionId, state] of sessionRegistry.entries()) {
+    if (nowMs - state.updatedAtMs > ttlMs) {
+      sessionRegistry.delete(sessionId);
+    }
+  }
+
+  const maxSessions = readMaxSessions();
+  if (sessionRegistry.size <= maxSessions) return;
+  const ranked = Array.from(sessionRegistry.values()).sort(
+    (a, b) => a.updatedAtMs - b.updatedAtMs,
+  );
+  for (const state of ranked) {
+    if (sessionRegistry.size <= maxSessions) break;
+    sessionRegistry.delete(state.sessionId);
+  }
+};
 
 export const resolveAudioIdentitySessionId = (args: {
   audioIdentitySessionId?: string | null;
@@ -42,6 +80,7 @@ const getOrCreateState = (args: {
   roomId?: string | null;
   threadId?: string | null;
 }): SpeakerSessionState => {
+  pruneExpiredSpeakerSessions();
   const sessionId = normalizeSessionId(args.sessionId);
   const existing = sessionRegistry.get(sessionId);
   if (existing) {
@@ -59,6 +98,25 @@ const getOrCreateState = (args: {
   };
   sessionRegistry.set(sessionId, state);
   return state;
+};
+
+const enforceSpeakerCap = (
+  state: SpeakerSessionState,
+  incomingSpeakerId: string,
+): void => {
+  if (state.speakers.has(incomingSpeakerId)) return;
+  const maxSpeakers = readMaxSpeakersPerSession();
+  while (state.speakers.size >= maxSpeakers) {
+    const removable =
+      Array.from(state.speakers.values()).find(
+        (speaker) =>
+          speaker.enrollment_state !== "session" &&
+          speaker.enrollment_state !== "profile" &&
+          speaker.role !== "owner",
+      ) ?? (state.speakers.values().next().value as HelixSpeakerLabel | undefined);
+    if (!removable) return;
+    state.speakers.delete(removable.speaker_id);
+  }
 };
 
 const nextOrdinal = (state: SpeakerSessionState, role: HelixSpeakerRole): number => {
@@ -92,24 +150,37 @@ const displayNameForSessionSpeaker = (
 const mergeSpeaker = (
   state: SpeakerSessionState,
   incoming: HelixSpeakerLabel,
+  args: {
+    captureSource: HelixCaptureSource;
+    policyMode: HelixSpeakerPolicyMode;
+    unknownSpeakerBehavior: HelixUnknownSpeakerBehavior;
+  },
 ): HelixSpeakerLabel => {
+  enforceSpeakerCap(state, incoming.speaker_id);
   const existing = state.speakers.get(incoming.speaker_id);
   if (existing) {
-    const existingTrusted =
-      existing.enrollment_state === "session" || existing.enrollment_state === "profile";
-    const incomingTrusted =
-      incoming.enrollment_state === "session" ||
-      incoming.enrollment_state === "profile" ||
-      incoming.role === "owner" ||
-      incoming.role === "trusted_guest";
-    const shouldPromote = !existingTrusted && incomingTrusted;
+    const policy = resolveSpeakerAuthorityPolicy({
+      captureSource: args.captureSource,
+      rawRole: incoming.role,
+      rawAuthority: incoming.authority,
+      sessionSpeaker: existing,
+      policyMode: args.policyMode,
+      unknownSpeakerBehavior: args.unknownSpeakerBehavior,
+    });
     const merged: HelixSpeakerLabel = {
       ...incoming,
-      display_name: shouldPromote ? displayNameForSessionSpeaker(state, incoming) : existing.display_name,
+      display_name: existing.display_name,
       color_token: existing.color_token,
-      role: shouldPromote ? incoming.role : existing.role,
-      authority: shouldPromote ? incoming.authority : existing.authority,
-      enrollment_state: shouldPromote ? incoming.enrollment_state : existing.enrollment_state,
+      role: policy.role,
+      authority: policy.authority,
+      authority_source: policy.authority_source,
+      authority_reason: policy.authority_reason,
+      enrollment_state:
+        policy.authority_source === "session_registry"
+          ? "session"
+          : policy.authority_source === "profile_enrollment"
+            ? "profile"
+            : existing.enrollment_state,
       speaker_profile_id: existing.speaker_profile_id ?? incoming.speaker_profile_id,
       confidence: Math.max(existing.confidence, incoming.confidence),
     };
@@ -117,12 +188,24 @@ const mergeSpeaker = (
     return cloneSpeaker(merged);
   }
 
+  const initialPolicy = resolveSpeakerAuthorityPolicy({
+    captureSource: args.captureSource,
+    rawRole: incoming.role,
+    rawAuthority: incoming.authority,
+    policyMode: args.policyMode,
+    unknownSpeakerBehavior: args.unknownSpeakerBehavior,
+  });
   const registered: HelixSpeakerLabel = {
     ...incoming,
     display_name: displayNameForSessionSpeaker(state, incoming),
     color_token:
       incoming.color_token ||
       resolveHelixSpeakerColorToken(state.roomId ?? state.sessionId, incoming.speaker_id),
+    role: initialPolicy.role,
+    authority: initialPolicy.authority,
+    authority_source: initialPolicy.authority_source,
+    authority_reason: initialPolicy.authority_reason,
+    enrollment_state: "none",
   };
   state.speakers.set(incoming.speaker_id, registered);
   return cloneSpeaker(registered);
@@ -150,7 +233,16 @@ export const applySpeakerSession = (
     roomId: args.roomId ?? identity.room_id ?? null,
     threadId: args.threadId ?? identity.thread_id ?? null,
   });
-  const speakers = identity.speakers.map((speaker) => mergeSpeaker(state, speaker));
+  const segmentBySpeakerId = new Map(
+    identity.segments.map((segment) => [segment.speaker_id, segment]),
+  );
+  const speakers = identity.speakers.map((speaker) =>
+    mergeSpeaker(state, speaker, {
+      captureSource: segmentBySpeakerId.get(speaker.speaker_id)?.capture_source ?? "mic",
+      policyMode: identity.policy.command_authority,
+      unknownSpeakerBehavior: identity.policy.unknown_speaker_behavior,
+    }),
+  );
   state.updatedAtMs = Date.now();
   const speakerById = new Map(speakers.map((speaker) => [speaker.speaker_id, speaker]));
   const segments = identity.segments.map((segment) => {
@@ -189,6 +281,7 @@ export const trustSessionSpeaker = (args: {
     threadId: args.threadId ?? null,
   });
   const speakerId = args.speakerId.trim();
+  enforceSpeakerCap(state, speakerId);
   const existing = state.speakers.get(speakerId);
   const role = args.role ?? "trusted_guest";
   const authority = args.authority ?? (role === "owner" ? "command_allowed" : "command_confirm");
@@ -204,6 +297,8 @@ export const trustSessionSpeaker = (args: {
       resolveHelixSpeakerColorToken(state.roomId ?? state.sessionId, speakerId),
     role,
     authority,
+    authority_source: "session_registry",
+    authority_reason: "speaker_explicitly_trusted_for_session",
     confidence:
       typeof args.confidence === "number" && Number.isFinite(args.confidence)
         ? Math.max(0, Math.min(1, args.confidence))

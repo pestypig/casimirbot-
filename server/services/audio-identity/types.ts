@@ -3,6 +3,7 @@ export type {
   HelixAudioIdentitySessionSnapshot,
   HelixCaptureSource,
   HelixSpeakerAuthority,
+  HelixSpeakerAuthoritySource,
   HelixSpeakerLabel,
   HelixSpeakerPolicyMode,
   HelixSpeakerRole,

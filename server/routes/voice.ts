@@ -50,6 +50,7 @@ import {
 import type {
   HelixAudioIdentityResult,
   HelixSpeakerAuthority,
+  HelixSpeakerAuthoritySource,
   HelixSpeakerRole,
   HelixSpeakerSegment,
 } from "../../shared/helix-audio-identity";
@@ -1138,6 +1139,8 @@ type VoiceTranscriptionHandlerResult = {
   speaker_confidence?: number;
   speaker_role?: HelixSpeakerRole;
   speaker_authority?: HelixSpeakerAuthority;
+  speaker_authority_source?: HelixSpeakerAuthoritySource;
+  speaker_authority_reason?: string;
   speaker_segments?: HelixSpeakerSegment[];
   audio_identity?: HelixAudioIdentityResult | null;
   primary_speaker_id?: string | null;
@@ -1181,6 +1184,8 @@ type VoiceTranscriptionResult = {
   speaker_confidence?: number;
   speaker_role?: HelixSpeakerRole;
   speaker_authority?: HelixSpeakerAuthority;
+  speaker_authority_source?: HelixSpeakerAuthoritySource;
+  speaker_authority_reason?: string;
   speaker_segments?: HelixSpeakerSegment[];
   audio_identity?: HelixAudioIdentityResult | null;
   primary_speaker_id?: string | null;
@@ -2203,6 +2208,10 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       speaker_role: primarySpeaker?.role ?? result.speaker_role ?? parsed.data.speaker_role ?? null,
       speaker_authority:
         primarySpeaker?.authority ?? result.speaker_authority ?? parsed.data.speaker_authority ?? null,
+      speaker_authority_source:
+        primarySpeaker?.authority_source ?? result.speaker_authority_source ?? null,
+      speaker_authority_reason:
+        primarySpeaker?.authority_reason ?? result.speaker_authority_reason ?? null,
       speaker_color_token: primarySpeaker?.color_token ?? result.speaker_color_token ?? null,
       unknown_speaker_detected:
         result.unknown_speaker_detected ??

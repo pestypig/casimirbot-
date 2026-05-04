@@ -104,4 +104,23 @@ describe("voice command arbiter speaker policy", () => {
       source: "parser",
     });
   });
+
+  it("suppresses overlapping speech even for trusted speakers", async () => {
+    const result = await runVoiceCommandArbiter({
+      transcript: "send",
+      traceId: "speaker-policy-overlap",
+      speakerId: "spk_owner",
+      speakerConfidence: 0.95,
+      speakerAuthority: "command_allowed",
+      speakerRole: "owner",
+      overlappingSpeech: true,
+    });
+
+    expect(result).toMatchObject({
+      decision: "suppressed",
+      action: "send",
+      suppression_reason: "overlapping_speech",
+      source: "parser",
+    });
+  });
 });

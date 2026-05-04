@@ -14,6 +14,7 @@ import type {
   HelixAudioIdentitySessionSnapshot,
   HelixCaptureSource,
   HelixSpeakerAuthority,
+  HelixSpeakerAuthoritySource,
   HelixSpeakerLabel,
   HelixSpeakerPolicyMode,
   HelixSpeakerRole,
@@ -1168,6 +1169,8 @@ export type VoiceTranscribeResponse = {
   primary_speaker_id?: string | null;
   speaker_role?: HelixSpeakerRole | null;
   speaker_authority?: HelixSpeakerAuthority | null;
+  speaker_authority_source?: HelixSpeakerAuthoritySource | null;
+  speaker_authority_reason?: string | null;
   speaker_color_token?: HelixSpeakerLabel["color_token"] | null;
   unknown_speaker_detected?: boolean;
   audio_identity?: HelixAudioIdentityResult | null;

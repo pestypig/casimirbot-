@@ -116,6 +116,7 @@ const DOC_AUTO_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
 const DOC_AUTO_READ_CHUNK_MAX = 560;
 const DOC_AUTO_READ_MAX_CHARS = 12_000;
 const DOC_AUTO_READ_TAG = "helix-doc-reader";
+const DOC_AUTO_READ_ACTIVE_CLASS = "doc-read-active-section";
 
 let globalDocReadController: AbortController | null = null;
 let globalDocReadAudio: HTMLAudioElement | null = null;
@@ -166,9 +167,10 @@ export function DocViewerPanel() {
     snippet: string;
   } | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const activeReadTargetRef = React.useRef<HTMLElement | null>(null);
   const modeRef = React.useRef(mode);
   const followLiveReadRef = React.useRef(followLiveRead);
-  const liveReadRatioRef = React.useRef(0);
+  const liveReadChunkRef = React.useRef<string | null>(null);
   const lastProceduralTraceIdRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
 
@@ -273,15 +275,50 @@ export function DocViewerPanel() {
     };
   }, []);
 
+  const clearActiveReadTarget = React.useCallback(() => {
+    const target = activeReadTargetRef.current;
+    if (target) {
+      target.classList.remove(DOC_AUTO_READ_ACTIVE_CLASS);
+      target.removeAttribute("data-doc-read-active");
+    }
+    activeReadTargetRef.current = null;
+  }, []);
+
+  const focusActiveReadChunk = React.useCallback(
+    (chunkText: string) => {
+      const container = contentRef.current;
+      if (!container || modeRef.current !== "doc") return null;
+      const target = findDocReadTarget(container, chunkText);
+      if (!target) return null;
+      if (activeReadTargetRef.current && activeReadTargetRef.current !== target) {
+        activeReadTargetRef.current.classList.remove(DOC_AUTO_READ_ACTIVE_CLASS);
+        activeReadTargetRef.current.removeAttribute("data-doc-read-active");
+      }
+      target.classList.add(DOC_AUTO_READ_ACTIVE_CLASS);
+      target.setAttribute("data-doc-read-active", "true");
+      activeReadTargetRef.current = target;
+      if (followLiveReadRef.current) {
+        keepDocReadTargetInView(container, target);
+      }
+      return target;
+    },
+    [],
+  );
+
   const stopAutoRead = React.useCallback(() => {
     stopGlobalDocRead();
+    clearActiveReadTarget();
     setIsAutoReading(false);
     setReadProgress(null);
     setFollowLiveRead(true);
-    liveReadRatioRef.current = 0;
-  }, []);
+    liveReadChunkRef.current = null;
+  }, [clearActiveReadTarget]);
 
   React.useEffect(() => () => stopAutoRead(), [stopAutoRead]);
+
+  React.useEffect(() => {
+    clearActiveReadTarget();
+  }, [clearActiveReadTarget, currentPath, html]);
 
   React.useEffect(() => {
     if (!proceduralStatus) return;
@@ -365,21 +402,6 @@ export function DocViewerPanel() {
       );
       for (let i = 0; i < chunks.length; i += 1) {
         if (controller.signal.aborted) return;
-        const snippet = chunks[i].slice(0, 220);
-        setReadProgress({
-          chunkIndex: i + 1,
-          chunkCount: chunks.length,
-          snippet,
-        });
-        const ratio = i / Math.max(1, chunks.length - 1);
-        liveReadRatioRef.current = ratio;
-        if (
-          contentRef.current &&
-          modeRef.current === "doc" &&
-          followLiveReadRef.current
-        ) {
-          scrollDocReadProgress(contentRef.current, ratio);
-        }
         const response = await speakVoice(
           {
             text: chunks[i],
@@ -400,6 +422,14 @@ export function DocViewerPanel() {
           throw new Error(response.payload?.error || response.payload?.message || "voice_response_json");
         }
         heardAudio = true;
+        const snippet = chunks[i].slice(0, 220);
+        liveReadChunkRef.current = chunks[i];
+        setReadProgress({
+          chunkIndex: i + 1,
+          chunkCount: chunks.length,
+          snippet,
+        });
+        focusActiveReadChunk(chunks[i]);
         await playAutoReadAudio({
           blob: response.blob,
           signal: controller.signal,
@@ -431,12 +461,16 @@ export function DocViewerPanel() {
         setIsAutoReading(false);
         setReadProgress(null);
         setFollowLiveRead(true);
+        liveReadChunkRef.current = null;
+        clearActiveReadTarget();
       });
   }, [
+    clearActiveReadTarget,
     clearPendingAutoRead,
     currentEntry,
     currentPath,
     error,
+    focusActiveReadChunk,
     loadedDocId,
     loading,
     mode,
@@ -461,13 +495,13 @@ export function DocViewerPanel() {
     if (!currentPath) return;
     viewDoc(currentPath, anchor);
     setFollowLiveRead(true);
-    const ratio = liveReadRatioRef.current;
+    const chunkText = liveReadChunkRef.current;
     if (typeof window === "undefined") return;
     window.setTimeout(() => {
-      if (!contentRef.current) return;
-      scrollDocReadProgress(contentRef.current, ratio);
+      if (!chunkText) return;
+      focusActiveReadChunk(chunkText);
     }, 30);
-  }, [anchor, currentPath, viewDoc]);
+  }, [anchor, currentPath, focusActiveReadChunk, viewDoc]);
 
   const queryValue = query.trim().toLowerCase();
   const filteredEntries = React.useMemo(() => {
@@ -849,14 +883,60 @@ async function playAutoReadAudio(args: {
   });
 }
 
-function scrollDocReadProgress(container: HTMLDivElement, ratio: number) {
+function findDocReadTarget(container: HTMLDivElement, chunkText: string): HTMLElement | null {
+  const chunk = normalizeDocReadText(chunkText);
+  if (!chunk) return null;
+  const article = container.querySelector("article") ?? container;
+  const blocks = Array.from(
+    article.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,pre"),
+  ).filter((element) => normalizeDocReadText(element.textContent ?? "").length > 0);
+  if (!blocks.length) return article instanceof HTMLElement ? article : null;
+
+  const directNeedle = chunk.slice(0, Math.min(160, chunk.length));
+  const directMatch = blocks.find((element) => normalizeDocReadText(element.textContent ?? "").includes(directNeedle));
+  if (directMatch) return directMatch;
+
+  const terms = chunk
+    .split(" ")
+    .filter((term) => term.length > 3)
+    .slice(0, 34);
+  let best: { element: HTMLElement; score: number } | null = null;
+  for (const element of blocks) {
+    const text = normalizeDocReadText(element.textContent ?? "");
+    const matches = terms.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
+    const prefixBoost = text && chunk.includes(text.slice(0, Math.min(80, text.length))) ? 8 : 0;
+    const score = matches + prefixBoost;
+    if (!best || score > best.score) {
+      best = { element, score };
+    }
+  }
+  return best && best.score >= Math.max(3, Math.ceil(Math.min(terms.length, 18) * 0.28)) ? best.element : null;
+}
+
+function keepDocReadTargetInView(container: HTMLDivElement, target: HTMLElement) {
   const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
   if (maxTop <= 0) return;
-  const clamped = Math.max(0, Math.min(1, ratio));
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const comfortPad = Math.min(180, Math.max(72, containerRect.height * 0.24));
+  const alreadyComfortable =
+    targetRect.top >= containerRect.top + comfortPad &&
+    targetRect.bottom <= containerRect.bottom - comfortPad;
+  if (alreadyComfortable) return;
+  const targetTop = targetRect.top - containerRect.top + container.scrollTop;
+  const centeredTop = targetTop + targetRect.height / 2 - container.clientHeight / 2;
   container.scrollTo({
-    top: Math.round(maxTop * clamped),
+    top: Math.max(0, Math.min(maxTop, Math.round(centeredTop))),
     behavior: "smooth",
   });
+}
+
+function normalizeDocReadText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function cssEscape(value: string) {

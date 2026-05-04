@@ -633,6 +633,18 @@ describe("HelixAskPill mic helper behavior", () => {
       action_id: "open_doc_and_read",
       args: { path: "docs/papers.md" },
     });
+    expect(parseWorkstationActionCommand("read this doc outloud")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "open_doc_and_read",
+      args: { path: "docs/papers.md" },
+    });
+    expect(parseWorkstationActionCommand("read this document aloud")).toEqual({
+      action: "run_panel_action",
+      panel_id: "docs-viewer",
+      action_id: "open_doc_and_read",
+      args: { path: "docs/papers.md" },
+    });
   });
 
   it("routes latest-topic doc prompts to deterministic docs-viewer actions", () => {

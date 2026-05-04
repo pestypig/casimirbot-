@@ -9,6 +9,7 @@ import {
   type HelixSpeakerRole,
   type HelixUnknownSpeakerBehavior,
 } from "../../../shared/helix-audio-identity";
+import { resolveSpeakerAuthorityPolicy } from "./speaker-policy";
 
 const DEFAULT_SPEAKER_CONFIDENCE = 0.5;
 const NOISY_ENVIRONMENT_SNR_DB = 12;
@@ -39,24 +40,6 @@ const resolveRole = (args: {
   if (args.activeListenerSpeakerIds.includes(args.speakerId)) return "owner";
   if (args.knownSpeakerIds.includes(args.speakerId)) return "trusted_guest";
   return args.speakerId === "spk_session_unknown" ? "unknown" : "guest";
-};
-
-const resolveAuthority = (args: {
-  role: HelixSpeakerRole;
-  speakerAuthority?: HelixSpeakerAuthority | null;
-  policyMode: HelixSpeakerPolicyMode;
-  unknownSpeakerBehavior: HelixUnknownSpeakerBehavior;
-}): HelixSpeakerAuthority => {
-  if (args.speakerAuthority) return args.speakerAuthority;
-  if (args.policyMode === "transcribe_only") return "transcribe_only";
-  if (args.role === "device_audio") return "transcribe_only";
-  if (args.role === "unknown") {
-    return args.unknownSpeakerBehavior === "ignore" ? "ignored" : "transcribe_only";
-  }
-  if (args.policyMode === "any_speaker") return "command_allowed";
-  if (args.role === "owner") return "command_allowed";
-  if (args.role === "trusted_guest") return args.policyMode === "profile_only" ? "command_confirm" : "command_allowed";
-  return args.policyMode === "profile_only" ? "transcribe_only" : "command_confirm";
 };
 
 export const buildHelixAudioIdentityResult = (args: {
@@ -102,9 +85,10 @@ export const buildHelixAudioIdentityResult = (args: {
     knownSpeakerIds,
     activeListenerSpeakerIds,
   });
-  const authority = resolveAuthority({
-    role,
-    speakerAuthority: args.speakerAuthority,
+  const policy = resolveSpeakerAuthorityPolicy({
+    captureSource: args.captureSource,
+    rawRole: role,
+    rawAuthority: args.speakerAuthority ?? null,
     policyMode,
     unknownSpeakerBehavior,
   });
@@ -114,12 +98,14 @@ export const buildHelixAudioIdentityResult = (args: {
       : DEFAULT_SPEAKER_CONFIDENCE;
   const speaker: HelixSpeakerLabel = {
     speaker_id: resolvedSpeakerId,
-    display_name: displayNameForRole(role, resolvedSpeakerId),
+    display_name: displayNameForRole(policy.role, resolvedSpeakerId),
     color_token: resolveHelixSpeakerColorToken(args.roomId, resolvedSpeakerId),
-    role,
-    authority,
+    role: policy.role,
+    authority: policy.authority,
+    authority_source: policy.authority_source,
+    authority_reason: policy.authority_reason,
     confidence,
-    enrollment_state: role === "owner" || role === "trusted_guest" ? "session" : "none",
+    enrollment_state: "none",
   };
   const durationMs =
     typeof args.durationMs === "number" && Number.isFinite(args.durationMs)

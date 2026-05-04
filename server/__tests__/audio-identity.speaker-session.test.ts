@@ -3,13 +3,24 @@ import { buildHelixAudioIdentityResult } from "../services/audio-identity/transc
 import {
   applySpeakerSession,
   getSpeakerSessionSnapshot,
+  pruneExpiredSpeakerSessions,
   resetSpeakerSessionRegistry,
   trustSessionSpeaker,
 } from "../services/audio-identity/speaker-session";
 
 describe("audio identity speaker sessions", () => {
+  const originalTtl = process.env.HELIX_AUDIO_IDENTITY_SESSION_TTL_MS;
+  const originalMaxSpeakers = process.env.HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION;
+
   afterEach(() => {
     resetSpeakerSessionRegistry();
+    if (typeof originalTtl === "string") process.env.HELIX_AUDIO_IDENTITY_SESSION_TTL_MS = originalTtl;
+    else delete process.env.HELIX_AUDIO_IDENTITY_SESSION_TTL_MS;
+    if (typeof originalMaxSpeakers === "string") {
+      process.env.HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION = originalMaxSpeakers;
+    } else {
+      delete process.env.HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION;
+    }
   });
 
   it("assigns stable session labels and colors for repeated speakers", () => {
@@ -103,5 +114,39 @@ describe("audio identity speaker sessions", () => {
       "spk_guest",
       "spk_owner",
     ]);
+  });
+
+  it("prunes expired sessions by ttl", () => {
+    process.env.HELIX_AUDIO_IDENTITY_SESSION_TTL_MS = "1";
+    trustSessionSpeaker({
+      sessionId: "session-expiring",
+      speakerId: "spk_owner",
+      role: "owner",
+    });
+
+    pruneExpiredSpeakerSessions(Date.now() + 10);
+
+    expect(getSpeakerSessionSnapshot("session-expiring")).toBeNull();
+  });
+
+  it("caps speakers per session", () => {
+    process.env.HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION = "2";
+    trustSessionSpeaker({
+      sessionId: "session-capped",
+      speakerId: "spk_a",
+      role: "trusted_guest",
+    });
+    trustSessionSpeaker({
+      sessionId: "session-capped",
+      speakerId: "spk_b",
+      role: "trusted_guest",
+    });
+    trustSessionSpeaker({
+      sessionId: "session-capped",
+      speakerId: "spk_c",
+      role: "trusted_guest",
+    });
+
+    expect(getSpeakerSessionSnapshot("session-capped")?.speaker_count).toBe(2);
   });
 });

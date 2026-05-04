@@ -20,6 +20,14 @@ export type HelixSpeakerAuthority =
   | "transcribe_only"
   | "ignored";
 
+export type HelixSpeakerAuthoritySource =
+  | "absent"
+  | "client_hint"
+  | "session_registry"
+  | "profile_enrollment"
+  | "device_audio_policy"
+  | "server_policy";
+
 export type HelixSpeakerEnrollmentState = "none" | "session" | "profile" | "revoked";
 
 export type HelixSpeakerPolicyMode =
@@ -40,6 +48,8 @@ export type HelixSpeakerLabel = {
   color_token: string;
   role: HelixSpeakerRole;
   authority: HelixSpeakerAuthority;
+  authority_source?: HelixSpeakerAuthoritySource;
+  authority_reason?: string;
   confidence: number;
   enrollment_state: HelixSpeakerEnrollmentState;
 };

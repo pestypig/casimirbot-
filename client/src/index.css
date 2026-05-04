@@ -136,6 +136,19 @@
     background-color: rgba(148, 163, 184, 0.55);
   }
 
+  .doc-read-active-section {
+    border-radius: 0.35rem;
+    outline: 1px solid rgba(34, 211, 238, 0.5);
+    outline-offset: 0.18rem;
+    background: rgba(8, 145, 178, 0.11);
+    box-shadow: 0 0 0 0.18rem rgba(8, 145, 178, 0.08);
+    transition:
+      background-color 180ms ease,
+      box-shadow 180ms ease,
+      outline-color 180ms ease;
+    scroll-margin-block: 35vh;
+  }
+
   /* Animation for simulation status indicators */
   .status-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;

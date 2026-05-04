@@ -10587,6 +10587,7 @@ function normalizeWorkstationCommandText(value: string): string {
   const collapsedWhitespace = normalizedQuotes.replace(/\s+/g, " ").trim();
   if (!collapsedWhitespace) return "";
   return collapsedWhitespace
+    .replace(/\boutloud\b/gi, "out loud")
     .replace(/\b(?:pull|bring)\s+up\b/gi, "open")
     .replace(/\bpop\s+open\b/gi, "open")
     .replace(/\bopen\s+up\b/gi, "open")
@@ -10594,7 +10595,13 @@ function normalizeWorkstationCommandText(value: string): string {
     .replace(/\bread\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
       return `read ${referent.toLowerCase()} doc to me`;
     })
+    .replace(/\bread\s+(this|current)\s+(?:aloud|out\s+loud)\b/gi, (_match, referent: string) => {
+      return `read ${referent.toLowerCase()} doc to me`;
+    })
     .replace(/\bnarrate\s+(this|current)\s+to\s+me\b/gi, (_match, referent: string) => {
+      return `read ${referent.toLowerCase()} doc to me`;
+    })
+    .replace(/\bnarrate\s+(this|current)\s+(?:aloud|out\s+loud)\b/gi, (_match, referent: string) => {
       return `read ${referent.toLowerCase()} doc to me`;
     })
     .replace(/\b(this|current)\s+file\b/gi, (_match, referent: string) => {

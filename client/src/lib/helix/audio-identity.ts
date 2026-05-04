@@ -3,6 +3,7 @@ import {
   type HelixAudioIdentityResult,
   type HelixAudioIdentitySessionSnapshot,
   type HelixSpeakerAuthority,
+  type HelixSpeakerAuthoritySource,
   type HelixSpeakerColorToken,
   type HelixSpeakerLabel,
   type HelixSpeakerSegment,
@@ -12,6 +13,7 @@ export type {
   HelixAudioIdentityResult,
   HelixAudioIdentitySessionSnapshot,
   HelixSpeakerAuthority,
+  HelixSpeakerAuthoritySource,
   HelixSpeakerLabel,
   HelixSpeakerSegment,
 };

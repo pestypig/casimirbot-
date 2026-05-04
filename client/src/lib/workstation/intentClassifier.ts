@@ -178,6 +178,8 @@ export function buildWorkstationIntentClassifierPrompt(prompt: string): string {
     `{"intent":"docs_read_paper|docs_summarize_doc|docs_summarize_section|docs_explain_paper|calculator_open|calculator_solve|calculator_solve_steps|calculator_ingest_clipboard|calculator_copy_result|calculator_copy_debug_log|open_panel|run_panel_action|close_active_panel|focus_next_panel|focus_previous_panel|reopen_last_closed_panel|none","confidence":0..1,"subgoal":"...","args":{...},"reason":"..."}`,
     'Use intent="docs_read_paper" when the request asks to find/open/read a paper/document on a topic.',
     'Also use intent="docs_read_paper" for phrasing like "open a panel about the sun and read it".',
+    'Read-aloud rule: "read this/current doc aloud/out loud/to me" is a workspace docs-viewer action, not a model-only answer.',
+    'For read-aloud on an active/current document, select docs_read_paper and preserve any args.path when known so the existing open_doc_and_read loop can run.',
     'Priority rule: when summarize/explain wording is present, prefer docs_summarize_doc/docs_summarize_section/docs_explain_paper over docs_read_paper.',
     'Do NOT map "summarize ... to me" to docs_read_paper unless explicit read-aloud wording is also present.',
     'For docs_read_paper, set args.topic as a short noun phrase like "NHM2".',
