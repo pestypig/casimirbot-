@@ -1,344 +1,290 @@
 # CasimirBot
 
-Warp-field research cockpit that pairs a Helix Core operations console with the supporting physics services, simulation assets, and archival "warp web" experiments. The repository contains both the real-time React client and the Express/TypeScript backend that brokers drive telemetry, curvature bricks, and pump controls.
+CasimirBot is a Helix Core research cockpit for warp-field simulation, agentic physics workflows, and evidence-gated verification. It combines a React/TypeScript operations console, an Express backend, numerical physics modules, audit DAGs, and reproducible campaign scripts for Needle Hull / NHM2 research.
 
-## Verification-first agents
-We’re building the grading, proof, and trace layer agents need to verify work across domains — starting with GR and constraint packs.
-- SDK + API adapters for agent runtimes.
-- Deterministic verdicts with policy ladders and certificates.
-- JSONL training traces for audits and learning.
+This repository is research and simulation software. It is not a claim of a working propulsion device; the project emphasizes falsifiable runs, citations, artifacts, and verification gates over unchecked narrative claims.
 
-## Features
-- **Helix Core desktop + mobile panels** - Modular windows for sector duty coordination, parametric sweeps, spectrum tuning, and live warp visualisation (see `client/src/pages/helix-core.panels.ts`). All new UI must ship as Helix panels so it appears in `/desktop` and `/mobile`; do not add UI to the deprecated `client/src/pages/helix-core.tsx` page.
-- **Hull 3D renderer** - WebGL2 ray-marcher with curvature, sector, and overlay diagnostics driven by the shared hull store (`client/src/components/Hull3DRenderer.ts`).
-- **Physics + scheduling services** - Energy pipeline modelling, curvature brick generation, and instrumentation endpoints implemented in the server (`server/energy-pipeline.ts`, `server/curvature-brick.ts`, `server/instruments/`).
-- **Lifshitz-aware Casimir chain** - Ideal/Drude/plasma stacks with Hamaker fallback, χ override/supercell/fallback diagnostics, and nominal vs. realistic energy/mass bands surfaced to the UI.
-- **Static research archives** - Halobank timeline and warp ledger microsites live under `warp-web/` with shared assets in `halobank-spore-timeline.js`.
-- **Design documentation** - Patch plans, focused reports, and sweep design notes in `PATCH_PLAN.md`, `REPORT.md`, and `docs/` (see `docs/gr-solver-progress.md` for the GR solver progress plan and open items; the full Einstein-field solve is not declared complete yet). Mass provenance rules live in `docs/mass-semantics.md`.
+## What To Look At First
 
-### Casimir tile narrative → implementation map
+| Area | Why it matters | Entry points |
+| --- | --- | --- |
+| Helix Ask agentic wrapper | Natural-language research/operator loop with audited tool calls, routing, regression packs, and prompt-quality probes. | `server/helix-core.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `npm run helix:ask:regression:light` |
+| NHM2 full-solve lane | Selected-family warp solve campaigns, shift-lapse sweeps, transport packages, source closure, observer audits, and publication bundles. | `scripts/warp-full-solve-campaign-cli.ts`, `scripts/research/run-nhm2-lapse-alpha-sweep.ts`, `docs/nhm2-closed-loop.md`, `artifacts/research/full-solve/` |
+| Evidence tree + DAG | Root-to-leaf proof structure for math, citations, manifests, and auditability. | `AUDIT_TREE.json`, `MATH_GRAPH.json`, `docs/warp-tree-dag-inventory.md`, `scripts/warp-tree-dag-walk.ts` |
+| Physics simulation codes | Runnable checks for GR loops, physics QA, Casimir verification, shadow injections, and sector controls. | `npm run gr:loop`, `npm run physics:validate`, `npm run casimir:verify`, `npm run warp:shadow:inject` |
+| Helix renderer + telemetry | WebGL hull renderer, curvature overlays, sector scheduler state, and live diagnostics for visual inspection. | `client/src/components/Hull3DRenderer.ts`, `client/src/components/AlcubierrePanel.tsx`, `server/energy-pipeline.ts` |
+| Stellar / solar research lanes | Experimental star and solar-adjacent workflows that sit beside the warp verification stack. | `npm run solar:pipeline`, `npm run solar:manifest`, `docs/architecture/compact-star-limit-observables-phase-1-plan.md` |
 
-If you need to prove that the Mk.1 Needle Hull story (Casimir tiles → ellipsoid tiling → γ_geo³ ladder → Ford–Roman duty/γ_VdB mass proxy) is wired into the codebase, read [`docs/casimir-tile-mechanism.md`](docs/casimir-tile-mechanism.md). It walks step-by-step from the research references through the exact functions (`server/energy-pipeline.ts`, `modules/sim_core/static-casimir.ts`, `warp-web/km-scale-warp-ledger.html`, etc.) so reviewers can go from theory to source in one pass.
+## Quick Start
 
-## Needle Hull Mainframe System
+Prerequisites:
 
-HELIX-CORE advertises itself as the **Needle Hull Mainframe System**, meaning the console is pre-wired to the Mk 1 Natário geometry, Ford–Roman duty guards, and AI-assisted terminal tooling:
+- Node.js 20.x
+- npm 10.x
+- Optional: Python 3.11 for some physics and document tooling
 
-- Helix Desktop/Mobile panels are declared in `client/src/pages/helix-core.panels.ts` and implemented in `client/src/components/` for the windowed UI.
-- `server/energy-pipeline.ts` seeds the global state with the canonical 1.007 km × 264 m × 173 m hull and 400-sector scheduler, while `modules/warp/warp-module.ts` keeps those semi-axes as the fallback for any Natário conversion.
-- `/api/helix/command` (implemented in `server/helix-core.ts`) provides the mainframe chat endpoint so operators can pulse sectors, request diagnostics, or load documents with function-call auditing.
-
-See `docs/needle-hull-mainframe.md` for the full architecture tour and list of endpoints/panels that make up the system.
-
-## Alcubierre renderer + live telemetry
-
-### Data path (bus -> overlay -> renderer)
-- **Telemetry ingress**: Hooks such as `useEnergyPipeline` and `useGlobalPhase` keep `AlcubierrePanel.tsx` flush with the latest scheduler, curvature, and hull axes data. Those hooks expose the `live` payloads (`betaTiltVec`, `epsilonTilt`, sector stats, etc.) that feed the tilt and curvature overlays.
-- **Bus overlay memo**: The panel subscribes to the `hull3d:tilt` channel, memoizes the most recent directive (`busTiltDirective`), and prefers it over derived telemetry when constructing `overlayConfig` (see ~`1730` in `AlcubierrePanel.tsx`). Each overlay is normalized, clamped, and written into the shared Hull3D overlay state (`state.overlays.tilt`, `state.overlays.curvature`, Ford-Roman, arc sectors, etc.).
-- **Renderer consumption**: `Hull3DRenderer.ts` pulls the memoized overlays via `useHull3DSharedStore`/`OVERLAY_QUERY_KEY`, repackages them as part of `Hull3DRendererState`, and binds them to WebGL programs each frame. Vector overlays drive the ring post-pass, while scalar overlays (heat, theta iso, Ford-Roman bar) are lifted into SSBOs or uniforms before the draw calls fire.
-
-### Surface + ring passes
-- **Surface sheet**: `SURFACE_OVERLAY_VS/FS` receive `u_tiltDir`, `u_tiltMag`, `u_tiltAlpha`, and `u_debugTiltEcho`. `drawSurfaceOverlay()` renormalizes the bus vector, clamps magnitude/alpha, enables additive blending (`gl.blendFunc(gl.SRC_ALPHA, gl.ONE)`), and uploads the uniforms so the sheet leans without muting the volumetric hull (see ~`12070-12420` in `Hull3DRenderer.ts`). The fragment shader perturbs the surface metric (`pMetric += tiltDir * x * tiltStrength`) and can render a zebra debug pattern when `window.__surfaceDebugEcho` is truthy.
-- **Ring + diagnostics**: The ring pass shares the same overlay state. When the surface sheet is enabled the renderer flips the ring blend mode to additive so zebra/sector arcs remain visible (~`16890`). Intent arrows, Qi/Ford-Roman badges, and the curvature band all read the same overlay cache, which keeps UI indicators aligned with the sheet lean seen in the ray-march.
-
-### Live observability hooks
-- `window.__surfaceDbg` is populated each surface draw with the normalized tilt vector, magnitude, alpha, and any debug toggles so you can inspect what the shader actually consumed without guessing from the visuals.
-- `window.__surfaceDebugEcho = true` draws the red zebra aligned to `u_tiltDir`, making it easy to validate that bus inputs, the stored overlay, and shader-space vectors are in agreement.
-
-### Tilt-gain coupling line of action (evaluation)
-The proposed patch ("Add `u_tiltGainMult`/`u_tiltMax`, feed them from curvature gain, and expose debug knobs") is a good fit for the current renderer architecture:
-1. **Shader knobs**: Adding `u_tiltGainMult` + `u_tiltMax` to `SURFACE_OVERLAY` cleanly replaces the hard-coded `TILT_GAIN ~= 0.65` without touching other passes. Because tilt uniforms are already cached, extending the cache avoids extra lookups.
-2. **Renderer binding**: Computing `tiltGainMult = unitGain * curvGain^gamma` inside `drawSurfaceOverlay()` keeps all scaling logic close to where `u_tiltMag` is uploaded. That's also where `window.__surfaceDbg` is filled, so the falsifiable checks (curvature toggle, gamma slope, ceiling guard) naturally fall out of the existing debug table.
-3. **Overlay contract**: Promoting `gainFromCurvature`/`unitGain` into `overlays.tilt` (with console fallbacks) keeps Helix UI controls, bus overrides, and renderer math in sync. The change is backwards compatible because defaults (`gainFromCurvature=false`, `unitGain=1`, `tiltMax>=1`) restore pre-patch behaviour.
-4. **Risk profile**: The patch doesn't touch ring/post passes and respects the additive blend rule, so there's little chance of regressions in 2D overlays. The only caveat is to clamp after multiplication so curvature gain and manual gain are both reflected before the debug ceiling applies.
-
-Taken together, wiring the multiplier exactly where the bus overlay is consumed gives us deterministic coupling between curvature gain and sheet bias, while the console knobs guarantee we can validate each acceptance criterion (AC-1...AC-4) in isolation.
-
-#### Patch plan distilled
-1. **Shader uniforms** (`client/src/components/Hull3DRenderer.ts` @ `SURFACE_OVERLAY_*`): declare `u_tiltGainMult` and `u_tiltMax`, replace the baked `TILT_GAIN` constant with `tiltStrength = clamp(u_tiltMag, 0.0, 1.0) * u_tiltGainMult`, and guard with `tiltStrength = min(tiltStrength, u_tiltMax)`.
-2. **Renderer binding** (`drawSurfaceOverlay`): cache/upload the new uniform locations, derive `tiltGainMult` from curvature gain + optional debug knobs (`window.__tiltGain`, `__tiltScaleFromCurvature`, `__tiltGainGamma`, `__tiltMax`), and write those values into `window.__surfaceDbg`.
-3. **Overlay contract (optional but preferred)**: extend `overlays.tilt` with `gainFromCurvature`, `unitGain`, and `gamma`, letting Helix UI state drive the multiplier with console fallbacks for rapid experiments.
-
-#### Falsifiable console checks
-- **Curvature coupling toggle**: Flip `window.__tiltScaleFromCurvature` between `false` and `true` while holding curvature gain at `k`; expect the zebra amplitude and `window.__surfaceDbg.tiltGainMult` to track `k` (bounded by `u_tiltMax`).
-- **Linear boost**: Set `__tiltScaleFromCurvature = false`, dial `__tiltGain` from `1` to `3`, and observe a ~3× increase in tilt bias and debug echo brightness.
-- **Gamma shaping**: With curvature scaling enabled, set `window.__tiltGainGamma = 0.5`; doubling `overlays.curvature.gain` should only increase the sheet strength by `sqrt(2)`.
-- **Ceiling guard**: Force `window.__tiltMax = 2.0`, then continue raising curvature gain or `__tiltGain`; the zebra stays bounded and `__surfaceDbg.tiltStrength` never exceeds `2.0`.
-
-#### Acceptance criteria
-- **AC-1**: Doubling `overlays.curvature.gain` doubles the surface tilt strength (until capped by `u_tiltMax`), verifiable through visuals plus `window.__surfaceDbg`.
-- **AC-2**: With curvature coupling disabled, `__tiltGain` and `__tiltGainGamma` provide deterministic scaling curves that match `tiltGainMult = baseGain * curvGain^gamma`.
-- **AC-3**: Setting `gainFromCurvature=false`, `unitGain=1`, and `tiltMax>=1` produces pre-patch visuals, proving backward compatibility.
-- **AC-4**: Additive blending and `u_tiltAlpha` gating remain unchanged; no occlusion or flicker occurs in ring/diagnostic overlays when the sheet gain is amplified.
-
-## Direction Pad two-lobe physics
-
-Here is the physics "why" behind the Direction Pad's two-lobe control and how each layer of the stack enforces the Alcubierre/Natario bubble requirements.
-
----
-
-### 1) What a lobe means in the GR picture
-
-In the 3+1 split used for Alcubierre and Natario bubbles the key kinematic scalar you visualize is the expansion (trace of the extrinsic curvature, York-time style). In the shader it appears as `theta_GR ∝ beta * ∂x f(rs)`, so the sign flips across the axis of motion: front (+x) is compressive (blue, `theta < 0`) and aft (−x) is expansive (red, `theta > 0`). The vertex shader differentiates the smoothed top-hat bubble profile and forms:
-
-```glsl
-float dfdr = d_topHat_dr(rs, u_sigma, u_R);
-vec3  dir  = pMetric / rs;
-float dfx  = dfdr * dir.x;
-float theta_gr = u_beta * dfx;   // sign flips front vs aft
-```
-
-Because `∂x f` is odd across the axis, physical steering must keep a front/back pair (a dipole) instead of a single monopole. A lone front-only lobe would violate the volume-preserving structure of Natario's divergence-free shift and the global conservation constraint `∇μ T^{μν} = 0` that the time-sliced proxy honors.
-
----
-
-### 2) Why the UI enforces a pair of lobes 180° apart
-
-The renderer instantiates a two-Gaussian, antipodal gate on the equatorial ring. When split mode is enabled, the shader makes a second lobe at `center + 0.5` (180°) and blends them with the split fraction:
-
-```glsl
-float g1 = exp(...);                       // primary lobe
-float g2 = exp(... at center + 0.5);       // antipodal lobe
-float wA = clamp(u_splitFrac, 0.0, 1.0);
-float g  = g1 * wA + g2 * (1.0 - wA);      // unity-weight pairing
-```
-
-The gate is rotatable via the normalized phase, so yaw rotates the dipole (`a01 = fract(a01 + u_phase01)`). Setting phase to 180° flips contraction and expansion and provides a fast sign sanity check.
-
----
-
-### 3) Why split weights stay complementary
-
-Front compression must be paid back by aft expansion to keep the cycle-averaged source compatible with GR constraints and the Ford-Roman guardrails. Implementation-wise every layer preserves the unity sum:
-
-- **Shader/UI**: `u_splitEnabled` + `u_splitFrac` blend the antipodal Gaussians with weights that add to one, so biasing one automatically thins the other.
-- **Energy pipeline**: the server applies a sign pattern across sectors, switching the active set between "neg" and "pos" per the requested fraction (`negativeFraction` mirrors `1 - splitFrac`). That sign multiplies the shell actuation amplitude that feeds the curvature proxy.
-- **System bookkeeping**: the live model tracks Ford-Roman margin (`zeta`), duty (`d_eff`), and light-crossing separation so the averaged drive stays within the same green-zone narrative documented in the km-scale warp ledger.
-
----
-
-### 4) Why yaw rotates while bias reweights
-
-These are the two knobs the continuum physics permits:
-
-- **Orientation:** rotate the dipole (`∂x f`) around the equator by adding `u_phase01` before sampling the ring. This matches the "Heading rotates the equatorial lobe pair" note in the Direction Pad UI.
-- **Relative magnitude:** tune how much scheduler duty/energy the compressive vs expansive half-ring receives. In the renderer this is `u_splitFrac`; in the scheduler it is the sector sign plus duty weighting. The unity sum keeps total power and average curvature density stable while steering.
-
----
-
-### 5) How the two-lobe control ties back to the GR proxy
-
-The Direction Pad feeds the same time-sliced, cycle-averaged source that the project uses as a GR-valid stand-in:
-
-```
-kappa_drive ~ (8πG / c^5) * (P_avg / A) * d_eff * G_shape,  with  TS >> 1
-```
-
-Because the Ford-Roman bound holds `zeta ≤ 1` and the light-crossing ratio `TS` is kept large, GR "sees" the average over many strobes. The scheduler mirrors contraction/expansion so this averaged source stays valid while still allowing directional control.
-
-Concrete hooks that match the proxy:
-
-- Spectrum/energy panels expose `duty`, `sectors`, and `lightCrossing_us`, which determine `d_eff` and `TS`.
-- The pipeline hook tracks `TS_ratio`, `zeta`, `P_avg`, `Q_L`, etc., so any UI bias must remain inside the documented green-zone bounds.
-
----
-
-### 6) Pump-phase intuition (dynamic Casimir actuation)
-
-On the actuator side the parametric tiles obey `lambda = lambda0 * cos(phi)`, so flipping the pump phase by `pi` swaps the sign of the effective actuation and shifting by `pi/2` moves between quadratures. That is why the scheduler can realize "front negative / aft positive" by assigning complementary phase windows to antipodal sectors while staying safely below threshold.
-
----
-
-### 7) What you see on the 3D hull
-
-The Hull/Alcubierre panel uses the same numbers the scheduler uses. The uniforms `u_phase01`, `u_splitEnabled`, and `u_splitFrac` drive the shader, which computes the sector-weighted `theta_drive` from the GR `theta`. As a result the 3D hull shows a brighter, fatter patch on one side when you push W/S, and rotating yaw walks the pair around the rim.
-
----
-
-### 8) Minimal math summary (why two lobes is the right number)
-
-Let `f(rs)` be the smoothed top-hat profile. Along the equator `theta_GR(phi) ∝ beta * (df/drs) * cos(phi)`, so the natural angular pattern is a dipole (`Y10 ~ cos phi`): one negative lobe (front) and one positive (aft). The gating simply modulates that dipole with a wrapped Gaussian pair (`g1` at `phi0`, `g2` at `phi0 + pi`) whose weights sum to one, preserving the integral constraint while steering.
-
----
-
-### 9) Built-in validation hooks
-
-- **Phase flip check:** set `u_phase01` to 0.5 (180°) and confirm contraction/expansion colors swap across the hull.
-- **Scheduler sign check:** monitor the sector sign output in the energy pipeline; contraction and expansion sectors are mutually exclusive per tick.
-- **Averaging/QI check:** confirm `TS >> 1` and `zeta ≤ 1` in the pipeline panel and warp ledger to ensure steering stays inside the admissible drive envelope.
-
-**Bottom line:** The two-lobe control is the minimal, physically consistent way to steer an Alcubierre/Natario bubble. Phase rotates the dipole, split fraction reweights the front/back pair, and the scheduler enforces the sign and duty that keep the cycle-averaged stress-energy proxy valid.
-
----
-
-## Research provenance for the rotating dipole
-
-Absolutely—and we can back each observed behavior with both code in this repo and the GR literature that motivates it.
-
-### What in the repo enforces “two antipodal lobes that ride with heading”?
-
-**1) Shader builds two wrapped Gaussians 180° apart and rotates them by phase.**  
-`client/src/components/Hull3DRenderer.ts` samples azimuth via `a01 = fract(a01 + u_phase01)` and, when split mode is enabled, evaluates Gaussians at `u_sectorCenter` and `center + 0.5`, blending them via `u_splitFrac`. That is the contraction/expansion dipole in math form.
-
-**2) UI exposes that phase knob (“rotate active lobe … flip 180°”).**  
-`client/src/components/AlcubierrePanel.tsx` surfaces the same `phase01` with badges/toggles so users directly rotate the dipole around the equator.
-
-**3) Pipeline carries shared phase fields.**  
-`phase01`, `phaseSign`, and `phaseMode` flow through `server/energy-pipeline.ts` and the client hooks, keeping scheduler and renderer aligned on heading.
-
-**4) Scheduler/sector model tracks the (+)/(−) split.**  
-The server’s sector state maintains a first-class split index so one set handles contraction while the antipodal set “pays back” expansion each cycle.
-
-**Why lobes “disappear” near 66° NE and peak near ~184°.**  
-Because the dipole is equatorial, when a lobe points toward the camera you see its narrow cross-section (appearing small near the center). When it swings to the limb (~180°), you observe the full footprint on the rim, so it looks large/bright. The shader’s Gaussian normalization (`g / avgG`) keeps total power constant; projection alone changes the apparent size.
-
-*(Verification tip: freeze `u_sectorCenter`, scrub `u_phase01`, and watch the Gaussian peak orbit the ring while its integral stays normalized.)*
-
-### Why GR demands this dipole (external references)
-
-**A) Contraction ahead / expansion aft (Alcubierre).**  
-Alcubierre’s metric produces opposite-sign curvature gradients fore vs aft—the contraction/expansion pair your renderer shows ([Alcubierre 2000](https://arxiv.org/pdf/gr-qc/0009013?utm_source=chatgpt.com)).
-
-**B) Natário’s shift-vector framing keeps the same orientation.**  
-Natário’s zero-expansion warp recasts the drive via the shift vector; directionality still enters through the shift, matching your `phase01`-controlled dipole ([Natário 2002](https://www.if.ufrj.br/~mbr/warp/etc/CQG19.1157.2002.pdf?utm_source=chatgpt.com)).
-
-### Why time-sliced sectoring with complementary lobes stays GR-valid when averaged
-
-**C) High-frequency averaging → effective stress-energy.**  
-Isaacson’s limit shows that rapidly varying sources admit a meaningful averaged stress tensor; your “sector strobing” rationale mirrors that logic ([Isaacson 1968](https://link.aps.org/doi/10.1103/PhysRev.166.1272?utm_source=chatgpt.com)).
-
-**D) Modern backreaction frameworks reach the same conclusion.**  
-Green & Wald formalize how small-scale structure backreacts via an effective stress-energy once averaged, backing your km-scale ledger claims ([Green & Wald 2011](https://link.aps.org/doi/10.1103/PhysRevD.83.084020?utm_source=chatgpt.com)).
-
-### Why the scheduler keeps lobes complementary (and QI-legal)
-
-**E) Quantum inequalities bound negative-energy duration.**  
-Ford, Roman, and collaborators proved that negative energy must be limited in magnitude × time; your mirrored duty-cycling (ζ parameter, complementary `negativeFraction`) is how the drive respects those bounds ([Pfenning & Ford 1995/1998](https://link.aps.org/doi/10.1103/PhysRevD.51.4277?utm_source=chatgpt.com)).
-
-### Put together
-
-- **Visual:** Two wrapped Gaussians rotate with `phase01`; projection makes them appear smaller when aimed at you and largest at the rim.
-- **Physics:** That dipole is exactly the contraction/expansion requirement from Alcubierre/Natário ([1](https://arxiv.org/pdf/gr-qc/0009013?utm_source=chatgpt.com), [2](https://www.if.ufrj.br/~mbr/warp/etc/CQG19.1157.2002.pdf?utm_source=chatgpt.com)).
-- **Engineering:** Fast sector strobing + antipodal mirroring yields a cycle-averaged stress-energy consistent with GR and quantum inequalities ([3](https://link.aps.org/doi/10.1103/PhysRev.166.1272?utm_source=chatgpt.com), [4](https://link.aps.org/doi/10.1103/PhysRevD.83.084020?utm_source=chatgpt.com), [5](https://link.aps.org/doi/10.1103/PhysRevD.51.4277?utm_source=chatgpt.com)).
-
-### Quick repo pointers
-
-- **Shader dipole:** `client/src/components/Hull3DRenderer.ts` (two Gaussians + phase rotation).
-- **Phase controls:** badges/toggles in `client/src/components/AlcubierrePanel.tsx`.
-- **Pipeline phase fields:** `phase01`, `phaseSign`, `phaseMode` in the energy pipeline state.
-- **Sector split in scheduler:** server-side split fields dividing (+)/(−) sectors.
-- **Design provenance:** km-scale warp ledger notes on GR-valid time-averaged curvature proxies.
-
-These references tie the UI behavior back to concrete implementation details and peer-reviewed GR literature.
-
----
-
-## Repository tour
-- `client/` - React app (Vite + TypeScript) and component library. Hooks under `client/src/hooks/` expose energy and curvature pipelines, while shared stores live in `client/src/store/`.
-- `server/` - Express server bootstrapped via `server/index.ts`, with feature modules in `server/energy-pipeline.ts`, `server/routes.ts`, and instrumentation helpers in `server/instruments/`.
-- `modules/` - Physics engines and numerical tooling shared between client and server.
-- `shared/` - Zod schemas (`shared/schema.ts`) consumed on both sides of the stack.
-- `warp-web/` - Stand-alone HTML experiments and documentation pages.
-- `docs/` - In-repo briefs for upcoming sweeps and feature work (see `docs/helix-desktop-panels.md` for the Helix Desktop/Start panel wiring guide).
-- `sim_core/` - Static calibration data (`phase_calibration.json`) bundled with the build.
-- `.cal/` - Runtime calibration logs dropped by the phase calibration utilities (ignored by Git by default).
-
-## Registering panels for Helix Start windows
-All new UI must be shipped as a Helix panel. Do not add standalone page routes for new UI work. The legacy page at `client/src/pages/helix-core.tsx` is deprecated and should not be used for new UI work.
-Helix Start lists launchable windows from `HELIX_PANELS` in `client/src/pages/helix-core.panels.ts`, and `/desktop` renders those entries as window panels via the desktop registry. To make a program discoverable:
-
-1. Create or expose the panel component under `client/src/components/` (or a page component you can import).
-2. Add a new entry in `client/src/pages/helix-core.panels.ts` using `lazyPanel`, with a unique `id`, user-facing `title`, and an icon (Lucide). Optionally set `defaultSize`, `defaultPosition`, `pinned`, and `endpoints`.
-3. Ensure the entry is part of `HELIX_PANELS` (not just `panelRegistry`) so it appears in Helix Start and the taskbar.
-4. For mobile availability, set `mobileReady: true`; otherwise it stays desktop-only.
-
-See `docs/helix-desktop-panels.md` for the full desktop/start wiring details and troubleshooting checklist.
-
-## Getting started
-For the fastest product path, see [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
-1. **Install prerequisites**
-   - Node.js 20.x (the project uses native ESM and `tsx`)
-   - npm 10.x (ships with Node 20)
-   - Optional: Python 3.11 + `requests`, `numpy` for `tests/test_dynamic.py`
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-3. **Start the stack (UI + API)**
-   ```bash
-   npm run dev
-   ```
-   This launches the Express server with Vite middleware on port 5173, so you
-   should not start a separate Vite process. Use `/desktop` or `/mobile` for the
-   UI. For AGI routes, run `npm run dev:agi` (or set `ENABLE_AGI=1` and
-   `ENABLE_ESSENCE=1`).
-4. **(Recommended) Enable local verification hooks**
-   ```bash
-   npm run hooks:install
-   ```
-   This wires Git to run `npm run verify:local` on each commit (set `SKIP_VERIFY=1`
-   to bypass in emergencies).
-
-## Running locally
 ```bash
-npm run dev           # Express + Vite middleware with HMR (default)
-# If you explicitly want to serve the last build without Vite/HMR:
-npm run dev:static    # requires a fresh `npm run build`
+npm install
+npm run dev:agi:5050
 ```
 
-The dev script launches the Express server with Vite middleware, so you should not need to run a separate `npx vite dev` process. The default UI entry points are [http://localhost:5173/desktop](http://localhost:5173/desktop) for the desktop window manager and [http://localhost:5173/mobile](http://localhost:5173/mobile) for the mobile app panel window configuration. The root route (`/`) automatically redirects based on the current device; pass `?desktop=1` or `?mobile=1` to force a target. Treat the app panel as a window panel: follow the Helix panel template in `client/src/pages/helix-core.panels.ts` so it registers as a window and appears in Helix Start on `/desktop` (see `docs/helix-desktop-panels.md`). API routes mount under the same origin via Express. The `dev:static` variant skips Vite and serves the prebuilt bundle, so rebuild after changes before using it.
+The development server runs Express with Vite middleware. Open:
 
-## Offline math upgrade loop
-- **Adapter-aware inference**: Configure Luma with `LUMA_PROVIDER`, `LUMA_MODEL`, and optionally `LORA_ADAPTER` to hot-load LoRA patches. The `/api/luma/chat/self-consistency` endpoint now wraps multi-sample decoding with majority voting on the `FINAL ANSWER` line.
-- **Training assets**: JSONL schemas under `datasets/train/` include cite-first answers, equation glossaries, comparisons, and abstentions with citation or `[NO_EVIDENCE]` prefixes matching the new prompt contract.
-- **Tooling**:
-  - `scripts/merge_lora.py` merges a trained LoRA adapter into base weights for runtimes that cannot mount adapters dynamically.
-  - `tools/verifier_math.py` scores generations or emits DPO preference pairs by inspecting the `FINAL ANSWER` value with SymPy.
-  - `tools/run_eval.py` runs a local HuggingFace model (optionally with a LoRA adapter) against a JSONL question set and records verifier metrics.
-- **Suggested workflow**:
-  1. Fine-tune a LoRA adapter on `datasets/train/*.jsonl`, optionally add verifier-derived preference pairs under `datasets/prefs/`.
-  2. Evaluate with `python tools/run_eval.py --model <path> --questions eval/dev_math.jsonl`.
-  3. Deploy by pointing `LORA_ADAPTER` (or `LUMA_MODEL` when merged) at the chosen artifact.
+- Desktop cockpit: http://localhost:5050/desktop
+- Mobile panels: http://localhost:5050/mobile
 
-### Useful npm scripts
-| Script | Description |
-| --- | --- |
-| `npm run dev` | Start Express + Vite in development mode. |
-| `npm run build` | Build the client via Vite and bundle the server with esbuild into `dist/`. |
-| `npm start` | Serve the production build from `dist/`. |
-| `npm test` | Run Vitest suites (`client/src/lib/warp-pipeline-adapter.test.ts`, component tests, etc.). |
-| `npm run db:push` | Apply Drizzle schema changes to the configured database. |
+Do not start a separate Vite server for normal development; the dev scripts already wire the API and UI together. Use `npm run dev` for the default port or `npm run dev:agi:5050` for the AGI-enabled 5050 workflow.
 
-## Testing
-- **Unit & integration** - `npm test` executes Vitest suites co-located with the client/lib code.
-- **Python physics checks** - `tests/test_dynamic.py` targets a running simulation service at `http://localhost:5173`. Activate your Python environment (see `pyproject.toml`) and run `pytest` when the simulator is available.
-- **Ledger guard** - `npm test -- --run tests/ledger-dimension.spec.ts` locks the green-zone slopes (duty, area, geometry gain, Q_L), GR prefactors, and equality of power vs. density forms using the dev-mock contract.
+## High-Signal Runs
 
-## Observability
-- **Prometheus endpoint** - `GET /metrics` now exports default Node stats plus AGI task counters, tool-call histograms, queue gauges, and HTTP request latency buckets. Point Prometheus at `http://localhost:5173/metrics` when the server is running.
-- **Structured tool logs** - `GET /api/agi/tools/logs?limit=50&tool=llm.local.generate` returns the most recent tool invocations (and `/api/agi/tools/logs/stream` keeps an SSE feed open for dashboards). Records include tool name, params hash, latency, seeds, and error text when available.
-- **Local Prom/Graf stack** - Launch `docker compose -f docker-compose.observability.yml up` to spin up Prometheus (port 9090) and Grafana (port 3001, admin/admin by default). The bundled `ops/observability/prometheus.yml` scrapes `host.docker.internal:5173/metrics`, so keep the Express server running on port 5173.
+These commands are the best first pass for understanding what the repo can do:
 
-## Production build
+```bash
+npm run helix:ask:regression:light
+npm run physics:validate
+npm run casimir:verify
+npm run warp:full-solve:readiness
+npm run warp:full-solve:nhm2-shift-lapse:alpha-sweep
+npm run warp:full-solve:g4-autoloop:status
+```
+
+For local product work:
+
 ```bash
 npm run build
-npm start
+npm test
+npm run hooks:install
 ```
 
-The build emits static client assets to `dist/public/` and bundles the server entry to `dist/index.js`. Ensure the `dist/public` directory is present before starting production mode.
+`npm run hooks:install` configures the repo hooks to run local verification before commits. Use `SKIP_VERIFY=1` only for emergency bypasses.
 
-## Environment controls
-- `PUMP_DRIVER` - Set to `mock` (default) to use the in-process pump driver (`server/instruments/pump-mock.ts`); provide a custom driver identifier to integrate real hardware.
-- `PUMP_LOG` - When `1`, logs pump duty updates to stdout.
-- `PUMP_MOCK_SETTLE_MS`, `PUMP_MOCK_JITTER_MS` - Tune timing characteristics for the mock pump.
-- `HELIX_PHASE_CALIB_JSON` - Override the path to the phase calibration JSON (`sim_core/phase_calibration.json` by default).
-- `PHASE_CAL_DIR` - Directory for calibration logs (`.cal/phase-calibration-log.jsonl` when unset).
-- `ENABLE_REPO_TOOLS` - When `1`, exposes repo-safe helpers (`repo.diff.review`, `repo.patch.simulate`) to the AGI planner for read-only diffing and patch dry-runs.
+## Architecture
 
-## Static research sites
-The `warp-web/` directory contains HTML microsites (e.g. `km-scale-warp-ledger.html`) that reference the same JavaScript helpers used in the Helix Core client. Open the files directly in a browser or host them via `npm run dev` to leverage Express static serving.
+```mermaid
+flowchart LR
+  UI["Helix UI\nclient/"]
+  API["Express API\nserver/"]
+  Ask["Helix Ask\nagentic wrapper"]
+  Physics["Physics modules\nmodules/ sim_core/"]
+  Campaigns["Campaign scripts\nscripts/ cli/"]
+  Evidence["Evidence DAG\nAUDIT_TREE.json MATH_GRAPH.json artifacts/"]
+  Docs["Research docs\ndocs/ warp-web/"]
+
+  UI --> API
+  API --> Ask
+  API --> Physics
+  Ask --> Campaigns
+  Physics --> Campaigns
+  Campaigns --> Evidence
+  Evidence --> Docs
+```
+
+## Core Systems
+
+### Helix Core Cockpit
+
+Helix Core is the operator surface for live panels, renderer diagnostics, and command routing. New UI should be registered as a Helix panel in `client/src/pages/helix-core.panels.ts` so it appears in both `/desktop` and `/mobile` where appropriate.
+
+Useful docs:
+
+- `docs/needle-hull-mainframe.md`
+- `docs/helix-desktop-panels.md`
+- `docs/helix-panel-template.md`
+
+### Helix Ask Agentic Wrapper
+
+Helix Ask is the agentic layer around the cockpit. It supports routed prompts, audited reasoning packets, regression sweeps, math routing evidence, prompt-quality probes, and decision bundles.
+
+Representative scripts:
+
+```bash
+npm run helix:ask:regression:light
+npm run helix:ask:sweep
+npm run helix:ask:math-router:evidence
+npm run helix:ask:agent-eval
+npm run helix:decision:run
+```
+
+Useful docs:
+
+- `docs/helix-ask-agentic-loop-current-overview.md`
+- `docs/helix-ask-flow.md`
+- `docs/architecture/helix-ask-proof-packet-rfc.md`
+- `docs/architecture/helix-ask-math-router-contract.md`
+
+### NHM2 Full-Solve Campaigns
+
+The NHM2 lane is organized around selected-family shift-lapse profiles, York-control proof packs, campaign runners, geometry conformance, strict signal readiness, source closure, observer audits, and full-loop audits.
+
+Representative scripts:
+
+```bash
+npm run warp:full-solve:readiness
+npm run warp:full-solve:canonical
+npm run warp:full-solve:reference:refresh
+npm run warp:full-solve:nhm2-shift-lapse:alpha-sweep
+npm run warp:full-solve:nhm2-shift-lapse:publish-source-closure
+npm run warp:full-solve:nhm2-shift-lapse:publish-observer-audit
+npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit
+```
+
+Useful docs and artifacts:
+
+- `docs/nhm2-closed-loop.md`
+- `docs/nhm2-audit-checklist.md`
+- `docs/audits/research/selected-family/nhm2-shift-lapse/`
+- `artifacts/research/full-solve/`
+
+### Tree, DAG, And Verification Layer
+
+The verification layer keeps research claims tied to source files, scripts, generated artifacts, certificates, traces, and policy gates. This is the part of the repository that should make every claim inspectable.
+
+Key files:
+
+- `AUDIT_TREE.json`
+- `MATH_GRAPH.json`
+- `MATH_STATUS.md`
+- `math.evidence.json`
+- `training-trace.jsonl`
+
+Representative scripts:
+
+```bash
+npm run math:validate
+npm run math:report
+npm run math:trace
+npm run validate:physics:root-leaf
+npm run warp:coverage-audit
+```
+
+Useful docs:
+
+- `docs/warp-tree-dag-inventory.md`
+- `docs/warp-tree-dag-schema.md`
+- `docs/warp-tree-dag-congruence-policy.md`
+- `docs/proof-pack.md`
+- `docs/CONSTRAINT-PACKS.md`
+
+### Physics And Simulation Runs
+
+The repo includes runnable physics workflows for GR loops, Casimir collection/verification, shadow injection scenarios, sector-control reproduction, solar spectra manifests, and static simulation outputs.
+
+Representative scripts:
+
+```bash
+npm run gr:loop
+npm run physics:ask
+npm run physics:validate
+npm run casimir:collect
+npm run casimir:verify
+npm run sector-control:repro
+npm run warp:shadow:inject
+npm run solar:pipeline
+```
+
+Simulation and calibration locations:
+
+- `modules/`
+- `sim_core/`
+- `simulations/`
+- `configs/`
+- `artifacts/`
+
+### Renderer And Live Telemetry
+
+The visual cockpit uses a WebGL hull renderer with curvature, sector, tilt, Ford-Roman, and direction-pad overlays. Runtime telemetry comes through the energy pipeline and shared client hooks.
+
+Important files:
+
+- `client/src/components/Hull3DRenderer.ts`
+- `client/src/components/AlcubierrePanel.tsx`
+- `client/src/pages/helix-core.panels.ts`
+- `server/energy-pipeline.ts`
+- `server/curvature-brick.ts`
+
+Useful docs:
+
+- `docs/alcubierre-alignment.md`
+- `docs/casimir-tile-mechanism.md`
+- `docs/mass-semantics.md`
+- `docs/gr-solver-progress.md`
+
+## Repository Tour
+
+| Path | Purpose |
+| --- | --- |
+| `client/` | React/Vite TypeScript app, Helix panels, hooks, and shared UI state. |
+| `server/` | Express API, Helix command endpoint, energy pipeline, curvature bricks, instruments, and telemetry. |
+| `modules/` | Shared physics and numerical modules. |
+| `cli/` | Command-line research and validation entry points. |
+| `scripts/` | Campaign runners, audits, bundles, reports, probes, and reproducibility tools. |
+| `docs/` | Research notes, architecture specs, proof-pack docs, runbooks, and audit reports. |
+| `artifacts/` | Generated evidence, traces, rendered frames, bundles, and campaign outputs. |
+| `simulations/` | Static simulation cases and outputs. |
+| `warp-web/` | Stand-alone research microsites and HTML experiments. |
+| `shared/` | Cross-stack schemas and shared contracts. |
+| `configs/` | Scenario, shadow-injection, model, and verification configuration. |
+
+## Environment
+
+Common controls:
+
+| Variable | Use |
+| --- | --- |
+| `ENABLE_AGI` | Enables AGI routes for agentic workflows. |
+| `ENABLE_ESSENCE` | Enables Essence-linked AGI runtime behavior. |
+| `ENABLE_REPO_TOOLS` | Exposes repo-safe helpers for read-only diffing and patch dry-runs. |
+| `PUMP_DRIVER` | Selects the pump driver; defaults to the mock driver. |
+| `PUMP_LOG` | Logs pump duty updates when set to `1`. |
+| `HELIX_PHASE_CALIB_JSON` | Overrides phase calibration JSON path. |
+| `PHASE_CAL_DIR` | Overrides phase calibration log directory. |
+
+For a fuller environment guide, see `docs/ENVIRONMENT.md` and `.env.example`.
+
+## Testing And CI-Style Checks
+
+```bash
+npm test
+npm run typecheck
+npm run build
+npm run verify:local
+npm run reports:ci
+```
+
+Targeted checks:
+
+```bash
+npm run casimir:verify:ci
+npm run warp:promotion:readiness:check
+npm run warp:integrity:check
+npm run warp:render:congruence:check
+npm run claims:disclaimer:check
+```
+
+## Observability
+
+When the server is running:
+
+- Prometheus metrics: `GET /metrics`
+- AGI tool logs: `GET /api/agi/tools/logs?limit=50`
+- AGI tool log stream: `GET /api/agi/tools/logs/stream`
+
+Local Prometheus/Grafana:
+
+```bash
+docker compose -f docker-compose.observability.yml up
+```
+
+Prometheus runs on port `9090`; Grafana runs on port `3001` with the default local credentials described in the compose setup.
+
+## Static Research Sites
+
+`warp-web/` contains static HTML research microsites such as the km-scale warp ledger. They can be opened directly or served through the development server.
 
 ## Contributing
+
 1. Create a feature branch from `main`.
-2. Run `npm run build` and `npm test` before pushing.
-3. Keep large binaries and generated logs out of Git; calibration logs land in `.cal/` which is ignored by default.
+2. Keep generated logs and large binaries out of Git unless they are intentional evidence artifacts.
+3. Run `npm run build` and `npm test` before pushing.
+4. For Helix UI work, register new surfaces through `client/src/pages/helix-core.panels.ts`.
+5. For research claims, include the script, artifact, doc, or citation path that makes the claim inspectable.
