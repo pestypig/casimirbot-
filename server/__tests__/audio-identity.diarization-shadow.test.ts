@@ -40,6 +40,7 @@ const makeTinyWav = (): Buffer => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.doUnmock("../services/audio-identity/audio-feature-summary");
   delete process.env.HELIX_AUDIO_IDENTITY_DIARIZATION_ENABLED;
   delete process.env.HELIX_AUDIO_IDENTITY_DIARIZATION_SHADOW;
   delete process.env.HELIX_AUDIO_IDENTITY_DIARIZATION_URL;
@@ -81,6 +82,36 @@ describe("audio identity diarization shadow mode", () => {
       status: "skipped",
       speakers: [],
       segments: [],
+      audio_features: null,
+      error: "audio_exceeds_diarization_max_audio_bytes",
+    });
+  });
+
+  it("skips oversized WAV audio before summarizing features", async () => {
+    vi.resetModules();
+    const summarizeAudioFeatures = vi.fn();
+    vi.doMock("../services/audio-identity/audio-feature-summary", () => ({
+      summarizeAudioFeatures,
+    }));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { runDiarizationShadow: runShadowWithMockedSummary } = await import(
+      "../services/audio-identity/diarization-shadow"
+    );
+
+    const result = await runShadowWithMockedSummary({
+      audioBuffer: Buffer.alloc(4096),
+      contentType: "audio/wav",
+      captureSessionId: "capture-large-wav",
+      captureSource: "mic",
+      config: { ...baseConfig, maxAudioBytes: 1024 },
+    });
+
+    expect(summarizeAudioFeatures).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: "skipped",
+      audio_features: null,
       error: "audio_exceeds_diarization_max_audio_bytes",
     });
   });
@@ -291,6 +322,52 @@ describe("audio identity diarization shadow mode", () => {
     expect(result).toMatchObject({
       status: "parse_error",
       provider: null,
+      error: "diarization_provider_parse_error",
+    });
+  });
+
+  it("returns parse_error for provider segments with end_ms before start_ms", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              schema: HELIX_DIARIZATION_RESPONSE_SCHEMA,
+              ok: true,
+              provider: "mock",
+              speakers: [{ speaker_id: "spk_reversed", confidence: 0.9 }],
+              segments: [
+                {
+                  segment_id: "seg-reversed",
+                  speaker_id: "spk_reversed",
+                  start_ms: 1200,
+                  end_ms: 600,
+                  confidence: 0.9,
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+
+    const result = await callDiarizationSidecar(
+      {
+        schema: "helix.diarization.request.v1",
+        capture_session_id: "capture-reversed-segment",
+        capture_source: "mic",
+        content_type: "audio/wav",
+        audio_base64: "AA==",
+      },
+      baseConfig,
+    );
+
+    expect(result).toMatchObject({
+      status: "parse_error",
+      provider: null,
+      speakers: [],
+      segments: [],
       error: "diarization_provider_parse_error",
     });
   });

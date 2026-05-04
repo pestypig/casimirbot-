@@ -65,7 +65,6 @@ export async function runDiarizationShadow(args: {
   const config = args.config ?? readDiarizationConfigFromEnv();
   if (!config.enabled) return null;
 
-  const audioFeatures = summarizeAudioFeatures(args.audioBuffer, args.contentType);
   if (args.audioBuffer.byteLength > config.maxAudioBytes) {
     return {
       enabled: true,
@@ -76,11 +75,12 @@ export async function runDiarizationShadow(args: {
       speakers: [],
       segments: [],
       audio_quality: null,
-      audio_features: audioFeatures,
+      audio_features: null,
       error: "audio_exceeds_diarization_max_audio_bytes",
     };
   }
 
+  const audioFeatures = summarizeAudioFeatures(args.audioBuffer, args.contentType);
   const result = await callDiarizationSidecar(
     {
       schema: HELIX_DIARIZATION_REQUEST_SCHEMA,

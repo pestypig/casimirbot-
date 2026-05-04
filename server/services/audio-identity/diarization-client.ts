@@ -19,6 +19,8 @@ const SegmentSchema = z.object({
   end_ms: z.number().min(0),
   confidence: z.number().min(0).max(1),
   overlap: z.boolean().optional(),
+}).refine((segment) => segment.end_ms >= segment.start_ms, {
+  message: "segment end_ms must be >= start_ms",
 });
 
 const DiarizationResponseSchema = z.object({

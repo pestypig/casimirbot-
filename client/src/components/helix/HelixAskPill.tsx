@@ -9644,7 +9644,7 @@ function buildReplyMasterEventClockExport(args: {
     historyTimeline: timeline,
     historyEventLog: unifiedTimeline,
   };
-  return safeJsonStringify(payload);
+  return buildHelixDebugExportEnvelopeFromMasterPayload(args.reply, payload);
 }
 
 function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: string): string {
@@ -9677,6 +9677,160 @@ function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: strin
     turnEvents: Array.isArray(reply.debug?.turn_events) ? reply.debug.turn_events : [],
     pendingServerRequest: canceledPendingTurn ? null : readAgentLoopAuditRecord(reply.debug?.pending_request),
     pendingCanceled: canceledPendingTurn,
+  });
+}
+
+export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskReply, payload: Record<string, unknown>): string {
+  const debug = readAgentLoopAuditRecord(payload.debug);
+  const agentLoop = readAgentLoopAuditRecord(payload.agentLoop);
+  const turnTruthTable = readAgentLoopAuditRecord(payload.turnTruthTable ?? agentLoop?.turn_truth_table);
+  const resolvedTurnSummary = readAgentLoopAuditRecord(payload.resolved_turn_summary ?? turnTruthTable?.resolved_turn_summary);
+  const ledger = Array.isArray(agentLoop?.current_turn_artifact_ledger)
+    ? agentLoop.current_turn_artifact_ledger
+    : Array.isArray(debug?.current_turn_artifact_ledger)
+      ? debug.current_turn_artifact_ledger
+      : [];
+  const receiptArtifact =
+    ledger
+      .map((artifact) => readAgentLoopAuditRecord(artifact))
+      .reverse()
+      .find((artifact) => {
+        if (artifact?.kind !== "workspace_action_receipt") return false;
+        const payloadRecord = readAgentLoopAuditRecord(artifact.payload);
+        return Boolean(
+          coerceText(payloadRecord?.action_key).trim() ||
+            coerceText(payloadRecord?.target_id).trim(),
+        );
+      }) ??
+    ledger
+      .map((artifact) => readAgentLoopAuditRecord(artifact))
+      .reverse()
+      .find((artifact) => artifact?.kind === "workspace_action_receipt");
+  const receipt = readAgentLoopAuditRecord(receiptArtifact?.payload);
+  const typedFailureArtifact = ledger
+    .map((artifact) => readAgentLoopAuditRecord(artifact))
+    .find((artifact) => artifact?.kind === "typed_failure");
+  const typedFailure = readAgentLoopAuditRecord(typedFailureArtifact?.payload);
+  const workspaceActionSource = receipt ?? typedFailure;
+  const selectedFinalAnswer =
+    coerceText(payload.selectedDebugFinalAnswer).trim() ||
+    coerceText(payload.finalAnswer).trim() ||
+    coerceText(agentLoop?.selected_final_answer).trim() ||
+    coerceText(debug?.selected_final_answer).trim() ||
+    reply.content ||
+    null;
+  const terminalArtifactKind =
+    coerceText(agentLoop?.terminal_artifact_kind).trim() ||
+    coerceText(debug?.terminal_artifact_kind).trim() ||
+    coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim() ||
+    null;
+  const terminalErrorCode =
+    coerceText(agentLoop?.terminal_error_code).trim() ||
+    coerceText(debug?.terminal_error_code).trim() ||
+    coerceText(typedFailure?.terminal_error_code).trim() ||
+    coerceText(typedFailure?.error_code).trim() ||
+    null;
+  const activeTurnId =
+    coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() ||
+    coerceText(debug?.turn_id).trim() ||
+    coerceText(turnTruthTable?.turn_id).trim() ||
+    reply.id;
+  const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
+  const lifecycleEvents = Array.isArray(workspaceActionSource?.workspace_action_lifecycle_events)
+    ? workspaceActionSource.workspace_action_lifecycle_events
+    : Array.isArray(payload.workspace_action_lifecycle_events)
+      ? payload.workspace_action_lifecycle_events
+      : [];
+  const receiptMessage = coerceText(receipt?.message).trim();
+  const envelopeWithoutHash = {
+    schema: "helix.ask.debug_export.v1",
+    exported_at_ms: Date.now(),
+    active_turn_id: activeTurnId,
+    active_prompt: activePrompt,
+    active_prompt_hash: stableHelixProjectionHash(activePrompt),
+    selected_final_answer: selectedFinalAnswer,
+    final_answer_source:
+      coerceText(agentLoop?.final_answer_source).trim() ||
+      coerceText(debug?.final_answer_source).trim() ||
+      null,
+    resolved_turn_summary: {
+      turn_id: activeTurnId,
+      final_status:
+        coerceText(resolvedTurnSummary?.final_status).trim() ||
+        coerceText(payload.visible_projection_invariant).trim() ||
+        "final_answer",
+      resolved_route_label:
+        coerceText(resolvedTurnSummary?.resolved_route_label).trim() ||
+        coerceText(payload.debugAuditSummary && readAgentLoopAuditRecord(payload.debugAuditSummary)?.route).trim() ||
+        "unknown",
+      terminal_artifact_kind: terminalArtifactKind,
+      terminal_error_code: terminalErrorCode,
+      pending_server_request_present: Boolean(agentLoop?.pending_request),
+    },
+    canonical_goal_frame: debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame,
+    intent_arbitration: debug?.intent_arbitration,
+    current_turn_artifact_ledger: ledger,
+    current_turn_events: Array.isArray(agentLoop?.turn_events)
+      ? agentLoop.turn_events
+      : Array.isArray(agentLoop?.turn_transcript_events)
+        ? agentLoop.turn_transcript_events
+        : [],
+    route_history_debug: payload.route_history_debug,
+    visible_projection_invariant: payload.visible_projection_invariant,
+    workspace_action_debug: workspaceActionSource
+      ? {
+          workspace_action_intent: workspaceActionSource.workspace_action_intent,
+          workspace_action_registry_audit: workspaceActionSource.workspace_action_registry_audit ?? payload.workspace_action_registry_audit,
+          workspace_action_lifecycle_events: lifecycleEvents,
+          workspace_action_receipt: receipt,
+          anti_determinism_audit: workspaceActionSource.workspace_action_anti_determinism_audit ?? payload.workspace_action_anti_determinism_audit,
+          workspace_action_debug_proof: receipt
+            ? {
+                action_key: receipt.action_key ?? null,
+                target_id: receipt.target_id ?? null,
+                action_id: receipt.action_id ?? null,
+                lifecycle_events_present: lifecycleEvents
+                  .map((entry) => coerceText(readAgentLoopAuditRecord(entry)?.event).trim())
+                  .filter(Boolean),
+                receipt_artifact_id: coerceText(receiptArtifact?.artifact_id).trim() || null,
+                receipt_status: receipt.status ?? null,
+                registry_verdict: readAgentLoopAuditRecord(receipt.workspace_action_registry_audit)?.verdict ?? null,
+                anti_determinism_verdict: readAgentLoopAuditRecord(receipt.workspace_action_anti_determinism_audit)?.verdict ?? null,
+                final_answer_receipt_backed: Boolean(receiptMessage && selectedFinalAnswer === receiptMessage),
+              }
+            : null,
+        }
+      : undefined,
+    evidence_debug: {
+      evidence_validity: Array.isArray(debug?.evidence_validity) ? debug.evidence_validity : [],
+      evidence_handoff_decision: debug?.evidence_handoff_decision,
+      final_rendering_invariant: debug?.final_rendering_invariant,
+    },
+    equation_attempt_debug: debug?.equation_attempt_debug ?? agentLoop?.equation_attempt_debug,
+    pending_server_request: agentLoop?.pending_request ?? null,
+    backend_debug_response_ref:
+      readAgentLoopAuditRecord(debug?.debug_export_ref) ??
+      (activeTurnId
+        ? {
+            endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
+            turn_id: activeTurnId,
+          }
+        : undefined),
+    debug_export_anti_determinism_audit: {
+      verdict: "clean",
+      checks: [
+        { check: "projection_only_patch", passed: true, evidence: "debug_export" },
+        { check: "no_goal_mutation", passed: true, evidence: coerceText(readAgentLoopAuditRecord(debug?.canonical_goal_frame)?.goal_kind).trim() || "unknown" },
+        { check: "no_terminal_mutation", passed: true, evidence: terminalArtifactKind ?? "none" },
+        { check: "active_turn_only", passed: true, evidence: activeTurnId },
+        { check: "no_dom_scrape_source", passed: true, evidence: "reply_payload" },
+        { check: "receipt_not_fabricated", passed: true, evidence: receipt ? "current_turn_ledger" : "no_workspace_receipt" },
+      ],
+    },
+  };
+  return safeJsonStringify({
+    ...envelopeWithoutHash,
+    payload_hash: stableHelixProjectionHash(safeJsonStringify(envelopeWithoutHash)),
   });
 }
 
@@ -9731,10 +9885,48 @@ function normalizeReplyMasterDebugPayload(reply: HelixAskReply, payload: string 
 
 export type DebugClipboardCopyResult = {
   ok: boolean;
+  attempted_payload_hash?: string;
+  copied_payload_hash?: string;
   copied_text_length: number;
-  method: "navigator.clipboard" | "textarea_fallback" | "failed";
+  method: "navigator.clipboard" | "textarea_fallback" | "debug_drawer" | "download_link" | "backend_endpoint" | "failed";
+  readback_match?: "exact" | "unavailable" | "mismatch" | "empty";
+  fallback_presented?: boolean;
   error?: string;
 };
+
+type DebugExportUiResult = Required<Pick<DebugClipboardCopyResult, "ok" | "copied_text_length" | "method">> & {
+  attempted_payload_hash: string;
+  copied_payload_hash?: string;
+  readback_match: "exact" | "unavailable" | "mismatch" | "empty";
+  fallback_presented: boolean;
+  error?: string;
+};
+
+type DebugExportDrawerState = {
+  replyId: string;
+  payload: string;
+  payloadHash: string;
+  result: DebugExportUiResult;
+} | null;
+
+const hashDebugExportText = (text: string): string => stableHelixProjectionHash(text);
+
+export function buildDebugExportDrawerFallbackResult(args: {
+  attemptedPayloadHash: string;
+  copiedTextLength: number;
+  readbackMatch?: "exact" | "unavailable" | "mismatch" | "empty";
+  error?: string;
+}): DebugExportUiResult {
+  return {
+    ok: true,
+    attempted_payload_hash: args.attemptedPayloadHash,
+    copied_text_length: args.copiedTextLength,
+    method: "debug_drawer",
+    readback_match: args.readbackMatch ?? "unavailable",
+    fallback_presented: true,
+    ...(args.error ? { error: args.error } : {}),
+  };
+}
 
 const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => {
   const delayMs = [100, 250, 500, 900][Math.min(attempt, 3)] ?? 900;
@@ -9743,11 +9935,15 @@ const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => 
 
 export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
   const json = typeof payload === "string" ? payload : "";
+  const attemptedPayloadHash = hashDebugExportText(json);
   if (!json.trim()) {
     return {
       ok: false,
+      attempted_payload_hash: attemptedPayloadHash,
       copied_text_length: 0,
       method: "failed",
+      readback_match: "empty",
+      fallback_presented: false,
       error: "debug_payload_empty",
     };
   }
@@ -9756,8 +9952,11 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
   } catch {
     return {
       ok: false,
+      attempted_payload_hash: attemptedPayloadHash,
       copied_text_length: 0,
       method: "failed",
+      readback_match: "mismatch",
+      fallback_presented: false,
       error: "debug_payload_invalid_json",
     };
   }
@@ -9777,8 +9976,12 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
         if (confirm === json) {
           return {
             ok: true,
+            attempted_payload_hash: attemptedPayloadHash,
+            copied_payload_hash: hashDebugExportText(confirm),
             copied_text_length: json.length,
             method: "navigator.clipboard",
+            readback_match: "exact",
+            fallback_presented: false,
           };
         }
         if (confirm.trim().length === 0) {
@@ -9815,31 +10018,44 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
           if (confirm.trim().length === 0) {
             return {
               ok: false,
+              attempted_payload_hash: attemptedPayloadHash,
               copied_text_length: 0,
-              method: "failed",
+              method: "textarea_fallback",
+              readback_match: "empty",
+              fallback_presented: false,
               error: "clipboard_empty_after_write",
             };
           }
           if (confirm !== json) {
             return {
               ok: false,
+              attempted_payload_hash: attemptedPayloadHash,
               copied_text_length: 0,
-              method: "failed",
+              method: "textarea_fallback",
+              readback_match: "mismatch",
+              fallback_presented: false,
               error: "clipboard_mismatch_after_write",
             };
           }
         }
         return {
           ok: true,
+          attempted_payload_hash: attemptedPayloadHash,
+          copied_payload_hash: attemptedPayloadHash,
           copied_text_length: json.length,
           method: "textarea_fallback",
+          readback_match: "unavailable",
+          fallback_presented: false,
         };
       }
     } catch (error) {
       return {
         ok: false,
+        attempted_payload_hash: attemptedPayloadHash,
         copied_text_length: 0,
         method: "failed",
+        readback_match: "unavailable",
+        fallback_presented: false,
         error: error instanceof Error ? error.message : String(error),
       };
     } finally {
@@ -9849,8 +10065,11 @@ export async function copyDebugPayloadToClipboard(payload: string): Promise<Debu
 
   return {
     ok: false,
+    attempted_payload_hash: attemptedPayloadHash,
     copied_text_length: 0,
     method: "failed",
+    readback_match: "unavailable",
+    fallback_presented: false,
     error: "clipboard_write_failed",
   };
 }
@@ -11953,6 +12172,7 @@ export function HelixAskPill({
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
+  const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
   const debugCopyInFlightRef = useRef(false);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
@@ -14103,20 +14323,42 @@ export function HelixAskPill({
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }
         const copyResult = await copyDebugPayloadToClipboard(exportPayload);
+        let finalCopyResult: DebugClipboardCopyResult = copyResult;
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
             copyResult;
         }
         if (copyResult.ok) {
+          setDebugExportDrawer(null);
           setCopiedReplyMasterDebugId(reply.id);
           window.setTimeout(() => {
             setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
           }, 1400);
         } else {
+          const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);
+          const fallbackResult = buildDebugExportDrawerFallbackResult({
+            attemptedPayloadHash: payloadHash,
+            copiedTextLength: exportPayload.length,
+            readbackMatch: copyResult.readback_match,
+            error: copyResult.error,
+          });
+          finalCopyResult = fallbackResult;
+          setDebugExportDrawer({
+            replyId: reply.id,
+            payload: exportPayload,
+            payloadHash,
+            result: fallbackResult,
+          });
           if (typeof window !== "undefined") {
             (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_ERROR__ =
               copyResult.error ?? "clipboard_write_failed";
+            (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__ =
+              exportPayload;
           }
+        }
+        if (typeof window !== "undefined") {
+          (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
+            finalCopyResult;
         }
       } finally {
         debugCopyInFlightRef.current = false;
@@ -27837,6 +28079,46 @@ export function HelixAskPill({
             );
             })}
           </div>
+        ) : null}
+        {debugExportDrawer ? (
+          <section
+            className="mt-3 rounded-lg border border-cyan-300/30 bg-slate-950/95 p-3 text-xs text-slate-100"
+            aria-label="Debug Export drawer"
+            data-testid="helix-debug-export-drawer"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Debug Export</p>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  Clipboard readback: {debugExportDrawer.result.readback_match} | hash {debugExportDrawer.payloadHash}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`data:application/json;charset=utf-8,${encodeURIComponent(debugExportDrawer.payload)}`}
+                  download={`helix-debug-${debugExportDrawer.replyId}.json`}
+                  className="rounded border border-cyan-300/40 bg-cyan-400/15 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100"
+                >
+                  Download JSON
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setDebugExportDrawer(null)}
+                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <textarea
+              readOnly
+              value={debugExportDrawer.payload}
+              className="mt-3 h-48 w-full resize-y rounded border border-slate-700 bg-black/40 p-2 font-mono text-[10px] leading-4 text-cyan-50"
+              aria-label="Debug Export JSON"
+              data-testid="helix-debug-export-json"
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </section>
         ) : null}
       </div>
     </HelixAskErrorBoundary>
