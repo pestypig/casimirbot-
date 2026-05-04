@@ -21,6 +21,7 @@ import type {
   HelixSpeakerSegment,
   HelixUnknownSpeakerBehavior,
 } from "@shared/helix-audio-identity";
+import type { HelixDiarizationShadowResult } from "@shared/helix-diarization";
 import type {
   ContextCapsuleReplayBundle,
   ContextCapsuleSummary,
@@ -1175,6 +1176,7 @@ export type VoiceTranscribeResponse = {
   speaker_color_token?: HelixSpeakerLabel["color_token"] | null;
   unknown_speaker_detected?: boolean;
   audio_identity?: HelixAudioIdentityResult | null;
+  diarization_shadow?: HelixDiarizationShadowResult | null;
   speaker_session?: HelixAudioIdentitySessionSnapshot | null;
   speech_probability?: number | null;
   snr_db?: number | null;

@@ -47,13 +47,20 @@ import {
   resolveAudioIdentitySessionId,
   trustSessionSpeaker,
 } from "../services/audio-identity/speaker-session";
-import type {
-  HelixAudioIdentityResult,
-  HelixSpeakerAuthority,
-  HelixSpeakerAuthoritySource,
-  HelixSpeakerRole,
-  HelixSpeakerSegment,
+import {
+  readDiarizationConfigFromEnv,
+  runDiarizationShadow,
+} from "../services/audio-identity/diarization-shadow";
+import {
+  resolveHelixSpeakerColorToken,
+  type HelixAudioIdentityResult,
+  type HelixSpeakerAuthority,
+  type HelixSpeakerAuthoritySource,
+  type HelixSpeakerLabel,
+  type HelixSpeakerRole,
+  type HelixSpeakerSegment,
 } from "../../shared/helix-audio-identity";
+import type { HelixDiarizationShadowResult } from "../../shared/helix-diarization";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -1143,6 +1150,7 @@ type VoiceTranscriptionHandlerResult = {
   speaker_authority_reason?: string;
   speaker_segments?: HelixSpeakerSegment[];
   audio_identity?: HelixAudioIdentityResult | null;
+  diarization_shadow?: HelixDiarizationShadowResult | null;
   primary_speaker_id?: string | null;
   speaker_color_token?: string | null;
   unknown_speaker_detected?: boolean;
@@ -1188,6 +1196,7 @@ type VoiceTranscriptionResult = {
   speaker_authority_reason?: string;
   speaker_segments?: HelixSpeakerSegment[];
   audio_identity?: HelixAudioIdentityResult | null;
+  diarization_shadow?: HelixDiarizationShadowResult | null;
   primary_speaker_id?: string | null;
   speaker_color_token?: string | null;
   unknown_speaker_detected?: boolean;
@@ -2150,7 +2159,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
         })
       : null;
     const audioIdentity = sessionApplied?.audioIdentity ?? null;
-    const speakerSession = sessionApplied?.session ?? null;
+    let speakerSession = sessionApplied?.session ?? null;
     const primarySpeaker = audioIdentity?.speakers.find(
       (speaker) => speaker.speaker_id === audioIdentity.primary_speaker_id,
     ) ?? audioIdentity?.speakers[0] ?? null;
@@ -2180,6 +2189,86 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
           suppressionReason:
             (parsed.data.capture_source ?? "mic") === "mic" ? "disabled" : "non_user_audio_source",
         });
+    const diarizationConfig = readDiarizationConfigFromEnv();
+    const diarizationShadow =
+      result.diarization_shadow ??
+      (await runDiarizationShadow({
+        audioBuffer: file.buffer,
+        contentType: file.mimetype?.trim() || "application/octet-stream",
+        captureSessionId:
+          audioIdentity?.capture_session_id ??
+          parsed.data.audio_identity_session_id ??
+          parsed.data.capture_session_id ??
+          speakerSessionId,
+        roomId: parsed.data.room_id ?? null,
+        threadId: parsed.data.thread_id ?? null,
+        captureSource: parsed.data.capture_source ?? "mic",
+        chunkIndex: parsed.data.chunk_index ?? null,
+        durationMs: resolvedDurationMs,
+        knownSpeakerIds: parsed.data.known_speaker_ids ?? null,
+        config: diarizationConfig,
+      }));
+    const appliedDiarizationSegments: HelixSpeakerSegment[] =
+      diarizationConfig.applySegments &&
+      diarizationShadow?.status === "success" &&
+      diarizationShadow.segments.length > 0
+        ? diarizationShadow.segments.map((segment) => ({
+            segment_id: segment.segment_id,
+            speaker_id: segment.speaker_id,
+            speaker_confidence: segment.confidence,
+            start_ms: Math.max(0, Math.round(segment.start_ms)),
+            end_ms: Math.max(0, Math.round(segment.end_ms)),
+            text: undefined,
+            language: result.language ?? parsed.data.language ?? "en",
+            speech_probability:
+              diarizationShadow.audio_quality?.speech_probability ?? resolvedSpeechProbability ?? undefined,
+            snr_db: diarizationShadow.audio_quality?.snr_db ?? resolvedSnrDb ?? undefined,
+            overlap: segment.overlap,
+            capture_source: parsed.data.capture_source ?? "mic",
+          }))
+        : [];
+    let responseSpeakerSegments =
+      appliedDiarizationSegments.length > 0 ? appliedDiarizationSegments : speakerSegments;
+    let responseAudioIdentity = audioIdentity;
+    if (appliedDiarizationSegments.length > 0 && audioIdentity && diarizationShadow?.status === "success") {
+      const knownSpeakerIds = new Set(audioIdentity.speakers.map((speaker) => speaker.speaker_id));
+      const sidecarLabels: HelixSpeakerLabel[] = diarizationShadow.speakers
+        .filter((speaker) => !knownSpeakerIds.has(speaker.speaker_id))
+        .map((speaker) => {
+          const deviceAudio = (parsed.data.capture_source ?? "mic") !== "mic";
+          return {
+            speaker_id: speaker.speaker_id,
+            display_name: deviceAudio ? "Device audio" : "Guest",
+            color_token: resolveHelixSpeakerColorToken(
+              parsed.data.room_id ?? speakerSessionId,
+              speaker.speaker_id,
+            ),
+            role: deviceAudio ? "device_audio" : "guest",
+            authority: "transcribe_only",
+            authority_source: deviceAudio ? "device_audio_policy" : "server_policy",
+            authority_reason: deviceAudio
+              ? "device_audio_transcribe_only"
+              : "diarization_shadow_requires_session_or_profile_trust",
+            confidence: speaker.confidence,
+            enrollment_state: "none",
+          };
+        });
+      const appliedIdentity = applySpeakerSession(
+        {
+          ...audioIdentity,
+          speakers: [...audioIdentity.speakers, ...sidecarLabels],
+          segments: appliedDiarizationSegments,
+        },
+        {
+          sessionId: speakerSessionId,
+          roomId: parsed.data.room_id ?? null,
+          threadId: parsed.data.thread_id ?? null,
+        },
+      );
+      responseAudioIdentity = appliedIdentity.audioIdentity;
+      speakerSession = appliedIdentity.session;
+      responseSpeakerSegments = responseAudioIdentity.segments;
+    }
     const missionId = resolveTranscribeMissionId(parsed.data);
 
     return res.status(200).json({
@@ -2204,8 +2293,8 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       translation_uncertain: result.translation_uncertain ?? false,
       speaker_id: primarySpeaker?.speaker_id ?? resolvedSpeakerId,
       speaker_confidence: primarySpeaker?.confidence ?? resolvedSpeakerConfidence,
-      speaker_segments: speakerSegments,
-      primary_speaker_id: audioIdentity?.primary_speaker_id ?? primarySpeaker?.speaker_id ?? resolvedSpeakerId,
+      speaker_segments: responseSpeakerSegments,
+      primary_speaker_id: responseAudioIdentity?.primary_speaker_id ?? primarySpeaker?.speaker_id ?? resolvedSpeakerId,
       claimed_role: primarySpeaker?.claimed_role ?? null,
       speaker_role: primarySpeaker?.role ?? result.speaker_role ?? parsed.data.speaker_role ?? null,
       speaker_authority:
@@ -2217,8 +2306,8 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       speaker_color_token: primarySpeaker?.color_token ?? result.speaker_color_token ?? null,
       unknown_speaker_detected:
         result.unknown_speaker_detected ??
-        (audioIdentity?.speakers.some((speaker) => speaker.role === "unknown") ?? false),
-      audio_identity: audioIdentity,
+        (responseAudioIdentity?.speakers.some((speaker) => speaker.role === "unknown") ?? false),
+      audio_identity: responseAudioIdentity,
       speaker_session: speakerSession,
       speech_probability: resolvedSpeechProbability,
       snr_db: resolvedSnrDb,
@@ -2252,6 +2341,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       interpreter_confirm_prompt: result.interpreter_confirm_prompt ?? null,
       interpreter_term_ids: Array.isArray(result.interpreter_term_ids) ? result.interpreter_term_ids : [],
       interpreter_concept_ids: Array.isArray(result.interpreter_concept_ids) ? result.interpreter_concept_ids : [],
+      ...(diarizationShadow ? { diarization_shadow: diarizationShadow } : {}),
       command_lane: commandLane,
     });
   });

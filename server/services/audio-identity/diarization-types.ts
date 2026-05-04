@@ -1,19 +1,4 @@
 export type {
-  HelixAudioIdentityResult,
-  HelixAudioIdentitySessionSnapshot,
-  HelixCaptureSource,
-  HelixSpeakerAuthority,
-  HelixSpeakerAuthoritySource,
-  HelixSpeakerLabel,
-  HelixSpeakerPolicyMode,
-  HelixSpeakerRole,
-  HelixSpeakerSegment,
-  HelixUnknownSpeakerBehavior,
-} from "../../../shared/helix-audio-identity";
-
-export { HELIX_AUDIO_IDENTITY_SCHEMA } from "../../../shared/helix-audio-identity";
-
-export type {
   HelixAudioFeatureSummary,
   HelixDiarizationAudioQuality,
   HelixDiarizationProvider,
@@ -29,3 +14,13 @@ export {
   HELIX_DIARIZATION_REQUEST_SCHEMA,
   HELIX_DIARIZATION_RESPONSE_SCHEMA,
 } from "../../../shared/helix-diarization";
+
+export type HelixDiarizationConfig = {
+  enabled: boolean;
+  shadow: boolean;
+  url: string;
+  timeoutMs: number;
+  minConfidence: number;
+  applySegments: boolean;
+  maxAudioBytes: number;
+};
