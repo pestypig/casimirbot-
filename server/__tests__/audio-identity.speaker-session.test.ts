@@ -129,6 +129,22 @@ describe("audio identity speaker sessions", () => {
     expect(getSpeakerSessionSnapshot("session-expiring")).toBeNull();
   });
 
+  it("prunes expired sessions on snapshot reads", () => {
+    process.env.HELIX_AUDIO_IDENTITY_SESSION_TTL_MS = "1";
+    trustSessionSpeaker({
+      sessionId: "session-read-expiring",
+      speakerId: "spk_owner",
+      role: "owner",
+    });
+
+    const started = Date.now();
+    while (Date.now() - started <= 4) {
+      // wait long enough for the 1ms TTL to expire before the read path prunes
+    }
+
+    expect(getSpeakerSessionSnapshot("session-read-expiring")).toBeNull();
+  });
+
   it("caps speakers per session", () => {
     process.env.HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION = "2";
     trustSessionSpeaker({
@@ -148,5 +164,30 @@ describe("audio identity speaker sessions", () => {
     });
 
     expect(getSpeakerSessionSnapshot("session-capped")?.speaker_count).toBe(2);
+  });
+
+  it("does not evict owner or session-trusted speakers when full", () => {
+    process.env.HELIX_AUDIO_IDENTITY_MAX_SPEAKERS_PER_SESSION = "2";
+    trustSessionSpeaker({
+      sessionId: "session-protected-cap",
+      speakerId: "spk_owner",
+      role: "owner",
+    });
+    trustSessionSpeaker({
+      sessionId: "session-protected-cap",
+      speakerId: "spk_trusted",
+      role: "trusted_guest",
+    });
+    trustSessionSpeaker({
+      sessionId: "session-protected-cap",
+      speakerId: "spk_extra",
+      role: "trusted_guest",
+    });
+
+    expect(
+      getSpeakerSessionSnapshot("session-protected-cap")?.speakers
+        .map((speaker) => speaker.speaker_id)
+        .sort(),
+    ).toEqual(["spk_owner", "spk_trusted"]);
   });
 });

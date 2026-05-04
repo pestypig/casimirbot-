@@ -66,7 +66,8 @@ describe("audio identity authority provenance", () => {
     const speaker = identity.speakers[0]!;
 
     expect(speaker).toMatchObject({
-      role: "owner",
+      claimed_role: "owner",
+      role: "guest",
       authority: "transcribe_only",
       authority_source: "client_hint",
       authority_reason: "client_hints_do_not_grant_command_authority",
@@ -166,6 +167,7 @@ describe("audio identity authority provenance", () => {
     }).audioIdentity;
 
     expect(identity.speakers[0]).toMatchObject({
+      claimed_role: "owner",
       role: "device_audio",
       authority: "transcribe_only",
       authority_source: "device_audio_policy",
@@ -189,6 +191,30 @@ describe("audio identity authority provenance", () => {
     expect(identity.speakers[0]).toMatchObject({
       role: "unknown",
       authority: "transcribe_only",
+    });
+  });
+
+  it("does not let client-provided any_speaker policy grant command authority", () => {
+    const rawIdentity = buildHelixAudioIdentityResult({
+      speakerIdentityEnabled: true,
+      captureSessionId: "capture-policy-6",
+      roomId: "room-policy-6",
+      captureSource: "mic",
+      speakerId: "spk_anyone",
+      speakerConfidence: 0.88,
+      policyMode: "any_speaker",
+      policyModeSource: "client_hint",
+      text: "send",
+    });
+    const identity = applySpeakerSession(rawIdentity!, {
+      sessionId: "session-policy-6",
+      roomId: "room-policy-6",
+    }).audioIdentity;
+
+    expect(identity.speakers[0]).toMatchObject({
+      role: "guest",
+      authority: "transcribe_only",
+      authority_source: "absent",
     });
   });
 });

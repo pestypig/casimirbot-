@@ -2131,6 +2131,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
         speakerRole: result.speaker_role ?? parsed.data.speaker_role ?? null,
         speakerAuthority: result.speaker_authority ?? parsed.data.speaker_authority ?? null,
         policyMode: parsed.data.speaker_policy_mode ?? null,
+        policyModeSource: "client_hint",
         unknownSpeakerBehavior: parsed.data.unknown_speaker_behavior ?? null,
         knownSpeakerIds: parsed.data.known_speaker_ids ?? null,
         activeListenerSpeakerIds: parsed.data.active_listener_speaker_ids ?? null,
@@ -2205,6 +2206,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       speaker_confidence: primarySpeaker?.confidence ?? resolvedSpeakerConfidence,
       speaker_segments: speakerSegments,
       primary_speaker_id: audioIdentity?.primary_speaker_id ?? primarySpeaker?.speaker_id ?? resolvedSpeakerId,
+      claimed_role: primarySpeaker?.claimed_role ?? null,
       speaker_role: primarySpeaker?.role ?? result.speaker_role ?? parsed.data.speaker_role ?? null,
       speaker_authority:
         primarySpeaker?.authority ?? result.speaker_authority ?? parsed.data.speaker_authority ?? null,

@@ -1167,6 +1167,7 @@ export type VoiceTranscribeResponse = {
   speaker_confidence?: number | null;
   speaker_segments?: HelixSpeakerSegment[];
   primary_speaker_id?: string | null;
+  claimed_role?: HelixSpeakerRole | null;
   speaker_role?: HelixSpeakerRole | null;
   speaker_authority?: HelixSpeakerAuthority | null;
   speaker_authority_source?: HelixSpeakerAuthoritySource | null;

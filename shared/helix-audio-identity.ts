@@ -46,6 +46,7 @@ export type HelixSpeakerLabel = {
   speaker_profile_id?: string;
   display_name: string;
   color_token: string;
+  claimed_role?: HelixSpeakerRole;
   role: HelixSpeakerRole;
   authority: HelixSpeakerAuthority;
   authority_source?: HelixSpeakerAuthoritySource;
@@ -83,6 +84,7 @@ export type HelixAudioIdentityResult = {
   };
   policy: {
     command_authority: HelixSpeakerPolicyMode;
+    command_authority_source?: HelixSpeakerAuthoritySource;
     unknown_speaker_behavior: HelixUnknownSpeakerBehavior;
   };
 };

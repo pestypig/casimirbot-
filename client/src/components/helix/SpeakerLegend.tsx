@@ -15,7 +15,7 @@ export function SpeakerLegend({ speakers, className }: SpeakerLegendProps) {
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2 text-xs text-muted-foreground", className)}>
-      {speakers.map((speaker) => (
+      {speakers.map((speaker: HelixSpeakerLabel) => (
         <div
           key={speaker.speaker_id}
           className="inline-flex h-7 items-center gap-2 rounded border border-border/70 bg-background/70 px-2"

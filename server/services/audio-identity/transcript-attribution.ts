@@ -4,6 +4,7 @@ import {
   type HelixAudioIdentityResult,
   type HelixCaptureSource,
   type HelixSpeakerAuthority,
+  type HelixSpeakerAuthoritySource,
   type HelixSpeakerLabel,
   type HelixSpeakerPolicyMode,
   type HelixSpeakerRole,
@@ -60,6 +61,7 @@ export const buildHelixAudioIdentityResult = (args: {
   speakerRole?: HelixSpeakerRole | null;
   speakerAuthority?: HelixSpeakerAuthority | null;
   policyMode?: HelixSpeakerPolicyMode | null;
+  policyModeSource?: HelixSpeakerAuthoritySource | null;
   unknownSpeakerBehavior?: HelixUnknownSpeakerBehavior | null;
   knownSpeakerIds?: string[] | null;
   activeListenerSpeakerIds?: string[] | null;
@@ -85,11 +87,20 @@ export const buildHelixAudioIdentityResult = (args: {
     knownSpeakerIds,
     activeListenerSpeakerIds,
   });
+  const rawRoleForPolicy =
+    args.speakerRole ??
+    (resolvedSpeakerId === "spk_session_unknown"
+      ? "unknown"
+      : knownSpeakerIds.includes(resolvedSpeakerId) ||
+          activeListenerSpeakerIds.includes(resolvedSpeakerId)
+        ? role
+        : null);
   const policy = resolveSpeakerAuthorityPolicy({
     captureSource: args.captureSource,
-    rawRole: role,
+    rawRole: rawRoleForPolicy,
     rawAuthority: args.speakerAuthority ?? null,
     policyMode,
+    policyModeSource: args.policyModeSource ?? "client_hint",
     unknownSpeakerBehavior,
   });
   const confidence =
@@ -100,6 +111,7 @@ export const buildHelixAudioIdentityResult = (args: {
     speaker_id: resolvedSpeakerId,
     display_name: displayNameForRole(policy.role, resolvedSpeakerId),
     color_token: resolveHelixSpeakerColorToken(args.roomId, resolvedSpeakerId),
+    claimed_role: policy.claimed_role,
     role: policy.role,
     authority: policy.authority,
     authority_source: policy.authority_source,
@@ -158,6 +170,7 @@ export const buildHelixAudioIdentityResult = (args: {
     },
     policy: {
       command_authority: policyMode,
+      command_authority_source: args.policyModeSource ?? "client_hint",
       unknown_speaker_behavior: unknownSpeakerBehavior,
     },
   };

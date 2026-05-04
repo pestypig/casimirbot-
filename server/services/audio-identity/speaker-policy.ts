@@ -9,6 +9,7 @@ import type {
 } from "../../../shared/helix-audio-identity";
 
 export type ResolvedSpeakerAuthorityPolicy = {
+  claimed_role?: HelixSpeakerRole;
   role: HelixSpeakerRole;
   authority: HelixSpeakerAuthority;
   authority_source: HelixSpeakerAuthoritySource;
@@ -30,7 +31,20 @@ const resolveUnknownAuthority = (
 
 const resolveUntrustedRole = (
   rawRole: HelixSpeakerRole | null | undefined,
-): HelixSpeakerRole => rawRole ?? "guest";
+): HelixSpeakerRole => {
+  if (rawRole === "unknown") return "unknown";
+  if (rawRole === "device_audio") return "device_audio";
+  return "guest";
+};
+
+const canUsePolicyModeForAuthority = (
+  policyMode: HelixSpeakerPolicyMode,
+  policyModeSource: HelixSpeakerAuthoritySource,
+): boolean =>
+  policyMode === "any_speaker" &&
+  (policyModeSource === "server_policy" ||
+    policyModeSource === "session_registry" ||
+    policyModeSource === "profile_enrollment");
 
 export function resolveSpeakerAuthorityPolicy(args: {
   captureSource: HelixCaptureSource;
@@ -38,10 +52,14 @@ export function resolveSpeakerAuthorityPolicy(args: {
   rawAuthority?: HelixSpeakerAuthority | null;
   sessionSpeaker?: HelixSpeakerLabel | null;
   policyMode: HelixSpeakerPolicyMode;
+  policyModeSource?: HelixSpeakerAuthoritySource | null;
   unknownSpeakerBehavior: HelixUnknownSpeakerBehavior;
 }): ResolvedSpeakerAuthorityPolicy {
+  const claimedRole = args.rawRole ?? undefined;
+  const policyModeSource = args.policyModeSource ?? "client_hint";
   if (isDeviceAudioSource(args.captureSource)) {
     return {
+      claimed_role: claimedRole,
       role: "device_audio",
       authority: "transcribe_only",
       authority_source: "device_audio_policy",
@@ -52,6 +70,7 @@ export function resolveSpeakerAuthorityPolicy(args: {
   if (isProfileAuthority(args.sessionSpeaker)) {
     const role = args.sessionSpeaker?.role ?? "owner";
     return {
+      claimed_role: claimedRole,
       role,
       authority:
         role === "owner"
@@ -65,6 +84,7 @@ export function resolveSpeakerAuthorityPolicy(args: {
   if (isSessionAuthority(args.sessionSpeaker)) {
     const role = args.sessionSpeaker?.role ?? "trusted_guest";
     return {
+      claimed_role: claimedRole,
       role,
       authority:
         args.sessionSpeaker?.authority ??
@@ -76,6 +96,7 @@ export function resolveSpeakerAuthorityPolicy(args: {
 
   if (args.policyMode === "transcribe_only") {
     return {
+      claimed_role: claimedRole,
       role: resolveUntrustedRole(args.rawRole),
       authority: "transcribe_only",
       authority_source: "server_policy",
@@ -85,6 +106,7 @@ export function resolveSpeakerAuthorityPolicy(args: {
 
   if (args.rawRole === "unknown") {
     return {
+      claimed_role: claimedRole,
       role: "unknown",
       authority: resolveUnknownAuthority(args.unknownSpeakerBehavior),
       authority_source: args.rawAuthority ? "client_hint" : "server_policy",
@@ -92,8 +114,19 @@ export function resolveSpeakerAuthorityPolicy(args: {
     };
   }
 
+  if (canUsePolicyModeForAuthority(args.policyMode, policyModeSource)) {
+    return {
+      claimed_role: claimedRole,
+      role: "guest",
+      authority: "command_confirm",
+      authority_source: policyModeSource,
+      authority_reason: "trusted_room_policy_allows_any_speaker_with_confirmation",
+    };
+  }
+
   if (args.rawRole || args.rawAuthority) {
     return {
+      claimed_role: claimedRole,
       role: resolveUntrustedRole(args.rawRole),
       authority: "transcribe_only",
       authority_source: "client_hint",
@@ -102,6 +135,7 @@ export function resolveSpeakerAuthorityPolicy(args: {
   }
 
   return {
+    claimed_role: claimedRole,
     role: "guest",
     authority: "transcribe_only",
     authority_source: "absent",
