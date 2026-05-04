@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,9 @@ import {
 import { formatScientificCalculatorDebugLog } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
+
+const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
 function renderMathHtml(value: string, displayMode: boolean): string {
   const input = value.trim();
@@ -46,11 +49,18 @@ function resolveSolveTrace(lastSolve: { trace?: ScientificSolveTrace; input_late
 export default function ScientificCalculatorPanel() {
   const { currentLatex, history, lastSolve, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
     useScientificCalculatorStore();
-  const [input, setInput] = useState(currentLatex);
+  const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
+  const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
+  const clearDraft = useWorkstationSessionMemoryStore((state) => state.clearDraft);
+  const [input, setInput] = useState(() => readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY) || currentLatex);
+  const lastStoredLatexRef = useRef(currentLatex);
 
   useEffect(() => {
+    if (currentLatex === lastStoredLatexRef.current) return;
+    lastStoredLatexRef.current = currentLatex;
     setInput(currentLatex);
-  }, [currentLatex]);
+    rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, currentLatex);
+  }, [currentLatex, rememberDraft]);
 
   useEffect(() => {
     const onPicked = (event: Event) => {
@@ -61,18 +71,33 @@ export default function ScientificCalculatorPanel() {
         anchor: detail.anchor,
         source: detail.sourcePath === "clipboard" ? "clipboard" : "doc_viewer",
       });
+      setInput(detail.latex);
+      rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, detail.latex);
     };
     window.addEventListener(SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT, onPicked as EventListener);
     return () => {
       window.removeEventListener(SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT, onPicked as EventListener);
     };
-  }, [ingestLatex]);
+  }, [ingestLatex, rememberDraft]);
 
   const handlePasteClipboard = async () => {
     if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
     const text = await navigator.clipboard.readText();
     if (!text.trim()) return;
     ingestLatex(text, { sourcePath: "clipboard", anchor: null, source: "clipboard" });
+    setInput(text);
+    rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, text);
+  };
+
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, value);
+  };
+
+  const handleClear = () => {
+    clear();
+    clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
+    setInput("");
   };
 
   const solve = (withSteps: boolean) => {
@@ -141,7 +166,7 @@ export default function ScientificCalculatorPanel() {
         <Textarea
           className="min-h-[130px] border-slate-700 bg-slate-900/70 font-mono text-xs text-slate-100"
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => handleInputChange(event.target.value)}
           placeholder="Example: t_{\\text{proper}} = t_{\\text{shift-driven}} + \\Delta t_{\\text{lapse-driven}}"
         />
         <div className="grid gap-2 lg:grid-cols-2">
@@ -183,7 +208,7 @@ export default function ScientificCalculatorPanel() {
           <Button size="sm" variant="outline" onClick={handleCopyDebugLog}>
             Copy Debug Log
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => clear()}>
+          <Button size="sm" variant="ghost" onClick={handleClear}>
             Clear
           </Button>
         </div>

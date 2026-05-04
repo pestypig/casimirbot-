@@ -2,6 +2,7 @@ import {
   HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
   normalizeSituationSetupOutputMode,
   type SituationRoomSetupActionArgs,
+  type SituationRoomSetupCorrelation,
   type SituationRoomSetupExecutionReceipt,
   type SituationRoomSetupMissingRequirement,
 } from "@shared/helix-situation-setup";
@@ -18,6 +19,26 @@ const stringArray = (value: unknown): string[] => {
   const single = nonEmpty(value);
   return single ? [single] : [];
 };
+
+const normalizeSetupCorrelation = (value: unknown): SituationRoomSetupCorrelation | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const setupCallId = nonEmpty(record.setup_call_id ?? record.setupCallId);
+  if (!setupCallId) return undefined;
+  return {
+    setup_call_id: setupCallId,
+    thread_id: nonEmpty(record.thread_id ?? record.threadId),
+    turn_id: nonEmpty(record.turn_id ?? record.turnId),
+    session_id: nonEmpty(record.session_id ?? record.sessionId),
+    trace_id: nonEmpty(record.trace_id ?? record.traceId),
+    dynamic_tool_item_id: nonEmpty(record.dynamic_tool_item_id ?? record.dynamicToolItemId),
+    request_id: nonEmpty(record.request_id ?? record.requestId),
+  };
+};
+
+const fallbackSetupCorrelation = (): SituationRoomSetupCorrelation => ({
+  setup_call_id: `situation-setup:client:${Date.now().toString(36)}`,
+});
 
 export const normalizeSituationRoomSetupActionArgs = (
   args: Record<string, unknown>,
@@ -47,6 +68,7 @@ export const normalizeSituationRoomSetupActionArgs = (
   speaker_a_native_language: nonEmpty(args.speaker_a_native_language ?? args.speakerANativeLanguage) ?? undefined,
   speaker_b_native_language: nonEmpty(args.speaker_b_native_language ?? args.speakerBNativeLanguage) ?? undefined,
   output_mode: normalizeSituationSetupOutputMode(args.output_mode ?? args.outputMode),
+  correlation: normalizeSetupCorrelation(args.correlation),
 });
 
 export const resolveSituationRoomForSetup = (roomId?: string): SituationRoom => {
@@ -62,6 +84,7 @@ const setupStatusForMissing = (missing: Set<SituationRoomSetupMissingRequirement
   missing.has("audio_source") || missing.has("capture_permission") ? "needs_capture_permission" : "needs_user_input";
 
 export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs): SituationRoomSetupExecutionReceipt => {
+  const correlation = input.correlation ?? fallbackSetupCorrelation();
   const room = resolveSituationRoomForSetup(input.room_id);
   const state = useSituationRoomStore.getState();
   const sourceIds = input.source_ids?.length
@@ -86,6 +109,7 @@ export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs
     return {
       schema: HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
       ok: false,
+      correlation,
       setup_status: setupStatusForMissing(missing),
       lifecycle_status: "failed",
       executed_action_id: "situation-room-pipelines.setup_from_prompt",
@@ -140,6 +164,7 @@ export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs
   return {
     schema: HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
     ok: Boolean(graph),
+    correlation,
     setup_status: graph ? "complete" : "blocked",
     lifecycle_status: graph ? "executed" : "failed",
     executed_action_id: "situation-room-pipelines.setup_from_prompt",

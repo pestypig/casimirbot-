@@ -34,6 +34,7 @@ import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
 } from "@/lib/workstation/workstationActionLiveEvents";
+import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -514,6 +515,11 @@ export default function DesktopPage({
                   : undefined,
               message: result.message,
               artifact: result.artifact ?? null,
+            });
+            maybePostSituationRoomSetupExecutionReceipt({
+              action,
+              artifact: result.artifact ?? null,
+              traceId,
             });
             return;
           }

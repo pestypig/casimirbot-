@@ -37,6 +37,7 @@ import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
 } from "@/lib/workstation/workstationActionLiveEvents";
+import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 
 const LONG_PRESS_MS = 650;
@@ -359,6 +360,11 @@ export default function MobileStartPage() {
                   : undefined,
               message: result.message,
               artifact: result.artifact ?? null,
+            });
+            maybePostSituationRoomSetupExecutionReceipt({
+              action,
+              artifact: result.artifact ?? null,
+              traceId,
             });
             return;
           }

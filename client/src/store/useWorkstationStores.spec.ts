@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 
 describe("workstation stores", () => {
   beforeEach(() => {
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
+    useWorkstationSessionMemoryStore.setState({ panelScroll: {}, drafts: {} });
   });
 
   it("creates and activates notes via upsertWorkflowNote", () => {
@@ -63,5 +65,21 @@ describe("workstation stores", () => {
     clipboard.clearReceipts();
     expect(useWorkstationClipboardStore.getState().receipts).toHaveLength(0);
   });
-});
 
+  it("remembers workstation scroll positions and drafts for the browser session", () => {
+    const memory = useWorkstationSessionMemoryStore.getState();
+    memory.rememberPanelScroll("docs-viewer:doc:/docs/example.md", {
+      scrollTop: 320.6,
+      scrollHeight: 1400,
+      clientHeight: 500,
+    });
+    memory.rememberDraft("scientific-calculator:input", "tau = alpha T");
+
+    const state = useWorkstationSessionMemoryStore.getState();
+    expect(state.readPanelScroll("docs-viewer:doc:/docs/example.md")?.scrollTop).toBe(321);
+    expect(state.readDraft("scientific-calculator:input")).toBe("tau = alpha T");
+
+    state.clearDraft("scientific-calculator:input");
+    expect(useWorkstationSessionMemoryStore.getState().readDraft("scientific-calculator:input")).toBe("");
+  });
+});

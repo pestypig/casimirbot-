@@ -17,6 +17,7 @@ import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 
 export type DocMathPickContext = {
   latex: string;
@@ -166,6 +167,8 @@ export function DocViewerPanel() {
     chunkCount: number;
     snippet: string;
   } | null>(null);
+  const rememberPanelScroll = useWorkstationSessionMemoryStore((state) => state.rememberPanelScroll);
+  const readPanelScroll = useWorkstationSessionMemoryStore((state) => state.readPanelScroll);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
   const activeReadTargetRef = React.useRef<HTMLElement | null>(null);
   const modeRef = React.useRef(mode);
@@ -173,6 +176,10 @@ export function DocViewerPanel() {
   const liveReadChunkRef = React.useRef<string | null>(null);
   const lastProceduralTraceIdRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
+  const docScrollMemoryKey = React.useMemo(
+    () => (mode === "doc" && currentPath ? `docs-viewer:doc:${currentPath}` : "docs-viewer:directory"),
+    [currentPath, mode],
+  );
 
   React.useEffect(() => {
     modeRef.current = mode;
@@ -243,6 +250,37 @@ export function DocViewerPanel() {
     }, 1600);
     return () => window.clearTimeout(timeout);
   }, [anchor, html, mode]);
+
+  React.useLayoutEffect(() => {
+    if (mode !== "doc" || anchor || loading || !contentRef.current) return;
+    const saved = readPanelScroll(docScrollMemoryKey);
+    if (!saved) return;
+    const node = contentRef.current;
+    const restore = () => {
+      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      node.scrollTop = Math.min(saved.scrollTop, maxScrollTop);
+    };
+    if (typeof window === "undefined") {
+      restore();
+      return;
+    }
+    const firstFrame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(restore);
+    });
+    return () => window.cancelAnimationFrame(firstFrame);
+  }, [anchor, docScrollMemoryKey, html, loading, mode, readPanelScroll]);
+
+  const handleContentScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const node = event.currentTarget;
+      rememberPanelScroll(docScrollMemoryKey, {
+        scrollTop: node.scrollTop,
+        scrollHeight: node.scrollHeight,
+        clientHeight: node.clientHeight,
+      });
+    },
+    [docScrollMemoryKey, rememberPanelScroll],
+  );
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -544,6 +582,7 @@ export function DocViewerPanel() {
           onQueryChange={setQuery}
           onSelect={viewDoc}
           variant="full"
+          scrollMemoryKey="docs-viewer:directory"
         />
       ) : (
         <div className="flex min-w-0 flex-1 flex-col">
@@ -564,6 +603,7 @@ export function DocViewerPanel() {
             ref={contentRef}
             className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden"
             style={{ scrollbarGutter: "stable" }}
+            onScroll={handleContentScroll}
           >
             {loading ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -615,6 +655,7 @@ type DirectoryRailProps = {
   onQueryChange: (value: string) => void;
   onSelect: (path: string) => void;
   variant?: "rail" | "full";
+  scrollMemoryKey?: string;
 };
 
 function DirectoryRail({
@@ -626,15 +667,51 @@ function DirectoryRail({
   onQueryChange,
   onSelect,
   variant = "rail",
+  scrollMemoryKey,
 }: DirectoryRailProps) {
   const entryRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const rememberPanelScroll = useWorkstationSessionMemoryStore((state) => state.rememberPanelScroll);
+  const readPanelScroll = useWorkstationSessionMemoryStore((state) => state.readPanelScroll);
   const isFull = variant === "full";
+
+  React.useLayoutEffect(() => {
+    if (!scrollMemoryKey || !scrollRef.current) return;
+    const saved = readPanelScroll(scrollMemoryKey);
+    if (!saved) return;
+    const node = scrollRef.current;
+    const restore = () => {
+      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      node.scrollTop = Math.min(saved.scrollTop, maxScrollTop);
+    };
+    if (typeof window === "undefined") {
+      restore();
+      return;
+    }
+    const frame = window.requestAnimationFrame(restore);
+    return () => window.cancelAnimationFrame(frame);
+  }, [entries, query, readPanelScroll, scrollMemoryKey]);
+
   React.useEffect(() => {
     if (!currentRoute) return;
+    if (scrollMemoryKey && readPanelScroll(scrollMemoryKey)) return;
     const target = entryRefs.current[currentRoute];
     if (!target) return;
     target.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [currentRoute, query, entries]);
+  }, [currentRoute, query, entries, readPanelScroll, scrollMemoryKey]);
+
+  const handleRailScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      if (!scrollMemoryKey) return;
+      const node = event.currentTarget;
+      rememberPanelScroll(scrollMemoryKey, {
+        scrollTop: node.scrollTop,
+        scrollHeight: node.scrollHeight,
+        clientHeight: node.clientHeight,
+      });
+    },
+    [rememberPanelScroll, scrollMemoryKey],
+  );
 
   return (
     <aside
@@ -657,7 +734,11 @@ function DirectoryRail({
           Showing {filteredCount} of {total} files.
         </p>
       </div>
-      <div className={cn("flex-1 overflow-y-auto px-2 py-3", isFull && "px-3")}>
+      <div
+        ref={scrollRef}
+        className={cn("flex-1 overflow-y-auto px-2 py-3", isFull && "px-3")}
+        onScroll={handleRailScroll}
+      >
         {entries.map((group) => (
           <div key={group.label} className="mb-4">
             <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-500">

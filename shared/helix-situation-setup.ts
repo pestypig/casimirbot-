@@ -1,5 +1,7 @@
 export const HELIX_SITUATION_SETUP_INTENT_SCHEMA = "helix.situation_setup_intent.v1" as const;
 export const HELIX_SITUATION_SETUP_RECEIPT_SCHEMA = "helix.situation_setup_receipt.v1" as const;
+export const HELIX_SITUATION_SETUP_RESOLUTION_SCHEMA = "helix.situation_setup_resolution.v1" as const;
+export const HELIX_SITUATION_SETUP_RESOLUTION_RECEIPT_SCHEMA = "helix.situation_setup_resolution_receipt.v1" as const;
 
 export type SituationRoomSetupIntentKind =
   | "translate_conversation"
@@ -34,6 +36,16 @@ export type SituationRoomSetupSpeakerMapping = {
   role_hint?: "self" | "friend" | "participant";
 };
 
+export type SituationRoomSetupCorrelation = {
+  setup_call_id: string;
+  thread_id?: string | null;
+  turn_id?: string | null;
+  session_id?: string | null;
+  trace_id?: string | null;
+  dynamic_tool_item_id?: string | null;
+  request_id?: string | null;
+};
+
 export type SituationRoomSetupIntent = {
   schema: typeof HELIX_SITUATION_SETUP_INTENT_SCHEMA;
   kind: SituationRoomSetupIntentKind;
@@ -60,6 +72,7 @@ export type SituationRoomSetupActionArgs = {
   speaker_a_native_language?: string;
   speaker_b_native_language?: string;
   output_mode?: SituationRoomSetupOutputMode;
+  correlation?: SituationRoomSetupCorrelation;
 };
 
 export type SituationRoomSetupStatus =
@@ -87,6 +100,7 @@ export type HelixWorkstationActionLike = {
 export type SituationRoomSetupReceipt = {
   schema: typeof HELIX_SITUATION_SETUP_RECEIPT_SCHEMA;
   ok: boolean;
+  correlation: SituationRoomSetupCorrelation;
   setup_status: SituationRoomSetupStatus;
   lifecycle_status?: SituationRoomSetupLifecycleStatus;
   graph_id?: string;
@@ -115,6 +129,28 @@ export type SituationRoomSetupExecutionReceipt = SituationRoomSetupReceipt & {
   graph_id?: string;
   job_ids?: string[];
   error?: string | null;
+};
+
+export type SituationRoomSetupResolutionInput = {
+  schema: typeof HELIX_SITUATION_SETUP_RESOLUTION_SCHEMA;
+  setup_call_id: string;
+  request_id?: string | null;
+  room_id?: string | null;
+  source_ids?: string[];
+  speaker_mappings?: SituationRoomSetupSpeakerMapping[];
+  capture_permission_granted?: boolean;
+  output_mode?: SituationRoomSetupOutputMode;
+};
+
+export type SituationRoomSetupResolutionReceipt = {
+  schema: typeof HELIX_SITUATION_SETUP_RESOLUTION_RECEIPT_SCHEMA;
+  ok: boolean;
+  setup_call_id: string;
+  request_id?: string | null;
+  resolved_requirements: SituationRoomSetupMissingRequirement[];
+  remaining_requirements: SituationRoomSetupMissingRequirement[];
+  next_actions: HelixWorkstationActionLike[];
+  message: string;
 };
 
 export const normalizeSituationSetupOutputMode = (value: unknown): SituationRoomSetupOutputMode => {

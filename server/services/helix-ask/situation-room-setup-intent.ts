@@ -3,6 +3,7 @@ import {
   HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
   normalizeSituationSetupOutputMode,
   type SituationRoomSetupActionArgs,
+  type SituationRoomSetupCorrelation,
   type SituationRoomSetupCapturePreference,
   type SituationRoomSetupIntent,
   type SituationRoomSetupIntentKind,
@@ -18,7 +19,7 @@ type WorkspaceSnapshotLike = {
 };
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
-  Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
+  Array.from(new Set(values.map((value: string | null | undefined) => value?.trim()).filter((value: string | undefined): value is string => Boolean(value))));
 
 const readString = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
@@ -26,7 +27,7 @@ const readString = (value: unknown): string | null => {
 };
 
 const readStringArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) return uniqueStrings(value.map((entry) => readString(entry)));
+  if (Array.isArray(value)) return uniqueStrings(value.map((entry: unknown) => readString(entry)));
   const single = readString(value);
   return single ? [single] : [];
 };
@@ -92,7 +93,7 @@ export const readSituationCaptureContext = (
   const record = context as Record<string, unknown>;
   const sources = Array.isArray(record.sources)
     ? record.sources.filter(
-        (source): source is SituationCaptureSourceSnapshot =>
+        (source: unknown): source is SituationCaptureSourceSnapshot =>
           Boolean(source && typeof source === "object" && !Array.isArray(source) && readString((source as Record<string, unknown>).source_id)),
       )
     : [];
@@ -110,7 +111,7 @@ export const readUsableSituationSources = (
   workspaceSnapshot?: WorkspaceSnapshotLike | null,
 ): SituationCaptureSourceSnapshot[] => {
   const context = readSituationCaptureContext(workspaceSnapshot);
-  return context?.sources.filter((source) => source.status === "active" && source.permission_state?.capture_granted) ?? [];
+  return context?.sources.filter((source: SituationCaptureSourceSnapshot) => source.status === "active" && source.permission_state?.capture_granted) ?? [];
 };
 
 export const readBlockedSituationSources = (
@@ -118,7 +119,7 @@ export const readBlockedSituationSources = (
 ): SituationCaptureSourceSnapshot[] => {
   const context = readSituationCaptureContext(workspaceSnapshot);
   return (
-    context?.sources.filter((source) => ["permission_denied", "error", "stopped"].includes(source.status)) ?? []
+    context?.sources.filter((source: SituationCaptureSourceSnapshot) => ["permission_denied", "error", "stopped"].includes(source.status)) ?? []
   );
 };
 
@@ -146,7 +147,7 @@ export const readSituationRoomSetupSpeakerMappings = (
       ? context?.speakers
       : [];
   return rawSpeakers
-    .map((entry): SituationRoomSetupSpeakerMapping | null => {
+    .map((entry: unknown): SituationRoomSetupSpeakerMapping | null => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
       const record = entry as Record<string, unknown>;
       const role = readString(record.role_hint) ?? readString(record.role);
@@ -157,7 +158,7 @@ export const readSituationRoomSetupSpeakerMappings = (
         role_hint: role === "self" || role === "friend" || role === "participant" ? role : undefined,
       };
     })
-    .filter((entry): entry is SituationRoomSetupSpeakerMapping => Boolean(entry));
+    .filter((entry: SituationRoomSetupSpeakerMapping | null): entry is SituationRoomSetupSpeakerMapping => Boolean(entry));
 };
 
 export const buildSituationRoomSetupIntent = (args: {
@@ -171,11 +172,11 @@ export const buildSituationRoomSetupIntent = (args: {
   const usableSources = readUsableSituationSources(args.workspaceSnapshot);
   const blockedSources = readBlockedSituationSources(args.workspaceSnapshot);
   const fallbackSourceIds = readSituationRoomSetupSourceIds(args.workspaceSnapshot);
-  const sourceIds = usableSources.length > 0 ? usableSources.map((source) => source.source_id) : fallbackSourceIds;
+  const sourceIds = usableSources.length > 0 ? usableSources.map((source: SituationCaptureSourceSnapshot) => source.source_id) : fallbackSourceIds;
   const roomId = captureContext?.room_id ?? readSituationRoomSetupRoomId(args.workspaceSnapshot);
   const speakerMappings = readSituationRoomSetupSpeakerMappings(args.workspaceSnapshot);
-  const speakerA = speakerMappings.find((entry) => entry.role_hint === "self") ?? speakerMappings[0] ?? null;
-  const speakerB = speakerMappings.find((entry) => entry.role_hint === "friend") ?? speakerMappings.find((entry) => entry !== speakerA) ?? null;
+  const speakerA = speakerMappings.find((entry: SituationRoomSetupSpeakerMapping) => entry.role_hint === "self") ?? speakerMappings[0] ?? null;
+  const speakerB = speakerMappings.find((entry: SituationRoomSetupSpeakerMapping) => entry.role_hint === "friend") ?? speakerMappings.find((entry: SituationRoomSetupSpeakerMapping) => entry !== speakerA) ?? null;
   const missing = new Set<SituationRoomSetupMissingRequirement>();
 
   if (usableSources.length === 0 && sourceIds.length === 0) {
@@ -201,18 +202,21 @@ export const buildSituationRoomSetupIntent = (args: {
     capture_preference: capturePreference,
     room_id: roomId,
     source_ids: sourceIds,
-    blocked_source_reasons: blockedSources.map((source) => `${source.source_id}:${source.status}`).slice(0, 8),
+    blocked_source_reasons: blockedSources.map((source: SituationCaptureSourceSnapshot) => `${source.source_id}:${source.status}`).slice(0, 8),
     speaker_mappings: speakerMappings,
     output_mode: "visual_only",
     missing_requirements: Array.from(missing),
   };
 };
 
-export const buildSituationRoomSetupActionArgs = (intent: SituationRoomSetupIntent): SituationRoomSetupActionArgs => {
-  const speakerA = intent.speaker_mappings?.find((entry) => entry.role_hint === "self") ?? intent.speaker_mappings?.[0];
+export const buildSituationRoomSetupActionArgs = (
+  intent: SituationRoomSetupIntent,
+  correlation?: SituationRoomSetupCorrelation,
+): SituationRoomSetupActionArgs => {
+  const speakerA = intent.speaker_mappings?.find((entry: SituationRoomSetupSpeakerMapping) => entry.role_hint === "self") ?? intent.speaker_mappings?.[0];
   const speakerB =
-    intent.speaker_mappings?.find((entry) => entry.role_hint === "friend") ??
-    intent.speaker_mappings?.find((entry) => entry !== speakerA);
+    intent.speaker_mappings?.find((entry: SituationRoomSetupSpeakerMapping) => entry.role_hint === "friend") ??
+    intent.speaker_mappings?.find((entry: SituationRoomSetupSpeakerMapping) => entry !== speakerA);
   return {
     intent:
       intent.kind === "monitor_conversation"
@@ -230,12 +234,18 @@ export const buildSituationRoomSetupActionArgs = (intent: SituationRoomSetupInte
     ...(speakerA?.native_language ? { speaker_a_native_language: speakerA.native_language } : {}),
     ...(speakerB?.native_language ? { speaker_b_native_language: speakerB.native_language } : {}),
     output_mode: intent.output_mode,
+    ...(correlation ? { correlation } : {}),
   };
 };
+
+const fallbackSetupCorrelation = (intent: SituationRoomSetupIntent): SituationRoomSetupCorrelation => ({
+  setup_call_id: `situation-setup:local:${intent.kind}:${Date.now().toString(36)}`,
+});
 
 export const buildSituationRoomSetupReceipt = (args: {
   intent: SituationRoomSetupIntent;
   setupActionArgs?: SituationRoomSetupActionArgs;
+  correlation?: SituationRoomSetupCorrelation;
   graphId?: string | null;
   jobIds?: string[];
 }): SituationRoomSetupPlanReceipt => {
@@ -246,7 +256,8 @@ export const buildSituationRoomSetupReceipt = (args: {
       : missing.length > 0
         ? "needs_user_input"
         : "complete";
-  const setupArgs = args.setupActionArgs ?? buildSituationRoomSetupActionArgs(args.intent);
+  const correlation = args.correlation ?? args.setupActionArgs?.correlation ?? fallbackSetupCorrelation(args.intent);
+  const setupArgs = args.setupActionArgs ?? buildSituationRoomSetupActionArgs(args.intent, correlation);
   const lifecycleStatus =
     setupStatus === "needs_capture_permission"
       ? "awaiting_capture_permission"
@@ -289,12 +300,13 @@ export const buildSituationRoomSetupReceipt = (args: {
   return {
     schema: HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
     ok: setupStatus === "complete",
+    correlation,
     setup_status: setupStatus,
     lifecycle_status: lifecycleStatus,
     execution_required: setupStatus === "complete",
     ...(args.intent.room_id ? { room_id: args.intent.room_id } : {}),
     ...(args.intent.source_ids?.length ? { source_ids: args.intent.source_ids } : {}),
-    speaker_ids: uniqueStrings(args.intent.speaker_mappings?.map((entry) => entry.speaker_id ?? null) ?? []),
+    speaker_ids: uniqueStrings(args.intent.speaker_mappings?.map((entry: SituationRoomSetupSpeakerMapping) => entry.speaker_id ?? null) ?? []),
     missing_requirements: missing,
     next_actions: nextActions,
     attachment_policy: "manual_only",
