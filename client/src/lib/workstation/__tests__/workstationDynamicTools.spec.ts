@@ -8,6 +8,7 @@ describe("workstation dynamic tools", () => {
   it("exposes Situation Room panels as schema-bound workstation tools", () => {
     const tools = getWorkstationDynamicTools();
     const createJob = tools.find((tool) => tool.name === "situation_room_pipelines.create_job");
+    const createTranslationPair = tools.find((tool) => tool.name === "situation_room_pipelines.create_translation_pair");
     const attachSource = tools.find((tool) => tool.name === "situation_room_sources.attach_display_audio_source");
 
     expect(createJob).toMatchObject({
@@ -28,6 +29,23 @@ describe("workstation dynamic tools", () => {
         target_language: { type: "string" },
         attachment_policy: { enum: ["manual_only"] },
         context_injection: { enum: ["explicit_attachment_only"] },
+      },
+    });
+    expect(createTranslationPair).toMatchObject({
+      namespace: "workstation",
+      panel_id: "situation-room-pipelines",
+      action_id: "create_translation_pair",
+      risk: "medium",
+      returns_artifact: true,
+      terminal_artifact_kind: "situation_room_graph",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+    expect(createTranslationPair?.inputSchema).toMatchObject({
+      required: ["speaker_a_id", "speaker_b_id", "speaker_a_native_language", "speaker_b_native_language"],
+      properties: {
+        render_policy: { enum: ["target_language", "native_language", "dual"] },
+        voice_output: { enum: ["off", "on_confirm", "auto_when_direct_addressed"] },
       },
     });
     expect(attachSource).toMatchObject({
@@ -69,6 +87,33 @@ describe("workstation dynamic tools", () => {
       ok: false,
       reason: "missing_required_args",
       missing_required_args: ["kind"],
+    });
+  });
+
+  it("maps translation-pair graph tools onto panel actions", () => {
+    const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.create_translation_pair", {
+      speaker_a_id: "spk_user_1",
+      speaker_b_id: "spk_rowan",
+      speaker_a_native_language: "en",
+      speaker_b_native_language: "es",
+      render_policy: "dual",
+    });
+
+    expect(mapped).toEqual({
+      ok: true,
+      action: {
+        schema_version: "helix.workstation.action/v1",
+        action: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: "create_translation_pair",
+        args: {
+          speaker_a_id: "spk_user_1",
+          speaker_b_id: "spk_rowan",
+          speaker_a_native_language: "en",
+          speaker_b_native_language: "es",
+          render_policy: "dual",
+        },
+      },
     });
   });
 

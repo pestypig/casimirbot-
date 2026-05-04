@@ -148,7 +148,7 @@ export type HelixAskAnswerContractSection = {
 export type HelixAskAnswerContract = {
   schema: "helix.ask.answer_contract.v1";
   source: "docs_viewer";
-  mode: "summarize_doc" | "summarize_section" | "explain_paper";
+  mode: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc";
   strict_sections?: boolean;
   sections?: HelixAskAnswerContractSection[];
   min_tokens?: number;

@@ -17,6 +17,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { speakVoice } from "@/lib/agi/api";
+import { SituationGraphCanvas } from "@/components/workstation/situation-graph/SituationGraphCanvas";
 import {
   draftJobFromNaturalLanguage,
   draftJobFromRecipe,
@@ -39,6 +40,7 @@ import {
   type SituationRoomMasterScrollRow,
   type SituationRoomJobOutputRenderPolicy,
 } from "@/store/useSituationRoomJobStore";
+import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 
 const JOB_OUTPUT_READ_PROVIDER = "elevenlabs";
 const JOB_OUTPUT_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
@@ -72,7 +74,7 @@ const LANGUAGE_CHIPS = [
   { label: "English", value: "en" },
 ];
 
-type PipelinePanelPage = "inputs" | "jobs" | "output";
+type PipelinePanelPage = "graph" | "inputs" | "jobs" | "output";
 
 let globalJobOutputReadController: AbortController | null = null;
 let globalJobOutputReadAudio: HTMLAudioElement | null = null;
@@ -295,7 +297,15 @@ export default function SituationRoomPipelinesPanel() {
   const stopJob = useSituationRoomJobStore((state) => state.stopJob);
   const saveJobAsNote = useSituationRoomJobStore((state) => state.saveJobAsNote);
   const attachJobToHelixAsk = useSituationRoomJobStore((state) => state.attachJobToHelixAsk);
-  const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("inputs");
+  const graphs = useSituationRoomGraphStore((state) => state.graphs);
+  const activeGraphIdByRoom = useSituationRoomGraphStore((state) => state.active_graph_id_by_room);
+  const selectedNodeIdByGraph = useSituationRoomGraphStore((state) => state.selected_node_id_by_graph);
+  const createGraph = useSituationRoomGraphStore((state) => state.createGraph);
+  const addGraphNode = useSituationRoomGraphStore((state) => state.addNode);
+  const connectGraphNodes = useSituationRoomGraphStore((state) => state.connectNodes);
+  const attachGraphToHelixAsk = useSituationRoomGraphStore((state) => state.attachGraphToHelixAsk);
+  const setSelectedGraphNode = useSituationRoomGraphStore((state) => state.setSelectedNode);
+  const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("graph");
   const [selectedSourceId, setSelectedSourceId] = React.useState<string>("__room__");
   const [selectedJobId, setSelectedJobId] = React.useState<string | undefined>();
   const [jobKind, setJobKind] = React.useState<SituationRoomJobKind>("translate");
@@ -350,6 +360,9 @@ export default function SituationRoomPipelinesPanel() {
   );
   const selectedSource = selectedSourceId !== "__room__" ? sources[selectedSourceId] : undefined;
   const selectedJob = selectedJobId ? jobs[selectedJobId] : undefined;
+  const activeGraphId = activeRoom?.room_id ? activeGraphIdByRoom[activeRoom.room_id] : undefined;
+  const activeGraph = activeGraphId ? graphs[activeGraphId] : null;
+  const selectedGraphNodeId = activeGraph ? selectedNodeIdByGraph[activeGraph.graph_id] : undefined;
   const draftScope = React.useMemo(
     () => ({
       room_id: activeRoom?.room_id ?? "",
@@ -566,21 +579,138 @@ export default function SituationRoomPipelinesPanel() {
     targetLanguage,
   ]);
 
+  const handleCreateGraph = React.useCallback(() => {
+    if (!activeRoom) return;
+    const graph = createGraph({
+      room_id: activeRoom.room_id,
+      title: `${activeRoom.title} graph`,
+    });
+    const sourceNodes = activeSources
+      .map((source) =>
+        addGraphNode({
+          graph_id: graph.graph_id,
+          type: source.capture_source === "mic" ? "source.audio.mic" : "source.audio.display",
+          title: source.label,
+          column: "sources",
+          status: source.status === "active" || source.status === "transcribing" ? "active" : "idle",
+          subtitle: `${source.capture_source} / ${source.status}`,
+          source_id: source.source_id,
+          config: {
+            capture_session_id: source.capture_session_id,
+            chunk_index: source.chunk_index,
+          },
+        }),
+      )
+      .filter(Boolean);
+    const jobNodes = activeJobs
+      .map((job) =>
+        addGraphNode({
+          graph_id: graph.graph_id,
+          type: job.kind === "translate" ? "translate" : "transcript.buffer",
+          title: job.title,
+          column: "jobs",
+          status:
+            job.status === "running" || job.status === "queued"
+              ? "running"
+              : job.status === "completed"
+                ? "complete"
+                : job.status === "error"
+                  ? "error"
+                  : "idle",
+          subtitle: `${job.kind} / outputs ${job.output_ids.length}`,
+          job_id: job.job_id,
+          config: {
+            attachment_policy: job.attachment_policy,
+            context_injection: job.context_injection,
+            command_lane_enabled: job.command_lane_enabled,
+            target_language: job.target_language,
+            native_language: job.native_language,
+          },
+        }),
+      )
+      .filter(Boolean);
+    const outputNode = addGraphNode({
+      graph_id: graph.graph_id,
+      type: "output.panel",
+      title: "Pipeline output",
+      column: "outputs",
+      status: activeJobs.some((job) => job.output_ids.length > 0) ? "active" : "idle",
+      subtitle: `${activeJobs.reduce((sum, job) => sum + job.output_ids.length, 0)} derived outputs`,
+      config: {
+        attachment_policy: "manual_only",
+      },
+    });
+    const helixNode = addGraphNode({
+      graph_id: graph.graph_id,
+      type: "helix.reason",
+      title: "Helix Ask context",
+      column: "helix",
+      status: "idle",
+      subtitle: "explicit attachment only",
+      config: {
+        context_injection: "explicit_attachment_only",
+      },
+    });
+    for (const sourceNode of sourceNodes) {
+      if (!sourceNode) continue;
+      for (const jobNode of jobNodes) {
+        if (!jobNode) continue;
+        connectGraphNodes({
+          graph_id: graph.graph_id,
+          from_node_id: sourceNode.node_id,
+          from_port: "transcript",
+          to_node_id: jobNode.node_id,
+          to_port: "input",
+          lane: "transcript",
+        });
+      }
+    }
+    for (const jobNode of jobNodes) {
+      if (!jobNode || !outputNode) continue;
+      connectGraphNodes({
+        graph_id: graph.graph_id,
+        from_node_id: jobNode.node_id,
+        from_port: "output",
+        to_node_id: outputNode.node_id,
+        to_port: "input",
+        lane: jobNode.type === "translate" ? "translation" : "transcript",
+      });
+    }
+    if (outputNode && helixNode) {
+      connectGraphNodes({
+        graph_id: graph.graph_id,
+        from_node_id: outputNode.node_id,
+        from_port: "manual_attach",
+        to_node_id: helixNode.node_id,
+        to_port: "context",
+        lane: "context",
+      });
+    }
+    setPanelPage("graph");
+  }, [activeJobs, activeRoom, activeSources, addGraphNode, connectGraphNodes, createGraph]);
+
   const goBack = () => {
     if (panelPage === "output") setPanelPage("jobs");
     else if (panelPage === "jobs") setPanelPage("inputs");
+    else if (panelPage === "inputs") setPanelPage("graph");
   };
 
   const pageTitle =
-    panelPage === "inputs" ? "Pipeline Inputs" : panelPage === "jobs" ? "Live Source Jobs" : "Job Output Scroll";
+    panelPage === "graph"
+      ? "Situation Graph"
+      : panelPage === "inputs"
+        ? "Pipeline Inputs"
+        : panelPage === "jobs"
+          ? "Live Source Jobs"
+          : "Job Output Scroll";
   const pageIcon =
-    panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
+    panelPage === "graph" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950/95 text-slate-100">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          {panelPage !== "inputs" ? (
+          {panelPage !== "graph" ? (
             <button
               type="button"
               onClick={goBack}
@@ -600,7 +730,7 @@ export default function SituationRoomPipelinesPanel() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-black/20 p-1 text-[11px]">
-          {(["inputs", "jobs", "output"] as PipelinePanelPage[]).map((page) => (
+          {(["graph", "inputs", "jobs", "output"] as PipelinePanelPage[]).map((page) => (
             <button
               key={page}
               type="button"
@@ -619,6 +749,20 @@ export default function SituationRoomPipelinesPanel() {
           ))}
         </div>
       </header>
+
+      {panelPage === "graph" ? (
+        <SituationGraphCanvas
+          graph={activeGraph}
+          selectedNodeId={selectedGraphNodeId}
+          onCreateGraph={handleCreateGraph}
+          onSelectNode={(nodeId) => {
+            if (activeGraph) setSelectedGraphNode(activeGraph.graph_id, nodeId);
+          }}
+          onAttachGraph={() => {
+            if (activeGraph) attachGraphToHelixAsk(activeGraph.graph_id);
+          }}
+        />
+      ) : null}
 
       {panelPage === "inputs" ? (
         <main className="min-h-0 flex-1 overflow-y-auto p-4">

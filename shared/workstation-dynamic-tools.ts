@@ -112,6 +112,9 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.create_job",
   "situation-room-pipelines.run_job",
   "situation-room-pipelines.attach_job_to_helix_ask",
+  "situation-room-pipelines.create_graph",
+  "situation-room-pipelines.create_translation_pair",
+  "situation-room-pipelines.attach_graph_to_helix_ask",
 ]);
 
 export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
@@ -188,6 +191,18 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "attach_job_to_helix_ask", required_args: ["job_id"], optional_args: [], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "save_job_as_note", required_args: ["job_id"], optional_args: [], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "stop_job", required_args: ["job_id"], optional_args: [], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "create_graph", required_args: [], optional_args: ["room_id", "title"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "add_node", required_args: ["graph_id", "type", "title"], optional_args: ["column", "status", "source_id", "speaker_id", "job_id"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "connect_nodes", required_args: ["graph_id", "from_node_id", "to_node_id", "lane"], optional_args: ["from_port", "to_port"], returns_artifact: true },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "create_translation_pair",
+    required_args: ["speaker_a_id", "speaker_b_id", "speaker_a_native_language", "speaker_b_native_language"],
+    optional_args: ["graph_id", "room_id", "source_ids", "render_policy", "voice_output", "title"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  { panel_id: "situation-room-pipelines", action_id: "attach_graph_to_helix_ask", required_args: ["graph_id"], optional_args: [], returns_artifact: true },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
@@ -420,6 +435,9 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "kind") return { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] };
   if (arg === "input_text_policy") return { enum: ["transcript_text", "source_text_preferred", "source_text_only"] };
   if (arg === "output_render_policy") return { enum: ["target_language", "native_language", "dual"] };
+  if (arg === "render_policy") return { enum: ["target_language", "native_language", "dual"] };
+  if (arg === "voice_output") return { enum: ["off", "on_confirm", "auto_when_direct_addressed"] };
+  if (arg === "lane") return { enum: ["audio", "speaker_identity", "transcript", "translation", "context", "command", "voice_output"] };
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
   return { type: "string" };
@@ -447,6 +465,11 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "docs-viewer" && actionId === "open_directory") return "workspace_action_receipt";
   if (panelId === "situation-room-sources") return "situation_room_context";
   if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";
+  if (panelId === "situation-room-pipelines" && actionId === "create_graph") return "situation_room_graph";
+  if (panelId === "situation-room-pipelines" && actionId === "add_node") return "situation_room_graph";
+  if (panelId === "situation-room-pipelines" && actionId === "connect_nodes") return "situation_room_graph";
+  if (panelId === "situation-room-pipelines" && actionId === "create_translation_pair") return "situation_room_graph";
+  if (panelId === "situation-room-pipelines" && actionId === "attach_graph_to_helix_ask") return "situation_room_graph_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
   if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
 
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
@@ -41,6 +42,7 @@ describe("panelActionAdapters", () => {
     useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, steps: [], debugEvents: [] });
     useSituationRoomStore.getState().reset();
     useSituationRoomJobStore.getState().reset();
+    useSituationRoomGraphStore.getState().reset();
   });
 
   it("opens/focuses docs panel before applying read intent", () => {
@@ -450,6 +452,56 @@ describe("panelActionAdapters", () => {
     );
     expect(runJob.ok).toBe(true);
     expect(runJob.artifact?.job_id).toBe(jobId);
+  });
+
+  it("delegates Situation Room graph and translation-pair actions", () => {
+    const room = useSituationRoomStore.getState().createRoom("Graph Delegation Room");
+    const createGraph = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "create_graph",
+        args: { room_id: room.room_id, title: "Mediator graph" },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(createGraph.ok).toBe(true);
+    expect(createGraph.artifact?.graph_id).toBeTruthy();
+
+    const translationPair = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "create_translation_pair",
+        args: {
+          graph_id: createGraph.artifact?.graph_id,
+          room_id: room.room_id,
+          speaker_a_id: "spk_user_1",
+          speaker_b_id: "spk_rowan",
+          speaker_a_native_language: "en",
+          speaker_b_native_language: "es",
+          render_policy: "dual",
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(translationPair.ok).toBe(true);
+    expect(translationPair.artifact?.graph_id).toBe(createGraph.artifact?.graph_id);
+    expect(translationPair.artifact?.job_ids).toHaveLength(2);
+    expect(translationPair.artifact).toMatchObject({
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+      command_lane_enabled: false,
+    });
   });
 
   it("keeps complex ADM-style symbolic equations solvable without crashing", () => {

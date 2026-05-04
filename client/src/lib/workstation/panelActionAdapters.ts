@@ -25,8 +25,16 @@ import {
   type SituationRoomJobInputTextPolicy,
   type SituationRoomJobOutputRenderPolicy,
 } from "@/store/useSituationRoomJobStore";
+import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+import type {
+  SituationGraphLane,
+  SituationGraphNodeColumn,
+  SituationGraphNodeStatus,
+  SituationGraphNodeType,
+  TranslationPairNodeConfig,
+} from "@shared/helix-situation-graph";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -115,6 +123,54 @@ function normalizeSituationInputTextPolicy(value: unknown): SituationRoomJobInpu
 function normalizeSituationOutputRenderPolicy(value: unknown): SituationRoomJobOutputRenderPolicy | undefined {
   const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
   return text === "target_language" || text === "native_language" || text === "dual" ? text : undefined;
+}
+
+function normalizeSituationGraphNodeType(value: unknown): SituationGraphNodeType | null {
+  const text = asNonEmptyString(value);
+  const allowed = new Set<SituationGraphNodeType>([
+    "source.audio.mic",
+    "source.audio.display",
+    "source.screen",
+    "speaker.identity",
+    "speaker.filter",
+    "transcript.buffer",
+    "language.detect",
+    "translate",
+    "helix.reason",
+    "helix.interjection_gate",
+    "output.voice",
+    "output.panel",
+    "output.note",
+    "output.history",
+  ]);
+  return text && allowed.has(text as SituationGraphNodeType) ? (text as SituationGraphNodeType) : null;
+}
+
+function normalizeSituationGraphColumn(value: unknown): SituationGraphNodeColumn | undefined {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  return text === "sources" || text === "speakers" || text === "jobs" || text === "outputs" || text === "helix"
+    ? text
+    : undefined;
+}
+
+function normalizeSituationGraphStatus(value: unknown): SituationGraphNodeStatus | undefined {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  return text === "idle" || text === "active" || text === "running" || text === "blocked" || text === "complete" || text === "error"
+    ? text
+    : undefined;
+}
+
+function normalizeSituationGraphLane(value: unknown): SituationGraphLane | null {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  return text === "audio" ||
+    text === "speaker_identity" ||
+    text === "transcript" ||
+    text === "translation" ||
+    text === "context" ||
+    text === "command" ||
+    text === "voice_output"
+    ? text
+    : null;
 }
 
 function resolveSituationRoom(args: Record<string, unknown>, options?: { createIfMissing?: boolean }): SituationRoom | null {
@@ -1034,6 +1090,198 @@ export function executeHelixPanelAction(
         action_id: actionId,
         artifact: { job_id: jobId, status: useSituationRoomJobStore.getState().jobs[jobId]?.status ?? null },
         message: `Stopped job ${jobId}.`,
+      };
+    }
+
+    const graphState = useSituationRoomGraphStore.getState();
+
+    if (actionId === "create_graph") {
+      const room = resolveSituationRoom(args);
+      if (!room) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No situation room is available for a graph.",
+          artifact: { missing: ["room_id"] },
+        };
+      }
+      const graph = graphState.createGraph({
+        room_id: room.room_id,
+        title: asNonEmptyString(args.title ?? args.graph_title ?? args.graphTitle) ?? `${room.title} graph`,
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          graph_id: graph.graph_id,
+          room_id: graph.room_id,
+          title: graph.title,
+          node_count: graph.nodes.length,
+          edge_count: graph.edges.length,
+          attachment_policy: "manual_only",
+          context_injection: "explicit_attachment_only",
+        },
+        message: `Created graph "${graph.title}" for "${room.title}".`,
+      };
+    }
+
+    if (actionId === "add_node") {
+      const graphId = asNonEmptyString(args.graph_id ?? args.graphId);
+      const type = normalizeSituationGraphNodeType(args.type ?? args.node_type ?? args.nodeType);
+      const title = asNonEmptyString(args.title ?? args.label);
+      if (!graphId || !type || !title) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.add_node requires graph_id, type, and title.",
+          artifact: {
+            missing: [!graphId ? "graph_id" : "", !type ? "type" : "", !title ? "title" : ""].filter(Boolean),
+          },
+        };
+      }
+      const node = graphState.addNode({
+        graph_id: graphId,
+        type,
+        title,
+        column: normalizeSituationGraphColumn(args.column),
+        status: normalizeSituationGraphStatus(args.status),
+        source_id: asNonEmptyString(args.source_id ?? args.sourceId) ?? undefined,
+        speaker_id: asNonEmptyString(args.speaker_id ?? args.speakerId) ?? undefined,
+        job_id: asNonEmptyString(args.job_id ?? args.jobId) ?? undefined,
+      });
+      return {
+        ok: Boolean(node),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { graph_id: graphId, node_id: node?.node_id ?? null },
+        message: node ? `Added ${type} node to graph ${graphId}.` : `Unknown situation room graph: ${graphId}`,
+      };
+    }
+
+    if (actionId === "connect_nodes") {
+      const graphId = asNonEmptyString(args.graph_id ?? args.graphId);
+      const fromNodeId = asNonEmptyString(args.from_node_id ?? args.fromNodeId);
+      const toNodeId = asNonEmptyString(args.to_node_id ?? args.toNodeId);
+      const lane = normalizeSituationGraphLane(args.lane);
+      if (!graphId || !fromNodeId || !toNodeId || !lane) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.connect_nodes requires graph_id, from_node_id, to_node_id, and lane.",
+          artifact: {
+            missing: [
+              !graphId ? "graph_id" : "",
+              !fromNodeId ? "from_node_id" : "",
+              !toNodeId ? "to_node_id" : "",
+              !lane ? "lane" : "",
+            ].filter(Boolean),
+          },
+        };
+      }
+      const edge = graphState.connectNodes({
+        graph_id: graphId,
+        from_node_id: fromNodeId,
+        from_port: asNonEmptyString(args.from_port ?? args.fromPort) ?? undefined,
+        to_node_id: toNodeId,
+        to_port: asNonEmptyString(args.to_port ?? args.toPort) ?? undefined,
+        lane,
+      });
+      return {
+        ok: Boolean(edge),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { graph_id: graphId, edge_id: edge?.edge_id ?? null },
+        message: edge ? `Connected graph lane ${lane}.` : `Could not connect nodes in graph ${graphId}.`,
+      };
+    }
+
+    if (actionId === "create_translation_pair") {
+      const room = resolveSituationRoom(args);
+      const speakerAId = asNonEmptyString(args.speaker_a_id ?? args.speakerAId);
+      const speakerBId = asNonEmptyString(args.speaker_b_id ?? args.speakerBId);
+      const speakerALanguage = asNonEmptyString(args.speaker_a_native_language ?? args.speakerANativeLanguage);
+      const speakerBLanguage = asNonEmptyString(args.speaker_b_native_language ?? args.speakerBNativeLanguage);
+      if (!room || !speakerAId || !speakerBId || !speakerALanguage || !speakerBLanguage) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message:
+            "situation-room-pipelines.create_translation_pair requires a room and two speaker ids/native languages.",
+          artifact: {
+            missing: [
+              !room ? "room_id" : "",
+              !speakerAId ? "speaker_a_id" : "",
+              !speakerBId ? "speaker_b_id" : "",
+              !speakerALanguage ? "speaker_a_native_language" : "",
+              !speakerBLanguage ? "speaker_b_native_language" : "",
+            ].filter(Boolean),
+          },
+        };
+      }
+      const renderPolicy =
+        normalizeSituationOutputRenderPolicy(args.render_policy ?? args.renderPolicy) ?? "dual";
+      const rawVoiceOutput = asNonEmptyString(args.voice_output ?? args.voiceOutput);
+      const voiceOutput: TranslationPairNodeConfig["voice_output"] =
+        rawVoiceOutput === "on_confirm" || rawVoiceOutput === "auto_when_direct_addressed"
+          ? rawVoiceOutput
+          : "off";
+      const result = graphState.createTranslationPair({
+        graph_id: asNonEmptyString(args.graph_id ?? args.graphId) ?? undefined,
+        room_id: room.room_id,
+        speaker_a_id: speakerAId,
+        speaker_b_id: speakerBId,
+        speaker_a_native_language: speakerALanguage,
+        speaker_b_native_language: speakerBLanguage,
+        source_ids: resolveSituationSourceIds(room, args),
+        render_policy: renderPolicy,
+        voice_output: voiceOutput,
+        title: asNonEmptyString(args.title ?? args.label) ?? undefined,
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: Boolean(result),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          graph_id: result?.graph.graph_id ?? null,
+          node_id: result?.node.node_id ?? null,
+          job_ids: result?.job_ids ?? [],
+          attachment_policy: "manual_only",
+          context_injection: "explicit_attachment_only",
+          command_lane_enabled: false,
+        },
+        message: result
+          ? `Created two-way translation graph for ${speakerAId} and ${speakerBId}.`
+          : "Could not create translation pair.",
+      };
+    }
+
+    if (actionId === "attach_graph_to_helix_ask") {
+      const graphId = asNonEmptyString(args.graph_id ?? args.graphId);
+      if (!graphId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.attach_graph_to_helix_ask requires graph_id.",
+        };
+      }
+      graphState.attachGraphToHelixAsk(graphId);
+      const graph = useSituationRoomGraphStore.getState().graphs[graphId];
+      return {
+        ok: Boolean(graph),
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { graph_id: graphId, node_count: graph?.nodes.length ?? 0, edge_count: graph?.edges.length ?? 0 },
+        message: graph ? `Attached graph ${graphId} to Helix Ask.` : `Unknown situation room graph: ${graphId}`,
       };
     }
   }
