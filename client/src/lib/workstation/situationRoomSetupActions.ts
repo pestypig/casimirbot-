@@ -2,8 +2,8 @@ import {
   HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
   normalizeSituationSetupOutputMode,
   type SituationRoomSetupActionArgs,
+  type SituationRoomSetupExecutionReceipt,
   type SituationRoomSetupMissingRequirement,
-  type SituationRoomSetupReceipt,
 } from "@shared/helix-situation-setup";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomStore, type SituationRoom } from "@/store/useSituationRoomStore";
@@ -14,7 +14,7 @@ const nonEmpty = (value: unknown): string | null => {
 };
 
 const stringArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value.map(nonEmpty).filter((entry): entry is string => Boolean(entry));
+  if (Array.isArray(value)) return value.map(nonEmpty).filter((entry: string | null): entry is string => Boolean(entry));
   const single = nonEmpty(value);
   return single ? [single] : [];
 };
@@ -27,7 +27,9 @@ export const normalizeSituationRoomSetupActionArgs = (
       ? "monitor_conversation"
       : nonEmpty(args.intent) === "summarize_conversation"
         ? "summarize_conversation"
-        : "translate_conversation",
+        : nonEmpty(args.intent) === "compose_prompt_from_room"
+          ? "compose_prompt_from_room"
+          : "translate_conversation",
   capture_preference:
     nonEmpty(args.capture_preference) === "mic"
       ? "mic"
@@ -56,12 +58,15 @@ export const resolveSituationRoomForSetup = (roomId?: string): SituationRoom => 
   return state.createRoom("Translation Situation Room");
 };
 
-export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs): SituationRoomSetupReceipt => {
+const setupStatusForMissing = (missing: Set<SituationRoomSetupMissingRequirement>) =>
+  missing.has("audio_source") || missing.has("capture_permission") ? "needs_capture_permission" : "needs_user_input";
+
+export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs): SituationRoomSetupExecutionReceipt => {
   const room = resolveSituationRoomForSetup(input.room_id);
   const state = useSituationRoomStore.getState();
   const sourceIds = input.source_ids?.length
-    ? input.source_ids.filter((sourceId) => Boolean(state.sources[sourceId]))
-    : room.source_ids.filter((sourceId) => Boolean(state.sources[sourceId]));
+    ? input.source_ids.filter((sourceId: string) => Boolean(state.sources[sourceId]))
+    : room.source_ids.filter((sourceId: string) => Boolean(state.sources[sourceId]));
   const missing = new Set<SituationRoomSetupMissingRequirement>();
   if (sourceIds.length === 0) {
     missing.add("audio_source");
@@ -81,7 +86,10 @@ export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs
     return {
       schema: HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
       ok: false,
-      setup_status: missing.has("audio_source") || missing.has("capture_permission") ? "needs_capture_permission" : "needs_user_input",
+      setup_status: setupStatusForMissing(missing),
+      lifecycle_status: "failed",
+      executed_action_id: "situation-room-pipelines.setup_from_prompt",
+      executed_at: new Date().toISOString(),
       room_id: room.room_id,
       source_ids: sourceIds,
       missing_requirements: Array.from(missing),
@@ -96,28 +104,47 @@ export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs
       context_injection: "explicit_attachment_only",
       command_lane_enabled: false,
       output_mode: outputMode,
+      error: "setup_requirements_missing",
       message: missing.has("audio_source")
         ? "Attach an audio source before starting Situation Room translation setup."
         : `Missing setup fields: ${Array.from(missing).join(", ")}.`,
     };
   }
 
-  const graphResult = useSituationRoomGraphStore.getState().createTranslationPair({
-    room_id: room.room_id,
-    source_ids: sourceIds,
-    speaker_a_id: input.speaker_a_id ?? "speaker-a",
-    speaker_b_id: input.speaker_b_id ?? "speaker-b",
-    speaker_a_native_language: input.speaker_a_native_language ?? "unknown",
-    speaker_b_native_language: input.speaker_b_native_language ?? "unknown",
-    render_policy: "dual",
-    voice_output: outputMode === "voice_auto_direct_address" ? "auto_when_direct_addressed" : outputMode === "voice_on_confirm" ? "on_confirm" : "off",
-    title: "Two-way translation setup",
-  });
+  const graphStore = useSituationRoomGraphStore.getState();
+  const graphResult =
+    input.intent === "translate_conversation"
+      ? graphStore.createTranslationPair({
+          room_id: room.room_id,
+          source_ids: sourceIds,
+          speaker_a_id: input.speaker_a_id ?? "speaker-a",
+          speaker_b_id: input.speaker_b_id ?? "speaker-b",
+          speaker_a_native_language: input.speaker_a_native_language ?? "unknown",
+          speaker_b_native_language: input.speaker_b_native_language ?? "unknown",
+          render_policy: "dual",
+          voice_output: outputMode === "voice_auto_direct_address" ? "auto_when_direct_addressed" : outputMode === "voice_on_confirm" ? "on_confirm" : "off",
+          title: "Two-way translation setup",
+        })
+      : null;
+  const graph =
+    graphResult?.graph ??
+    graphStore.createGraph({
+      room_id: room.room_id,
+      title:
+        input.intent === "compose_prompt_from_room"
+          ? "Prompt composer setup"
+          : input.intent === "summarize_conversation"
+            ? "Conversation summary setup"
+            : "Conversation monitor setup",
+    });
   return {
     schema: HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
-    ok: Boolean(graphResult),
-    setup_status: graphResult ? "complete" : "blocked",
-    graph_id: graphResult?.graph.graph_id,
+    ok: Boolean(graph),
+    setup_status: graph ? "complete" : "blocked",
+    lifecycle_status: graph ? "executed" : "failed",
+    executed_action_id: "situation-room-pipelines.setup_from_prompt",
+    executed_at: new Date().toISOString(),
+    graph_id: graph?.graph_id,
     job_ids: graphResult?.job_ids ?? [],
     room_id: room.room_id,
     source_ids: sourceIds,
@@ -127,8 +154,11 @@ export const setupSituationRoomFromPrompt = (input: SituationRoomSetupActionArgs
     context_injection: "explicit_attachment_only",
     command_lane_enabled: false,
     output_mode: outputMode,
-    message: graphResult
-      ? "Created two-way translation setup. Jobs are manual-only and outputs require explicit attachment."
+    error: graph ? null : "graph_creation_failed",
+    message: graph
+      ? input.intent === "translate_conversation"
+        ? "Executed two-way translation setup. Jobs are manual-only and outputs require explicit attachment."
+        : "Executed Situation Room setup graph. Outputs require explicit attachment."
       : "Could not create the Situation Room translation graph.",
   };
 };

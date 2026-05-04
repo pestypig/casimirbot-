@@ -42,7 +42,7 @@ export function emitWorkstationActionLiveEvent(args: {
   traceId: string;
   action: HelixWorkstationAction;
   ok: boolean;
-  kind?: "workstation_action_receipt" | "workstation_procedural_step";
+  kind?: "workstation_action_receipt" | "workstation_procedural_step" | "situation_room_setup_execution_receipt";
   message?: string;
   durationMs?: number;
   artifact?: Record<string, unknown> | null;

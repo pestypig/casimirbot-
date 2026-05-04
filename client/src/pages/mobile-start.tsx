@@ -251,6 +251,7 @@ export default function MobileStartPage() {
         const startedAtMs = Date.now();
         const publish = (args: {
           ok: boolean;
+          kind?: "workstation_action_receipt" | "workstation_procedural_step" | "situation_room_setup_execution_receipt";
           message?: string;
           artifact?: Record<string, unknown> | null;
         }) => {
@@ -259,6 +260,7 @@ export default function MobileStartPage() {
             traceId,
             action,
             ok: args.ok,
+            kind: args.kind,
             message: args.message,
             artifact: args.artifact ?? null,
             durationMs: Math.max(0, Date.now() - startedAtMs),
@@ -349,6 +351,12 @@ export default function MobileStartPage() {
             );
             publish({
               ok: result.ok,
+              kind:
+                result.artifact &&
+                typeof result.artifact === "object" &&
+                (result.artifact as Record<string, unknown>).kind === "situation_room_setup_execution_receipt"
+                  ? "situation_room_setup_execution_receipt"
+                  : undefined,
               message: result.message,
               artifact: result.artifact ?? null,
             });

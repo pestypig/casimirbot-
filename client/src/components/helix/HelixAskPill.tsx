@@ -66,6 +66,7 @@ import {
   sourceLabelForSituationSource,
   type SituationRoomState,
 } from "@/lib/helix/situation-room";
+import { buildSituationRoomCaptureContext } from "@/lib/helix/situation-capture-context";
 import {
   dispatchHelixWorkstationAction,
   dispatchHelixWorkstationActions,
@@ -8906,6 +8907,7 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     situationRoomJobState,
     situationRoomJobState.last_attached_job_id,
   );
+  const situationCaptureContext = buildSituationRoomCaptureContext(situationRoomState);
   const recentNotes = notesState.order.slice(0, 8).flatMap((noteId) => {
     const note = notesState.notes[noteId] ?? null;
     if (!note?.title) return [];
@@ -8942,6 +8944,7 @@ function buildAskTurnWorkspaceContextSnapshot(sessionId: string | null | undefin
     recentNotes,
     hasNoteContext,
     situationRoomContext,
+    situationCaptureContext,
     hasSituationRoomContext: Boolean(situationRoomContext),
     hasClipboardContext: Object.values(layoutState.groups).some((group) =>
       group.panelIds.includes("workstation-clipboard-history"),

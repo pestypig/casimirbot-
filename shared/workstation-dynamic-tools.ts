@@ -485,7 +485,7 @@ export function buildWorkstationToolInputSchema(action: WorkstationDynamicToolAc
 export function resolveWorkstationToolTerminalArtifactKind(panelId: string, actionId: string): string | null {
   if (actionId === "open") return "workspace_action_receipt";
   if (panelId === "docs-viewer" && actionId === "open_directory") return "workspace_action_receipt";
-  if (panelId === "situation-room-pipelines" && actionId === "setup_from_prompt") return "situation_room_setup_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "setup_from_prompt") return "situation_room_setup_execution_receipt";
   if (panelId === "situation-room-sources") return "situation_room_context";
   if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";
   if (panelId === "situation-room-pipelines" && actionId === "create_graph") return "situation_room_graph";

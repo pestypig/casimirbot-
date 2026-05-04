@@ -996,7 +996,10 @@ export function executeHelixPanelAction(
         ok: receipt.ok,
         panel_id: panelId,
         action_id: actionId,
-        artifact: receipt as unknown as Record<string, unknown>,
+        artifact: {
+          kind: "situation_room_setup_execution_receipt",
+          ...receipt,
+        } as unknown as Record<string, unknown>,
         message: receipt.message,
       };
     }

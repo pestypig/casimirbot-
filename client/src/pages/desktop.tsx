@@ -218,7 +218,7 @@ export default function DesktopPage({
         const startedAtMs = Date.now();
         const publish = (args: {
           ok: boolean;
-          kind?: "workstation_action_receipt" | "workstation_procedural_step";
+          kind?: "workstation_action_receipt" | "workstation_procedural_step" | "situation_room_setup_execution_receipt";
           message?: string;
           artifact?: Record<string, unknown> | null;
         }) => {
@@ -506,6 +506,12 @@ export default function DesktopPage({
             }
             publish({
               ok: result.ok,
+              kind:
+                result.artifact &&
+                typeof result.artifact === "object" &&
+                (result.artifact as Record<string, unknown>).kind === "situation_room_setup_execution_receipt"
+                  ? "situation_room_setup_execution_receipt"
+                  : undefined,
               message: result.message,
               artifact: result.artifact ?? null,
             });

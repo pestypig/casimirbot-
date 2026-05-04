@@ -72,6 +72,9 @@ export function SituationGraphCanvas({
             New
           </button>
         </div>
+        <div className="mb-3 xl:hidden">
+          <SituationGraphInspector graph={graph} node={selectedNode} onAttach={onAttachGraph} />
+        </div>
         <div className="grid gap-3 lg:grid-cols-5">
           {COLUMNS.map((column) => {
             const nodes = graph.nodes.filter((node: SituationGraphNode) => node.column === column.id);
@@ -102,7 +105,9 @@ export function SituationGraphCanvas({
           <SituationGraphEdgeLayer edges={graph.edges} nodes={graph.nodes} />
         </div>
       </section>
-      <SituationGraphInspector graph={graph} node={selectedNode} onAttach={onAttachGraph} />
+      <div className="hidden xl:block xl:sticky xl:top-3 xl:self-start">
+        <SituationGraphInspector graph={graph} node={selectedNode} onAttach={onAttachGraph} />
+      </div>
     </main>
   );
 }

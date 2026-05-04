@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+(globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
 import { HELIX_ASK_LIVE_EVENT_BUS_EVENT } from "@/lib/helix/liveEventsBus";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
@@ -6,6 +8,9 @@ import { useSituationRoomStore, type SituationRoomSource } from "@/store/useSitu
 
 vi.mock("@/lib/helix/display-audio-capture", () => ({
   startDisplayAudioSituationSession: vi.fn(),
+}));
+vi.mock("@/lib/helix/mic-audio-situation-capture", () => ({
+  startMicAudioSituationSession: vi.fn(),
 }));
 
 function seedRoom() {
@@ -20,7 +25,7 @@ function seedRoom() {
     chunk_index: 0,
     started_at: "2026-05-04T12:00:00.000Z",
   };
-  useSituationRoomStore.setState((state) => ({
+  useSituationRoomStore.setState((state: ReturnType<typeof useSituationRoomStore.getState>) => ({
     sources: { ...state.sources, [source.source_id]: source },
     rooms: {
       ...state.rooms,
@@ -88,7 +93,7 @@ describe("useSituationRoomGraphStore", () => {
     });
 
     expect(result?.job_ids).toHaveLength(2);
-    const [aToB, bToA] = result!.job_ids.map((jobId) => useSituationRoomJobStore.getState().jobs[jobId]);
+    const [aToB, bToA] = result!.job_ids.map((jobId: string) => useSituationRoomJobStore.getState().jobs[jobId]);
     expect(aToB).toMatchObject({
       kind: "translate",
       target_language: "es",

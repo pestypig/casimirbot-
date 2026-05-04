@@ -40,13 +40,18 @@ export type SituationRoomSetupIntent = {
   capture_preference: SituationRoomSetupCapturePreference;
   room_id?: string | null;
   source_ids?: string[];
+  blocked_source_reasons?: string[];
   speaker_mappings?: SituationRoomSetupSpeakerMapping[];
   output_mode: SituationRoomSetupOutputMode;
   missing_requirements: SituationRoomSetupMissingRequirement[];
 };
 
 export type SituationRoomSetupActionArgs = {
-  intent: "translate_conversation" | "monitor_conversation" | "summarize_conversation";
+  intent:
+    | "translate_conversation"
+    | "monitor_conversation"
+    | "summarize_conversation"
+    | "compose_prompt_from_room";
   capture_preference?: SituationRoomSetupCapturePreference;
   room_id?: string;
   source_ids?: string[];
@@ -63,6 +68,14 @@ export type SituationRoomSetupStatus =
   | "needs_capture_permission"
   | "blocked";
 
+export type SituationRoomSetupLifecycleStatus =
+  | "planned"
+  | "awaiting_user_input"
+  | "awaiting_capture_permission"
+  | "executing_client_action"
+  | "executed"
+  | "failed";
+
 export type HelixWorkstationActionLike = {
   schema_version: "helix.workstation.action/v1";
   action: "open_panel" | "focus_panel" | "run_panel_action";
@@ -75,6 +88,7 @@ export type SituationRoomSetupReceipt = {
   schema: typeof HELIX_SITUATION_SETUP_RECEIPT_SCHEMA;
   ok: boolean;
   setup_status: SituationRoomSetupStatus;
+  lifecycle_status?: SituationRoomSetupLifecycleStatus;
   graph_id?: string;
   job_ids?: string[];
   room_id?: string;
@@ -87,6 +101,20 @@ export type SituationRoomSetupReceipt = {
   command_lane_enabled: false;
   output_mode: SituationRoomSetupOutputMode;
   message: string;
+};
+
+export type SituationRoomSetupPlanReceipt = SituationRoomSetupReceipt & {
+  lifecycle_status: "planned" | "awaiting_user_input" | "awaiting_capture_permission";
+  execution_required: boolean;
+};
+
+export type SituationRoomSetupExecutionReceipt = SituationRoomSetupReceipt & {
+  lifecycle_status: "executed" | "failed";
+  executed_action_id: string;
+  executed_at: string;
+  graph_id?: string;
+  job_ids?: string[];
+  error?: string | null;
 };
 
 export const normalizeSituationSetupOutputMode = (value: unknown): SituationRoomSetupOutputMode => {

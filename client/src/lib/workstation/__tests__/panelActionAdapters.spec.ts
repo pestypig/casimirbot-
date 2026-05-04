@@ -519,7 +519,7 @@ describe("panelActionAdapters", () => {
       chunk_index: 0,
       started_at: "2026-05-04T00:00:00.000Z",
     };
-    useSituationRoomStore.setState((state) => ({
+    useSituationRoomStore.setState((state: ReturnType<typeof useSituationRoomStore.getState>) => ({
       sources: { ...state.sources, [source.source_id]: source },
       rooms: {
         ...state.rooms,
@@ -555,8 +555,11 @@ describe("panelActionAdapters", () => {
 
     expect(setup.ok).toBe(true);
     expect(setup.artifact).toMatchObject({
+      kind: "situation_room_setup_execution_receipt",
       schema: "helix.situation_setup_receipt.v1",
       setup_status: "complete",
+      lifecycle_status: "executed",
+      executed_action_id: "situation-room-pipelines.setup_from_prompt",
       room_id: room.room_id,
       source_ids: [source.source_id],
       attachment_policy: "manual_only",
@@ -565,6 +568,36 @@ describe("panelActionAdapters", () => {
     });
     expect(setup.artifact?.graph_id).toBeTruthy();
     expect(setup.artifact?.job_ids).toHaveLength(2);
+
+    const missingSetup = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "setup_from_prompt",
+        args: {
+          intent: "translate_conversation",
+          capture_preference: "browser_tab_audio",
+          room_id: room.room_id,
+          speaker_a_id: "spk_user_1",
+          speaker_b_id: "spk_friend_1",
+          speaker_a_native_language: "English",
+          speaker_b_native_language: "Spanish",
+          source_ids: ["src:not-found"],
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+    expect(missingSetup.ok).toBe(false);
+    expect(missingSetup.artifact).toMatchObject({
+      kind: "situation_room_setup_execution_receipt",
+      lifecycle_status: "failed",
+      setup_status: "needs_capture_permission",
+      error: "setup_requirements_missing",
+    });
 
     const mic = executeHelixPanelAction(
       {

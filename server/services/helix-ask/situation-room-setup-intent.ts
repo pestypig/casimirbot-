@@ -7,12 +7,14 @@ import {
   type SituationRoomSetupIntent,
   type SituationRoomSetupIntentKind,
   type SituationRoomSetupMissingRequirement,
-  type SituationRoomSetupReceipt,
+  type SituationRoomSetupPlanReceipt,
   type SituationRoomSetupSpeakerMapping,
 } from "@shared/helix-situation-setup";
+import type { SituationRoomCaptureContext, SituationCaptureSourceSnapshot } from "@shared/helix-situation-capture-context";
 
 type WorkspaceSnapshotLike = {
   situationRoomContext?: Record<string, unknown> | null;
+  situationCaptureContext?: Record<string, unknown> | null;
 };
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
@@ -32,26 +34,46 @@ const readStringArray = (value: unknown): string[] => {
 export const isSituationRoomSetupPrompt = (prompt: string): boolean => {
   const normalized = prompt.trim().toLowerCase();
   if (!normalized) return false;
-  if (/\b(?:create|run|start|make)\b.*\b(?:job|pipeline)\b/.test(normalized) || /\btranslation\s+job\b/.test(normalized)) {
+  const promptComposerCue =
+    /\b(?:prompt\s+composer|compose\s+a\s+prompt|make\s+a\s+prompt|turn\s+(?:the\s+)?(?:call|conversation|voice\s+chat)\s+into\s+a\s+prompt)\b/.test(
+      normalized,
+    );
+  if (
+    !promptComposerCue &&
+    (/\b(?:create|run|start|make)\b.*\b(?:job|pipeline)\b/.test(normalized) || /\btranslation\s+job\b/.test(normalized))
+  ) {
     return false;
   }
-  const conversationCue = /\b(?:conversation|call|voice\s+chat|discord|meeting|room|microphone|mic|browser\s+tab|tab\s+audio)\b/.test(normalized);
-  const setupCue = /\b(?:translate|translation|monitor|listen|summari[sz]e|compose\s+prompt|set\s+up|setup)\b/.test(normalized);
+  const conversationCue =
+    /\b(?:conversation|call|voice\s+chat|discord(?:\s+voice\s+chat)?|meeting|room|microphone|mic|same\s+microphone|shared\s+mic|one\s+mic|browser\s+tab|browser\s+call|tab\s+audio)\b/.test(
+      normalized,
+    );
+  const setupCue =
+    promptComposerCue ||
+    /\b(?:translate|translation|monitor|listen|summari[sz]e|compose\s+prompt|set\s+up|setup|live\s+interpreter|interpreter|interpret(?:\s+this)?|make\s+a\s+live\s+interpreter)\b/.test(
+      normalized,
+    );
   return conversationCue && setupCue;
 };
 
 export const classifySituationRoomSetupIntentKind = (prompt: string): SituationRoomSetupIntentKind => {
   const normalized = prompt.trim().toLowerCase();
   if (/\b(?:summari[sz]e|summary)\b/.test(normalized)) return "summarize_conversation";
-  if (/\b(?:compose\s+prompt|prompt\s+from)\b/.test(normalized)) return "compose_prompt_from_room";
+  if (
+    /\b(?:prompt\s+composer|prompt\s+composer\s+pipeline|compose\s+(?:a\s+)?prompt|prompt\s+from|turn\s+(?:the\s+)?(?:call|conversation|voice\s+chat)\s+into\s+a\s+prompt|make\s+a\s+prompt\s+from)\b/.test(
+      normalized,
+    )
+  ) {
+    return "compose_prompt_from_room";
+  }
   if (/\b(?:monitor|listen|watch)\b/.test(normalized) && !/\btranslat/.test(normalized)) return "monitor_conversation";
   return "translate_conversation";
 };
 
 export const classifySituationRoomCapturePreference = (prompt: string): SituationRoomSetupCapturePreference => {
   const normalized = prompt.trim().toLowerCase();
-  if (/\b(?:same\s+)?(?:microphone|mic)\b/.test(normalized)) return "mic";
-  if (/\b(?:discord|browser\s+tab|tab\s+audio|this\s+tab)\b/.test(normalized)) return "browser_tab_audio";
+  if (/\b(?:(?:same|shared|one)\s+)?(?:microphone|mic)\b/.test(normalized)) return "mic";
+  if (/\b(?:discord|discord\s+voice\s+chat|browser\s+tab|browser\s+call|tab\s+audio|this\s+tab|this\s+voice\s+chat|this\s+call)\b/.test(normalized)) return "browser_tab_audio";
   if (/\b(?:display|screen|window|screen\s+share|screenshare)\b/.test(normalized)) return "display_audio";
   if (/\b(?:existing|attached|current|live)\s+(?:source|room)\b/.test(normalized)) return "existing_source";
   return "unknown";
@@ -60,6 +82,44 @@ export const classifySituationRoomCapturePreference = (prompt: string): Situatio
 const readSituationRoomContext = (workspaceSnapshot?: WorkspaceSnapshotLike | null): Record<string, unknown> | null => {
   const context = workspaceSnapshot?.situationRoomContext;
   return context && typeof context === "object" && !Array.isArray(context) ? context : null;
+};
+
+export const readSituationCaptureContext = (
+  workspaceSnapshot?: WorkspaceSnapshotLike | null,
+): SituationRoomCaptureContext | null => {
+  const context = workspaceSnapshot?.situationCaptureContext;
+  if (!context || typeof context !== "object" || Array.isArray(context)) return null;
+  const record = context as Record<string, unknown>;
+  const sources = Array.isArray(record.sources)
+    ? record.sources.filter(
+        (source): source is SituationCaptureSourceSnapshot =>
+          Boolean(source && typeof source === "object" && !Array.isArray(source) && readString((source as Record<string, unknown>).source_id)),
+      )
+    : [];
+  return {
+    schema: "helix.situation_capture_context.v1",
+    room_id: readString(record.room_id) ?? readString(record.roomId),
+    source_ids: readStringArray(record.source_ids ?? record.sourceIds),
+    sources,
+    context_policy: "explicit_attachment_only",
+    command_lane_enabled: false,
+  };
+};
+
+export const readUsableSituationSources = (
+  workspaceSnapshot?: WorkspaceSnapshotLike | null,
+): SituationCaptureSourceSnapshot[] => {
+  const context = readSituationCaptureContext(workspaceSnapshot);
+  return context?.sources.filter((source) => source.status === "active" && source.permission_state?.capture_granted) ?? [];
+};
+
+export const readBlockedSituationSources = (
+  workspaceSnapshot?: WorkspaceSnapshotLike | null,
+): SituationCaptureSourceSnapshot[] => {
+  const context = readSituationCaptureContext(workspaceSnapshot);
+  return (
+    context?.sources.filter((source) => ["permission_denied", "error", "stopped"].includes(source.status)) ?? []
+  );
 };
 
 export const readSituationRoomSetupSourceIds = (workspaceSnapshot?: WorkspaceSnapshotLike | null): string[] => {
@@ -107,18 +167,26 @@ export const buildSituationRoomSetupIntent = (args: {
   if (!isSituationRoomSetupPrompt(args.prompt)) return null;
   const kind = classifySituationRoomSetupIntentKind(args.prompt);
   const capturePreference = classifySituationRoomCapturePreference(args.prompt);
-  const sourceIds = readSituationRoomSetupSourceIds(args.workspaceSnapshot);
-  const roomId = readSituationRoomSetupRoomId(args.workspaceSnapshot);
+  const captureContext = readSituationCaptureContext(args.workspaceSnapshot);
+  const usableSources = readUsableSituationSources(args.workspaceSnapshot);
+  const blockedSources = readBlockedSituationSources(args.workspaceSnapshot);
+  const fallbackSourceIds = readSituationRoomSetupSourceIds(args.workspaceSnapshot);
+  const sourceIds = usableSources.length > 0 ? usableSources.map((source) => source.source_id) : fallbackSourceIds;
+  const roomId = captureContext?.room_id ?? readSituationRoomSetupRoomId(args.workspaceSnapshot);
   const speakerMappings = readSituationRoomSetupSpeakerMappings(args.workspaceSnapshot);
   const speakerA = speakerMappings.find((entry) => entry.role_hint === "self") ?? speakerMappings[0] ?? null;
   const speakerB = speakerMappings.find((entry) => entry.role_hint === "friend") ?? speakerMappings.find((entry) => entry !== speakerA) ?? null;
   const missing = new Set<SituationRoomSetupMissingRequirement>();
 
-  if (sourceIds.length === 0) {
+  if (usableSources.length === 0 && sourceIds.length === 0) {
     missing.add("audio_source");
     if (capturePreference === "browser_tab_audio" || capturePreference === "display_audio" || capturePreference === "mic") {
       missing.add("capture_permission");
     }
+  }
+  if (usableSources.length === 0 && blockedSources.length > 0) {
+    missing.add("audio_source");
+    missing.add("capture_permission");
   }
   if (kind === "translate_conversation") {
     if (!speakerA?.speaker_id) missing.add("speaker_a");
@@ -133,6 +201,7 @@ export const buildSituationRoomSetupIntent = (args: {
     capture_preference: capturePreference,
     room_id: roomId,
     source_ids: sourceIds,
+    blocked_source_reasons: blockedSources.map((source) => `${source.source_id}:${source.status}`).slice(0, 8),
     speaker_mappings: speakerMappings,
     output_mode: "visual_only",
     missing_requirements: Array.from(missing),
@@ -150,7 +219,9 @@ export const buildSituationRoomSetupActionArgs = (intent: SituationRoomSetupInte
         ? "monitor_conversation"
         : intent.kind === "summarize_conversation"
           ? "summarize_conversation"
-          : "translate_conversation",
+          : intent.kind === "compose_prompt_from_room"
+            ? "compose_prompt_from_room"
+            : "translate_conversation",
     capture_preference: intent.capture_preference,
     ...(intent.room_id ? { room_id: intent.room_id } : {}),
     ...(intent.source_ids?.length ? { source_ids: intent.source_ids } : {}),
@@ -167,7 +238,7 @@ export const buildSituationRoomSetupReceipt = (args: {
   setupActionArgs?: SituationRoomSetupActionArgs;
   graphId?: string | null;
   jobIds?: string[];
-}): SituationRoomSetupReceipt => {
+}): SituationRoomSetupPlanReceipt => {
   const missing = args.intent.missing_requirements;
   const setupStatus =
     missing.includes("capture_permission") || missing.includes("audio_source")
@@ -176,6 +247,12 @@ export const buildSituationRoomSetupReceipt = (args: {
         ? "needs_user_input"
         : "complete";
   const setupArgs = args.setupActionArgs ?? buildSituationRoomSetupActionArgs(args.intent);
+  const lifecycleStatus =
+    setupStatus === "needs_capture_permission"
+      ? "awaiting_capture_permission"
+      : setupStatus === "needs_user_input"
+        ? "awaiting_user_input"
+        : "planned";
   const nextActions =
     setupStatus === "needs_capture_permission"
       ? [
@@ -204,7 +281,7 @@ export const buildSituationRoomSetupReceipt = (args: {
 
   const message =
     setupStatus === "complete"
-      ? "Prepared Situation Room translation setup. The graph/jobs remain manual-only and explicit-context-only."
+      ? "Planned Situation Room setup. The client workstation action must execute before graph or job creation is confirmed."
       : setupStatus === "needs_capture_permission"
         ? "I can prepare the Situation Room workflow, but you need to attach an audio source before capture can start."
         : `I need ${missing.join(", ")} before creating the Situation Room workflow.`;
@@ -213,8 +290,8 @@ export const buildSituationRoomSetupReceipt = (args: {
     schema: HELIX_SITUATION_SETUP_RECEIPT_SCHEMA,
     ok: setupStatus === "complete",
     setup_status: setupStatus,
-    ...(args.graphId ? { graph_id: args.graphId } : {}),
-    ...(args.jobIds?.length ? { job_ids: args.jobIds } : {}),
+    lifecycle_status: lifecycleStatus,
+    execution_required: setupStatus === "complete",
     ...(args.intent.room_id ? { room_id: args.intent.room_id } : {}),
     ...(args.intent.source_ids?.length ? { source_ids: args.intent.source_ids } : {}),
     speaker_ids: uniqueStrings(args.intent.speaker_mappings?.map((entry) => entry.speaker_id ?? null) ?? []),
