@@ -100,8 +100,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(agentLoop?.selected_final_answer) ??
     readString(debug?.selected_final_answer) ??
     readString(reply.content);
+  const canonicalGoalFrame = asRecord(debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame);
   const activeTurnId =
     readString(debug?.turn_id) ??
+    readString(canonicalGoalFrame?.turn_id) ??
     readString(asRecord(payload.turnTruthTable)?.turn_id) ??
     readString(reply.id) ??
     "unknown-turn";
@@ -125,7 +127,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       terminal_error_code: readString(agentLoop?.terminal_error_code) ?? readString(debug?.terminal_error_code),
       pending_server_request_present: Boolean(agentLoop?.pending_request),
     },
-    canonical_goal_frame: debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame,
+    canonical_goal_frame: canonicalGoalFrame,
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],
     workspace_action_debug: receipt
@@ -155,7 +157,24 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     subgoal_artifact_map: debug?.subgoal_artifact_map ?? agentLoop?.subgoal_artifact_map,
     composite_anti_determinism_audit:
       debug?.composite_anti_determinism_audit ?? agentLoop?.composite_anti_determinism_audit,
-    pending_server_request: agentLoop?.pending_request ?? null,
+    composite_subgoal_reference_intent:
+      debug?.composite_subgoal_reference_intent ?? agentLoop?.composite_subgoal_reference_intent ?? payload.composite_subgoal_reference_intent,
+    composite_subgoal_binding: debug?.composite_subgoal_binding ?? agentLoop?.composite_subgoal_binding ?? payload.composite_subgoal_binding,
+    composite_handoff_decision: debug?.composite_handoff_decision ?? agentLoop?.composite_handoff_decision ?? payload.composite_handoff_decision,
+    composite_subgoal_explanation:
+      debug?.composite_subgoal_explanation ?? agentLoop?.composite_subgoal_explanation ?? payload.composite_subgoal_explanation,
+    composite_followup_anti_determinism_audit:
+      debug?.composite_followup_anti_determinism_audit ?? agentLoop?.composite_followup_anti_determinism_audit ?? payload.composite_followup_anti_determinism_audit,
+    pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
+    backend_debug_response_ref:
+      asRecord(debug?.debug_export_ref) ??
+      asRecord(payload.debug_export_ref) ??
+      (activeTurnId
+        ? {
+            endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
+            turn_id: activeTurnId,
+          }
+        : undefined),
     debug_export_anti_determinism_audit: {
       verdict: "clean",
       checks: [
