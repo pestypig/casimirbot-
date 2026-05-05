@@ -12,6 +12,10 @@ import {
   type SituationSalienceReceipt,
   type SituationStateProjection,
 } from "@shared/helix-situation-standby";
+import type {
+  HelixStandbyObservationAppendDecision,
+  HelixStandbyObservationBatchReceipt,
+} from "@shared/helix-standby-observation-batch";
 import {
   getMinecraftEventHints,
   normalizeMinecraftWorldEventToSignal,
@@ -22,7 +26,8 @@ import {
   isLocationSalienceEnabled,
   type MinecraftEventSalienceClass,
 } from "./minecraft-salience-policy";
-import { appendStandbyObservationToThread } from "./standby-thread-observation";
+import { buildStandbyObservationRef } from "./standby-thread-observation";
+import { appendStandbyObservationBatch } from "./standby-observation-batch-writer";
 import {
   createSituationThreadBinding,
 } from "./thread-binding-store";
@@ -67,16 +72,22 @@ export const worldEventBatchRequestSchema = z.object({
 export const worldEventReplayRequestSchema = z.object({
   room_id: z.string().trim().min(1).nullable().optional(),
   reset: z.boolean().optional(),
+  dry_run: z.boolean().optional(),
+  force_thread_id: z.string().trim().min(1).optional(),
+  force_room_id: z.string().trim().min(1).optional(),
+  deterministic_now: z.string().trim().min(1).optional(),
   events: z.array(helixWorldEventSchema),
 });
 
 export type WorldEventIngestOptions = {
   appendToThread?: boolean;
+  deferThreadAppend?: boolean;
   threadId?: string | null;
   turnId?: string | null;
   sessionId?: string | null;
   traceId?: string | null;
   graphId?: string | null;
+  now?: () => Date;
 };
 
 export type WorldEventIngestResult = {
@@ -99,11 +110,18 @@ export type WorldEventIngestResult = {
   salience_receipt?: SituationSalienceReceipt | null;
   interjection_proposal?: SituationInterjectionProposal | null;
   debug?: WorldEventIngestDebug;
+  append_decision?: HelixStandbyObservationAppendDecision;
+  batch_receipt?: HelixStandbyObservationBatchReceipt | null;
+  append_candidate?: WorldEventAppendCandidate | null;
 };
 
 export type WorldEventIngestBatchResult = {
   ok: boolean;
   schema: "helix.world_event_batch_ingest_response.v1";
+  event_count: number;
+  appended_count: number;
+  suppressed_count: number;
+  batch_receipts: HelixStandbyObservationBatchReceipt[];
   results: WorldEventIngestResult[];
 };
 
@@ -124,6 +142,23 @@ export type WorldEventIngestDebug = {
   dedupe_key?: string | null;
   seen_source?: WorldSourceSeen;
   quality?: WorldEventQualitySummary;
+};
+
+export type WorldEventAppendCandidate = {
+  event: HelixWorldEvent;
+  eventId: string;
+  threadId: string;
+  sessionId?: string | null;
+  traceId?: string | null;
+  roomId: string;
+  worldId?: string | null;
+  sourceId?: string | null;
+  graphId?: string | null;
+  observationRef: Record<string, unknown>;
+  salienceReason?: string | null;
+  saliencePriority?: "info" | "warn" | "critical" | "action" | null;
+  dedupeKey?: string | null;
+  evidenceRefs: string[];
 };
 
 type RoomRuntimeState = {
@@ -519,29 +554,77 @@ export const ingestWorldEvent = async (
           world_id: event.world_id,
         });
   const resolvedBinding = bindingResolution.binding;
-  const appendResult: Awaited<ReturnType<typeof appendStandbyObservationToThread>> =
-    options.appendToThread === false || bindingResolution.reason === "binding_mismatch"
-      ? { appended: false, reason: "no_binding" as const }
-      : await appendStandbyObservationToThread({
-          binding: resolvedBinding,
-          world_event: event,
-          signal,
-          state_projection: projection,
-          goal_hypotheses: goalHypotheses,
-          salience_receipt: salienceReceipt,
-          interjection_proposal: interjectionProposal,
-        });
-  const appended = appendResult.appended;
-  const threadId = appendResult.thread_id ?? resolvedBinding?.thread_id ?? explicitThreadId ?? null;
-  const turnId = appendResult.turn_id ?? resolvedBinding?.turn_id ?? explicitTurnId ?? null;
+  const appendBlockedReason =
+    bindingResolution.reason === "binding_mismatch"
+      ? "binding_mismatch"
+      : !resolvedBinding
+        ? "no_thread_context"
+        : resolvedBinding.mode === "observe_only"
+          ? "binding_observe_only"
+          : resolvedBinding.append_policy === "salient_only" && salienceReceipt?.should_notify_helix !== true
+            ? "not_salient"
+            : null;
+  const appendCandidate: WorldEventAppendCandidate | null =
+    options.appendToThread === false || appendBlockedReason || !resolvedBinding
+      ? null
+      : {
+          event,
+          eventId: signal.signal_id,
+          threadId: resolvedBinding.thread_id,
+          sessionId: resolvedBinding.session_id ?? options.sessionId ?? null,
+          traceId: resolvedBinding.trace_id ?? options.traceId ?? null,
+          roomId: resolvedBinding.room_id,
+          worldId: resolvedBinding.world_id ?? event.world_id,
+          sourceId: resolvedBinding.source_id ?? event.source_id ?? null,
+          graphId: resolvedBinding.graph_id ?? graphId,
+          observationRef: buildStandbyObservationRef({
+            binding: resolvedBinding,
+            world_event: event,
+            signal,
+            state_projection: projection,
+            goal_hypotheses: goalHypotheses,
+            salience_receipt: salienceReceipt,
+            interjection_proposal: interjectionProposal,
+          }),
+          salienceReason: salienceReceipt?.reason ?? null,
+          saliencePriority: salienceReceipt?.priority ?? null,
+          dedupeKey: salienceReceipt?.dedupe_key ?? null,
+          evidenceRefs: signal.evidence_refs,
+        };
+  const batchReceipt =
+    appendCandidate && !options.deferThreadAppend
+      ? await appendStandbyObservationBatch({
+          threadId: appendCandidate.threadId,
+          turnId: resolvedBinding?.turn_id ?? explicitTurnId ?? null,
+          sessionId: appendCandidate.sessionId,
+          traceId: appendCandidate.traceId,
+          roomId: appendCandidate.roomId,
+          now: options.now,
+          observations: [
+            {
+              eventId: appendCandidate.eventId,
+              worldId: appendCandidate.worldId,
+              sourceId: appendCandidate.sourceId,
+              graphId: appendCandidate.graphId,
+              observationRef: appendCandidate.observationRef,
+              salienceReason: appendCandidate.salienceReason,
+              saliencePriority: appendCandidate.saliencePriority,
+              dedupeKey: appendCandidate.dedupeKey,
+              evidenceRefs: appendCandidate.evidenceRefs,
+            },
+          ],
+        })
+      : null;
+  const batchDecision = batchReceipt?.decisions[0] ?? null;
+  const appended = Boolean(batchDecision?.appended);
+  const threadId = batchDecision?.thread_id ?? resolvedBinding?.thread_id ?? explicitThreadId ?? null;
+  const turnId = batchReceipt?.turn_id ?? resolvedBinding?.turn_id ?? explicitTurnId ?? null;
   const reason =
     appended
       ? null
-      : bindingResolution.reason === "binding_mismatch"
-        ? "binding_mismatch"
-        : appendResult.reason === "no_binding"
-        ? "no_thread_context"
-        : appendResult.reason;
+      : appendBlockedReason === "binding_observe_only"
+        ? "binding_observe_only"
+        : appendBlockedReason ?? (appendCandidate ? "batch_deferred" : "no_thread_context");
   const appendReason: WorldEventIngestDebug["append_reason"] = appended
     ? "appended"
     : reason === "binding_mismatch"
@@ -570,8 +653,31 @@ export const ingestWorldEvent = async (
     binding_id: debug.binding_id,
     thread_id: debug.thread_id,
     dedupe_key: debug.dedupe_key,
-    item_id: appendResult.item_id ?? null,
+    item_id: batchDecision?.observation_item_id ?? null,
+    batch_id: batchReceipt?.batch_id ?? null,
+    turn_id: batchReceipt?.turn_id ?? null,
   });
+  const appendDecision: HelixStandbyObservationAppendDecision = batchDecision ?? {
+    event_id: signal.signal_id,
+    world_id: event.world_id,
+    room_id: event.room_id,
+    source_id: event.source_id ?? null,
+    graph_id: graphId,
+    thread_id: threadId,
+    appendable: Boolean(appendCandidate),
+    appended: false,
+    salience_reason: salienceReceipt?.reason ?? null,
+    salience_priority: salienceReceipt?.priority ?? null,
+    append_reason: appendCandidate ? "salient_receipt" : null,
+    suppression_reason:
+      appendReason === "observe_only_binding"
+        ? "observe_only_binding"
+        : appendReason === "appended"
+          ? null
+          : appendReason,
+    dedupe_key: salienceReceipt?.dedupe_key ?? null,
+    observation_item_id: null,
+  };
 
   return {
     ok: true,
@@ -583,7 +689,7 @@ export const ingestWorldEvent = async (
     goal_hypothesis_ids: goalHypotheses.map((goal: SituationGoalHypothesis) => goal.hypothesis_id),
     thread_id: threadId,
     turn_id: turnId,
-    item_id: appendResult.item_id ?? null,
+    item_id: batchDecision?.observation_item_id ?? null,
     reason,
     message: appended
       ? "World event ingested and appended as a thread observation."
@@ -595,6 +701,9 @@ export const ingestWorldEvent = async (
     salience_receipt: salienceReceipt,
     interjection_proposal: interjectionProposal,
     debug,
+    append_decision: appendDecision,
+    batch_receipt: batchReceipt,
+    append_candidate: appendCandidate,
   };
 };
 
@@ -607,11 +716,93 @@ export const ingestWorldEventBatch = async (
     .sort((a: HelixWorldEvent, b: HelixWorldEvent) => a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type));
   const results: WorldEventIngestResult[] = [];
   for (const event of ordered) {
-    results.push(await ingestWorldEvent(event, options));
+    results.push(await ingestWorldEvent(event, { ...options, deferThreadAppend: true }));
   }
+  const candidates = results
+    .map((result: WorldEventIngestResult) => result.append_candidate)
+    .filter((candidate: WorldEventAppendCandidate | null | undefined): candidate is WorldEventAppendCandidate =>
+      Boolean(candidate),
+    );
+  const candidatesByThread = new Map<string, WorldEventAppendCandidate[]>();
+  for (const candidate of candidates) {
+    const key = `${candidate.threadId}:${candidate.sessionId ?? ""}:${candidate.traceId ?? ""}:${candidate.roomId}`;
+    const group = candidatesByThread.get(key) ?? [];
+    group.push(candidate);
+    candidatesByThread.set(key, group);
+  }
+
+  const batchReceipts: HelixStandbyObservationBatchReceipt[] = [];
+  for (const group of candidatesByThread.values()) {
+    const first = group[0];
+    const receipt = await appendStandbyObservationBatch({
+      threadId: first.threadId,
+      turnId: null,
+      sessionId: first.sessionId ?? null,
+      traceId: first.traceId ?? null,
+      roomId: first.roomId,
+      now: options.now,
+      observations: group.map((candidate: WorldEventAppendCandidate) => ({
+        eventId: candidate.eventId,
+        worldId: candidate.worldId,
+        sourceId: candidate.sourceId,
+        graphId: candidate.graphId,
+        observationRef: candidate.observationRef,
+        salienceReason: candidate.salienceReason,
+        saliencePriority: candidate.saliencePriority,
+        dedupeKey: candidate.dedupeKey,
+        evidenceRefs: candidate.evidenceRefs,
+      })),
+    });
+    batchReceipts.push(receipt);
+  }
+
+  const decisionsByEventId = new Map<string, { decision: HelixStandbyObservationAppendDecision; receipt: HelixStandbyObservationBatchReceipt }>();
+  for (const receipt of batchReceipts) {
+    for (const decision of receipt.decisions) {
+      decisionsByEventId.set(decision.event_id, { decision, receipt });
+    }
+  }
+
+  for (const result of results) {
+    const eventId = result.signal_id;
+    if (!eventId) continue;
+    const appendedDecision = decisionsByEventId.get(eventId);
+    if (!appendedDecision) continue;
+    result.appended = appendedDecision.decision.appended;
+    result.reason = appendedDecision.decision.appended ? null : result.reason;
+    result.thread_id = appendedDecision.decision.thread_id ?? result.thread_id;
+    result.turn_id = appendedDecision.receipt.turn_id ?? result.turn_id;
+    result.item_id = appendedDecision.decision.observation_item_id ?? result.item_id;
+    result.append_decision = appendedDecision.decision;
+    result.batch_receipt = appendedDecision.receipt;
+    if (result.debug) {
+      result.debug.append_decision = appendedDecision.decision.appended ? "appended" : "not_appended";
+      result.debug.append_reason = appendedDecision.decision.appended ? "appended" : result.debug.append_reason;
+      result.debug.thread_id = appendedDecision.decision.thread_id ?? result.debug.thread_id;
+    }
+    const candidate = result.append_candidate;
+    if (candidate) {
+      updateWorldSourceDebug(candidate.event, {
+        append_decision: appendedDecision.decision.appended ? "appended" : "not_appended",
+        append_reason: appendedDecision.decision.appended ? "appended" : result.debug?.append_reason ?? "not_salient",
+        salience_class: result.debug?.salience_class ?? "salience_candidate",
+        binding_id: result.debug?.binding_id ?? null,
+        thread_id: appendedDecision.decision.thread_id ?? null,
+        dedupe_key: appendedDecision.decision.dedupe_key ?? null,
+        item_id: appendedDecision.decision.observation_item_id ?? null,
+        batch_id: appendedDecision.receipt.batch_id,
+        turn_id: appendedDecision.receipt.turn_id ?? null,
+      });
+    }
+  }
+  const appendedCount = results.filter((result: WorldEventIngestResult) => result.appended).length;
   return {
     ok: true,
     schema: "helix.world_event_batch_ingest_response.v1",
+    event_count: results.length,
+    appended_count: appendedCount,
+    suppressed_count: results.length - appendedCount,
+    batch_receipts: batchReceipts,
     results,
   };
 };

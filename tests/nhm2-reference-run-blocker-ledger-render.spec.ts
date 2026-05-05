@@ -25,7 +25,15 @@ const ledger = () =>
       regionalSourceClosureEvidence: "regional.json",
       sourceToGeometryDivergenceReport: "divergence.md",
       tileCounterpartProvenanceAudit: "provenance.md",
+      sourceTensorArtifact: "source-tensor.json",
+      conservationArtifact: null,
       referenceRunValidation: "validation.json",
+    },
+    tileCounterpartSource: {
+      sourceTensorArtifactRef: "source-tensor.json",
+      sourceTensorAuthorityMode: "reconstituted_from_source_channels",
+      conservationStatus: "unknown",
+      qeiLinkageStatus: "UNKNOWN",
     },
     gateSummary: [
       {

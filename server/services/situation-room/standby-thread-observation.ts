@@ -21,7 +21,7 @@ export type StandbyObservationAppendReason =
 const hashShort = (value: unknown, size = 12): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
-const compactWorldEvent = (worldEvent?: HelixWorldEvent | null): Record<string, unknown> | null => {
+export const compactWorldEvent = (worldEvent?: HelixWorldEvent | null): Record<string, unknown> | null => {
   if (!worldEvent) return null;
   return {
     event_type: worldEvent.event_type,
@@ -36,7 +36,7 @@ const compactWorldEvent = (worldEvent?: HelixWorldEvent | null): Record<string, 
   };
 };
 
-const compactProjection = (
+export const compactProjection = (
   projection?: SituationStateProjection | null,
 ): Record<string, unknown> | null => {
   if (!projection) return null;
@@ -50,7 +50,7 @@ const compactProjection = (
   };
 };
 
-const compactGoals = (goals?: SituationGoalHypothesis[]): SituationGoalHypothesis[] =>
+export const compactGoals = (goals?: SituationGoalHypothesis[]): SituationGoalHypothesis[] =>
   (goals ?? []).slice(-6).map((goal: SituationGoalHypothesis) => ({
     ...goal,
     evidence_refs: goal.evidence_refs.slice(-8),
@@ -100,32 +100,7 @@ export async function appendStandbyObservationToThread(input: {
     `standby_observation:${hashShort([binding.binding_id, signalId, input.world_event?.ts])}`;
   const itemId = `standby_observation:${hashShort([binding.binding_id, signalId], 16)}`;
   const now = new Date().toISOString();
-  const observationRef = {
-    schema: "helix.standby_thread_observation.v1",
-    source: "minecraft_event",
-    room_id: binding.room_id,
-    source_id: binding.source_id ?? input.world_event?.source_id ?? null,
-    graph_id: binding.graph_id ?? input.signal?.graph_id ?? null,
-    world_id: binding.world_id ?? input.world_event?.world_id ?? null,
-    world_event: compactWorldEvent(input.world_event),
-    signal: input.signal
-      ? {
-          signal_id: input.signal.signal_id,
-          source: input.signal.source,
-          event_type: input.signal.event_type,
-          actor: input.signal.actor ?? null,
-          evidence_refs: input.signal.evidence_refs,
-          ts: input.signal.ts,
-        }
-      : null,
-    salience_receipt: input.salience_receipt ?? null,
-    interjection_proposal: input.interjection_proposal ?? null,
-    state_projection_summary: compactProjection(input.state_projection),
-    goal_hypotheses: compactGoals(input.goal_hypotheses),
-    append_policy: binding.append_policy,
-    context_policy: "explicit_attachment_only",
-    command_lane_enabled: false,
-  };
+  const observationRef = buildStandbyObservationRef(input);
 
   try {
     appendHelixThreadEvent({
@@ -206,4 +181,42 @@ export async function appendStandbyObservationToThread(input: {
       item_id: itemId,
     };
   }
+}
+
+export function buildStandbyObservationRef(input: {
+  binding: HelixSituationThreadBinding;
+  world_event?: HelixWorldEvent | null;
+  signal?: SituationEventSignal | null;
+  state_projection?: SituationStateProjection | null;
+  goal_hypotheses?: SituationGoalHypothesis[];
+  salience_receipt?: SituationSalienceReceipt | null;
+  interjection_proposal?: SituationInterjectionProposal | null;
+}): Record<string, unknown> {
+  const binding = input.binding;
+  return {
+    schema: "helix.standby_thread_observation.v1",
+    source: "minecraft_event",
+    room_id: binding.room_id,
+    source_id: binding.source_id ?? input.world_event?.source_id ?? null,
+    graph_id: binding.graph_id ?? input.signal?.graph_id ?? null,
+    world_id: binding.world_id ?? input.world_event?.world_id ?? null,
+    world_event: compactWorldEvent(input.world_event),
+    signal: input.signal
+      ? {
+          signal_id: input.signal.signal_id,
+          source: input.signal.source,
+          event_type: input.signal.event_type,
+          actor: input.signal.actor ?? null,
+          evidence_refs: input.signal.evidence_refs,
+          ts: input.signal.ts,
+        }
+      : null,
+    salience_receipt: input.salience_receipt ?? null,
+    interjection_proposal: input.interjection_proposal ?? null,
+    state_projection_summary: compactProjection(input.state_projection),
+    goal_hypotheses: compactGoals(input.goal_hypotheses),
+    append_policy: binding.append_policy,
+    context_policy: "explicit_attachment_only",
+    command_lane_enabled: false,
+  };
 }

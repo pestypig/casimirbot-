@@ -18,6 +18,8 @@ export type WorldSourceSeen = {
     thread_id?: string | null;
     dedupe_key?: string | null;
     item_id?: string | null;
+    batch_id?: string | null;
+    turn_id?: string | null;
   } | null;
 };
 

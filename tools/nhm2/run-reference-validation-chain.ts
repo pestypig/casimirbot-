@@ -51,6 +51,7 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const sourceClosure = required(args, "source-closure");
   const fullLoopAudit = required(args, "full-loop-audit");
   const qeiDossier = typeof args["qei-dossier"] === "string" ? args["qei-dossier"] : null;
+  const sourceInput = typeof args["source-input"] === "string" ? args["source-input"] : null;
   const literatureMap =
     typeof args["literature-map"] === "string"
       ? args["literature-map"]
@@ -59,6 +60,9 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const runId = required(args, "run-id");
   const auditOnly = args["audit-only"] === true ? ["--audit-only"] : [];
   const tileCounterpart = `${outRoot}/nhm2-tile-effective-counterpart.json`;
+  const sourceTensor = `${outRoot}/nhm2-tile-effective-full-tensor-source.json`;
+  const conservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
+  const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
   const divergenceReport = `${outRoot}/nhm2-source-to-geometry-divergence.md`;
   const provenanceAudit = `${outRoot}/nhm2-tile-counterpart-provenance.md`;
@@ -66,12 +70,41 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const ledger = `${outRoot}/nhm2-blocker-ledger-${runId}.json`;
   const ledgerReport = `${outRoot}/nhm2-blocker-ledger-${runId}.md`;
 
+  if (sourceInput != null) {
+    run("nhm2:publish-tile-effective-full-tensor-source", [
+      "--reference-run",
+      referenceRun,
+      "--source-input",
+      sourceInput,
+      ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
+      "--out",
+      sourceTensor,
+      ...auditOnly,
+    ]);
+    run("nhm2:publish-tile-counterpart-conservation", [
+      "--reference-run",
+      referenceRun,
+      "--tile-full-tensor-source",
+      sourceTensor,
+      "--out",
+      conservation,
+      ...auditOnly,
+    ]);
+    run("nhm2:audit-tile-counterpart-source-independence", [
+      "--tile-full-tensor-source",
+      sourceTensor,
+      "--out",
+      sourceIndependenceAudit,
+    ]);
+  }
+
   run("nhm2:publish-tile-effective-counterpart", [
     "--reference-run",
     referenceRun,
     "--source-closure",
     sourceClosure,
     ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
+    ...(sourceInput == null ? [] : ["--tile-full-tensor-source", sourceTensor, "--conservation", conservation]),
     "--out",
     tileCounterpart,
     ...auditOnly,
@@ -108,6 +141,7 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
       regionalEvidence,
       "--tile-effective-counterpart",
       tileCounterpart,
+      ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
       "--literature-map",
       literatureMap,
       "--out",
@@ -130,6 +164,9 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     divergenceReport,
     "--tile-provenance-audit",
     provenanceAudit,
+    ...(sourceInput == null
+      ? []
+      : ["--source-tensor-artifact", sourceTensor, "--conservation", conservation]),
     ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
     "--literature-map",
     literatureMap,

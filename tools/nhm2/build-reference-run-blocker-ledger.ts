@@ -13,6 +13,8 @@ import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossie
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import { isNhm2RegionalSourceClosureEvidenceArtifact } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { isNhm2TileEffectiveCounterpartArtifact } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import { isNhm2TileEffectiveFullTensorSourceArtifact } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
+import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 import {
   classifySourceToGeometryDivergence,
 } from "./report-source-to-geometry-divergence";
@@ -117,10 +119,10 @@ const classifyGate = (gateId: string): Nhm2BlockerClass => {
   if (id.includes("claim")) return "claim_lock";
   if (id.includes("latest") || id.includes("profile")) return "provenance";
   if (id.includes("observer")) return "observer";
+  if (id.includes("qei")) return "qei";
   if (id.includes("tile_counterpart") || id.includes("tile_effective")) return "tile_counterpart";
   if (id.includes("source_closure") || id.includes("regional")) return "source_closure";
   if (id.includes("tensor")) return "tensor_authority";
-  if (id.includes("qei")) return "qei";
   if (id.includes("reproducibility")) return "reproducibility";
   if (id.includes("certificate")) return "certificate_policy";
   if (id.includes("literature")) return "literature_boundary";
@@ -249,10 +251,10 @@ const primaryBlockerClass = (
   const priority: Nhm2BlockerClass[] = [
     "provenance",
     "tile_counterpart",
+    "qei",
     "source_closure",
     "tensor_authority",
     "observer",
-    "qei",
     "reproducibility",
     "certificate_policy",
     "literature_boundary",
@@ -298,6 +300,8 @@ export const buildReferenceRunBlockerLedger = (args: {
   sourceDivergenceReportPath?: string | null;
   tileProvenanceAuditPath?: string | null;
   qeiDossierPath?: string | null;
+  sourceTensorArtifactPath?: string | null;
+  conservationArtifactPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2BlockerLedgerArtifact => {
   const paths = [
@@ -309,6 +313,8 @@ export const buildReferenceRunBlockerLedger = (args: {
     args.sourceDivergenceReportPath,
     args.tileProvenanceAuditPath,
     args.qeiDossierPath,
+    args.sourceTensorArtifactPath,
+    args.conservationArtifactPath,
     args.literatureMapPath,
   ];
   if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
@@ -347,6 +353,20 @@ export const buildReferenceRunBlockerLedger = (args: {
   const literatureMap = readJson(resolvePath(args.repoRoot, args.literatureMapPath));
   if (!isLiteratureClaimMap(literatureMap)) {
     throw new Error("literature map must include support and non-support boundaries");
+  }
+  const sourceTensor =
+    args.sourceTensorArtifactPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.sourceTensorArtifactPath));
+  if (sourceTensor != null && !isNhm2TileEffectiveFullTensorSourceArtifact(sourceTensor)) {
+    throw new Error("source tensor artifact must be nhm2_tile_effective_full_tensor_source/v1");
+  }
+  const conservation =
+    args.conservationArtifactPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.conservationArtifactPath));
+  if (conservation != null && !isNhm2TileCounterpartConservationArtifact(conservation)) {
+    throw new Error("conservation artifact must be nhm2_tile_counterpart_conservation/v1");
   }
 
   const gateSummary = validation.gates.map((entry: Nhm2ReferenceRunValidationGate) => ({
@@ -406,7 +426,21 @@ export const buildReferenceRunBlockerLedger = (args: {
       regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath,
       sourceToGeometryDivergenceReport: args.sourceDivergenceReportPath ?? null,
       tileCounterpartProvenanceAudit: args.tileProvenanceAuditPath ?? null,
+      sourceTensorArtifact: args.sourceTensorArtifactPath ?? null,
+      conservationArtifact: args.conservationArtifactPath ?? null,
       referenceRunValidation: args.validationPath,
+    },
+    tileCounterpartSource: {
+      sourceTensorArtifactRef: args.sourceTensorArtifactPath ?? tile.sourceTensorArtifactRef ?? null,
+      sourceTensorAuthorityMode:
+        (isNhm2TileEffectiveFullTensorSourceArtifact(sourceTensor)
+          ? sourceTensor.sourceModel.sourceModelClass
+          : tile.sourceTensorAuthorityMode) ?? null,
+      conservationStatus:
+        (isNhm2TileCounterpartConservationArtifact(conservation)
+          ? conservation.overallState
+          : tile.conservationStatus) ?? null,
+      qeiLinkageStatus: tile.qeiApplicabilityStatus,
     },
     gateSummary,
     regionalBlockers,
@@ -463,6 +497,8 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     sourceDivergenceReportPath: asString(args["source-divergence-report"]),
     tileProvenanceAuditPath: asString(args["tile-provenance-audit"]),
     qeiDossierPath: asString(args["qei-dossier"]),
+    sourceTensorArtifactPath: asString(args["source-tensor-artifact"]),
+    conservationArtifactPath: asString(args.conservation),
     literatureMapPath: args["literature-map"] as string,
     outPath: args.out as string,
     auditOnly: args["audit-only"] === true,

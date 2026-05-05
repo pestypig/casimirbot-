@@ -41,11 +41,14 @@
       "claimSupport": [
         "natario_zero_expansion_geometry_context",
         "shift_family_context",
+        "zero_expansion_warp_geometry_context",
+        "natario_shift_family_context",
         "zero_expansion_shift_family_context",
         "global_and_optical_properties_context"
       ],
       "nonSupport": [
         "does_not_validate_nhm2_source_closure",
+        "does_not_validate_nhm2_source_tensor",
         "does_not_validate_tile_effective_counterpart",
         "does_not_validate_nhm2_source_mechanism",
         "does_not_remove_negative_energy_or_horizon_concerns",
@@ -58,6 +61,7 @@
       "url": "https://arxiv.org/abs/gr-qc/9702026",
       "claimSupport": [
         "warp_metrics_negative_energy_qi_guardrail",
+        "warp_metric_negative_energy_qi_guardrail",
         "negative_energy_quantum_inequality_guardrail_for_warp_metrics",
         "warp_drive_energy_condition_risk_context"
       ],
@@ -67,6 +71,7 @@
         "does_not_validate_tile_effective_counterpart",
         "does_not_validate_tile_effective_source",
         "does_not_allow_predictive_warp_claims",
+        "warns_against_negative_energy_overclaim",
         "does_not_validate_transport"
       ]
     },

@@ -28,7 +28,15 @@ const validLedger = () =>
       regionalSourceClosureEvidence: "regional.json",
       sourceToGeometryDivergenceReport: null,
       tileCounterpartProvenanceAudit: null,
+      sourceTensorArtifact: null,
+      conservationArtifact: null,
       referenceRunValidation: "validation.json",
+    },
+    tileCounterpartSource: {
+      sourceTensorArtifactRef: null,
+      sourceTensorAuthorityMode: null,
+      conservationStatus: null,
+      qeiLinkageStatus: null,
     },
     gateSummary: [
       {

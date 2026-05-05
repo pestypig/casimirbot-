@@ -61,7 +61,15 @@ export type Nhm2BlockerLedgerArtifact = {
     regionalSourceClosureEvidence: string | null;
     sourceToGeometryDivergenceReport: string | null;
     tileCounterpartProvenanceAudit: string | null;
+    sourceTensorArtifact: string | null;
+    conservationArtifact: string | null;
     referenceRunValidation: string | null;
+  };
+  tileCounterpartSource: {
+    sourceTensorArtifactRef: string | null;
+    sourceTensorAuthorityMode: string | null;
+    conservationStatus: string | null;
+    qeiLinkageStatus: string | null;
   };
   gateSummary: Array<{
     gateId: string;
@@ -282,6 +290,9 @@ export const isNhm2BlockerLedgerArtifact = (
   const literature = isRecord(record?.literatureClaimBoundary)
     ? record?.literatureClaimBoundary
     : null;
+  const tileCounterpartSource = isRecord(record?.tileCounterpartSource)
+    ? record?.tileCounterpartSource
+    : null;
   if (
     record == null ||
     record.artifactId !== NHM2_BLOCKER_LEDGER_ARTIFACT_ID ||
@@ -310,7 +321,14 @@ export const isNhm2BlockerLedgerArtifact = (
     !isNullableText(refs.regionalSourceClosureEvidence) ||
     !isNullableText(refs.sourceToGeometryDivergenceReport) ||
     !isNullableText(refs.tileCounterpartProvenanceAudit) ||
+    !isNullableText(refs.sourceTensorArtifact) ||
+    !isNullableText(refs.conservationArtifact) ||
     !isNullableText(refs.referenceRunValidation) ||
+    tileCounterpartSource == null ||
+    !isNullableText(tileCounterpartSource.sourceTensorArtifactRef) ||
+    !isNullableText(tileCounterpartSource.sourceTensorAuthorityMode) ||
+    !isNullableText(tileCounterpartSource.conservationStatus) ||
+    !isNullableText(tileCounterpartSource.qeiLinkageStatus) ||
     !Array.isArray(record.gateSummary) ||
     !record.gateSummary.every(isGate) ||
     !Array.isArray(record.regionalBlockers) ||

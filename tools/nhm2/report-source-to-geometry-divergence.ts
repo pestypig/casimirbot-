@@ -97,10 +97,18 @@ export const classifySourceToGeometryDivergence = (
   ) {
     return "tensor_authority_insufficient";
   }
-  if (blockers.has("qei_not_promotion_safe") || blockers.has("provenance_missing")) {
+  if (
+    blockers.has("qei_not_promotion_safe") ||
+    blockers.has("qei_dossier_not_pass") ||
+    blockers.has("provenance_missing")
+  ) {
     return "qei_or_provenance_missing";
   }
-  if (blockers.has("conservation_missing") || blockers.has("conservation_failed")) {
+  if (
+    blockers.has("conservation_missing") ||
+    blockers.has("conservation_failed") ||
+    blockers.has("conservation_unknown")
+  ) {
     return "conservation_missing_or_fail";
   }
   if (region.residuals.pass === false) return "residual_exceeded";

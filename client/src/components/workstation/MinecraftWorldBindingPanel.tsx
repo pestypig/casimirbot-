@@ -19,6 +19,8 @@ export type MinecraftWorldSourceView = {
     thread_id?: string | null;
     dedupe_key?: string | null;
     item_id?: string | null;
+    batch_id?: string | null;
+    turn_id?: string | null;
   } | null;
 };
 
@@ -123,6 +125,23 @@ export function MinecraftWorldBindingPanel({
         <div className="rounded border border-white/10 bg-slate-950/70 p-2">
           <p className="text-[10px] uppercase text-slate-500">Last item</p>
           <p className="mt-1 break-all text-xs text-slate-300">{detectedSource?.latest_debug?.item_id ?? "none"}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <div className="rounded border border-white/10 bg-slate-950/70 p-2">
+          <p className="text-[10px] uppercase text-slate-500">Last batch</p>
+          <p className="mt-1 break-all text-xs text-slate-300">{detectedSource?.latest_debug?.batch_id ?? "none"}</p>
+        </div>
+        <div className="rounded border border-white/10 bg-slate-950/70 p-2">
+          <p className="text-[10px] uppercase text-slate-500">Aux turn</p>
+          <p className="mt-1 break-all text-xs text-slate-300">{detectedSource?.latest_debug?.turn_id ?? "none"}</p>
+        </div>
+        <div className="rounded border border-white/10 bg-slate-950/70 p-2">
+          <p className="text-[10px] uppercase text-slate-500">Thread</p>
+          <p className="mt-1 break-all text-xs text-slate-300">
+            {detectedSource?.latest_debug?.thread_id ?? binding?.thread_id ?? "none"}
+          </p>
         </div>
       </div>
 

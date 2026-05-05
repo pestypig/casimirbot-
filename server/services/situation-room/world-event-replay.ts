@@ -5,7 +5,9 @@ import type {
   SituationStateProjection,
 } from "@shared/helix-situation-standby";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import type { HelixStandbyObservationBatchReceipt } from "@shared/helix-standby-observation-batch";
 import {
+  ingestWorldEventBatch,
   ingestWorldEvent,
   resetWorldEventIngestState,
   type WorldEventIngestResult,
@@ -20,11 +22,16 @@ export type WorldEventReplayResult = {
   goal_hypotheses: SituationGoalHypothesis[];
   salience_receipts: SituationSalienceReceipt[];
   interjection_proposals: SituationInterjectionProposal[];
+  batch_receipts?: HelixStandbyObservationBatchReceipt[];
 };
 
 export const replayWorldEvents = async (args: {
   roomId?: string | null;
   reset?: boolean;
+  dryRun?: boolean;
+  forceThreadId?: string | null;
+  forceRoomId?: string | null;
+  deterministicNow?: string | null;
   events: HelixWorldEvent[];
 }): Promise<WorldEventReplayResult> => {
   if (args.reset !== false) {
@@ -33,15 +40,23 @@ export const replayWorldEvents = async (args: {
   const ordered = args.events
     .slice()
     .map((event: HelixWorldEvent): HelixWorldEvent =>
-      args.roomId ? { ...event, room_id: args.roomId } : event,
+      args.forceRoomId || args.roomId ? { ...event, room_id: args.forceRoomId ?? args.roomId ?? event.room_id } : event,
     )
     .sort(
       (a: HelixWorldEvent, b: HelixWorldEvent) =>
         a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type),
     );
-  const results: WorldEventIngestResult[] = [];
-  for (const event of ordered) {
-    results.push(await ingestWorldEvent(event, { appendToThread: false }));
+  const batch = args.dryRun === false && args.forceThreadId
+    ? await ingestWorldEventBatch(ordered, {
+        threadId: args.forceThreadId ?? null,
+        now: args.deterministicNow ? () => new Date(args.deterministicNow ?? "") : undefined,
+      })
+    : null;
+  const results: WorldEventIngestResult[] = batch?.results ?? [];
+  if (!batch) {
+    for (const event of ordered) {
+      results.push(await ingestWorldEvent(event, { appendToThread: false }));
+    }
   }
 
   const projections = results
@@ -80,5 +95,6 @@ export const replayWorldEvents = async (args: {
           proposal: SituationInterjectionProposal | null | undefined,
         ): proposal is SituationInterjectionProposal => Boolean(proposal),
       ),
+    batch_receipts: batch?.batch_receipts ?? [],
   };
 };

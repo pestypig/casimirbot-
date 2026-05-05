@@ -989,14 +989,19 @@ const main = (): void => {
   const referenceRun = readJsonIfExists(resolveRepoPath(repoRoot, referenceRunPath));
   const literaturePath = resolveRepoPath(
     repoRoot,
-    "docs/research/nhm2-literature-claim-map.v1.json",
+    asString(args["literature-map"]) ?? "docs/research/nhm2-literature-claim-map.v1.json",
   );
   const regionalEvidencePath = asString(args["regional-evidence"]);
   const tileCounterpartPath = asString(args["tile-effective-counterpart"]);
+  const qeiDossierPath = asString(args["qei-dossier"]);
   const validation = validateNhm2ReferenceRun({
     referenceRun,
     repoRoot,
     literatureClaimMap: readJsonIfExists(literaturePath),
+    qeiDossier:
+      qeiDossierPath == null
+        ? null
+        : readJsonIfExists(resolveRepoPath(repoRoot, qeiDossierPath)),
     regionalSourceClosureEvidence:
       regionalEvidencePath == null
         ? null

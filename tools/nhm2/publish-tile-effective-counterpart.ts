@@ -19,6 +19,11 @@ import {
   type Nhm2TileEffectiveCounterpartRegion,
   type Nhm2TileEffectiveCounterpartTensorAuthorityMode,
 } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import {
+  isNhm2TileEffectiveFullTensorSourceArtifact,
+  type Nhm2TileEffectiveFullTensorSourceArtifact,
+} from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
+import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 
 const TILE_COUNTERPART_LITERATURE_REFS = [
   "natario_2001_zero_expansion",
@@ -276,15 +281,94 @@ const makeRegion = (
   };
 };
 
+const mapSourceDerivationMode = (
+  mode: Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number]["provenance"]["derivationMode"],
+): Nhm2TileEffectiveCounterpartRegion["provenance"]["derivationMode"] => {
+  if (mode === "metric_echo") return "metric_echo";
+  if (mode === "diagonal_proxy") return "diagonal_proxy";
+  if (mode === "source_model_direct_full_tensor") return "tile_model_direct_full_tensor";
+  if (mode === "source_model_reconstituted_full_tensor") return "tile_model_reconstituted_full_tensor";
+  return "unknown";
+};
+
+const makeRegionFromFullTensorSource = (
+  regionId: Nhm2RegionalSourceClosureRegionId,
+  sourceRegion: Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number] | null,
+  sourceArtifact: Nhm2TileEffectiveFullTensorSourceArtifact,
+  qeiStatus: "PASS" | "REVIEW" | "FAIL" | "UNKNOWN",
+  conservationStatus: "pass" | "review" | "fail" | "missing" | "unknown",
+): Nhm2TileEffectiveCounterpartRegion => {
+  if (sourceRegion == null) return makeMissingRegion(regionId);
+  const sourceSide =
+    sourceArtifact.sourceModel.sourceSideOnly &&
+    sourceArtifact.sourceModel.notDerivedFromMetricRequiredTensor &&
+    sourceArtifact.sourceModel.metricRequiredInputRefs.length === 0 &&
+    sourceRegion.provenance.notDerivedFromMetricRequiredTensor &&
+    sourceRegion.provenance.derivationMode !== "metric_echo";
+  const fullAuthority =
+    sourceRegion.tensorAuthorityMode === "full_tensor" ||
+    sourceRegion.tensorAuthorityMode === "symmetric_full_tensor";
+  const blockers = [...sourceRegion.blockers];
+  if (!sourceSide) blockers.push("metric_required_derivation_not_allowed");
+  if (!fullAuthority) blockers.push("full_tensor_authority_missing");
+  if (qeiStatus !== "PASS") blockers.push("qei_not_promotion_safe");
+  if (conservationStatus !== "pass") blockers.push("conservation_unknown");
+  const comparisonRole =
+    sourceSide && fullAuthority
+      ? "tile_effective_counterpart"
+      : sourceRegion.provenance.derivationMode === "metric_echo"
+        ? "metric_echo_diagnostic_only"
+        : "unknown";
+  return {
+    regionId,
+    status:
+      sourceRegion.status === "fail" || !sourceSide
+        ? "fail"
+        : blockers.length > 0
+          ? "review"
+          : "pass",
+    comparisonRole,
+    tensorAuthorityMode:
+      sourceRegion.tensorAuthorityMode === "metric_echo_forbidden"
+        ? "unknown"
+        : sourceRegion.tensorAuthorityMode,
+    tensor: sourceRegion.tensor,
+    chartRef: sourceRegion.chartRef,
+    unitsRef: sourceRegion.unitsRef,
+    regionMaskRef: sourceRegion.regionMaskRef,
+    aggregationMode: sourceRegion.aggregationMode,
+    normalizationBasis: sourceRegion.normalizationBasis,
+    sampleCount: sourceRegion.sampleCount,
+    provenance: {
+      producerModule: sourceRegion.provenance.producerModule,
+      producerFunction: sourceRegion.provenance.producerFunction,
+      inputRefs: sourceRegion.provenance.inputRefs,
+      sourceModelId: sourceArtifact.sourceModel.sourceModelId,
+      sourceModelVersion: sourceArtifact.sourceModel.sourceModelVersion,
+      derivationMode: mapSourceDerivationMode(sourceRegion.provenance.derivationMode),
+      notDerivedFromMetricRequiredTensor: sourceSide,
+    },
+    blockers,
+  };
+};
+
 export const publishTileEffectiveCounterpart = (args: {
   repoRoot: string;
   referenceRunPath: string;
   sourceClosurePath: string;
   outPath: string;
   qeiDossierPath?: string | null;
+  tileFullTensorSourcePath?: string | null;
+  conservationPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2TileEffectiveCounterpartArtifact => {
-  const paths = [args.referenceRunPath, args.sourceClosurePath, args.qeiDossierPath ?? ""];
+  const paths = [
+    args.referenceRunPath,
+    args.sourceClosurePath,
+    args.qeiDossierPath ?? "",
+    args.tileFullTensorSourcePath ?? "",
+    args.conservationPath ?? "",
+  ];
   if (!args.auditOnly && paths.some((path) => path.length > 0 && pathUsesLatestAlias(path))) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -300,6 +384,30 @@ export const publishTileEffectiveCounterpart = (args: {
       ? readJson(resolvePath(args.repoRoot, args.qeiDossierPath))
       : null;
   const qei = isNhm2QeiDossierArtifact(qeiDossier) ? qeiDossier : null;
+  const fullTensorSource =
+    args.tileFullTensorSourcePath != null &&
+    existsSync(resolvePath(args.repoRoot, args.tileFullTensorSourcePath))
+      ? readJson(resolvePath(args.repoRoot, args.tileFullTensorSourcePath))
+      : null;
+  if (fullTensorSource != null && !isNhm2TileEffectiveFullTensorSourceArtifact(fullTensorSource)) {
+    throw new Error("tile full tensor source must be nhm2_tile_effective_full_tensor_source/v1");
+  }
+  const conservation =
+    args.conservationPath != null && existsSync(resolvePath(args.repoRoot, args.conservationPath))
+      ? readJson(resolvePath(args.repoRoot, args.conservationPath))
+      : null;
+  if (conservation != null && !isNhm2TileCounterpartConservationArtifact(conservation)) {
+    throw new Error("conservation must be nhm2_tile_counterpart_conservation/v1");
+  }
+  const sourceArtifact = isNhm2TileEffectiveFullTensorSourceArtifact(fullTensorSource)
+    ? fullTensorSource
+    : null;
+  const conservationArtifact = isNhm2TileCounterpartConservationArtifact(conservation)
+    ? conservation
+    : null;
+  const sourceRegionMap = new Map(
+    sourceArtifact?.regions.map((region) => [region.regionId, region]) ?? [],
+  );
 
   const regionMap = new Map<string, Record<string, unknown>>();
   const sourceRegions = getNested(sourceClosure, ["regionComparisons", "regions"]);
@@ -318,6 +426,10 @@ export const publishTileEffectiveCounterpart = (args: {
     expectedProfileId: referenceRun.selectedFamily.expectedProfileId,
     laneId: "nhm2_shift_lapse",
     sourceAuthorityMode: "unknown",
+    sourceTensorArtifactRef: args.tileFullTensorSourcePath ?? null,
+    sourceTensorAuthorityMode: sourceArtifact?.sourceModel.sourceModelClass ?? null,
+    conservationRef: args.conservationPath ?? null,
+    conservationStatus: conservationArtifact?.overallState ?? "unknown",
     qeiDossierRef: args.qeiDossierPath ?? null,
     qeiApplicabilityStatus: qei?.qeiApplicabilityStatus ?? "UNKNOWN",
     quantumStateAssumptions: qei?.quantumStateAssumptions ?? [],
@@ -334,7 +446,15 @@ export const publishTileEffectiveCounterpart = (args: {
       momentumResidualLInf: null,
     },
     regions: NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) =>
-      makeRegion(regionId, regionMap.get(regionId) ?? null, sourceClosure),
+      sourceArtifact == null
+        ? makeRegion(regionId, regionMap.get(regionId) ?? null, sourceClosure)
+        : makeRegionFromFullTensorSource(
+            regionId,
+            sourceRegionMap.get(regionId) ?? null,
+            sourceArtifact,
+            qei?.qeiApplicabilityStatus ?? "UNKNOWN",
+            conservationArtifact?.overallState ?? "unknown",
+          ),
     ),
     literatureRefs: TILE_COUNTERPART_LITERATURE_REFS,
   });
@@ -361,6 +481,8 @@ const main = (): void => {
     referenceRunPath,
     sourceClosurePath,
     qeiDossierPath: asString(args["qei-dossier"]),
+    tileFullTensorSourcePath: asString(args["tile-full-tensor-source"]),
+    conservationPath: asString(args.conservation),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

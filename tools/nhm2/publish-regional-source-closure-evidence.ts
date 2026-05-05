@@ -306,7 +306,11 @@ const makeGlobalRegion = (
         ? sourceClosure.status
         : "review",
     comparisonBasisStatus:
-      sourceClosure.comparisonBasisStatus === "same_basis" ? "same_basis" : "unknown",
+      tileCounterpartRegion != null
+        ? "same_basis"
+        : sourceClosure.comparisonBasisStatus === "same_basis"
+          ? "same_basis"
+          : "unknown",
     metricRequired: {
       tensorRef: asString(tensorRefs?.metricRequired),
       tensorAuthorityMode: inferAuthorityMode(metric, JSON.stringify(tensors?.metricRequired)),
@@ -391,7 +395,20 @@ const makeRegionalRegion = (
   const metric = normalizeTensor(sourceRegion.metricRequiredTensor);
   const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(sourceRegion.tileEffectiveTensor);
   const metricMeta = extractSideMeta(sourceRegion, "metric");
-  const tileMeta = extractSideMeta(sourceRegion, "tile");
+  const legacyTileMeta = extractSideMeta(sourceRegion, "tile");
+  const tileMeta =
+    tileCounterpartRegion == null
+      ? legacyTileMeta
+      : {
+          ...legacyTileMeta,
+          chartRef: tileCounterpartRegion.chartRef,
+          unitsRef: tileCounterpartRegion.unitsRef,
+          aggregationMode: tileCounterpartRegion.aggregationMode,
+          normalizationBasis: tileCounterpartRegion.normalizationBasis,
+          sampleCount: tileCounterpartRegion.sampleCount,
+          comparisonRole: tileCounterpartRegion.comparisonRole,
+          evidenceText: JSON.stringify(tileCounterpartRegion),
+        };
   const role = tileCounterpartRegion?.comparisonRole ?? normalizeComparisonRole(tileMeta.comparisonRole);
   const comparisonBasisStatus = basisStatusFor(
     asString(sourceRegion.comparisonBasisStatus),

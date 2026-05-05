@@ -76,6 +76,11 @@ export type Nhm2TileEffectiveCounterpartArtifact = {
   sourceAuthorityMode: Nhm2TileEffectiveCounterpartSourceAuthorityMode;
   promotionAllowed: false;
   physicalMechanismClaimAllowed: false;
+  validationClaimAllowed: false;
+  sourceTensorArtifactRef?: string | null;
+  sourceTensorAuthorityMode?: string | null;
+  conservationRef?: string | null;
+  conservationStatus?: "pass" | "review" | "fail" | "missing" | "unknown";
   qeiDossierRef: string | null;
   qeiApplicabilityStatus: "PASS" | "REVIEW" | "FAIL" | "UNKNOWN";
   quantumStateAssumptions: string[];
@@ -104,6 +109,7 @@ export type BuildNhm2TileEffectiveCounterpartArtifactInput = Omit<
   | "claimEffect"
   | "promotionAllowed"
   | "physicalMechanismClaimAllowed"
+  | "validationClaimAllowed"
   | "reasonCodes"
 >;
 
@@ -307,6 +313,7 @@ export const buildNhm2TileEffectiveCounterpartArtifact = (
     sourceAuthorityMode: input.sourceAuthorityMode === "unknown" ? aggregateSourceAuthority(regions) : input.sourceAuthorityMode,
     promotionAllowed: false,
     physicalMechanismClaimAllowed: false,
+    validationClaimAllowed: false,
     regions,
     reasonCodes: Array.from(reasonCodes),
   };
@@ -368,6 +375,7 @@ export const isNhm2TileEffectiveCounterpartArtifact = (
     !isSourceAuthorityMode(record.sourceAuthorityMode) ||
     record.promotionAllowed !== false ||
     record.physicalMechanismClaimAllowed !== false ||
+    record.validationClaimAllowed !== false ||
     !isNullableText(record.qeiDossierRef) ||
     !isQeiApplicability(record.qeiApplicabilityStatus) ||
     !Array.isArray(record.quantumStateAssumptions) ||
