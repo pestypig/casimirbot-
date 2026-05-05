@@ -32,6 +32,11 @@ export type SituationGraphSetupIntentKind =
   | "action_item_monitor"
   | "minecraft_situation_monitor"
   | "browser_video_translation"
+  | "standby_voice_chat_monitor"
+  | "standby_translation_mediator"
+  | "minecraft_world_monitor"
+  | "minecraft_goal_watch"
+  | "screen_share_research_watch"
   | "custom_graph";
 
 export type SituationGraphSetupPlan = {
@@ -86,6 +91,11 @@ export const classifySituationGraphSetupIntentKind = (prompt: string): Situation
     return "prompt_composer_from_room";
   }
   if (/\b(?:action\s+items?|to-?dos?)\b/.test(normalized)) return "action_item_monitor";
+  if (/\bminecraft\b.*\b(?:goal|objective|track)\b/.test(normalized)) return "minecraft_goal_watch";
+  if (/\b(?:stand\s*by|tell me when something important happens|watch)\b.*\bminecraft\b/.test(normalized)) return "minecraft_world_monitor";
+  if (/\b(?:stand\s*by|watch)\b.*\b(?:translation|mediate|mediator)\b/.test(normalized)) return "standby_translation_mediator";
+  if (/\b(?:stand\s*by|tell me when something important happens)\b.*\b(?:voice\s+chat|discord|call|conversation)\b/.test(normalized)) return "standby_voice_chat_monitor";
+  if (/\b(?:screen\s*share|research\s+screen|monitor\s+this\s+screen)\b/.test(normalized)) return "screen_share_research_watch";
   if (/\bminecraft\b|\bdanger\b/.test(normalized)) return "minecraft_situation_monitor";
   if (/\b(?:meeting\s+summary|summari[sz]e\s+(?:this\s+)?(?:call|meeting|conversation)|summary)\b/.test(normalized)) return "meeting_summary";
   if (/\b(?:video|browser\s+video)\b.*\btranslat/.test(normalized)) return "browser_video_translation";
@@ -166,9 +176,29 @@ export const buildSituationGraphSetupPlan = (args: {
     ...buildSpeakerBindings(speakerMappings),
     output_mode: "visual_only",
   };
-  if (intentKind === "voice_chat_monitor" || intentKind === "minecraft_situation_monitor") {
+  if (
+    intentKind === "voice_chat_monitor" ||
+    intentKind === "minecraft_situation_monitor" ||
+    intentKind === "standby_voice_chat_monitor" ||
+    intentKind === "minecraft_world_monitor" ||
+    intentKind === "minecraft_goal_watch" ||
+    intentKind === "screen_share_research_watch"
+  ) {
     bindings.monitor_mode = intentKind === "minecraft_situation_monitor" ? "danger" : "activity";
-    bindings.interjection_policy = intentKind === "minecraft_situation_monitor" ? "high_salience" : "direct_address_only";
+    bindings.interjection_policy =
+      intentKind === "minecraft_situation_monitor" || intentKind === "minecraft_world_monitor" || intentKind === "minecraft_goal_watch"
+        ? "high_salience"
+        : "direct_address_only";
+    bindings.standby_mode =
+      intentKind === "minecraft_world_monitor" || intentKind === "minecraft_goal_watch"
+        ? "game_master"
+        : intentKind === "screen_share_research_watch"
+          ? "research_assistant"
+          : "high_salience";
+  }
+  if (intentKind === "standby_translation_mediator") {
+    bindings.standby_mode = "translation_mediator";
+    bindings.output_mode = "dual";
   }
   if (intentKind === "browser_video_translation") {
     bindings.target_language = readString((args.workspaceSnapshot?.situationRoomContext as Record<string, unknown> | undefined)?.target_language) ?? "en";

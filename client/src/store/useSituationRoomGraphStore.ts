@@ -116,6 +116,7 @@ const defaultColumnForNodeType = (type: SituationGraphNodeType): SituationGraphN
 
 const graphNodeTypeForCapability = (capabilityId: string, capability?: HelixGraphCapability): SituationGraphNodeType => {
   if (capabilityId === "source.mic_audio") return "source.audio.mic";
+  if (capabilityId === "source.screen_summary" || capabilityId === "source.minecraft_events") return "source.screen";
   if (capabilityId.startsWith("source.")) return "source.audio.display";
   if (capabilityId === "identity.speaker_profile_map" || capabilityId === "identity.speaker_split") return "speaker.identity";
   if (capabilityId === "policy.unknown_speaker_filter") return "speaker.filter";

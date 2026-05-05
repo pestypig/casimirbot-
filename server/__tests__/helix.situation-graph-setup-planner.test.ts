@@ -53,6 +53,12 @@ describe("situation graph setup planner", () => {
     expect(classifySituationGraphSetupIntentKind("Prompt composer pipeline for this voice chat")).toBe(
       "prompt_composer_from_room",
     );
+    expect(classifySituationGraphSetupIntentKind("Stand by and watch this Discord session. Tell me when something important happens.")).toBe(
+      "standby_voice_chat_monitor",
+    );
+    expect(classifySituationGraphSetupIntentKind("Stand by and watch Minecraft. Tell me when danger happens.")).toBe(
+      "minecraft_world_monitor",
+    );
   });
 
   it("keeps job and panel negative controls out of graph setup", () => {
@@ -128,5 +134,29 @@ describe("situation graph setup planner", () => {
         "speaker_b_native_language",
       ]),
     );
+  });
+
+  it("plans standby monitor graphs with standby mode bindings", () => {
+    const plan = buildSituationGraphSetupPlan({
+      prompt: "Stand by and watch this Discord session. Tell me when something important happens.",
+      workspaceSnapshot: activeCaptureSnapshot,
+      setupCallId: "setup:standby",
+    });
+
+    expect(plan).toMatchObject({
+      recipe_id: "standby_voice_chat_monitor",
+      missing_requirements: [],
+      missing_bindings: [],
+      bindings: {
+        standby_mode: "high_salience",
+      },
+      command_lane_enabled: false,
+    });
+    expect(plan?.next_actions[0]).toMatchObject({
+      action_id: "create_graph_from_recipe",
+      args: {
+        recipe_id: "standby_voice_chat_monitor",
+      },
+    });
   });
 });

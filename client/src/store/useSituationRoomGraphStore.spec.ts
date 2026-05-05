@@ -5,6 +5,7 @@ import { HELIX_ASK_LIVE_EVENT_BUS_EVENT } from "@/lib/helix/liveEventsBus";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomStore, type SituationRoomSource } from "@/store/useSituationRoomStore";
+import type { SituationGraphEdge, SituationGraphNode } from "@shared/helix-situation-graph";
 
 vi.mock("@/lib/helix/display-audio-capture", () => ({
   startDisplayAudioSituationSession: vi.fn(),
@@ -147,10 +148,10 @@ describe("useSituationRoomGraphStore", () => {
     expect(receipt.edge_ids.length).toBeGreaterThan(3);
     expect(receipt.job_ids).toHaveLength(2);
     const graph = useSituationRoomGraphStore.getState().graphs[receipt.graph_id];
-    expect(graph?.nodes.some((node) => node.capability_id === "identity.speaker_split")).toBe(true);
-    expect(graph?.nodes.some((node) => node.capability_id === "monitor.translation_health")).toBe(true);
-    expect(graph?.edges.some((edge) => edge.lane === "translation")).toBe(true);
-    expect(receipt.job_ids.map((jobId) => useSituationRoomJobStore.getState().jobs[jobId]?.kind)).toEqual([
+    expect(graph?.nodes.some((node: SituationGraphNode) => node.capability_id === "identity.speaker_split")).toBe(true);
+    expect(graph?.nodes.some((node: SituationGraphNode) => node.capability_id === "monitor.translation_health")).toBe(true);
+    expect(graph?.edges.some((edge: SituationGraphEdge) => edge.lane === "translation")).toBe(true);
+    expect(receipt.job_ids.map((jobId: string) => useSituationRoomJobStore.getState().jobs[jobId]?.kind)).toEqual([
       "translate",
       "translate",
     ]);
@@ -174,6 +175,33 @@ describe("useSituationRoomGraphStore", () => {
     );
     expect(receipt.node_ids).toEqual([]);
     expect(Object.keys(useSituationRoomGraphStore.getState().graphs)).toHaveLength(graphCount);
+  });
+
+  it("creates standby monitor graphs from recipes without jobs or command lanes", () => {
+    const { room, source } = seedRoom();
+    const receipt = useSituationRoomGraphStore.getState().createGraphFromRecipe({
+      recipe_id: "minecraft_world_monitor",
+      room_id: room.room_id,
+      source_ids: [source.source_id],
+      bindings: {
+        standby_mode: "game_master",
+        world_id: "minecraft:local",
+      },
+    });
+
+    expect(receipt).toMatchObject({
+      ok: true,
+      recipe_id: "minecraft_world_monitor",
+      job_ids: [],
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+      command_lane_enabled: false,
+    });
+    const graph = useSituationRoomGraphStore.getState().graphs[receipt.graph_id];
+    expect(graph.nodes.some((node: SituationGraphNode) => node.capability_id === "monitor.salience_gate")).toBe(true);
+    expect(graph.nodes.some((node: SituationGraphNode) => node.capability_id === "monitor.interjection_proposal")).toBe(true);
+    expect(graph.edges.some((edge: SituationGraphEdge) => edge.lane === "monitor_signal")).toBe(true);
+    expect(graph.edges.some((edge: SituationGraphEdge) => edge.lane === "command")).toBe(false);
   });
 
   it("attaches a graph snapshot to Helix Ask explicitly", () => {

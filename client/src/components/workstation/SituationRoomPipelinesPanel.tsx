@@ -41,8 +41,11 @@ import {
   type SituationRoomJobOutputRenderPolicy,
 } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
+import { buildSituationStandbyKey, useSituationStandbyStore } from "@/store/useSituationStandbyStore";
+import { buildSituationEventSignal } from "@/lib/helix/situation-standby-signals";
 import { HELIX_GRAPH_CAPABILITIES } from "@shared/helix-graph-capability";
 import { HELIX_SITUATION_GRAPH_RECIPES } from "@shared/helix-situation-graph-recipes";
+import type { SituationStandbyMode } from "@shared/helix-situation-standby";
 
 const JOB_OUTPUT_READ_PROVIDER = "elevenlabs";
 const JOB_OUTPUT_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
@@ -74,6 +77,15 @@ const LANGUAGE_CHIPS = [
   { label: "German", value: "de" },
   { label: "Japanese", value: "ja" },
   { label: "English", value: "en" },
+];
+
+const STANDBY_MODE_OPTIONS: Array<{ value: SituationStandbyMode; label: string }> = [
+  { value: "off", label: "Off" },
+  { value: "direct_address_only", label: "Direct address" },
+  { value: "high_salience", label: "High salience" },
+  { value: "translation_mediator", label: "Translation mediator" },
+  { value: "game_master", label: "Game master" },
+  { value: "research_assistant", label: "Research assistant" },
 ];
 
 type PipelinePanelPage = "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
@@ -308,6 +320,14 @@ export default function SituationRoomPipelinesPanel() {
   const connectGraphNodes = useSituationRoomGraphStore((state) => state.connectNodes);
   const attachGraphToHelixAsk = useSituationRoomGraphStore((state) => state.attachGraphToHelixAsk);
   const setSelectedGraphNode = useSituationRoomGraphStore((state) => state.setSelectedNode);
+  const standbyModes = useSituationStandbyStore((state) => state.mode_by_key);
+  const standbyProjections = useSituationStandbyStore((state) => state.projection_by_key);
+  const standbyGoals = useSituationStandbyStore((state) => state.goals_by_key);
+  const standbyReceipts = useSituationStandbyStore((state) => state.salience_receipts_by_key);
+  const standbyProposals = useSituationStandbyStore((state) => state.interjection_proposals_by_key);
+  const setStandbyMode = useSituationStandbyStore((state) => state.setMode);
+  const ingestStandbySignal = useSituationStandbyStore((state) => state.ingestSignal);
+  const dismissStandbyProposal = useSituationStandbyStore((state) => state.dismissProposal);
   const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("graph");
   const [selectedSourceId, setSelectedSourceId] = React.useState<string>("__room__");
   const [selectedJobId, setSelectedJobId] = React.useState<string | undefined>();
@@ -366,6 +386,12 @@ export default function SituationRoomPipelinesPanel() {
   const activeGraphId = activeRoom?.room_id ? activeGraphIdByRoom[activeRoom.room_id] : undefined;
   const activeGraph = activeGraphId ? graphs[activeGraphId] : null;
   const selectedGraphNodeId = activeGraph ? selectedNodeIdByGraph[activeGraph.graph_id] : undefined;
+  const standbyKey = activeRoom ? buildSituationStandbyKey(activeRoom.room_id, activeGraph?.graph_id) : null;
+  const activeStandbyMode = standbyKey ? standbyModes[standbyKey] ?? "off" : "off";
+  const activeStandbyProjection = standbyKey ? standbyProjections[standbyKey] : undefined;
+  const activeStandbyGoals = standbyKey ? standbyGoals[standbyKey] ?? [] : [];
+  const activeStandbyReceipts = standbyKey ? standbyReceipts[standbyKey] ?? [] : [];
+  const activeStandbyProposals = standbyKey ? standbyProposals[standbyKey] ?? [] : [];
   const draftScope = React.useMemo(
     () => ({
       room_id: activeRoom?.room_id ?? "",
@@ -705,6 +731,7 @@ export default function SituationRoomPipelinesPanel() {
           source_ids: sourceIds,
           output_mode: "dual",
           monitor_mode: "activity",
+          standby_mode: "high_salience",
         },
         title: HELIX_SITUATION_GRAPH_RECIPES.find((recipe) => recipe.recipe_id === recipeId)?.title,
       });
@@ -712,6 +739,38 @@ export default function SituationRoomPipelinesPanel() {
       else setPanelPage("runtime");
     },
     [activeRoom, activeSources, createGraphFromRecipe],
+  );
+
+  const handleSeedStandbySignal = React.useCallback(
+    (kind: "direct_address" | "risk" | "goal") => {
+      if (!activeRoom) return;
+      const sourceId = activeSources[0]?.source_id;
+      const text =
+        kind === "direct_address"
+          ? "Helix, what now?"
+          : kind === "risk"
+            ? "Low health near blaze spawner."
+            : "We need blaze rods and entered the fortress.";
+      ingestStandbySignal(
+        buildSituationEventSignal({
+          room_id: activeRoom.room_id,
+          graph_id: activeGraph?.graph_id ?? null,
+          source_id: sourceId ?? null,
+          source: kind === "risk" || kind === "goal" ? "minecraft_event" : "voice_transcript",
+          event_type: kind === "risk" ? "damage_taken" : kind === "goal" ? "objective_marker" : "direct_address",
+          text,
+          evidence_refs: [`standby-demo:${kind}`],
+          meta:
+            kind === "risk"
+              ? { health_delta: { current: 4 }, objective_delta: { status: "blocked" } }
+              : kind === "goal"
+                ? { objective_delta: { status: "active", label: "collect blaze rods" } }
+                : null,
+        }),
+      );
+      setPanelPage("runtime");
+    },
+    [activeGraph?.graph_id, activeRoom, activeSources, ingestStandbySignal],
   );
 
   const goBack = () => {
@@ -888,6 +947,137 @@ export default function SituationRoomPipelinesPanel() {
               <p className="mt-3 text-xs text-slate-400">
                 Monitor and execution receipts are observations only. Graph runtime does not start capture, inject transcript context, or grant command authority.
               </p>
+            </section>
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Standby Salience</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Standby reducers emit typed receipts and proposals; they do not run Helix Ask reasoning.
+                  </p>
+                </div>
+                <select
+                  value={activeStandbyMode}
+                  disabled={!activeRoom}
+                  onChange={(event) => {
+                    if (!activeRoom) return;
+                    setStandbyMode(activeRoom.room_id, activeGraph?.graph_id ?? null, event.target.value as SituationStandbyMode);
+                  }}
+                  className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none disabled:opacity-45"
+                  aria-label="Standby mode"
+                >
+                  {STANDBY_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSeedStandbySignal("direct_address")}
+                  disabled={!activeRoom}
+                  className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Test direct address
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSeedStandbySignal("risk")}
+                  disabled={!activeRoom}
+                  className="rounded border border-amber-400/35 bg-amber-500/10 px-2 py-1 text-xs text-amber-100 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Test risk signal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSeedStandbySignal("goal")}
+                  disabled={!activeRoom}
+                  className="rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Test goal cue
+                </button>
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">State projection</p>
+                  <p className="mt-1 text-xs text-slate-300">
+                    {activeStandbyProjection
+                      ? `${activeStandbyProjection.window.event_count} signal(s), ${activeStandbyProjection.recent_facts.length} fact(s)`
+                      : "No standby signals yet."}
+                  </p>
+                  {activeStandbyProjection?.world_state ? (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      health risk: {String(Boolean(activeStandbyProjection.world_state.health_risk))}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Goal hypotheses</p>
+                  {activeStandbyGoals.length === 0 ? (
+                    <p className="mt-1 text-xs text-slate-500">None yet.</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {activeStandbyGoals.slice(-3).map((goal) => (
+                        <div key={goal.hypothesis_id} className="rounded border border-emerald-400/20 bg-emerald-500/10 p-2">
+                          <p className="text-xs font-semibold text-emerald-100">{goal.goal_label}</p>
+                          <p className="text-[11px] text-emerald-100/75">
+                            {goal.status} / confidence {goal.confidence.toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Interjection proposals</p>
+                  {activeStandbyProposals.length === 0 ? (
+                    <p className="mt-1 text-xs text-slate-500">None pending.</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {activeStandbyProposals.slice(-3).map((proposal) => (
+                        <div key={proposal.proposal_id} className="rounded border border-cyan-400/20 bg-cyan-500/10 p-2">
+                          <p className="text-xs text-cyan-50">{proposal.text}</p>
+                          <div className="mt-2 flex gap-2">
+                            <button type="button" className="rounded border border-cyan-300/35 px-2 py-1 text-[11px] text-cyan-100">
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => dismissStandbyProposal(proposal.proposal_id)}
+                              className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] font-semibold uppercase text-slate-500">Salience Receipt Rail</p>
+              {activeStandbyReceipts.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500">No salience decisions yet.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {activeStandbyReceipts.slice(-6).reverse().map((receipt) => (
+                    <div key={receipt.receipt_id} className="rounded border border-white/10 bg-slate-950/70 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-white">{receipt.reason}</p>
+                        <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-slate-300">
+                          {receipt.priority} / notify {String(receipt.should_notify_helix)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-300">{receipt.summary}</p>
+                      <p className="mt-1 break-all text-[10px] text-slate-500">{receipt.dedupe_key}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
         </main>
