@@ -12,6 +12,10 @@ import {
   type Nhm2RegionalSourceClosureRegionId,
   type Nhm2RegionalTensor,
 } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import {
+  buildNhm2TileEffectiveCounterpartArtifact,
+  type Nhm2TileEffectiveCounterpartRegion,
+} from "../shared/contracts/nhm2-tile-effective-counterpart.v1";
 import { validateNhm2ReferenceRun } from "../tools/nhm2/validate-reference-run";
 
 const makeReferenceRun = (
@@ -217,7 +221,7 @@ const evidenceRegion = (
     sampleCount: 10,
   },
   tileEffectiveCounterpart: {
-    tensorRef: `tile.${regionId}`,
+    tensorRef: `nhm2_tile_effective_counterpart:${regionId}`,
     tensorAuthorityMode: "full_tensor",
     tensor: fullTensor(10),
     chartRef: "comoving_cartesian",
@@ -259,6 +263,65 @@ const passingRegionalEvidence = () =>
       evidenceRegion("exterior_shell"),
     ],
     literatureRefs: ["natario_2001_zero_expansion"],
+  });
+
+const tileCounterpartRegion = (
+  regionId: Nhm2RegionalSourceClosureRegionId,
+  overrides: Partial<Nhm2TileEffectiveCounterpartRegion> = {},
+): Nhm2TileEffectiveCounterpartRegion => ({
+  regionId,
+  status: "pass",
+  comparisonRole: "tile_effective_counterpart",
+  tensorAuthorityMode: "full_tensor",
+  tensor: fullTensor(10),
+  chartRef: "comoving_cartesian",
+  unitsRef: "J/m^3",
+  regionMaskRef: `mask.${regionId}`,
+  aggregationMode: "mean",
+  normalizationBasis: "sample_count",
+  sampleCount: 10,
+  provenance: {
+    producerModule: "tile-model.ts",
+    producerFunction: "emitFullTensor",
+    inputRefs: [`tile.input.${regionId}`],
+    sourceModelId: "tile-model",
+    sourceModelVersion: "v1",
+    derivationMode: "tile_model_direct_full_tensor",
+    notDerivedFromMetricRequiredTensor: true,
+  },
+  blockers: [],
+  ...overrides,
+});
+
+const passingTileCounterpart = () =>
+  buildNhm2TileEffectiveCounterpartArtifact({
+    generatedAt: "2026-05-04T00:00:00.000Z",
+    runId: "nhm2-reference-test",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    expectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    laneId: "nhm2_shift_lapse",
+    sourceAuthorityMode: "cycle_averaged_tile_model",
+    qeiDossierRef: "artifacts/research/full-solve/nhm2-qei-dossier.json",
+    qeiApplicabilityStatus: "PASS",
+    quantumStateAssumptions: ["bounded sampled reference state"],
+    renormalizationConvention: "declared",
+    cavityBoundaryModel: "declared",
+    cycleAverageClosureStatus: "pass",
+    dutyCycleStatus: "pass",
+    lightCrossingConsistencyStatus: "pass",
+    conservationDiagnostics: {
+      divTStatus: "pass",
+      divTResidualLInf: 0,
+      continuityResidualLInf: 0,
+      momentumResidualLInf: 0,
+    },
+    regions: [
+      tileCounterpartRegion("global"),
+      tileCounterpartRegion("hull"),
+      tileCounterpartRegion("wall"),
+      tileCounterpartRegion("exterior_shell"),
+    ],
+    literatureRefs: ["fewster_thompson_2023_stationary_worldline_qei"],
   });
 
 const failingRegionalEvidence = () =>
@@ -338,6 +401,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",
@@ -376,6 +440,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: null,
     });
@@ -394,6 +459,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",
@@ -441,6 +507,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: null,
     });
@@ -459,6 +526,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",
@@ -540,6 +608,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: failingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: null,
     });
@@ -559,6 +628,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: null,
     });
@@ -581,6 +651,7 @@ describe("nhm2 reference run contract", () => {
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
       regionalSourceClosureEvidence: failingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",

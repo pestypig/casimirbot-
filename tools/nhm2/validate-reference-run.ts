@@ -11,6 +11,9 @@ import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossie
 import {
   isNhm2RegionalSourceClosureEvidenceArtifact,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import {
+  isNhm2TileEffectiveCounterpartArtifact,
+} from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
 
 export const NHM2_REFERENCE_RUN_VALIDATION_ARTIFACT_ID =
   "nhm2_reference_run_validation";
@@ -25,6 +28,11 @@ export const NHM2_REFERENCE_RUN_GATE_IDS = [
   "GATE_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS",
   "GATE_REGIONAL_SOURCE_CLOSURE_COUNTERPART",
   "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
+  "GATE_TILE_EFFECTIVE_COUNTERPART_ARTIFACT",
+  "GATE_TILE_COUNTERPART_NOT_METRIC_ECHO",
+  "GATE_TILE_COUNTERPART_FULL_TENSOR_AUTHORITY",
+  "GATE_TILE_COUNTERPART_QEI_LINKAGE",
+  "GATE_SOURCE_CLOSURE_EVIDENCE_USES_COUNTERPART",
   "GATE_FULL_TENSOR_WHERE_CLAIMED",
   "GATE_QEI_DOSSIER_PRESENT",
   "GATE_REPRODUCIBILITY_FIELDS",
@@ -563,6 +571,151 @@ export const evaluateRegionalSourceClosureEvidenceArtifact = (
   );
 };
 
+export const evaluateTileEffectiveCounterpartArtifact = (
+  value: unknown | null,
+): Nhm2ReferenceRunValidationGate => {
+  if (value == null) {
+    return gate("GATE_TILE_EFFECTIVE_COUNTERPART_ARTIFACT", "review", [
+      "tile_effective_counterpart_artifact_missing",
+    ]);
+  }
+  if (!isNhm2TileEffectiveCounterpartArtifact(value)) {
+    return gate("GATE_TILE_EFFECTIVE_COUNTERPART_ARTIFACT", "fail", [
+      "tile_effective_counterpart_artifact_invalid",
+    ]);
+  }
+  const required = new Set(["global", "hull", "wall", "exterior_shell"]);
+  for (const region of value.regions) required.delete(region.regionId);
+  const reasons = Array.from(required).map(
+    (regionId) => `tile_counterpart_region_missing:${regionId}`,
+  );
+  if (!value.profileMatch) reasons.push("tile_counterpart_profile_mismatch");
+  return gate(
+    "GATE_TILE_EFFECTIVE_COUNTERPART_ARTIFACT",
+    reasons.length > 0 ? "fail" : "pass",
+    reasons,
+  );
+};
+
+export const evaluateTileCounterpartNotMetricEcho = (
+  value: unknown | null,
+): Nhm2ReferenceRunValidationGate => {
+  if (!isNhm2TileEffectiveCounterpartArtifact(value)) {
+    return gate("GATE_TILE_COUNTERPART_NOT_METRIC_ECHO", "review", [
+      "tile_effective_counterpart_artifact_missing",
+    ]);
+  }
+  const reasons = value.regions.flatMap((region) => {
+    const regionReasons: string[] = [];
+    if (
+      region.comparisonRole === "metric_echo_diagnostic_only" ||
+      region.provenance.derivationMode === "metric_echo" ||
+      !region.provenance.notDerivedFromMetricRequiredTensor
+    ) {
+      regionReasons.push(`${region.regionId}_metric_echo_not_source_closure`);
+    }
+    return regionReasons;
+  });
+  return gate(
+    "GATE_TILE_COUNTERPART_NOT_METRIC_ECHO",
+    reasons.length > 0 ? "fail" : "pass",
+    reasons,
+  );
+};
+
+export const evaluateTileCounterpartFullTensorAuthority = (
+  value: unknown | null,
+): Nhm2ReferenceRunValidationGate => {
+  if (!isNhm2TileEffectiveCounterpartArtifact(value)) {
+    return gate("GATE_TILE_COUNTERPART_FULL_TENSOR_AUTHORITY", "review", [
+      "tile_effective_counterpart_artifact_missing",
+    ]);
+  }
+  const reasons: string[] = [];
+  let fail = false;
+  for (const region of value.regions) {
+    if (region.tensorAuthorityMode === "proxy") {
+      fail = true;
+      reasons.push(`${region.regionId}_proxy_tensor_authority`);
+    } else if (
+      region.tensorAuthorityMode === "diagonal_reduced_order" ||
+      region.tensorAuthorityMode === "unknown"
+    ) {
+      reasons.push(`${region.regionId}_full_tensor_authority_missing`);
+    }
+  }
+  return gate(
+    "GATE_TILE_COUNTERPART_FULL_TENSOR_AUTHORITY",
+    fail ? "fail" : reasons.length > 0 ? "review" : "pass",
+    reasons,
+  );
+};
+
+export const evaluateTileCounterpartQeiLinkage = (
+  value: unknown | null,
+): Nhm2ReferenceRunValidationGate => {
+  if (!isNhm2TileEffectiveCounterpartArtifact(value)) {
+    return gate("GATE_TILE_COUNTERPART_QEI_LINKAGE", "review", [
+      "tile_effective_counterpart_artifact_missing",
+    ]);
+  }
+  const reasons: string[] = [];
+  if (value.qeiDossierRef == null) reasons.push("tile_counterpart_qei_dossier_ref_missing");
+  if (value.qeiApplicabilityStatus === "FAIL") {
+    return gate("GATE_TILE_COUNTERPART_QEI_LINKAGE", "fail", [
+      ...reasons,
+      "tile_counterpart_qei_failed",
+    ]);
+  }
+  if (value.qeiApplicabilityStatus !== "PASS") {
+    reasons.push(`tile_counterpart_qei_not_pass:${value.qeiApplicabilityStatus}`);
+  }
+  if (value.sourceAuthorityMode === "proxy") {
+    return gate("GATE_TILE_COUNTERPART_QEI_LINKAGE", "fail", [
+      ...reasons,
+      "tile_counterpart_proxy_source_authority",
+    ]);
+  }
+  return gate(
+    "GATE_TILE_COUNTERPART_QEI_LINKAGE",
+    reasons.length > 0 ? "review" : "pass",
+    reasons,
+  );
+};
+
+export const evaluateSourceClosureEvidenceUsesCounterpart = (
+  regionalEvidence: unknown | null,
+  explicitTileCounterpartProvided = false,
+): Nhm2ReferenceRunValidationGate => {
+  if (!isNhm2RegionalSourceClosureEvidenceArtifact(regionalEvidence)) {
+    return gate("GATE_SOURCE_CLOSURE_EVIDENCE_USES_COUNTERPART", "review", [
+      "regional_source_closure_evidence_artifact_missing",
+    ]);
+  }
+  const reasons: string[] = [];
+  let fail = false;
+  for (const region of regionalEvidence.regions) {
+    const role = region.tileEffectiveCounterpart.comparisonRole;
+    if (role === "gr_matter_channel_observation" || role === "metric_echo_diagnostic_only") {
+      fail = true;
+      reasons.push(`${region.regionId}_source_evidence_uses_${role}`);
+    } else if (
+      role !== "tile_effective_counterpart" ||
+      !region.tileEffectiveCounterpart.tensorRef?.startsWith("nhm2_tile_effective_counterpart")
+    ) {
+      if (explicitTileCounterpartProvided) {
+        fail = true;
+      }
+      reasons.push(`${region.regionId}_source_evidence_uses_legacy_or_missing_counterpart`);
+    }
+  }
+  return gate(
+    "GATE_SOURCE_CLOSURE_EVIDENCE_USES_COUNTERPART",
+    fail ? "fail" : reasons.length > 0 ? "review" : "pass",
+    reasons,
+  );
+};
+
 const certificateIsExplicitlyNonPromotional = (
   certificate: Record<string, unknown> | null,
 ): boolean =>
@@ -620,6 +773,7 @@ export const validateNhm2ReferenceRun = (args: {
   literatureClaimMap?: unknown | null;
   adapterVerificationStatus?: Nhm2AdapterVerificationStatus;
   regionalSourceClosureEvidence?: unknown | null;
+  tileEffectiveCounterpart?: unknown | null;
   strictPromotion?: boolean;
 }): Nhm2ReferenceRunValidationArtifact => {
   const referenceRun = args.referenceRun as Nhm2ReferenceRunArtifact;
@@ -714,6 +868,16 @@ export const validateNhm2ReferenceRun = (args: {
     evaluateRegionalSourceClosureEvidenceArtifact(
       args.regionalSourceClosureEvidence ?? null,
       args.strictPromotion === true,
+    ),
+  );
+  gates.push(evaluateTileEffectiveCounterpartArtifact(args.tileEffectiveCounterpart ?? null));
+  gates.push(evaluateTileCounterpartNotMetricEcho(args.tileEffectiveCounterpart ?? null));
+  gates.push(evaluateTileCounterpartFullTensorAuthority(args.tileEffectiveCounterpart ?? null));
+  gates.push(evaluateTileCounterpartQeiLinkage(args.tileEffectiveCounterpart ?? null));
+  gates.push(
+    evaluateSourceClosureEvidenceUsesCounterpart(
+      args.regionalSourceClosureEvidence ?? null,
+      isNhm2TileEffectiveCounterpartArtifact(args.tileEffectiveCounterpart ?? null),
     ),
   );
   gates.push(evaluateFullTensorAuthority(sourceClosure));
@@ -828,6 +992,7 @@ const main = (): void => {
     "docs/research/nhm2-literature-claim-map.v1.json",
   );
   const regionalEvidencePath = asString(args["regional-evidence"]);
+  const tileCounterpartPath = asString(args["tile-effective-counterpart"]);
   const validation = validateNhm2ReferenceRun({
     referenceRun,
     repoRoot,
@@ -836,6 +1001,10 @@ const main = (): void => {
       regionalEvidencePath == null
         ? null
         : readJsonIfExists(resolveRepoPath(repoRoot, regionalEvidencePath)),
+    tileEffectiveCounterpart:
+      tileCounterpartPath == null
+        ? null
+        : readJsonIfExists(resolveRepoPath(repoRoot, tileCounterpartPath)),
     strictPromotion: args["strict-promotion"] === true,
   });
   const outPath = asString(args.out);

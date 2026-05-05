@@ -77,6 +77,7 @@ export type Nhm2RegionalSourceClosureEvidenceRegion = {
     comparisonRole:
       | "tile_effective_counterpart"
       | "gr_matter_channel_observation"
+      | "metric_echo_diagnostic_only"
       | "unknown";
   };
   residuals: {
@@ -193,6 +194,7 @@ const isComparisonRole = (
 ): value is Nhm2RegionalSourceClosureEvidenceRegion["tileEffectiveCounterpart"]["comparisonRole"] =>
   value === "tile_effective_counterpart" ||
   value === "gr_matter_channel_observation" ||
+  value === "metric_echo_diagnostic_only" ||
   value === "unknown";
 
 const isTensor = (value: unknown): value is Nhm2RegionalTensor => {
@@ -328,6 +330,9 @@ export const deriveNhm2RegionalSourceClosureRegionBlockers = (
   }
   if (tile.comparisonRole !== "tile_effective_counterpart") {
     blockers.add(`tile_role_not_counterpart:${tile.comparisonRole}`);
+  }
+  if (tile.comparisonRole === "metric_echo_diagnostic_only") {
+    blockers.add("metric_echo_not_source_closure");
   }
   if (
     metric.tensorAuthorityMode === "proxy" ||

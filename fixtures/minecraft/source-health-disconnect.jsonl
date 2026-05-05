@@ -1,0 +1,1 @@
+{"schema":"helix.world_event.v1","world_id":"paper:local","room_id":"room:minecraft:test","source_id":"minecraft:paper","ts":"2026-05-05T12:03:00.000Z","event_type":"source_disconnected","text":"Paper bridge disconnected.","evidence_refs":["mc:event:disconnect:1"],"meta":{"reason":"webhook_unreachable"}}

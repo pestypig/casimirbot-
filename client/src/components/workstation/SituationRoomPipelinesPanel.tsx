@@ -323,6 +323,7 @@ export default function SituationRoomPipelinesPanel() {
   const standbyModes = useSituationStandbyStore((state) => state.mode_by_key);
   const standbyProjections = useSituationStandbyStore((state) => state.projection_by_key);
   const standbyGoals = useSituationStandbyStore((state) => state.goals_by_key);
+  const standbySignals = useSituationStandbyStore((state) => state.signals_by_key);
   const standbyReceipts = useSituationStandbyStore((state) => state.salience_receipts_by_key);
   const standbyProposals = useSituationStandbyStore((state) => state.interjection_proposals_by_key);
   const setStandbyMode = useSituationStandbyStore((state) => state.setMode);
@@ -390,6 +391,8 @@ export default function SituationRoomPipelinesPanel() {
   const activeStandbyMode = standbyKey ? standbyModes[standbyKey] ?? "off" : "off";
   const activeStandbyProjection = standbyKey ? standbyProjections[standbyKey] : undefined;
   const activeStandbyGoals = standbyKey ? standbyGoals[standbyKey] ?? [] : [];
+  const activeStandbySignals = standbyKey ? standbySignals[standbyKey] ?? [] : [];
+  const activeWorldSignals = activeStandbySignals.filter((signal) => signal.source === "minecraft_event");
   const activeStandbyReceipts = standbyKey ? standbyReceipts[standbyKey] ?? [] : [];
   const activeStandbyProposals = standbyKey ? standbyProposals[standbyKey] ?? [] : [];
   const draftScope = React.useMemo(
@@ -1057,6 +1060,39 @@ export default function SituationRoomPipelinesPanel() {
                   )}
                 </div>
               </div>
+            </section>
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Minecraft / World Events</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    World plugin signals are runtime observations; they do not start Helix turns or run game actions.
+                  </p>
+                </div>
+                <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] uppercase text-slate-400">
+                  {activeWorldSignals.length} event(s)
+                </span>
+              </div>
+              {activeWorldSignals.length === 0 ? (
+                <p className="mt-3 text-xs text-slate-500">No Minecraft or world-event signals in this graph yet.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {activeWorldSignals.slice(-5).reverse().map((signal) => (
+                    <div key={signal.signal_id} className="rounded border border-white/10 bg-slate-950/70 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-white">{signal.event_type}</p>
+                        <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-slate-300">
+                          {signal.actor ?? signal.source_id ?? "world"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-300">{signal.text ?? "World event received."}</p>
+                      <p className="mt-1 break-all text-[10px] text-slate-500">
+                        {signal.evidence_refs.length > 0 ? signal.evidence_refs.join(", ") : signal.signal_id}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <p className="text-[11px] font-semibold uppercase text-slate-500">Salience Receipt Rail</p>

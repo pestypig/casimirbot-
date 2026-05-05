@@ -16,6 +16,11 @@ import {
   type Nhm2TensorComponent,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
+import {
+  isNhm2TileEffectiveCounterpartArtifact,
+  type Nhm2TileEffectiveCounterpartArtifact,
+  type Nhm2TileEffectiveCounterpartRegion,
+} from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
 
 const SOURCE_CLOSURE_LITERATURE_REFS = [
   "natario_2001_zero_expansion",
@@ -174,7 +179,8 @@ const normalizeComparisonRole = (
   value: string | null,
 ): Nhm2RegionalSourceClosureEvidenceRegion["tileEffectiveCounterpart"]["comparisonRole"] =>
   value === "tile_effective_counterpart" ||
-  value === "gr_matter_channel_observation"
+  value === "gr_matter_channel_observation" ||
+  value === "metric_echo_diagnostic_only"
     ? value
     : "unknown";
 
@@ -274,6 +280,7 @@ const basisStatusFor = (
 
 const makeGlobalRegion = (
   sourceClosure: Record<string, unknown>,
+  tileCounterpartRegion?: Nhm2TileEffectiveCounterpartRegion | null,
 ): Nhm2RegionalSourceClosureEvidenceRegion => {
   const tensors = asRecord(sourceClosure.tensors);
   const tensorRefs = asRecord(sourceClosure.tensorRefs);
@@ -283,7 +290,7 @@ const makeGlobalRegion = (
   const tileAccounting =
     asRecord(sourceClosure.tileAccounting) ?? asRecord(globalAccounting?.tile);
   const metric = normalizeTensor(asRecord(tensors?.metricRequired));
-  const tile = normalizeTensor(asRecord(tensors?.tileEffective));
+  const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(asRecord(tensors?.tileEffective));
   const residuals = computeResiduals(
     metric,
     tile,
@@ -311,24 +318,38 @@ const makeGlobalRegion = (
       sampleCount: asNumber(metricAccounting?.sampleCount),
     },
     tileEffectiveCounterpart: {
-      tensorRef: asString(tensorRefs?.tileEffective),
-      tensorAuthorityMode: inferAuthorityMode(tile, JSON.stringify(tensors?.tileEffective)),
+      tensorRef:
+        tileCounterpartRegion == null
+          ? asString(tensorRefs?.tileEffective)
+          : `nhm2_tile_effective_counterpart:${tileCounterpartRegion.regionId}`,
+      tensorAuthorityMode:
+        tileCounterpartRegion?.tensorAuthorityMode ??
+        inferAuthorityMode(tile, JSON.stringify(tensors?.tileEffective)),
       tensor: tile,
-      chartRef: asString(tileAccounting?.chartRef) ?? "comoving_cartesian",
-      unitsRef: asString(tileAccounting?.unitsRef) ?? "J/m^3",
-      aggregationMode: normalizeAggregationMode(tileAccounting?.aggregationMode),
-      normalizationBasis: normalizeNormalizationBasis(tileAccounting?.normalizationBasis),
-      sampleCount: asNumber(tileAccounting?.sampleCount),
-      comparisonRole: "tile_effective_counterpart",
+      chartRef:
+        tileCounterpartRegion?.chartRef ??
+        asString(tileAccounting?.chartRef) ??
+        "comoving_cartesian",
+      unitsRef: tileCounterpartRegion?.unitsRef ?? asString(tileAccounting?.unitsRef) ?? "J/m^3",
+      aggregationMode:
+        tileCounterpartRegion?.aggregationMode ??
+        normalizeAggregationMode(tileAccounting?.aggregationMode),
+      normalizationBasis:
+        tileCounterpartRegion?.normalizationBasis ??
+        normalizeNormalizationBasis(tileAccounting?.normalizationBasis),
+      sampleCount: tileCounterpartRegion?.sampleCount ?? asNumber(tileAccounting?.sampleCount),
+      comparisonRole:
+        tileCounterpartRegion?.comparisonRole ?? "tile_effective_counterpart",
     },
     residuals,
-    blockers: [],
+    blockers: tileCounterpartRegion?.blockers ?? [],
   };
 };
 
 const makeRegionalRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
   sourceRegion: Record<string, unknown> | null,
+  tileCounterpartRegion?: Nhm2TileEffectiveCounterpartRegion | null,
 ): Nhm2RegionalSourceClosureEvidenceRegion => {
   if (sourceRegion == null) {
     return {
@@ -368,10 +389,10 @@ const makeRegionalRegion = (
   }
 
   const metric = normalizeTensor(sourceRegion.metricRequiredTensor);
-  const tile = normalizeTensor(sourceRegion.tileEffectiveTensor);
+  const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(sourceRegion.tileEffectiveTensor);
   const metricMeta = extractSideMeta(sourceRegion, "metric");
   const tileMeta = extractSideMeta(sourceRegion, "tile");
-  const role = normalizeComparisonRole(tileMeta.comparisonRole);
+  const role = tileCounterpartRegion?.comparisonRole ?? normalizeComparisonRole(tileMeta.comparisonRole);
   const comparisonBasisStatus = basisStatusFor(
     asString(sourceRegion.comparisonBasisStatus),
     metricMeta,
@@ -415,18 +436,24 @@ const makeRegionalRegion = (
       sampleCount: metricMeta.sampleCount,
     },
     tileEffectiveCounterpart: {
-      tensorRef: tileMeta.tensorRef,
-      tensorAuthorityMode: inferAuthorityMode(tile, tileMeta.evidenceText),
+      tensorRef:
+        tileCounterpartRegion == null
+          ? tileMeta.tensorRef
+          : `nhm2_tile_effective_counterpart:${tileCounterpartRegion.regionId}`,
+      tensorAuthorityMode:
+        tileCounterpartRegion?.tensorAuthorityMode ??
+        inferAuthorityMode(tile, tileMeta.evidenceText),
       tensor: tile,
-      chartRef: tileMeta.chartRef,
-      unitsRef: tileMeta.unitsRef,
-      aggregationMode: tileMeta.aggregationMode,
-      normalizationBasis: tileMeta.normalizationBasis,
-      sampleCount: tileMeta.sampleCount,
+      chartRef: tileCounterpartRegion?.chartRef ?? tileMeta.chartRef,
+      unitsRef: tileCounterpartRegion?.unitsRef ?? tileMeta.unitsRef,
+      aggregationMode: tileCounterpartRegion?.aggregationMode ?? tileMeta.aggregationMode,
+      normalizationBasis:
+        tileCounterpartRegion?.normalizationBasis ?? tileMeta.normalizationBasis,
+      sampleCount: tileCounterpartRegion?.sampleCount ?? tileMeta.sampleCount,
       comparisonRole: role,
     },
     residuals,
-    blockers,
+    blockers: [...blockers, ...(tileCounterpartRegion?.blockers ?? [])],
   };
 };
 
@@ -435,12 +462,14 @@ export const publishRegionalSourceClosureEvidence = (args: {
   referenceRunPath: string;
   sourceClosurePath: string;
   outPath: string;
+  tileEffectiveCounterpartPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2RegionalSourceClosureEvidenceArtifact => {
   if (
     !args.auditOnly &&
     (pathUsesLatestAlias(args.referenceRunPath) ||
-      pathUsesLatestAlias(args.sourceClosurePath))
+      pathUsesLatestAlias(args.sourceClosurePath) ||
+      pathUsesLatestAlias(args.tileEffectiveCounterpartPath ?? ""))
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -455,6 +484,22 @@ export const publishRegionalSourceClosureEvidence = (args: {
   if (sourceClosure == null) {
     throw new Error("source closure artifact must be a JSON object");
   }
+  const tileCounterpart =
+    args.tileEffectiveCounterpartPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.tileEffectiveCounterpartPath));
+  if (
+    tileCounterpart != null &&
+    !isNhm2TileEffectiveCounterpartArtifact(tileCounterpart)
+  ) {
+    throw new Error("tile-effective counterpart must be nhm2_tile_effective_counterpart/v1");
+  }
+  const tileRegionMap = new Map<string, Nhm2TileEffectiveCounterpartRegion>();
+  if (isNhm2TileEffectiveCounterpartArtifact(tileCounterpart)) {
+    for (const region of tileCounterpart.regions) {
+      tileRegionMap.set(region.regionId, region);
+    }
+  }
 
   const sourceRegions = new Map<string, Record<string, unknown>>();
   const regionList = getNested(sourceClosure, ["regionComparisons", "regions"]);
@@ -468,8 +513,12 @@ export const publishRegionalSourceClosureEvidence = (args: {
 
   const regions = NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) =>
     regionId === "global"
-      ? makeGlobalRegion(sourceClosure)
-      : makeRegionalRegion(regionId, sourceRegions.get(regionId) ?? null),
+      ? makeGlobalRegion(sourceClosure, tileRegionMap.get(regionId) ?? null)
+      : makeRegionalRegion(
+          regionId,
+          sourceRegions.get(regionId) ?? null,
+          tileRegionMap.get(regionId) ?? null,
+        ),
   );
 
   const artifact = buildNhm2RegionalSourceClosureEvidenceArtifact({
@@ -503,6 +552,7 @@ const main = (): void => {
     repoRoot: process.cwd(),
     referenceRunPath,
     sourceClosurePath,
+    tileEffectiveCounterpartPath: asString(args["tile-effective-counterpart"]),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

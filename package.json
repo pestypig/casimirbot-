@@ -180,6 +180,8 @@
     "nhm2:validate-reference-run": "tsx tools/nhm2/validate-reference-run.ts",
     "nhm2:publish-regional-source-closure-evidence": "tsx tools/nhm2/publish-regional-source-closure-evidence.ts",
     "nhm2:report-source-to-geometry-divergence": "tsx tools/nhm2/report-source-to-geometry-divergence.ts",
+    "nhm2:publish-tile-effective-counterpart": "tsx tools/nhm2/publish-tile-effective-counterpart.ts",
+    "nhm2:audit-tile-effective-counterpart-provenance": "tsx tools/nhm2/audit-tile-effective-counterpart-provenance.ts",
     "warp:full-solve:nhm2-shift-lapse:publish-metric-wec-feasibility": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-metric-wec-feasibility",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",
