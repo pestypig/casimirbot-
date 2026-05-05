@@ -10,10 +10,53 @@
       "sourceId": "maldacena_1997_ads_cft",
       "title": "The Large N Limit of Superconformal Field Theories and Supergravity",
       "url": "https://arxiv.org/abs/hep-th/9711200",
-      "claimSupport": ["controlled_holographic_context"],
+      "claimSupport": ["controlled_holographic_duality_context"],
       "nonSupport": [
-        "does_not_validate_nhm2_source_mechanism",
+        "does_not_validate_nhm2",
+        "does_not_validate_local_casimir_tile_source",
         "does_not_validate_transport"
+      ]
+    },
+    {
+      "sourceId": "natario_2001_zero_expansion",
+      "title": "Warp Drive With Zero Expansion",
+      "url": "https://arxiv.org/abs/gr-qc/0110086",
+      "claimSupport": [
+        "natario_zero_expansion_context",
+        "warp_shift_family_context",
+        "horizon_and_energy_condition_guardrail"
+      ],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_validate_tile_effective_source",
+        "does_not_remove_source_closure_requirement"
+      ]
+    },
+    {
+      "sourceId": "ford_roman_negative_energy_quantum_inequality_context",
+      "title": "Negative energy seen by accelerated observers",
+      "url": "https://doi.org/10.1103/PhysRevD.87.085001",
+      "claimSupport": [
+        "negative_energy_duration_magnitude_guardrail",
+        "qei_sampling_worldline_context"
+      ],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_validate_strobed_tile_source"
+      ]
+    },
+    {
+      "sourceId": "fewster_thompson_2023_stationary_worldline_qei",
+      "title": "Quantum Energy Inequalities along stationary worldlines",
+      "url": "https://arxiv.org/abs/2301.01698",
+      "claimSupport": [
+        "qei_lower_bound_context",
+        "worldline_sampling_context",
+        "curvature_invariant_worldline_bound_context"
+      ],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_validate_tile_effective_source"
       ]
     },
     {
@@ -53,20 +96,27 @@
       "title": "Real observers solving imaginary problems",
       "url": "https://arxiv.org/abs/2412.14014",
       "versionNote": "v3, last revised 2025-11-04; observer inclusion mostly cancels phase but leaves an overall minus sign",
-      "claimSupport": ["observer_inclusion_is_physics_relevant"],
-      "nonSupport": ["does_not_validate_nhm2_observer_audit"]
+      "claimSupport": [
+        "observer_inclusion_is_physics_relevant",
+        "view_from_nowhere_guardrail"
+      ],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_validate_nhm2_observer_audit"
+      ]
     },
     {
       "sourceId": "maldacena_milekhin_popov_4d_wormholes",
       "title": "Traversable wormholes in four dimensions",
       "url": "https://arxiv.org/abs/1807.04726",
       "claimSupport": [
-        "negative_casimir_like_energy_can_support_specific_wormhole_solutions",
+        "negative_casimir_like_energy_specific_solution_context",
         "ambient_causality_guardrail"
       ],
       "nonSupport": [
         "does_not_validate_warp_drive",
-        "does_not_validate_nhm2_tile_source"
+        "does_not_validate_nhm2_tile_source",
+        "does_not_validate_nhm2_transport"
       ]
     },
     {

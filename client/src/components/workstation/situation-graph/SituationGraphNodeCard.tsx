@@ -56,10 +56,15 @@ export function SituationGraphNodeCard({
           {node.job_id ?? node.source_id ?? node.speaker_id}
         </p>
       ) : null}
+      {node.capability_id ? (
+        <p className="mt-2 truncate text-[10px] opacity-75">{node.capability_id}</p>
+      ) : null}
       {node.runtime ? (
         <div className="mt-2 grid grid-cols-2 gap-1 text-[10px] opacity-75">
-          <span>events {node.runtime.event_count ?? 0}</span>
+          <span>inputs {node.runtime.input_count ?? node.runtime.event_count ?? 0}</span>
           <span>outputs {node.runtime.output_count ?? 0}</span>
+          {node.runtime.error_count ? <span>errors {node.runtime.error_count}</span> : null}
+          {node.runtime.status_text ? <span className="truncate">{node.runtime.status_text}</span> : null}
           {node.runtime.last_error ? <span className="col-span-2 truncate text-rose-100">{node.runtime.last_error}</span> : null}
         </div>
       ) : null}

@@ -6,6 +6,12 @@ import {
   type Nhm2ReferenceRunArtifact,
 } from "../shared/contracts/nhm2-reference-run.v1";
 import { buildNhm2QeiDossierArtifact } from "../shared/contracts/nhm2-qei-dossier.v1";
+import {
+  buildNhm2RegionalSourceClosureEvidenceArtifact,
+  type Nhm2RegionalSourceClosureEvidenceRegion,
+  type Nhm2RegionalSourceClosureRegionId,
+  type Nhm2RegionalTensor,
+} from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { validateNhm2ReferenceRun } from "../tools/nhm2/validate-reference-run";
 
 const makeReferenceRun = (
@@ -174,6 +180,118 @@ const passSourceClosure = {
   },
 };
 
+const fullTensor = (value: number): Nhm2RegionalTensor => ({
+  T00: -value,
+  T01: 0,
+  T02: 0,
+  T03: 0,
+  T10: 0,
+  T11: value,
+  T12: 0,
+  T13: 0,
+  T20: 0,
+  T21: 0,
+  T22: value,
+  T23: 0,
+  T30: 0,
+  T31: 0,
+  T32: 0,
+  T33: value,
+});
+
+const evidenceRegion = (
+  regionId: Nhm2RegionalSourceClosureRegionId,
+  overrides: Partial<Nhm2RegionalSourceClosureEvidenceRegion> = {},
+): Nhm2RegionalSourceClosureEvidenceRegion => ({
+  regionId,
+  status: "pass",
+  comparisonBasisStatus: "same_basis",
+  metricRequired: {
+    tensorRef: `metric.${regionId}`,
+    tensorAuthorityMode: "full_tensor",
+    tensor: fullTensor(10),
+    chartRef: "comoving_cartesian",
+    unitsRef: "J/m^3",
+    aggregationMode: "mean",
+    normalizationBasis: "sample_count",
+    sampleCount: 10,
+  },
+  tileEffectiveCounterpart: {
+    tensorRef: `tile.${regionId}`,
+    tensorAuthorityMode: "full_tensor",
+    tensor: fullTensor(10),
+    chartRef: "comoving_cartesian",
+    unitsRef: "J/m^3",
+    aggregationMode: "mean",
+    normalizationBasis: "sample_count",
+    sampleCount: 10,
+    comparisonRole: "tile_effective_counterpart",
+  },
+  residuals: {
+    componentResiduals: {
+      T00: {
+        metricRequired: -10,
+        tileEffectiveCounterpart: -10,
+        absResidual: 0,
+        relResidual: 0,
+      },
+    },
+    relLInf: 0,
+    absLInf: 0,
+    toleranceRelLInf: 0.1,
+    pass: true,
+  },
+  blockers: [],
+  ...overrides,
+});
+
+const passingRegionalEvidence = () =>
+  buildNhm2RegionalSourceClosureEvidenceArtifact({
+    generatedAt: "2026-05-04T00:00:00.000Z",
+    runId: "nhm2-reference-test",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    expectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    laneId: "nhm2_shift_lapse",
+    regions: [
+      evidenceRegion("global"),
+      evidenceRegion("hull"),
+      evidenceRegion("wall"),
+      evidenceRegion("exterior_shell"),
+    ],
+    literatureRefs: ["natario_2001_zero_expansion"],
+  });
+
+const failingRegionalEvidence = () =>
+  buildNhm2RegionalSourceClosureEvidenceArtifact({
+    generatedAt: "2026-05-04T00:00:00.000Z",
+    runId: "nhm2-reference-test",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    expectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    laneId: "nhm2_shift_lapse",
+    regions: [
+      evidenceRegion("global"),
+      evidenceRegion("hull", {
+        residuals: {
+          componentResiduals: {
+            T00: {
+              metricRequired: -10,
+              tileEffectiveCounterpart: -12,
+              absResidual: 2,
+              relResidual: 0.2,
+            },
+          },
+          relLInf: 0.2,
+          absLInf: 2,
+          toleranceRelLInf: 0.1,
+          pass: false,
+        },
+      }),
+      evidenceRegion("wall"),
+      evidenceRegion("exterior_shell"),
+    ],
+    literatureRefs: ["natario_2001_zero_expansion"],
+  });
+
 describe("nhm2 reference run contract", () => {
   it("rejects latest aliases in validation mode", () => {
     const artifact = makeReferenceRun([
@@ -219,6 +337,7 @@ describe("nhm2 reference run contract", () => {
       fullLoopAudit: passFullLoop,
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",
@@ -256,6 +375,7 @@ describe("nhm2 reference run contract", () => {
       fullLoopAudit: passFullLoop,
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: null,
     });
@@ -273,6 +393,7 @@ describe("nhm2 reference run contract", () => {
       fullLoopAudit: passFullLoop,
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",
@@ -319,6 +440,7 @@ describe("nhm2 reference run contract", () => {
       },
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: null,
     });
@@ -336,6 +458,7 @@ describe("nhm2 reference run contract", () => {
       fullLoopAudit: passFullLoop,
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
       literatureClaimMap: validLiteratureMap,
       qeiDossier: buildNhm2QeiDossierArtifact({
         runId: "nhm2-reference-test",
@@ -366,5 +489,126 @@ describe("nhm2 reference run contract", () => {
 
     expect(validation.adapterVerificationStatus).toBe("blocked_infra_endpoint_unavailable");
     expect(validation.adapterVerificationPhysicsImpact).toBe("none_claimed");
+  });
+
+  it("missing regional evidence artifact gives review reason", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: buildNhm2QeiDossierArtifact({
+        runId: "nhm2-reference-test",
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        status: "pass",
+        rhoSource: "metric_required",
+        qeiApplicabilityStatus: "PASS",
+        quantumStateAssumptions: ["bounded sampled reference state"],
+        renormalizationConvention: "declared",
+        cavityBoundaryModel: "declared",
+        samplingWorldlines: [
+          {
+            id: "worldline-wall-1",
+            regionId: "wall",
+            properTimeWindow_s: 1,
+            qeiMargin: 0.1,
+            status: "pass",
+          },
+        ],
+        worstWorldlineId: "worldline-wall-1",
+        dutyCyclePass: true,
+        lightCrossingConsistencyStatus: "pass",
+        cycleAverageClosureStatus: "pass",
+        literatureRefs: ["https://arxiv.org/abs/1807.04726"],
+      }),
+    });
+
+    const gate = validation.gates.find(
+      (entry) => entry.gateId === "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
+    );
+    expect(gate?.state).toBe("review");
+    expect(gate?.reasonCodes).toContain(
+      "regional_source_closure_evidence_artifact_missing",
+    );
+  });
+
+  it("present failing regional evidence blocks promotion", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: failingRegionalEvidence(),
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: null,
+    });
+
+    const gate = validation.gates.find(
+      (entry) => entry.gateId === "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
+    );
+    expect(gate?.state).toBe("fail");
+    expect(gate?.reasonCodes).toContain("regional_evidence_overall_not_pass:fail");
+    expect(validation.claimTierAllowed).toBeNull();
+  });
+
+  it("present passing regional evidence can retire only the source evidence gate", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: null,
+    });
+
+    const sourceGate = validation.gates.find(
+      (entry) => entry.gateId === "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
+    );
+    const qeiGate = validation.gates.find(
+      (entry) => entry.gateId === "GATE_QEI_DOSSIER_PRESENT",
+    );
+    expect(sourceGate?.state).toBe("pass");
+    expect(qeiGate?.state).toBe("review");
+    expect(validation.overallState).toBe("review");
+  });
+
+  it("certificate green still cannot override source evidence fail", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: failingRegionalEvidence(),
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: buildNhm2QeiDossierArtifact({
+        runId: "nhm2-reference-test",
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        status: "pass",
+        rhoSource: "metric_required",
+        qeiApplicabilityStatus: "PASS",
+        quantumStateAssumptions: ["bounded sampled reference state"],
+        renormalizationConvention: "declared",
+        cavityBoundaryModel: "declared",
+        samplingWorldlines: [
+          {
+            id: "worldline-wall-1",
+            regionId: "wall",
+            properTimeWindow_s: 1,
+            qeiMargin: 0.1,
+            status: "pass",
+          },
+        ],
+        worstWorldlineId: "worldline-wall-1",
+        dutyCyclePass: true,
+        lightCrossingConsistencyStatus: "pass",
+        cycleAverageClosureStatus: "pass",
+        literatureRefs: ["https://arxiv.org/abs/1807.04726"],
+      }),
+    });
+
+    expect(validation.overallState).toBe("fail");
+    expect(validation.claimTierAllowed).toBeNull();
   });
 });

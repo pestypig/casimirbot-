@@ -74,12 +74,26 @@ describe("workstation stores", () => {
       clientHeight: 500,
     });
     memory.rememberDraft("scientific-calculator:input", "tau = alpha T");
+    memory.rememberDraft("situation-room:pipeline-draft", "monitor voice chat");
 
     const state = useWorkstationSessionMemoryStore.getState();
     expect(state.readPanelScroll("docs-viewer:doc:/docs/example.md")?.scrollTop).toBe(321);
     expect(state.readDraft("scientific-calculator:input")).toBe("tau = alpha T");
+    expect(state.buildWorkstationSessionMemorySnapshot()).toMatchObject({
+      schema: "helix.workstation_memory.v1",
+      memory_class: "surface_session_only",
+      storage: "sessionStorage",
+      panel_scroll_keys: ["docs-viewer:doc:/docs/example.md"],
+      context_injection: "never_by_default",
+      user_visible: true,
+    });
+    expect(state.buildWorkstationSessionMemorySnapshot().draft_keys).toEqual([
+      "scientific-calculator:input",
+      "situation-room:pipeline-draft",
+    ]);
 
     state.clearDraft("scientific-calculator:input");
     expect(useWorkstationSessionMemoryStore.getState().readDraft("scientific-calculator:input")).toBe("");
+    expect(useWorkstationSessionMemoryStore.getState().readDraft("situation-room:pipeline-draft")).toBe("monitor voice chat");
   });
 });

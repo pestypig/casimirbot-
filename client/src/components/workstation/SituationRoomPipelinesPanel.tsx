@@ -41,6 +41,8 @@ import {
   type SituationRoomJobOutputRenderPolicy,
 } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
+import { HELIX_GRAPH_CAPABILITIES } from "@shared/helix-graph-capability";
+import { HELIX_SITUATION_GRAPH_RECIPES } from "@shared/helix-situation-graph-recipes";
 
 const JOB_OUTPUT_READ_PROVIDER = "elevenlabs";
 const JOB_OUTPUT_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
@@ -74,7 +76,7 @@ const LANGUAGE_CHIPS = [
   { label: "English", value: "en" },
 ];
 
-type PipelinePanelPage = "graph" | "inputs" | "jobs" | "output";
+type PipelinePanelPage = "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
 
 let globalJobOutputReadController: AbortController | null = null;
 let globalJobOutputReadAudio: HTMLAudioElement | null = null;
@@ -301,6 +303,7 @@ export default function SituationRoomPipelinesPanel() {
   const activeGraphIdByRoom = useSituationRoomGraphStore((state) => state.active_graph_id_by_room);
   const selectedNodeIdByGraph = useSituationRoomGraphStore((state) => state.selected_node_id_by_graph);
   const createGraph = useSituationRoomGraphStore((state) => state.createGraph);
+  const createGraphFromRecipe = useSituationRoomGraphStore((state) => state.createGraphFromRecipe);
   const addGraphNode = useSituationRoomGraphStore((state) => state.addNode);
   const connectGraphNodes = useSituationRoomGraphStore((state) => state.connectNodes);
   const attachGraphToHelixAsk = useSituationRoomGraphStore((state) => state.attachGraphToHelixAsk);
@@ -689,22 +692,53 @@ export default function SituationRoomPipelinesPanel() {
     setPanelPage("graph");
   }, [activeJobs, activeRoom, activeSources, addGraphNode, connectGraphNodes, createGraph]);
 
+  const handleCreateGraphRecipe = React.useCallback(
+    (recipeId: string) => {
+      if (!activeRoom) return;
+      const sourceIds = activeSources.map((source) => source.source_id);
+      const receipt = createGraphFromRecipe({
+        recipe_id: recipeId,
+        room_id: activeRoom.room_id,
+        source_ids: sourceIds,
+        bindings: {
+          room_id: activeRoom.room_id,
+          source_ids: sourceIds,
+          output_mode: "dual",
+          monitor_mode: "activity",
+        },
+        title: HELIX_SITUATION_GRAPH_RECIPES.find((recipe) => recipe.recipe_id === recipeId)?.title,
+      });
+      if (receipt.ok) setPanelPage("graph");
+      else setPanelPage("runtime");
+    },
+    [activeRoom, activeSources, createGraphFromRecipe],
+  );
+
   const goBack = () => {
     if (panelPage === "output") setPanelPage("jobs");
     else if (panelPage === "jobs") setPanelPage("inputs");
-    else if (panelPage === "inputs") setPanelPage("graph");
+    else if (panelPage === "inputs") setPanelPage("recipes");
+    else if (panelPage === "runtime") setPanelPage("graph");
+    else if (panelPage === "capabilities") setPanelPage("recipes");
+    else if (panelPage === "recipes") setPanelPage("graph");
   };
 
   const pageTitle =
     panelPage === "graph"
       ? "Situation Graph"
+      : panelPage === "recipes"
+        ? "Graph Recipes"
+        : panelPage === "capabilities"
+          ? "Capabilities"
+          : panelPage === "runtime"
+            ? "Graph Runtime"
       : panelPage === "inputs"
         ? "Pipeline Inputs"
         : panelPage === "jobs"
           ? "Live Source Jobs"
           : "Job Output Scroll";
   const pageIcon =
-    panelPage === "graph" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
+    panelPage === "graph" || panelPage === "recipes" || panelPage === "capabilities" || panelPage === "runtime" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950/95 text-slate-100">
@@ -730,7 +764,7 @@ export default function SituationRoomPipelinesPanel() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-black/20 p-1 text-[11px]">
-          {(["graph", "inputs", "jobs", "output"] as PipelinePanelPage[]).map((page) => (
+          {(["graph", "recipes", "capabilities", "runtime", "inputs", "jobs", "output"] as PipelinePanelPage[]).map((page) => (
             <button
               key={page}
               type="button"
@@ -762,6 +796,101 @@ export default function SituationRoomPipelinesPanel() {
             if (activeGraph) attachGraphToHelixAsk(activeGraph.graph_id);
           }}
         />
+      ) : null}
+
+      {panelPage === "recipes" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-5xl space-y-4">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Graph Recipes</p>
+                  <p className="mt-1 text-xs text-slate-400">Recipes expand into visible nodes, manual-only jobs, and typed execution receipts.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("capabilities")}
+                  className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                >
+                  Capabilities
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {HELIX_SITUATION_GRAPH_RECIPES.map((recipe) => (
+                  <button
+                    key={recipe.recipe_id}
+                    type="button"
+                    onClick={() => handleCreateGraphRecipe(recipe.recipe_id)}
+                    disabled={!activeRoom}
+                    className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-cyan-300/50 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <p className="truncate text-sm font-semibold text-white">{recipe.title}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{recipe.description}</p>
+                    <p className="mt-2 text-[10px] text-slate-500">
+                      {recipe.nodes.length} nodes / {recipe.required_bindings.length} required bindings
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        </main>
+      ) : null}
+
+      {panelPage === "capabilities" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-5xl">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] font-semibold uppercase text-slate-500">Capability Registry</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {HELIX_GRAPH_CAPABILITIES.map((capability) => (
+                  <div key={capability.capability_id} className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{capability.title}</p>
+                        <p className="mt-1 truncate text-[10px] text-slate-500">{capability.capability_id}</p>
+                      </div>
+                      <span className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] uppercase text-slate-300">
+                        {capability.family}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-slate-400">{capability.description}</p>
+                    <p className="mt-2 text-[10px] text-slate-500">
+                      {capability.execution_mode} / {capability.attachment_policy} / {capability.context_injection}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </main>
+      ) : null}
+
+      {panelPage === "runtime" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-5xl space-y-4">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] font-semibold uppercase text-slate-500">Runtime Receipts</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Graph</p>
+                  <p className="mt-1 text-xl font-semibold text-white">{activeGraph ? 1 : 0}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Nodes</p>
+                  <p className="mt-1 text-xl font-semibold text-white">{activeGraph?.nodes.length ?? 0}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Edges</p>
+                  <p className="mt-1 text-xl font-semibold text-white">{activeGraph?.edges.length ?? 0}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-slate-400">
+                Monitor and execution receipts are observations only. Graph runtime does not start capture, inject transcript context, or grant command authority.
+              </p>
+            </section>
+          </div>
+        </main>
       ) : null}
 
       {panelPage === "inputs" ? (

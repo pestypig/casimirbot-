@@ -125,6 +125,19 @@ describe("helix ask E2 situation room setup intent", () => {
       speaker_a_native_language: "English",
       speaker_b_native_language: "Spanish",
     });
+    expect(response.body?.workspace_action).toMatchObject({
+      panel_id: "situation-room-pipelines",
+      action_id: "create_graph_from_recipe",
+      args: {
+        recipe_id: "two_way_interpreter",
+      },
+    });
+    expect(response.body?.situation_graph_setup_plan).toMatchObject({
+      schema: "helix.situation_graph_setup_plan.v1",
+      recipe_id: "two_way_interpreter",
+      missing_bindings: [],
+      missing_requirements: [],
+    });
     expect(response.body?.situation_room_setup_receipt).toMatchObject({
       ok: true,
       setup_status: "complete",

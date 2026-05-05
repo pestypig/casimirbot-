@@ -20,6 +20,7 @@ export function SituationGraphInspector({
   onAttach: () => void;
 }) {
   const configEntries = Object.entries(node?.config ?? {}).slice(0, 8);
+  const paramEntries = Object.entries(node?.params ?? {}).slice(0, 10);
   const translationPair =
     node?.config?.translation_pair && typeof node.config.translation_pair === "object"
       ? (node.config.translation_pair as TranslationPairConfigView)
@@ -72,6 +73,11 @@ export function SituationGraphInspector({
             <p>
               <span className="text-slate-500">Column:</span> {node.column}
             </p>
+            {node.capability_id ? (
+              <p>
+                <span className="text-slate-500">Capability:</span> {node.capability_id}
+              </p>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -80,7 +86,10 @@ export function SituationGraphInspector({
           <p className="mb-2 text-[10px] font-semibold uppercase text-slate-500">Runtime</p>
           <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400">
             <span>Events {node.runtime.event_count ?? 0}</span>
+            <span>Inputs {node.runtime.input_count ?? 0}</span>
             <span>Outputs {node.runtime.output_count ?? 0}</span>
+            <span>Errors {node.runtime.error_count ?? 0}</span>
+            {node.runtime.status_text ? <span className="col-span-2">Status {node.runtime.status_text}</span> : null}
             <span className="col-span-2">Updated {node.runtime.last_updated_at ?? "not yet"}</span>
             {node.runtime.last_error ? <span className="col-span-2 text-rose-200">{node.runtime.last_error}</span> : null}
           </div>
@@ -109,6 +118,18 @@ export function SituationGraphInspector({
           <p className="mb-2 text-[10px] font-semibold uppercase text-slate-500">Config</p>
           <div className="space-y-1">
             {configEntries.map(([key, value]) => (
+              <p key={key} className="break-all text-[10px] text-slate-400">
+                <span className="text-slate-200">{key}</span>: {JSON.stringify(value)}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {paramEntries.length > 0 ? (
+        <div className="mt-3 rounded border border-white/10 bg-slate-950/70 p-2">
+          <p className="mb-2 text-[10px] font-semibold uppercase text-slate-500">Parameters</p>
+          <div className="space-y-1">
+            {paramEntries.map(([key, value]) => (
               <p key={key} className="break-all text-[10px] text-slate-400">
                 <span className="text-slate-200">{key}</span>: {JSON.stringify(value)}
               </p>

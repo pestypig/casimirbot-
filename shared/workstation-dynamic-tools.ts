@@ -114,6 +114,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.run_job",
   "situation-room-pipelines.attach_job_to_helix_ask",
   "situation-room-pipelines.create_graph",
+  "situation-room-pipelines.create_graph_from_recipe",
   "situation-room-pipelines.create_translation_pair",
   "situation-room-pipelines.attach_graph_to_helix_ask",
 ]);
@@ -211,6 +212,14 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "save_job_as_note", required_args: ["job_id"], optional_args: [], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "stop_job", required_args: ["job_id"], optional_args: [], risk: "medium", returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "create_graph", required_args: [], optional_args: ["room_id", "title"], returns_artifact: true },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "create_graph_from_recipe",
+    required_args: ["recipe_id", "bindings"],
+    optional_args: ["room_id", "source_ids", "title"],
+    risk: "medium",
+    returns_artifact: true,
+  },
   { panel_id: "situation-room-pipelines", action_id: "add_node", required_args: ["graph_id", "type", "title"], optional_args: ["column", "status", "source_id", "speaker_id", "job_id"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "connect_nodes", required_args: ["graph_id", "from_node_id", "to_node_id", "lane"], optional_args: ["from_port", "to_port"], returns_artifact: true },
   {
@@ -488,6 +497,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "setup_from_prompt") return "situation_room_setup_execution_receipt";
   if (panelId === "situation-room-sources") return "situation_room_context";
   if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";
+  if (panelId === "situation-room-pipelines" && actionId === "create_graph_from_recipe") return "situation_room_graph_execution_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "create_graph") return "situation_room_graph";
   if (panelId === "situation-room-pipelines" && actionId === "add_node") return "situation_room_graph";
   if (panelId === "situation-room-pipelines" && actionId === "connect_nodes") return "situation_room_graph";

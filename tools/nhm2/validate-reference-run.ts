@@ -8,6 +8,9 @@ import {
   type Nhm2ReferenceRunArtifact,
 } from "../../shared/contracts/nhm2-reference-run.v1";
 import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
+import {
+  isNhm2RegionalSourceClosureEvidenceArtifact,
+} from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 
 export const NHM2_REFERENCE_RUN_VALIDATION_ARTIFACT_ID =
   "nhm2_reference_run_validation";
@@ -21,6 +24,7 @@ export const NHM2_REFERENCE_RUN_GATE_IDS = [
   "GATE_OBSERVER_ARTIFACT_CONSISTENCY",
   "GATE_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS",
   "GATE_REGIONAL_SOURCE_CLOSURE_COUNTERPART",
+  "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
   "GATE_FULL_TENSOR_WHERE_CLAIMED",
   "GATE_QEI_DOSSIER_PRESENT",
   "GATE_REPRODUCIBILITY_FIELDS",
@@ -414,8 +418,14 @@ export const evaluateLiteratureClaimMap = (
     const nonSupport = Array.isArray(sourceRecord?.nonSupport)
       ? sourceRecord.nonSupport
       : [];
-    if (!asString(sourceRecord?.url)?.startsWith("https://arxiv.org/abs/")) {
-      reasons.add(`${sourceId}_primary_arxiv_url_missing`);
+    const url = asString(sourceRecord?.url);
+    if (
+      url == null ||
+      (!url.startsWith("https://arxiv.org/abs/") &&
+        !url.startsWith("https://doi.org/") &&
+        !url.startsWith("https://journals.aps.org/"))
+    ) {
+      reasons.add(`${sourceId}_primary_literature_url_missing`);
     }
     if (support.length > 0 && nonSupport.length === 0) {
       reasons.add(`${sourceId}_non_support_missing`);
@@ -493,6 +503,66 @@ export const evaluateQeiDossier = (
   return gate("GATE_QEI_DOSSIER_PRESENT", state, Array.from(reasons));
 };
 
+export const evaluateRegionalSourceClosureEvidenceArtifact = (
+  value: unknown | null,
+  strictPromotion = false,
+): Nhm2ReferenceRunValidationGate => {
+  if (value == null) {
+    return gate(
+      "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
+      strictPromotion ? "fail" : "review",
+      ["regional_source_closure_evidence_artifact_missing"],
+    );
+  }
+  if (!isNhm2RegionalSourceClosureEvidenceArtifact(value)) {
+    return gate("GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT", "fail", [
+      "regional_source_closure_evidence_artifact_invalid",
+    ]);
+  }
+
+  const reasons = new Set<string>();
+  if (!value.profileMatch) reasons.add("regional_evidence_profile_mismatch");
+  if (value.missingRequiredRegions.length > 0) {
+    for (const regionId of value.missingRequiredRegions) {
+      reasons.add(`regional_evidence_region_missing:${regionId}`);
+    }
+  }
+  if (value.overallState !== "pass") {
+    reasons.add(`regional_evidence_overall_not_pass:${value.overallState}`);
+  }
+  for (const region of value.regions) {
+    if (region.comparisonBasisStatus !== "same_basis") {
+      reasons.add(`${region.regionId}_basis_not_same:${region.comparisonBasisStatus}`);
+    }
+    if (
+      region.tileEffectiveCounterpart.comparisonRole !==
+      "tile_effective_counterpart"
+    ) {
+      reasons.add(
+        `${region.regionId}_tile_role_not_counterpart:${region.tileEffectiveCounterpart.comparisonRole}`,
+      );
+    }
+    if (region.residuals.pass === false) {
+      reasons.add(`${region.regionId}_residual_failed`);
+    }
+    if (
+      region.metricRequired.tensorAuthorityMode === "diagonal_reduced_order" ||
+      region.metricRequired.tensorAuthorityMode === "proxy" ||
+      region.tileEffectiveCounterpart.tensorAuthorityMode ===
+        "diagonal_reduced_order" ||
+      region.tileEffectiveCounterpart.tensorAuthorityMode === "proxy"
+    ) {
+      reasons.add(`${region.regionId}_tensor_authority_not_promotion_safe`);
+    }
+  }
+
+  return gate(
+    "GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT",
+    reasons.size > 0 ? (value.overallState === "fail" ? "fail" : "review") : "pass",
+    Array.from(reasons),
+  );
+};
+
 const certificateIsExplicitlyNonPromotional = (
   certificate: Record<string, unknown> | null,
 ): boolean =>
@@ -549,6 +619,8 @@ export const validateNhm2ReferenceRun = (args: {
   qeiDossier?: unknown | null;
   literatureClaimMap?: unknown | null;
   adapterVerificationStatus?: Nhm2AdapterVerificationStatus;
+  regionalSourceClosureEvidence?: unknown | null;
+  strictPromotion?: boolean;
 }): Nhm2ReferenceRunValidationArtifact => {
   const referenceRun = args.referenceRun as Nhm2ReferenceRunArtifact;
   const structuralPass = isNhm2ReferenceRunArtifact(args.referenceRun);
@@ -638,6 +710,12 @@ export const validateNhm2ReferenceRun = (args: {
   );
   gates.push(evaluateRegionalSourceClosureRequiredRegions(sourceClosure));
   gates.push(evaluateRegionalSourceClosureCounterparts(sourceClosure));
+  gates.push(
+    evaluateRegionalSourceClosureEvidenceArtifact(
+      args.regionalSourceClosureEvidence ?? null,
+      args.strictPromotion === true,
+    ),
+  );
   gates.push(evaluateFullTensorAuthority(sourceClosure));
 
   const qeiDossier = args.qeiDossier ?? null;
@@ -749,10 +827,16 @@ const main = (): void => {
     repoRoot,
     "docs/research/nhm2-literature-claim-map.v1.json",
   );
+  const regionalEvidencePath = asString(args["regional-evidence"]);
   const validation = validateNhm2ReferenceRun({
     referenceRun,
     repoRoot,
     literatureClaimMap: readJsonIfExists(literaturePath),
+    regionalSourceClosureEvidence:
+      regionalEvidencePath == null
+        ? null
+        : readJsonIfExists(resolveRepoPath(repoRoot, regionalEvidencePath)),
+    strictPromotion: args["strict-promotion"] === true,
   });
   const outPath = asString(args.out);
   const body = `${JSON.stringify(validation, null, 2)}\n`;

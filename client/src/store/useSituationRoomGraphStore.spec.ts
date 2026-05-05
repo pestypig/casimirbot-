@@ -116,6 +116,66 @@ describe("useSituationRoomGraphStore", () => {
     });
   });
 
+  it("creates a generic graph from a recipe and returns an execution receipt", () => {
+    const { room, source } = seedRoom();
+    const receipt = useSituationRoomGraphStore.getState().createGraphFromRecipe({
+      recipe_id: "two_way_interpreter",
+      room_id: room.room_id,
+      source_ids: [source.source_id],
+      bindings: {
+        speaker_a_id: "spk_user_1",
+        speaker_b_id: "spk_rowan",
+        speaker_a_native_language: "en",
+        speaker_b_native_language: "es",
+        output_mode: "dual",
+      },
+      title: "Interpreter graph",
+    });
+
+    expect(receipt).toMatchObject({
+      schema: "helix.situation_graph_execution_receipt.v1",
+      ok: true,
+      recipe_id: "two_way_interpreter",
+      room_id: room.room_id,
+      source_ids: [source.source_id],
+      missing_bindings: [],
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+      command_lane_enabled: false,
+    });
+    expect(receipt.node_ids.length).toBeGreaterThan(3);
+    expect(receipt.edge_ids.length).toBeGreaterThan(3);
+    expect(receipt.job_ids).toHaveLength(2);
+    const graph = useSituationRoomGraphStore.getState().graphs[receipt.graph_id];
+    expect(graph?.nodes.some((node) => node.capability_id === "identity.speaker_split")).toBe(true);
+    expect(graph?.nodes.some((node) => node.capability_id === "monitor.translation_health")).toBe(true);
+    expect(graph?.edges.some((edge) => edge.lane === "translation")).toBe(true);
+    expect(receipt.job_ids.map((jobId) => useSituationRoomJobStore.getState().jobs[jobId]?.kind)).toEqual([
+      "translate",
+      "translate",
+    ]);
+  });
+
+  it("validates missing recipe bindings without creating graph artifacts", () => {
+    const { room, source } = seedRoom();
+    const graphCount = Object.keys(useSituationRoomGraphStore.getState().graphs).length;
+    const receipt = useSituationRoomGraphStore.getState().createGraphFromRecipe({
+      recipe_id: "two_way_interpreter",
+      room_id: room.room_id,
+      source_ids: [source.source_id],
+      bindings: {
+        speaker_a_id: "spk_user_1",
+      },
+    });
+
+    expect(receipt.ok).toBe(false);
+    expect(receipt.missing_bindings).toEqual(
+      expect.arrayContaining(["speaker_b_id", "speaker_a_native_language", "speaker_b_native_language", "output_mode"]),
+    );
+    expect(receipt.node_ids).toEqual([]);
+    expect(Object.keys(useSituationRoomGraphStore.getState().graphs)).toHaveLength(graphCount);
+  });
+
   it("attaches a graph snapshot to Helix Ask explicitly", () => {
     const received: unknown[] = [];
     const listeners = new Map<string, Set<(event: Event) => void>>();

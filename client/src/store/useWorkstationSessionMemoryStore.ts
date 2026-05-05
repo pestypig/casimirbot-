@@ -1,5 +1,9 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import {
+  HELIX_WORKSTATION_MEMORY_SCHEMA,
+  type HelixWorkstationMemorySnapshot,
+} from "@shared/helix-workstation-memory";
 
 const WORKSTATION_SESSION_MEMORY_KEY = "workstation-session-memory:v1";
 
@@ -26,6 +30,7 @@ type WorkstationSessionMemoryState = {
   rememberDraft: (key: string, text: string) => void;
   readDraft: (key: string) => string;
   clearDraft: (key: string) => void;
+  buildWorkstationSessionMemorySnapshot: () => HelixWorkstationMemorySnapshot;
 };
 
 const fallbackSessionStorage = (() => {
@@ -109,6 +114,15 @@ export const useWorkstationSessionMemoryStore = create<WorkstationSessionMemoryS
           return { drafts };
         });
       },
+      buildWorkstationSessionMemorySnapshot: () => ({
+        schema: HELIX_WORKSTATION_MEMORY_SCHEMA,
+        memory_class: "surface_session_only",
+        storage: "sessionStorage",
+        panel_scroll_keys: Object.keys(get().panelScroll).sort(),
+        draft_keys: Object.keys(get().drafts).sort(),
+        context_injection: "never_by_default",
+        user_visible: true,
+      }),
     }),
     {
       name: WORKSTATION_SESSION_MEMORY_KEY,

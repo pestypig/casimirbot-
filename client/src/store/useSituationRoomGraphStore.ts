@@ -4,6 +4,7 @@ import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
+import { getHelixGraphCapability, type HelixGraphCapability, type HelixGraphPortKind } from "@shared/helix-graph-capability";
 import type {
   SituationGraphEdge,
   SituationGraphLane,
@@ -11,10 +12,15 @@ import type {
   SituationGraphNodeColumn,
   SituationGraphNodeStatus,
   SituationGraphNodeType,
+  SituationRoomGraphExecutionReceipt,
   SituationRoomGraph,
   TranslationPairNodeConfig,
 } from "@shared/helix-situation-graph";
-import { HELIX_SITUATION_GRAPH_SCHEMA } from "@shared/helix-situation-graph";
+import {
+  HELIX_SITUATION_GRAPH_EXECUTION_RECEIPT_SCHEMA,
+  HELIX_SITUATION_GRAPH_SCHEMA,
+} from "@shared/helix-situation-graph";
+import { getHelixSituationGraphRecipe } from "@shared/helix-situation-graph-recipes";
 
 const SITUATION_ROOM_GRAPH_STORAGE_KEY = "situation-room-graphs:v1";
 
@@ -34,6 +40,9 @@ type AddNodeInput = {
   speaker_id?: string;
   job_id?: string;
   output_id?: string;
+  capability_id?: string;
+  params?: Record<string, unknown>;
+  param_schema?: Record<string, unknown>;
   config?: Record<string, unknown>;
 };
 
@@ -59,6 +68,14 @@ export type CreateTranslationPairInput = {
   title?: string;
 };
 
+export type CreateGraphFromRecipeInput = {
+  recipe_id: string;
+  room_id?: string;
+  source_ids?: string[];
+  bindings?: Record<string, unknown>;
+  title?: string;
+};
+
 type SituationRoomGraphStoreState = {
   graphs: Record<string, SituationRoomGraph>;
   graph_order: string[];
@@ -73,6 +90,7 @@ type SituationRoomGraphStoreState = {
     node: SituationGraphNode;
     job_ids: [string, string];
   } | null;
+  createGraphFromRecipe: (input: CreateGraphFromRecipeInput) => SituationRoomGraphExecutionReceipt;
   attachGraphToHelixAsk: (graphId: string) => void;
   setSelectedNode: (graphId: string, nodeId?: string) => void;
   reset: () => void;
@@ -94,6 +112,54 @@ const defaultColumnForNodeType = (type: SituationGraphNodeType): SituationGraphN
   if (type === "translate" || type === "language.detect" || type === "transcript.buffer") return "jobs";
   if (type.startsWith("output.")) return "outputs";
   return "helix";
+};
+
+const graphNodeTypeForCapability = (capabilityId: string, capability?: HelixGraphCapability): SituationGraphNodeType => {
+  if (capabilityId === "source.mic_audio") return "source.audio.mic";
+  if (capabilityId.startsWith("source.")) return "source.audio.display";
+  if (capabilityId === "identity.speaker_profile_map" || capabilityId === "identity.speaker_split") return "speaker.identity";
+  if (capabilityId === "policy.unknown_speaker_filter") return "speaker.filter";
+  if (capabilityId === "policy.interjection_gate") return "helix.interjection_gate";
+  if (capabilityId === "transform.language_detect") return "language.detect";
+  if (capabilityId === "transform.translate") return "translate";
+  if (capabilityId.startsWith("transform.")) return "transcript.buffer";
+  if (capabilityId === "output.voice_on_confirm") return "output.voice";
+  if (capabilityId === "output.note") return "output.note";
+  if (capabilityId.startsWith("output.")) return "output.panel";
+  if (capability?.family === "monitor" || capability?.family === "helix_bridge") return "helix.reason";
+  return "helix.reason";
+};
+
+const laneForPortKind = (kind?: HelixGraphPortKind): SituationGraphLane => {
+  if (kind === "audio") return "audio";
+  if (kind === "speaker_identity") return "speaker_identity";
+  if (kind === "translation" || kind === "language") return "translation";
+  if (kind === "context") return "context";
+  if (kind === "command") return "command";
+  if (kind === "voice_output") return "voice_output";
+  if (kind === "receipt") return "receipt";
+  if (kind === "monitor_signal") return "monitor_signal";
+  return "transcript";
+};
+
+const jobKindForCapability = (capabilityId: string): "translate" | "rolling_summary" | "action_items" | "prompt_composer" | null => {
+  if (capabilityId === "transform.translate") return "translate";
+  if (capabilityId === "transform.rolling_summary") return "rolling_summary";
+  if (capabilityId === "transform.action_items") return "action_items";
+  if (capabilityId === "transform.prompt_composer") return "prompt_composer";
+  return null;
+};
+
+const asStringBinding = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value.trim() : undefined;
+
+const asStringArrayBinding = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+
+const hasBindingValue = (value: unknown): boolean => {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return value !== null && value !== undefined;
 };
 
 const edgeId = (input: Omit<ConnectNodesInput, "graph_id">): string =>
@@ -188,6 +254,9 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           speaker_id: input.speaker_id,
           job_id: input.job_id,
           output_id: input.output_id,
+          capability_id: input.capability_id,
+          params: input.params,
+          param_schema: input.param_schema,
           config: input.config,
           created_at: timestamp,
           updated_at: timestamp,
@@ -272,6 +341,14 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           column: "jobs",
           status: "idle",
           subtitle: `${input.speaker_a_native_language} <-> ${input.speaker_b_native_language}`,
+          capability_id: "transform.translate",
+          params: {
+            speaker_a_id: input.speaker_a_id,
+            speaker_b_id: input.speaker_b_id,
+            output_mode: renderPolicy,
+            voice_output: voiceOutput,
+          },
+          param_schema: getHelixGraphCapability("transform.translate")?.parameter_schema,
           config: { translation_pair: config },
           runtime: {
             event_count: 0,
@@ -290,6 +367,9 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           status: "idle",
           speaker_id: input.speaker_a_id,
           subtitle: input.speaker_a_native_language,
+          capability_id: "identity.speaker_profile_map",
+          params: { speaker_id: input.speaker_a_id, native_language: input.speaker_a_native_language },
+          param_schema: getHelixGraphCapability("identity.speaker_profile_map")?.parameter_schema,
           config: { native_language: input.speaker_a_native_language, authority: "transcribe_only" },
           runtime: {
             event_count: 0,
@@ -308,6 +388,9 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           status: "idle",
           speaker_id: input.speaker_b_id,
           subtitle: input.speaker_b_native_language,
+          capability_id: "identity.speaker_profile_map",
+          params: { speaker_id: input.speaker_b_id, native_language: input.speaker_b_native_language },
+          param_schema: getHelixGraphCapability("identity.speaker_profile_map")?.parameter_schema,
           config: { native_language: input.speaker_b_native_language, authority: "transcribe_only" },
           runtime: {
             event_count: 0,
@@ -367,6 +450,191 @@ export const useSituationRoomGraphStore = create<SituationRoomGraphStoreState>()
           },
         });
         return { graph: nextGraph, node, job_ids: [aToB.job_id, bToA.job_id] };
+      },
+      createGraphFromRecipe: (input) => {
+        const recipe = getHelixSituationGraphRecipe(input.recipe_id);
+        const bindings: Record<string, unknown> = {
+          ...(input.bindings ?? {}),
+        };
+        if (input.room_id) bindings.room_id = input.room_id;
+        if (input.source_ids) bindings.source_ids = input.source_ids;
+        const sourceIds = asStringArrayBinding(bindings.source_ids);
+        const missingBindings = recipe
+          ? recipe.required_bindings.filter((bindingKey) => !hasBindingValue(bindings[bindingKey]))
+          : ["recipe_id"];
+        if (!recipe || missingBindings.length > 0) {
+          return {
+            schema: HELIX_SITUATION_GRAPH_EXECUTION_RECEIPT_SCHEMA,
+            ok: false,
+            graph_id: "",
+            recipe_id: input.recipe_id || null,
+            room_id: asStringBinding(bindings.room_id) ?? null,
+            source_ids: sourceIds,
+            node_ids: [],
+            edge_ids: [],
+            job_ids: [],
+            missing_bindings: missingBindings,
+            attachment_policy: "manual_only",
+            context_injection: "explicit_attachment_only",
+            command_lane_enabled: false,
+            error: recipe ? "recipe_bindings_missing" : "unknown_recipe",
+          };
+        }
+
+        const roomId = asStringBinding(bindings.room_id) ?? "room:default";
+        const graph = get().createGraph({
+          room_id: roomId,
+          title: input.title?.trim() || recipe.title,
+        });
+        const timestamp = nowIso();
+        const jobState = useSituationRoomJobStore.getState();
+        const localNodeIds: Record<string, string> = {};
+        const nodeIds: string[] = [];
+        const edgeIds: string[] = [];
+        const jobIds: string[] = [];
+        let nextGraph = graph;
+
+        for (const recipeNode of recipe.nodes) {
+          const capability = getHelixGraphCapability(recipeNode.capability_id);
+          const type = graphNodeTypeForCapability(recipeNode.capability_id, capability);
+          const jobKind = jobKindForCapability(recipeNode.capability_id);
+          let jobId: string | undefined;
+          const params = {
+            ...(capability?.default_params ?? {}),
+            ...(recipeNode.params ?? {}),
+            ...bindings,
+          };
+          if (jobKind) {
+            const targetLanguage =
+              recipeNode.local_id === "translate_a_to_b"
+                ? asStringBinding(bindings.speaker_b_native_language)
+                : recipeNode.local_id === "translate_b_to_a"
+                  ? asStringBinding(bindings.speaker_a_native_language)
+                  : asStringBinding(bindings.target_language);
+            const nativeLanguage =
+              recipeNode.local_id === "translate_a_to_b"
+                ? asStringBinding(bindings.speaker_a_native_language)
+                : recipeNode.local_id === "translate_b_to_a"
+                  ? asStringBinding(bindings.speaker_b_native_language)
+                  : asStringBinding(bindings.native_language);
+            const job = jobState.createJob({
+              room_id: roomId,
+              kind: jobKind,
+              title: recipeNode.title ?? capability?.title ?? jobKind,
+              source_ids: sourceIds,
+              target_language: targetLanguage,
+              native_language: nativeLanguage,
+              input_text_policy: "source_text_preferred",
+              output_render_policy: asStringBinding(bindings.output_mode) === "dual" ? "dual" : "target_language",
+              attachment_policy: "manual_only",
+              context_injection: "explicit_attachment_only",
+              command_lane_enabled: false,
+            });
+            jobId = job.job_id;
+            jobIds.push(job.job_id);
+          }
+          const node: SituationGraphNode = {
+            node_id: createId(`node:${recipeNode.local_id}`),
+            type,
+            title: recipeNode.title ?? capability?.title ?? recipeNode.capability_id,
+            column: defaultColumnForNodeType(type),
+            status: "idle",
+            subtitle: capability?.family ?? recipeNode.capability_id,
+            job_id: jobId,
+            source_id: type.startsWith("source.") ? sourceIds[0] : undefined,
+            capability_id: recipeNode.capability_id,
+            params,
+            param_schema: capability?.parameter_schema,
+            config: {
+              recipe_id: recipe.recipe_id,
+              local_id: recipeNode.local_id,
+              attachment_policy: "manual_only",
+              context_injection: "explicit_attachment_only",
+              command_lane_enabled: false,
+            },
+            runtime: {
+              event_count: 0,
+              input_count: 0,
+              output_count: 0,
+              error_count: 0,
+              last_error: null,
+              last_updated_at: timestamp,
+              status_text: "ready",
+            },
+            created_at: timestamp,
+            updated_at: timestamp,
+          };
+          localNodeIds[recipeNode.local_id] = node.node_id;
+          nodeIds.push(node.node_id);
+          nextGraph = upsertNode(nextGraph, node);
+        }
+
+        for (const recipeEdge of recipe.edges) {
+          const fromNodeId = localNodeIds[recipeEdge.from];
+          const toNodeId = localNodeIds[recipeEdge.to];
+          if (!fromNodeId || !toNodeId) continue;
+          const fromRecipeNode = recipe.nodes.find((node) => node.local_id === recipeEdge.from);
+          const fromCapability = fromRecipeNode ? getHelixGraphCapability(fromRecipeNode.capability_id) : undefined;
+          const portKind = fromCapability?.output_ports.find((port) => port.port_id === recipeEdge.from_port)?.kind;
+          const edge: SituationGraphEdge = {
+            edge_id: edgeId({
+              from_node_id: fromNodeId,
+              from_port: recipeEdge.from_port,
+              to_node_id: toNodeId,
+              to_port: recipeEdge.to_port,
+              lane: laneForPortKind(portKind),
+            }),
+            from_node_id: fromNodeId,
+            from_port: recipeEdge.from_port,
+            to_node_id: toNodeId,
+            to_port: recipeEdge.to_port,
+            lane: laneForPortKind(portKind),
+          };
+          edgeIds.push(edge.edge_id);
+          nextGraph = upsertEdge(nextGraph, edge);
+        }
+
+        set((state) => ({
+          graphs: { ...state.graphs, [graph.graph_id]: nextGraph },
+          active_graph_id_by_room: {
+            ...state.active_graph_id_by_room,
+            [roomId]: graph.graph_id,
+          },
+          selected_node_id_by_graph: {
+            ...state.selected_node_id_by_graph,
+            [graph.graph_id]: nodeIds[0],
+          },
+        }));
+        pushWorkstationDebugEvent({
+          channel: "situation_room_graph",
+          action: "graph_recipe_created",
+          room_id: roomId,
+          detail: {
+            graph_id: graph.graph_id,
+            recipe_id: recipe.recipe_id,
+            node_ids: nodeIds,
+            edge_ids: edgeIds,
+            job_ids: jobIds,
+            attachment_policy: "manual_only",
+            context_injection: "explicit_attachment_only",
+          },
+        });
+        return {
+          schema: HELIX_SITUATION_GRAPH_EXECUTION_RECEIPT_SCHEMA,
+          ok: true,
+          graph_id: graph.graph_id,
+          recipe_id: recipe.recipe_id,
+          room_id: roomId,
+          source_ids: sourceIds,
+          node_ids: nodeIds,
+          edge_ids: edgeIds,
+          job_ids: jobIds,
+          missing_bindings: [],
+          attachment_policy: "manual_only",
+          context_injection: "explicit_attachment_only",
+          command_lane_enabled: false,
+          error: null,
+        };
       },
       attachGraphToHelixAsk: (graphId) => {
         const graph = get().graphs[graphId];

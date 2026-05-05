@@ -172,7 +172,9 @@ function normalizeSituationGraphLane(value: unknown): SituationGraphLane | null 
     text === "translation" ||
     text === "context" ||
     text === "command" ||
-    text === "voice_output"
+    text === "voice_output" ||
+    text === "receipt" ||
+    text === "monitor_signal"
     ? text
     : null;
 }
@@ -1147,6 +1149,48 @@ export function executeHelixPanelAction(
     }
 
     const graphState = useSituationRoomGraphStore.getState();
+
+    if (actionId === "create_graph_from_recipe") {
+      const recipeId = asNonEmptyString(args.recipe_id ?? args.recipeId);
+      const bindings = asRecord(args.bindings) ?? {};
+      if (!recipeId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.create_graph_from_recipe requires recipe_id.",
+          artifact: { missing: ["recipe_id"] },
+        };
+      }
+      const room = resolveSituationRoom({ ...args, ...bindings });
+      const sourceIds =
+        asStringArray(args.source_ids ?? args.sourceIds).length > 0
+          ? asStringArray(args.source_ids ?? args.sourceIds)
+          : asStringArray(bindings.source_ids ?? bindings.sourceIds);
+      const receipt = graphState.createGraphFromRecipe({
+        recipe_id: recipeId,
+        room_id: asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? undefined,
+        source_ids: sourceIds.length > 0 ? sourceIds : undefined,
+        bindings,
+        title: asNonEmptyString(args.title ?? args.graph_title ?? args.graphTitle) ?? undefined,
+      });
+      if (receipt.ok) {
+        context.openPanel(panelId, undefined);
+        context.focusPanel(panelId, undefined);
+      }
+      return {
+        ok: receipt.ok,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_room_graph_execution_receipt",
+          ...receipt,
+        },
+        message: receipt.ok
+          ? `Created ${receipt.recipe_id ?? recipeId} graph ${receipt.graph_id}.`
+          : `Could not create ${recipeId}: missing ${receipt.missing_bindings.join(", ") || "recipe"}.`,
+      };
+    }
 
     if (actionId === "create_graph") {
       const room = resolveSituationRoom(args);

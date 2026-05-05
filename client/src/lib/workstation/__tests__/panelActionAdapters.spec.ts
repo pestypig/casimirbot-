@@ -505,6 +505,44 @@ describe("panelActionAdapters", () => {
       context_injection: "explicit_attachment_only",
       command_lane_enabled: false,
     });
+
+    const graphFromRecipe = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "create_graph_from_recipe",
+        args: {
+          recipe_id: "two_way_interpreter",
+          room_id: room.room_id,
+          source_ids: ["src:voice"],
+          bindings: {
+            source_ids: ["src:voice"],
+            speaker_a_id: "spk_user_1",
+            speaker_b_id: "spk_rowan",
+            speaker_a_native_language: "en",
+            speaker_b_native_language: "es",
+            output_mode: "dual",
+          },
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(graphFromRecipe.ok).toBe(true);
+    expect(graphFromRecipe.artifact).toMatchObject({
+      kind: "situation_room_graph_execution_receipt",
+      schema: "helix.situation_graph_execution_receipt.v1",
+      recipe_id: "two_way_interpreter",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+      command_lane_enabled: false,
+    });
+    expect(graphFromRecipe.artifact?.node_ids).toHaveLength(7);
+    expect(graphFromRecipe.artifact?.job_ids).toHaveLength(2);
   });
 
   it("delegates Situation Room setup-from-prompt and mic source actions with receipts", () => {

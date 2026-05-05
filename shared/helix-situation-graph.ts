@@ -1,4 +1,7 @@
 export const HELIX_SITUATION_GRAPH_SCHEMA = "helix.situation_graph.v1" as const;
+export const HELIX_SITUATION_GRAPH_EXECUTION_RECEIPT_SCHEMA =
+  "helix.situation_graph_execution_receipt.v1" as const;
+export const HELIX_GRAPH_MONITOR_RECEIPT_SCHEMA = "helix.graph_monitor_receipt.v1" as const;
 
 export type SituationGraphLane =
   | "audio"
@@ -7,7 +10,9 @@ export type SituationGraphLane =
   | "translation"
   | "context"
   | "command"
-  | "voice_output";
+  | "voice_output"
+  | "receipt"
+  | "monitor_signal";
 
 export type SituationGraphNodeType =
   | "source.audio.mic"
@@ -70,17 +75,55 @@ export type SituationGraphNode = {
   speaker_id?: string;
   job_id?: string;
   output_id?: string;
+  capability_id?: string;
+  params?: Record<string, unknown>;
+  param_schema?: Record<string, unknown>;
   config?: Record<string, unknown>;
   runtime?: {
     last_event_id?: string;
     last_output_id?: string;
+    last_run_at?: string | null;
+    last_receipt_id?: string | null;
+    status_text?: string | null;
     event_count?: number;
+    input_count?: number;
     output_count?: number;
+    error_count?: number;
     last_error?: string | null;
     last_updated_at?: string;
   };
   created_at: string;
   updated_at: string;
+};
+
+export type SituationRoomGraphExecutionReceipt = {
+  schema: typeof HELIX_SITUATION_GRAPH_EXECUTION_RECEIPT_SCHEMA;
+  ok: boolean;
+  graph_id: string;
+  recipe_id?: string | null;
+  room_id?: string | null;
+  source_ids?: string[];
+  node_ids: string[];
+  edge_ids: string[];
+  job_ids: string[];
+  missing_bindings: string[];
+  attachment_policy: "manual_only";
+  context_injection: "explicit_attachment_only";
+  command_lane_enabled: false;
+  error?: string | null;
+};
+
+export type HelixGraphMonitorReceipt = {
+  schema: typeof HELIX_GRAPH_MONITOR_RECEIPT_SCHEMA;
+  monitor_id: string;
+  graph_id: string;
+  status: "ok" | "warn" | "error";
+  signal: string;
+  summary: string;
+  evidence_refs: string[];
+  should_notify_helix: boolean;
+  should_request_user_input: boolean;
+  ts: string;
 };
 
 export type SituationGraphEdge = {

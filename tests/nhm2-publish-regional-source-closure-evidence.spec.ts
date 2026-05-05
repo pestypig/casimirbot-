@@ -1,0 +1,271 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+
+import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
+import {
+  isNhm2RegionalSourceClosureEvidenceArtifact,
+  type Nhm2RegionalTensor,
+} from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import { publishRegionalSourceClosureEvidence } from "../tools/nhm2/publish-regional-source-closure-evidence";
+
+const profile = "stage1_centerline_alpha_0p995_v1";
+
+const referenceRun = () =>
+  buildNhm2ReferenceRunArtifact({
+    generatedAt: "2026-05-04T00:00:00.000Z",
+    runId: "run-1",
+    repo: {
+      repositoryFullName: "local/casimirbot",
+      branch: "main",
+      commitSha: "abc123",
+      dirtyTreeStatus: "dirty",
+    },
+    selectedFamily: {
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: profile,
+      expectedProfileId: profile,
+      profileMatch: true,
+    },
+    claimLock: {
+      currentClaimTier: "diagnostic",
+      maximumClaimTier: "reduced-order",
+      validationMode: "red_team_hardening",
+      validationClaimAllowed: false,
+      latestAliasForbidden: true,
+    },
+    commands: [],
+    artifactSet: [],
+    hashLock: {
+      inputManifestSha256: null,
+      toleranceManifestSha256: null,
+      artifactSetSha256: null,
+      literatureClaimMapSha256: null,
+    },
+    blockerSummary: {
+      overallState: "review",
+      blockingReasons: [],
+      observerConsistencyStatus: "unknown",
+      sourceClosureRegionalStatus: "unknown",
+      qeiDossierStatus: "missing",
+      reproducibilityStatus: "missing",
+    },
+  });
+
+const tensor = (value: number): Nhm2RegionalTensor => ({
+  T00: -value,
+  T01: 0,
+  T02: 0,
+  T03: 0,
+  T10: 0,
+  T11: value,
+  T12: 0,
+  T13: 0,
+  T20: 0,
+  T21: 0,
+  T22: value,
+  T23: 0,
+  T30: 0,
+  T31: 0,
+  T32: 0,
+  T33: value,
+});
+
+const residuals = (metric = -10, tile = -10) => ({
+  T00: {
+    metricRequired: metric,
+    tileEffective: tile,
+    absResidual: Math.abs(metric - tile),
+    relResidual: metric === 0 ? null : Math.abs(metric - tile) / Math.abs(metric),
+  },
+});
+
+const sourceRegion = (
+  regionId: "hull" | "wall" | "exterior_shell",
+  options: {
+    role?: "tile_effective_counterpart" | "gr_matter_channel_observation";
+    basis?: string;
+    pass?: boolean;
+  } = {},
+) => ({
+  regionId,
+  status: options.pass === false ? "fail" : "pass",
+  comparisonBasisStatus: options.basis ?? "same_basis",
+  counterpartResolutionStatus:
+    options.role === "gr_matter_channel_observation" ? "missing" : "resolved",
+  comparisonBasisAuthorityStatus:
+    options.role === "gr_matter_channel_observation" ? "counterpart_missing" : "resolved",
+  metricRequiredTensor: tensor(10),
+  tileEffectiveTensor: tensor(options.pass === false ? 12 : 10),
+  metricTensorRef: `metric.${regionId}`,
+  tileTensorRef: `tile.${regionId}`,
+  metricAccounting: {
+    sampleCount: 10,
+    aggregationMode: "mean",
+    normalizationBasis: "sample_count",
+  },
+  tileAccounting: {
+    sampleCount: 10,
+    aggregationMode: "mean",
+    normalizationBasis: "sample_count",
+  },
+  metricT00Diagnostics: {
+    trace: {
+      tensorRef: `metric.${regionId}`,
+      pathFacts: {
+        unitsRef: "J/m^3",
+        comparisonRole: "metric_required_reference",
+      },
+    },
+  },
+  tileT00Diagnostics: {
+    trace: {
+      tensorRef: `tile.${regionId}`,
+      pathFacts: {
+        unitsRef: "J/m^3",
+        comparisonRole: options.role ?? "tile_effective_counterpart",
+      },
+    },
+  },
+  residualComponents: residuals(-10, options.pass === false ? -12 : -10),
+  residualNorms: {
+    absLInf: options.pass === false ? 2 : 0,
+    relLInf: options.pass === false ? 0.2 : 0,
+    toleranceRelLInf: 0.1,
+    pass: options.pass !== false,
+  },
+});
+
+const sourceClosure = (role?: "tile_effective_counterpart" | "gr_matter_channel_observation") => ({
+  artifactId: "nhm2_source_closure",
+  schemaVersion: "nhm2_source_closure/v2",
+  status: role === "gr_matter_channel_observation" ? "review" : "pass",
+  tensors: {
+    metricRequired: tensor(10),
+    tileEffective: tensor(10),
+  },
+  tensorRefs: {
+    metricRequired: "metric.global",
+    tileEffective: "tile.global",
+  },
+  globalAccounting: {
+    metric: {
+      sampleCount: 10,
+      aggregationMode: "mean",
+      normalizationBasis: "sample_count",
+    },
+    tile: {
+      sampleCount: 10,
+      aggregationMode: "mean",
+      normalizationBasis: "sample_count",
+    },
+  },
+  comparisonBasisStatus: "same_basis",
+  residualComponents: residuals(),
+  residualNorms: {
+    absLInf: 0,
+    relLInf: 0,
+    toleranceRelLInf: 0.1,
+    pass: true,
+  },
+  regionComparisons: {
+    regions: [
+      sourceRegion("hull", { role }),
+      sourceRegion("wall", { role }),
+      sourceRegion("exterior_shell", { role }),
+    ],
+  },
+});
+
+const withTemp = (fn: (root: string) => void) => {
+  const root = mkdtempSync(join(tmpdir(), "nhm2-source-evidence-"));
+  try {
+    fn(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+};
+
+const writeArtifacts = (root: string, closure: unknown, sourceName = "source.json") => {
+  writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
+  writeFileSync(join(root, sourceName), JSON.stringify(closure), "utf8");
+};
+
+describe("publish regional source-closure evidence", () => {
+  it("current diagnostic-only source closure produces review or fail", () =>
+    withTemp((root) => {
+      writeArtifacts(root, sourceClosure("gr_matter_channel_observation"));
+      const out = "evidence.json";
+      const artifact = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        outPath: out,
+      });
+
+      expect(artifact.overallState).not.toBe("pass");
+      expect(artifact.reasonCodes).toContain(
+        "hull:tile_role_not_counterpart:gr_matter_channel_observation",
+      );
+      expect(isNhm2RegionalSourceClosureEvidenceArtifact(artifact)).toBe(true);
+      expect(JSON.parse(readFileSync(join(root, out), "utf8"))).toMatchObject({
+        artifactId: "nhm2_regional_source_closure_evidence",
+      });
+    }));
+
+  it("source closure with all same-basis counterparts produces pass", () =>
+    withTemp((root) => {
+      writeArtifacts(root, sourceClosure("tile_effective_counterpart"));
+      const artifact = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        outPath: "evidence.json",
+      });
+
+      expect(artifact.overallState).toBe("pass");
+      expect(artifact.regions.map((region) => region.regionId)).toEqual([
+        "global",
+        "hull",
+        "wall",
+        "exterior_shell",
+      ]);
+    }));
+
+  it("latest path is refused unless audit-only", () =>
+    withTemp((root) => {
+      writeArtifacts(root, sourceClosure("tile_effective_counterpart"), "source-latest.json");
+      expect(() =>
+        publishRegionalSourceClosureEvidence({
+          repoRoot: root,
+          referenceRunPath: "reference.json",
+          sourceClosurePath: "source-latest.json",
+          outPath: "evidence.json",
+        }),
+      ).toThrow(/latest aliases are forbidden/);
+
+      expect(
+        publishRegionalSourceClosureEvidence({
+          repoRoot: root,
+          referenceRunPath: "reference.json",
+          sourceClosurePath: "source-latest.json",
+          outPath: "evidence.json",
+          auditOnly: true,
+        }).artifactId,
+      ).toBe("nhm2_regional_source_closure_evidence");
+    }));
+
+  it("artifact includes literatureRefs", () =>
+    withTemp((root) => {
+      writeArtifacts(root, sourceClosure("tile_effective_counterpart"));
+      const artifact = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        outPath: "evidence.json",
+      });
+
+      expect(artifact.literatureRefs).toContain("natario_2001_zero_expansion");
+    }));
+});
