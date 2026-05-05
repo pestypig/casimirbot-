@@ -120,6 +120,23 @@ Eruptive anchors:
 - `solar.eruptive.irradiance_continuity.v1`
 - `solar.eruptive.source_region_linkage.v1`
 
+StarSim solar-event congruence anchors:
+
+- `solar.eruptive.reconnection_null.v1`
+- `solar.eruptive.pmode_phase_modulation.v1`
+- `solar.eruptive.ribbon_blob_tearing_context.v1`
+- `solar.eruptive.photospheric_field_backreaction.v1`
+- `solar.local_helio.sunquake_flare_alignment.v1`
+- `solar.transition_region.nanoflare_brightening_context.v1`
+- `solar.temporal.multifractal_flare_memory.v1`
+- `solar.polarimetry.faraday_path_context.v1`
+- `solar.radiation.packet_energy_closure.v1`
+- `solar.speculative.collapse_residual_context.v1`
+
+These anchors use the same reference-pack fields as the observed baseline checks:
+`reference_anchor_id`, `reference_pack_id`, `reference_pack_version`, `reference_doc_ids`, `product_family`, `required_observables`, `pass_thresholds`, `warn_thresholds`, and `claim_tier`.
+The collapse residual anchor is speculative/advisory only and is not allowed to promote a primary physics winner or create source power.
+
 Cross-phase consistency anchors:
 
 - `solar.consistency.source_region_overlap.v1`

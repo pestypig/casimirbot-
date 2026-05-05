@@ -2,21 +2,27 @@
 
 ## Abstract
 
-This whitepaper presents NHM2 as a same-chart 3+1 lapse-shift metric-evaluation framework for studying bounded warp-like geometries in a fixed comoving Cartesian chart. The construction separates four layers: a mechanism-side Casimir-tile source model, a solve-backed shift-lapse geometry, a geometry-first Einstein-tensor stress-energy evaluator, and observer-facing energy-condition and timing diagnostics. The central mathematical move is to express the observer problem in the ADM/Gourgoulhon projection grammar: Eulerian energy density `E`, momentum density `J_i`, and spatial stress `S_ij` are defined on one foliation, reconstructed into `T_mu_nu` when needed, and tested against weak, null, strong, and dominant energy-condition surfaces. The current selected NHM2 clocking-law anchor uses a centerline lapse `alpha = 0.995`, giving the target relation `tau = alpha T` under a frozen coordinate mission and shift schedule. Lower-alpha profiles remain expected targets until their own repository-measured full-loop artifacts pass. The paper therefore claims a bounded, artifact-limited mathematical framework, not physical viability or experimental validation.
+This whitepaper presents NHM2 as a same-chart 3+1 lapse-shift metric-evaluation framework for studying bounded warp-like geometries in a fixed comoving Cartesian chart. The construction separates four layers: a mechanism-side Casimir-tile source model, a solve-backed shift-lapse geometry, a geometry-first Einstein-tensor stress-energy evaluator, and observer-facing energy-condition and timing diagnostics. The central mathematical move is to express the observer problem in the ADM/Gourgoulhon projection grammar: Eulerian energy density `E`, momentum density `J_i`, and spatial stress `S_ij` are defined on one foliation, reconstructed into `T_mu_nu` when needed, and tested against weak, null, strong, and dominant energy-condition surfaces. The current selected NHM2 clocking-law anchor uses a centerline lapse `alpha = 0.995`, giving the target relation `tau = alpha T` under a frozen coordinate mission and shift schedule. Lower-alpha profiles remain expected targets until their own repository-measured full-loop artifacts pass.
+
+The May 2026 red-team update narrows the paper's status claim further. NHM2 is now treated as a lapse-extended Natario-style diagnostic / reduced-order candidate lane with bounded solve-backed outputs under review. The validation-hardening branch defines the current divergence surface: the metric-required same-chart tensor route is relatively well-formed, while the tile-effective source mechanism has not yet supplied an authoritative same-basis regional counterpart tensor, observer artifacts still require single-run reconciliation, and QEI / convergence / independent reproduction evidence remains promotion-blocking. The paper therefore claims a bounded, artifact-limited mathematical framework and a well-defined blocker map, not physical viability or experimental validation.
 
 ## Executive scientific claim boundary
 
-NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or validated lower-alpha profiles. Repository artifacts define which NHM2 rows are validated, review-level, diagnostic, runtime-blocked, or unsupported.
+NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or lower-alpha profile promotion. Repository artifacts define which NHM2 rows are pass-level under a named contract, review-level, diagnostic, runtime-blocked, or unsupported.
 
-The literature roles are intentionally narrow. Gourgoulhon / ADM provide formalism context, not NHM2 validation. Alcubierre / Natario provide warp-metric context, not NHM2 validation. Pfenning-Ford / Fewster-Roman / Santiago-Schuster-Visser provide limitation and energy-condition context, not NHM2 validation. Repository artifacts define NHM2 row status.
+The literature roles are intentionally narrow. Gourgoulhon / ADM provide formalism context, not NHM2 validation. Alcubierre / Natario provide warp-metric context, not NHM2 validation. Pfenning-Ford / Fewster-Roman / Santiago-Schuster-Visser provide limitation and energy-condition context, not NHM2 validation. Maldacena / holography / entanglement-wedge / traversable-wormhole sources provide external context only; they do not validate NHM2 source closure, observer closure, or transport. Repository artifacts define NHM2 row status.
 
-The selected-profile clocking-law anchor is not a blanket full-loop certified pass. `0p7000` is runtime-blocked, not physics-failed. `0p5000` is exploratory, not validated. Source closure is globally diagonal-tight but review-level because of diagnostic-only regional `T00` and assumption drift. The Casimir source model is mechanism-side and not an experimentally grounded macroscopic stress-energy realization. Sector strobing modulates duty-averaged source strength; it is not a certified thrust law. `g` targets are local proper-acceleration targets in Earth-gravity units, not Lorentz gamma.
+The selected-profile clocking-law anchor is not a blanket full-loop certified pass. `0p7000` is runtime-blocked, not physics-failed. `0p5000` is exploratory, not promoted. Source closure is globally diagonal-tight but review-level because regional comparison is diagnostic-only, the expected `tile_effective_counterpart` surface is missing, and assumption drift remains recorded. The Casimir source model is mechanism-side and not an experimentally grounded macroscopic stress-energy realization. Sector strobing modulates duty-averaged source strength; it is not a certified thrust law. `g` targets are local proper-acceleration targets in Earth-gravity units, not Lorentz gamma.
+
+The red-team baseline changes the practical scientific question. The immediate question is no longer "can the dashboard be made green?" It is: can one frozen NHM2 reference run make the bridge from metric-required stress-energy to tile-effective stress-energy impossible to misread, region by region, observer by observer, with QEI/QFT and reproducibility evidence attached?
 
 ## 1. Motivation and problem statement
 
 The scientific problem addressed here is narrower than a flight-ready warp-drive claim. NHM2 asks whether a bounded lapse-shift profile can be represented, evaluated, and audited in one declared chart with enough mathematical discipline that observer quantities, energy-condition surfaces, and centerline proper-time targets are not confused with coordinate artifacts or mechanism-side assumptions.
 
-That problem has three recurring failure modes. First, a shift vector can be misread as an ordinary ship speed. Second, a diagonal stress-energy proxy can be mistaken for a full observer tensor. Third, an expected clocking law such as `tau = alpha T` can be mistaken for a validated route result. The whitepaper is structured to prevent those errors: accepted equations first, NHM2 instantiation second, computation/evidence surfaces third, and artifact status last.
+That problem has three recurring failure modes. First, a shift vector can be misread as an ordinary ship speed. Second, a diagonal stress-energy proxy can be mistaken for a full observer tensor. Third, an expected clocking law such as `tau = alpha T` can be mistaken for a promoted route result. The whitepaper is structured to prevent those errors: accepted equations first, NHM2 instantiation second, computation/evidence surfaces third, and artifact status last.
+
+The red-team branch adds a fourth failure mode: a summary artifact can be mistaken for a validation surface when its inputs are not frozen to one run. The new reference-run harness therefore treats `latest` aliases, profile mismatch, observer summary/detail disagreement, missing regional source counterparts, diagonal-proxy authority, missing QEI dossier, null reproducibility fields, and certificate-overrides-review behavior as first-class blockers.
 
 The implementation records calculations through repository artifacts. Those artifacts are not the theory itself; they are the evidence surfaces used to determine which NHM2 rows are admitted, review-level, diagnostic, runtime-blocked, or unsupported.
 
@@ -246,7 +252,34 @@ The Casimir source model is mechanism-side and not an experimentally grounded ma
 
 ### 4.5 Source closure: global diagonal tightness and regional diagnostic limits
 
-Source closure is numerically tight on the global diagonal comparison in the current evidence stack, including a reported `relLInf = 4.6143808140791624e-10`. That number should not be promoted by itself. Source closure remains review-level because regional direct `T00` comparison is diagnostic-only and assumption drift remains recorded. The safe conclusion is: global diagonal agreement is tight under the current comparison, while regional direct source closure is not yet an authoritative physical source proof.
+Source closure is numerically tight on the global diagonal comparison in the current evidence stack, including a reported `relLInf = 4.6143808140791624e-10`. That number should not be promoted by itself. Source closure remains review-level because regional direct `T00` comparison is diagnostic-only, the metric side expects a `tile_effective_counterpart`, and the tile side currently resolves through a `gr_matter_channel_observation` path rather than an authoritative same-basis counterpart. The current regional residuals are also not small under that diagnostic comparison: hull is about `0.977`, wall is about `14.95`, and exterior shell is about `2.02`. The safe conclusion is: global diagonal agreement is tight under the current comparison, while regional direct source closure is not yet an authoritative physical source proof.
+
+### 4.6 Divergence surface: where new physics or a source-model correction must enter
+
+The red-team baseline localizes the central divergence. The metric-required lane can compute a same-chart stress-energy demand from the selected geometry:
+
+\[
+T_{\mu\nu}^{\rm required}[g_{\rm NHM2}]=\frac{1}{8\pi}G_{\mu\nu}[g_{\rm NHM2}].
+\]
+
+The source-mechanism lane must then supply an independently meaningful tile-effective counterpart:
+
+\[
+T_{\mu\nu}^{\rm tile\ effective}
+\]
+
+on the same chart, tensor basis, profile, run, units, masks, and regional aggregation rules. The hard comparison is not merely global and not merely diagonal:
+
+\[
+\Delta T_{\mu\nu}^{(R)}
+=T_{\mu\nu}^{\rm required}(R)-T_{\mu\nu}^{\rm tile\ effective}(R),
+\qquad
+R\in\{{\rm global,hull,wall,exterior\ shell}\}.
+\]
+
+This equation defines where future novelty could live. If a future source model supplies a conserved, observer-auditable, QEI-bounded, same-basis tile-effective tensor whose regional residuals close against the metric-required tensor, then NHM2 would have a novel reduced-order source-to-geometry result to report. If that tensor cannot be supplied, then NHM2 remains a geometry-first diagnostic lane whose metric can be evaluated but whose proposed Casimir/tile source mechanism is not physically closed.
+
+The term "new physics" should therefore be used carefully. The current paper does not claim that new physics has been found. It identifies the exact bridge any new physics, material mechanism, renormalized stress-tensor model, boundary-state construction, or source-coupling correction would have to cross.
 
 ## 5. Full-tensor observer closure
 
@@ -348,11 +381,13 @@ The route then projects the computed same-chart tensor into `E`, `J_i`, and `S_i
 
 ### 5.5 Observer energy-condition gates
 
-The observer audit checks energy-condition surfaces from the full tensor, not from a lone coordinate entry. Passing an observer audit means the selected route satisfied the implemented observer-surface checks under the declared artifact semantics. It does not mean physical viability, experimental validation, or robustness for arbitrary external fields.
+The observer audit checks energy-condition surfaces from the full tensor, not from a lone coordinate entry. A clean observer pass would mean the selected route satisfied the implemented observer-surface checks under the declared artifact semantics. It would not mean physical viability, experimental validation, or robustness for arbitrary external fields.
+
+The present red-team status is stricter than the older summary wording. A full-loop observer section that reports `pass` cannot override a detailed observer artifact from a nearby run that reports `status = fail`, `observer_condition_failed`, `surrogate_model_limited`, or robust DEC failure. In the current evidence stack, the dated observer artifact reports robust DEC failure with a worst value on the order of `-5.8267450e7` on both metric and tile surfaces. That does not by itself refute the geometry-first tensor route; it means observer closure must be regenerated from one frozen run and reconciled before any clean observer-pass language is allowed.
 
 ### 5.6 What this closure does and does not prove
 
-This closure demonstrates an auditable same-chart tensor evaluation path inside the repository evidence stack. It does not prove the physical source is realizable, that a lower-alpha profile passes, that a route ETA exists, or that any strong-field environment is safe.
+This closure demonstrates an auditable same-chart tensor evaluation path inside the repository evidence stack. The red-team baseline now treats it as an admitted metric-required diagnostic route, not as a completed observer-safe physical mechanism. It does not prove the physical source is realizable, that a lower-alpha profile passes, that a route ETA exists, or that any strong-field environment is safe.
 
 ## 6. Centerline-lapse clocking calculation
 
@@ -445,7 +480,7 @@ The same expected target calculation gives:
 | 0p8000 | 0.800 | 110204772.733744 | -27551193.183436 | 318.879551 | 1.250000000 | expected target unless fresh row artifacts pass |
 | 0p7300 | 0.730 | 100561855.119541 | -37194110.797638 | 430.487393 | 1.369863014 | near-frontier target / revalidation rung |
 | 0p7000 | 0.700 | 96429176.142026 | -41326789.775154 | 478.319326 | 1.428571429 | runtime-blocked, not physics-failed |
-| 0p5000 | 0.500 | 68877982.958590 | -68877982.958590 | 797.198877 | 2.000000000 | deep exploratory, not validated |
+| 0p5000 | 0.500 | 68877982.958590 | -68877982.958590 | 797.198877 | 2.000000000 | deep exploratory, not promoted |
 
 For `0p7000`, the calculation is:
 
@@ -471,7 +506,7 @@ For `0p5000`, the calculation is:
 {\rm savedDays}=797.198877.
 \]
 
-### 6.6 Why lower-alpha rows are targets, not validated outcomes
+### 6.6 Why lower-alpha rows are targets, not promoted outcomes
 
 Expected clocking math says what a row should produce if the same schedule remains frozen and the centerline worldline remains flat at `d tau / dt = alpha`. Validation requires fresh artifacts: selected transport completion, profile coherence, mission coordinate invariance, proper/coordinate ratio closure, decomposition residual closure, lapse-tracked fraction, horizon margin, beta-over-alpha sanity, observer gates, source/provenance gates, and full-loop audit state.
 
@@ -484,6 +519,8 @@ The current evidence stack admits selected same-chart observer routes and a sele
 ### 7.2 Perturbation and reproducibility limits
 
 Reproducibility depends on artifact freshness, deterministic output paths, source manifests, and fail-closed gates. A row that lacks a fresh full-loop artifact is not silently promoted by expected math. A row blocked by selected transport is not a physics failure until the runtime layer completes and the physics gates are reached.
+
+The red-team reference-run contract strengthens this requirement: validation claims cannot depend on `latest` aliases, mismatched profile IDs, null convergence fields, null boundary or smoothing sensitivity, missing independent reproduction, or artifact hash mismatch. These fields may remain null for diagnostic research, but they must be explicit blockers for any future validation or certified-language update.
 
 ### 7.3 0p7000 runtime frontier
 
@@ -510,6 +547,10 @@ The NHM2 calculation does not solve an experimentally realized Casimir material 
 The following remain outside the current claim:
 
 - physical source realization of the required stress-energy tensor
+- same-basis regional `T_ab_tile_effective_counterpart` closure against `T_ab_metric_required`
+- single-frozen-run observer audit reconciliation
+- QEI/QFT dossier with state assumptions, sampling worldlines, renormalization convention, and light-crossing / duty-cycle consistency
+- convergence, boundary-condition sensitivity, smoothing-kernel sensitivity, and independent reproduction evidence
 - experimental validation of Casimir-tile amplification as a macroscopic GR source
 - arbitrary route dynamics
 - max speed
@@ -522,7 +563,17 @@ The following remain outside the current claim:
 
 ### 8.3 Why literature context is not validation
 
-The cited GR and warp-drive literature defines the mathematical language and the known cautionary terrain. It does not certify this repository's numeric artifacts. In this whitepaper, papers provide formalism and context; repository artifacts define NHM2 row status.
+The cited GR and warp-drive literature defines the mathematical language and the known cautionary terrain. Holography and wormhole literature provide additional external context about geometry, observers, negative energy, and causality. They do not certify this repository's numeric artifacts. In this whitepaper, papers provide formalism and context; repository artifacts define NHM2 row status.
+
+### 8.4 What a future novel claim could be
+
+The current novel contribution is not a claim of physical transport. It is the explicit localization of the source-to-geometry divergence under a same-chart red-team harness. The future publishable claim, if earned, would be narrower and stronger:
+
+```text
+NHM2 Reference Solve v1 supplies a frozen reduced-order same-chart source-to-geometry closure result: regional metric-required tensors and independently defined tile-effective counterpart tensors close within declared tolerance, observer artifacts agree from one run, QEI/QFT bounds are explicit, and convergence/reproduction evidence is emitted.
+```
+
+That would still not automatically imply experimental propulsion, ambient causality violation, or full quantum-gravity validation. It would be a defensible reduced-order GR result with a specific source-mechanism dossier. The reason to update this whitepaper now is to define the exact evidence bridge before trying to cross it.
 
 ## Appendix A. Repository artifact status and claim-tier table
 
@@ -537,11 +588,15 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | currentClaimTier | `diagnostic` | not promoted to reduced-order / physical-viability claim |
 | highestPassingClaimTier | `null` | no blanket top-level promotion |
 | representative blocking reasons | `insufficient_provenance`, `policy_review_required` | provenance/policy gates still constrain claims |
-| source_closure | globally diagonal-tight, review-level | regional direct `T00` diagnostic-only and assumption drift remain |
-| observer_audit | selected same-chart route admitted/pass in current artifact stack | repo-internal observer closure, not external validation |
+| reference-run validation mode | `red_team_hardening` | validation claim remains false until hard gates pass |
+| source_closure | globally diagonal-tight, review-level | regional comparison is diagnostic-only; expected `tile_effective_counterpart` is missing |
+| regional residuals | hull about `0.977`, wall about `14.95`, exterior shell about `2.02` | diagnostic comparison does not regionally close |
+| observer_audit | inconsistent summary/detail evidence | full-loop pass language must be reconciled against detailed fail artifacts from one frozen run |
+| QEI/QFT dossier | missing / not promotion-safe | physical-mechanism language remains blocked |
+| reproducibility fields | incomplete / null in current full-loop evidence | convergence, boundary, smoothing, independent reproduction, and hash consistency block validation language |
 | certificate_policy_result | `pass` in current artifact stack | policy sub-surface pass does not override top-level review state |
 | 0p7000 | `runtime_blocked` due to `selected_transport_timeout` | runtime-blocked, not physics-failed |
-| 0p5000 | exploratory expected target | not validated |
+| 0p5000 | exploratory expected target | not promoted |
 
 ## Appendix B. Current generated artifact reproducibility boundary
 
@@ -554,6 +609,15 @@ artifacts/research/full-solve/selected-family/nhm2-shift-lapse/alpha-sweep/nhm2-
 
 Unless those generated JSONs are separately committed and published, community-facing review should treat this markdown paper as documenting the local/generated artifact state rather than assuming every underlying JSON surface is publicly fetchable from GitHub.
 
+The May 2026 red-team harness adds two explicit commands for freezing and validating a reference run:
+
+```text
+npm run nhm2:freeze-reference-run
+npm run nhm2:validate-reference-run
+```
+
+The freeze step is allowed to produce an audit-only blocker ledger while `latest` aliases remain in the current artifact graph. A validation-ready reference run must have one commit, one selected profile, one run ID, one artifact set, no `latest` aliases, and no profile mismatches.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -563,8 +627,9 @@ Unless those generated JSONs are separately committed and published, community-f
 | `E,J_i,S_ij` projections | observer stress-energy grammar | same-chart full-tensor observer closure | requires admitted route |
 | `T_ij`, `T_0i`, `T_00` reconstruction | reconstruct coordinate tensor components | prevents diagonal-only proxy promotion | valid only from same-chart projected quantities |
 | `G_mu_nu=8piT_mu_nu` | Einstein tensor route | geometry-first stress-energy evaluation | repo-internal evaluator, not experimental validation |
+| `Delta T_mu_nu^(R)=T_required^(R)-T_tile_effective^(R)` | red-team divergence surface | identifies where source-to-geometry closure must be proven | requires same-basis regional counterpart tensor |
 | WEC/NEC/SEC/DEC | energy-condition tests | observer audit | passing audit is not physical viability |
-| `tau=alpha T` | frozen centerline clocking target | lapse sweep expectation | lower-alpha rows unvalidated until artifacts pass |
+| `tau=alpha T` | frozen centerline clocking target | lapse sweep expectation | lower-alpha rows remain targets until artifacts pass |
 | `E/A=-pi^2 hbar c/(720a^3)` | mechanism-side source model | tile energy baseline | not GR-coupled physical source proof |
 | `d_eff=d_burst d_cycle (N_concurrent/N_sector)` | duty averaging | sector strobing source strength | not a certified thrust law |
 | `a_i=partial_i alpha / alpha` | Eulerian proper acceleration | cabin-frame acceleration diagnostic | not curvature gravity or comfort/safety certification |
@@ -580,8 +645,17 @@ Unless those generated JSONs are separately committed and published, community-f
 | Pfenning and Ford, The unphysical nature of Warp Drive: https://arxiv.org/abs/gr-qc/9702026 | negative-energy and warp limitation context | does not validate NHM2 |
 | Fewster and Roman, Null energy conditions in quantum field theory: https://arxiv.org/abs/gr-qc/0209036 | energy-condition and quantum-field-theory caution context | does not validate NHM2 |
 | Santiago, Schuster, Visser, Generic warp drives violate the null energy condition: https://arxiv.org/abs/2105.03079 | generic warp-drive NEC caution context | does not validate NHM2 |
+| Maldacena, The Large N Limit of Superconformal Field Theories and Supergravity: https://arxiv.org/abs/hep-th/9711200 | controlled holographic context | does not validate NHM2 source closure or transport |
+| Ryu and Takayanagi, Holographic Derivation of Entanglement Entropy from AdS/CFT: https://arxiv.org/abs/hep-th/0603001 | holographic geometry / entropy context | does not validate a local Casimir-tile source |
+| Penington, Entanglement Wedge Reconstruction and the Information Paradox: https://arxiv.org/abs/1905.08255 | entanglement-wedge / Page-time context | does not validate NHM2 |
+| Almheiri, Engelhardt, Marolf, Maxfield, The entropy of bulk quantum fields and the entanglement wedge of an evaporating black hole: https://arxiv.org/abs/1905.08762 | black-hole information and wedge context | does not validate NHM2 |
+| Maldacena, Real observers solving imaginary problems: https://arxiv.org/abs/2412.14014 | observer-inclusion caution; v3 leaves an overall minus-sign caveat | does not validate the NHM2 observer audit |
+| Maldacena, Milekhin, Popov, Traversable wormholes in four dimensions: https://arxiv.org/abs/1807.04726 | negative Casimir-like energy and ambient-causality context | does not validate warp drive or NHM2 tile source |
+| Guevara, Lupsasca, Skinner, Strominger, Weil, Single-minus gluon tree amplitudes are nonzero: https://arxiv.org/abs/2602.12176 | unrelated scattering-amplitudes context | does not support NHM2 source closure |
 | CasimirBot repository artifacts | implementation/evidence state | only source for NHM2 row status |
 
 ## Final conclusion
 
-NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy closure route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a same-chart tensor, observer projections define energy-condition gates, and the centerline-lapse law computes expected timing targets. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, or validated deep-clock rows. The immediate progression is to preserve the selected-profile clocking-law anchor, recover the `0p7000` selected-transport runtime frontier, and promote only rows whose own fresh artifacts pass.
+NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a metric-required tensor, observer projections define energy-condition gates, and the centerline-lapse law computes expected timing targets.
+
+The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, or promoted deep-clock rows. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, attach a QEI/QFT dossier, emit convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. Any future novel claim should be made at that bridge, after the bridge passes, not before.

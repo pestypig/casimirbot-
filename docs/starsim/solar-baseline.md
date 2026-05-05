@@ -303,3 +303,15 @@ This patch does not imply:
 - full flare/CME prediction
 
 The current live fit path remains the existing solar-like stellar path.
+
+## Solar event congruence extension
+
+`solar_event_congruence` is an additive StarSim layer for event-level observational agreement.
+It does not change the continuous `stellar_spectral_viability` M0-M3 model semantics.
+
+The current lattice lane means continuous Planck-derived radiance with flux-preserving lattice emissivity redistribution.
+It does not mean discrete emitted photon packets.
+Photon packets are a downstream measurement simulation through `stellar_packet_measurement`, using `E_gamma = h c / lambda` and Poisson count sampling against a calibrated continuous spectrum.
+
+The congruence layer treats magnetic reconnection, p-mode timing, ribbon-kernel structure, PIL magnetic backreaction, local helioseismic response, transition-region brightening, multifractal flare memory, and polarimetric path constraints as ordinary observational physics.
+Collapse-like residual timing is advisory-only and remains gated behind computed magnetic and p-mode nulls plus applicable backreaction/topology and energy-closure checks.

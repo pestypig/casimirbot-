@@ -1,3 +1,7 @@
+// StarSim M0-M3 are continuous spectral source models. M1_lattice_emissivity
+// redistributes Planck-derived radiance with a lattice emissivity kernel and is
+// renormalized to the same flux; packetized photons belong in the separate
+// stellar_packet_measurement lane.
 const PLANCK_H = 6.62607015e-34;
 const BOLTZMANN_K = 1.380649e-23;
 const LIGHT_C = 299792458;
