@@ -117,6 +117,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.create_graph_from_recipe",
   "situation-room-pipelines.create_translation_pair",
   "situation-room-pipelines.attach_graph_to_helix_ask",
+  "situation-room-pipelines.attach_standby_to_helix_thread",
 ]);
 
 export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
@@ -231,6 +232,14 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     returns_artifact: true,
   },
   { panel_id: "situation-room-pipelines", action_id: "attach_graph_to_helix_ask", required_args: ["graph_id"], optional_args: [], returns_artifact: true },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "attach_standby_to_helix_thread",
+    required_args: ["room_id", "thread_id"],
+    optional_args: ["source_id", "graph_id", "world_id", "turn_id", "session_id", "trace_id", "append_policy"],
+    risk: "medium",
+    returns_artifact: true,
+  },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
@@ -503,6 +512,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "connect_nodes") return "situation_room_graph";
   if (panelId === "situation-room-pipelines" && actionId === "create_translation_pair") return "situation_room_graph";
   if (panelId === "situation-room-pipelines" && actionId === "attach_graph_to_helix_ask") return "situation_room_graph_attachment";
+  if (panelId === "situation-room-pipelines" && actionId === "attach_standby_to_helix_thread") return "situation_thread_binding_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
   if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {

@@ -37,6 +37,7 @@ import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 
 describe("panelActionAdapters", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     hoisted.callOrder.length = 0;
     hoisted.openDocPanelMock.mockClear();
     hoisted.launchHelixAskPromptMock.mockClear();
@@ -543,6 +544,60 @@ describe("panelActionAdapters", () => {
     });
     expect(graphFromRecipe.artifact?.node_ids).toHaveLength(7);
     expect(graphFromRecipe.artifact?.job_ids).toHaveLength(2);
+  });
+
+  it("posts Situation Room standby thread binding requests", () => {
+    const room = useSituationRoomStore.getState().createRoom("Minecraft Binding Room");
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ok: true, schema: "helix.situation_thread_binding_receipt.v1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "attach_standby_to_helix_thread",
+        args: {
+          room_id: room.room_id,
+          source_id: "source:minecraft-server",
+          world_id: "minecraft:minehut",
+          thread_id: "thread:ask",
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toMatchObject({
+      kind: "situation_thread_binding_receipt",
+      ok: true,
+      context_policy: "explicit_attachment_only",
+      command_lane_enabled: false,
+      binding_request: {
+        room_id: room.room_id,
+        source_id: "source:minecraft-server",
+        world_id: "minecraft:minehut",
+        thread_id: "thread:ask",
+        mode: "standby_receipts",
+        append_policy: "salient_only",
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agi/situation/thread-binding",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
   });
 
   it("delegates Situation Room setup-from-prompt and mic source actions with receipts", () => {

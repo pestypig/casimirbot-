@@ -100,6 +100,15 @@ function asStringArray(value: unknown): string[] {
   return single ? [single] : [];
 }
 
+function postSituationThreadBinding(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/thread-binding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
 function normalizeSituationJobKind(value: unknown): SituationRoomJobKind | null {
   const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
   if (!text) return null;
@@ -1379,6 +1388,58 @@ export function executeHelixPanelAction(
         action_id: actionId,
         artifact: { graph_id: graphId, node_count: graph?.nodes.length ?? 0, edge_count: graph?.edges.length ?? 0 },
         message: graph ? `Attached graph ${graphId} to Helix Ask.` : `Unknown situation room graph: ${graphId}`,
+      };
+    }
+
+    if (actionId === "attach_standby_to_helix_thread") {
+      const room = resolveSituationRoom(args);
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId);
+      if (!room || !threadId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            kind: "situation_thread_binding_receipt",
+            ok: false,
+            missing: [!room ? "room_id" : "", !threadId ? "thread_id" : ""].filter(Boolean),
+          },
+          message: !room
+            ? "No situation room is available to bind to Helix Ask."
+            : "situation-room-pipelines.attach_standby_to_helix_thread requires thread_id.",
+        };
+      }
+      const sourceIds = resolveSituationSourceIds(room, args);
+      const bindingRequest = {
+        room_id: room.room_id,
+        source_id: asNonEmptyString(args.source_id ?? args.sourceId) ?? sourceIds[0] ?? null,
+        graph_id: asNonEmptyString(args.graph_id ?? args.graphId) ?? null,
+        world_id: asNonEmptyString(args.world_id ?? args.worldId) ?? "minecraft:minehut",
+        thread_id: threadId,
+        turn_id: asNonEmptyString(args.turn_id ?? args.turnId) ?? null,
+        session_id: asNonEmptyString(args.session_id ?? args.sessionId) ?? null,
+        trace_id: asNonEmptyString(args.trace_id ?? args.traceId) ?? null,
+        mode: "standby_receipts",
+        append_policy:
+          asNonEmptyString(args.append_policy ?? args.appendPolicy) === "all_receipts_debug"
+            ? "all_receipts_debug"
+            : "salient_only",
+      };
+      postSituationThreadBinding(bindingRequest);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_thread_binding_receipt",
+          ok: true,
+          binding_request: bindingRequest,
+          context_policy: "explicit_attachment_only",
+          command_lane_enabled: false,
+        },
+        message: `Submitted standby receipt binding for ${room.title}.`,
       };
     }
   }

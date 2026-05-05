@@ -12,11 +12,15 @@ import {
   type SituationSalienceReceipt,
   type SituationStateProjection,
 } from "@shared/helix-situation-standby";
-import { appendHelixThreadEvent } from "../helix-thread/ledger";
 import {
   getMinecraftEventHints,
   normalizeMinecraftWorldEventToSignal,
 } from "./minecraft-event-normalizer";
+import { appendStandbyObservationToThread } from "./standby-thread-observation";
+import {
+  createSituationThreadBinding,
+  resolveSituationThreadBinding,
+} from "./thread-binding-store";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -72,6 +76,7 @@ export type WorldEventIngestResult = {
   goal_hypothesis_ids?: string[];
   thread_id?: string | null;
   turn_id?: string | null;
+  item_id?: string | null;
   reason?: string | null;
   message: string;
   event_type?: string;
@@ -105,7 +110,7 @@ const stableJson = (value: unknown): string => {
   const record = value as Record<string, unknown>;
   return `{${Object.keys(record)
     .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+    .map((key: string) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
     .join(",")}}`;
 };
 
@@ -183,7 +188,7 @@ const buildProjection = (
   const toTs = signals.at(-1)?.ts ?? signal.ts;
   const latestFacts = signals
     .slice(-8)
-    .map((entry) => ({
+    .map((entry: SituationEventSignal) => ({
       fact_id: `fact:${hashShort([entry.signal_id, entry.event_type], 10)}`,
       text: entry.text?.trim()
         ? entry.text.trim()
@@ -194,7 +199,7 @@ const buildProjection = (
   return {
     schema: HELIX_SITUATION_STATE_PROJECTION_SCHEMA,
     projection_id: `projection:${state.roomId}:${hashShort(
-      signals.map((entry) => entry.signal_id),
+      signals.map((entry: SituationEventSignal) => entry.signal_id),
       12,
     )}`,
     room_id: state.roomId,
@@ -423,7 +428,9 @@ export const ingestWorldEvent = async (
   const signalId = buildSignalId(event);
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
   state.signals.push(signal);
-  state.signals.sort((a, b) => a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id));
+  state.signals.sort((a: SituationEventSignal, b: SituationEventSignal) =>
+    a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id),
+  );
   if (state.signals.length > 100) {
     state.signals.splice(0, state.signals.length - 100);
   }
@@ -438,42 +445,54 @@ export const ingestWorldEvent = async (
     repeatedLocationCount,
   });
   const interjectionProposal = buildInterjectionProposal(salienceReceipt);
-  const threadId = options.threadId ?? null;
-  const turnId = options.turnId ?? null;
-  const shouldAppend = options.appendToThread !== false && Boolean(threadId && turnId);
-  let appended = false;
-
-  if (shouldAppend && threadId && turnId) {
-    const itemId = `world_event_observation:${signal.signal_id}`;
-    appendHelixThreadEvent({
-      route: "/ask",
-      event_type: "item_completed",
-      thread_id: threadId,
-      turn_id: turnId,
-      session_id: options.sessionId ?? null,
-      trace_id: options.traceId ?? null,
-      item_id: itemId,
-      item_type: "toolObservation",
-      item_status: "completed",
-      item_stream: "observation",
-      observation_ref: {
-        schema: "helix.world_event_observation.v1",
-        world_event: event,
-        signal,
-        projection,
-        goal_hypotheses: goalHypotheses,
-        salience_receipt: salienceReceipt,
-        interjection_proposal: interjectionProposal,
-      },
-      meta: {
-        kind: "minecraft_world_event",
-        room_id: event.room_id,
-        world_id: event.world_id,
-        salience_reason: salienceReceipt?.reason ?? null,
-      },
-    });
-    appended = true;
-  }
+  const explicitThreadId = options.threadId ?? null;
+  const explicitTurnId = options.turnId ?? null;
+  const explicitBinding =
+    options.appendToThread !== false && explicitThreadId
+      ? createSituationThreadBinding({
+          room_id: event.room_id,
+          source_id: event.source_id ?? null,
+          graph_id: graphId,
+          world_id: event.world_id,
+          thread_id: explicitThreadId,
+          turn_id: explicitTurnId,
+          session_id: options.sessionId ?? null,
+          trace_id: options.traceId ?? null,
+          mode: "standby_receipts",
+          append_policy: "all_receipts_debug",
+        }).binding ?? null
+      : null;
+  const resolvedBinding =
+    explicitBinding ??
+    (options.appendToThread === false
+      ? null
+      : resolveSituationThreadBinding({
+          room_id: event.room_id,
+          source_id: event.source_id ?? null,
+          graph_id: graphId,
+          world_id: event.world_id,
+        }));
+  const appendResult: Awaited<ReturnType<typeof appendStandbyObservationToThread>> =
+    options.appendToThread === false
+      ? { appended: false, reason: "no_binding" as const }
+      : await appendStandbyObservationToThread({
+          binding: resolvedBinding,
+          world_event: event,
+          signal,
+          state_projection: projection,
+          goal_hypotheses: goalHypotheses,
+          salience_receipt: salienceReceipt,
+          interjection_proposal: interjectionProposal,
+        });
+  const appended = appendResult.appended;
+  const threadId = appendResult.thread_id ?? resolvedBinding?.thread_id ?? explicitThreadId ?? null;
+  const turnId = appendResult.turn_id ?? resolvedBinding?.turn_id ?? explicitTurnId ?? null;
+  const reason =
+    appended
+      ? null
+      : appendResult.reason === "no_binding"
+        ? "no_thread_context"
+        : appendResult.reason;
 
   return {
     ok: true,
@@ -482,10 +501,11 @@ export const ingestWorldEvent = async (
     signal_id: signal.signal_id,
     salience_receipt_id: salienceReceipt?.receipt_id ?? null,
     projection_id: projection.projection_id,
-    goal_hypothesis_ids: goalHypotheses.map((goal) => goal.hypothesis_id),
+    goal_hypothesis_ids: goalHypotheses.map((goal: SituationGoalHypothesis) => goal.hypothesis_id),
     thread_id: threadId,
     turn_id: turnId,
-    reason: appended ? null : "no_thread_context",
+    item_id: appendResult.item_id ?? null,
+    reason,
     message: appended
       ? "World event ingested and appended as a thread observation."
       : "World event ingested without thread append.",
@@ -504,7 +524,7 @@ export const ingestWorldEventBatch = async (
 ): Promise<WorldEventIngestBatchResult> => {
   const ordered = events
     .slice()
-    .sort((a, b) => a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type));
+    .sort((a: HelixWorldEvent, b: HelixWorldEvent) => a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type));
   const results: WorldEventIngestResult[] = [];
   for (const event of ordered) {
     results.push(await ingestWorldEvent(event, options));

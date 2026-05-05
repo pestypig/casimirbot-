@@ -90,6 +90,25 @@ const STANDBY_MODE_OPTIONS: Array<{ value: SituationStandbyMode; label: string }
 
 type PipelinePanelPage = "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
 
+type SituationThreadBindingView = {
+  binding_id: string;
+  binding_kind: "room" | "source" | "graph" | "minecraft_world";
+  room_id: string;
+  source_id?: string | null;
+  graph_id?: string | null;
+  world_id?: string | null;
+  thread_id: string;
+  mode: "observe_only" | "standby_receipts";
+  append_policy: "salient_only" | "all_receipts_debug";
+  updated_at: string;
+};
+
+type SituationThreadBindingStatus = {
+  ok: boolean;
+  message: string;
+  reason?: string | null;
+};
+
 let globalJobOutputReadController: AbortController | null = null;
 let globalJobOutputReadAudio: HTMLAudioElement | null = null;
 let globalJobOutputReadUrl: string | null = null;
@@ -351,6 +370,11 @@ export default function SituationRoomPipelinesPanel() {
     chunkIndex: number;
     chunkCount: number;
   } | null>(null);
+  const [bindingThreadId, setBindingThreadId] = React.useState("helix-ask:desktop");
+  const [bindingWorldId, setBindingWorldId] = React.useState("minecraft:minehut");
+  const [bindingStatus, setBindingStatus] = React.useState<SituationThreadBindingStatus | null>(null);
+  const [threadBindings, setThreadBindings] = React.useState<SituationThreadBindingView[]>([]);
+  const [bindingBusy, setBindingBusy] = React.useState(false);
   const masterScrollRef = React.useRef<HTMLDivElement | null>(null);
   const masterScrollPinnedRef = React.useRef(true);
   const knownJobIdsRef = React.useRef<Set<string> | null>(null);
@@ -395,6 +419,20 @@ export default function SituationRoomPipelinesPanel() {
   const activeWorldSignals = activeStandbySignals.filter((signal) => signal.source === "minecraft_event");
   const activeStandbyReceipts = standbyKey ? standbyReceipts[standbyKey] ?? [] : [];
   const activeStandbyProposals = standbyKey ? standbyProposals[standbyKey] ?? [] : [];
+  const minecraftSourceId = activeSources.find((source) => source.source_id === "source:minecraft-server")?.source_id
+    ?? activeWorldSignals.at(-1)?.source_id
+    ?? activeSources[0]?.source_id
+    ?? "source:minecraft-server";
+  const activeThreadBinding = React.useMemo(() => {
+    if (!activeRoom) return null;
+    return (
+      threadBindings.find((binding) => activeGraph?.graph_id && binding.graph_id === activeGraph.graph_id) ??
+      threadBindings.find((binding) => binding.source_id === minecraftSourceId) ??
+      threadBindings.find((binding) => binding.world_id === bindingWorldId) ??
+      threadBindings.find((binding) => binding.room_id === activeRoom.room_id) ??
+      null
+    );
+  }, [activeGraph?.graph_id, activeRoom, bindingWorldId, minecraftSourceId, threadBindings]);
   const draftScope = React.useMemo(
     () => ({
       room_id: activeRoom?.room_id ?? "",
@@ -436,6 +474,22 @@ export default function SituationRoomPipelinesPanel() {
     if (!activeJobs.length || (selectedJobId && jobs[selectedJobId])) return;
     setSelectedJobId(activeJobs[0]?.job_id);
   }, [activeJobs, jobs, selectedJobId]);
+
+  const loadThreadBindings = React.useCallback(async () => {
+    try {
+      const response = await fetch("/api/agi/situation/thread-binding/list");
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !Array.isArray(payload.bindings)) return;
+      setThreadBindings(payload.bindings as SituationThreadBindingView[]);
+    } catch {
+      // Runtime diagnostics should never block the panel.
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (panelPage !== "runtime") return;
+    void loadThreadBindings();
+  }, [loadThreadBindings, panelPage]);
 
   React.useEffect(() => {
     const currentIds = new Set(activeJobs.map((job) => job.job_id));
@@ -776,6 +830,73 @@ export default function SituationRoomPipelinesPanel() {
     [activeGraph?.graph_id, activeRoom, activeSources, ingestStandbySignal],
   );
 
+  const handleAttachThreadBinding = React.useCallback(
+    async (target: "room" | "source" | "graph") => {
+      if (!activeRoom) return;
+      const threadId = bindingThreadId.trim();
+      if (!threadId) {
+        setBindingStatus({ ok: false, message: "Thread id is required before attaching standby receipts." });
+        return;
+      }
+      setBindingBusy(true);
+      setBindingStatus(null);
+      const body = {
+        room_id: activeRoom.room_id,
+        source_id: target === "source" ? minecraftSourceId : undefined,
+        graph_id: target === "graph" ? activeGraph?.graph_id : undefined,
+        world_id: target === "source" ? bindingWorldId.trim() || "minecraft:minehut" : undefined,
+        thread_id: threadId,
+        mode: "standby_receipts",
+        append_policy: "salient_only",
+      };
+      try {
+        const response = await fetch("/api/agi/situation/thread-binding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          setBindingStatus({
+            ok: false,
+            message: payload?.message ?? payload?.error ?? "Could not attach standby receipts.",
+            reason: payload?.error ?? null,
+          });
+        } else {
+          setBindingStatus({ ok: true, message: payload.message ?? "Standby receipts attached to Helix Ask." });
+          await loadThreadBindings();
+        }
+      } catch {
+        setBindingStatus({ ok: false, message: "Could not reach the thread-binding endpoint." });
+      } finally {
+        setBindingBusy(false);
+      }
+    },
+    [activeGraph?.graph_id, activeRoom, bindingThreadId, bindingWorldId, loadThreadBindings, minecraftSourceId],
+  );
+
+  const handleDetachThreadBinding = React.useCallback(async () => {
+    if (!activeThreadBinding) return;
+    setBindingBusy(true);
+    setBindingStatus(null);
+    try {
+      const response = await fetch(`/api/agi/situation/thread-binding/${encodeURIComponent(activeThreadBinding.binding_id)}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        setBindingStatus({ ok: false, message: payload?.message ?? "Could not detach standby receipts." });
+      } else {
+        setBindingStatus({ ok: true, message: "Standby receipt binding detached." });
+        await loadThreadBindings();
+      }
+    } catch {
+      setBindingStatus({ ok: false, message: "Could not reach the thread-binding endpoint." });
+    } finally {
+      setBindingBusy(false);
+    }
+  }, [activeThreadBinding, loadThreadBindings]);
+
   const goBack = () => {
     if (panelPage === "output") setPanelPage("jobs");
     else if (panelPage === "jobs") setPanelPage("inputs");
@@ -1060,6 +1181,101 @@ export default function SituationRoomPipelinesPanel() {
                   )}
                 </div>
               </div>
+            </section>
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Helix Thread Binding</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Attach salient standby receipts to Helix Ask as tool observations. This does not start model turns or enable Minecraft actions.
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "rounded border px-2 py-0.5 text-[10px] uppercase",
+                    activeThreadBinding
+                      ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-100"
+                      : "border-white/15 text-slate-400",
+                  )}
+                >
+                  {activeThreadBinding ? "attached to Helix Ask" : "observe-only"}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+                <label className="block">
+                  <span className="text-[10px] uppercase text-slate-500">Thread id</span>
+                  <input
+                    value={bindingThreadId}
+                    onChange={(event) => setBindingThreadId(event.target.value)}
+                    className="mt-1 w-full rounded border border-white/15 bg-slate-950 px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-cyan-300/60"
+                    placeholder="helix-ask:desktop"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] uppercase text-slate-500">World id</span>
+                  <input
+                    value={bindingWorldId}
+                    onChange={(event) => setBindingWorldId(event.target.value)}
+                    className="mt-1 w-full rounded border border-white/15 bg-slate-950 px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-cyan-300/60"
+                    placeholder="minecraft:minehut"
+                  />
+                </label>
+                <div className="flex flex-wrap items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAttachThreadBinding("room")}
+                    disabled={!activeRoom || bindingBusy}
+                    className="rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Attach room
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAttachThreadBinding("source")}
+                    disabled={!activeRoom || bindingBusy}
+                    className="rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Attach Minecraft source
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAttachThreadBinding("graph")}
+                    disabled={!activeRoom || !activeGraph || bindingBusy}
+                    className="rounded border border-violet-400/35 bg-violet-500/10 px-2 py-1.5 text-xs text-violet-100 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Attach graph
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDetachThreadBinding}
+                    disabled={!activeThreadBinding || bindingBusy}
+                    className="rounded border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Detach
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-2">
+                  <p className="text-[10px] uppercase text-slate-500">Source</p>
+                  <p className="mt-1 break-all text-xs text-slate-300">{minecraftSourceId}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-2">
+                  <p className="text-[10px] uppercase text-slate-500">Append policy</p>
+                  <p className="mt-1 text-xs text-slate-300">{activeThreadBinding?.append_policy ?? "salient_only"}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-2">
+                  <p className="text-[10px] uppercase text-slate-500">Last append status</p>
+                  <p className={cn("mt-1 text-xs", bindingStatus?.ok === false ? "text-rose-200" : "text-slate-300")}>
+                    {bindingStatus?.message ?? (activeThreadBinding ? `thread ${activeThreadBinding.thread_id}` : "no_thread_context")}
+                  </p>
+                </div>
+              </div>
+              {activeThreadBinding ? (
+                <p className="mt-2 break-all text-[10px] text-slate-500">
+                  binding {activeThreadBinding.binding_id} / {activeThreadBinding.binding_kind} / mode {activeThreadBinding.mode}
+                </p>
+              ) : null}
             </section>
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

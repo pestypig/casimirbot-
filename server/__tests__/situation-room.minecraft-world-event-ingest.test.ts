@@ -12,6 +12,7 @@ import {
   ingestWorldEvent,
   resetWorldEventIngestState,
 } from "../services/situation-room/world-event-ingest";
+import { resetSituationThreadBindings } from "../services/situation-room/thread-binding-store";
 
 const createApp = async (): Promise<express.Express> => {
   const { planRouter } = await import("../routes/agi.plan");
@@ -38,6 +39,7 @@ describe("Minecraft world-event ingest", () => {
     delete process.env.HELIX_WORLD_EVENT_MAX_BATCH;
     __resetHelixThreadLedgerStore();
     resetWorldEventIngestState();
+    resetSituationThreadBindings();
   });
 
   it("normalizes a valid world event into a minecraft_event signal", async () => {
@@ -209,7 +211,7 @@ describe("Minecraft world-event ingest", () => {
       turn_id: "turn:mc",
     });
     const events = getHelixThreadLedgerEvents({ threadId: "thread:mc" });
-    expect(events.some((entry) => entry.observation_ref?.schema === "helix.world_event_observation.v1")).toBe(
+    expect(events.some((entry) => entry.observation_ref?.schema === "helix.standby_thread_observation.v1")).toBe(
       true,
     );
     expect(events.some((entry) => entry.item_type === "answer")).toBe(false);
