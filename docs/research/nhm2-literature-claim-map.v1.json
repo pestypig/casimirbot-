@@ -27,6 +27,8 @@
       "url": "https://arxiv.org/abs/hep-th/9711200",
       "claimSupport": ["controlled_holographic_duality_context", "context_only"],
       "nonSupport": [
+        "does_not_validate_local_casimir_source",
+        "does_not_validate_nhm2_source_closure",
         "does_not_validate_nhm2_source_mechanism",
         "does_not_validate_local_casimir_tile_source",
         "does_not_validate_transport"
@@ -37,10 +39,14 @@
       "title": "Warp Drive With Zero Expansion",
       "url": "https://arxiv.org/abs/gr-qc/0110086",
       "claimSupport": [
+        "natario_zero_expansion_geometry_context",
+        "shift_family_context",
         "zero_expansion_shift_family_context",
         "global_and_optical_properties_context"
       ],
       "nonSupport": [
+        "does_not_validate_nhm2_source_closure",
+        "does_not_validate_tile_effective_counterpart",
         "does_not_validate_nhm2_source_mechanism",
         "does_not_remove_negative_energy_or_horizon_concerns",
         "does_not_validate_transport"
@@ -51,21 +57,26 @@
       "title": "The unphysical nature of Warp Drive",
       "url": "https://arxiv.org/abs/gr-qc/9702026",
       "claimSupport": [
+        "warp_metrics_negative_energy_qi_guardrail",
         "negative_energy_quantum_inequality_guardrail_for_warp_metrics",
         "warp_drive_energy_condition_risk_context"
       ],
       "nonSupport": [
         "does_not_validate_nhm2",
+        "does_not_validate_tile_source",
         "does_not_validate_tile_effective_counterpart",
         "does_not_validate_tile_effective_source",
+        "does_not_allow_predictive_warp_claims",
         "does_not_validate_transport"
       ]
     },
     {
       "sourceId": "ford_roman_1996_negative_energy_restrictions",
       "title": "Restrictions on Negative Energy Density in Flat Spacetime",
-      "url": "https://arxiv.org/abs/gr-qc/9607003",
+      "url": "https://doi.org/10.1103/PhysRevD.53.5496",
+      "versionNote": "OSTI mirror: https://www.osti.gov/biblio/286137",
       "claimSupport": [
+        "negative_energy_magnitude_duration_guardrail",
         "negative_energy_magnitude_duration_constraint_context",
         "quantum_inequality_guardrail"
       ],
@@ -93,11 +104,15 @@
       "title": "Quantum Energy Inequalities along stationary worldlines",
       "url": "https://arxiv.org/abs/2301.01698",
       "claimSupport": [
+        "qei_worldline_averaged_energy_lower_bound_context",
+        "stationary_worldline_sampling_context",
         "worldline_averaged_energy_lower_bound_context",
         "qei_dossier_requires_sampling_worldlines"
       ],
       "nonSupport": [
         "does_not_validate_nhm2",
+        "does_not_validate_nhm2_qei_dossier",
+        "does_not_validate_tile_effective_counterpart",
         "does_not_validate_casimir_tile_source",
         "does_not_provide_nhm2_specific_qei_bound"
       ]
@@ -140,11 +155,13 @@
       "url": "https://arxiv.org/abs/2412.14014",
       "versionNote": "v3, last revised 2025-11-04; observer inclusion mostly cancels phase but leaves an overall minus sign",
       "claimSupport": [
+        "observer_inclusion_relevant_to_quantum_gravity",
         "observer_inclusion_is_physics_relevant",
         "no_view_from_nowhere_guardrail"
       ],
       "nonSupport": [
         "does_not_validate_nhm2_observer_audit",
+        "does_not_validate_transport",
         "does_not_validate_source_closure"
       ]
     },
@@ -153,12 +170,14 @@
       "title": "Traversable wormholes in four dimensions",
       "url": "https://arxiv.org/abs/1807.04726",
       "claimSupport": [
+        "negative_casimir_like_energy_context",
         "negative_casimir_like_energy_can_support_specific_wormhole_solutions",
         "ambient_causality_guardrail"
       ],
       "nonSupport": [
         "does_not_validate_warp_drive",
         "does_not_validate_nhm2_tile_source",
+        "does_not_validate_ambient_ftl",
         "does_not_allow_ambient_causality_violation"
       ]
     },

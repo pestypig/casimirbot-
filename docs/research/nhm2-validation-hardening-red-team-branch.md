@@ -46,6 +46,12 @@ GATE_NO_LATEST_ALIAS
 GATE_PROFILE_MATCH
 GATE_OBSERVER_ARTIFACT_CONSISTENCY
 GATE_REGIONAL_SOURCE_CLOSURE_COUNTERPART
+GATE_REGIONAL_SOURCE_CLOSURE_EVIDENCE_ARTIFACT
+GATE_TILE_EFFECTIVE_COUNTERPART_ARTIFACT
+GATE_TILE_COUNTERPART_NOT_METRIC_ECHO
+GATE_TILE_COUNTERPART_FULL_TENSOR_AUTHORITY
+GATE_TILE_COUNTERPART_QEI_LINKAGE
+GATE_SOURCE_CLOSURE_EVIDENCE_USES_COUNTERPART
 GATE_FULL_TENSOR_WHERE_CLAIMED
 GATE_QEI_DOSSIER_PRESENT
 GATE_REPRODUCIBILITY_FIELDS
@@ -70,6 +76,10 @@ GATE_CERTIFICATE_DOES_NOT_OVERRIDE_REVIEW
 ```bash
 npm run nhm2:freeze-reference-run -- --profile stage1_centerline_alpha_0p995_v1 --run-id <stable-run-id> --artifact-root artifacts/research/full-solve --out artifacts/research/full-solve/reference/nhm2-reference-run-<stable-run-id>.json
 npm run nhm2:validate-reference-run -- --reference-run artifacts/research/full-solve/reference/nhm2-reference-run-<stable-run-id>.json
+npm run nhm2:build-reference-run-blocker-ledger -- --reference-run <frozen-reference-run> --full-loop-audit <frozen-full-loop-audit> --validation <reference-validation> --tile-effective-counterpart <tile-counterpart> --regional-source-closure-evidence <regional-evidence> --literature-map docs/research/nhm2-literature-claim-map.v1.json --out <blocker-ledger>
+npm run nhm2:render-reference-run-blocker-ledger -- --ledger <blocker-ledger> --out artifacts/research/full-solve/reference/nhm2-blocker-ledger-<stable-run-id>.md
 ```
 
 Use `--audit-only` on the freeze command when the current artifact set still contains `latest` aliases and the goal is to publish a blocker ledger rather than a validation-ready reference run.
+
+The blocker ledger is the compact frozen-run product for reviewer use. It must keep `validationClaimAllowed = false`, treat certificate GREEN as non-promotional while validation gates remain non-pass, and list the next required evidence instead of promoting NHM2.

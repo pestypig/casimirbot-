@@ -1,0 +1,471 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  buildNhm2BlockerLedgerArtifact,
+  isNhm2BlockerLedgerArtifact,
+  type Nhm2BlockerClass,
+  type Nhm2BlockerLedgerArtifact,
+  type Nhm2DivergenceBoundary,
+} from "../../shared/contracts/nhm2-blocker-ledger.v1";
+import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
+import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
+import { isNhm2RegionalSourceClosureEvidenceArtifact } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import { isNhm2TileEffectiveCounterpartArtifact } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import {
+  classifySourceToGeometryDivergence,
+} from "./report-source-to-geometry-divergence";
+import type {
+  Nhm2ReferenceRunValidationArtifact,
+  Nhm2ReferenceRunValidationGate,
+} from "./validate-reference-run";
+
+type LiteratureClaimMap = {
+  schemaVersion: "nhm2_literature_claim_map/v1";
+  claimPolicy: {
+    externalTheoryDoesNotValidateNHM2: boolean;
+    webOrPaperCitationRequiredForExternalTheoryClaims: boolean;
+    noPredictiveLanguageFromExperimentalMathOnly: boolean;
+  };
+  sources: Array<{
+    sourceId: string;
+    claimSupport: string[];
+    nonSupport: string[];
+  }>;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const asString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value : null;
+
+const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const resolvePath = (repoRoot: string, path: string): string =>
+  isAbsolute(path) ? path : join(repoRoot, path);
+
+const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8")) as unknown;
+
+const pathUsesLatestAlias = (path: string | null | undefined): boolean =>
+  path != null && /(^|[-/\\])latest(\.|[-/\\]|$)/i.test(path);
+
+const parseArgs = (argv: string[]): Record<string, string | boolean> => {
+  const parsed: Record<string, string | boolean> = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (!arg.startsWith("--")) continue;
+    const key = arg.slice(2);
+    const next = argv[index + 1];
+    if (next == null || next.startsWith("--")) {
+      parsed[key] = true;
+    } else {
+      parsed[key] = next;
+      index += 1;
+    }
+  }
+  return parsed;
+};
+
+const isValidationArtifact = (
+  value: unknown,
+): value is Nhm2ReferenceRunValidationArtifact => {
+  const record = asRecord(value);
+  return (
+    record != null &&
+    record.artifactId === "nhm2_reference_run_validation" &&
+    record.schemaVersion === "nhm2_reference_run_validation/v1" &&
+    typeof record.runId === "string" &&
+    (record.overallState === "pass" ||
+      record.overallState === "review" ||
+      record.overallState === "fail") &&
+    Array.isArray(record.gates) &&
+    record.validationClaimAllowed === false
+  );
+};
+
+const isLiteratureClaimMap = (value: unknown): value is LiteratureClaimMap => {
+  const record = asRecord(value);
+  const policy = asRecord(record?.claimPolicy);
+  return (
+    record != null &&
+    record.schemaVersion === "nhm2_literature_claim_map/v1" &&
+    policy?.externalTheoryDoesNotValidateNHM2 === true &&
+    policy?.webOrPaperCitationRequiredForExternalTheoryClaims === true &&
+    policy?.noPredictiveLanguageFromExperimentalMathOnly === true &&
+    Array.isArray(record.sources) &&
+    record.sources.every((source) => {
+      const item = asRecord(source);
+      return (
+        item != null &&
+        typeof item.sourceId === "string" &&
+        Array.isArray(item.claimSupport) &&
+        Array.isArray(item.nonSupport) &&
+        item.claimSupport.length > 0 &&
+        item.nonSupport.length > 0
+      );
+    })
+  );
+};
+
+const classifyGate = (gateId: string): Nhm2BlockerClass => {
+  const id = gateId.toLowerCase();
+  if (id.includes("claim")) return "claim_lock";
+  if (id.includes("latest") || id.includes("profile")) return "provenance";
+  if (id.includes("observer")) return "observer";
+  if (id.includes("tile_counterpart") || id.includes("tile_effective")) return "tile_counterpart";
+  if (id.includes("source_closure") || id.includes("regional")) return "source_closure";
+  if (id.includes("tensor")) return "tensor_authority";
+  if (id.includes("qei")) return "qei";
+  if (id.includes("reproducibility")) return "reproducibility";
+  if (id.includes("certificate")) return "certificate_policy";
+  if (id.includes("literature")) return "literature_boundary";
+  return "unknown";
+};
+
+const nextEvidence = (boundary: Nhm2DivergenceBoundary): string => {
+  switch (boundary) {
+    case "counterpart_missing":
+      return "emit non-proxy same-basis tile_effective_counterpart tensors for every controlled region";
+    case "basis_mismatch":
+      return "regenerate metric and tile tensors with matching chart, units, aggregation, and normalization";
+    case "profile_mismatch":
+      return "regenerate artifacts from the frozen selected profile";
+    case "tensor_authority_insufficient":
+      return "emit full tensor evidence or explicit symmetric full-tensor authority";
+    case "residual_exceeded":
+      return "inspect the dominant regional residual after counterpart/provenance gates are clean";
+    case "qei_unlinked":
+      return "link a pass-level QEI dossier with declared state, worldlines, and sampling assumptions";
+    case "conservation_unknown":
+      return "emit pass-level conservation diagnostics for the tile-effective source";
+    case "none":
+      return "no source-to-geometry evidence required for this region";
+  }
+};
+
+const normalizeBoundary = (
+  value: ReturnType<typeof classifySourceToGeometryDivergence>,
+): Nhm2DivergenceBoundary => {
+  if (value === "metric_echo") return "counterpart_missing";
+  if (value === "qei_or_provenance_missing") return "qei_unlinked";
+  if (value === "conservation_missing_or_fail") return "conservation_unknown";
+  return value;
+};
+
+const missingQeiFields = (qei: unknown): string[] => {
+  if (!isNhm2QeiDossierArtifact(qei)) return ["qei_dossier_missing"];
+  const missing: string[] = [];
+  if (qei.quantumStateAssumptions.length === 0) missing.push("quantumStateAssumptions");
+  if (qei.renormalizationConvention == null) missing.push("renormalizationConvention");
+  if (qei.cavityBoundaryModel == null) missing.push("cavityBoundaryModel");
+  if (qei.samplingWorldlines.length === 0) missing.push("samplingWorldlines");
+  if (qei.worstWorldlineId == null) missing.push("worstWorldlineId");
+  if (qei.dutyCyclePass !== true) missing.push("dutyCyclePass");
+  if (qei.lightCrossingConsistencyStatus !== "pass") {
+    missing.push("lightCrossingConsistencyStatus");
+  }
+  if (qei.cycleAverageClosureStatus !== "pass") {
+    missing.push("cycleAverageClosureStatus");
+  }
+  if (qei.literatureRefs.length === 0) missing.push("literatureRefs");
+  return missing;
+};
+
+const getNested = (value: unknown, path: string[]): unknown =>
+  path.reduce<unknown>((cursor, part) => asRecord(cursor)?.[part], value);
+
+const reproducibilitySummary = (
+  fullLoopAudit: Record<string, unknown> | null,
+): Nhm2BlockerLedgerArtifact["reproducibilityBlockers"] => {
+  const section = asRecord(
+    getNested(fullLoopAudit, ["sections", "uncertainty_perturbation_reproducibility"]),
+  );
+  const required = [
+    "meshConvergenceOrder",
+    "boundaryConditionSensitivity",
+    "smoothingKernelSensitivity",
+    "independentReproductionStatus",
+    "artifactHashConsistencyStatus",
+  ];
+  const missingFields = required.filter((field) => section?.[field] == null);
+  const status =
+    section == null
+      ? "unknown"
+      : missingFields.length > 0
+        ? "review"
+        : asString(section.independentReproductionStatus) === "fail" ||
+            asString(section.artifactHashConsistencyStatus) === "mismatch"
+          ? "fail"
+          : "pass";
+  return { status, missingFields };
+};
+
+const certificateSummary = (
+  fullLoopAudit: Record<string, unknown> | null,
+  validation: Nhm2ReferenceRunValidationArtifact,
+): Nhm2BlockerLedgerArtifact["certificatePolicy"] => {
+  const certificate = asRecord(getNested(fullLoopAudit, ["sections", "certificate_policy_result"]));
+  const certificateStatus =
+    asString(certificate?.state) ??
+    asString(certificate?.status) ??
+    asString(certificate?.color) ??
+    null;
+  const certificateIntegrity =
+    asString(certificate?.integrity) ??
+    (typeof certificate?.integrityOk === "boolean" ? String(certificate.integrityOk) : null);
+  const green = certificateStatus != null && /pass|green|admissible/i.test(certificateStatus);
+  const nonPass = validation.overallState !== "pass";
+  return {
+    certificateStatus,
+    certificateIntegrity,
+    greenButNonPromotional: green && nonPass,
+    reason:
+      green && nonPass
+        ? "certificate green is non-promotional because reference validation remains non-pass"
+        : null,
+  };
+};
+
+const observerSummary = (
+  validation: Nhm2ReferenceRunValidationArtifact,
+): Nhm2BlockerLedgerArtifact["observerBlockers"] => {
+  const gate = validation.gates.find(
+    (entry) => entry.gateId === "GATE_OBSERVER_ARTIFACT_CONSISTENCY",
+  );
+  return {
+    summaryVsDetailedStatus: gate?.state ?? "unknown",
+    reasonCodes: gate?.reasonCodes ?? [],
+  };
+};
+
+const primaryBlockerClass = (
+  gates: Nhm2BlockerLedgerArtifact["gateSummary"],
+): string | null => {
+  const priority: Nhm2BlockerClass[] = [
+    "provenance",
+    "tile_counterpart",
+    "source_closure",
+    "tensor_authority",
+    "observer",
+    "qei",
+    "reproducibility",
+    "certificate_policy",
+    "literature_boundary",
+    "adapter_infra",
+    "claim_lock",
+    "unknown",
+  ];
+  return (
+    priority.find((blockerClass) =>
+      gates.some((gate) => gate.blockerClass === blockerClass && gate.state !== "pass"),
+    ) ?? null
+  );
+};
+
+const recommendation = (blockerClass: string | null): string => {
+  switch (blockerClass) {
+    case "tile_counterpart":
+      return "emit non-proxy same-basis tile_effective_counterpart tensors for hull, wall, and exterior_shell";
+    case "source_closure":
+      return "retire tile-counterpart tensor authority and QEI/conservation blockers before attempting residual tuning";
+    case "qei":
+      return "publish a pass-level worldline QEI dossier before physical-mechanism language";
+    case "observer":
+      return "regenerate observer and full-loop audit artifacts from the same frozen run";
+    case "reproducibility":
+      return "emit convergence, boundary, smoothing, and independent reproduction evidence";
+    case "provenance":
+      return "freeze artifacts without latest aliases and with one profile/commit/run identity";
+    default:
+      return "continue targeted blocker retirement from the frozen ledger";
+  }
+};
+
+export const buildReferenceRunBlockerLedger = (args: {
+  repoRoot: string;
+  referenceRunPath: string;
+  fullLoopAuditPath: string;
+  validationPath: string;
+  tileEffectiveCounterpartPath: string;
+  regionalSourceClosureEvidencePath: string;
+  literatureMapPath: string;
+  outPath: string;
+  sourceDivergenceReportPath?: string | null;
+  tileProvenanceAuditPath?: string | null;
+  qeiDossierPath?: string | null;
+  auditOnly?: boolean;
+}): Nhm2BlockerLedgerArtifact => {
+  const paths = [
+    args.referenceRunPath,
+    args.fullLoopAuditPath,
+    args.validationPath,
+    args.tileEffectiveCounterpartPath,
+    args.regionalSourceClosureEvidencePath,
+    args.sourceDivergenceReportPath,
+    args.tileProvenanceAuditPath,
+    args.qeiDossierPath,
+    args.literatureMapPath,
+  ];
+  if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
+    throw new Error("latest aliases are forbidden unless --audit-only is passed");
+  }
+  for (const path of paths.filter((entry): entry is string => entry != null)) {
+    if (!existsSync(resolvePath(args.repoRoot, path))) {
+      throw new Error(`required ledger input missing: ${path}`);
+    }
+  }
+
+  const referenceRun = readJson(resolvePath(args.repoRoot, args.referenceRunPath));
+  if (!isNhm2ReferenceRunArtifact(referenceRun)) {
+    throw new Error("reference run must be nhm2_reference_run/v1");
+  }
+  const fullLoopAudit = asRecord(readJson(resolvePath(args.repoRoot, args.fullLoopAuditPath)));
+  const validation = readJson(resolvePath(args.repoRoot, args.validationPath));
+  if (!isValidationArtifact(validation)) {
+    throw new Error("validation must be nhm2_reference_run_validation/v1");
+  }
+  const tile = readJson(resolvePath(args.repoRoot, args.tileEffectiveCounterpartPath));
+  if (!isNhm2TileEffectiveCounterpartArtifact(tile)) {
+    throw new Error("tile-effective counterpart must be nhm2_tile_effective_counterpart/v1");
+  }
+  const regionalEvidence = readJson(
+    resolvePath(args.repoRoot, args.regionalSourceClosureEvidencePath),
+  );
+  if (!isNhm2RegionalSourceClosureEvidenceArtifact(regionalEvidence)) {
+    throw new Error("regional evidence must be nhm2_regional_source_closure_evidence/v1");
+  }
+  const qei =
+    args.qeiDossierPath == null ? null : readJson(resolvePath(args.repoRoot, args.qeiDossierPath));
+  if (qei != null && !isNhm2QeiDossierArtifact(qei)) {
+    throw new Error("QEI dossier must be nhm2_qei_dossier/v1");
+  }
+  const literatureMap = readJson(resolvePath(args.repoRoot, args.literatureMapPath));
+  if (!isLiteratureClaimMap(literatureMap)) {
+    throw new Error("literature map must include support and non-support boundaries");
+  }
+
+  const gateSummary = validation.gates.map((entry: Nhm2ReferenceRunValidationGate) => ({
+    gateId: entry.gateId,
+    state: entry.state,
+    reasonCodes: entry.reasonCodes,
+    blockerClass: classifyGate(entry.gateId),
+  }));
+  const qeiArtifact = isNhm2QeiDossierArtifact(qei) ? qei : null;
+  const qeiMissingFields = missingQeiFields(qeiArtifact);
+  const qeiBlockers: Nhm2BlockerLedgerArtifact["qeiBlockers"] = {
+    status: qeiArtifact == null ? "missing" : qeiArtifact.status,
+    qeiApplicabilityStatus:
+      qeiArtifact == null ? null : qeiArtifact.qeiApplicabilityStatus,
+    missingFields: qeiMissingFields,
+  };
+  const regionalBlockers = regionalEvidence.regions.map((region) => {
+    const boundary = normalizeBoundary(classifySourceToGeometryDivergence(region));
+    return {
+      regionId: region.regionId,
+      firstDivergenceBoundary: boundary,
+      metricTensorAuthorityMode: region.metricRequired.tensorAuthorityMode,
+      tileTensorAuthorityMode: region.tileEffectiveCounterpart.tensorAuthorityMode,
+      comparisonRole: region.tileEffectiveCounterpart.comparisonRole,
+      relLInf: region.residuals.relLInf,
+      absLInf: region.residuals.absLInf,
+      status: region.status,
+      nextRequiredEvidence: nextEvidence(boundary),
+    };
+  });
+  const primary = primaryBlockerClass(gateSummary);
+  const ledger = buildNhm2BlockerLedgerArtifact({
+    generatedAt: new Date().toISOString(),
+    runId: referenceRun.runId,
+    selectedProfileId: referenceRun.selectedFamily.selectedProfileId,
+    expectedProfileId: referenceRun.selectedFamily.expectedProfileId,
+    laneId: "nhm2_shift_lapse",
+    claimLock: {
+      validationClaimAllowed: false,
+      physicalMechanismClaimAllowed: false,
+      promotionAllowed: false,
+      allowedClaimTier:
+        validation.claimTierAllowed === "diagnostic" ||
+        validation.claimTierAllowed === "reduced-order"
+          ? validation.claimTierAllowed
+          : null,
+      claimEffect:
+        validation.overallState === "pass"
+          ? "reduced_order_candidate_evidence"
+          : "blocker_ledger_only",
+    },
+    artifactRefs: {
+      referenceRun: args.referenceRunPath,
+      fullLoopAudit: args.fullLoopAuditPath,
+      qeiDossier: args.qeiDossierPath ?? null,
+      tileEffectiveCounterpart: args.tileEffectiveCounterpartPath,
+      regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath,
+      sourceToGeometryDivergenceReport: args.sourceDivergenceReportPath ?? null,
+      tileCounterpartProvenanceAudit: args.tileProvenanceAuditPath ?? null,
+      referenceRunValidation: args.validationPath,
+    },
+    gateSummary,
+    regionalBlockers,
+    observerBlockers: observerSummary(validation),
+    qeiBlockers,
+    reproducibilityBlockers: reproducibilitySummary(fullLoopAudit),
+    certificatePolicy: certificateSummary(fullLoopAudit, validation),
+    adapterVerification: {
+      status: validation.adapterVerificationStatus,
+      physicsImpact: validation.adapterVerificationPhysicsImpact,
+    },
+    literatureClaimBoundary: {
+      externalTheoryDoesNotValidateNHM2: true,
+      noPredictiveLanguageFromExperimentalMathOnly: true,
+      sourcesChecked: literatureMap.sources.map((source) => source.sourceId),
+    },
+    primaryBlockerClass: primary,
+    nextPatchRecommendation: recommendation(primary),
+  });
+
+  if (!isNhm2BlockerLedgerArtifact(ledger)) {
+    throw new Error("built ledger failed nhm2_blocker_ledger/v1 validation");
+  }
+  const outPath = resolvePath(args.repoRoot, args.outPath);
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, `${JSON.stringify(ledger, null, 2)}\n`, "utf8");
+  return ledger;
+};
+
+if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url))) {
+  const args = parseArgs(process.argv.slice(2));
+  const repoRoot = process.cwd();
+  const required = [
+    "reference-run",
+    "full-loop-audit",
+    "validation",
+    "tile-effective-counterpart",
+    "regional-source-closure-evidence",
+    "literature-map",
+    "out",
+  ];
+  for (const key of required) {
+    if (typeof args[key] !== "string") {
+      throw new Error(`missing required --${key}`);
+    }
+  }
+  const ledger = buildReferenceRunBlockerLedger({
+    repoRoot,
+    referenceRunPath: args["reference-run"] as string,
+    fullLoopAuditPath: args["full-loop-audit"] as string,
+    validationPath: args.validation as string,
+    tileEffectiveCounterpartPath: args["tile-effective-counterpart"] as string,
+    regionalSourceClosureEvidencePath: args["regional-source-closure-evidence"] as string,
+    sourceDivergenceReportPath: asString(args["source-divergence-report"]),
+    tileProvenanceAuditPath: asString(args["tile-provenance-audit"]),
+    qeiDossierPath: asString(args["qei-dossier"]),
+    literatureMapPath: args["literature-map"] as string,
+    outPath: args.out as string,
+    auditOnly: args["audit-only"] === true,
+  });
+  process.stdout.write(`${JSON.stringify(ledger, null, 2)}\n`);
+}
