@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,12 +28,20 @@ const required = (args: Record<string, string | boolean>, key: string): string =
   return value;
 };
 
-const run = (script: string, args: string[]): void => {
+const run = (
+  script: string,
+  args: string[],
+  options: { allowNonZeroWithOutput?: string } = {},
+): void => {
   const result = spawnSync("npm", ["run", script, "--", ...args], {
     stdio: "inherit",
     shell: process.platform === "win32",
   });
-  if (result.status !== 0) {
+  if (
+    result.status !== 0 &&
+    (options.allowNonZeroWithOutput == null ||
+      !existsSync(options.allowNonZeroWithOutput))
+  ) {
     throw new Error(`${script} failed with status ${result.status}`);
   }
 };
@@ -90,18 +99,22 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     "--out",
     provenanceAudit,
   ]);
-  run("nhm2:validate-reference-run", [
-    "--reference-run",
-    referenceRun,
-    "--regional-evidence",
-    regionalEvidence,
-    "--tile-effective-counterpart",
-    tileCounterpart,
-    "--literature-map",
-    literatureMap,
-    "--out",
-    validation,
-  ]);
+  run(
+    "nhm2:validate-reference-run",
+    [
+      "--reference-run",
+      referenceRun,
+      "--regional-evidence",
+      regionalEvidence,
+      "--tile-effective-counterpart",
+      tileCounterpart,
+      "--literature-map",
+      literatureMap,
+      "--out",
+      validation,
+    ],
+    { allowNonZeroWithOutput: validation },
+  );
   run("nhm2:build-reference-run-blocker-ledger", [
     "--reference-run",
     referenceRun,

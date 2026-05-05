@@ -19,6 +19,10 @@ import {
 import { speakVoice } from "@/lib/agi/api";
 import { SituationGraphCanvas } from "@/components/workstation/situation-graph/SituationGraphCanvas";
 import {
+  MinecraftWorldBindingPanel,
+  type MinecraftWorldSourceView,
+} from "@/components/workstation/MinecraftWorldBindingPanel";
+import {
   draftJobFromNaturalLanguage,
   draftJobFromRecipe,
   labelSituationRoomLanguage,
@@ -374,6 +378,7 @@ export default function SituationRoomPipelinesPanel() {
   const [bindingWorldId, setBindingWorldId] = React.useState("minecraft:minehut");
   const [bindingStatus, setBindingStatus] = React.useState<SituationThreadBindingStatus | null>(null);
   const [threadBindings, setThreadBindings] = React.useState<SituationThreadBindingView[]>([]);
+  const [worldSourcesSeen, setWorldSourcesSeen] = React.useState<MinecraftWorldSourceView[]>([]);
   const [bindingBusy, setBindingBusy] = React.useState(false);
   const masterScrollRef = React.useRef<HTMLDivElement | null>(null);
   const masterScrollPinnedRef = React.useRef(true);
@@ -423,6 +428,15 @@ export default function SituationRoomPipelinesPanel() {
     ?? activeWorldSignals.at(-1)?.source_id
     ?? activeSources[0]?.source_id
     ?? "source:minecraft-server";
+  const detectedMinecraftSource = React.useMemo(
+    () =>
+      worldSourcesSeen.find((source) => source.room_id === activeRoom?.room_id && source.world_id === bindingWorldId) ??
+      worldSourcesSeen.find((source) => source.world_id === bindingWorldId) ??
+      worldSourcesSeen.find((source) => source.source_id === "source:minecraft-server") ??
+      worldSourcesSeen[0] ??
+      null,
+    [activeRoom?.room_id, bindingWorldId, worldSourcesSeen],
+  );
   const activeThreadBinding = React.useMemo(() => {
     if (!activeRoom) return null;
     return (
@@ -486,10 +500,22 @@ export default function SituationRoomPipelinesPanel() {
     }
   }, []);
 
+  const loadWorldSourcesSeen = React.useCallback(async () => {
+    try {
+      const response = await fetch("/api/agi/situation/world-event/sources");
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok || !Array.isArray(payload.sources)) return;
+      setWorldSourcesSeen(payload.sources as MinecraftWorldSourceView[]);
+    } catch {
+      // Runtime diagnostics should never block the panel.
+    }
+  }, []);
+
   React.useEffect(() => {
     if (panelPage !== "runtime") return;
     void loadThreadBindings();
-  }, [loadThreadBindings, panelPage]);
+    void loadWorldSourcesSeen();
+  }, [loadThreadBindings, loadWorldSourcesSeen, panelPage]);
 
   React.useEffect(() => {
     const currentIds = new Set(activeJobs.map((job) => job.job_id));
@@ -831,20 +857,24 @@ export default function SituationRoomPipelinesPanel() {
   );
 
   const handleAttachThreadBinding = React.useCallback(
-    async (target: "room" | "source" | "graph") => {
+    async (target: "room" | "source" | "graph" | "detected_source") => {
       if (!activeRoom) return;
       const threadId = bindingThreadId.trim();
       if (!threadId) {
         setBindingStatus({ ok: false, message: "Thread id is required before attaching standby receipts." });
         return;
       }
+      const useDetected = target === "detected_source" && detectedMinecraftSource;
+      const roomId = useDetected ? detectedMinecraftSource.room_id : activeRoom.room_id;
+      const sourceId = useDetected ? detectedMinecraftSource.source_id : minecraftSourceId;
+      const worldId = useDetected ? detectedMinecraftSource.world_id : bindingWorldId.trim() || "minecraft:minehut";
       setBindingBusy(true);
       setBindingStatus(null);
       const body = {
-        room_id: activeRoom.room_id,
-        source_id: target === "source" ? minecraftSourceId : undefined,
+        room_id: roomId,
+        source_id: target === "source" || target === "detected_source" ? sourceId : undefined,
         graph_id: target === "graph" ? activeGraph?.graph_id : undefined,
-        world_id: target === "source" ? bindingWorldId.trim() || "minecraft:minehut" : undefined,
+        world_id: target === "source" || target === "detected_source" ? worldId : undefined,
         thread_id: threadId,
         mode: "standby_receipts",
         append_policy: "salient_only",
@@ -872,7 +902,7 @@ export default function SituationRoomPipelinesPanel() {
         setBindingBusy(false);
       }
     },
-    [activeGraph?.graph_id, activeRoom, bindingThreadId, bindingWorldId, loadThreadBindings, minecraftSourceId],
+    [activeGraph?.graph_id, activeRoom, bindingThreadId, bindingWorldId, detectedMinecraftSource, loadThreadBindings, minecraftSourceId],
   );
 
   const handleDetachThreadBinding = React.useCallback(async () => {
@@ -1182,6 +1212,13 @@ export default function SituationRoomPipelinesPanel() {
                 </div>
               </div>
             </section>
+            <MinecraftWorldBindingPanel
+              detectedSource={detectedMinecraftSource}
+              binding={activeThreadBinding}
+              busy={bindingBusy}
+              status={bindingStatus}
+              onAttachDetected={() => handleAttachThreadBinding("detected_source")}
+            />
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

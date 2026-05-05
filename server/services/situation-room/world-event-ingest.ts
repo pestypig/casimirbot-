@@ -16,11 +16,24 @@ import {
   getMinecraftEventHints,
   normalizeMinecraftWorldEventToSignal,
 } from "./minecraft-event-normalizer";
+import {
+  classifyMinecraftEventSalience,
+  getLocationMinSamples,
+  isLocationSalienceEnabled,
+  type MinecraftEventSalienceClass,
+} from "./minecraft-salience-policy";
 import { appendStandbyObservationToThread } from "./standby-thread-observation";
 import {
   createSituationThreadBinding,
-  resolveSituationThreadBinding,
 } from "./thread-binding-store";
+import { resolveWorldEventThreadBinding } from "./thread-binding-resolver";
+import {
+  recordWorldSourceSeen,
+  resetWorldSourceRegistry,
+  updateWorldSourceDebug,
+  type WorldSourceSeen,
+} from "./world-source-registry";
+import { summarizeWorldEventQuality, type WorldEventQualitySummary } from "./world-event-quality";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -85,12 +98,32 @@ export type WorldEventIngestResult = {
   goal_hypotheses?: SituationGoalHypothesis[];
   salience_receipt?: SituationSalienceReceipt | null;
   interjection_proposal?: SituationInterjectionProposal | null;
+  debug?: WorldEventIngestDebug;
 };
 
 export type WorldEventIngestBatchResult = {
   ok: boolean;
   schema: "helix.world_event_batch_ingest_response.v1";
   results: WorldEventIngestResult[];
+};
+
+export type WorldEventIngestDebug = {
+  append_decision: "appended" | "not_appended";
+  append_reason:
+    | "no_thread_context"
+    | "observe_only_binding"
+    | "not_salient"
+    | "projection_only"
+    | "dedupe_cooldown"
+    | "rate_limited"
+    | "binding_mismatch"
+    | "appended";
+  salience_class: MinecraftEventSalienceClass;
+  binding_id?: string | null;
+  thread_id?: string | null;
+  dedupe_key?: string | null;
+  seen_source?: WorldSourceSeen;
+  quality?: WorldEventQualitySummary;
 };
 
 type RoomRuntimeState = {
@@ -151,6 +184,7 @@ const readBooleanMeta = (event: HelixWorldEvent, key: string): boolean =>
 
 export const resetWorldEventIngestState = (): void => {
   runtimeStateByKey.clear();
+  resetWorldSourceRegistry();
 };
 
 const getOrCreateState = (
@@ -310,8 +344,15 @@ const buildSalienceReceipt = (args: {
   signal: SituationEventSignal;
   goalHypotheses: SituationGoalHypothesis[];
   repeatedLocationCount: number;
+  salienceClass: MinecraftEventSalienceClass;
 }): SituationSalienceReceipt | null => {
-  const { event, state, signal, goalHypotheses, repeatedLocationCount } = args;
+  const { event, state, signal, goalHypotheses, repeatedLocationCount, salienceClass } = args;
+  if (salienceClass === "projection_only" && event.event_type !== "player_location_sample") {
+    return null;
+  }
+  if (event.event_type === "player_location_sample" && !isLocationSalienceEnabled()) {
+    return null;
+  }
   const currentHealth = readNumber(event.health_delta, [
     "current_health",
     "current",
@@ -353,7 +394,9 @@ const buildSalienceReceipt = (args: {
   } else if (
     readString(event.objective_delta, "status") === "blocked" ||
     event.event_type === "objective_blocked" ||
-    repeatedLocationCount >= 3
+    (event.event_type === "player_location_sample" &&
+      repeatedLocationCount >= getLocationMinSamples() &&
+      goalHypotheses.some((goal: SituationGoalHypothesis) => goal.status === "active" || goal.status === "blocked"))
   ) {
     reason = "goal_blocked";
     priority = "action";
@@ -424,6 +467,9 @@ export const ingestWorldEvent = async (
   options: WorldEventIngestOptions = {},
 ): Promise<WorldEventIngestResult> => {
   const graphId = options.graphId ?? null;
+  const salienceClass = classifyMinecraftEventSalience(event);
+  const seenSource = recordWorldSourceSeen(event);
+  const quality = summarizeWorldEventQuality(event);
   const state = getOrCreateState(event, graphId);
   const signalId = buildSignalId(event);
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
@@ -443,6 +489,7 @@ export const ingestWorldEvent = async (
     signal,
     goalHypotheses,
     repeatedLocationCount,
+    salienceClass,
   });
   const interjectionProposal = buildInterjectionProposal(salienceReceipt);
   const explicitThreadId = options.threadId ?? null;
@@ -462,18 +509,18 @@ export const ingestWorldEvent = async (
           append_policy: "all_receipts_debug",
         }).binding ?? null
       : null;
-  const resolvedBinding =
-    explicitBinding ??
-    (options.appendToThread === false
-      ? null
-      : resolveSituationThreadBinding({
+  const bindingResolution =
+    explicitBinding || options.appendToThread === false
+      ? { binding: explicitBinding, reason: explicitBinding ? ("matched" as const) : ("no_thread_context" as const), mismatched_bindings: [] }
+      : resolveWorldEventThreadBinding({
           room_id: event.room_id,
           source_id: event.source_id ?? null,
           graph_id: graphId,
           world_id: event.world_id,
-        }));
+        });
+  const resolvedBinding = bindingResolution.binding;
   const appendResult: Awaited<ReturnType<typeof appendStandbyObservationToThread>> =
-    options.appendToThread === false
+    options.appendToThread === false || bindingResolution.reason === "binding_mismatch"
       ? { appended: false, reason: "no_binding" as const }
       : await appendStandbyObservationToThread({
           binding: resolvedBinding,
@@ -490,9 +537,41 @@ export const ingestWorldEvent = async (
   const reason =
     appended
       ? null
-      : appendResult.reason === "no_binding"
+      : bindingResolution.reason === "binding_mismatch"
+        ? "binding_mismatch"
+        : appendResult.reason === "no_binding"
         ? "no_thread_context"
         : appendResult.reason;
+  const appendReason: WorldEventIngestDebug["append_reason"] = appended
+    ? "appended"
+    : reason === "binding_mismatch"
+      ? "binding_mismatch"
+      : salienceClass === "projection_only" && !salienceReceipt
+        ? "projection_only"
+        : reason === "binding_observe_only"
+          ? "observe_only_binding"
+          : reason === "not_salient"
+            ? "not_salient"
+            : "no_thread_context";
+  const debug: WorldEventIngestDebug = {
+    append_decision: appended ? "appended" : "not_appended",
+    append_reason: appendReason,
+    salience_class: salienceClass,
+    binding_id: resolvedBinding?.binding_id ?? null,
+    thread_id: threadId,
+    dedupe_key: salienceReceipt?.dedupe_key ?? null,
+    seen_source: seenSource,
+    quality,
+  };
+  updateWorldSourceDebug(event, {
+    append_decision: debug.append_decision,
+    append_reason: debug.append_reason,
+    salience_class: debug.salience_class,
+    binding_id: debug.binding_id,
+    thread_id: debug.thread_id,
+    dedupe_key: debug.dedupe_key,
+    item_id: appendResult.item_id ?? null,
+  });
 
   return {
     ok: true,
@@ -515,6 +594,7 @@ export const ingestWorldEvent = async (
     goal_hypotheses: goalHypotheses,
     salience_receipt: salienceReceipt,
     interjection_proposal: interjectionProposal,
+    debug,
   };
 };
 

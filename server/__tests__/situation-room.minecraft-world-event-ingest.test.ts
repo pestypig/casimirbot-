@@ -132,6 +132,52 @@ describe("Minecraft world-event ingest", () => {
     expect(result.salience_receipt_id).toBeNull();
   });
 
+  it("records detected Minecraft source ids for binding diagnostics", async () => {
+    const app = await createApp();
+    const [event] = readFixture("nether-low-health.jsonl");
+
+    await request(app).post("/api/agi/situation/world-event").send(event).expect(200);
+    const response = await request(app).get("/api/agi/situation/world-event/sources").expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "helix.world_event_sources.v1",
+      sources: [
+        {
+          room_id: event.room_id,
+          source_id: event.source_id,
+          world_id: event.world_id,
+          latest_event_type: event.event_type,
+          event_count: 1,
+        },
+      ],
+    });
+  }, 15000);
+
+  it("treats routine location samples as projection-only by default", async () => {
+    const event: HelixWorldEvent = {
+      schema: "helix.world_event.v1",
+      world_id: "minecraft:minehut",
+      room_id: "room:minecraft-minehut",
+      source_id: "source:minecraft-server",
+      ts: "2026-05-05T07:30:00.000Z",
+      actor_id: "player:datdampig",
+      actor_label: "DatDamPig",
+      event_type: "player_location_sample",
+      location: { dimension: "minecraft:overworld", x: 280, y: 66, z: -405 },
+      evidence_refs: ["minecraft:minecraft:minehut:event:location"],
+      meta: {},
+    };
+
+    const result = await ingestWorldEvent(event, { appendToThread: false });
+
+    expect(result.salience_receipt).toBeNull();
+    expect(result.debug).toMatchObject({
+      append_reason: "projection_only",
+      salience_class: "projection_only",
+    });
+  });
+
   it("preserves timestamp ordering through the batch endpoint", async () => {
     const app = await createApp();
     const events = [
@@ -215,5 +261,35 @@ describe("Minecraft world-event ingest", () => {
       true,
     );
     expect(events.some((entry) => entry.item_type === "answer")).toBe(false);
+  }, 15000);
+
+  it("reports binding mismatch when an existing source binding uses different plugin ids", async () => {
+    const app = await createApp();
+    const [event] = readFixture("nether-low-health.jsonl");
+
+    await request(app)
+      .post("/api/agi/situation/thread-binding")
+      .send({
+        room_id: event.room_id,
+        source_id: "source:local-ui-generated",
+        world_id: "minecraft:local",
+        thread_id: "thread:mismatch",
+        mode: "standby_receipts",
+        append_policy: "salient_only",
+      })
+      .expect(200);
+
+    const response = await request(app).post("/api/agi/situation/world-event").send(event).expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      appended: false,
+      reason: "binding_mismatch",
+      debug: {
+        append_reason: "binding_mismatch",
+        salience_class: "salience_candidate",
+      },
+    });
+    expect(getHelixThreadLedgerEvents({ threadId: "thread:mismatch" })).toHaveLength(0);
   }, 15000);
 });

@@ -2,7 +2,7 @@
 
 Date: 2026-05-05
 
-Status: working local-dev observe-only pipeline.
+Status: working local-dev observe-only pipeline with explicit Helix Ask thread binding.
 
 ## Current Pipeline
 
@@ -19,6 +19,7 @@ Minehut Paper server
   -> goal hypotheses
   -> salience receipt
   -> interjection proposal
+  -> optional Helix thread toolObservation when explicitly bound
 ```
 
 This is an observe-only bridge. Minecraft events enter Helix, but Helix does not modify the Minecraft world.
@@ -59,18 +60,33 @@ voice_output: off
 requires_confirmation: true
 ```
 
+After explicit thread binding, a live Minehut event was verified as a durable Helix thread observation:
+
+```txt
+thread_id: helix-ask:desktop
+item_type: toolObservation
+schema: helix.standby_thread_observation.v1
+event_type: player_damage
+actor: DatDamPig
+reason: risk_detected
+summary: DatDamPig is in danger at 4 health.
+source_id: source:minecraft-server
+room_id: room:minecraft-minehut
+evidence_ref: minecraft:minecraft:minehut:event:7
+```
+
 ## Important Boundary
 
-Current expected ingest response:
+Without an explicit Situation Room thread binding, the expected ingest response is:
 
 ```txt
 appended: false
 reason: no_thread_context
 ```
 
-This is not a transport failure. It means the event was ingested into Situation Room runtime state, but it was not appended to a Helix Ask thread because no explicit room/graph/thread binding exists yet.
+This is not a transport failure. It means the event was ingested into Situation Room runtime state, but it was not appended to a Helix Ask thread because no explicit room/source/graph/thread binding exists yet.
 
-The next backend/UI patch is thread-aware binding:
+With an explicit binding:
 
 ```txt
 Before explicit attachment:
@@ -78,6 +94,15 @@ Before explicit attachment:
 
 After explicit attachment:
   Minecraft event -> projection/salience -> helix-thread toolObservation -> appended=true
+```
+
+The current safe binding mode is still observation-only:
+
+```txt
+mode: standby_receipts
+append_policy: salient_only
+context_policy: explicit_attachment_only
+command_lane_enabled: false
 ```
 
 ## Local Components
@@ -202,8 +227,8 @@ helix:
   max_events_per_flush: 25
   flush_period_ticks: 20
   http_timeout_seconds: 4
-  enable_location_samples: true
-  location_sample_ticks: 100
+  enable_location_samples: false
+  location_sample_ticks: 600
 ```
 
 Keep:
@@ -213,6 +238,8 @@ mode: "observe"
 ```
 
 There are no Minecraft world-changing actions in the current plugin milestone.
+
+Location samples are useful for projection debugging, but they can be noisy. The confirmed live test showed repeated `player_location_sample` events producing repeated `goal_blocked` observations. For normal testing, keep `enable_location_samples: false`. If projection testing needs location samples, use a slower interval such as `location_sample_ticks: 600` instead of `100`.
 
 ## Minehut Load Confirmation
 
@@ -301,6 +328,48 @@ event_type: bridge_ping
 projection.active_sources includes source:minecraft-server
 ```
 
+If no thread binding exists, `appended: false` with `reason: no_thread_context` is expected.
+
+## Create Thread Binding
+
+Use this only after the tunnel health check and direct ingest checks pass. It binds the Minehut room/source/world to a Helix Ask thread so salient standby receipts become durable `toolObservation` items.
+
+```powershell
+$body = @{
+  room_id = "room:minecraft-minehut"
+  source_id = "source:minecraft-server"
+  world_id = "minecraft:minehut"
+  thread_id = "helix-ask:desktop"
+  mode = "standby_receipts"
+  append_policy = "salient_only"
+} | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:5050/api/agi/situation/thread-binding" `
+  -Method Post `
+  -ContentType "application/json" `
+  -Headers @{ Authorization = "Bearer dev-local-token" } `
+  -Body $body
+```
+
+Expected response:
+
+```txt
+schema: helix.situation_thread_binding_receipt.v1
+ok: true
+binding.mode: standby_receipts
+binding.append_policy: salient_only
+binding.thread_id: helix-ask:desktop
+```
+
+List active bindings:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:5050/api/agi/situation/thread-binding/list" `
+  -Headers @{ Authorization = "Bearer dev-local-token" }
+```
+
 ## Direct Risk-Salience Test
 
 Use this to verify the risk salience gate:
@@ -343,6 +412,21 @@ salience_receipt.reason: risk_detected
 salience_receipt.priority: warn
 salience_receipt.summary: DatDamPig is in danger at 4 health.
 interjection_proposal.requires_confirmation: true
+```
+
+If the thread binding exists and the event is salient, the response should also show:
+
+```txt
+appended: true
+thread_id: helix-ask:desktop
+```
+
+The Helix thread ledger should contain a compact observation, not a generated answer turn:
+
+```txt
+item_type: toolObservation
+item_stream: observation
+observation_ref.schema: helix.standby_thread_observation.v1
 ```
 
 ## Troubleshooting
@@ -409,21 +493,26 @@ reason: no_thread_context
 
 that is expected until a Minecraft room/source/graph is explicitly bound to a Helix Ask thread.
 
-## Next Patch Target
+### Repeated Goal Blocked Observations
 
-Suggested patch name:
+If the ledger fills with repeated `player_location_sample` events and `goal_blocked` summaries, reduce the location signal volume:
 
-```txt
-E91-E94 Minecraft Session Binding + Thread-Aware Standby Receipts
+```yaml
+helix:
+  enable_location_samples: false
 ```
 
-Goal:
+or slow it down:
 
-```txt
-When a Minecraft world-event source or Minecraft situation graph is explicitly attached to Helix Ask, subsequent salient world-event receipts should append as helix-thread toolObservation items.
+```yaml
+helix:
+  enable_location_samples: true
+  location_sample_ticks: 600
 ```
 
-Non-goals:
+The server-side salience gate should eventually treat routine location samples as projection-only unless risk or objective context exists.
+
+## Current Non-Goals
 
 ```txt
 Do not start answer turns from Minecraft events.
