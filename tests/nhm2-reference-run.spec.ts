@@ -16,7 +16,7 @@ const makeReferenceRun = (
     runId: "nhm2-reference-test",
     repo: {
       repositoryFullName: "local/casimirbot",
-      branch: "validation-hardening/nhm2-reference-solve-red-team",
+      branch: "main",
       commitSha: "abc123",
       dirtyTreeStatus: "dirty",
     },
@@ -137,8 +137,37 @@ const passSourceClosure = {
           },
         },
       },
+      {
+        regionId: "wall",
+        comparisonBasisStatus: "same_basis",
+        counterpartResolutionStatus: "resolved",
+        metricExpectedCounterpartRole: "tile_effective_counterpart",
+        tileTensorRef: "artifact://tile-effective-counterpart-wall",
+        status: "pass",
+        tileT00Diagnostics: {
+          trace: {
+            tensorRef: "tile_effective_counterpart.wall",
+            pathFacts: { comparisonRole: "tile_effective_counterpart" },
+          },
+        },
+      },
+      {
+        regionId: "exterior_shell",
+        comparisonBasisStatus: "same_basis",
+        counterpartResolutionStatus: "resolved",
+        metricExpectedCounterpartRole: "tile_effective_counterpart",
+        tileTensorRef: "artifact://tile-effective-counterpart-exterior-shell",
+        status: "pass",
+        tileT00Diagnostics: {
+          trace: {
+            tensorRef: "tile_effective_counterpart.exterior_shell",
+            pathFacts: { comparisonRole: "tile_effective_counterpart" },
+          },
+        },
+      },
     ],
   },
+  tensorSymmetry: "symmetric",
   tensors: {
     metricRequired: { T00: 1, T01: 0, T02: 0, T03: 0, T11: 1, T12: 0, T13: 0, T22: 1, T23: 0, T33: 1 },
     tileEffective: { T00: 1, T01: 0, T02: 0, T03: 0, T11: 1, T12: 0, T13: 0, T22: 1, T23: 0, T33: 1 },
@@ -238,13 +267,55 @@ describe("nhm2 reference run contract", () => {
     expect(qeiGate?.reasonCodes).toContain("qei_dossier_missing");
   });
 
+  it("QEI-shaped paperwork still blocks promotion when required evidence is incomplete", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: buildNhm2QeiDossierArtifact({
+        runId: "nhm2-reference-test",
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        status: "review",
+        rhoSource: "metric_required",
+        qeiApplicabilityStatus: "REVIEW",
+        quantumStateAssumptions: [],
+        renormalizationConvention: null,
+        cavityBoundaryModel: null,
+        samplingWorldlines: [
+          {
+            id: "worldline-wall-1",
+            regionId: "wall",
+            properTimeWindow_s: null,
+            qeiMargin: null,
+            status: "review",
+          },
+        ],
+        worstWorldlineId: "missing-worldline",
+        dutyCyclePass: null,
+        lightCrossingConsistencyStatus: "review",
+        cycleAverageClosureStatus: "review",
+        literatureRefs: [],
+      }),
+    });
+
+    const qeiGate = validation.gates.find(
+      (entry) => entry.gateId === "GATE_QEI_DOSSIER_PRESENT",
+    );
+    expect(qeiGate?.state).toBe("review");
+    expect(qeiGate?.reasonCodes).toContain("qei_quantum_state_assumptions_missing");
+    expect(qeiGate?.reasonCodes).toContain("qei_worst_worldline_unresolved");
+    expect(qeiGate?.reasonCodes).toContain("qei_duty_cycle_not_pass");
+  });
+
   it("certificate policy green cannot override full-loop review", () => {
     const validation = validateNhm2ReferenceRun({
       referenceRun: makeReferenceRun(),
       fullLoopAudit: {
         ...passFullLoop,
         overallState: "review",
-        highestPassingClaimTier: "reduced-order",
+        highestPassingClaimTier: null,
       },
       observerAudit: passObserver,
       sourceClosure: passSourceClosure,
@@ -256,6 +327,44 @@ describe("nhm2 reference run contract", () => {
       (entry) => entry.gateId === "GATE_CERTIFICATE_DOES_NOT_OVERRIDE_REVIEW",
     );
     expect(gate?.state).toBe("fail");
-    expect(gate?.reasonCodes).toContain("certificate_policy_green_overrode_review");
+    expect(gate?.reasonCodes).toContain("certificate_policy_green_overrode_non_pass_full_loop");
+  });
+
+  it("classifies unavailable adapter verification as infrastructure, not physics impact", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: buildNhm2QeiDossierArtifact({
+        runId: "nhm2-reference-test",
+        profileId: "stage1_centerline_alpha_0p995_v1",
+        status: "pass",
+        rhoSource: "metric_required",
+        qeiApplicabilityStatus: "PASS",
+        quantumStateAssumptions: ["bounded sampled reference state"],
+        renormalizationConvention: "declared",
+        cavityBoundaryModel: "declared",
+        samplingWorldlines: [
+          {
+            id: "worldline-wall-1",
+            regionId: "wall",
+            properTimeWindow_s: 1,
+            qeiMargin: 0.1,
+            status: "pass",
+          },
+        ],
+        worstWorldlineId: "worldline-wall-1",
+        dutyCyclePass: true,
+        lightCrossingConsistencyStatus: "pass",
+        cycleAverageClosureStatus: "pass",
+        literatureRefs: ["https://arxiv.org/abs/1807.04726"],
+      }),
+      adapterVerificationStatus: "blocked_infra_endpoint_unavailable",
+    });
+
+    expect(validation.adapterVerificationStatus).toBe("blocked_infra_endpoint_unavailable");
+    expect(validation.adapterVerificationPhysicsImpact).toBe("none_claimed");
   });
 });

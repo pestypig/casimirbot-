@@ -19,6 +19,7 @@ export const NHM2_REFERENCE_RUN_GATE_IDS = [
   "GATE_NO_LATEST_ALIAS",
   "GATE_PROFILE_MATCH",
   "GATE_OBSERVER_ARTIFACT_CONSISTENCY",
+  "GATE_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS",
   "GATE_REGIONAL_SOURCE_CLOSURE_COUNTERPART",
   "GATE_FULL_TENSOR_WHERE_CLAIMED",
   "GATE_QEI_DOSSIER_PRESENT",
@@ -45,7 +46,17 @@ export type Nhm2ReferenceRunValidationArtifact = {
   gates: Nhm2ReferenceRunValidationGate[];
   claimTierAllowed: "diagnostic" | "reduced-order" | "certified" | null;
   validationClaimAllowed: false;
+  adapterVerificationStatus:
+    | "pass"
+    | "fail"
+    | "blocked_infra_endpoint_unavailable"
+    | "not_run"
+    | "unknown";
+  adapterVerificationPhysicsImpact: "none_claimed";
 };
+
+export type Nhm2AdapterVerificationStatus =
+  Nhm2ReferenceRunValidationArtifact["adapterVerificationStatus"];
 
 export type LiteratureClaimMap = {
   schemaVersion: "nhm2_literature_claim_map/v1";
@@ -78,6 +89,9 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const asString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
+
+const asBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
 
 const readJsonIfExists = (path: string): unknown | null => {
   if (!existsSync(path)) return null;
@@ -112,6 +126,34 @@ const aggregate = (
 
 const getNested = (value: unknown, path: string[]): unknown =>
   path.reduce<unknown>((cursor, part) => asRecord(cursor)?.[part], value);
+
+const REQUIRED_REGIONAL_SOURCE_CLOSURE_REGIONS = [
+  "hull",
+  "wall",
+  "exterior_shell",
+] as const;
+
+const FULL_TENSOR_COMPONENTS = [
+  "T00",
+  "T01",
+  "T02",
+  "T03",
+  "T11",
+  "T12",
+  "T13",
+  "T22",
+  "T23",
+  "T33",
+] as const;
+
+const FULL_TENSOR_LOWER_COMPONENTS = [
+  "T10",
+  "T20",
+  "T30",
+  "T21",
+  "T31",
+  "T32",
+] as const;
 
 const extractObserverConditionStatus = (
   artifact: Record<string, unknown> | null,
@@ -251,6 +293,63 @@ export const evaluateRegionalSourceClosureCounterparts = (
   );
 };
 
+export const evaluateRegionalSourceClosureRequiredRegions = (
+  sourceClosureArtifact: Record<string, unknown> | null,
+): Nhm2ReferenceRunValidationGate => {
+  const regions = asRecord(sourceClosureArtifact?.regionComparisons)?.regions;
+  if (!Array.isArray(regions) || regions.length === 0) {
+    return gate("GATE_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS", "fail", [
+      "regional_source_closure_regions_missing",
+    ]);
+  }
+
+  const present = new Set<string>();
+  for (const region of regions) {
+    const regionId = asString(asRecord(region)?.regionId);
+    if (regionId != null) present.add(regionId);
+  }
+  const missing = REQUIRED_REGIONAL_SOURCE_CLOSURE_REGIONS.filter(
+    (regionId) => !present.has(regionId),
+  );
+
+  return gate(
+    "GATE_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS",
+    missing.length > 0 ? "fail" : "pass",
+    missing.map((regionId) => `regional_source_closure_region_missing:${regionId}`),
+  );
+};
+
+const collectTensorComponents = (
+  value: unknown,
+  components = new Set<string>(),
+): Set<string> => {
+  const record = asRecord(value);
+  if (record == null) {
+    if (Array.isArray(value)) {
+      for (const entry of value) collectTensorComponents(entry, components);
+    }
+    return components;
+  }
+  for (const [key, nested] of Object.entries(record)) {
+    if (/^T[0-3][0-3]$/.test(key)) components.add(key);
+    collectTensorComponents(nested, components);
+  }
+  return components;
+};
+
+const hasTensorSymmetryDeclaration = (artifact: Record<string, unknown> | null): boolean => {
+  const text = JSON.stringify(artifact ?? {}).toLowerCase();
+  return (
+    text.includes("symmetric_tensor") ||
+    text.includes("tensor_symmetry") ||
+    text.includes("tensorsymmetry") ||
+    text.includes("symmetric stress tensor") ||
+    text.includes("symmetric_stress_tensor") ||
+    text.includes("\"symmetry\":\"symmetric\"") ||
+    text.includes("\"symmetric\":true")
+  );
+};
+
 export const evaluateFullTensorAuthority = (
   artifact: Record<string, unknown> | null,
 ): Nhm2ReferenceRunValidationGate => {
@@ -259,9 +358,24 @@ export const evaluateFullTensorAuthority = (
   if (/diagonal_proxy/i.test(text) || /pressure proxy/i.test(text)) {
     reasons.add("diagonal_proxy_present_reduced_order_only");
   }
-  const hasT0i = /"T0[123]"\s*:/.test(text) || /"T01"\s*:/.test(text);
-  const hasOffDiagonal = /"T12"\s*:/.test(text) || /"T13"\s*:/.test(text) || /"T23"\s*:/.test(text);
-  if (!hasT0i || !hasOffDiagonal) {
+  const components = collectTensorComponents(artifact);
+  const missingDeclared = FULL_TENSOR_COMPONENTS.filter(
+    (component) => !components.has(component),
+  );
+  for (const component of missingDeclared) {
+    reasons.add(`full_tensor_component_missing:${component}`);
+  }
+  const hasSymmetryDeclaration = hasTensorSymmetryDeclaration(artifact);
+  const missingLower = FULL_TENSOR_LOWER_COMPONENTS.filter(
+    (component) => !components.has(component),
+  );
+  if (missingLower.length > 0 && !hasSymmetryDeclaration) {
+    reasons.add("full_tensor_symmetry_or_lower_components_missing");
+    for (const component of missingLower) {
+      reasons.add(`full_tensor_component_missing:${component}`);
+    }
+  }
+  if (missingDeclared.length > 0 || (missingLower.length > 0 && !hasSymmetryDeclaration)) {
     reasons.add("full_tensor_components_not_emitted");
   }
   return gate(
@@ -314,6 +428,118 @@ export const evaluateLiteratureClaimMap = (
   );
 };
 
+export const evaluateQeiDossier = (
+  qeiDossier: unknown | null,
+): Nhm2ReferenceRunValidationGate => {
+  if (!isNhm2QeiDossierArtifact(qeiDossier)) {
+    return gate("GATE_QEI_DOSSIER_PRESENT", "review", ["qei_dossier_missing"]);
+  }
+
+  const reasons = new Set<string>();
+  if (qeiDossier.status !== "pass") {
+    reasons.add(`qei_dossier_status_not_pass:${qeiDossier.status}`);
+  }
+  if (qeiDossier.rhoSource === "proxy") {
+    reasons.add("qei_proxy_rho_source_blocks_physical_mechanism");
+  }
+  if (qeiDossier.rhoSource === "unknown") {
+    reasons.add("qei_rho_source_unknown");
+  }
+  if (qeiDossier.qeiApplicabilityStatus !== "PASS") {
+    reasons.add(
+      `qei_applicability_not_pass:${qeiDossier.qeiApplicabilityStatus}`,
+    );
+  }
+  if (qeiDossier.quantumStateAssumptions.length === 0) {
+    reasons.add("qei_quantum_state_assumptions_missing");
+  }
+  if (qeiDossier.renormalizationConvention == null) {
+    reasons.add("qei_renormalization_convention_missing");
+  }
+  if (qeiDossier.cavityBoundaryModel == null) {
+    reasons.add("qei_cavity_boundary_model_missing");
+  }
+  if (qeiDossier.samplingWorldlines.length === 0) {
+    reasons.add("qei_sampling_worldlines_missing");
+  }
+  const worldlineIds = new Set(
+    qeiDossier.samplingWorldlines.map((worldline) => worldline.id),
+  );
+  if (
+    qeiDossier.worstWorldlineId == null ||
+    !worldlineIds.has(qeiDossier.worstWorldlineId)
+  ) {
+    reasons.add("qei_worst_worldline_unresolved");
+  }
+  if (qeiDossier.dutyCyclePass !== true) {
+    reasons.add("qei_duty_cycle_not_pass");
+  }
+  if (qeiDossier.lightCrossingConsistencyStatus !== "pass") {
+    reasons.add(
+      `qei_light_crossing_not_pass:${qeiDossier.lightCrossingConsistencyStatus}`,
+    );
+  }
+  if (qeiDossier.cycleAverageClosureStatus !== "pass") {
+    reasons.add(
+      `qei_cycle_average_closure_not_pass:${qeiDossier.cycleAverageClosureStatus}`,
+    );
+  }
+  if (qeiDossier.literatureRefs.length === 0) {
+    reasons.add("qei_literature_refs_missing");
+  }
+
+  const state: Nhm2ReferenceRunValidationState =
+    reasons.size === 0 ? "pass" : qeiDossier.status === "fail" ? "fail" : "review";
+  return gate("GATE_QEI_DOSSIER_PRESENT", state, Array.from(reasons));
+};
+
+const certificateIsExplicitlyNonPromotional = (
+  certificate: Record<string, unknown> | null,
+): boolean =>
+  certificate != null &&
+  (certificate.nonPromotional === true ||
+    certificate.promotionAllowed === false ||
+    certificate.promotional === false ||
+    certificate.validationPromotionAllowed === false ||
+    asString(certificate.promotionSafety) === "non_promotional" ||
+    asString(certificate.claimEffect) === "non_promotional");
+
+const certificateImpliesPromotion = (
+  certificate: Record<string, unknown> | null,
+): boolean => {
+  if (certificate == null) return false;
+  const textValues = Object.entries(certificate)
+    .filter(([, value]) => typeof value === "string")
+    .map(([key, value]) => `${key}:${value}`.toLowerCase());
+  return (
+    certificate.state === "pass" ||
+    certificate.status === "pass" ||
+    textValues.some((entry) =>
+      /\b(green|certified|admissible|pass)\b/.test(entry),
+    ) ||
+    asBoolean(certificate.certificateGreen) === true ||
+    asBoolean(certificate.admissible) === true ||
+    asBoolean(certificate.certified) === true
+  );
+};
+
+const classifyAdapterVerification = (
+  referenceRun: Nhm2ReferenceRunArtifact | null,
+  override?: Nhm2AdapterVerificationStatus,
+): Nhm2AdapterVerificationStatus => {
+  if (override != null) return override;
+  const command = referenceRun?.commands.find((entry) =>
+    /casimir:verify|adapter/i.test(`${entry.id} ${entry.command}`),
+  );
+  if (command == null) return "not_run";
+  if (command.status === "pass") return "pass";
+  if (command.status === "not_run") return "not_run";
+  if (/econnrefused|endpoint|adapter.*unavailable/i.test(command.command)) {
+    return "blocked_infra_endpoint_unavailable";
+  }
+  return "fail";
+};
+
 export const validateNhm2ReferenceRun = (args: {
   referenceRun: unknown;
   repoRoot?: string;
@@ -322,6 +548,7 @@ export const validateNhm2ReferenceRun = (args: {
   sourceClosure?: Record<string, unknown> | null;
   qeiDossier?: unknown | null;
   literatureClaimMap?: unknown | null;
+  adapterVerificationStatus?: Nhm2AdapterVerificationStatus;
 }): Nhm2ReferenceRunValidationArtifact => {
   const referenceRun = args.referenceRun as Nhm2ReferenceRunArtifact;
   const structuralPass = isNhm2ReferenceRunArtifact(args.referenceRun);
@@ -409,25 +636,12 @@ export const validateNhm2ReferenceRun = (args: {
       detailedObserverArtifact: observerAudit,
     }),
   );
+  gates.push(evaluateRegionalSourceClosureRequiredRegions(sourceClosure));
   gates.push(evaluateRegionalSourceClosureCounterparts(sourceClosure));
   gates.push(evaluateFullTensorAuthority(sourceClosure));
 
   const qeiDossier = args.qeiDossier ?? null;
-  gates.push(
-    gate(
-      "GATE_QEI_DOSSIER_PRESENT",
-      isNhm2QeiDossierArtifact(qeiDossier) &&
-        qeiDossier.status !== "missing" &&
-        qeiDossier.rhoSource !== "proxy"
-        ? "pass"
-        : "review",
-      isNhm2QeiDossierArtifact(qeiDossier)
-        ? qeiDossier.rhoSource === "proxy"
-          ? ["qei_proxy_rho_source_blocks_physical_mechanism"]
-          : []
-        : ["qei_dossier_missing"],
-    ),
-  );
+  gates.push(evaluateQeiDossier(qeiDossier));
 
   const reproducibility = asRecord(
     getNested(fullLoopAudit, [
@@ -455,23 +669,25 @@ export const validateNhm2ReferenceRun = (args: {
   const certificate = asRecord(
     getNested(fullLoopAudit, ["sections", "certificate_policy_result"]),
   );
+  const certificateOverridesReview =
+    fullLoopAudit?.overallState !== "pass" &&
+    certificateImpliesPromotion(certificate) &&
+    !certificateIsExplicitlyNonPromotional(certificate);
   gates.push(
     gate(
       "GATE_CERTIFICATE_DOES_NOT_OVERRIDE_REVIEW",
-      fullLoopAudit?.overallState === "review" &&
-        certificate?.state === "pass" &&
-        fullLoopAudit?.highestPassingClaimTier != null
-        ? "fail"
-        : "pass",
-      fullLoopAudit?.overallState === "review" &&
-        certificate?.state === "pass" &&
-        fullLoopAudit?.highestPassingClaimTier != null
-        ? ["certificate_policy_green_overrode_review"]
+      certificateOverridesReview ? "fail" : "pass",
+      certificateOverridesReview
+        ? ["certificate_policy_green_overrode_non_pass_full_loop"]
         : [],
     ),
   );
 
   const overallState = aggregate(gates);
+  const adapterVerificationStatus = classifyAdapterVerification(
+    structuralPass ? referenceRun : null,
+    args.adapterVerificationStatus,
+  );
   return {
     artifactId: NHM2_REFERENCE_RUN_VALIDATION_ARTIFACT_ID,
     schemaVersion: NHM2_REFERENCE_RUN_VALIDATION_SCHEMA_VERSION,
@@ -485,6 +701,8 @@ export const validateNhm2ReferenceRun = (args: {
           ? "diagnostic"
           : null,
     validationClaimAllowed: false,
+    adapterVerificationStatus,
+    adapterVerificationPhysicsImpact: "none_claimed",
   };
 };
 
