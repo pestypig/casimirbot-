@@ -6,6 +6,8 @@ This page turns the NHM2 closed-loop narrative into a concrete audit contract. I
 
 Use this alongside [`docs/nhm2-closed-loop.md`](./nhm2-closed-loop.md). That page states the current claim tier; this page states the evidence needed to move it.
 
+For red-team validation hardening, use [`docs/research/nhm2-validation-hardening-red-team-branch.md`](./research/nhm2-validation-hardening-red-team-branch.md). Certificate-policy green is not allowed to override a full-loop `review` state, a missing same-basis regional source counterpart, or an inconsistent observer artifact.
+
 ## Audit Status Vocabulary
 
 Use these statuses for each artifact bundle:

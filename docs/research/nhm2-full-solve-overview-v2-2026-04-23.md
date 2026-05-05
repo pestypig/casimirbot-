@@ -277,3 +277,6 @@ Claims intentionally withheld:
 - max-speed/ETA broad certification claims,
 - broad viability expansion claims from bounded outputs.
 
+## Validation-Hardening Claim Boundary
+
+NHM2 full-solve overview language remains bounded by the red-team validation harness: NHM2 is a lapse-extended Natario-style diagnostic / reduced-order candidate lane with bounded solve-backed outputs under review. This overview must not be read as asserting validation, certified transport, a physically solved GR-plus-quantum mechanism, or an ambient causality-violating route claim.

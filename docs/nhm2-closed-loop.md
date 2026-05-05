@@ -8,6 +8,8 @@ For the concrete audit contract that turns this narrative into artifact names an
 
 NHM2 should currently be described as a lapse-extended candidate research lane built on a Natario-style zero-expansion transport core, not as a closed-loop certified transport solution.
 
+Validation-hardening work must preserve the stricter red-team wording: NHM2 is a lapse-extended Natario-style diagnostic / reduced-order candidate lane with bounded solve-backed outputs under review. Holography, observer, and wormhole literature may be cited as external context only; those papers do not validate NHM2 source closure, observer closure, or transport claims.
+
 The repository already contains:
 
 - a sector-strobed Casimir source proxy with cycle-average timing semantics,

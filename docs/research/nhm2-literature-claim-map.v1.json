@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "nhm2_literature_claim_map/v1",
+  "claimPolicy": {
+    "externalTheoryDoesNotValidateNHM2": true,
+    "webOrPaperCitationRequiredForExternalTheoryClaims": true,
+    "noPredictiveLanguageFromExperimentalMathOnly": true
+  },
+  "sources": [
+    {
+      "sourceId": "maldacena_1997_ads_cft",
+      "title": "The Large N Limit of Superconformal Field Theories and Supergravity",
+      "url": "https://arxiv.org/abs/hep-th/9711200",
+      "claimSupport": ["controlled_holographic_context"],
+      "nonSupport": [
+        "does_not_validate_nhm2_source_mechanism",
+        "does_not_validate_transport"
+      ]
+    },
+    {
+      "sourceId": "ryu_takayanagi_2006_holographic_entanglement_entropy",
+      "title": "Holographic Derivation of Entanglement Entropy from AdS/CFT",
+      "url": "https://arxiv.org/abs/hep-th/0603001",
+      "claimSupport": ["holographic_geometry_entropy_context"],
+      "nonSupport": [
+        "does_not_validate_local_casimir_tile_source",
+        "does_not_validate_nhm2_source_closure"
+      ]
+    },
+    {
+      "sourceId": "penington_2019_entanglement_wedge_information_paradox",
+      "title": "Entanglement Wedge Reconstruction and the Information Paradox",
+      "url": "https://arxiv.org/abs/1905.08255",
+      "versionNote": "v3, last revised 2020-08-29; entanglement wedge reconstruction and Page-time transition in AdS/CFT black-hole settings",
+      "claimSupport": ["controlled_entanglement_wedge_context"],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_validate_transport",
+        "does_not_validate_tile_effective_source"
+      ]
+    },
+    {
+      "sourceId": "almheiri_engelhardt_marolf_maxfield_2019_bulk_entropy_wedge",
+      "title": "The entropy of bulk quantum fields and the entanglement wedge of an evaporating black hole",
+      "url": "https://arxiv.org/abs/1905.08762",
+      "claimSupport": ["black_hole_information_context"],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_validate_local_warp_source_mechanism"
+      ]
+    },
+    {
+      "sourceId": "maldacena_2025_real_observers_v3",
+      "title": "Real observers solving imaginary problems",
+      "url": "https://arxiv.org/abs/2412.14014",
+      "versionNote": "v3, last revised 2025-11-04; observer inclusion mostly cancels phase but leaves an overall minus sign",
+      "claimSupport": ["observer_inclusion_is_physics_relevant"],
+      "nonSupport": ["does_not_validate_nhm2_observer_audit"]
+    },
+    {
+      "sourceId": "maldacena_milekhin_popov_4d_wormholes",
+      "title": "Traversable wormholes in four dimensions",
+      "url": "https://arxiv.org/abs/1807.04726",
+      "claimSupport": [
+        "negative_casimir_like_energy_can_support_specific_wormhole_solutions",
+        "ambient_causality_guardrail"
+      ],
+      "nonSupport": [
+        "does_not_validate_warp_drive",
+        "does_not_validate_nhm2_tile_source"
+      ]
+    },
+    {
+      "sourceId": "guevara_lupsasca_skinner_strominger_weil_2026_single_minus",
+      "title": "Single-minus gluon tree amplitudes are nonzero",
+      "url": "https://arxiv.org/abs/2602.12176",
+      "versionNote": "v2, last revised 2026-03-09",
+      "claimSupport": ["unrelated_scattering_amplitudes_context_only"],
+      "nonSupport": [
+        "does_not_validate_nhm2",
+        "does_not_support_source_closure"
+      ]
+    }
+  ]
+}
