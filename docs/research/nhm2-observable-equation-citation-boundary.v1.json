@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "v1",
+  "globalRule": "External literature provides context, method, or constraint boundaries only. It does not validate NHM2.",
+  "requiredRefs": [
+    {
+      "id": "gourgoulhon_2007_3p1_formalism",
+      "category": "geometry_3p1",
+      "allowedUse": ["3+1 formalism context", "lapse shift spatial metric terminology", "numerical relativity method context"],
+      "forbiddenUse": ["validates NHM2", "proves physical mechanism"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "munzner_2009_nested_model",
+      "category": "visualization_method",
+      "allowedUse": ["domain-task to data-abstraction to encoding planning"],
+      "forbiddenUse": ["physics validation"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "cleveland_mcgill_1984_graphical_perception",
+      "category": "visualization_method",
+      "allowedUse": ["quantitative comparison chart rationale"],
+      "forbiddenUse": ["physics validation"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "crameri_2020_colour",
+      "category": "visualization_method",
+      "allowedUse": ["scientific color-map policy", "avoid rainbow and misleading color scales"],
+      "forbiddenUse": ["physics validation"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "alcubierre_1994_warp_metric",
+      "category": "warp_metric_context",
+      "allowedUse": ["warp metric context", "exotic matter caveat"],
+      "forbiddenUse": ["validates NHM2", "proves propulsion"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "natario_2002_zero_expansion",
+      "category": "warp_metric_context",
+      "allowedUse": ["zero-expansion warp-drive context", "avoid simplistic expansion/contraction cartoon"],
+      "forbiddenUse": ["validates NHM2"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "pfenning_ford_1997_warp_qi",
+      "category": "qei_semiclassical",
+      "allowedUse": ["quantum inequality restrictions on warp-drive negative energy"],
+      "forbiddenUse": ["QEI completion claim", "NHM2 physical-closure claim"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "fewster_2005_qei_review",
+      "category": "qei_semiclassical",
+      "allowedUse": ["QEI mathematical context", "weighted stress-energy average context"],
+      "forbiddenUse": ["QEI dossier complete"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "kontou_sanders_2020_energy_conditions",
+      "category": "energy_conditions",
+      "allowedUse": ["energy-condition review context", "classical versus quantum caveats"],
+      "forbiddenUse": ["energy-condition clearance claim"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "hollands_wald_2014_qft_curved_spacetime",
+      "category": "qft_curved_spacetime",
+      "allowedUse": ["QFT in curved spacetime context", "stress-energy renormalization caveat"],
+      "forbiddenUse": ["renormalized QFT bridge complete"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "lamoreaux_1997_casimir_force",
+      "category": "casimir_context",
+      "allowedUse": ["Casimir force experimental context"],
+      "forbiddenUse": ["Casimir tile validates macro curvature", "proves NHM2 source closure"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "klimchitskaya_2009_real_materials_casimir",
+      "category": "casimir_context",
+      "allowedUse": ["real-material Casimir theory and experiment context"],
+      "forbiddenUse": ["ideal Casimir model validates tile-effective tensor"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "bobrick_martire_2021_physical_warp_drives",
+      "category": "warp_metric_context",
+      "allowedUse": ["modern warp-drive taxonomy context", "positive-energy subluminal context"],
+      "forbiddenUse": ["NHM2 validated"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "santiago_schuster_visser_2022_nec",
+      "category": "energy_condition_constraint",
+      "allowedUse": ["NEC/WEC caution boundary for generic warp drives"],
+      "forbiddenUse": ["energy-condition clearance claim", "warp feasibility claim"],
+      "doesValidateNHM2": false
+    }
+  ]
+}

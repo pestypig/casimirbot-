@@ -1,0 +1,993 @@
+{
+  "artifactId": "nhm2_observable_equation_map",
+  "schemaVersion": "v1",
+  "generatedAt": "2026-05-06T00:00:00.000Z",
+  "sourceWhitepaperRefs": [
+    {
+      "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "sha256": "47a4dde7e1e309f83c629803bfe4f3ac8d90b0cbbd5b28de141d4b8a36752212",
+      "role": "status_whitepaper"
+    },
+    {
+      "path": "docs/research/nhm2-full-solve-overview-v2-2026-04-23.md",
+      "sha256": "dcc1f4d1407781c2002c73acda9df227b4fde638fb0b16928e404e506852efa7",
+      "role": "full_solve_overview"
+    },
+    {
+      "path": "docs/research/nhm2-source-to-york-bridge-gaps-2026-03-30.md",
+      "sha256": "ae52748d5dacce4e0ead261268268226f4456620b24495c9a494206a1172c298",
+      "role": "source_to_york_bridge"
+    },
+    {
+      "path": "docs/research/nhm2-tile-effective-counterpart-claim-safety.md",
+      "sha256": "42b4b26d994d8e1648d81e68c34cd16920cf9644e871d631672befa750524947",
+      "role": "tile_effective_claim_safety"
+    },
+    {
+      "path": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+      "sha256": "a5e3b8e89f87555ac331387d6059963a30a7e5e08881a05f7fa74682e644d832",
+      "role": "reference_ledger"
+    }
+  ],
+  "claimBoundary": {
+    "validationClaimAllowed": false,
+    "physicalMechanismClaimAllowed": false,
+    "promotionAllowed": false,
+    "literatureDoesValidateNHM2": false
+  },
+  "nodes": [
+    {
+      "id": "alpha_lapse",
+      "family": "geometry_3p1",
+      "symbol": "alpha",
+      "displayEquation": "d tau / dt = alpha on the frozen centerline branch",
+      "equationLatex": "\\frac{d\\tau}{dt}=\\alpha_{\\rm centerline}",
+      "plainMeaning": "Lapse field controlling the relation between coordinate time and normal-observer proper time in the selected 3+1 chart.",
+      "whyItMatters": "This is the whitepaper's cleanest observable for separating clocking from unsupported speed language.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+          "channel": "alpha",
+          "units": "repo_normalized",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "alpha_lapse_field_and_centerline",
+          "figureType": "field_slice",
+          "purpose": "Show alpha and alpha - 1 with field statistics and centerline sampling.",
+          "requiredAxesOrEncodings": ["x sample", "z sample", "repo-normalized value", "centerline sample"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "computed",
+      "blockerRefs": [
+        {
+          "blockerId": "observer_summary_detail_reconciliation",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "natario_2002_zero_expansion"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no speed certification", "no physical viability claim"]
+    },
+    {
+      "id": "beta_shift",
+      "family": "geometry_3p1",
+      "symbol": "beta_i",
+      "displayEquation": "dx^i + beta^i dt enters the 3+1 line element",
+      "equationLatex": "ds^2=-\\alpha^2dt^2+\\gamma_{ij}(dx^i+\\beta^idt)(dx^j+\\beta^jdt)",
+      "plainMeaning": "Shift vector describing spatial coordinate drift between hypersurfaces in the declared chart.",
+      "whyItMatters": "The map keeps beta as a chart-dependent transport descriptor rather than an ordinary ship speed.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+          "channel": "beta_x",
+          "units": "repo_normalized",
+          "hashRequired": true
+        },
+        {
+          "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+          "channel": "beta_y",
+          "units": "repo_normalized",
+          "hashRequired": true
+        },
+        {
+          "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+          "channel": "beta_z",
+          "units": "repo_normalized",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "beta_shift_component_and_magnitude",
+          "figureType": "field_slice",
+          "purpose": "Show beta_x and |beta| with independent dynamic ranges.",
+          "requiredAxesOrEncodings": ["x sample", "z sample", "signed beta_x", "|beta| magnitude"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "computed",
+      "blockerRefs": [
+        {
+          "blockerId": "transport_descriptor_not_speed",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "pass"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "natario_2002_zero_expansion"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no route ETA claim", "no speed claim"]
+    },
+    {
+      "id": "gamma_spatial_metric",
+      "family": "geometry_3p1",
+      "symbol": "gamma_ij",
+      "plainMeaning": "Spatial metric on each 3+1 hypersurface.",
+      "whyItMatters": "Observer normalization and stress projections depend on the same-chart spatial basis.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/user-york-brick-latest.json",
+          "fieldName": "gamma_ij",
+          "units": "repo_normalized",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "gamma_component_availability_matrix",
+          "figureType": "tensor_matrix",
+          "purpose": "Show which spatial-metric components are available to downstream observer and source routes.",
+          "requiredAxesOrEncodings": ["i index", "j index", "availability/status"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "diagnostic",
+      "blockerRefs": [
+        {
+          "blockerId": "same_chart_basis_required",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no cross-chart component mixing"]
+    },
+    {
+      "id": "extrinsic_curvature",
+      "family": "geometry_3p1",
+      "symbol": "K_ij",
+      "plainMeaning": "Embedding/evolution geometry of the spatial hypersurfaces, including trace-like or expansion diagnostics used by the repo.",
+      "whyItMatters": "This is the bridge from visual theta/low-expansion diagnostics to the actual 3+1 geometry grammar.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+          "channel": "theta",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "extrinsic_curvature_theta_diagnostic",
+          "figureType": "field_slice",
+          "purpose": "Show signed theta or trace-like diagnostics with zero-centered scaling and near-zero metadata.",
+          "requiredAxesOrEncodings": ["x sample", "z sample", "signed diagnostic", "zero midpoint"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "diagnostic",
+      "blockerRefs": [
+        {
+          "blockerId": "theta_is_diagnostic_not_viability",
+          "sourceArtifact": "docs/research/nhm2-full-solve-overview-v2-2026-04-23.md",
+          "status": "pass"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "natario_2002_zero_expansion"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no zero-expansion sufficiency claim"]
+    },
+    {
+      "id": "hull_sdf",
+      "family": "geometry_3p1",
+      "symbol": "hull_sdf",
+      "plainMeaning": "Signed-distance field defining hull, wall, and exterior-shell region masks.",
+      "whyItMatters": "Regional closure claims require whole-region masks rather than selected patches on the hull.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+          "channel": "hull_sdf",
+          "units": "repo_normalized",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "hull_sdf_region_envelopes",
+          "figureType": "field_slice",
+          "purpose": "Show nested hull, wall, and exterior-shell region masks used for comparisons.",
+          "requiredAxesOrEncodings": ["region", "signed distance", "mask membership"],
+          "allowedRenderer": "scientific_3p1_renderer"
+        }
+      ],
+      "status": "computed",
+      "blockerRefs": [
+        {
+          "blockerId": "regional_masks_required_for_closure",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "pass"
+        }
+      ],
+      "literatureRefs": ["munzner_2009_nested_model"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no selected-region shortcut"]
+    },
+    {
+      "id": "einstein_tensor_source",
+      "family": "metric_required_source",
+      "symbol": "T_geom_ab",
+      "displayEquation": "T_geom_ab = G_ab / 8 pi",
+      "equationLatex": "T^{\\rm geom}_{ab}=\\frac{1}{8\\pi}G_{ab}",
+      "plainMeaning": "Stress-energy tensor required by the solved metric in the selected chart and basis.",
+      "whyItMatters": "This is the authoritative metric-required side of the source-closure comparison.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
+          "fieldName": "metricRequiredTensor",
+          "component": "ab",
+          "units": "geometric_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "metric_required_source_tensor_matrix",
+          "figureType": "tensor_matrix",
+          "purpose": "Show required tensor components and same-chart basis status.",
+          "requiredAxesOrEncodings": ["a index", "b index", "component status/value"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "diagnostic",
+      "blockerRefs": [
+        {
+          "blockerId": "metric_required_route_not_source_mechanism",
+          "sourceArtifact": "docs/research/nhm2-tile-effective-counterpart-claim-safety.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "alcubierre_1994_warp_metric"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no source mechanism confirmation"]
+    },
+    {
+      "id": "regional_metric_source",
+      "family": "metric_required_source",
+      "symbol": "T_geom_ab | region",
+      "plainMeaning": "Metric-required tensor aggregated over hull, wall, and exterior_shell masks.",
+      "whyItMatters": "Global agreement is not enough; the closure problem is regional and same-basis.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-hull-latest.json",
+          "fieldName": "hullMetricRequiredTensor",
+          "units": "geometric_units",
+          "hashRequired": true
+        },
+        {
+          "artifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-wall-latest.json",
+          "fieldName": "wallMetricRequiredTensor",
+          "units": "geometric_units",
+          "hashRequired": true
+        },
+        {
+          "artifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-exterior-shell-latest.json",
+          "fieldName": "exteriorShellMetricRequiredTensor",
+          "units": "geometric_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "regional_metric_source_profiles",
+          "figureType": "component_profile",
+          "purpose": "Show metric-required tensor summaries by region.",
+          "requiredAxesOrEncodings": ["region", "component", "metric-required value/status"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "regional_basis_diagnostic_only",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-regional-source-closure-evidence.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no global-to-regional promotion"]
+    },
+    {
+      "id": "eulerian_observer_normal",
+      "family": "observer_projection",
+      "symbol": "n^mu",
+      "displayEquation": "n_mu = (-alpha, 0, 0, 0), n^mu = (1/alpha, -beta^i/alpha)",
+      "equationLatex": "n_\\mu=(-\\alpha,0,0,0),\\quad n^\\mu=(1/\\alpha,-\\beta^i/\\alpha)",
+      "plainMeaning": "Unit normal observer field used for same-foliation projection.",
+      "whyItMatters": "This makes the observer real and chart-declared rather than a view-from-nowhere summary.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/nhm2-observer-audit-2026-04-25.json",
+          "fieldName": "eulerianObserver",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "eulerian_observer_worldline_schematic",
+          "figureType": "centerline_curve",
+          "purpose": "Show the observer path and region bands used for projection audits.",
+          "requiredAxesOrEncodings": ["centerline sample", "region band", "observer family"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "observer_artifact_reconciliation",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no observer closure shortcut"]
+    },
+    {
+      "id": "observer_energy_density",
+      "family": "observer_projection",
+      "symbol": "E",
+      "displayEquation": "E = T_mu_nu n^mu n^nu",
+      "equationLatex": "E=T_{\\mu\\nu}n^\\mu n^\\nu",
+      "plainMeaning": "Energy density measured by the selected observer family.",
+      "whyItMatters": "Energy-condition claims must be observer-family claims, not single coordinate-component claims.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/nhm2-observer-audit-2026-04-25.json",
+          "fieldName": "E",
+          "units": "geometric_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "observer_energy_density_region_banded_curve",
+          "figureType": "centerline_curve",
+          "purpose": "Show observer energy density along the centerline with region bands.",
+          "requiredAxesOrEncodings": ["centerline sample", "E", "region"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "observer_summary_detail_disagreement",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "kontou_sanders_2020_energy_conditions"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no energy-condition clearance claim"]
+    },
+    {
+      "id": "momentum_density",
+      "family": "observer_projection",
+      "symbol": "J_i",
+      "displayEquation": "J_i = -T_mu_nu n^mu gamma^nu_i",
+      "equationLatex": "J_i=-T_{\\mu\\nu}n^\\mu\\gamma^\\nu{}_i",
+      "plainMeaning": "Observer-projected momentum density.",
+      "whyItMatters": "A diagonal-only stress proxy cannot substitute for full observer momentum channels.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/nhm2-observer-audit-2026-04-25.json",
+          "fieldName": "J_i",
+          "units": "geometric_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "momentum_density_component_profiles",
+          "figureType": "component_profile",
+          "purpose": "Show J_i component coverage and selected profiles.",
+          "requiredAxesOrEncodings": ["component", "sample/region", "coverage/value"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "full_tensor_observer_authority",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "kontou_sanders_2020_energy_conditions"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no diagonal-only promotion"]
+    },
+    {
+      "id": "spatial_stress",
+      "family": "observer_projection",
+      "symbol": "S_ij",
+      "displayEquation": "S_ij = T_mu_nu gamma^mu_i gamma^nu_j",
+      "equationLatex": "S_{ij}=T_{\\mu\\nu}\\gamma^\\mu{}_i\\gamma^\\nu{}_j",
+      "plainMeaning": "Spatial stress projected into the hypersurface.",
+      "whyItMatters": "Full/off-diagonal stress authority is one of the central closure pressure points.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/nhm2-observer-audit-2026-04-25.json",
+          "fieldName": "S_ij",
+          "units": "geometric_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "spatial_stress_authority_matrix",
+          "figureType": "tensor_matrix",
+          "purpose": "Show spatial-stress component authority and missing/review-gated cells.",
+          "requiredAxesOrEncodings": ["i index", "j index", "authority status"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "full_offdiagonal_authority_review",
+          "sourceArtifact": "docs/research/nhm2-tile-effective-counterpart-claim-safety.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "kontou_sanders_2020_energy_conditions"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no full tensor promotion without evidence"]
+    },
+    {
+      "id": "casimir_tile_layout",
+      "family": "source_model",
+      "symbol": "tile geometry",
+      "displayEquation": "E/A = -pi^2 hbar c / (720 a^3)",
+      "equationLatex": "\\frac{E}{A}=-\\frac{\\pi^2\\hbar c}{720a^3}",
+      "plainMeaning": "Fabrication/layout-scale source element and idealized Casimir baseline, not a direct spacetime field.",
+      "whyItMatters": "This separates real Casimir context from an unsupported macro-curvature bridge.",
+      "repoBindings": [
+        {
+          "artifactPath": "configs/needle-hull-mark2-cavity-contract.v1.json",
+          "fieldName": "layout",
+          "units": "layout_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "casimir_tile_layout_process_panel",
+          "figureType": "tile_layout",
+          "purpose": "Show representative tile layers as fabrication/process geometry only.",
+          "requiredAxesOrEncodings": ["process layer", "layout feature", "gap/membrane/mirror"],
+          "allowedRenderer": "svg_table"
+        }
+      ],
+      "status": "diagnostic",
+      "blockerRefs": [
+        {
+          "blockerId": "casimir_to_macro_tensor_bridge_missing",
+          "sourceArtifact": "docs/research/nhm2-source-to-york-bridge-gaps-2026-03-30.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["lamoreaux_1997_casimir_force", "klimchitskaya_2009_real_materials_casimir"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no macro-curvature validation from Casimir context"]
+    },
+    {
+      "id": "sector_schedule",
+      "family": "source_model",
+      "symbol": "sectorCount, concurrentSectors",
+      "plainMeaning": "Scheduled sector activation model from the NHM2 cavity contract.",
+      "whyItMatters": "Duty-cycle figures should show schedule structure, not imply active energy intensity.",
+      "repoBindings": [
+        {
+          "artifactPath": "configs/needle-hull-mark2-cavity-contract.v1.json",
+          "fieldName": "geometry.sectorCount",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        },
+        {
+          "artifactPath": "configs/needle-hull-mark2-cavity-contract.v1.json",
+          "fieldName": "geometry.concurrentSectors",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "sector_schedule_all_sector_timeline",
+          "figureType": "sector_schedule",
+          "purpose": "Show every scheduled sector and the concurrent-sector count from the contract.",
+          "requiredAxesOrEncodings": ["sector", "schedule window", "scheduled active boolean"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "computed",
+      "blockerRefs": [
+        {
+          "blockerId": "schedule_not_thrust_law",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "pass"
+        }
+      ],
+      "literatureRefs": ["munzner_2009_nested_model"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no thrust law claim"]
+    },
+    {
+      "id": "tile_effective_tensor",
+      "family": "tile_effective_counterpart",
+      "symbol": "T_tile_eff_ab",
+      "plainMeaning": "Proposed source-side tensor counterpart in the same chart, units, region mask, aggregation mode, and normalization basis.",
+      "whyItMatters": "This is the missing or review-gated bridge needed before mechanism-side language can become stronger.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json",
+          "fieldName": "tileEffectiveTensor",
+          "component": "ab",
+          "units": "geometric_units",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "tile_effective_counterpart_coverage_matrix",
+          "figureType": "tensor_matrix",
+          "purpose": "Show source-side counterpart tensor coverage and review-gated components.",
+          "requiredAxesOrEncodings": ["a index", "b index", "coverage/status"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "same_basis_tile_effective_counterpart_authority",
+          "sourceArtifact": "docs/research/nhm2-tile-effective-counterpart-claim-safety.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["lamoreaux_1997_casimir_force", "klimchitskaya_2009_real_materials_casimir", "gourgoulhon_2007_3p1_formalism"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no metric echo as source", "no mechanism promotion"]
+    },
+    {
+      "id": "same_basis_closure",
+      "family": "closure_residual",
+      "symbol": "Delta T_ab",
+      "displayEquation": "Delta T_ab = T_geom_ab - T_tile_eff_ab",
+      "equationLatex": "\\Delta T_{ab}=T^{\\rm geom}_{ab}-T^{\\rm tile\\_eff}_{ab}",
+      "plainMeaning": "Same-chart, same-basis closure residual between metric-required and tile-effective tensors.",
+      "whyItMatters": "This is the core mathematical gap between the classical metric solve and the quantum/source-side route.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+          "fieldName": "residualNorms",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "same_basis_closure_residual_matrix",
+          "figureType": "residual_chart",
+          "purpose": "Show closure residuals only where both tensors are available in the same basis.",
+          "requiredAxesOrEncodings": ["component", "region", "signed residual/status"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "regional_basis_diagnostic_only",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-regional-source-closure-evidence.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "pfenning_ford_1997_warp_qi"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no closure promotion while regional basis is diagnostic"]
+    },
+    {
+      "id": "regional_source_closure",
+      "family": "closure_residual",
+      "symbol": "Delta T_ab | hull, wall, exterior_shell",
+      "plainMeaning": "Regional source-closure status by whole-hull region.",
+      "whyItMatters": "This is where the atlas should show what remains unresolved rather than painting blocker status on the hull.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-regional-source-closure-evidence.json",
+          "fieldName": "regionalBlockers",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "regional_source_closure_waterfall",
+          "figureType": "residual_chart",
+          "purpose": "Show hull, wall, and exterior_shell residual or blocker status as a chart.",
+          "requiredAxesOrEncodings": ["region", "component/blocker", "status/residual"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "regional_direct_t00_semantic_misalignment",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no region closure shortcut"]
+    },
+    {
+      "id": "energy_condition_family",
+      "family": "energy_condition",
+      "symbol": "NEC / WEC / SEC / DEC",
+      "plainMeaning": "Observer-family energy-condition diagnostics for the stress-energy tensor.",
+      "whyItMatters": "Energy-condition panels must show observer-family evidence and missing families, not binary optimism.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/nhm2-observer-audit-2026-04-25.json",
+          "fieldName": "energyConditions",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "energy_condition_observer_family_status",
+          "figureType": "observer_family_surface",
+          "purpose": "Show which observer families and conditions are evidenced, missing, or review-gated.",
+          "requiredAxesOrEncodings": ["observer family", "condition", "status/value"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "observer_energy_condition_reconciliation",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["kontou_sanders_2020_energy_conditions", "santiago_schuster_visser_2022_nec", "pfenning_ford_1997_warp_qi"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no condition-clearance claim"]
+    },
+    {
+      "id": "qei_sampling_requirement",
+      "family": "qei_gate",
+      "symbol": "int f(tau) T_mn u^m u^n d tau",
+      "displayEquation": "integral of sampled stress-energy along a worldline",
+      "equationLatex": "\\int f(\\tau)T_{\\mu\\nu}u^\\mu u^\\nu d\\tau",
+      "plainMeaning": "Weighted worldline sampling requirement for QEI-style audit.",
+      "whyItMatters": "This keeps QEI as a mathematical dossier requirement, not a decorative pass badge.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/rendered/scientific-figure-atlas/2026-05-06/math_closure/10_observer_qei_worldline_plot.source-data.json",
+          "fieldName": "qeiSampling",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "qei_sampling_worldline_requirement",
+          "figureType": "qei_sampling_plot",
+          "purpose": "Show sampling window, worldline, and dossier completeness as pending/review evidence.",
+          "requiredAxesOrEncodings": ["proper-time/sample", "sampling weight", "worldline region", "dossier status"],
+          "allowedRenderer": "vega_lite"
+        }
+      ],
+      "status": "blocked",
+      "blockerRefs": [
+        {
+          "blockerId": "qei_qft_dossier_missing",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "status": "missing"
+        }
+      ],
+      "literatureRefs": ["pfenning_ford_1997_warp_qi", "fewster_2005_qei_review", "hollands_wald_2014_qft_curved_spacetime"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no QEI completion claim", "no physical closure claim"]
+    },
+    {
+      "id": "convergence_reproducibility",
+      "family": "convergence_reproducibility",
+      "symbol": "grid / seed / hash / residual stability",
+      "plainMeaning": "Run reproducibility and convergence evidence for the map-to-figure chain and full solve.",
+      "whyItMatters": "A figure is not acceptance evidence unless its source run, hashes, and convergence status are auditable.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "fieldName": "reproducibilityBlockers",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "convergence_reproducibility_artifact_table",
+          "figureType": "convergence_plot",
+          "purpose": "Show convergence/reproduction fields, hashes, and missing evidence.",
+          "requiredAxesOrEncodings": ["artifact", "hash/status", "convergence field"],
+          "allowedRenderer": "svg_table"
+        }
+      ],
+      "status": "review",
+      "blockerRefs": [
+        {
+          "blockerId": "independent_reproduction_and_convergence_missing",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["munzner_2009_nested_model", "crameri_2020_colour"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no reproducibility promotion without full chain"]
+    },
+    {
+      "id": "claim_locks",
+      "family": "claim_boundary",
+      "symbol": "validationClaimAllowed=false; physicalMechanismClaimAllowed=false; promotionAllowed=false",
+      "plainMeaning": "Frozen-run claim boundary for validation, physical-mechanism, and promotion language.",
+      "whyItMatters": "This keeps the observable-equation atlas from turning context, diagnostics, or literature into promotion.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "fieldName": "claimBoundary",
+          "units": "dimensionless_diagnostic",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "claim_boundary_lock_strip",
+          "figureType": "claim_boundary_strip",
+          "purpose": "Show the three locked claim fields and their non-promotional meaning.",
+          "requiredAxesOrEncodings": ["claim field", "allowed boolean", "reason/status"],
+          "allowedRenderer": "svg_table"
+        }
+      ],
+      "status": "blocked",
+      "blockerRefs": [
+        {
+          "blockerId": "promotion_locks_active",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-blocker-ledger-nhm2-reference-ledger-2026-05-05-v1.json",
+          "status": "pass"
+        }
+      ],
+      "literatureRefs": ["alcubierre_1994_warp_metric", "santiago_schuster_visser_2022_nec"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": ["no external validation claim", "no physical mechanism claim"]
+    }
+  ],
+  "edges": [
+    {
+      "from": "alpha_lapse",
+      "to": "eulerian_observer_normal",
+      "relation": "defines",
+      "plainMeaning": "The lapse contributes directly to the Eulerian normal observer.",
+      "claimBoundaryNote": "This defines observer bookkeeping only; it does not validate transport."
+    },
+    {
+      "from": "beta_shift",
+      "to": "eulerian_observer_normal",
+      "relation": "defines",
+      "plainMeaning": "The shift enters n^mu through -beta^i / alpha.",
+      "claimBoundaryNote": "This is chart geometry, not speed certification."
+    },
+    {
+      "from": "gamma_spatial_metric",
+      "to": "observer_energy_density",
+      "relation": "projects_to",
+      "plainMeaning": "The spatial metric and projector define observer-facing energy variables.",
+      "claimBoundaryNote": "Projection does not imply energy-condition clearance."
+    },
+    {
+      "from": "extrinsic_curvature",
+      "to": "einstein_tensor_source",
+      "relation": "requires",
+      "plainMeaning": "Metric-derived tensor routes depend on the 3+1 geometry state.",
+      "claimBoundaryNote": "Metric-required source is not source-side mechanism evidence."
+    },
+    {
+      "from": "hull_sdf",
+      "to": "regional_metric_source",
+      "relation": "defines",
+      "plainMeaning": "Region masks define hull, wall, and exterior-shell aggregation.",
+      "claimBoundaryNote": "Region masks must cover whole regions rather than selected decorative patches."
+    },
+    {
+      "from": "einstein_tensor_source",
+      "to": "same_basis_closure",
+      "relation": "compares_against",
+      "plainMeaning": "The metric-required tensor is one side of the closure residual.",
+      "claimBoundaryNote": "Restating G_ab/8pi on both sides is not source closure."
+    },
+    {
+      "from": "tile_effective_tensor",
+      "to": "same_basis_closure",
+      "relation": "compares_against",
+      "plainMeaning": "The tile-effective tensor is the required source-side counterpart.",
+      "claimBoundaryNote": "Unavailable or review-gated components block stronger mechanism language."
+    },
+    {
+      "from": "regional_metric_source",
+      "to": "regional_source_closure",
+      "relation": "requires",
+      "plainMeaning": "Regional closure requires region-specific metric-required tensors.",
+      "claimBoundaryNote": "Global residuals cannot substitute for region-resolved closure."
+    },
+    {
+      "from": "casimir_tile_layout",
+      "to": "tile_effective_tensor",
+      "relation": "requires",
+      "plainMeaning": "Tile layout informs the source model but does not directly produce macro tensor authority.",
+      "claimBoundaryNote": "Casimir context remains source-model context until a same-basis tensor is derived."
+    },
+    {
+      "from": "sector_schedule",
+      "to": "tile_effective_tensor",
+      "relation": "averages_to",
+      "plainMeaning": "Sector scheduling can support a duty-averaged source model only under explicit averaging assumptions.",
+      "claimBoundaryNote": "Duty scheduling is not a certified thrust or source law."
+    },
+    {
+      "from": "observer_energy_density",
+      "to": "energy_condition_family",
+      "relation": "projects_to",
+      "plainMeaning": "Observer energy density feeds WEC/NEC/SEC/DEC diagnostics.",
+      "claimBoundaryNote": "A projected scalar does not clear all observer-family conditions."
+    },
+    {
+      "from": "momentum_density",
+      "to": "energy_condition_family",
+      "relation": "requires",
+      "plainMeaning": "Momentum density is part of full observer stress-energy authority.",
+      "claimBoundaryNote": "Diagonal-only evidence blocks promotion-sensitive energy-condition language."
+    },
+    {
+      "from": "spatial_stress",
+      "to": "energy_condition_family",
+      "relation": "requires",
+      "plainMeaning": "Spatial stress components contribute to observer-family condition tests.",
+      "claimBoundaryNote": "Off-diagonal review status must remain visible."
+    },
+    {
+      "from": "observer_energy_density",
+      "to": "qei_sampling_requirement",
+      "relation": "bounds",
+      "plainMeaning": "QEI-style audits require weighted stress-energy sampling along worldlines.",
+      "claimBoundaryNote": "A sampling schematic is not a completed QEI bound."
+    },
+    {
+      "from": "same_basis_closure",
+      "to": "claim_locks",
+      "relation": "blocks",
+      "plainMeaning": "Review-gated or missing closure keeps claim locks active.",
+      "claimBoundaryNote": "Locks remain false until ledger evidence explicitly changes them."
+    },
+    {
+      "from": "qei_sampling_requirement",
+      "to": "claim_locks",
+      "relation": "blocks",
+      "plainMeaning": "Missing QEI/QFT dossier evidence blocks physical-mechanism language.",
+      "claimBoundaryNote": "External QEI literature constrains the route but does not complete it."
+    },
+    {
+      "from": "convergence_reproducibility",
+      "to": "claim_locks",
+      "relation": "documents",
+      "plainMeaning": "Reproducibility and convergence evidence document whether figures can be treated as acceptance evidence.",
+      "claimBoundaryNote": "Figure generation alone cannot promote a run."
+    }
+  ]
+}
