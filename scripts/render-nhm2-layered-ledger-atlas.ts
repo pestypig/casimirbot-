@@ -230,6 +230,7 @@ async function main(): Promise<void> {
     },
     inputHashes: {
       brick: sha256Hex(brickBytes),
+      wrappedBrick: fs.existsSync(args.wrappedBrick) ? sha256Hex(fs.readFileSync(args.wrappedBrick)) : null,
       ricci4: hashFloat32(ricci4),
       hull_sdf: hashFloat32(hullSdf),
       ledger: ledgerInput.hash,
