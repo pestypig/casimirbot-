@@ -5,7 +5,7 @@ export type SolarMechanismId =
   | "photospheric_field_backreaction"
   | "sunquake_acoustic_response"
   | "nanoflare_transition_region_brightening"
-  | "multifractal_flare_memory"
+  | "multifractal_flare_memory_proxy"
   | "polarimetric_faraday_path"
   | "collapse_residual_hypothesis";
 
@@ -33,6 +33,10 @@ export interface SolarEventObservation {
   harp_id?: string;
   topology_context_ref?: string;
   energy_closure_fraction?: number;
+  packet_expected_energy_J?: number;
+  radiated_energy_J?: number;
+  p_mode_frequency_mHz?: number;
+  qpp_period_candidates_s?: ArrayLike<number>;
 }
 
 export interface SolarCongruenceMetric {
@@ -47,9 +51,42 @@ export interface SolarCongruenceMetric {
 export interface SolarEventCongruenceReport {
   event_id: string;
   metrics: SolarCongruenceMetric[];
+  constraint_envelope: SolarConstraintEnvelope;
   primary_physics_pass: boolean;
   speculative_residual_allowed: boolean;
   mismatch_fingerprint: string;
+}
+
+export interface SolarConstraintEnvelope {
+  event_id: string;
+  energy_budget: {
+    magnetic_free_energy_J?: number;
+    radiated_energy_J?: number;
+    acoustic_energy_proxy?: number;
+    packet_expected_energy_J?: number;
+    energy_closure_fraction?: number;
+    status: SolarCongruenceStatus;
+  };
+  timing_budget: {
+    p_mode_frequency_mHz?: number;
+    phase_lock_score?: number;
+    flare_onset_lag_s?: number;
+    ribbon_to_quake_lag_s?: number;
+    qpp_period_candidates_s?: number[];
+    status: SolarCongruenceStatus;
+  };
+  topology_budget: {
+    has_active_region_linkage: boolean;
+    has_pil_context: boolean;
+    has_ribbon_flux: boolean;
+    has_topology_context: boolean;
+    status: SolarCongruenceStatus;
+  };
+  residual_budget: {
+    residual_allowed: boolean;
+    residual_claim_tier: "none" | "advisory_only";
+    blocked_reasons: string[];
+  };
 }
 
 const finiteValues = (series?: ArrayLike<number>): number[] =>
@@ -68,6 +105,25 @@ const hasSource = (observation: SolarEventObservation): boolean =>
   Boolean(observation.source_region_id || observation.noaa_active_region || observation.harp_id);
 const driverSeries = (observation: SolarEventObservation): ArrayLike<number> | undefined =>
   observation.goes_xray_flux ?? observation.euv_irradiance ?? observation.ribbon_flux_Mx;
+
+function metricById(metrics: SolarCongruenceMetric[], id: SolarMechanismId): SolarCongruenceMetric | undefined {
+  return metrics.find((metric) => metric.id === id);
+}
+
+function vectorStrength(phases: number[]): number {
+  if (phases.length === 0) return 0;
+  return Math.sqrt((mean(phases.map(Math.cos)) ?? 0) ** 2 + (mean(phases.map(Math.sin)) ?? 0) ** 2);
+}
+
+function shiftedPhaseControl(phases: number[], selectedIndices: number[]): number {
+  if (phases.length < 4 || selectedIndices.length === 0) return 0;
+  const controlCount = Math.min(16, phases.length - 1);
+  const strengths = Array.from({ length: controlCount }, (_, shiftIndex) => {
+    const shift = shiftIndex + 1;
+    return vectorStrength(selectedIndices.map((index) => phases[(index + shift) % phases.length]));
+  });
+  return mean(strengths) ?? 0;
+}
 
 function magneticReconnectionNull(observation: SolarEventObservation): SolarCongruenceMetric {
   const radiative = hasSeries(observation.goes_xray_flux) || hasSeries(observation.euv_irradiance);
@@ -106,16 +162,20 @@ function pModePhaseModulation(observation: SolarEventObservation): SolarCongruen
   const driver = finiteValues(driverSeries(observation));
   const driverRange = range(driver);
   const threshold = driver.length === phases.length && driverRange !== null ? Math.min(...driver) + 0.75 * driverRange : null;
-  const selected = phases.filter((_, index) => threshold === null || driver[index] >= threshold);
-  const sample = selected.length > 0 ? selected : phases;
-  const score = Math.sqrt((mean(sample.map(Math.cos)) ?? 0) ** 2 + (mean(sample.map(Math.sin)) ?? 0) ** 2);
+  const selectedIndices = phases
+    .map((_, index) => index)
+    .filter((index) => threshold === null || driver[index] >= threshold);
+  const sampleIndices = selectedIndices.length > 0 ? selectedIndices : phases.map((_, index) => index);
+  const score = vectorStrength(sampleIndices.map((index) => phases[index]));
+  const control = shiftedPhaseControl(phases, sampleIndices);
+  const beatsControl = score >= control + 0.1;
   return {
     id: "p_mode_phase_modulation",
     value: score,
-    status: score >= 0.7 ? "pass" : "warn",
+    status: score >= 0.7 && beatsControl ? "pass" : "warn",
     null_model: "random_event_phase_control",
     evidence_refs: ["p_mode_phase_rad", ...(driver.length > 0 ? ["event_driver_series"] : [])],
-    notes: "Five-minute p-modes are timing modulators, not EUV photon energy sources.",
+    notes: `Five-minute p-modes are timing modulators, not EUV photon energy sources; shuffled_control=${control.toFixed(6)}.`,
   };
 }
 
@@ -143,14 +203,19 @@ function photosphericFieldBackreaction(observation: SolarEventObservation): Sola
   if (field.length === 0) {
     return { id: "photospheric_field_backreaction", value: null, status: "missing", null_model: "no_permanent_pil_field_step", evidence_refs: [] };
   }
-  const score = Math.min(1, (range(field) ?? 0) / Math.max(Math.abs(mean(field) ?? 0), 1e-12));
+  const midpoint = Math.floor(field.length / 2);
+  const pre = field.slice(0, midpoint);
+  const post = field.slice(midpoint);
+  const stepAmplitude = Math.abs((mean(post) ?? 0) - (mean(pre) ?? 0));
+  const pooledScale = Math.max(std(field) ?? 0, Math.abs(mean(field) ?? 0), 1e-12);
+  const score = Math.min(1, stepAmplitude / pooledScale);
   return {
     id: "photospheric_field_backreaction",
     value: score,
-    status: score >= 0.35 ? "pass" : "warn",
+    status: score >= 0.25 ? "pass" : "warn",
     null_model: "no_permanent_pil_field_step",
     evidence_refs: ["pil_horizontal_field_T", ...(hasSeries(observation.goes_xray_flux) ? ["goes_xray_flux"] : [])],
-    notes: "PIL backreaction is magnetic recoil context, not collapse evidence.",
+    notes: "PIL backreaction uses a pre/post field-step proxy and remains magnetic recoil context, not collapse evidence.",
   };
 }
 
@@ -184,19 +249,20 @@ function nanoflareTransitionRegionBrightening(observation: SolarEventObservation
   };
 }
 
-function multifractalFlareMemory(observation: SolarEventObservation): SolarCongruenceMetric {
+function multifractalFlareMemoryProxy(observation: SolarEventObservation): SolarCongruenceMetric {
   const driver = finiteValues(observation.goes_xray_flux ?? observation.euv_irradiance);
   if (driver.length < 4) {
-    return { id: "multifractal_flare_memory", value: null, status: "missing", null_model: "white_or_smoothed_flare_noise", evidence_refs: [] };
+    return { id: "multifractal_flare_memory_proxy", value: null, status: "missing", null_model: "white_or_smoothed_flare_noise", evidence_refs: [] };
   }
   const differences = driver.slice(1).map((value, index) => value - driver[index]);
   const burstiness = (std(differences) ?? 0) / Math.max(std(driver) ?? 0, 1e-12);
   return {
-    id: "multifractal_flare_memory",
+    id: "multifractal_flare_memory_proxy",
     value: burstiness,
     status: burstiness > 0.15 ? "pass" : "warn",
     null_model: "white_or_smoothed_flare_noise",
     evidence_refs: [observation.goes_xray_flux ? "goes_xray_flux" : "euv_irradiance"],
+    notes: "Proxy only; full multifractal validation requires WTMM, structure-function, or spectrum analysis.",
   };
 }
 
@@ -216,19 +282,92 @@ function polarimetricFaradayPath(observation: SolarEventObservation): SolarCongr
   };
 }
 
-function residualAllowed(metrics: SolarCongruenceMetric[], observation: SolarEventObservation): boolean {
-  const byId = new Map(metrics.map((metric) => [metric.id, metric]));
-  const primaryComputed = ["magnetic_reconnection_null", "p_mode_phase_modulation"].every((id) =>
-    ["pass", "warn"].includes(byId.get(id as SolarMechanismId)?.status ?? ""),
-  );
-  const fieldOk = hasSeries(observation.pil_horizontal_field_T)
-    ? byId.get("photospheric_field_backreaction")?.status !== "missing"
-    : true;
-  const ribbonOk = hasSeries(observation.ribbon_blob_width_km) || hasSeries(observation.ribbon_blob_spacing_km)
-    ? byId.get("ribbon_blob_tearing")?.status !== "missing"
-    : true;
-  const energyOk = observation.energy_closure_fraction === undefined || observation.energy_closure_fraction <= 1.01;
-  return primaryComputed && fieldOk && ribbonOk && energyOk;
+function buildResidualBlockedReasons(metrics: SolarCongruenceMetric[], observation: SolarEventObservation): string[] {
+  const blocked: string[] = [];
+  const magneticStatus = metricById(metrics, "magnetic_reconnection_null")?.status;
+  const pModeStatus = metricById(metrics, "p_mode_phase_modulation")?.status;
+  if (magneticStatus !== "pass" && magneticStatus !== "warn") blocked.push("magnetic_floor_not_computed_or_failed");
+  if (pModeStatus !== "pass" && pModeStatus !== "warn") blocked.push("p_mode_not_computed");
+  if (
+    hasSeries(observation.pil_horizontal_field_T) &&
+    metricById(metrics, "photospheric_field_backreaction")?.status === "missing"
+  ) {
+    blocked.push("photospheric_backreaction_missing");
+  }
+  if (
+    (hasSeries(observation.ribbon_blob_width_km) || hasSeries(observation.ribbon_blob_spacing_km)) &&
+    metricById(metrics, "ribbon_blob_tearing")?.status === "missing"
+  ) {
+    blocked.push("ribbon_topology_missing");
+  }
+  if (observation.energy_closure_fraction !== undefined && observation.energy_closure_fraction > 1.01) {
+    blocked.push("energy_closure_exceeds_budget");
+  }
+  return blocked;
+}
+
+export function buildSolarConstraintEnvelope(
+  observation: SolarEventObservation,
+  metrics: SolarCongruenceMetric[],
+): SolarConstraintEnvelope {
+  const closure = observation.energy_closure_fraction;
+  const hasEnergyEvidence =
+    observation.magnetic_free_energy_J !== undefined ||
+    observation.radiated_energy_J !== undefined ||
+    observation.packet_expected_energy_J !== undefined ||
+    closure !== undefined;
+  const energyStatus: SolarCongruenceStatus =
+    !hasEnergyEvidence
+      ? "missing"
+      : closure !== undefined && closure > 1.01
+        ? "fail"
+        : observation.magnetic_free_energy_J !== undefined && observation.magnetic_free_energy_J <= 0
+          ? "fail"
+          : observation.magnetic_free_energy_J
+            ? "pass"
+            : "warn";
+  const phaseScore = metricById(metrics, "p_mode_phase_modulation")?.value ?? undefined;
+  const timingStatus = metricById(metrics, "p_mode_phase_modulation")?.status ?? "missing";
+  const topologyParts = {
+    has_active_region_linkage: hasSource(observation),
+    has_pil_context: hasSeries(observation.pil_horizontal_field_T),
+    has_ribbon_flux: hasSeries(observation.ribbon_flux_Mx) || hasSeries(observation.ribbon_area_m2),
+    has_topology_context: Boolean(observation.topology_context_ref),
+  };
+  const topologyCount = Object.values(topologyParts).filter(Boolean).length;
+  const topologyStatus: SolarCongruenceStatus =
+    topologyCount === 0 ? "missing" : topologyCount >= 3 ? "pass" : "warn";
+  const blockedReasons = buildResidualBlockedReasons(metrics, observation);
+  const acoustic = finiteValues(observation.sunquake_power);
+
+  return {
+    event_id: observation.event_id,
+    energy_budget: {
+      magnetic_free_energy_J: observation.magnetic_free_energy_J,
+      radiated_energy_J: observation.radiated_energy_J,
+      acoustic_energy_proxy: acoustic.length > 0 ? Math.max(...acoustic) : undefined,
+      packet_expected_energy_J: observation.packet_expected_energy_J,
+      energy_closure_fraction: closure,
+      status: energyStatus,
+    },
+    timing_budget: {
+      p_mode_frequency_mHz: observation.p_mode_frequency_mHz,
+      phase_lock_score: phaseScore,
+      qpp_period_candidates_s: observation.qpp_period_candidates_s
+        ? finiteValues(observation.qpp_period_candidates_s)
+        : undefined,
+      status: timingStatus,
+    },
+    topology_budget: {
+      ...topologyParts,
+      status: topologyStatus,
+    },
+    residual_budget: {
+      residual_allowed: blockedReasons.length === 0,
+      residual_claim_tier: blockedReasons.length === 0 ? "advisory_only" : "none",
+      blocked_reasons: blockedReasons,
+    },
+  };
 }
 
 export function evaluateSolarEventCongruence(observation: SolarEventObservation): SolarEventCongruenceReport {
@@ -239,10 +378,11 @@ export function evaluateSolarEventCongruence(observation: SolarEventObservation)
     photosphericFieldBackreaction(observation),
     sunquakeAcousticResponse(observation),
     nanoflareTransitionRegionBrightening(observation),
-    multifractalFlareMemory(observation),
+    multifractalFlareMemoryProxy(observation),
     polarimetricFaradayPath(observation),
   ];
-  const allowed = residualAllowed(metrics, observation);
+  const constraintEnvelope = buildSolarConstraintEnvelope(observation, metrics);
+  const allowed = constraintEnvelope.residual_budget.residual_allowed;
   metrics.push({
     id: "collapse_residual_hypothesis",
     value: allowed ? 0 : null,
@@ -257,6 +397,7 @@ export function evaluateSolarEventCongruence(observation: SolarEventObservation)
   return {
     event_id: observation.event_id,
     metrics,
+    constraint_envelope: constraintEnvelope,
     primary_physics_pass: primary.some((metric) => metric.status === "pass") && primary.every((metric) => metric.status !== "fail"),
     speculative_residual_allowed: allowed,
     mismatch_fingerprint: metrics.map((metric) => `${metric.id}:${metric.status}`).join("|"),

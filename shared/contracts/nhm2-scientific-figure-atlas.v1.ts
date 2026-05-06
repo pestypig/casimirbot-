@@ -45,6 +45,7 @@ export interface Nhm2ScientificFigureRecord {
   outputSvg?: string;
   outputPng: string;
   sourceDataJson: string;
+  fieldStatsJson?: string;
   dataSources: Array<{
     path: string;
     sha256: string;

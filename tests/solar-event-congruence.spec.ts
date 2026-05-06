@@ -39,6 +39,7 @@ describe("solar event congruence", () => {
     expect(metricStatus(report, "p_mode_phase_modulation")).toBe("missing");
     expect(metricStatus(report, "collapse_residual_hypothesis")).toBe("missing");
     expect(report.speculative_residual_allowed).toBe(false);
+    expect(report.constraint_envelope.residual_budget.blocked_reasons).toContain("magnetic_floor_not_computed_or_failed");
   });
 
   it("scores primary congruence metrics with pass, warn, and advisory statuses", () => {
@@ -48,7 +49,11 @@ describe("solar event congruence", () => {
     expect(metricStatus(report, "ribbon_blob_tearing")).toBe("pass");
     expect(metricStatus(report, "photospheric_field_backreaction")).toBe("pass");
     expect(metricStatus(report, "polarimetric_faraday_path")).toBe("advisory");
+    expect(metricStatus(report, "multifractal_flare_memory_proxy")).toBe("pass");
     expect(report.primary_physics_pass).toBe(true);
+    expect(report.constraint_envelope.energy_budget.status).toBe("pass");
+    expect(report.constraint_envelope.topology_budget.status).toBe("pass");
+    expect(report.constraint_envelope.residual_budget.residual_claim_tier).toBe("advisory_only");
   });
 
   it("fails the magnetic null when the declared free-energy support is non-physical", () => {
@@ -56,6 +61,18 @@ describe("solar event congruence", () => {
     expect(metricStatus(report, "magnetic_reconnection_null")).toBe("fail");
     expect(report.primary_physics_pass).toBe(false);
     expect(report.speculative_residual_allowed).toBe(false);
+  });
+
+  it("warns p-mode timing when raw phase lock does not beat shuffled controls", () => {
+    const time = timeGrid();
+    const report = evaluateSolarEventCongruence({
+      ...baseEvent(),
+      goes_xray_flux: Float64Array.from(time, (_, index) => (index > 7 ? 1 : 0)),
+      p_mode_phase_rad: Float64Array.from(time, () => 0.05),
+    });
+
+    expect(metricStatus(report, "p_mode_phase_modulation")).toBe("warn");
+    expect(report.constraint_envelope.timing_budget.phase_lock_score).toBeGreaterThan(0.9);
   });
 
   it("keeps collapse residual advisory-only and blocked from primary source-power semantics", () => {
@@ -73,5 +90,20 @@ describe("solar event congruence", () => {
     const report = evaluateSolarEventCongruence({ ...baseEvent(), energy_closure_fraction: 1.2 });
     expect(report.speculative_residual_allowed).toBe(false);
     expect(metricStatus(report, "collapse_residual_hypothesis")).toBe("missing");
+    expect(report.constraint_envelope.residual_budget.blocked_reasons).toContain("energy_closure_exceeds_budget");
+  });
+
+  it("keeps Faraday path advisory and unable to unlock residual by itself", () => {
+    const report = evaluateSolarEventCongruence({
+      event_id: "faraday_only",
+      time_s: timeGrid(),
+      rotation_measure_rad_m2: Float64Array.from([1, 2, 3]),
+      polarization_fraction: Float64Array.from([0.1, 0.1, 0.1]),
+    });
+
+    expect(metricStatus(report, "polarimetric_faraday_path")).toBe("advisory");
+    expect(report.speculative_residual_allowed).toBe(false);
+    expect(metricStatus(report, "collapse_residual_hypothesis")).toBe("missing");
+    expect(report.constraint_envelope.residual_budget.blocked_reasons).toContain("magnetic_floor_not_computed_or_failed");
   });
 });

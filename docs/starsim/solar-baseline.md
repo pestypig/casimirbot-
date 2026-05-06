@@ -313,5 +313,6 @@ The current lattice lane means continuous Planck-derived radiance with flux-pres
 It does not mean discrete emitted photon packets.
 Photon packets are a downstream measurement simulation through `stellar_packet_measurement`, using `E_gamma = h c / lambda` and Poisson count sampling against a calibrated continuous spectrum.
 
-The congruence layer treats magnetic reconnection, p-mode timing, ribbon-kernel structure, PIL magnetic backreaction, local helioseismic response, transition-region brightening, multifractal flare memory, and polarimetric path constraints as ordinary observational physics.
+The congruence layer treats magnetic reconnection, p-mode timing, ribbon-kernel structure, PIL magnetic backreaction, local helioseismic response, transition-region brightening, multifractal flare memory proxies, and polarimetric path constraints as ordinary observational physics.
+Each report now carries a `SolarConstraintEnvelope` with energy, timing, topology, and residual budgets.
 Collapse-like residual timing is advisory-only and remains gated behind computed magnetic and p-mode nulls plus applicable backreaction/topology and energy-closure checks.

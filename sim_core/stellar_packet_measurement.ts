@@ -10,6 +10,7 @@ export interface PhotonPacketInput {
   throughput?: ArrayLike<number> | number;
   rng_seed?: string;
   record_packets?: boolean;
+  max_recorded_packets?: number;
 }
 
 export interface PhotonPacketBin {
@@ -31,8 +32,13 @@ export interface PhotonPacketReport {
   bins: PhotonPacketBin[];
   expected_energy_J: number;
   sampled_energy_J: number;
+  expected_energy_closure_fraction: number;
+  sampled_energy_closure_fraction: number;
+  sampled_energy_sigma_fraction: number;
   energy_closure_fraction: number;
   claim: "packetized_measurement_of_continuous_spectrum";
+  packets_recorded: number;
+  packet_recording_truncated: boolean;
   packets?: PhotonPacketEvent[];
 }
 
@@ -46,9 +52,12 @@ export function computeWavelengthBinWidths(wavelength_m: ArrayLike<number>): Flo
   return Float64Array.from({ length: wavelength_m.length }, (_, index) => {
     const current = Number(wavelength_m[index]);
     if (!Number.isFinite(current) || current <= 0) throw new Error("wavelength_m must be positive and finite");
-    if (index === 0) return Math.abs(Number(wavelength_m[1]) - current);
-    if (index === wavelength_m.length - 1) return Math.abs(current - Number(wavelength_m[index - 1]));
-    return Math.abs(Number(wavelength_m[index + 1]) - Number(wavelength_m[index - 1])) / 2;
+    if (index > 0 && current <= Number(wavelength_m[index - 1])) {
+      throw new Error("wavelength_m must be strictly increasing");
+    }
+    if (index === 0) return Number(wavelength_m[1]) - current;
+    if (index === wavelength_m.length - 1) return current - Number(wavelength_m[index - 1]);
+    return (Number(wavelength_m[index + 1]) - Number(wavelength_m[index - 1])) / 2;
   });
 }
 
@@ -102,17 +111,24 @@ export function packetizeContinuousSpectrum(input: PhotonPacketInput): PhotonPac
   if (wavelength_m.length !== spectral_flux_W_m2_per_m.length) {
     throw new Error("wavelength_m and spectral_flux_W_m2_per_m must have the same length");
   }
+  if (typeof input.throughput !== "number" && input.throughput !== undefined && input.throughput.length !== wavelength_m.length) {
+    throw new Error("throughput array must match wavelength_m length");
+  }
   if (!Number.isFinite(exposure_s) || exposure_s <= 0) throw new Error("exposure_s must be positive and finite");
   if (!Number.isFinite(collecting_area_m2) || collecting_area_m2 <= 0) {
     throw new Error("collecting_area_m2 must be positive and finite");
+  }
+  if (input.record_packets && (!Number.isFinite(input.max_recorded_packets) || (input.max_recorded_packets ?? 0) < 0)) {
+    throw new Error("record_packets requires a finite non-negative max_recorded_packets cap");
   }
 
   const rng = makeRng(input.rng_seed);
   const widths = computeWavelengthBinWidths(wavelength_m);
   const bins: PhotonPacketBin[] = [];
-  const packets: PhotonPacketEvent[] = [];
   let expectedEnergy = 0;
   let sampledEnergy = 0;
+  let expectedCountTotal = 0;
+  let sampledCountTotal = 0;
 
   for (let index = 0; index < wavelength_m.length; index += 1) {
     const lambda = Number(wavelength_m[index]);
@@ -125,6 +141,8 @@ export function packetizeContinuousSpectrum(input: PhotonPacketInput): PhotonPac
     const binSampledEnergy = sampledCount * photonEnergy;
     expectedEnergy += binEnergy;
     sampledEnergy += binSampledEnergy;
+    expectedCountTotal += expectedCount;
+    sampledCountTotal += sampledCount;
     bins.push({
       lambda_center_m: lambda,
       delta_lambda_m: widths[index],
@@ -133,19 +151,33 @@ export function packetizeContinuousSpectrum(input: PhotonPacketInput): PhotonPac
       sampled_count: sampledCount,
       sampled_energy_J: binSampledEnergy,
     });
-    if (input.record_packets) {
-      for (let eventIndex = 0; eventIndex < sampledCount; eventIndex += 1) {
-        packets.push({ bin_index: index, lambda_m: lambda, energy_J: photonEnergy });
+  }
+
+  const maxRecordedPackets = input.max_recorded_packets ?? 0;
+  const packetRecordingTruncated = Boolean(input.record_packets && sampledCountTotal > maxRecordedPackets);
+  const packets: PhotonPacketEvent[] = [];
+  if (input.record_packets && !packetRecordingTruncated) {
+    for (let index = 0; index < bins.length; index += 1) {
+      const bin = bins[index];
+      for (let eventIndex = 0; eventIndex < bin.sampled_count; eventIndex += 1) {
+        packets.push({ bin_index: index, lambda_m: bin.lambda_center_m, energy_J: bin.photon_energy_J });
       }
     }
   }
+
+  const sampledSigmaFraction = expectedCountTotal > 0 ? 1 / Math.sqrt(expectedCountTotal) : 0;
 
   return {
     bins,
     expected_energy_J: expectedEnergy,
     sampled_energy_J: sampledEnergy,
+    expected_energy_closure_fraction: 1,
+    sampled_energy_closure_fraction: expectedEnergy > 0 ? sampledEnergy / expectedEnergy : 1,
+    sampled_energy_sigma_fraction: sampledSigmaFraction,
     energy_closure_fraction: expectedEnergy > 0 ? sampledEnergy / expectedEnergy : 1,
     claim: "packetized_measurement_of_continuous_spectrum",
-    ...(input.record_packets ? { packets } : {}),
+    packets_recorded: packets.length,
+    packet_recording_truncated: packetRecordingTruncated,
+    ...(input.record_packets && !packetRecordingTruncated ? { packets } : {}),
   };
 }

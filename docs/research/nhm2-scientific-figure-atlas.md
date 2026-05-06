@@ -21,13 +21,25 @@ This atlas is diagnostic. It does not validate propulsion, does not establish a 
 Non-spatial validation state is not drawn on the hull.
 Source-closure status, certificate status, provenance, literature boundaries, claim locks, tensor authority gates, and QEI dossier status are rendered as graphs, tables, matrices, or DAGs.
 
+## Fidelity Rules
+
+Scalar field figures write field-stat sidecars with min/max, percentiles, normalization, units, source hash, and formatted legend ticks.
+Lapse and shift panels use independent scales so low-amplitude structure is not hidden by a shared color domain.
+Signed theta diagnostics use a zero-centered diverging scale and document near-zero masking in figure metadata.
+
+The sector schedule accounts for every sector in the cavity contract.
+The representative tile layout records required process/mask layers and keeps color semantics tied to fabrication layout, not energy, curvature, or spacetime intensity.
+Observer/QEI worldline plots may show region bands and sampling windows, but remain audit-path placeholders unless ledger evidence explicitly promotes them.
+
 ## Re-run Instructions
 
 ```bash
 npm run nhm2:render-scientific-figure-atlas
 npm run nhm2:validate-scientific-figure-atlas
+tsx tools/nhm2/validate-scientific-figure-fidelity.ts
 npm run test:nhm2:figures
 npm run nhm2:figures:check
+npm run nhm2:figures:fidelity-check
 ```
 
 The default output folder is:

@@ -21,6 +21,8 @@ describe("stellar packet measurement", () => {
     const reconstructed = report.bins.reduce((sum, bin) => sum + bin.expected_count * bin.photon_energy_J, 0);
     expect(report.claim).toBe("packetized_measurement_of_continuous_spectrum");
     expect(reconstructed).toBeCloseTo(report.expected_energy_J, 12);
+    expect(report.expected_energy_closure_fraction).toBe(1);
+    expect(report.sampled_energy_sigma_fraction).toBeGreaterThan(0);
   });
 
   it("uses E = h c / lambda so shorter wavelengths require fewer photons per joule", () => {
@@ -54,6 +56,56 @@ describe("stellar packet measurement", () => {
     });
     const expectedFromBins = report.bins.reduce((sum, bin) => sum + bin.expected_count * bin.photon_energy_J, 0);
     expect(report.expected_energy_J).toBeCloseTo(expectedFromBins, 12);
+  });
+
+  it("rejects non-monotonic wavelength grids", () => {
+    expect(() =>
+      packetizeContinuousSpectrum({
+        wavelength_m: Float64Array.from([400e-9, 600e-9, 500e-9]),
+        spectral_flux_W_m2_per_m: Float64Array.from([1, 1, 1]),
+        exposure_s: 1,
+        collecting_area_m2: 1,
+      }),
+    ).toThrow(/strictly increasing/);
+  });
+
+  it("requires throughput arrays to match the wavelength grid", () => {
+    expect(() =>
+      packetizeContinuousSpectrum({
+        wavelength_m: Float64Array.from([400e-9, 500e-9, 600e-9]),
+        spectral_flux_W_m2_per_m: Float64Array.from([1, 1, 1]),
+        throughput: Float64Array.from([1, 1]),
+        exposure_s: 1,
+        collecting_area_m2: 1,
+      }),
+    ).toThrow(/throughput array/);
+  });
+
+  it("caps timestamped packet recording while preserving binned counts", () => {
+    expect(() =>
+      packetizeContinuousSpectrum({
+        wavelength_m: Float64Array.from([400e-9, 500e-9]),
+        spectral_flux_W_m2_per_m: Float64Array.from([1, 1]),
+        exposure_s: 1,
+        collecting_area_m2: 1,
+        record_packets: true,
+      }),
+    ).toThrow(/max_recorded_packets/);
+
+    const report = packetizeContinuousSpectrum({
+      wavelength_m: Float64Array.from([400e-9, 500e-9]),
+      spectral_flux_W_m2_per_m: Float64Array.from([1e12, 1e12]),
+      exposure_s: 1,
+      collecting_area_m2: 1,
+      rng_seed: "packet-cap",
+      record_packets: true,
+      max_recorded_packets: 1,
+    });
+
+    expect(report.packet_recording_truncated).toBe(true);
+    expect(report.packets_recorded).toBe(0);
+    expect(report.packets).toBeUndefined();
+    expect(report.bins.reduce((sum, bin) => sum + bin.sampled_count, 0)).toBeGreaterThan(1);
   });
 
   it("documents M1 as flux-preserving redistribution rather than emitted photon packets", () => {

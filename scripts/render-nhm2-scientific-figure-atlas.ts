@@ -24,21 +24,24 @@ import {
   type Nhm2ScientificFigureRecord,
 } from "../shared/contracts/nhm2-scientific-figure-atlas.v1.js";
 import { SCIENTIFIC_FIGURE_CAPTIONS } from "./figures/figure-captions.js";
-import { DIVERGING_BLUE_ORANGE, FIGURE_BACKGROUND, SEQUENTIAL_TEAL } from "./figures/figure-colors.js";
+import { FIGURE_BACKGROUND } from "./figures/figure-colors.js";
 import { CLAIM_BOUNDARY, ensureDir, findNewestFile, makeRecord, readJsonIfExists, relPath, sha256File, writeJson } from "./figures/figure-manifest.js";
 import { renderVegaLite } from "./figures/render-vega.js";
 import { renderDot } from "./figures/render-graphviz.js";
-import { renderRawSvg, renderSvgTable } from "./figures/render-svg-table.js";
+import { renderSvgTable } from "./figures/render-svg-table.js";
 import { renderFigureContactSheet } from "./figures/contact-sheet.js";
 import { loadCitationBoundary } from "./figures/figure-citations.js";
-import { loadBrickFieldBundle, sampleCenterSlice, channelExtent } from "./figures/nhm2/extract-brick-fields.js";
-import { extractRegionProfiles } from "./figures/nhm2/extract-region-profiles.js";
+import { loadBrickFieldBundle } from "./figures/nhm2/extract-brick-fields.js";
 import { extractSectorSchedule } from "./figures/nhm2/extract-sector-schedule.js";
 import { extractSourceClosureResiduals } from "./figures/nhm2/extract-source-closure.js";
 import { extractTensorAuthority } from "./figures/nhm2/extract-tensor-authority.js";
 import { extractObserverQei } from "./figures/nhm2/extract-observer-qei.js";
 import { dagToDot, extractValidationDag } from "./figures/nhm2/extract-validation-dag.js";
 import { extractClaimBoundary } from "./figures/nhm2/extract-claim-boundary.js";
+import { buildLapseShiftPanels, buildThetaPanel } from "./figures/nhm2/render-field-slice-panels.js";
+import { sectorScheduleOverviewSpec } from "./figures/nhm2/render-sector-schedule-pages.js";
+import { renderFaithfulTileLayout } from "./figures/nhm2/render-faithful-tile-layout.js";
+import { writeFieldStats } from "./figures/nhm2/field-stats.js";
 import { validateNhm2ScientificFigureAtlas } from "../tools/nhm2/validate-scientific-figure-atlas.js";
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
@@ -75,9 +78,6 @@ async function main(): Promise<void> {
   const bundle = loadBrickFieldBundle(args.brick, args.wrappedBrick);
   const hullSdf = mustChannel(decoded.channels.get("hull_sdf")?.values, "hull_sdf");
   const ricci4 = mustChannel(decoded.channels.get("ricci4")?.values, "ricci4");
-  const alphaExtent = channelExtent(bundle, "alpha");
-  const betaExtent = channelExtent(bundle, "beta_x");
-  const thetaExtent = channelExtent(bundle, "theta");
   const transform = buildSceneTransform(dims, origin, spacing, { preservePhysicalAxes: true });
   const camera = { ...DEFAULT_CAMERA, width: WIDTH, height: HEIGHT };
 
@@ -112,8 +112,8 @@ async function main(): Promise<void> {
 
   figures.push(await renderCleanRicciGeometry(args, camera, dims, transform, ricci4, hullSdf, dataSources));
   figures.push(await renderNestedRegionEnvelopes(args, camera, dims, transform, hullSdf, dataSources));
-  figures.push(await renderLapseShiftSlice(args, bundle, dataSources, alphaExtent, betaExtent));
-  figures.push(await renderThetaSlice(args, bundle, dataSources, thetaExtent));
+  figures.push(await renderLapseShiftSlice(args, bundle, dataSources, sourceHashes.brick));
+  figures.push(await renderThetaSlice(args, bundle, dataSources, sourceHashes.brick));
   figures.push(await renderTileSectorArchitecture(args, camera, dims, transform, hullSdf, cavity, dataSources));
   figures.push(await renderSectorTimeline(args, cavity, dataSources));
   figures.push(await renderRepresentativeTileLayout(args, cavity, dataSources));
@@ -200,29 +200,31 @@ async function renderNestedRegionEnvelopes(args: CliArgs, camera: typeof DEFAULT
   return figureRecord(id, "Nested region envelopes", "geometry", "spatial_geometry", { png, sourceDataJson: metadata }, [dataSources.hullSdf], "scientific_3p1_renderer", true);
 }
 
-async function renderLapseShiftSlice(args: CliArgs, bundle: any, dataSources: any, alphaExtent: any, betaExtent: any): Promise<Nhm2ScientificFigureRecord> {
+async function renderLapseShiftSlice(args: CliArgs, bundle: any, dataSources: any, sourceHash: string): Promise<Nhm2ScientificFigureRecord> {
   const id = "03_lapse_shift_grid_slice";
-  const data = sampleCenterSlice(bundle, "alpha", { samples: 32 }).map((row) => ({ ...row, field: "alpha" }));
-  const beta = sampleCenterSlice(bundle, "beta_x", { samples: 32, signed: true }).map((row) => ({ ...row, field: "beta_x" }));
-  const rows = [...data, ...beta];
-  return renderVegaFigure(args, id, "Lapse and shift field slice", "geometry", "field_slice", rows, heatmapSpec(rows, "Lapse / shift field slice", "repo-normalized"), [dataSources.field], {
+  const panel = buildLapseShiftPanels(bundle, sourceHash, 36);
+  const fieldStatsJson = path.join(args.out, "geometry", `${id}.field-stats.json`);
+  writeFieldStats(fieldStatsJson, panel.stats);
+  return renderVegaFigure(args, id, "Lapse and shift field slice", "geometry", "field_slice", panel.rows, panel.spec, [dataSources.field], {
     x: "x",
     y: "y",
     color: "value",
     region: "xz center slice",
     renderer: "vega_lite",
-  }, false, { alphaExtent, betaExtent });
+  }, false, { fieldStats: relPath(fieldStatsJson) }, fieldStatsJson);
 }
 
-async function renderThetaSlice(args: CliArgs, bundle: any, dataSources: any, thetaExtent: any): Promise<Nhm2ScientificFigureRecord> {
+async function renderThetaSlice(args: CliArgs, bundle: any, dataSources: any, sourceHash: string): Promise<Nhm2ScientificFigureRecord> {
   const id = "04_theta_signed_diagnostic";
-  const rows = sampleCenterSlice(bundle, "theta", { samples: 36, signed: true });
-  return renderVegaFigure(args, id, "Signed theta diagnostic", "geometry", "field_slice", rows, heatmapSpec(rows, "Signed theta diagnostic", "signed scalar", true), [dataSources.field], {
+  const panel = buildThetaPanel(bundle, sourceHash, 48);
+  const fieldStatsJson = path.join(args.out, "geometry", `${id}.field-stats.json`);
+  writeFieldStats(fieldStatsJson, panel.stats);
+  return renderVegaFigure(args, id, "Signed theta diagnostic", "geometry", "field_slice", panel.rows, panel.spec, [dataSources.field], {
     x: "x",
     y: "y",
     color: "theta",
     renderer: "vega_lite",
-  }, false, { thetaExtent });
+  }, false, { fieldStats: relPath(fieldStatsJson) }, fieldStatsJson);
 }
 
 async function renderTileSectorArchitecture(args: CliArgs, camera: typeof DEFAULT_CAMERA, dims: [number, number, number], transform: any, hullSdf: Float32Array, cavity: any, dataSources: any): Promise<Nhm2ScientificFigureRecord> {
@@ -242,20 +244,7 @@ async function renderTileSectorArchitecture(args: CliArgs, camera: typeof DEFAUL
 async function renderSectorTimeline(args: CliArgs, cavity: any, dataSources: any): Promise<Nhm2ScientificFigureRecord> {
   const id = "06_sector_schedule_timeline";
   const schedule = extractSectorSchedule(cavity);
-  const spec = {
-    width: 680,
-    height: 280,
-    background: FIGURE_BACKGROUND,
-    title: { text: "Sector schedule timeline", color: "#dbeaf1" },
-    data: { values: schedule.rows },
-    mark: { type: "bar", cornerRadius: 2 },
-    encoding: {
-      x: { field: "window", type: "ordinal", title: "schedule window", axis: { labelColor: "#dbeaf1", titleColor: "#dbeaf1" } },
-      y: { field: "sector", type: "ordinal", title: "sector", axis: { labelColor: "#dbeaf1", titleColor: "#dbeaf1" } },
-      color: { value: "#f0aa42" },
-    },
-    config: baseVegaConfig(),
-  };
+  const spec = sectorScheduleOverviewSpec(schedule);
   return renderVegaFigure(args, id, "Sector schedule timeline", "mechanism", "schedule_timeline", schedule, spec, [dataSources.cavity], {
     x: "window",
     y: "sector",
@@ -269,25 +258,7 @@ async function renderRepresentativeTileLayout(args: CliArgs, cavity: any, dataSo
   const svg = path.join(args.out, "mechanism", `${id}.svg`);
   const png = path.join(args.out, "mechanism", `${id}.png`);
   const sourceDataJson = path.join(args.out, "mechanism", `${id}.source-data.json`);
-  const tile = cavity?.layout ?? {};
-  const rawSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="760" height="520" viewBox="0 0 760 520">
-    <rect width="100%" height="100%" fill="#05080d"/>
-    <text x="42" y="48" font-family="Consolas, monospace" font-size="22" fill="#dbeaf1">Representative tile-sector layout</text>
-    <rect x="220" y="92" width="300" height="300" rx="8" fill="#102435" stroke="#7ee7ff" stroke-width="2"/>
-    <rect x="270" y="142" width="200" height="200" rx="6" fill="#263616" stroke="#b9df66" stroke-width="2"/>
-    <rect x="248" y="120" width="244" height="18" fill="#d7a443"/>
-    <rect x="248" y="346" width="244" height="18" fill="#af6cff"/>
-    <g fill="#07111b" stroke="#7ee7ff" stroke-width="2">
-      ${Array.from({ length: 18 }, (_, i) => `<circle cx="${306 + (i % 6) * 26}" cy="${206 + Math.floor(i / 6) * 32}" r="7"/>`).join("")}
-    </g>
-    <g fill="#ec6a48">
-      <rect x="556" y="150" width="74" height="38"/><rect x="556" y="270" width="74" height="38"/>
-    </g>
-    <text x="42" y="438" font-family="Consolas, monospace" font-size="14" fill="#f0aa42">Mask/process layers; not field strength, curvature, or spacetime intensity.</text>
-    <text x="42" y="466" font-family="Consolas, monospace" font-size="13" fill="#dbeaf1">tile ${cavity?.geometry?.tileWidth_mm ?? 10} mm x ${cavity?.geometry?.tileHeight_mm ?? 10} mm; release holes ${tile?.releaseHoles?.rows ?? 3} x ${tile?.releaseHoles?.columns ?? 6}</text>
-  </svg>`;
-  await renderRawSvg(rawSvg, svg, png);
-  writeJson(sourceDataJson, { figureId: id, representative: true, layout: cavity?.layout, geometry: cavity?.geometry });
+  await renderFaithfulTileLayout(cavity, svg, png, sourceDataJson);
   return figureRecord(id, "Representative tile layout", "mechanism", "mechanism_schematic", { svg, png, sourceDataJson }, [dataSources.cavity], "svg_table", false);
 }
 
@@ -302,15 +273,20 @@ async function renderTensorCounterpartMatrix(args: CliArgs, ledger: any, dataSou
     data: { values: rows },
     mark: { type: "rect" },
     encoding: {
-      x: { field: "col", type: "ordinal", title: "b index", axis: axisStyle() },
-      y: { field: "row", type: "ordinal", title: "a index", axis: axisStyle() },
+      x: { field: "colLabel", type: "ordinal", title: "T_ab tile-effective counterpart", axis: axisStyle() },
+      y: { field: "rowLabel", type: "ordinal", title: "G_ab / 8pi required source", axis: axisStyle() },
       color: { field: "authority", type: "nominal", scale: { domain: ["available", "review"], range: ["#34c99a", "#f0aa42"] }, legend: { labelColor: "#dbeaf1", titleColor: "#dbeaf1" } },
+      tooltip: [
+        { field: "rowLabel", type: "nominal", title: "required" },
+        { field: "colLabel", type: "nominal", title: "counterpart" },
+        { field: "note", type: "nominal", title: "authority note" },
+      ],
     },
     config: baseVegaConfig(),
   };
   return renderVegaFigure(args, id, "Tensor counterpart matrix", "math_closure", "tensor_matrix", rows, spec, [dataSources.ledger], {
-    matrixRows: "a index",
-    matrixCols: "b index",
+    matrixRows: "G_ab / 8pi required source",
+    matrixCols: "T_ab tile-effective counterpart",
     color: "authority",
     renderer: "vega_lite",
   }, false);
@@ -332,21 +308,46 @@ async function renderObserverQeiWorldline(args: CliArgs, bundle: any, ledger: an
   const id = "10_observer_qei_worldline_plot";
   const data = extractObserverQei(bundle, ledger);
   const rows = data.worldline.flatMap((row) => [
-    { s: row.s, value: row.alpha, channel: "alpha" },
-    { s: row.s, value: row.qeiSampling, channel: "sampling_window" },
+    { s: row.s, value: row.region === "hull" ? 0.08 : row.region === "wall" ? 0.045 : 0.018, channel: `region:${row.region}`, region: row.region },
+    { s: row.s, value: row.alpha, channel: "alpha", region: row.region },
+    { s: row.s, value: row.qeiSampling, channel: "sampling_window", region: row.region },
   ]);
   const spec = {
     width: 680,
     height: 330,
     background: FIGURE_BACKGROUND,
     title: { text: "Observer / QEI worldline sampling", color: "#dbeaf1" },
-    data: { values: rows },
-    mark: { type: "line", strokeWidth: 2 },
-    encoding: {
-      x: { field: "s", type: "quantitative", title: "centerline sample", axis: axisStyle() },
-      y: { field: "value", type: "quantitative", title: "repo-normalized", axis: axisStyle() },
-      color: { field: "channel", type: "nominal", scale: { range: ["#7ee7ff", "#e05aff"] }, legend: { labelColor: "#dbeaf1", titleColor: "#dbeaf1" } },
-    },
+    layer: [
+      {
+        data: { values: rows.filter((row) => row.channel.startsWith("region:")) },
+        mark: { type: "bar", opacity: 0.34 },
+        encoding: {
+          x: { field: "s", type: "quantitative", title: "centerline sample", axis: axisStyle() },
+          y: { field: "value", type: "quantitative", title: "repo-normalized", axis: axisStyle() },
+          color: {
+            field: "region",
+            type: "nominal",
+            scale: { domain: ["hull", "wall", "exterior_shell"], range: ["#34c99a", "#f0aa42", "#7f9cff"] },
+            legend: { labelColor: "#dbeaf1", titleColor: "#dbeaf1", title: "region band" },
+          },
+        },
+      },
+      {
+        data: { values: rows.filter((row) => !row.channel.startsWith("region:")) },
+        mark: { type: "line", strokeWidth: 2 },
+        encoding: {
+          x: { field: "s", type: "quantitative", title: "centerline sample", axis: axisStyle() },
+          y: { field: "value", type: "quantitative", title: "repo-normalized", axis: axisStyle() },
+          color: {
+            field: "channel",
+            type: "nominal",
+            scale: { domain: ["alpha", "sampling_window"], range: ["#7ee7ff", "#e05aff"] },
+            legend: { labelColor: "#dbeaf1", titleColor: "#dbeaf1", title: "audit path" },
+          },
+        },
+      },
+    ],
+    resolve: { scale: { color: "independent" } },
     config: baseVegaConfig(),
   };
   return renderVegaFigure(args, id, "Observer QEI worldline plot", "math_closure", "observer_worldline_plot", data, spec, [dataSources.field, dataSources.ledger], {
@@ -434,6 +435,7 @@ async function renderVegaFigure(
   encoding: Nhm2ScientificFigureRecord["visualEncoding"],
   usesHullGeometry: boolean,
   notes?: unknown,
+  fieldStatsJson?: string,
 ): Promise<Nhm2ScientificFigureRecord> {
   const dir = path.join(args.out, family);
   const svg = path.join(dir, `${id}.svg`);
@@ -442,7 +444,7 @@ async function renderVegaFigure(
   const sourceDataJson = path.join(dir, `${id}.source-data.json`);
   writeJson(sourceDataJson, { figureId: id, data, notes });
   await renderVegaLite(spec, svg, png, specJson);
-  return figureRecord(id, title, family, kind, { svg, png, sourceDataJson }, sources, encoding.renderer, usesHullGeometry, encoding);
+  return figureRecord(id, title, family, kind, { svg, png, sourceDataJson, fieldStatsJson }, sources, encoding.renderer, usesHullGeometry, encoding);
 }
 
 async function renderDotFigure(
@@ -470,7 +472,7 @@ function figureRecord(
   title: string,
   family: Nhm2ScientificFigureRecord["family"],
   kind: Nhm2ScientificFigureRecord["kind"],
-  output: { svg?: string; png: string; sourceDataJson: string },
+  output: { svg?: string; png: string; sourceDataJson: string; fieldStatsJson?: string },
   sources: Nhm2ScientificFigureRecord["dataSources"],
   renderer: Nhm2ScientificFigureRecord["visualEncoding"]["renderer"],
   usesHullGeometry: boolean,
@@ -485,6 +487,7 @@ function figureRecord(
     outputSvg: output.svg ? relPath(output.svg) : undefined,
     outputPng: relPath(output.png),
     sourceDataJson: relPath(output.sourceDataJson),
+    fieldStatsJson: output.fieldStatsJson ? relPath(output.fieldStatsJson) : undefined,
     dataSources: sources,
     visualEncoding: { renderer, ...encoding },
     hullOverlayPolicy: {
@@ -495,30 +498,6 @@ function figureRecord(
     caption: caption.caption,
     literatureRefs: caption.literatureRefs,
   });
-}
-
-function heatmapSpec(rows: unknown[], title: string, units: string, diverging = false): any {
-  return {
-    width: 620,
-    height: 380,
-    background: FIGURE_BACKGROUND,
-    title: { text: title, color: "#dbeaf1" },
-    data: { values: rows },
-    mark: { type: "rect" },
-    encoding: {
-      x: { field: "x", type: "ordinal", title: "x sample", axis: axisStyle() },
-      y: { field: "y", type: "ordinal", title: "z sample", axis: axisStyle() },
-      color: {
-        field: "value",
-        type: "quantitative",
-        title: units,
-        scale: { range: diverging ? DIVERGING_BLUE_ORANGE : SEQUENTIAL_TEAL },
-        legend: { labelColor: "#dbeaf1", titleColor: "#dbeaf1" },
-      },
-      column: (rows as any[]).some((row) => row.field) ? { field: "field", type: "nominal", header: { labelColor: "#dbeaf1", titleColor: "#dbeaf1" } } : undefined,
-    },
-    config: baseVegaConfig(),
-  };
 }
 
 function barSpec(rows: unknown[], title: string, xField: string, yField: string, colorField: string): any {

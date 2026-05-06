@@ -30,10 +30,19 @@ It is a measurement simulation of an existing continuous spectrum, not a new rad
 | `solar_event_congruence` | Checks whether flare, p-mode, magnetic, ribbon, sunquake, irradiance, and polarimetric observations agree | observational congruence |
 | `collapse_residual_hypothesis` | Optional residual timing model after magnetic and p-mode nulls are computed | speculative diagnostic |
 
+## Constraint Envelope
+
+Every congruence report carries a `SolarConstraintEnvelope`.
+The envelope summarizes four budgets: energy, timing, topology, and residual eligibility.
+It is a physics passport for the run: if the magnetic floor, p-mode timing, applicable backreaction/topology checks, or energy closure are missing or failed, the residual budget records the blocked reasons and leaves the residual claim tier at `none`.
+
 ## Residual Gate
 
 The collapse-like residual gate is blocked unless magnetic reconnection and p-mode diagnostics are computed, applicable photospheric backreaction and ribbon-kernel diagnostics are present when their data exist, and energy closure does not exceed the continuous-spectrum budget.
 The residual is advisory-only; it cannot become a primary winner and cannot create source power.
+
+`multifractal_flare_memory_proxy` is intentionally named as a proxy until it is backed by a WTMM, structure-function, or multifractal-spectrum implementation.
+Faraday-path evidence remains advisory magnetic-geometry context and cannot unlock a residual by itself.
 
 ## Research Anchors
 

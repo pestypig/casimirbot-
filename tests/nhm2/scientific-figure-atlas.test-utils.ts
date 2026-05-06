@@ -7,6 +7,9 @@ export const SCIENTIFIC_ATLAS_TEST_OUT = path.join("artifacts", "tmp", "scientif
 
 export function ensureScientificAtlasRendered(): string {
   const manifestPath = path.join(SCIENTIFIC_ATLAS_TEST_OUT, "manifest.json");
+  if (fs.existsSync(manifestPath) && !manifestHasFidelityOutputs(manifestPath)) {
+    fs.rmSync(SCIENTIFIC_ATLAS_TEST_OUT, { recursive: true, force: true });
+  }
   if (!fs.existsSync(manifestPath)) {
     execFileSync(process.execPath, [
       "node_modules/tsx/dist/cli.mjs",
@@ -26,4 +29,9 @@ export function loadScientificAtlasManifest(): Nhm2ScientificFigureAtlasManifest
 
 export function resolveRepoPath(relativeOrAbsolutePath: string): string {
   return path.isAbsolute(relativeOrAbsolutePath) ? relativeOrAbsolutePath : path.join(process.cwd(), relativeOrAbsolutePath);
+}
+
+function manifestHasFidelityOutputs(manifestPath: string): boolean {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Nhm2ScientificFigureAtlasManifest;
+  return manifest.figures.some((figure) => figure.id === "03_lapse_shift_grid_slice" && Boolean(figure.fieldStatsJson));
 }

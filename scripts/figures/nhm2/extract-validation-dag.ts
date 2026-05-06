@@ -18,11 +18,11 @@ export interface ValidationDag {
 export function extractValidationDag(_ledger: any): ValidationDag {
   return {
     nodes: [
-      { id: "brick", label: "metric brick", kind: "artifact" },
-      { id: "closure", label: "source closure", kind: "artifact" },
-      { id: "observer", label: "observer audit", kind: "gate" },
-      { id: "qei", label: "QEI dossier", kind: "gate" },
-      { id: "ledger", label: "frozen blocker ledger", kind: "decision" },
+      { id: "brick", label: "metric brick hash/ref", kind: "artifact" },
+      { id: "closure", label: "source closure artifact", kind: "artifact" },
+      { id: "observer", label: "observer audit artifact", kind: "gate" },
+      { id: "qei", label: "QEI dossier ref", kind: "gate" },
+      { id: "ledger", label: "frozen blocker ledger ref", kind: "decision" },
       { id: "claim", label: "claim locks remain false", kind: "decision" },
     ],
     edges: [
