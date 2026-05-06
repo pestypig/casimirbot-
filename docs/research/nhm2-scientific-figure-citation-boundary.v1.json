@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "v1",
+  "globalRule": "External literature provides context and claim boundaries only. It does not validate NHM2.",
+  "requiredRefs": [
+    {
+      "id": "alcubierre_1994_warp_metric",
+      "allowedUse": ["warp-metric context", "exotic-matter caveat"],
+      "forbiddenUse": ["validates NHM2", "proves propulsion"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "natario_2002_zero_expansion",
+      "allowedUse": ["zero-expansion warp-drive context", "avoid simplistic Alcubierre cartoon"],
+      "forbiddenUse": ["validates NHM2"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "pfenning_ford_1997_quantum_inequality_warp",
+      "allowedUse": ["QEI/negative-energy constraint context"],
+      "forbiddenUse": ["QEI passed", "NHM2 physically closed"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "fewster_2005_energy_inequalities",
+      "allowedUse": ["QEI mathematical context"],
+      "forbiddenUse": ["QEI dossier complete"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "lamoreaux_1997_casimir_measurement",
+      "allowedUse": ["Casimir experiment context"],
+      "forbiddenUse": ["Casimir tile validates macro curvature"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "klimchitskaya_2009_real_materials_casimir",
+      "allowedUse": ["real-material Casimir context"],
+      "forbiddenUse": ["ideal Casimir model validates tile-effective tensor"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "bobrick_martire_2021_physical_warp_drives",
+      "allowedUse": ["modern warp-drive taxonomy context"],
+      "forbiddenUse": ["NHM2 validated"],
+      "doesValidateNHM2": false
+    },
+    {
+      "id": "santiago_schuster_visser_2022_nec",
+      "allowedUse": ["energy-condition caution boundary"],
+      "forbiddenUse": ["energy conditions cleared"],
+      "doesValidateNHM2": false
+    }
+  ]
+}

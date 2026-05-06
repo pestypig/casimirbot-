@@ -296,6 +296,10 @@
     "nhm2:render-layered-ledger-atlas": "tsx scripts/render-nhm2-layered-ledger-atlas.ts",
     "nhm2:validate-layered-ledger-atlas": "tsx tools/nhm2/validate-layered-ledger-atlas.ts",
     "nhm2:render-layered-ledger-atlas:check": "npm run nhm2:render-layered-ledger-atlas && npm run nhm2:validate-layered-ledger-atlas",
+    "nhm2:render-scientific-figure-atlas": "tsx scripts/render-nhm2-scientific-figure-atlas.ts",
+    "nhm2:validate-scientific-figure-atlas": "tsx tools/nhm2/validate-scientific-figure-atlas.ts",
+    "test:nhm2:figures": "vitest run tests/nhm2/scientific-figure-atlas.manifest.test.ts tests/nhm2/scientific-figure-atlas.figure-semantics.test.ts tests/nhm2/scientific-figure-atlas.citations.test.ts tests/nhm2/scientific-figure-atlas.renderers.test.ts",
+    "nhm2:figures:check": "npm run nhm2:render-scientific-figure-atlas && npm run nhm2:validate-scientific-figure-atlas && npm run test:nhm2:figures",
     "physics:validate:bounded": "tsx tools/ci/run-with-timeout.ts --timeout-ms 120000 --out artifacts/research/full-solve/logs/physics-validate -- npm run physics:validate",
     "test:nhm2:atlas": "vitest run tests/nhm2/layered-ledger-atlas.manifest.test.ts tests/nhm2/layered-ledger-atlas.literature-map.test.ts tests/nhm2/layered-ledger-atlas.renderer-backcompat.test.ts",
     "nhm2:verify-layered-ledger-atlas-release": "tsx tools/nhm2/verify-layered-ledger-atlas-release.ts",
@@ -433,6 +437,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@hpcc-js/wasm": "^2.33.5",
     "@playwright/test": "^1.57.0",
     "@replit/vite-plugin-cartographer": "^0.2.7",
     "@tailwindcss/vite": "^4.1.3",
@@ -459,6 +464,8 @@
     "jsdom": "^25.0.1",
     "supertest": "^7.1.1",
     "tsx": "^4.21.0",
+    "vega": "^6.2.0",
+    "vega-lite": "^6.4.3",
     "vitest": "^1.6.0"
   },
   "optionalDependencies": {
