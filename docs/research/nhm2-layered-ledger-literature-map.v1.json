@@ -1,0 +1,103 @@
+{
+  "artifactId": "nhm2_layered_ledger_literature_map",
+  "schemaVersion": "v1",
+  "boundary": "External references are context-only or claim-boundary references. They do not validate NHM2, the selected run, a physical mechanism, propulsion, or full tensor closure.",
+  "refs": [
+    {
+      "id": "alcubierre_1994_warp_metric",
+      "title": "The warp drive: hyper-fast travel within general relativity",
+      "authors": ["Miguel Alcubierre"],
+      "venue": "Classical and Quantum Gravity",
+      "year": 1994,
+      "doiOrArxiv": "doi:10.1088/0264-9381/11/5/001",
+      "useInThisRepo": "context_only",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for warp-metric geometry and energy-condition caveats.",
+      "forbiddenCaptionUse": "Do not claim Alcubierre validates NHM2, propulsion, FTL, or Casimir-to-curvature closure."
+    },
+    {
+      "id": "natario_2002_zero_expansion",
+      "title": "Warp drive with zero expansion",
+      "authors": ["Jose Natario"],
+      "venue": "Classical and Quantum Gravity",
+      "year": 2002,
+      "doiOrArxiv": "doi:10.1088/0264-9381/19/6/308",
+      "useInThisRepo": "context_only",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for zero-expansion warp-drive metric construction and shell-style curvature visualization.",
+      "forbiddenCaptionUse": "Do not claim Natario validates the NHM2 solve, the Casimir mechanism, or a physical warp drive."
+    },
+    {
+      "id": "pfenning_ford_1997_warp_qi",
+      "title": "The unphysical nature of warp drive",
+      "authors": ["Michael J. Pfenning", "L. H. Ford"],
+      "venue": "Classical and Quantum Gravity",
+      "year": 1997,
+      "doiOrArxiv": "doi:10.1088/0264-9381/14/7/011",
+      "useInThisRepo": "qei_context",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for quantum-inequality restrictions on negative-energy warp metrics.",
+      "forbiddenCaptionUse": "Do not claim QEI pass, physical feasibility, or validated negative-energy sourcing."
+    },
+    {
+      "id": "fewster_2005_energy_inequalities",
+      "title": "Energy inequalities in quantum field theory",
+      "authors": ["Christopher J. Fewster"],
+      "venue": "arXiv",
+      "year": 2005,
+      "doiOrArxiv": "arXiv:math-ph/0501073",
+      "useInThisRepo": "qei_context",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for why QEI or quantum-energy-inequality gates are treated as separate audit obligations.",
+      "forbiddenCaptionUse": "Do not claim a QEI dossier is complete or passed unless the NHM2 ledger provides that evidence."
+    },
+    {
+      "id": "lamoreaux_1997_casimir_force",
+      "title": "Demonstration of the Casimir Force in the 0.6 to 6 micrometer range",
+      "authors": ["S. K. Lamoreaux"],
+      "venue": "Physical Review Letters",
+      "year": 1997,
+      "doiOrArxiv": "doi:10.1103/PhysRevLett.78.5",
+      "useInThisRepo": "casimir_context",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for laboratory Casimir-force measurement as a separate phenomenon from NHM2 curvature sourcing.",
+      "forbiddenCaptionUse": "Do not claim laboratory Casimir-force measurements prove NHM2 curvature, propulsion, or source closure."
+    },
+    {
+      "id": "klimchitskaya_2009_casimir_real_materials",
+      "title": "The Casimir force between real materials: Experiment and theory",
+      "authors": ["G. L. Klimchitskaya", "U. Mohideen", "V. M. Mostepanenko"],
+      "venue": "Reviews of Modern Physics",
+      "year": 2009,
+      "doiOrArxiv": "doi:10.1103/RevModPhys.81.1827",
+      "useInThisRepo": "casimir_context",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for real-material Casimir modeling limits and why tile/process depictions are not field-intensity maps.",
+      "forbiddenCaptionUse": "Do not claim real-material Casimir theory validates NHM2 source closure or a physical mechanism."
+    },
+    {
+      "id": "bobrick_martire_2021_physical_warp_drives",
+      "title": "Introducing physical warp drives",
+      "authors": ["Alexey Bobrick", "Gianni Martire"],
+      "venue": "Classical and Quantum Gravity",
+      "year": 2021,
+      "doiOrArxiv": "doi:10.1088/1361-6382/abdf6e; arXiv:2102.06824",
+      "useInThisRepo": "claim_boundary",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for broader warp-drive taxonomy and why NHM2 remains diagnostic unless its own gates pass.",
+      "forbiddenCaptionUse": "Do not import positive-energy or physical-warp-drive claims into NHM2."
+    },
+    {
+      "id": "santiago_schuster_visser_2022_generic_warp_nec",
+      "title": "Generic warp drives violate the null energy condition",
+      "authors": ["Jessica Santiago", "Sebastian Schuster", "Matt Visser"],
+      "venue": "Physical Review D",
+      "year": 2022,
+      "doiOrArxiv": "doi:10.1103/PhysRevD.105.064038; arXiv:2105.03079",
+      "useInThisRepo": "claim_boundary",
+      "doesValidateNHM2": false,
+      "allowedCaptionUse": "Context for energy-condition boundary language and observer-frame caution.",
+      "forbiddenCaptionUse": "Do not claim NHM2 evades NEC or WEC unless repo evidence explicitly proves the required observer/tensor conditions."
+    }
+  ]
+}
