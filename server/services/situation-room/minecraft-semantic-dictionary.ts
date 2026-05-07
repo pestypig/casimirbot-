@@ -99,6 +99,23 @@ export function buildMinecraftSemanticEvent(args: {
       goalClues.push("recover_items", "survive");
       narrativeTemplate = "{subject} died.";
       break;
+    case "mob_nearby":
+    case "hostile_nearby":
+    case "creeper_fuse_started":
+    case "explosion_imminent":
+      verb = "faced a nearby threat";
+      object = event.event_type === "creeper_fuse_started" ? "creeper fuse" : "hostile entity";
+      tags.push("risk", "combat");
+      riskClues.push(
+        event.event_type === "explosion_imminent"
+          ? "explosion_imminent"
+          : event.event_type === "creeper_fuse_started"
+            ? "creeper_fuse_started"
+            : "hostile_nearby",
+      );
+      goalClues.push("survive");
+      narrativeTemplate = "{subject} faced a nearby threat.";
+      break;
     case "player_location_sample":
     case "player_location_changed":
     case "dimension_changed":

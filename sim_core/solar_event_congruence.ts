@@ -45,7 +45,19 @@ export interface SolarCongruenceMetric {
   status: SolarCongruenceStatus;
   null_model: string;
   evidence_refs: string[];
+  entropy_diagnostics: SolarEntropyDiagnostics;
   notes?: string;
+}
+
+export interface SolarEntropyDiagnostics {
+  observational_entropy: number;
+  model_entropy: number;
+  provenance_entropy: number;
+  aliasing_entropy: number;
+  entropy_stretch_lambda: number;
+  entropy_penalty: number;
+  entropy_adjusted_score: number | null;
+  aliasing_nulls: SolarMechanismId[];
 }
 
 export interface SolarEventCongruenceReport {
@@ -106,6 +118,83 @@ const hasSource = (observation: SolarEventObservation): boolean =>
 const driverSeries = (observation: SolarEventObservation): ArrayLike<number> | undefined =>
   observation.goes_xray_flux ?? observation.euv_irradiance ?? observation.ribbon_flux_Mx;
 
+const ORDINARY_SOLAR_ALIASING_NULLS: SolarMechanismId[] = [
+  "magnetic_reconnection_null",
+  "p_mode_phase_modulation",
+  "ribbon_blob_tearing",
+  "photospheric_field_backreaction",
+  "sunquake_acoustic_response",
+  "nanoflare_transition_region_brightening",
+  "multifractal_flare_memory_proxy",
+  "polarimetric_faraday_path",
+];
+
+function entropyForStatus(status: SolarCongruenceStatus): number {
+  switch (status) {
+    case "pass":
+      return 0.05;
+    case "advisory":
+      return 0.6;
+    case "warn":
+      return 0.85;
+    case "fail":
+      return 1.25;
+    case "missing":
+      return 1.6;
+    default:
+      return 1;
+  }
+}
+
+function modelEntropyFor(id: SolarMechanismId): number {
+  if (id === "collapse_residual_hypothesis") return 1.8;
+  if (id === "multifractal_flare_memory_proxy") return 1.1;
+  if (id === "polarimetric_faraday_path") return 0.75;
+  return 0.35;
+}
+
+function entropyBetaFor(id: SolarMechanismId): number {
+  if (id === "collapse_residual_hypothesis") return 2.5;
+  if (id === "multifractal_flare_memory_proxy") return 1.5;
+  return 0.75;
+}
+
+function aliasingNullsFor(id: SolarMechanismId): SolarMechanismId[] {
+  if (id === "collapse_residual_hypothesis") return ORDINARY_SOLAR_ALIASING_NULLS;
+  if (id === "polarimetric_faraday_path") return ["magnetic_reconnection_null", "photospheric_field_backreaction"];
+  return ORDINARY_SOLAR_ALIASING_NULLS.filter((candidate) => candidate !== id).slice(0, 3);
+}
+
+function withEntropyDiagnostics(
+  metric: Omit<SolarCongruenceMetric, "entropy_diagnostics">,
+  expectedEvidenceCount = 2,
+): SolarCongruenceMetric {
+  const evidenceCoverage = Math.min(1, metric.evidence_refs.length / Math.max(1, expectedEvidenceCount));
+  const observationalEntropy = entropyForStatus(metric.status) + 0.5 * (1 - evidenceCoverage);
+  const modelEntropy = modelEntropyFor(metric.id);
+  const provenanceEntropy = metric.evidence_refs.length > 0 ? 0.05 : 0.75;
+  const aliasingNulls = aliasingNullsFor(metric.id);
+  const aliasingEntropy = aliasingNulls.length / ORDINARY_SOLAR_ALIASING_NULLS.length;
+  const deltaEntropy = Math.max(0, observationalEntropy + modelEntropy + provenanceEntropy + aliasingEntropy - 1);
+  const entropyStretchLambda = Math.exp(deltaEntropy);
+  const entropyPenalty = 1 / (1 + entropyBetaFor(metric.id) * Math.max(0, entropyStretchLambda - 1));
+  const entropyAdjustedScore = metric.value === null ? null : Math.max(0, Math.min(1, metric.value)) * entropyPenalty;
+
+  return {
+    ...metric,
+    entropy_diagnostics: {
+      observational_entropy: observationalEntropy,
+      model_entropy: modelEntropy,
+      provenance_entropy: provenanceEntropy,
+      aliasing_entropy: aliasingEntropy,
+      entropy_stretch_lambda: entropyStretchLambda,
+      entropy_penalty: entropyPenalty,
+      entropy_adjusted_score: entropyAdjustedScore,
+      aliasing_nulls: aliasingNulls,
+    },
+  };
+}
+
 function metricById(metrics: SolarCongruenceMetric[], id: SolarMechanismId): SolarCongruenceMetric | undefined {
   return metrics.find((metric) => metric.id === id);
 }
@@ -139,25 +228,25 @@ function magneticReconnectionNull(observation: SolarEventObservation): SolarCong
     ...(energy ? ["magnetic_free_energy_budget"] : []),
   ];
   if (!radiative && !ribbon && !source) {
-    return { id: "magnetic_reconnection_null", value: null, status: "missing", null_model: "magnetic_reconnection_floor", evidence_refs };
+    return withEntropyDiagnostics({ id: "magnetic_reconnection_null", value: null, status: "missing", null_model: "magnetic_reconnection_floor", evidence_refs }, 5);
   }
   if (observation.magnetic_free_energy_J !== undefined && (!energy || observation.magnetic_free_energy_J <= 0)) {
-    return { id: "magnetic_reconnection_null", value: 0, status: "fail", null_model: "magnetic_reconnection_floor", evidence_refs };
+    return withEntropyDiagnostics({ id: "magnetic_reconnection_null", value: 0, status: "fail", null_model: "magnetic_reconnection_floor", evidence_refs }, 5);
   }
   const score = [radiative, ribbon, source, topology, energy].filter(Boolean).length / 5;
-  return {
+  return withEntropyDiagnostics({
     id: "magnetic_reconnection_null",
     value: score,
     status: score >= 0.6 ? "pass" : "warn",
     null_model: "magnetic_reconnection_floor",
     evidence_refs,
-  };
+  }, 5);
 }
 
 function pModePhaseModulation(observation: SolarEventObservation): SolarCongruenceMetric {
   const phases = finiteValues(observation.p_mode_phase_rad);
   if (phases.length === 0) {
-    return { id: "p_mode_phase_modulation", value: null, status: "missing", null_model: "random_event_phase_control", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "p_mode_phase_modulation", value: null, status: "missing", null_model: "random_event_phase_control", evidence_refs: [] }, 2);
   }
   const driver = finiteValues(driverSeries(observation));
   const driverRange = range(driver);
@@ -169,39 +258,39 @@ function pModePhaseModulation(observation: SolarEventObservation): SolarCongruen
   const score = vectorStrength(sampleIndices.map((index) => phases[index]));
   const control = shiftedPhaseControl(phases, sampleIndices);
   const beatsControl = score >= control + 0.1;
-  return {
+  return withEntropyDiagnostics({
     id: "p_mode_phase_modulation",
     value: score,
     status: score >= 0.7 && beatsControl ? "pass" : "warn",
     null_model: "random_event_phase_control",
     evidence_refs: ["p_mode_phase_rad", ...(driver.length > 0 ? ["event_driver_series"] : [])],
     notes: `Five-minute p-modes are timing modulators, not EUV photon energy sources; shuffled_control=${control.toFixed(6)}.`,
-  };
+  }, 2);
 }
 
 function ribbonBlobTearing(observation: SolarEventObservation): SolarCongruenceMetric {
   const widths = finiteValues(observation.ribbon_blob_width_km);
   const spacings = finiteValues(observation.ribbon_blob_spacing_km);
   if (widths.length === 0 && spacings.length === 0) {
-    return { id: "ribbon_blob_tearing", value: null, status: "missing", null_model: "random_ribbon_kernel_spacing", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "ribbon_blob_tearing", value: null, status: "missing", null_model: "random_ribbon_kernel_spacing", evidence_refs: [] }, 2);
   }
   const widthScore = widths.length ? widths.filter((v) => v >= 320 && v <= 455).length / widths.length : null;
   const spacingScore = spacings.length ? spacings.filter((v) => v >= 850 && v <= 1350).length / spacings.length : null;
   const parts = [widthScore, spacingScore].filter((v): v is number => v !== null);
   const score = mean(parts) ?? 0;
-  return {
+  return withEntropyDiagnostics({
     id: "ribbon_blob_tearing",
     value: score,
     status: score >= 0.5 ? "pass" : "warn",
     null_model: "random_ribbon_kernel_spacing",
     evidence_refs: [...(widths.length ? ["ribbon_blob_width_km"] : []), ...(spacings.length ? ["ribbon_blob_spacing_km"] : [])],
-  };
+  }, 2);
 }
 
 function photosphericFieldBackreaction(observation: SolarEventObservation): SolarCongruenceMetric {
   const field = finiteValues(observation.pil_horizontal_field_T);
   if (field.length === 0) {
-    return { id: "photospheric_field_backreaction", value: null, status: "missing", null_model: "no_permanent_pil_field_step", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "photospheric_field_backreaction", value: null, status: "missing", null_model: "no_permanent_pil_field_step", evidence_refs: [] }, 2);
   }
   const midpoint = Math.floor(field.length / 2);
   const pre = field.slice(0, midpoint);
@@ -209,77 +298,77 @@ function photosphericFieldBackreaction(observation: SolarEventObservation): Sola
   const stepAmplitude = Math.abs((mean(post) ?? 0) - (mean(pre) ?? 0));
   const pooledScale = Math.max(std(field) ?? 0, Math.abs(mean(field) ?? 0), 1e-12);
   const score = Math.min(1, stepAmplitude / pooledScale);
-  return {
+  return withEntropyDiagnostics({
     id: "photospheric_field_backreaction",
     value: score,
     status: score >= 0.25 ? "pass" : "warn",
     null_model: "no_permanent_pil_field_step",
     evidence_refs: ["pil_horizontal_field_T", ...(hasSeries(observation.goes_xray_flux) ? ["goes_xray_flux"] : [])],
     notes: "PIL backreaction uses a pre/post field-step proxy and remains magnetic recoil context, not collapse evidence.",
-  };
+  }, 2);
 }
 
 function sunquakeAcousticResponse(observation: SolarEventObservation): SolarCongruenceMetric {
   const quake = finiteValues(observation.sunquake_power);
   if (quake.length === 0) {
-    return { id: "sunquake_acoustic_response", value: null, status: "missing", null_model: "no_acoustic_impulse", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "sunquake_acoustic_response", value: null, status: "missing", null_model: "no_acoustic_impulse", evidence_refs: [] }, 2);
   }
   const linked = hasSeries(driverSeries(observation)) || hasSeries(observation.hmi_doppler_velocity);
-  return {
+  return withEntropyDiagnostics({
     id: "sunquake_acoustic_response",
     value: Math.max(...quake),
     status: linked ? "pass" : "warn",
     null_model: "no_acoustic_impulse",
     evidence_refs: ["sunquake_power", ...(linked ? ["flare_or_doppler_driver"] : [])],
-  };
+  }, 2);
 }
 
 function nanoflareTransitionRegionBrightening(observation: SolarEventObservation): SolarCongruenceMetric {
   const euv = finiteValues(observation.euv_irradiance);
   if (euv.length === 0) {
-    return { id: "nanoflare_transition_region_brightening", value: null, status: "missing", null_model: "no_compact_transition_region_brightening", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "nanoflare_transition_region_brightening", value: null, status: "missing", null_model: "no_compact_transition_region_brightening", evidence_refs: [] }, 2);
   }
   const burstiness = (std(euv) ?? 0) / Math.max(Math.abs(mean(euv) ?? 0), 1e-12);
-  return {
+  return withEntropyDiagnostics({
     id: "nanoflare_transition_region_brightening",
     value: burstiness,
     status: burstiness > 0.05 && (hasSource(observation) || Boolean(observation.topology_context_ref)) ? "pass" : "warn",
     null_model: "no_compact_transition_region_brightening",
     evidence_refs: ["euv_irradiance"],
-  };
+  }, 2);
 }
 
 function multifractalFlareMemoryProxy(observation: SolarEventObservation): SolarCongruenceMetric {
   const driver = finiteValues(observation.goes_xray_flux ?? observation.euv_irradiance);
   if (driver.length < 4) {
-    return { id: "multifractal_flare_memory_proxy", value: null, status: "missing", null_model: "white_or_smoothed_flare_noise", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "multifractal_flare_memory_proxy", value: null, status: "missing", null_model: "white_or_smoothed_flare_noise", evidence_refs: [] }, 2);
   }
   const differences = driver.slice(1).map((value, index) => value - driver[index]);
   const burstiness = (std(differences) ?? 0) / Math.max(std(driver) ?? 0, 1e-12);
-  return {
+  return withEntropyDiagnostics({
     id: "multifractal_flare_memory_proxy",
     value: burstiness,
     status: burstiness > 0.15 ? "pass" : "warn",
     null_model: "white_or_smoothed_flare_noise",
     evidence_refs: [observation.goes_xray_flux ? "goes_xray_flux" : "euv_irradiance"],
     notes: "Proxy only; full multifractal validation requires WTMM, structure-function, or spectrum analysis.",
-  };
+  }, 2);
 }
 
 function polarimetricFaradayPath(observation: SolarEventObservation): SolarCongruenceMetric {
   const rm = finiteValues(observation.rotation_measure_rad_m2);
   const pol = finiteValues(observation.polarization_fraction);
   if (rm.length === 0 && pol.length === 0) {
-    return { id: "polarimetric_faraday_path", value: null, status: "missing", null_model: "no_magnetized_path_constraint", evidence_refs: [] };
+    return withEntropyDiagnostics({ id: "polarimetric_faraday_path", value: null, status: "missing", null_model: "no_magnetized_path_constraint", evidence_refs: [] }, 2);
   }
-  return {
+  return withEntropyDiagnostics({
     id: "polarimetric_faraday_path",
     value: Math.abs(mean(rm) ?? 0),
     status: "advisory",
     null_model: "magnetized_path_constraint_only",
     evidence_refs: [...(rm.length ? ["rotation_measure_rad_m2"] : []), ...(pol.length ? ["polarization_fraction"] : [])],
     notes: "Faraday rotation constrains magnetic path geometry only; collapse_rate_claim_from_faraday_only = false.",
-  };
+  }, 2);
 }
 
 function buildResidualBlockedReasons(metrics: SolarCongruenceMetric[], observation: SolarEventObservation): string[] {
@@ -383,7 +472,7 @@ export function evaluateSolarEventCongruence(observation: SolarEventObservation)
   ];
   const constraintEnvelope = buildSolarConstraintEnvelope(observation, metrics);
   const allowed = constraintEnvelope.residual_budget.residual_allowed;
-  metrics.push({
+  metrics.push(withEntropyDiagnostics({
     id: "collapse_residual_hypothesis",
     value: allowed ? 0 : null,
     status: allowed ? "advisory" : "missing",
@@ -392,7 +481,7 @@ export function evaluateSolarEventCongruence(observation: SolarEventObservation)
     notes: allowed
       ? "Advisory residual gate only; this metric is never a primary winner and never creates source power."
       : "Residual gate blocked until magnetic, p-mode, applicable topology/backreaction, and energy gates are computed.",
-  });
+  }, ORDINARY_SOLAR_ALIASING_NULLS.length));
   const primary = metrics.filter((metric) => metric.id !== "collapse_residual_hypothesis");
   return {
     event_id: observation.event_id,

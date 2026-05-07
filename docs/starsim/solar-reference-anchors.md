@@ -128,9 +128,10 @@ StarSim solar-event congruence anchors:
 - `solar.eruptive.photospheric_field_backreaction.v1`
 - `solar.local_helio.sunquake_flare_alignment.v1`
 - `solar.transition_region.nanoflare_brightening_context.v1`
-- `solar.temporal.multifractal_flare_memory.v1`
+- `solar.temporal.multifractal_flare_memory_proxy.v1`
 - `solar.polarimetry.faraday_path_context.v1`
 - `solar.radiation.packet_energy_closure.v1`
+- `solar.congruence.entropy_aliasing_context.v1`
 - `solar.speculative.collapse_residual_context.v1`
 
 These anchors use the same reference-pack fields as the observed baseline checks:

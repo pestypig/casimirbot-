@@ -54,6 +54,8 @@ describe("solar event congruence", () => {
     expect(report.constraint_envelope.energy_budget.status).toBe("pass");
     expect(report.constraint_envelope.topology_budget.status).toBe("pass");
     expect(report.constraint_envelope.residual_budget.residual_claim_tier).toBe("advisory_only");
+    expect(report.metrics.every((metric) => metric.entropy_diagnostics.entropy_penalty <= 1)).toBe(true);
+    expect(report.metrics.every((metric) => metric.entropy_diagnostics.entropy_stretch_lambda >= 1)).toBe(true);
   });
 
   it("fails the magnetic null when the declared free-energy support is non-physical", () => {
@@ -105,5 +107,15 @@ describe("solar event congruence", () => {
     expect(report.speculative_residual_allowed).toBe(false);
     expect(metricStatus(report, "collapse_residual_hypothesis")).toBe("missing");
     expect(report.constraint_envelope.residual_budget.blocked_reasons).toContain("magnetic_floor_not_computed_or_failed");
+  });
+
+  it("records ordinary aliasing nulls for speculative residual entropy hygiene", () => {
+    const report = evaluateSolarEventCongruence(baseEvent());
+    const residual = report.metrics.find((metric) => metric.id === "collapse_residual_hypothesis");
+
+    expect(residual?.entropy_diagnostics.aliasing_nulls).toContain("magnetic_reconnection_null");
+    expect(residual?.entropy_diagnostics.aliasing_nulls).toContain("p_mode_phase_modulation");
+    expect(residual?.entropy_diagnostics.aliasing_nulls).toContain("ribbon_blob_tearing");
+    expect(residual?.entropy_diagnostics.entropy_adjusted_score).toBe(0);
   });
 });

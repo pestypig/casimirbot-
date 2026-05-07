@@ -36,6 +36,16 @@ Every congruence report carries a `SolarConstraintEnvelope`.
 The envelope summarizes four budgets: energy, timing, topology, and residual eligibility.
 It is a physics passport for the run: if the magnetic floor, p-mode timing, applicable backreaction/topology checks, or energy closure are missing or failed, the residual budget records the blocked reasons and leaves the residual claim tier at `none`.
 
+## Entropy And Aliasing
+
+Each congruence metric also carries `entropy_diagnostics`.
+The diagnostic names observational, model, provenance, and aliasing entropy separately, then converts their sum into `entropy_stretch_lambda = exp(delta_entropy)`.
+The corresponding `entropy_penalty` is penalty-only: it can demote a metric's entropy-adjusted score, but it cannot boost a weak lane into a stronger claim.
+
+`aliasing_nulls` lists ordinary mechanisms that can mimic the same residual under coarse evidence.
+For the speculative residual lane, those nulls include reconnection, p-mode timing, ribbon blobs, photospheric backreaction, sunquake response, transition-region brightening, flare-memory proxy, and Faraday-path geometry.
+If evidence is too coarse to distinguish them, StarSim reports aliasing pressure rather than promotion.
+
 ## Residual Gate
 
 The collapse-like residual gate is blocked unless magnetic reconnection and p-mode diagnostics are computed, applicable photospheric backreaction and ribbon-kernel diagnostics are present when their data exist, and energy closure does not exceed the continuous-spectrum budget.
@@ -47,6 +57,7 @@ Faraday-path evidence remains advisory magnetic-geometry context and cannot unlo
 ## Research Anchors
 
 - DKIST/ViSP ribbon blobs: [Yadav et al., Multi-line Spectropolarimetric Observation of Flare Ribbon Fine Structures with ViSP/DKIST](https://arxiv.org/abs/2507.20070)
+- High-entropy classical limit: [Carcassi, Landini, and Aidala, Classical mechanics as the high-entropy limit of quantum mechanics](https://arxiv.org/abs/2411.00972)
 - Solar p-mode context: [Kosovichev, Solar Oscillations](https://ar5iv.labs.arxiv.org/html/1001.5283)
 - Coronal five-minute oscillations: [Didkovsky et al., Solar Physics 2013](https://link.springer.com/article/10.1007/s11207-012-0186-3)
 - Photospheric field backreaction: [Yadav and Kazachenko, high-cadence vector magnetogram flare statistics](https://arxiv.org/abs/2210.14264)

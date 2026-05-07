@@ -20,6 +20,11 @@ import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
 import type { SituationSemanticEvent } from "@shared/helix-situation-semantics";
+import type {
+  SituationEpisode,
+  SituationEpisodeNarration,
+  SituationPrediction as SituationEpisodePrediction,
+} from "@shared/helix-situation-episode";
 import {
   getMinecraftEventHints,
   normalizeMinecraftWorldEventToSignal,
@@ -48,6 +53,11 @@ import {
   type WorldSourceSeen,
 } from "./world-source-registry";
 import { summarizeWorldEventQuality, type WorldEventQualitySummary } from "./world-event-quality";
+import {
+  narrateSituationEpisode,
+  predictFromSituationEpisode,
+  reduceSituationEpisodes,
+} from "./situation-episode-reducer";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -121,6 +131,9 @@ export type WorldEventIngestResult = {
   semantic_events?: SituationSemanticEvent[];
   narration_receipt?: SituationNarrationReceipt | null;
   predictions?: SituationPrediction[];
+  episodes?: SituationEpisode[];
+  episode_narrations?: SituationEpisodeNarration[];
+  episode_predictions?: SituationEpisodePrediction[];
   queue_items?: StandbyQueueItem[];
   interjection_decision?: InterjectionDecision;
   debug?: WorldEventIngestDebug;
@@ -180,8 +193,10 @@ type RoomRuntimeState = {
   graphId: string | null;
   worldId: string;
   signals: SituationEventSignal[];
+  worldEvents: HelixWorldEvent[];
   goals: Map<string, SituationGoalHypothesis>;
   predictions: Map<string, SituationPrediction>;
+  episodePredictions: Map<string, SituationEpisodePrediction>;
   locationCounts: Map<string, number>;
 };
 
@@ -249,8 +264,10 @@ const getOrCreateState = (
     graphId,
     worldId: event.world_id,
     signals: [],
+    worldEvents: [],
     goals: new Map(),
     predictions: new Map(),
+    episodePredictions: new Map(),
     locationCounts: new Map(),
   };
   runtimeStateByKey.set(key, next);
@@ -413,7 +430,15 @@ const buildSalienceReceipt = (args: {
     readBooleanMeta(event, "hostile_nearby") ||
     readBooleanMeta(event, "lava_nearby") ||
     event.event_type === "mob_nearby" ||
+    event.event_type === "hostile_nearby" ||
+    event.event_type === "creeper_fuse_started" ||
+    event.event_type === "explosion_imminent" ||
     event.event_type === "player_death";
+  const precursorRisk =
+    event.event_type === "mob_nearby" ||
+    event.event_type === "hostile_nearby" ||
+    event.event_type === "creeper_fuse_started" ||
+    event.event_type === "explosion_imminent";
   const riskEvent =
     event.event_type === "player_damage" ||
     event.event_type === "damage_taken" ||
@@ -426,12 +451,19 @@ const buildSalienceReceipt = (args: {
   let summary = "";
   let shouldRequestUserInput = false;
 
-  if ((riskEvent && (lowHealth || dangerNearby)) || event.event_type === "player_death") {
+  if ((riskEvent && (lowHealth || dangerNearby)) || precursorRisk || event.event_type === "player_death") {
     reason = "risk_detected";
-    priority = event.event_type === "player_death" || currentHealth === 0 ? "critical" : "warn";
+    priority =
+      event.event_type === "player_death" ||
+      currentHealth === 0 ||
+      event.event_type === "explosion_imminent"
+        ? "critical"
+        : "warn";
     summary =
       event.event_type === "player_death"
         ? `${event.actor_label ?? event.actor_id ?? "Player"} died in Minecraft.`
+        : precursorRisk
+          ? `${event.actor_label ?? event.actor_id ?? "Player"} has a nearby Minecraft threat.`
         : `${event.actor_label ?? event.actor_id ?? "Player"} is in danger${
             currentHealth !== null ? ` at ${currentHealth} health` : ""
           }.`;
@@ -548,8 +580,15 @@ export const ingestWorldEvent = async (
   state.signals.sort((a: SituationEventSignal, b: SituationEventSignal) =>
     a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id),
   );
+  state.worldEvents.push(event);
+  state.worldEvents.sort((a: HelixWorldEvent, b: HelixWorldEvent) =>
+    a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type),
+  );
   if (state.signals.length > 100) {
     state.signals.splice(0, state.signals.length - 100);
+  }
+  if (state.worldEvents.length > 100) {
+    state.worldEvents.splice(0, state.worldEvents.length - 100);
   }
   const repeatedLocationCount = updateLocationCounts(state, event);
   const goalHypotheses = updateGoalHypotheses(state, event, signal);
@@ -577,9 +616,25 @@ export const ingestWorldEvent = async (
     narration: narrationReceipt,
     existing: Array.from(state.predictions.values()),
   });
+  const recentWindowStart = Number.isFinite(Date.parse(event.ts))
+    ? new Date(Date.parse(event.ts) - 12_000).toISOString()
+    : event.ts;
+  const recentWorldEvents = state.worldEvents.filter((entry: HelixWorldEvent) => entry.ts >= recentWindowStart);
+  const episodes = reduceSituationEpisodes({
+    roomId: event.room_id,
+    graphId,
+    worldId: event.world_id,
+    events: recentWorldEvents,
+  });
+  const episodeNarrations = episodes.map(narrateSituationEpisode);
+  const episodePredictions = episodes.flatMap(predictFromSituationEpisode);
   state.predictions.clear();
   for (const prediction of predictions) {
     state.predictions.set(prediction.prediction_id, prediction);
+  }
+  state.episodePredictions.clear();
+  for (const prediction of episodePredictions) {
+    state.episodePredictions.set(prediction.prediction_id, prediction);
   }
   const interjectionDecision = decideSituationInterjection({
     salienceReceipt,
@@ -712,11 +767,14 @@ export const ingestWorldEvent = async (
             goal_hypotheses: goalHypotheses,
             salience_receipt: salienceReceipt,
             interjection_proposal: interjectionProposal,
-            semantic_events: semanticEvents,
-            narration_receipts: narrationReceipt ? [narrationReceipt] : [],
-            predictions,
-            interjection_decision: interjectionDecision,
-          }),
+          semantic_events: semanticEvents,
+          narration_receipts: narrationReceipt ? [narrationReceipt] : [],
+          predictions,
+          episodes,
+          episode_narrations: episodeNarrations,
+          episode_predictions: episodePredictions,
+          interjection_decision: interjectionDecision,
+        }),
           salienceReason: salienceReceipt?.reason ?? null,
           saliencePriority: salienceReceipt?.priority ?? null,
           dedupeKey: salienceReceipt?.dedupe_key ?? null,
@@ -834,6 +892,9 @@ export const ingestWorldEvent = async (
     semantic_events: semanticEvents,
     narration_receipt: narrationReceipt,
     predictions,
+    episodes,
+    episode_narrations: episodeNarrations,
+    episode_predictions: episodePredictions,
     queue_items: queueItems,
     interjection_decision: interjectionDecision,
     debug,

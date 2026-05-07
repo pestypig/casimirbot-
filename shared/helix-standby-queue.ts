@@ -38,3 +38,45 @@ export type SituationCognitionPowerMode =
   | "warm_standby"
   | "active_companion"
   | "game_master";
+
+export const HELIX_STANDBY_WORK_ITEM_SCHEMA =
+  "helix.standby_work_item.v1" as const;
+
+export type StandbyWorkPriority =
+  | "user_direct"
+  | "critical_salience"
+  | "standby_salience"
+  | "standby_interpretation"
+  | "maintenance";
+
+export type StandbyWorkKind =
+  | "episode_narration"
+  | "goal_prediction"
+  | "interjection_review"
+  | "state_compaction"
+  | "thread_observation_append"
+  | "user_request_context_refresh";
+
+export type StandbyWorkItem = {
+  schema: typeof HELIX_STANDBY_WORK_ITEM_SCHEMA;
+  work_id: string;
+  priority: StandbyWorkPriority;
+  kind: StandbyWorkKind;
+  room_id: string;
+  graph_id?: string | null;
+  thread_id?: string | null;
+  episode_id?: string | null;
+  salience_receipt_id?: string | null;
+  evidence_refs: string[];
+  payload: Record<string, unknown>;
+  status: "queued" | "running" | "completed" | "cancelled" | "failed";
+  created_at: string;
+  updated_at: string;
+};
+
+export type StandbyCognitionMode =
+  | "off"
+  | "deterministic_only"
+  | "llm_on_salience"
+  | "llm_per_episode"
+  | "llm_per_event_debug";

@@ -127,6 +127,21 @@ const solarReferencePackSchema = z.object({
       irradiance_continuity: solarReferenceAnchorSchema,
       source_region_linkage: solarReferenceAnchorSchema,
     }),
+    event_congruence: z.object({
+      reconnection_null: solarReferenceAnchorSchema,
+      pmode_phase_modulation: solarReferenceAnchorSchema,
+      ribbon_blob_tearing_context: solarReferenceAnchorSchema,
+      photospheric_field_backreaction: solarReferenceAnchorSchema,
+      sunquake_flare_alignment: solarReferenceAnchorSchema,
+      transition_region_nanoflare_brightening_context: solarReferenceAnchorSchema,
+      multifractal_flare_memory_proxy: solarReferenceAnchorSchema,
+      faraday_path_context: solarReferenceAnchorSchema,
+      packet_energy_closure: solarReferenceAnchorSchema,
+      entropy_aliasing_context: solarReferenceAnchorSchema,
+    }),
+    speculative: z.object({
+      collapse_residual_context: solarReferenceAnchorSchema,
+    }),
     consistency: z.object({
       source_region_overlap: solarReferenceAnchorSchema,
       magnetogram_active_region_linkage: solarReferenceAnchorSchema,
@@ -172,6 +187,8 @@ const getAllAnchors = (pack: StarSimSolarReferencePack): StarSimSolarReferenceAn
   ...Object.values(pack.anchors.topology_linkage),
   ...Object.values(pack.anchors.cross_layer_consistency),
   ...Object.values(pack.anchors.eruptive),
+  ...Object.values(pack.anchors.event_congruence),
+  ...Object.values(pack.anchors.speculative),
   ...Object.values(pack.anchors.consistency),
 ];
 

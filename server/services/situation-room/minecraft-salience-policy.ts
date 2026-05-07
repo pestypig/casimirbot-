@@ -40,6 +40,9 @@ export function classifyMinecraftEventSalience(event: HelixWorldEvent): Minecraf
     event.event_type === "damage_taken" ||
     event.event_type === "player_death" ||
     event.event_type === "mob_nearby" ||
+    event.event_type === "hostile_nearby" ||
+    event.event_type === "creeper_fuse_started" ||
+    event.event_type === "explosion_imminent" ||
     event.event_type === "achievement_awarded" ||
     event.event_type === "advancement_unlocked" ||
     event.event_type === "dimension_changed" ||
@@ -59,4 +62,3 @@ export function getLocationMinSamples(): number {
   const parsed = Number(process.env.HELIX_MINECRAFT_LOCATION_MIN_SAMPLES);
   return Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 8;
 }
-

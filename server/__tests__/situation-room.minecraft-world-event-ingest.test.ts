@@ -260,7 +260,7 @@ describe("Minecraft world-event ingest", () => {
     expect(events.some((entry) => entry.observation_ref?.schema === "helix.standby_thread_observation.v1")).toBe(
       true,
     );
-    const observation = events.find(
+    const observation = events.slice().reverse().find(
       (entry) =>
         entry.observation_ref?.schema === "helix.standby_thread_observation.v1" &&
         Array.isArray(entry.observation_ref.semantic_events),
@@ -270,6 +270,8 @@ describe("Minecraft world-event ingest", () => {
           semantic_events?: Array<{ schema: string; tags: string[] }>;
           narration_receipts?: Array<{ schema: string; text: string }>;
           predictions?: Array<{ schema: string; predicted_goal: string }>;
+          episodes?: Array<{ schema: string; episode_type: string }>;
+          episode_narrations?: Array<{ schema: string; text: string }>;
           interjection_decision?: string;
         }
       | undefined;
@@ -284,9 +286,42 @@ describe("Minecraft world-event ingest", () => {
       schema: "helix.situation_prediction.v1",
       predicted_goal: "survive immediate danger",
     });
+    expect(observation?.episodes?.[0]).toMatchObject({
+      schema: "helix.situation_episode.v1",
+      episode_type: "combat_risk",
+    });
+    expect(observation?.episode_narrations?.[0]).toMatchObject({
+      schema: "helix.situation_episode_narration.v1",
+    });
     expect(observation?.interjection_decision).toBe("text_callout");
     expect(events.some((entry) => entry.item_type === "answer")).toBe(false);
   }, 15000);
+
+  it("can warn on a creeper precursor before damage when the plugin emits one", async () => {
+    const event: HelixWorldEvent = {
+      schema: "helix.world_event.v1",
+      world_id: "minecraft:minehut",
+      room_id: "room:minecraft-minehut",
+      source_id: "source:minecraft-server",
+      ts: "2026-05-07T12:10:00.000Z",
+      actor_id: "player:datdampig",
+      actor_label: "DatDamPig",
+      event_type: "creeper_fuse_started",
+      location: { dimension: "minecraft:overworld", x: 10, y: 69, z: 10 },
+      entities: [{ entity_type: "minecraft:creeper", distance: 2.5 }],
+      evidence_refs: ["mc:creeper:fuse"],
+      meta: { hostile_nearby: true, entity_type: "minecraft:creeper" },
+    };
+
+    const result = await ingestWorldEvent(event, { appendToThread: false });
+
+    expect(result.salience_receipt).toMatchObject({
+      reason: "risk_detected",
+      priority: "warn",
+      should_notify_helix: true,
+    });
+    expect(result.interjection_proposal?.text).toContain("nearby Minecraft threat");
+  });
 
   it("reports binding mismatch when an existing source binding uses different plugin ids", async () => {
     const app = await createApp();

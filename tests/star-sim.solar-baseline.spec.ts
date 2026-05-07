@@ -1588,6 +1588,28 @@ describe("star-sim solar observed adapter scaffold", () => {
     expect(diagnostics.checks.convection_zone_depth.reference_pack_version).toBe(updatedPack.version);
   });
 
+  it("validates event-congruence and speculative anchors from the solar reference pack", () => {
+    const pack = getSolarReferencePack();
+
+    expect(pack.anchors.event_congruence.reconnection_null.id).toBe("solar.eruptive.reconnection_null.v1");
+    expect(pack.anchors.event_congruence.pmode_phase_modulation.id).toBe(
+      "solar.eruptive.pmode_phase_modulation.v1",
+    );
+    expect(pack.anchors.event_congruence.ribbon_blob_tearing_context.reference_doc_ids).toContain(
+      "dkist_visp_ribbon_blobs_2025",
+    );
+    expect(pack.anchors.event_congruence.multifractal_flare_memory_proxy.id).toBe(
+      "solar.temporal.multifractal_flare_memory_proxy.v1",
+    );
+    expect(pack.anchors.event_congruence.entropy_aliasing_context.reference_doc_ids).toContain(
+      "high_entropy_quantum_limit_2026",
+    );
+    expect(
+      (pack.anchors.speculative.collapse_residual_context.expected_summary as Record<string, unknown>)
+        .source_power_allowed,
+    ).toBe(false);
+  });
+
   it("fails clearly when the solar reference-pack JSON is malformed", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "starsim-solar-pack-"));
     const packPath = path.join(tempRoot, "solar-reference-pack.bad.json");

@@ -10,6 +10,11 @@ import type {
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
 import type { SituationSemanticEvent } from "@shared/helix-situation-semantics";
+import type {
+  SituationEpisode,
+  SituationEpisodeNarration,
+  SituationPrediction as SituationEpisodePrediction,
+} from "@shared/helix-situation-episode";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 import type { InterjectionDecision } from "./interjection-policy";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
@@ -104,7 +109,7 @@ export async function appendStandbyObservationToThread(input: {
     `standby_observation:${hashShort([binding.binding_id, signalId, input.world_event?.ts])}`;
   const itemId = `standby_observation:${hashShort([binding.binding_id, signalId], 16)}`;
   const now = new Date().toISOString();
-  const observationRef = buildStandbyObservationRef(input);
+  const observationRef = buildStandbyObservationRef({ ...input, binding });
 
   try {
     appendHelixThreadEvent({
@@ -198,6 +203,9 @@ export function buildStandbyObservationRef(input: {
   semantic_events?: SituationSemanticEvent[];
   narration_receipts?: SituationNarrationReceipt[];
   predictions?: SituationPrediction[];
+  episodes?: SituationEpisode[];
+  episode_narrations?: SituationEpisodeNarration[];
+  episode_predictions?: SituationEpisodePrediction[];
   interjection_decision?: InterjectionDecision;
 }): Record<string, unknown> {
   const binding = input.binding;
@@ -223,6 +231,12 @@ export function buildStandbyObservationRef(input: {
     interjection_proposal: input.interjection_proposal ?? null,
     semantic_events: (input.semantic_events ?? []).slice(-8),
     narration_receipts: (input.narration_receipts ?? []).slice(-8),
+    episodes: (input.episodes ?? []).slice(-5),
+    episode_narrations: (input.episode_narrations ?? []).slice(-5),
+    episode_predictions: (input.episode_predictions ?? []).slice(-5).map((prediction: SituationEpisodePrediction) => ({
+      ...prediction,
+      evidence_refs: prediction.evidence_refs.slice(-8),
+    })),
     predictions: (input.predictions ?? []).slice(-8).map((prediction: SituationPrediction) => ({
       ...prediction,
       evidence_refs: prediction.evidence_refs.slice(-8),
