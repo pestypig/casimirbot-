@@ -16,6 +16,10 @@ import type {
   HelixStandbyObservationAppendDecision,
   HelixStandbyObservationBatchReceipt,
 } from "@shared/helix-standby-observation-batch";
+import type { StandbyQueueItem } from "@shared/helix-standby-queue";
+import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
+import type { SituationPrediction } from "@shared/helix-situation-prediction";
+import type { SituationSemanticEvent } from "@shared/helix-situation-semantics";
 import {
   getMinecraftEventHints,
   normalizeMinecraftWorldEventToSignal,
@@ -28,6 +32,11 @@ import {
 } from "./minecraft-salience-policy";
 import { buildStandbyObservationRef } from "./standby-thread-observation";
 import { appendStandbyObservationBatch } from "./standby-observation-batch-writer";
+import { decideSituationInterjection, type InterjectionDecision } from "./interjection-policy";
+import { reduceGoalPredictions } from "./goal-prediction-reducer";
+import { buildSituationMicroNarration } from "./situation-micro-narrator";
+import { buildSituationSemanticEvents } from "./situation-semantic-dictionary";
+import { completeStandbyQueueItem, enqueueStandbyQueueItem } from "./standby-queue";
 import {
   createSituationThreadBinding,
 } from "./thread-binding-store";
@@ -109,6 +118,11 @@ export type WorldEventIngestResult = {
   goal_hypotheses?: SituationGoalHypothesis[];
   salience_receipt?: SituationSalienceReceipt | null;
   interjection_proposal?: SituationInterjectionProposal | null;
+  semantic_events?: SituationSemanticEvent[];
+  narration_receipt?: SituationNarrationReceipt | null;
+  predictions?: SituationPrediction[];
+  queue_items?: StandbyQueueItem[];
+  interjection_decision?: InterjectionDecision;
   debug?: WorldEventIngestDebug;
   append_decision?: HelixStandbyObservationAppendDecision;
   batch_receipt?: HelixStandbyObservationBatchReceipt | null;
@@ -167,6 +181,7 @@ type RoomRuntimeState = {
   worldId: string;
   signals: SituationEventSignal[];
   goals: Map<string, SituationGoalHypothesis>;
+  predictions: Map<string, SituationPrediction>;
   locationCounts: Map<string, number>;
 };
 
@@ -235,6 +250,7 @@ const getOrCreateState = (
     worldId: event.world_id,
     signals: [],
     goals: new Map(),
+    predictions: new Map(),
     locationCounts: new Map(),
   };
   runtimeStateByKey.set(key, next);
@@ -497,6 +513,26 @@ const buildInterjectionProposal = (
   };
 };
 
+const recordCompletedQueueItem = (input: {
+  roomId: string;
+  graphId?: string | null;
+  taskKind: "semantic_event" | "micro_narration" | "goal_prediction" | "salience_review" | "interjection_review";
+  inputRefs: string[];
+  resultRef?: string | null;
+  priority?: "critical_salience" | "standby_salience" | "standby_interpretation";
+  ts: string;
+}): StandbyQueueItem => {
+  const item = enqueueStandbyQueueItem({
+    room_id: input.roomId,
+    graph_id: input.graphId ?? null,
+    priority: input.priority ?? "standby_interpretation",
+    task_kind: input.taskKind,
+    input_refs: input.inputRefs,
+    created_at: input.ts,
+  });
+  return completeStandbyQueueItem(item.queue_item_id, input.resultRef ?? null, input.ts) ?? item;
+};
+
 export const ingestWorldEvent = async (
   event: HelixWorldEvent,
   options: WorldEventIngestOptions = {},
@@ -527,6 +563,97 @@ export const ingestWorldEvent = async (
     salienceClass,
   });
   const interjectionProposal = buildInterjectionProposal(salienceReceipt);
+  const semanticEvents = buildSituationSemanticEvents({ event, signal });
+  const narrationReceipt = buildSituationMicroNarration({
+    roomId: event.room_id,
+    graphId,
+    semanticEvents,
+    ts: signal.ts,
+  });
+  const predictions = reduceGoalPredictions({
+    roomId: event.room_id,
+    graphId,
+    semanticEvents,
+    narration: narrationReceipt,
+    existing: Array.from(state.predictions.values()),
+  });
+  state.predictions.clear();
+  for (const prediction of predictions) {
+    state.predictions.set(prediction.prediction_id, prediction);
+  }
+  const interjectionDecision = decideSituationInterjection({
+    salienceReceipt,
+    interjectionProposal,
+    predictions,
+    powerMode: "low_power",
+    voiceOutputGranted: false,
+    speakerAuthority: "trusted",
+  });
+  const queueItems: StandbyQueueItem[] = [];
+  if (semanticEvents.length > 0) {
+    queueItems.push(
+      recordCompletedQueueItem({
+        roomId: event.room_id,
+        graphId,
+        taskKind: "semantic_event",
+        inputRefs: [signal.signal_id],
+        resultRef: semanticEvents.at(-1)?.semantic_event_id ?? null,
+        ts: signal.ts,
+      }),
+    );
+  }
+  if (narrationReceipt) {
+    queueItems.push(
+      recordCompletedQueueItem({
+        roomId: event.room_id,
+        graphId,
+        taskKind: "micro_narration",
+        inputRefs: narrationReceipt.semantic_event_ids,
+        resultRef: narrationReceipt.narration_id,
+        ts: signal.ts,
+      }),
+    );
+  }
+  if (predictions.length > 0 && narrationReceipt) {
+    queueItems.push(
+      recordCompletedQueueItem({
+        roomId: event.room_id,
+        graphId,
+        taskKind: "goal_prediction",
+        inputRefs: [narrationReceipt.narration_id],
+        resultRef: predictions.at(-1)?.prediction_id ?? null,
+        ts: signal.ts,
+      }),
+    );
+  }
+  if (salienceReceipt) {
+    queueItems.push(
+      recordCompletedQueueItem({
+        roomId: event.room_id,
+        graphId,
+        taskKind: "salience_review",
+        inputRefs: [signal.signal_id],
+        resultRef: salienceReceipt.receipt_id,
+        priority: salienceReceipt.priority === "critical" || salienceReceipt.priority === "action"
+          ? "critical_salience"
+          : "standby_salience",
+        ts: signal.ts,
+      }),
+    );
+  }
+  if (interjectionProposal) {
+    queueItems.push(
+      recordCompletedQueueItem({
+        roomId: event.room_id,
+        graphId,
+        taskKind: "interjection_review",
+        inputRefs: [interjectionProposal.salience_receipt_id],
+        resultRef: interjectionProposal.proposal_id,
+        priority: "standby_salience",
+        ts: signal.ts,
+      }),
+    );
+  }
   const explicitThreadId = options.threadId ?? null;
   const explicitTurnId = options.turnId ?? null;
   const explicitBinding =
@@ -585,6 +712,10 @@ export const ingestWorldEvent = async (
             goal_hypotheses: goalHypotheses,
             salience_receipt: salienceReceipt,
             interjection_proposal: interjectionProposal,
+            semantic_events: semanticEvents,
+            narration_receipts: narrationReceipt ? [narrationReceipt] : [],
+            predictions,
+            interjection_decision: interjectionDecision,
           }),
           salienceReason: salienceReceipt?.reason ?? null,
           saliencePriority: salienceReceipt?.priority ?? null,
@@ -700,6 +831,11 @@ export const ingestWorldEvent = async (
     goal_hypotheses: goalHypotheses,
     salience_receipt: salienceReceipt,
     interjection_proposal: interjectionProposal,
+    semantic_events: semanticEvents,
+    narration_receipt: narrationReceipt,
+    predictions,
+    queue_items: queueItems,
+    interjection_decision: interjectionDecision,
     debug,
     append_decision: appendDecision,
     batch_receipt: batchReceipt,

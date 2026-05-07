@@ -260,6 +260,31 @@ describe("Minecraft world-event ingest", () => {
     expect(events.some((entry) => entry.observation_ref?.schema === "helix.standby_thread_observation.v1")).toBe(
       true,
     );
+    const observation = events.find(
+      (entry) =>
+        entry.observation_ref?.schema === "helix.standby_thread_observation.v1" &&
+        Array.isArray(entry.observation_ref.semantic_events),
+    )
+      ?.observation_ref as
+      | {
+          semantic_events?: Array<{ schema: string; tags: string[] }>;
+          narration_receipts?: Array<{ schema: string; text: string }>;
+          predictions?: Array<{ schema: string; predicted_goal: string }>;
+          interjection_decision?: string;
+        }
+      | undefined;
+    expect(observation?.semantic_events?.[0]).toMatchObject({
+      schema: "helix.situation_semantic_event.v1",
+      tags: expect.arrayContaining(["risk"]),
+    });
+    expect(observation?.narration_receipts?.[0]).toMatchObject({
+      schema: "helix.situation_narration_receipt.v1",
+    });
+    expect(observation?.predictions?.[0]).toMatchObject({
+      schema: "helix.situation_prediction.v1",
+      predicted_goal: "survive immediate danger",
+    });
+    expect(observation?.interjection_decision).toBe("text_callout");
     expect(events.some((entry) => entry.item_type === "answer")).toBe(false);
   }, 15000);
 

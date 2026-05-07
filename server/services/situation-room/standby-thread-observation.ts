@@ -7,7 +7,11 @@ import type {
   SituationSalienceReceipt,
   SituationStateProjection,
 } from "@shared/helix-situation-standby";
+import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
+import type { SituationPrediction } from "@shared/helix-situation-prediction";
+import type { SituationSemanticEvent } from "@shared/helix-situation-semantics";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import type { InterjectionDecision } from "./interjection-policy";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
 
 export type StandbyObservationAppendReason =
@@ -191,6 +195,10 @@ export function buildStandbyObservationRef(input: {
   goal_hypotheses?: SituationGoalHypothesis[];
   salience_receipt?: SituationSalienceReceipt | null;
   interjection_proposal?: SituationInterjectionProposal | null;
+  semantic_events?: SituationSemanticEvent[];
+  narration_receipts?: SituationNarrationReceipt[];
+  predictions?: SituationPrediction[];
+  interjection_decision?: InterjectionDecision;
 }): Record<string, unknown> {
   const binding = input.binding;
   return {
@@ -213,6 +221,14 @@ export function buildStandbyObservationRef(input: {
       : null,
     salience_receipt: input.salience_receipt ?? null,
     interjection_proposal: input.interjection_proposal ?? null,
+    semantic_events: (input.semantic_events ?? []).slice(-8),
+    narration_receipts: (input.narration_receipts ?? []).slice(-8),
+    predictions: (input.predictions ?? []).slice(-8).map((prediction: SituationPrediction) => ({
+      ...prediction,
+      evidence_refs: prediction.evidence_refs.slice(-8),
+      derived_from_narration_ids: prediction.derived_from_narration_ids.slice(-8),
+    })),
+    interjection_decision: input.interjection_decision ?? null,
     state_projection_summary: compactProjection(input.state_projection),
     goal_hypotheses: compactGoals(input.goal_hypotheses),
     append_policy: binding.append_policy,
