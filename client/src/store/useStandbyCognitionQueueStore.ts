@@ -23,7 +23,7 @@ export const useStandbyCognitionQueueStore = create<StandbyCognitionQueueState>(
   upsertItem: (item: StandbyWorkItem) =>
     set((state: StandbyCognitionQueueState) => {
       const existing = state.items.filter((entry: StandbyWorkItem) => entry.work_id !== item.work_id);
-      return { items: [...existing, item].sort((a, b) => a.created_at.localeCompare(b.created_at)) };
+      return { items: [...existing, item].sort((a: StandbyWorkItem, b: StandbyWorkItem) => a.created_at.localeCompare(b.created_at)) };
     }),
   setPaused: (roomId: string, paused: boolean) =>
     set((state: StandbyCognitionQueueState) => ({

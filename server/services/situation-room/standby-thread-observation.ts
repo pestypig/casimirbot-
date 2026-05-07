@@ -15,6 +15,10 @@ import type {
   SituationEpisodeNarration,
   SituationPrediction as SituationEpisodePrediction,
 } from "@shared/helix-situation-episode";
+import type {
+  StandbyCalloutDeliveryReceipt,
+  StandbyCalloutProposal,
+} from "@shared/helix-standby-callout";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 import type { InterjectionDecision } from "./interjection-policy";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
@@ -74,6 +78,8 @@ export async function appendStandbyObservationToThread(input: {
   goal_hypotheses?: SituationGoalHypothesis[];
   salience_receipt?: SituationSalienceReceipt | null;
   interjection_proposal?: SituationInterjectionProposal | null;
+  callout_proposal?: StandbyCalloutProposal | null;
+  callout_delivery_receipt?: StandbyCalloutDeliveryReceipt | null;
 }): Promise<{
   appended: boolean;
   reason: StandbyObservationAppendReason;
@@ -207,6 +213,8 @@ export function buildStandbyObservationRef(input: {
   episode_narrations?: SituationEpisodeNarration[];
   episode_predictions?: SituationEpisodePrediction[];
   interjection_decision?: InterjectionDecision;
+  callout_proposal?: StandbyCalloutProposal | null;
+  callout_delivery_receipt?: StandbyCalloutDeliveryReceipt | null;
 }): Record<string, unknown> {
   const binding = input.binding;
   return {
@@ -229,6 +237,8 @@ export function buildStandbyObservationRef(input: {
       : null,
     salience_receipt: input.salience_receipt ?? null,
     interjection_proposal: input.interjection_proposal ?? null,
+    callout_proposal: input.callout_proposal ?? null,
+    callout_delivery_receipt: input.callout_delivery_receipt ?? null,
     semantic_events: (input.semantic_events ?? []).slice(-8),
     narration_receipts: (input.narration_receipts ?? []).slice(-8),
     episodes: (input.episodes ?? []).slice(-5),

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   claimNextStandbyWorkItem,
   enqueueStandbyWorkItem,
+  getStandbyQueueMetrics,
   listStandbyWorkItems,
   resetStandbyCognitionQueue,
 } from "../services/situation-room/standby-cognition-queue";
@@ -31,8 +32,12 @@ describe("standby cognition queue", () => {
       priority: "user_direct",
       status: "running",
     });
-    expect(listStandbyWorkItems({ status: "queued" })[0]).toMatchObject({
+    expect(listStandbyWorkItems({ status: "dropped" })[0]).toMatchObject({
       priority: "standby_interpretation",
+      dropped_reason: "preempted_by_user_direct",
+    });
+    expect(getStandbyQueueMetrics()).toMatchObject({
+      dropped_count: 1,
     });
   });
 });

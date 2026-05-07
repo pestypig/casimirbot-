@@ -4,17 +4,20 @@ import {
   type StandbyWorkItem,
   type StandbyWorkKind,
   type StandbyWorkPriority,
+  type StandbyQueueMetrics,
 } from "@shared/helix-standby-queue";
 
 const priorityOrder: Record<StandbyWorkPriority, number> = {
   user_direct: 0,
   critical_salience: 1,
-  standby_salience: 2,
-  standby_interpretation: 3,
-  maintenance: 4,
+  standby_callout_delivery: 2,
+  standby_salience: 3,
+  standby_interpretation: 4,
+  maintenance: 5,
 };
 
 const workItems = new Map<string, StandbyWorkItem>();
+let lastPreemptedWorkId: string | undefined;
 
 const hashShort = (value: unknown, size = 12): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -56,7 +59,24 @@ export function enqueueStandbyWorkItem(input: {
     status: "queued",
     created_at: now,
     updated_at: now,
+    dropped_reason: null,
   };
+  if (input.priority === "user_direct") {
+    for (const existing of workItems.values()) {
+      if (
+        existing.status === "queued" &&
+        (existing.priority === "standby_interpretation" || existing.priority === "maintenance")
+      ) {
+        workItems.set(existing.work_id, {
+          ...existing,
+          status: "dropped",
+          updated_at: now,
+          dropped_reason: "preempted_by_user_direct",
+        });
+        lastPreemptedWorkId = existing.work_id;
+      }
+    }
+  }
   workItems.set(workId, item);
   return item;
 }
@@ -86,16 +106,30 @@ export function claimNextStandbyWorkItem(now = new Date().toISOString()): Standb
 
 export function completeStandbyWorkItem(
   workId: string,
-  status: "completed" | "cancelled" | "failed" = "completed",
+  status: "completed" | "cancelled" | "failed" | "dropped" = "completed",
   now = new Date().toISOString(),
+  droppedReason?: string | null,
 ): StandbyWorkItem | null {
   const existing = workItems.get(workId);
   if (!existing) return null;
-  const updated: StandbyWorkItem = { ...existing, status, updated_at: now };
+  const updated: StandbyWorkItem = { ...existing, status, updated_at: now, dropped_reason: droppedReason ?? existing.dropped_reason ?? null };
+  if (status === "dropped") lastPreemptedWorkId = workId;
   workItems.set(workId, updated);
   return updated;
 }
 
+export function getStandbyQueueMetrics(): StandbyQueueMetrics {
+  const items = Array.from(workItems.values());
+  return {
+    pending_count: items.filter((item: StandbyWorkItem) => item.status === "queued").length,
+    running_count: items.filter((item: StandbyWorkItem) => item.status === "running").length,
+    completed_count: items.filter((item: StandbyWorkItem) => item.status === "completed").length,
+    dropped_count: items.filter((item: StandbyWorkItem) => item.status === "dropped").length,
+    ...(lastPreemptedWorkId ? { last_preempted_work_id: lastPreemptedWorkId } : {}),
+  };
+}
+
 export function resetStandbyCognitionQueue(): void {
   workItems.clear();
+  lastPreemptedWorkId = undefined;
 }

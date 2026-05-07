@@ -1,6 +1,14 @@
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
+import { StandbyCalloutCard } from "@/components/helix/StandbyCalloutCard";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
-import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import {
+  useStandbyCalloutStore,
+  type StandbyCalloutState,
+} from "@/store/useStandbyCalloutStore";
+import {
+  useWorkstationLayoutStore,
+  type WorkstationLayoutState,
+} from "@/store/useWorkstationLayoutStore";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
 export function HelixAskDock({
@@ -16,7 +24,8 @@ export function HelixAskDock({
   onOpenPanel: (panelId: PanelDefinition["id"]) => void;
   onOpenConversation: (sessionId: string) => void;
 }) {
-  const toggleChatDock = useWorkstationLayoutStore((state) => state.toggleChatDock);
+  const toggleChatDock = useWorkstationLayoutStore((state: WorkstationLayoutState) => state.toggleChatDock);
+  const latestCallout = useStandbyCalloutStore((state: StandbyCalloutState) => state.proposals[0] ?? null);
   const isBottomPlacement = placement === "bottom";
 
   return (
@@ -44,15 +53,22 @@ export function HelixAskDock({
           </button>
         </div>
         {!collapsed ? (
-          <HelixAskPill
-            className="flex h-full min-h-0 w-full flex-col"
-            contextId={HELIX_ASK_CONTEXT_ID.desktop}
-            maxWidthClassName="max-w-none"
-            layoutVariant="dock"
-            onOpenPanel={onOpenPanel}
-            onOpenConversation={onOpenConversation}
-            placeholder="Ask Helix about this workspace"
-          />
+          <>
+            {latestCallout ? (
+              <div className={isBottomPlacement ? "mb-1" : "mb-2"}>
+                <StandbyCalloutCard proposal={latestCallout} />
+              </div>
+            ) : null}
+            <HelixAskPill
+              className="flex h-full min-h-0 w-full flex-col"
+              contextId={HELIX_ASK_CONTEXT_ID.desktop}
+              maxWidthClassName="max-w-none"
+              layoutVariant="dock"
+              onOpenPanel={onOpenPanel}
+              onOpenConversation={onOpenConversation}
+              placeholder="Ask Helix about this workspace"
+            />
+          </>
         ) : null}
       </div>
     </aside>

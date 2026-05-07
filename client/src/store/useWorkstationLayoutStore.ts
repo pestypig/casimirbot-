@@ -23,7 +23,7 @@ type WorkstationClosedPanelEntry = {
   closedAtMs: number;
 };
 
-type WorkstationLayoutState = {
+export type WorkstationLayoutState = {
   mode: WorkstationLayoutMode;
   chatDock: {
     side: WorkstationDockSide;

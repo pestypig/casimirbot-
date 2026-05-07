@@ -16,6 +16,10 @@ import type {
   HelixStandbyObservationAppendDecision,
   HelixStandbyObservationBatchReceipt,
 } from "@shared/helix-standby-observation-batch";
+import type {
+  StandbyCalloutDeliveryReceipt,
+  StandbyCalloutProposal,
+} from "@shared/helix-standby-callout";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -46,6 +50,10 @@ import {
   createSituationThreadBinding,
 } from "./thread-binding-store";
 import { resolveWorldEventThreadBinding } from "./thread-binding-resolver";
+import {
+  buildStandbyCalloutProposal,
+  deliverStandbyCalloutProposal,
+} from "./standby-callout-policy";
 import {
   recordWorldSourceSeen,
   resetWorldSourceRegistry,
@@ -140,6 +148,8 @@ export type WorldEventIngestResult = {
   append_decision?: HelixStandbyObservationAppendDecision;
   batch_receipt?: HelixStandbyObservationBatchReceipt | null;
   append_candidate?: WorldEventAppendCandidate | null;
+  callout_proposal?: StandbyCalloutProposal | null;
+  callout_delivery_receipt?: StandbyCalloutDeliveryReceipt | null;
 };
 
 export type WorldEventIngestBatchResult = {
@@ -723,7 +733,7 @@ export const ingestWorldEvent = async (
           session_id: options.sessionId ?? null,
           trace_id: options.traceId ?? null,
           mode: "standby_receipts",
-          append_policy: "all_receipts_debug",
+          append_policy: "salient_only",
         }).binding ?? null
       : null;
   const bindingResolution =
@@ -746,6 +756,40 @@ export const ingestWorldEvent = async (
           : resolvedBinding.append_policy === "salient_only" && salienceReceipt?.should_notify_helix !== true
             ? "not_salient"
             : null;
+  const calloutNowMs = Number.isFinite(Date.parse(signal.ts))
+    ? Date.parse(signal.ts)
+    : (options.now?.() ?? new Date()).getTime();
+  const calloutProposal =
+    salienceReceipt && resolvedBinding?.thread_id
+      ? buildStandbyCalloutProposal({
+          mode: "text_only",
+          voiceOutputGranted: false,
+          micListeningActive: false,
+          helixAskDockVisible: true,
+          priority: salienceReceipt.priority,
+          salienceReason: salienceReceipt.reason,
+          directAddressed: salienceReceipt.reason === "direct_address",
+          userBusy: false,
+          dedupeKey: salienceReceipt.dedupe_key,
+          nowMs: calloutNowMs,
+          roomId: event.room_id,
+          threadId: resolvedBinding.thread_id,
+          graphId,
+          episodeId: episodes.at(-1)?.episode_id ?? null,
+          salienceReceiptId: salienceReceipt.receipt_id,
+          text: salienceReceipt.summary,
+          evidenceRefs: salienceReceipt.evidence_refs,
+        })
+      : null;
+  const calloutDeliveryReceipt =
+    calloutProposal && calloutProposal.decision !== "suppress"
+      ? deliverStandbyCalloutProposal({
+          proposal: calloutProposal,
+          mode: "text_only",
+          voiceOutputGranted: false,
+          nowMs: calloutNowMs,
+        })
+      : null;
   const appendCandidate: WorldEventAppendCandidate | null =
     options.appendToThread === false || appendBlockedReason || !resolvedBinding
       ? null
@@ -767,14 +811,16 @@ export const ingestWorldEvent = async (
             goal_hypotheses: goalHypotheses,
             salience_receipt: salienceReceipt,
             interjection_proposal: interjectionProposal,
-          semantic_events: semanticEvents,
-          narration_receipts: narrationReceipt ? [narrationReceipt] : [],
-          predictions,
-          episodes,
-          episode_narrations: episodeNarrations,
-          episode_predictions: episodePredictions,
-          interjection_decision: interjectionDecision,
-        }),
+            callout_proposal: calloutProposal,
+            callout_delivery_receipt: calloutDeliveryReceipt,
+            semantic_events: semanticEvents,
+            narration_receipts: narrationReceipt ? [narrationReceipt] : [],
+            predictions,
+            episodes,
+            episode_narrations: episodeNarrations,
+            episode_predictions: episodePredictions,
+            interjection_decision: interjectionDecision,
+          }),
           salienceReason: salienceReceipt?.reason ?? null,
           saliencePriority: salienceReceipt?.priority ?? null,
           dedupeKey: salienceReceipt?.dedupe_key ?? null,
@@ -901,6 +947,8 @@ export const ingestWorldEvent = async (
     append_decision: appendDecision,
     batch_receipt: batchReceipt,
     append_candidate: appendCandidate,
+    callout_proposal: calloutProposal,
+    callout_delivery_receipt: calloutDeliveryReceipt,
   };
 };
 

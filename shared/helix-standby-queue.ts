@@ -45,6 +45,7 @@ export const HELIX_STANDBY_WORK_ITEM_SCHEMA =
 export type StandbyWorkPriority =
   | "user_direct"
   | "critical_salience"
+  | "standby_callout_delivery"
   | "standby_salience"
   | "standby_interpretation"
   | "maintenance";
@@ -53,6 +54,7 @@ export type StandbyWorkKind =
   | "episode_narration"
   | "goal_prediction"
   | "interjection_review"
+  | "standby_callout_delivery"
   | "state_compaction"
   | "thread_observation_append"
   | "user_request_context_refresh";
@@ -69,9 +71,18 @@ export type StandbyWorkItem = {
   salience_receipt_id?: string | null;
   evidence_refs: string[];
   payload: Record<string, unknown>;
-  status: "queued" | "running" | "completed" | "cancelled" | "failed";
+  status: "queued" | "running" | "completed" | "cancelled" | "failed" | "dropped";
   created_at: string;
   updated_at: string;
+  dropped_reason?: string | null;
+};
+
+export type StandbyQueueMetrics = {
+  pending_count: number;
+  running_count: number;
+  completed_count: number;
+  dropped_count: number;
+  last_preempted_work_id?: string;
 };
 
 export type StandbyCognitionMode =

@@ -27,6 +27,12 @@ export function buildDeterministicStandbyReasoningResult(args: {
       : "The episode is useful context but does not pass an interjection threshold.",
     evidence_refs: args.episode.evidence_refs,
     confidence: isRisk ? 0.82 : 0.62,
+    source: "deterministic_dictionary",
+    context_policy: "observation_only",
+    model_invoked: false,
+    user_visible: false,
+    safe_for_future_context: true,
+    deterministic: true,
   };
 }
 
@@ -46,9 +52,10 @@ export function appendVisibleStandbyReasoningTurn(args: {
     args.result ?? buildDeterministicStandbyReasoningResult({ workId: args.workId, episode: args.episode });
   const turnId = `standby_reasoning:${hashShort([args.threadId, args.workId, args.episode.episode_id], 16)}`;
   const observationItemId = `standby_reasoning_observation:${hashShort([turnId, "episode"], 12)}`;
-  const planItemId = `standby_reasoning_plan:${hashShort([turnId, "plan"], 12)}`;
-  const answerItemId = `standby_reasoning_result:${hashShort([turnId, "result"], 12)}`;
+  const assessmentItemId = `standby_reasoning_assessment:${hashShort([turnId, "assessment"], 12)}`;
+  const answerItemId = `standby_reasoning_callout:${hashShort([turnId, "callout"], 12)}`;
   const route = args.route ?? "/ask";
+  const mayWriteAnswer = result.model_invoked === true && result.user_visible === true;
 
   appendHelixThreadEvent({
     route,
@@ -63,6 +70,9 @@ export function appendVisibleStandbyReasoningTurn(args: {
       visibility: "standby_trace",
       work_id: args.workId,
       episode_id: args.episode.episode_id,
+      source: result.source,
+      model_invoked: result.model_invoked,
+      context_policy: result.context_policy,
     },
     ts,
   });
@@ -106,60 +116,84 @@ export function appendVisibleStandbyReasoningTurn(args: {
     turn_id: turnId,
     session_id: args.sessionId ?? null,
     trace_id: args.traceId ?? null,
-    item_id: planItemId,
-    item_type: "plan",
+    item_id: assessmentItemId,
+    item_type: "validation",
     item_status: "in_progress",
-    item_stream: "plan",
-    ts,
-  });
-  appendHelixThreadEvent({
-    route,
-    event_type: "item_completed",
-    thread_id: args.threadId,
-    turn_id: turnId,
-    session_id: args.sessionId ?? null,
-    trace_id: args.traceId ?? null,
-    item_id: planItemId,
-    item_type: "plan",
-    item_status: "completed",
-    item_stream: "plan",
-    delta_text: "Reviewing episode against current goals and interjection policy.",
-    ts,
-  });
-  appendHelixThreadEvent({
-    route,
-    event_type: "item_started",
-    thread_id: args.threadId,
-    turn_id: turnId,
-    session_id: args.sessionId ?? null,
-    trace_id: args.traceId ?? null,
-    item_id: answerItemId,
-    item_type: "answer",
-    item_status: "in_progress",
-    item_stream: "answer",
-    meta: { kind: "standby_reasoning_result", primary_user_visible: false },
-    ts,
-  });
-  appendHelixThreadEvent({
-    route,
-    event_type: "item_completed",
-    thread_id: args.threadId,
-    turn_id: turnId,
-    session_id: args.sessionId ?? null,
-    trace_id: args.traceId ?? null,
-    item_id: answerItemId,
-    item_type: "answer",
-    item_status: "completed",
-    item_stream: "answer",
-    assistant_text: result.summary,
-    observation_ref: result,
+    item_stream: "observation",
     meta: {
-      kind: "standby_reasoning_result",
-      decision: result.decision,
+      kind: "standby_reasoning_assessment",
+      source: result.source,
       primary_user_visible: false,
+      model_invoked: result.model_invoked,
+      context_policy: result.context_policy,
     },
     ts,
   });
+  appendHelixThreadEvent({
+    route,
+    event_type: "item_completed",
+    thread_id: args.threadId,
+    turn_id: turnId,
+    session_id: args.sessionId ?? null,
+    trace_id: args.traceId ?? null,
+    item_id: assessmentItemId,
+    item_type: "validation",
+    item_status: "completed",
+    item_stream: "observation",
+    observation_ref: result,
+    meta: {
+      kind: "standby_reasoning_assessment",
+      source: result.source,
+      primary_user_visible: false,
+      model_invoked: result.model_invoked,
+      context_policy: result.context_policy,
+      safe_for_future_context: result.safe_for_future_context,
+    },
+    ts,
+  });
+  if (mayWriteAnswer) {
+    appendHelixThreadEvent({
+      route,
+      event_type: "item_started",
+      thread_id: args.threadId,
+      turn_id: turnId,
+      session_id: args.sessionId ?? null,
+      trace_id: args.traceId ?? null,
+      item_id: answerItemId,
+      item_type: "answer",
+      item_status: "in_progress",
+      item_stream: "answer",
+      meta: {
+        kind: "standby_callout_answer",
+        primary_user_visible: true,
+        source: result.source,
+        model_invoked: result.model_invoked,
+      },
+      ts,
+    });
+    appendHelixThreadEvent({
+      route,
+      event_type: "item_completed",
+      thread_id: args.threadId,
+      turn_id: turnId,
+      session_id: args.sessionId ?? null,
+      trace_id: args.traceId ?? null,
+      item_id: answerItemId,
+      item_type: "answer",
+      item_status: "completed",
+      item_stream: "answer",
+      assistant_text: result.summary,
+      observation_ref: result,
+      meta: {
+        kind: "standby_callout_answer",
+        decision: result.decision,
+        primary_user_visible: true,
+        source: result.source,
+        model_invoked: result.model_invoked,
+      },
+      ts,
+    });
+  }
   appendHelixThreadEvent({
     route,
     event_type: "turn_completed",
@@ -172,8 +206,17 @@ export function appendVisibleStandbyReasoningTurn(args: {
       kind: "standby_reasoning",
       visibility: "standby_trace",
       decision: result.decision,
+      source: result.source,
+      model_invoked: result.model_invoked,
+      context_policy: result.context_policy,
     },
     ts,
   });
-  return { turn_id: turnId, result, item_ids: [observationItemId, planItemId, answerItemId] };
+  return {
+    turn_id: turnId,
+    result,
+    item_ids: mayWriteAnswer
+      ? [observationItemId, assessmentItemId, answerItemId]
+      : [observationItemId, assessmentItemId],
+  };
 }
