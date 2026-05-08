@@ -1,10 +1,6 @@
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
-import { StandbyCalloutCard } from "@/components/helix/StandbyCalloutCard";
+import { HelixStandbyActivityRail } from "@/components/helix/HelixStandbyActivityRail";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
-import {
-  useStandbyCalloutStore,
-  type StandbyCalloutState,
-} from "@/store/useStandbyCalloutStore";
 import {
   useWorkstationLayoutStore,
   type WorkstationLayoutState,
@@ -25,7 +21,6 @@ export function HelixAskDock({
   onOpenConversation: (sessionId: string) => void;
 }) {
   const toggleChatDock = useWorkstationLayoutStore((state: WorkstationLayoutState) => state.toggleChatDock);
-  const latestCallout = useStandbyCalloutStore((state: StandbyCalloutState) => state.proposals[0] ?? null);
   const isBottomPlacement = placement === "bottom";
 
   return (
@@ -54,11 +49,7 @@ export function HelixAskDock({
         </div>
         {!collapsed ? (
           <>
-            {latestCallout ? (
-              <div className={isBottomPlacement ? "mb-1" : "mb-2"}>
-                <StandbyCalloutCard proposal={latestCallout} />
-              </div>
-            ) : null}
+            <HelixStandbyActivityRail threadId="helix-ask:desktop" />
             <HelixAskPill
               className="flex h-full min-h-0 w-full flex-col"
               contextId={HELIX_ASK_CONTEXT_ID.desktop}

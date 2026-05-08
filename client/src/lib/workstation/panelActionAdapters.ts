@@ -109,6 +109,15 @@ function postSituationThreadBinding(body: Record<string, unknown>): void {
   }).catch(() => undefined);
 }
 
+function postSituationGoalSession(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/goal-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
 function normalizeSituationJobKind(value: unknown): SituationRoomJobKind | null {
   const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
   if (!text) return null;
@@ -1440,6 +1449,100 @@ export function executeHelixPanelAction(
           command_lane_enabled: false,
         },
         message: `Submitted standby receipt binding for ${room.title}.`,
+      };
+    }
+
+    if (actionId === "start_situation_goal_session") {
+      const room = resolveSituationRoom(args);
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const roomId = asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? "room:minecraft-minehut";
+      const sourceIdsFromRoom = room ? resolveSituationSourceIds(room, args) : [];
+      const sourceId =
+        asNonEmptyString(args.source_id ?? args.sourceId) ?? sourceIdsFromRoom[0] ?? "source:minecraft-server";
+      const sourceIds = Array.from(
+        new Set([
+          ...asStringArray(args.source_ids ?? args.sourceIds),
+          sourceId,
+        ].filter(Boolean)),
+      );
+      const worldId = asNonEmptyString(args.world_id ?? args.worldId) ?? "minecraft:minehut";
+      const existingGraphId = asNonEmptyString(args.graph_id ?? args.graphId) ?? graphState.active_graph_id_by_room[roomId];
+      const graphReceipt = existingGraphId
+        ? null
+        : graphState.createGraphFromRecipe({
+            recipe_id: "minecraft_world_monitor",
+            room_id: roomId,
+            source_ids: sourceIds,
+            bindings: {
+              room_id: roomId,
+              source_ids: sourceIds,
+              standby_mode: "high_salience",
+              world_id: worldId,
+            },
+            title: "Minecraft world monitor",
+          });
+      const graphId = existingGraphId ?? (graphReceipt?.ok ? graphReceipt.graph_id : null);
+      if (graphId) {
+        graphState.attachGraphToHelixAsk(graphId);
+      }
+      const appendPolicy =
+        asNonEmptyString(args.append_policy ?? args.appendPolicy) === "episodes_and_salience"
+          ? "episodes_and_salience"
+          : asNonEmptyString(args.append_policy ?? args.appendPolicy) === "callouts_only"
+            ? "callouts_only"
+            : "salient_only";
+      const standbyMode =
+        asNonEmptyString(args.standby_mode ?? args.standbyMode) === "voice_on_confirm"
+          ? "voice_on_confirm"
+          : asNonEmptyString(args.standby_mode ?? args.standbyMode) === "critical_voice"
+            ? "critical_voice"
+            : asNonEmptyString(args.standby_mode ?? args.standbyMode) === "direct_address_only"
+              ? "direct_address_only"
+              : asNonEmptyString(args.standby_mode ?? args.standbyMode) === "off"
+                ? "off"
+                : "text_only";
+      const bindingRequest = {
+        room_id: roomId,
+        source_id: sourceId,
+        graph_id: graphId,
+        world_id: worldId,
+        thread_id: threadId,
+        turn_id: asNonEmptyString(args.turn_id ?? args.turnId) ?? null,
+        session_id: asNonEmptyString(args.session_id ?? args.sessionId) ?? null,
+        trace_id: asNonEmptyString(args.trace_id ?? args.traceId) ?? null,
+        mode: "standby_receipts",
+        append_policy: "salient_only",
+      };
+      const sessionRequest = {
+        thread_id: threadId,
+        room_id: roomId,
+        source_ids: sourceIds,
+        graph_id: graphId,
+        world_id: worldId,
+        objective:
+          asNonEmptyString(args.objective) ??
+          "Monitor my Minecraft session and surface danger or meaningful progress.",
+        standby_mode: standbyMode,
+        append_policy: appendPolicy,
+      };
+      postSituationThreadBinding(bindingRequest);
+      postSituationGoalSession(sessionRequest);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_goal_session_receipt",
+          ok: true,
+          session_request: sessionRequest,
+          binding_request: bindingRequest,
+          graph_receipt: graphReceipt,
+          context_policy: "explicit_attachment_only",
+          command_lane_enabled: false,
+        },
+        message: `Started a visible situation goal session for ${worldId}.`,
       };
     }
   }

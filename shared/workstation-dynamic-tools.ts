@@ -118,6 +118,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.create_translation_pair",
   "situation-room-pipelines.attach_graph_to_helix_ask",
   "situation-room-pipelines.attach_standby_to_helix_thread",
+  "situation-room-pipelines.start_situation_goal_session",
 ]);
 
 export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
@@ -237,6 +238,14 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     action_id: "attach_standby_to_helix_thread",
     required_args: ["room_id", "thread_id"],
     optional_args: ["source_id", "graph_id", "world_id", "turn_id", "session_id", "trace_id", "append_policy"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "start_situation_goal_session",
+    required_args: ["thread_id"],
+    optional_args: ["room_id", "source_id", "world_id", "graph_id", "objective", "standby_mode", "append_policy"],
     risk: "medium",
     returns_artifact: true,
   },
@@ -513,6 +522,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "create_translation_pair") return "situation_room_graph";
   if (panelId === "situation-room-pipelines" && actionId === "attach_graph_to_helix_ask") return "situation_room_graph_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "attach_standby_to_helix_thread") return "situation_thread_binding_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "start_situation_goal_session") return "situation_goal_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
   if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {
