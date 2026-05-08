@@ -105,4 +105,60 @@ describe("helix ask Minecraft situation session routing", () => {
     expect(response.body?.pending_resolution_reason).toBe("pending_cleared_for_unrelated_conversation");
     expect(response.body?.pending_server_request).toBeNull();
   }, 60000);
+
+  it("treats Minecraft situation questions as direct Ask context, not session setup", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+
+    const { app } = await createApp();
+    const sessionId = `minecraft-direct-question-${Date.now()}`;
+    await request(app)
+      .post("/api/agi/situation/goal-session/start")
+      .send({
+        thread_id: sessionId,
+        room_id: "room:minecraft-minehut",
+        source_id: "source:minecraft-server",
+        world_id: "minecraft:minehut",
+        objective: "Monitor danger and progress.",
+        standby_mode: "text_only",
+        append_policy: "salient_only",
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is my current Minecraft situation and what should I watch next?",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "situation-room-pipelines",
+          hasSituationRoomContext: true,
+        },
+      })
+      .expect(200);
+
+    const actions = executedActions(response.body);
+    expect(
+      actions.some(
+        (action) =>
+          action?.panel_id === "situation-room-pipelines" &&
+          action?.action_id === "start_situation_goal_session",
+      ),
+    ).toBe(false);
+    expect(response.body?.situation_context_pack).toMatchObject({
+      schema: "helix.situation_context_pack.v1",
+      thread_id: sessionId,
+      mission_memory: {
+        schema: "helix.mission_memory.v1",
+        status: "active",
+      },
+      raw_audio_included: false,
+      raw_transcript_included: false,
+    });
+    expect(answerText(response.body)).not.toContain("Started a Minecraft Situation Goal Session action");
+  }, 60000);
 });

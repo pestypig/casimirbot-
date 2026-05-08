@@ -119,6 +119,15 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.attach_graph_to_helix_ask",
   "situation-room-pipelines.attach_standby_to_helix_thread",
   "situation-room-pipelines.start_situation_goal_session",
+  "situation-room-pipelines.mission_memory.refresh",
+  "situation-room-pipelines.interjection_investigator.review_latest",
+  "situation-room-pipelines.episode_timeline.summarize_window",
+  "situation-room-pipelines.goal_ledger.set_objective",
+  "situation-room-pipelines.goal_ledger.mark_complete",
+  "situation-room-pipelines.goal_ledger.mark_blocked",
+  "situation-room-pipelines.situation_context.attach_to_ask",
+  "situation-room-pipelines.callout_policy.set_mode",
+  "situation-room-pipelines.voice_delivery.confirm_speak",
 ]);
 
 export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
@@ -249,6 +258,28 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     risk: "medium",
     returns_artifact: true,
   },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "mission_memory.refresh",
+    required_args: ["thread_id"],
+    optional_args: ["room_id", "session_id"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "interjection_investigator.review_latest",
+    required_args: ["thread_id"],
+    optional_args: ["trigger", "room_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  { panel_id: "situation-room-pipelines", action_id: "episode_timeline.summarize_window", required_args: ["thread_id"], optional_args: ["room_id", "window_ms"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "goal_ledger.set_objective", required_args: ["thread_id", "objective"], optional_args: ["room_id"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "goal_ledger.mark_complete", required_args: ["thread_id", "goal"], optional_args: ["room_id"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "goal_ledger.mark_blocked", required_args: ["thread_id", "goal"], optional_args: ["room_id", "reason"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "situation_context.attach_to_ask", required_args: ["thread_id"], optional_args: ["room_id", "session_id"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "callout_policy.set_mode", required_args: ["thread_id", "mode"], optional_args: ["room_id"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "voice_delivery.confirm_speak", required_args: ["thread_id"], optional_args: ["proposal_id", "delivery_id"], risk: "medium", returns_artifact: true },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
@@ -523,6 +554,13 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "attach_graph_to_helix_ask") return "situation_room_graph_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "attach_standby_to_helix_thread") return "situation_thread_binding_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "start_situation_goal_session") return "situation_goal_session_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "mission_memory.refresh") return "mission_memory_update";
+  if (panelId === "situation-room-pipelines" && actionId === "interjection_investigator.review_latest") return "interjection_decision";
+  if (panelId === "situation-room-pipelines" && actionId === "situation_context.attach_to_ask") return "situation_context_pack";
+  if (panelId === "situation-room-pipelines" && actionId.startsWith("goal_ledger.")) return "situation_goal_ledger_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "episode_timeline.summarize_window") return "situation_episode_summary";
+  if (panelId === "situation-room-pipelines" && actionId === "callout_policy.set_mode") return "standby_callout_policy_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.confirm_speak") return "standby_callout_delivery_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
   if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {

@@ -118,6 +118,24 @@ function postSituationGoalSession(body: Record<string, unknown>): void {
   }).catch(() => undefined);
 }
 
+function postSituationMissionMemoryRefresh(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/mission-memory/refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
+function postInterjectionInvestigation(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/interjection-investigator/review-latest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
 function normalizeSituationJobKind(value: unknown): SituationRoomJobKind | null {
   const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
   if (!text) return null;
@@ -1543,6 +1561,88 @@ export function executeHelixPanelAction(
           command_lane_enabled: false,
         },
         message: `Started a visible situation goal session for ${worldId}.`,
+      };
+    }
+
+    if (actionId === "mission_memory.refresh") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const body = {
+        thread_id: threadId,
+        room_id: asNonEmptyString(args.room_id ?? args.roomId) ?? null,
+        session_id: asNonEmptyString(args.session_id ?? args.sessionId) ?? null,
+      };
+      postSituationMissionMemoryRefresh(body);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "mission_memory_update",
+          ok: true,
+          request: body,
+          deterministic: true,
+          model_invoked: false,
+          context_policy: "compact_context_only",
+        },
+        message: "Requested a compact mission memory refresh.",
+      };
+    }
+
+    if (actionId === "interjection_investigator.review_latest") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const body = {
+        thread_id: threadId,
+        trigger: asNonEmptyString(args.trigger) ?? "manual_review",
+        room_id: asNonEmptyString(args.room_id ?? args.roomId) ?? null,
+        session_id: asNonEmptyString(args.session_id ?? args.sessionId) ?? null,
+      };
+      postInterjectionInvestigation(body);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "interjection_decision",
+          ok: true,
+          request: body,
+          deterministic_gate: true,
+          model_invoked: false,
+          allowed_outputs: ["silent_keep_in_context", "show_text", "voice_on_confirm", "request_user_input"],
+        },
+        message: "Requested deterministic interjection review for the latest mission state.",
+      };
+    }
+
+    if (
+      actionId === "episode_timeline.summarize_window" ||
+      actionId === "situation_context.attach_to_ask" ||
+      actionId.startsWith("goal_ledger.") ||
+      actionId === "callout_policy.set_mode" ||
+      actionId === "voice_delivery.confirm_speak"
+    ) {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind:
+            actionId === "episode_timeline.summarize_window"
+              ? "situation_episode_summary"
+              : actionId === "situation_context.attach_to_ask"
+                ? "situation_context_pack"
+                : actionId.startsWith("goal_ledger.")
+                  ? "situation_goal_ledger_receipt"
+                  : actionId === "callout_policy.set_mode"
+                    ? "standby_callout_policy_receipt"
+                    : "standby_callout_delivery_receipt",
+          ok: true,
+          thread_id: threadId,
+          request: args,
+          command_lane_enabled: false,
+          minecraft_actions_enabled: false,
+        },
+        message: `Recorded ${actionId} as a bounded Situation Room tool request.`,
       };
     }
   }

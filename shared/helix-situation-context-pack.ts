@@ -7,6 +7,7 @@ export type SituationContextPack = {
   thread_id: string;
   room_id: string;
   session_id?: string | null;
+  mission_memory?: import("./helix-mission-memory").HelixMissionMemory | null;
   objective?: string | null;
   current_goal?: string | null;
   latest_projection?: Record<string, unknown> | null;
