@@ -11,6 +11,7 @@ import {
 } from "./situation-goal-session-store";
 import { getMissionMemoryForThread } from "./mission-memory-reducer";
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
+import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
 
 const hashShort = (value: unknown, size = 14): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -42,6 +43,7 @@ export function buildSituationContextPack(args: {
   const ledger = sessionId ? getSituationGoalSessionLedger(sessionId) : null;
   const missionMemory = getMissionMemoryForThread({ threadId: args.threadId }).memory ?? null;
   const liveArtifact = getActiveLiveSituationArtifactForThread(args.threadId);
+  const liveAnswerEnvironment = getActiveLiveAnswerEnvironmentForThread(args.threadId);
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -71,6 +73,16 @@ export function buildSituationContextPack(args: {
           current_state_lines: liveArtifact.current_state_lines,
           subgoals: liveArtifact.subgoals,
           latest_evaluation: liveArtifact.latest_evaluation ?? null,
+        }
+      : null,
+    live_answer_environment: liveAnswerEnvironment
+      ? {
+          environment_id: liveAnswerEnvironment.environment_id,
+          objective: liveAnswerEnvironment.objective,
+          lines: liveAnswerEnvironment.lines,
+          latest_summary: liveAnswerEnvironment.latest_summary,
+          evidence_refs: liveAnswerEnvironment.evidence_refs,
+          updated_at: liveAnswerEnvironment.updated_at,
         }
       : null,
     objective: activeSession?.objective ?? ledger?.objective ?? null,

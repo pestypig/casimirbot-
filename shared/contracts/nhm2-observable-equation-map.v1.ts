@@ -1,3 +1,5 @@
+import { validateNhm2ComputableForm, type Nhm2ComputableForm } from "./nhm2-equation-visualizer.v1.js";
+
 export const NHM2_OBSERVABLE_EQUATION_MAP_ARTIFACT_ID = "nhm2_observable_equation_map" as const;
 export const NHM2_OBSERVABLE_EQUATION_MAP_SCHEMA_VERSION = "v1" as const;
 
@@ -107,6 +109,7 @@ export interface Nhm2EquationNode {
       | "svg_table"
       | "katex_equation_panel";
   }>;
+  computableForms?: Nhm2ComputableForm[];
   status: Nhm2EquationStatus;
   blockerRefs: Array<{
     blockerId: string;
@@ -267,6 +270,10 @@ export function validateNhm2ObservableEquationMap(value: unknown): string[] {
         }
       }
       if (!Array.isArray(node.literatureRefs)) issues.push(`node ${node.id} literatureRefs must be an array`);
+      for (const form of node.computableForms ?? []) {
+        issues.push(...validateNhm2ComputableForm(form).map((issue) => `node ${node.id}: ${issue}`));
+        if (form.nodeId !== node.id) issues.push(`node ${node.id} has computableForm ${form.id} with mismatched nodeId`);
+      }
       if (!Array.isArray(node.forbiddenClaims) || node.forbiddenClaims.length === 0) issues.push(`node ${node.id} must include forbiddenClaims`);
       if (node.claimBoundary?.doesValidateNHM2 !== false) issues.push(`node ${node.id} doesValidateNHM2 must remain false`);
       if (node.claimBoundary?.maySupportContextOnly !== true) issues.push(`node ${node.id} maySupportContextOnly must be true`);

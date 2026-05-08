@@ -24,6 +24,10 @@ import type {
   LiveSituationArtifact,
   LiveSituationArtifactDelta,
 } from "@shared/helix-live-situation-artifact";
+import type {
+  LiveAnswerEnvironment,
+  LiveAnswerEnvironmentDelta,
+} from "@shared/helix-live-answer-environment";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -76,6 +80,8 @@ import {
   updateLiveSituationArtifact,
   upsertLiveSituationSubgoal,
 } from "./live-situation-artifact-store";
+import { getActiveLiveAnswerEnvironmentForRoom } from "./live-answer-environment-store";
+import { reduceLiveAnswerEnvironmentFromWorldEvent } from "./live-answer-line-reducer";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -162,6 +168,8 @@ export type WorldEventIngestResult = {
   callout_delivery_receipt?: StandbyCalloutDeliveryReceipt | null;
   live_situation_artifact?: LiveSituationArtifact | null;
   live_situation_artifact_delta?: LiveSituationArtifactDelta | null;
+  live_answer_environment?: LiveAnswerEnvironment | null;
+  live_answer_environment_delta?: LiveAnswerEnvironmentDelta | null;
 };
 
 export type WorldEventIngestBatchResult = {
@@ -962,6 +970,10 @@ export const ingestWorldEvent = async (
     resolvedBinding && options.appendToThread !== false
       ? getActiveLiveSituationArtifactForRoom(resolvedBinding.room_id)
       : null;
+  const liveAnswerEnvironmentBeforeUpdate =
+    resolvedBinding && options.appendToThread !== false
+      ? getActiveLiveAnswerEnvironmentForRoom(resolvedBinding.room_id)
+      : null;
   const liveArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId
       ? buildLiveSituationUpdate({
@@ -975,8 +987,20 @@ export const ingestWorldEvent = async (
           ts: signal.ts,
         })
       : null;
+  const liveAnswerEnvironmentUpdate =
+    liveAnswerEnvironmentBeforeUpdate && standbyTurnId
+      ? reduceLiveAnswerEnvironmentFromWorldEvent({
+          environment: liveAnswerEnvironmentBeforeUpdate,
+          event,
+          signal,
+          salienceReceipt,
+          episodes,
+          goalHypotheses,
+          now: signal.ts,
+        })
+      : null;
   const batchReceipt =
-    (appendCandidate || liveArtifactUpdate) && resolvedBinding && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
           threadId: resolvedBinding.thread_id,
           turnId: standbyTurnId,
@@ -1024,8 +1048,39 @@ export const ingestWorldEvent = async (
                     safe_for_future_context: true,
                   } as Record<string, unknown>,
                 },
+                ...(liveAnswerEnvironmentUpdate
+                  ? [
+                      {
+                        itemId: `live_answer_environment_delta:${hashShort([liveAnswerEnvironmentUpdate.delta.delta_id], 14)}`,
+                        itemType: "validation" as const,
+                        kind: "live_answer_environment_delta",
+                        observationRef: {
+                          ...liveAnswerEnvironmentUpdate.delta,
+                          provenance: "deterministic_world_reduction",
+                          model_invoked: false,
+                          context_role: "observation_not_assistant_answer",
+                          safe_for_future_context: true,
+                        } as Record<string, unknown>,
+                      },
+                    ]
+                  : []),
               ]
-            : [],
+            : liveAnswerEnvironmentUpdate
+              ? [
+                  {
+                    itemId: `live_answer_environment_delta:${hashShort([liveAnswerEnvironmentUpdate.delta.delta_id], 14)}`,
+                    itemType: "validation" as const,
+                    kind: "live_answer_environment_delta",
+                    observationRef: {
+                      ...liveAnswerEnvironmentUpdate.delta,
+                      provenance: "deterministic_world_reduction",
+                      model_invoked: false,
+                      context_role: "observation_not_assistant_answer",
+                      safe_for_future_context: true,
+                    } as Record<string, unknown>,
+                  },
+                ]
+              : [],
         })
       : null;
   const batchDecision = batchReceipt?.decisions[0] ?? null;
@@ -1129,6 +1184,8 @@ export const ingestWorldEvent = async (
     callout_delivery_receipt: calloutDeliveryReceipt,
     live_situation_artifact: liveArtifactUpdate?.artifact ?? liveArtifactBeforeUpdate ?? null,
     live_situation_artifact_delta: liveArtifactUpdate?.delta ?? null,
+    live_answer_environment: liveAnswerEnvironmentUpdate?.environment ?? liveAnswerEnvironmentBeforeUpdate ?? null,
+    live_answer_environment_delta: liveAnswerEnvironmentUpdate?.delta ?? null,
   };
 };
 

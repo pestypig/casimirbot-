@@ -119,6 +119,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.attach_graph_to_helix_ask",
   "situation-room-pipelines.attach_standby_to_helix_thread",
   "situation-room-pipelines.start_situation_goal_session",
+  "situation-room-pipelines.create_live_answer_environment",
   "situation-room-pipelines.mission_memory.refresh",
   "situation-room-pipelines.interjection_investigator.review_latest",
   "situation-room-pipelines.episode_timeline.summarize_window",
@@ -255,6 +256,14 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     action_id: "start_situation_goal_session",
     required_args: ["thread_id"],
     optional_args: ["room_id", "source_id", "world_id", "graph_id", "objective", "mode", "standby_mode", "append_policy"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "create_live_answer_environment",
+    required_args: ["objective"],
+    optional_args: ["thread_id", "room_id", "source_ids", "graph_id", "preset", "line_schema", "mode"],
     risk: "medium",
     returns_artifact: true,
   },
@@ -554,6 +563,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "attach_graph_to_helix_ask") return "situation_room_graph_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "attach_standby_to_helix_thread") return "situation_thread_binding_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "start_situation_goal_session") return "situation_goal_session_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "create_live_answer_environment") return "live_answer_environment_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "mission_memory.refresh") return "mission_memory_update";
   if (panelId === "situation-room-pipelines" && actionId === "interjection_investigator.review_latest") return "interjection_decision";
   if (panelId === "situation-room-pipelines" && actionId === "situation_context.attach_to_ask") return "situation_context_pack";

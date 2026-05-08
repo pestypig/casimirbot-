@@ -15,6 +15,14 @@ export type SituationContextPack = {
     subgoals: import("./helix-live-situation-artifact").LiveSituationSubgoal[];
     latest_evaluation?: import("./helix-live-situation-artifact").LiveSituationEvaluation | null;
   } | null;
+  live_answer_environment?: {
+    environment_id: string;
+    objective: string;
+    lines: import("./helix-live-answer-environment").LiveAnswerLineState[];
+    latest_summary: string;
+    evidence_refs: string[];
+    updated_at: string;
+  } | null;
   objective?: string | null;
   current_goal?: string | null;
   latest_projection?: Record<string, unknown> | null;

@@ -1,0 +1,67 @@
+import type {
+  LiveAnswerEnvironmentPreset,
+  LiveAnswerLineDefinition,
+} from "@shared/helix-live-answer-environment";
+
+const has = (transcript: string, pattern: RegExp): boolean => pattern.test(transcript);
+
+export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  if (/\blive\s+answer\s+environment\b/.test(normalized)) return true;
+  if (/\bcreate\s+(?:a\s+)?live\b/.test(normalized) && /\b(?:environment|monitor|tracker|readout|artifact)\b/.test(normalized)) return true;
+  if (/\btrack\s+this\s+video\b/.test(normalized)) return true;
+  if (/\bfollow\s+this\s+research\s+session\b/.test(normalized)) return true;
+  if (/\bwatch\s+my\s+minecraft\s+run\b/.test(normalized)) return true;
+  if (/\bcreate\s+(?:a\s+)?live\s+.*\b(?:discord|minecraft|video|research)\b/.test(normalized)) return true;
+  return false;
+}
+
+export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswerEnvironmentPreset {
+  const normalized = transcript.trim().toLowerCase();
+  if (has(normalized, /\bdiscord|call|speaker|interpreter|translation\b/)) return "discord_interpreter";
+  if (has(normalized, /\bvideo|claim|evidence|contradiction|segment\b/)) return "browser_video_tracker";
+  if (has(normalized, /\bresearch|hypothesis|caveat|computation|paper\b/)) return "research_session";
+  if (has(normalized, /\bminecraft|minehut|mine\s*hut|game|run\b/)) return "minecraft_run_monitor";
+  return "custom";
+}
+
+export function inferLiveAnswerEnvironmentSourceArgs(transcript: string): {
+  room_id?: string;
+  source_ids?: string[];
+  graph_id?: string;
+} {
+  const preset = inferLiveAnswerEnvironmentPreset(transcript);
+  if (preset === "minecraft_run_monitor") {
+    return {
+      room_id: "room:minecraft-minehut",
+      source_ids: ["source:minecraft-server"],
+    };
+  }
+  return {};
+}
+
+export function buildLiveAnswerEnvironmentArgs(args: {
+  transcript: string;
+  sessionId?: string | null;
+  line_schema?: LiveAnswerLineDefinition[] | null;
+}): Record<string, unknown> {
+  const normalized = args.transcript.trim().toLowerCase();
+  const preset = inferLiveAnswerEnvironmentPreset(normalized);
+  const mode =
+    /\bcritical\s+voice\b/.test(normalized)
+      ? "critical_voice"
+      : /\bvoice\s+on\s+confirm|confirm\s+(?:before\s+)?(?:voice|speaking|speak)\b/.test(normalized)
+        ? "voice_on_confirm"
+        : /\bdirect\s+address(?:\s+only)?\b/.test(normalized)
+          ? "direct_address_only"
+          : "text_only";
+  return {
+    thread_id: "helix-ask:desktop",
+    objective: args.transcript.trim(),
+    preset,
+    mode,
+    ...inferLiveAnswerEnvironmentSourceArgs(args.transcript),
+    ...(args.line_schema ? { line_schema: args.line_schema } : {}),
+  };
+}

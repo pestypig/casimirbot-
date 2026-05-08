@@ -118,6 +118,15 @@ function postSituationGoalSession(body: Record<string, unknown>): void {
   }).catch(() => undefined);
 }
 
+function postLiveAnswerEnvironment(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/live-answer-environment/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
 function postSituationMissionMemoryRefresh(body: Record<string, unknown>): void {
   if (typeof fetch !== "function") return;
   void fetch("/api/agi/situation/mission-memory/refresh", {
@@ -1561,6 +1570,49 @@ export function executeHelixPanelAction(
           command_lane_enabled: false,
         },
         message: `Started a visible situation goal session for ${worldId}.`,
+      };
+    }
+
+    if (actionId === "create_live_answer_environment") {
+      const room = resolveSituationRoom(args);
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const objective =
+        asNonEmptyString(args.objective) ??
+        "Create a live answer environment for this source.";
+      const roomId = asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? undefined;
+      const sourceIds = Array.from(
+        new Set([
+          ...asStringArray(args.source_ids ?? args.sourceIds),
+          ...asStringArray(args.source_id ?? args.sourceId),
+          ...(room ? resolveSituationSourceIds(room, args) : []),
+        ].filter(Boolean)),
+      );
+      const request = {
+        thread_id: threadId,
+        objective,
+        room_id: roomId,
+        source_ids: sourceIds,
+        graph_id: asNonEmptyString(args.graph_id ?? args.graphId) ?? undefined,
+        preset: asNonEmptyString(args.preset) ?? "custom",
+        line_schema: Array.isArray(args.line_schema) ? args.line_schema : undefined,
+        mode: asNonEmptyString(args.mode) ?? "text_only",
+      };
+      postLiveAnswerEnvironment(request);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "live_answer_environment_receipt",
+          ok: true,
+          request,
+          context_policy: "compact_context_pack_only",
+          deterministic_content_role: "observation_not_assistant_answer",
+          command_lane_enabled: false,
+        },
+        message: `Created a live answer environment for ${objective}.`,
       };
     }
 

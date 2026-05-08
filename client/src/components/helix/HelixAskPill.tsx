@@ -154,14 +154,22 @@ import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
 import type { LiveSituationArtifact } from "@shared/helix-live-situation-artifact";
+import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
 import { DEFAULT_MINECRAFT_STANDBY_VOICE_POLICY } from "@shared/helix-standby-voice-policy";
 import { LiveSituationArtifactCard } from "@/components/helix/LiveSituationArtifactCard";
+import { LiveAnswerEnvironmentCard } from "@/components/helix/LiveAnswerEnvironmentCard";
 import {
   selectActiveLiveSituationArtifact,
   selectLiveSituationDeltas,
   useLiveSituationArtifactStore,
   type LiveSituationArtifactState,
 } from "@/store/useLiveSituationArtifactStore";
+import {
+  selectActiveLiveAnswerEnvironment,
+  selectLiveAnswerEnvironmentDeltas,
+  useLiveAnswerEnvironmentStore,
+  type LiveAnswerEnvironmentState,
+} from "@/store/useLiveAnswerEnvironmentStore";
 import { useStandbyVoiceDeliveryStore } from "@/store/useStandbyVoiceDeliveryStore";
 import { deliverStandbyVoiceCallout } from "@/lib/helix/standbyVoiceDelivery";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
@@ -304,6 +312,79 @@ function HelixAskLiveSituationProjection({
           setVoiceError(error instanceof Error ? error.message : "standby_voice_delivery_failed");
         }
       }}
+    />
+  );
+}
+
+function HelixAskLiveAnswerEnvironmentProjection({
+  threadId,
+  initialEnvironment,
+  onAskHelix,
+  onOpenSituation,
+}: {
+  threadId: string;
+  initialEnvironment?: LiveAnswerEnvironment | null;
+  onAskHelix?: (prompt: string) => void;
+  onOpenSituation?: () => void;
+}) {
+  const upsertReadResponse = useLiveAnswerEnvironmentStore(
+    (state: LiveAnswerEnvironmentState) => state.upsertReadResponse,
+  );
+  const loadEnvironment = useLiveAnswerEnvironmentStore(
+    (state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment,
+  );
+  const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
+    selectActiveLiveAnswerEnvironment(state, threadId),
+  );
+  const renderedEnvironment = environment ?? initialEnvironment ?? null;
+  const deltas = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
+    selectLiveAnswerEnvironmentDeltas(state, renderedEnvironment?.environment_id),
+  );
+  const diagnostics = useLiveAnswerEnvironmentStore(
+    (state: LiveAnswerEnvironmentState) => state.diagnosticsByThread[threadId] ?? null,
+  );
+
+  useEffect(() => {
+    if (!initialEnvironment) return;
+    upsertReadResponse(threadId, {
+      ok: true,
+      environment: initialEnvironment,
+      deltas: [],
+      debug: {
+        thread_id: threadId,
+        environment_id: initialEnvironment.environment_id,
+        delta_count: 0,
+        last_delta_id: null,
+        last_next_hash: null,
+        raw_transcript_included: false,
+        raw_audio_included: false,
+        deterministic_content_role: "observation_not_assistant_answer",
+      },
+    });
+  }, [initialEnvironment, threadId, upsertReadResponse]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      if (!cancelled) void loadEnvironment(threadId, 30);
+    };
+    load();
+    const interval = window.setInterval(load, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [loadEnvironment, threadId]);
+
+  if (!renderedEnvironment) return null;
+
+  return (
+    <LiveAnswerEnvironmentCard
+      environment={renderedEnvironment}
+      deltas={deltas}
+      stale={diagnostics?.stale === true}
+      onAskHelix={onAskHelix}
+      onOpenSituation={onOpenSituation}
     />
   );
 }
@@ -5418,6 +5499,7 @@ type HelixAskReply = {
   contextCapsule?: ContextCapsuleSummary;
   situationContextPack?: SituationContextPack | null;
   liveSituationArtifact?: LiveSituationArtifact | null;
+  liveAnswerEnvironment?: LiveAnswerEnvironment | null;
   mode?: "read" | "observe" | "act" | "verify";
   proof?: {
     verdict?: "PASS" | "FAIL";
@@ -19557,6 +19639,7 @@ export function HelixAskPill({
                   contextCapsule: response.context_capsule,
                   situationContextPack: response.situation_context_pack ?? null,
                   liveSituationArtifact: response.live_situation_artifact ?? null,
+                  liveAnswerEnvironment: response.live_answer_environment ?? null,
                   sources:
                     responseDebugWithClientMode?.context_files ??
                     responseDebugWithClientMode?.prompt_context_files ??
@@ -24070,6 +24153,7 @@ export function HelixAskPill({
                 contextCapsule: responseContextCapsule,
                 situationContextPack: responseSituationContextPack ?? null,
                 liveSituationArtifact: null,
+                liveAnswerEnvironment: null,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
@@ -25213,6 +25297,7 @@ export function HelixAskPill({
                   contextCapsule: responseContextCapsule,
                   situationContextPack: responseSituationContextPack ?? null,
                   liveSituationArtifact: localResponseForTerminal?.live_situation_artifact ?? null,
+                  liveAnswerEnvironment: localResponseForTerminal?.live_answer_environment ?? null,
                   sources:
                     responseDebugPayload?.context_files ??
                     responseDebugPayload?.prompt_context_files ??
@@ -27434,8 +27519,11 @@ export function HelixAskPill({
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
             const liveSituationArtifact =
               reply.liveSituationArtifact ?? reply.situationContextPack?.live_situation_artifact ?? null;
+            const liveAnswerEnvironment =
+              reply.liveAnswerEnvironment ?? reply.situationContextPack?.live_answer_environment ?? null;
             const liveSituationThreadId =
               liveSituationArtifact?.thread_id ??
+              liveAnswerEnvironment?.thread_id ??
               reply.situationContextPack?.thread_id ??
               "helix-ask:desktop";
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
@@ -27530,8 +27618,18 @@ export function HelixAskPill({
             const shouldRenderLiveSituationProjection =
               Boolean(liveSituationArtifact) ||
               (isLatestReply &&
+                !liveAnswerEnvironment &&
+                !/\b(?:live answer environment|watch my minecraft run|track this video|follow this research session)\b/i.test(
+                  `${reply.question ?? ""}\n${reply.content ?? ""}`,
+                ) &&
                 /\b(?:minecraft|minehut)\b/i.test(`${reply.question ?? ""}\n${reply.content ?? ""}`) &&
                 /\b(?:situation|watch|danger|progress|monitor|goal session)\b/i.test(
+                  `${reply.question ?? ""}\n${reply.content ?? ""}`,
+                ));
+            const shouldRenderLiveAnswerEnvironmentProjection =
+              Boolean(liveAnswerEnvironment) ||
+              (isLatestReply &&
+                /\b(?:live answer environment|track this video|follow this research session|watch my minecraft run|claims?|evidence|contradictions?)\b/i.test(
                   `${reply.question ?? ""}\n${reply.content ?? ""}`,
                 ));
             const historySummary = clipText(
@@ -27577,6 +27675,14 @@ export function HelixAskPill({
                   <HelixAskLiveSituationProjection
                     threadId={liveSituationThreadId}
                     initialArtifact={liveSituationArtifact}
+                    onAskHelix={(prompt) => syncAskDraftValue(prompt, { focus: true, forceMoodHint: true })}
+                    onOpenSituation={() => openPanelById("situation-room-pipelines")}
+                  />
+                ) : null}
+                {shouldRenderLiveAnswerEnvironmentProjection ? (
+                  <HelixAskLiveAnswerEnvironmentProjection
+                    threadId={liveSituationThreadId}
+                    initialEnvironment={liveAnswerEnvironment}
                     onAskHelix={(prompt) => syncAskDraftValue(prompt, { focus: true, forceMoodHint: true })}
                     onOpenSituation={() => openPanelById("situation-room-pipelines")}
                   />

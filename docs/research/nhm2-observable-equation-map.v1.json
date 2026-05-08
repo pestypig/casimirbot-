@@ -5,7 +5,7 @@
   "sourceWhitepaperRefs": [
     {
       "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-      "sha256": "47a4dde7e1e309f83c629803bfe4f3ac8d90b0cbbd5b28de141d4b8a36752212",
+      "sha256": "832ff05bd2ab5d8a6bf695dab2a6047685d2a3fd680f2c3c135374ac86dc83b5",
       "role": "status_whitepaper"
     },
     {
@@ -61,6 +61,71 @@
           "allowedRenderer": "vega_lite"
         }
       ],
+      "computableForms": [
+        {
+          "id": "alpha_centerline_profile_form",
+          "nodeId": "alpha_lapse",
+          "operatorKind": "field_sample",
+          "displayLatex": "\\alpha(x_{\\rm centerline})",
+          "inputs": [
+            {
+              "name": "alpha",
+              "symbol": "alpha",
+              "meaning": "lapse samples from the metric brick",
+              "source": "repo_artifact",
+              "units": "repo_normalized",
+              "artifactBinding": {
+                "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+                "fieldName": "alpha",
+                "sha256Required": true
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "alpha",
+              "symbol": "alpha",
+              "meaning": "repo-normalized centerline lapse sample",
+              "units": "repo_normalized"
+            }
+          ],
+          "allowedGraphModes": ["centerline_profile"],
+          "defaultAxisTemplates": [
+            {
+              "id": "centerline_alpha",
+              "graphMode": "centerline_profile",
+              "x": {
+                "variable": "s",
+                "label": "centerline sample",
+                "units": "dimensionless_diagnostic"
+              },
+              "y": {
+                "output": "alpha",
+                "label": "alpha",
+                "units": "repo_normalized"
+              },
+              "regionBands": true,
+              "captionTemplate": "3+1 observable: lapse field alpha sampled along the NHM2 centerline.",
+              "uncertaintyTemplate": "Values are repo-normalized diagnostic samples; proper-time interpretation depends on the declared observer assumptions."
+            }
+          ],
+          "domainPolicy": {
+            "finiteOnly": true,
+            "maxSamples": 256,
+            "allowComplex": false,
+            "allowUnits": false,
+            "allowUnknownUnits": false
+          },
+          "claimBoundary": {
+            "doesValidateNHM2": false,
+            "diagnosticOnly": true,
+            "validationClaimAllowed": false,
+            "physicalMechanismClaimAllowed": false,
+            "promotionAllowed": false
+          }
+        }
+      ],
       "status": "computed",
       "blockerRefs": [
         {
@@ -112,6 +177,77 @@
           "purpose": "Show beta_x and |beta| with independent dynamic ranges.",
           "requiredAxesOrEncodings": ["x sample", "z sample", "signed beta_x", "|beta| magnitude"],
           "allowedRenderer": "vega_lite"
+        }
+      ],
+      "computableForms": [
+        {
+          "id": "beta_shift_centerline_profile_form",
+          "nodeId": "beta_shift",
+          "operatorKind": "field_sample",
+          "displayLatex": "\\beta_x(x_{\\rm centerline}),\\ |\\beta|(x_{\\rm centerline})",
+          "inputs": [
+            {
+              "name": "beta_x",
+              "symbol": "beta_x",
+              "meaning": "x component of shift from the metric brick",
+              "source": "repo_artifact",
+              "units": "repo_normalized",
+              "artifactBinding": {
+                "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+                "fieldName": "beta_x",
+                "sha256Required": true
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "beta_x",
+              "symbol": "beta_x",
+              "meaning": "repo-normalized centerline shift component",
+              "units": "repo_normalized"
+            },
+            {
+              "name": "beta_magnitude",
+              "symbol": "|beta|",
+              "meaning": "repo-normalized shift magnitude",
+              "units": "repo_normalized"
+            }
+          ],
+          "allowedGraphModes": ["centerline_profile"],
+          "defaultAxisTemplates": [
+            {
+              "id": "centerline_beta",
+              "graphMode": "centerline_profile",
+              "x": {
+                "variable": "s",
+                "label": "centerline sample",
+                "units": "dimensionless_diagnostic"
+              },
+              "y": {
+                "output": "value",
+                "label": "shift diagnostic",
+                "units": "repo_normalized"
+              },
+              "regionBands": true,
+              "captionTemplate": "3+1 observable: shift component and magnitude along the NHM2 centerline.",
+              "uncertaintyTemplate": "Shift is a chart-dependent descriptor, not a direct speed claim."
+            }
+          ],
+          "domainPolicy": {
+            "finiteOnly": true,
+            "maxSamples": 512,
+            "allowComplex": false,
+            "allowUnits": false,
+            "allowUnknownUnits": false
+          },
+          "claimBoundary": {
+            "doesValidateNHM2": false,
+            "diagnosticOnly": true,
+            "validationClaimAllowed": false,
+            "physicalMechanismClaimAllowed": false,
+            "promotionAllowed": false
+          }
         }
       ],
       "status": "computed",
@@ -529,6 +665,104 @@
           "allowedRenderer": "svg_table"
         }
       ],
+      "computableForms": [
+        {
+          "id": "casimir_gap_energy_sweep_form",
+          "nodeId": "casimir_tile_layout",
+          "operatorKind": "scalar_expression",
+          "expressionSyntax": "mathjs",
+          "expression": "-(pi^2 * hbar * c * A) / (720 * a^3)",
+          "displayLatex": "E_{\\rm tile}=-\\frac{\\pi^2\\hbar c}{720a^3}A",
+          "inputs": [
+            {
+              "name": "a",
+              "symbol": "a",
+              "meaning": "plate gap in meters",
+              "source": "sweep_axis",
+              "units": "layout_units",
+              "defaultRange": {
+                "min": 4e-9,
+                "max": 24e-9,
+                "steps": 64,
+                "scale": "linear"
+              },
+              "required": true
+            },
+            {
+              "name": "A",
+              "symbol": "A",
+              "meaning": "tile plate area in square meters",
+              "source": "repo_artifact",
+              "units": "layout_units",
+              "artifactBinding": {
+                "artifactPath": "configs/needle-hull-mark2-cavity-contract.v1.json",
+                "fieldName": "layout.tileArea_mm2",
+                "sha256Required": true
+              },
+              "required": true
+            },
+            {
+              "name": "hbar",
+              "symbol": "hbar",
+              "meaning": "reduced Planck constant",
+              "source": "constant",
+              "units": "unknown",
+              "defaultValue": 1.054571817e-34,
+              "required": true
+            },
+            {
+              "name": "c",
+              "symbol": "c",
+              "meaning": "speed of light",
+              "source": "constant",
+              "units": "unknown",
+              "defaultValue": 299792458,
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "E_tile",
+              "symbol": "E_tile",
+              "meaning": "idealized static Casimir tile energy",
+              "units": "unknown"
+            }
+          ],
+          "allowedGraphModes": ["one_dimensional_sweep"],
+          "defaultAxisTemplates": [
+            {
+              "id": "gap_energy_sweep",
+              "graphMode": "one_dimensional_sweep",
+              "x": {
+                "variable": "a",
+                "label": "gap a",
+                "units": "layout_units"
+              },
+              "y": {
+                "output": "E_tile",
+                "label": "idealized tile energy",
+                "units": "unknown"
+              },
+              "captionTemplate": "Source-model exploration: idealized static Casimir tile energy versus declared gap.",
+              "uncertaintyTemplate": "This is an idealized source-model sweep and does not establish a macro-curvature source bridge."
+            }
+          ],
+          "domainPolicy": {
+            "finiteOnly": true,
+            "maxSamples": 256,
+            "allowComplex": false,
+            "allowUnits": false,
+            "allowUnknownUnits": true
+          },
+          "claimBoundary": {
+            "doesValidateNHM2": false,
+            "diagnosticOnly": true,
+            "validationClaimAllowed": false,
+            "physicalMechanismClaimAllowed": false,
+            "promotionAllowed": false
+          }
+        }
+      ],
       "status": "diagnostic",
       "blockerRefs": [
         {
@@ -655,6 +889,81 @@
           "allowedRenderer": "vega_lite"
         }
       ],
+      "computableForms": [
+        {
+          "id": "same_basis_residual_matrix_form",
+          "nodeId": "same_basis_closure",
+          "operatorKind": "residual",
+          "displayLatex": "\\Delta T_{ab}=T^{\\rm geom}_{ab}-T^{\\rm tile\\_eff}_{ab}",
+          "inputs": [
+            {
+              "name": "metricRequired",
+              "symbol": "T_geom_ab",
+              "meaning": "metric-required tensor components",
+              "source": "repo_artifact",
+              "units": "geometric_units",
+              "artifactBinding": {
+                "artifactPath": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+                "fieldName": "tensors.metricRequired",
+                "sha256Required": true
+              },
+              "required": true
+            },
+            {
+              "name": "tileEffective",
+              "symbol": "T_tile_eff_ab",
+              "meaning": "tile-effective tensor components",
+              "source": "repo_artifact",
+              "units": "geometric_units",
+              "artifactBinding": {
+                "artifactPath": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+                "fieldName": "tensors.tileEffective",
+                "sha256Required": true
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "deltaT",
+              "symbol": "Delta T_ab",
+              "meaning": "same-basis residual where counterpart data exists",
+              "units": "geometric_units"
+            }
+          ],
+          "allowedGraphModes": ["tensor_matrix"],
+          "defaultAxisTemplates": [
+            {
+              "id": "residual_tensor_matrix",
+              "graphMode": "tensor_matrix",
+              "color": {
+                "output": "deltaT",
+                "label": "signed residual",
+                "units": "geometric_units",
+                "scale": "diverging_zero_centered"
+              },
+              "tensorRows": "a index",
+              "tensorCols": "b index",
+              "captionTemplate": "Closure residual: Delta T_ab shown only where both metric-required and tile-effective values are available.",
+              "uncertaintyTemplate": "Missing or review-gated components are status-coded, not plotted as zero."
+            }
+          ],
+          "domainPolicy": {
+            "finiteOnly": true,
+            "maxSamples": 32,
+            "allowComplex": false,
+            "allowUnits": false,
+            "allowUnknownUnits": false
+          },
+          "claimBoundary": {
+            "doesValidateNHM2": false,
+            "diagnosticOnly": true,
+            "validationClaimAllowed": false,
+            "physicalMechanismClaimAllowed": false,
+            "promotionAllowed": false
+          }
+        }
+      ],
       "status": "review",
       "blockerRefs": [
         {
@@ -772,6 +1081,103 @@
           "purpose": "Show sampling window, worldline, and dossier completeness as pending/review evidence.",
           "requiredAxesOrEncodings": ["proper-time/sample", "sampling weight", "worldline region", "dossier status"],
           "allowedRenderer": "vega_lite"
+        }
+      ],
+      "computableForms": [
+        {
+          "id": "qei_sampling_window_form",
+          "nodeId": "qei_sampling_requirement",
+          "operatorKind": "worldline_integral",
+          "expressionSyntax": "mathjs",
+          "expression": "exp(-((tau - tau0)^2) / (2 * sigma^2))",
+          "displayLatex": "f(\\tau)=\\exp\\left[-\\frac{(\\tau-\\tau_0)^2}{2\\sigma^2}\\right]",
+          "inputs": [
+            {
+              "name": "tau",
+              "symbol": "tau",
+              "meaning": "worldline sample parameter",
+              "source": "sweep_axis",
+              "units": "dimensionless_diagnostic",
+              "defaultRange": {
+                "min": 0,
+                "max": 1,
+                "steps": 96,
+                "scale": "linear"
+              },
+              "required": true
+            },
+            {
+              "name": "tau0",
+              "symbol": "tau0",
+              "meaning": "sampling-window center",
+              "source": "manual_input",
+              "units": "dimensionless_diagnostic",
+              "defaultValue": 0.5,
+              "defaultRange": {
+                "min": 0,
+                "max": 1,
+                "steps": 101,
+                "scale": "linear"
+              },
+              "required": true
+            },
+            {
+              "name": "sigma",
+              "symbol": "sigma",
+              "meaning": "sampling-window width",
+              "source": "manual_input",
+              "units": "dimensionless_diagnostic",
+              "defaultValue": 0.18,
+              "defaultRange": {
+                "min": 0.05,
+                "max": 0.4,
+                "steps": 50,
+                "scale": "linear"
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "samplingWeight",
+              "symbol": "f(tau)",
+              "meaning": "dimensionless QEI sampling window weight",
+              "units": "dimensionless_diagnostic"
+            }
+          ],
+          "allowedGraphModes": ["worldline_sampling_plot"],
+          "defaultAxisTemplates": [
+            {
+              "id": "qei_sampling_window",
+              "graphMode": "worldline_sampling_plot",
+              "x": {
+                "variable": "tau",
+                "label": "worldline sample tau",
+                "units": "dimensionless_diagnostic"
+              },
+              "y": {
+                "output": "samplingWeight",
+                "label": "sampling weight",
+                "units": "dimensionless_diagnostic"
+              },
+              "captionTemplate": "QEI sampling requirement: weighted worldline window shown as an audit requirement.",
+              "uncertaintyTemplate": "This is a sampling-window requirement visualization, not a completed QEI bound."
+            }
+          ],
+          "domainPolicy": {
+            "finiteOnly": true,
+            "maxSamples": 256,
+            "allowComplex": false,
+            "allowUnits": false,
+            "allowUnknownUnits": false
+          },
+          "claimBoundary": {
+            "doesValidateNHM2": false,
+            "diagnosticOnly": true,
+            "validationClaimAllowed": false,
+            "physicalMechanismClaimAllowed": false,
+            "promotionAllowed": false
+          }
         }
       ],
       "status": "blocked",

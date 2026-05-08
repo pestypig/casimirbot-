@@ -1,0 +1,239 @@
+{
+  "artifactId": "nhm2_equation_visualizer_presets",
+  "schemaVersion": "v1",
+  "generatedAt": "2026-05-08T00:00:00.000Z",
+  "equationMap": {
+    "path": "docs/research/nhm2-observable-equation-map.v1.json",
+    "sha256": "638e51e7ebc75cd113cc5de95f83888946c329373d4c8e7c838fcd4b922dd302"
+  },
+  "presets": [
+    {
+      "id": "alpha_centerline_profile",
+      "equationNodeId": "alpha_lapse",
+      "computableFormId": "alpha_centerline_profile_form",
+      "graphMode": "centerline_profile",
+      "axisTemplateId": "centerline_alpha",
+      "title": "Alpha Centerline Profile",
+      "purpose": "Show lapse-related diagnostic values along the centerline.",
+      "variables": [
+        {
+          "name": "alpha",
+          "symbol": "alpha",
+          "meaning": "lapse samples from the metric brick",
+          "source": "repo_artifact",
+          "units": "repo_normalized",
+          "artifactBinding": {
+            "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+            "fieldName": "alpha",
+            "sha256Required": true
+          },
+          "required": true
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "natario_2002_zero_expansion"],
+      "caption": "3+1 observable: lapse field alpha sampled along the NHM2 centerline; values are repo-normalized diagnostic samples.",
+      "uncertaintyNote": "Proper-time interpretation is conditional on the declared centerline observer assumptions and remains diagnostic-only.",
+      "claimBoundary": {
+        "diagnosticOnly": true,
+        "doesValidateNHM2": false,
+        "validationClaimAllowed": false,
+        "physicalMechanismClaimAllowed": false,
+        "promotionAllowed": false
+      }
+    },
+    {
+      "id": "beta_shift_component_profile",
+      "equationNodeId": "beta_shift",
+      "computableFormId": "beta_shift_centerline_profile_form",
+      "graphMode": "centerline_profile",
+      "axisTemplateId": "centerline_beta",
+      "title": "Beta Shift Component Profile",
+      "purpose": "Show beta_x and shift magnitude along the centerline.",
+      "variables": [
+        {
+          "name": "beta_x",
+          "symbol": "beta_x",
+          "meaning": "x component of shift from the metric brick",
+          "source": "repo_artifact",
+          "units": "repo_normalized",
+          "artifactBinding": {
+            "artifactPath": "artifacts/research/full-solve/triage-brick-48.raw",
+            "fieldName": "beta_x",
+            "sha256Required": true
+          },
+          "required": true
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "natario_2002_zero_expansion"],
+      "caption": "3+1 observable: shift component beta_x and shift magnitude sampled along the NHM2 centerline.",
+      "uncertaintyNote": "Shift is chart-dependent and is not an ordinary speed or route-time claim.",
+      "claimBoundary": {
+        "diagnosticOnly": true,
+        "doesValidateNHM2": false,
+        "validationClaimAllowed": false,
+        "physicalMechanismClaimAllowed": false,
+        "promotionAllowed": false
+      }
+    },
+    {
+      "id": "same_basis_residual_component",
+      "equationNodeId": "same_basis_closure",
+      "computableFormId": "same_basis_residual_matrix_form",
+      "graphMode": "tensor_matrix",
+      "axisTemplateId": "residual_tensor_matrix",
+      "title": "Same-Basis Residual Component Matrix",
+      "purpose": "Show Delta T_ab only for available same-basis tensor components.",
+      "variables": [
+        {
+          "name": "metricRequired",
+          "symbol": "T_geom_ab",
+          "meaning": "metric-required tensor components",
+          "source": "repo_artifact",
+          "units": "geometric_units",
+          "artifactBinding": {
+            "artifactPath": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+            "fieldName": "tensors.metricRequired",
+            "sha256Required": true
+          },
+          "required": true
+        },
+        {
+          "name": "tileEffective",
+          "symbol": "T_tile_eff_ab",
+          "meaning": "tile-effective tensor components",
+          "source": "repo_artifact",
+          "units": "geometric_units",
+          "artifactBinding": {
+            "artifactPath": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+            "fieldName": "tensors.tileEffective",
+            "sha256Required": true
+          },
+          "required": true
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "pfenning_ford_1997_warp_qi"],
+      "caption": "Closure residual: Delta T_ab = T_geom_ab - T_tile_eff_ab, shown where both quantities are available in the same basis.",
+      "uncertaintyNote": "Missing or review-gated tensor cells are represented as missing/review, never as zero.",
+      "claimBoundary": {
+        "diagnosticOnly": true,
+        "doesValidateNHM2": false,
+        "validationClaimAllowed": false,
+        "physicalMechanismClaimAllowed": false,
+        "promotionAllowed": false
+      }
+    },
+    {
+      "id": "tile_source_parameter_sweep",
+      "equationNodeId": "casimir_tile_layout",
+      "computableFormId": "casimir_gap_energy_sweep_form",
+      "graphMode": "one_dimensional_sweep",
+      "axisTemplateId": "gap_energy_sweep",
+      "title": "Tile Source Parameter Sweep",
+      "purpose": "Explore idealized source-side sensitivity to declared layout gap.",
+      "variables": [
+        {
+          "name": "a",
+          "symbol": "a",
+          "meaning": "plate gap in meters",
+          "source": "sweep_axis",
+          "units": "layout_units",
+          "defaultRange": {
+            "min": 4e-9,
+            "max": 24e-9,
+            "steps": 64,
+            "scale": "linear"
+          },
+          "required": true
+        },
+        {
+          "name": "A",
+          "symbol": "A",
+          "meaning": "tile plate area in square meters",
+          "source": "repo_artifact",
+          "units": "layout_units",
+          "artifactBinding": {
+            "artifactPath": "configs/needle-hull-mark2-cavity-contract.v1.json",
+            "fieldName": "layout.tileArea_mm2",
+            "sha256Required": true
+          },
+          "required": true
+        }
+      ],
+      "literatureRefs": ["lamoreaux_1997_casimir_force", "klimchitskaya_2009_real_materials_casimir"],
+      "caption": "Source-model exploration: idealized static Casimir tile energy versus declared gap.",
+      "uncertaintyNote": "This is a source-model sensitivity plot and does not establish a macro-curvature source bridge.",
+      "claimBoundary": {
+        "diagnosticOnly": true,
+        "doesValidateNHM2": false,
+        "validationClaimAllowed": false,
+        "physicalMechanismClaimAllowed": false,
+        "promotionAllowed": false
+      }
+    },
+    {
+      "id": "qei_sampling_window_demo",
+      "equationNodeId": "qei_sampling_requirement",
+      "computableFormId": "qei_sampling_window_form",
+      "graphMode": "worldline_sampling_plot",
+      "axisTemplateId": "qei_sampling_window",
+      "title": "QEI Sampling Window Requirement",
+      "purpose": "Show the sampling function structure required for a QEI-style audit.",
+      "variables": [
+        {
+          "name": "tau",
+          "symbol": "tau",
+          "meaning": "worldline sample parameter",
+          "source": "sweep_axis",
+          "units": "dimensionless_diagnostic",
+          "defaultRange": {
+            "min": 0,
+            "max": 1,
+            "steps": 96,
+            "scale": "linear"
+          },
+          "required": true
+        },
+        {
+          "name": "tau0",
+          "symbol": "tau0",
+          "meaning": "sampling-window center",
+          "source": "manual_input",
+          "units": "dimensionless_diagnostic",
+          "defaultValue": 0.5,
+          "defaultRange": {
+            "min": 0,
+            "max": 1,
+            "steps": 101,
+            "scale": "linear"
+          },
+          "required": true
+        },
+        {
+          "name": "sigma",
+          "symbol": "sigma",
+          "meaning": "sampling-window width",
+          "source": "manual_input",
+          "units": "dimensionless_diagnostic",
+          "defaultValue": 0.18,
+          "defaultRange": {
+            "min": 0.05,
+            "max": 0.4,
+            "steps": 50,
+            "scale": "linear"
+          },
+          "required": true
+        }
+      ],
+      "literatureRefs": ["pfenning_ford_1997_warp_qi", "fewster_2005_qei_review", "hollands_wald_2014_qft_curved_spacetime"],
+      "caption": "QEI sampling requirement: weighted worldline window shown as an audit requirement, not a completed bound.",
+      "uncertaintyNote": "This demo shows sampling structure only; QEI/QFT dossier evidence remains blocked unless ledger evidence changes.",
+      "claimBoundary": {
+        "diagnosticOnly": true,
+        "doesValidateNHM2": false,
+        "validationClaimAllowed": false,
+        "physicalMechanismClaimAllowed": false,
+        "promotionAllowed": false
+      }
+    }
+  ]
+}
