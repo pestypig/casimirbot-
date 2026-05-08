@@ -26,6 +26,7 @@
     "check": "tsc",
     "check:noise": "tsc -p client/tsconfig.noise.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:qst": "tsc -p tsconfig.qst.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
     "lint:fix": "npm run lint",
     "test": "vitest run",

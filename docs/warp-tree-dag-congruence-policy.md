@@ -25,6 +25,8 @@ QCL is a parallel diagnostic lane, not a promotion path into CL0-CL4.
 
 QCL artifacts must use `spacetimeCL: "proxy_only"` unless a separate metric/ADM/geometry/stress-energy derivation satisfies the CL ladder independently. ER=EPR and holographic entropy entries are diagnostics, not wormhole inventory. The supported graph edge is `edgeType: "holographic_entropy_proxy"` with `mayPromoteToCL4: false`.
 
+`QST_PROXY` estimates loss of quantum distinguishability under entropy stretch and optionally reports holographic analogy variables; it is not a metric-equivalence lane, not a stress-energy source, not a wormhole inventory, and not a local photon-production model.
+
 ## Edge Types and Required CL
 | edgeType | requiresCL | definition |
 | --- | --- | --- |

@@ -374,6 +374,8 @@ The associated visibility ratio is:
 
 This is not a claim that the physical constant `hbar` changes. It is an epistemic / diagnostic visibility ratio: higher entropy stretch means the model should demote quantum-structure visibility unless a separate channel justifies the claim.
 
+`QST_PROXY` estimates loss of quantum distinguishability under entropy stretch and optionally reports holographic analogy variables; it is not a metric-equivalence lane, not a stress-energy source, not a wormhole inventory, and not a local photon-production model.
+
 Cosmological expansion is tracked separately:
 
 \[

@@ -153,6 +153,17 @@ import {
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
+import type { LiveSituationArtifact } from "@shared/helix-live-situation-artifact";
+import { DEFAULT_MINECRAFT_STANDBY_VOICE_POLICY } from "@shared/helix-standby-voice-policy";
+import { LiveSituationArtifactCard } from "@/components/helix/LiveSituationArtifactCard";
+import {
+  selectActiveLiveSituationArtifact,
+  selectLiveSituationDeltas,
+  useLiveSituationArtifactStore,
+  type LiveSituationArtifactState,
+} from "@/store/useLiveSituationArtifactStore";
+import { useStandbyVoiceDeliveryStore } from "@/store/useStandbyVoiceDeliveryStore";
+import { deliverStandbyVoiceCallout } from "@/lib/helix/standbyVoiceDelivery";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import {
@@ -190,6 +201,111 @@ export function formatReadAloudButtonLabel(state: ReadAloudPlaybackState): strin
   if (state === "dry-run") return "Read aloud (dry-run)";
   if (state === "error") return "Read aloud (error)";
   return "Read aloud";
+}
+
+function HelixAskLiveSituationProjection({
+  threadId,
+  initialArtifact,
+  onAskHelix,
+  onOpenSituation,
+}: {
+  threadId: string;
+  initialArtifact?: LiveSituationArtifact | null;
+  onAskHelix?: (prompt: string) => void;
+  onOpenSituation?: () => void;
+}) {
+  const upsertReadResponse = useLiveSituationArtifactStore(
+    (state: LiveSituationArtifactState) => state.upsertReadResponse,
+  );
+  const loadLiveArtifact = useLiveSituationArtifactStore(
+    (state: LiveSituationArtifactState) => state.loadLiveArtifact,
+  );
+  const artifact = useLiveSituationArtifactStore((state: LiveSituationArtifactState) =>
+    selectActiveLiveSituationArtifact(state, threadId),
+  );
+  const renderedArtifact = artifact ?? initialArtifact ?? null;
+  const deltas = useLiveSituationArtifactStore((state: LiveSituationArtifactState) =>
+    selectLiveSituationDeltas(state, renderedArtifact?.artifact_id),
+  );
+  const diagnostics = useLiveSituationArtifactStore(
+    (state: LiveSituationArtifactState) => state.diagnosticsByThread[threadId] ?? null,
+  );
+  const addVoiceReceipt = useStandbyVoiceDeliveryStore((state) => state.addReceipt);
+  const setVoiceError = useStandbyVoiceDeliveryStore((state) => state.setError);
+
+  useEffect(() => {
+    if (!initialArtifact) return;
+    upsertReadResponse(threadId, {
+      ok: true,
+      artifact: initialArtifact,
+      deltas: [],
+      debug: {
+        thread_id: threadId,
+        artifact_id: initialArtifact.artifact_id,
+        delta_count: 0,
+        last_delta_id: null,
+        last_next_hash: null,
+        raw_transcript_included: false,
+        raw_audio_included: false,
+        deterministic_content_role: "observation_not_assistant_answer",
+      },
+    });
+  }, [initialArtifact, threadId, upsertReadResponse]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      if (!cancelled) void loadLiveArtifact(threadId, 30);
+    };
+    load();
+    const interval = window.setInterval(load, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [loadLiveArtifact, threadId]);
+
+  if (!renderedArtifact) return null;
+
+  return (
+    <LiveSituationArtifactCard
+      artifact={renderedArtifact}
+      deltas={deltas}
+      stale={diagnostics?.stale === true}
+      speakable={renderedArtifact.mode === "voice_on_confirm"}
+      onAskHelix={onAskHelix}
+      onOpenSituation={onOpenSituation}
+      onSuppress={() => setVoiceError(null)}
+      onSpeak={async () => {
+        try {
+          const receipt = await deliverStandbyVoiceCallout({
+            proposalId: renderedArtifact.latest_evaluation?.evaluation_id ?? renderedArtifact.artifact_id,
+            text: renderedArtifact.latest_evaluation?.summary ?? renderedArtifact.current_state_lines.risk,
+            priority:
+              renderedArtifact.latest_evaluation?.trigger === "risk_update" ||
+              renderedArtifact.latest_evaluation?.trigger === "goal_blocked"
+                ? "critical"
+                : "warn",
+            evidenceRefs: renderedArtifact.latest_evaluation?.evidence_refs ?? renderedArtifact.evidence_refs,
+            policy: {
+              ...DEFAULT_MINECRAFT_STANDBY_VOICE_POLICY,
+              voice_output_enabled: true,
+              standby_voice_mode: renderedArtifact.mode,
+              requires_confirmation: false,
+              last_user_granted_voice_output_at: new Date().toISOString(),
+            },
+            requiresConfirmation: false,
+            dedupeKey: renderedArtifact.latest_evaluation?.evaluation_id ?? renderedArtifact.artifact_id,
+            traceId: renderedArtifact.created_turn_id,
+          });
+          addVoiceReceipt(receipt);
+          setVoiceError(null);
+        } catch (error) {
+          setVoiceError(error instanceof Error ? error.message : "standby_voice_delivery_failed");
+        }
+      }}
+    />
+  );
 }
 
 const SPEAK_TEXT_MAX_CHARS = 600;
@@ -5301,6 +5417,7 @@ type HelixAskReply = {
   interpreter_confirm_prompt?: string | null;
   contextCapsule?: ContextCapsuleSummary;
   situationContextPack?: SituationContextPack | null;
+  liveSituationArtifact?: LiveSituationArtifact | null;
   mode?: "read" | "observe" | "act" | "verify";
   proof?: {
     verdict?: "PASS" | "FAIL";
@@ -19439,6 +19556,7 @@ export function HelixAskPill({
                   proof: response.proof,
                   contextCapsule: response.context_capsule,
                   situationContextPack: response.situation_context_pack ?? null,
+                  liveSituationArtifact: response.live_situation_artifact ?? null,
                   sources:
                     responseDebugWithClientMode?.context_files ??
                     responseDebugWithClientMode?.prompt_context_files ??
@@ -23951,6 +24069,7 @@ export function HelixAskPill({
                 proof: responseProof,
                 contextCapsule: responseContextCapsule,
                 situationContextPack: responseSituationContextPack ?? null,
+                liveSituationArtifact: null,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
@@ -25093,6 +25212,7 @@ export function HelixAskPill({
                   proof: responseProof,
                   contextCapsule: responseContextCapsule,
                   situationContextPack: responseSituationContextPack ?? null,
+                  liveSituationArtifact: localResponseForTerminal?.live_situation_artifact ?? null,
                   sources:
                     responseDebugPayload?.context_files ??
                     responseDebugPayload?.prompt_context_files ??
@@ -27312,28 +27432,12 @@ export function HelixAskPill({
               workstationLayoutState: workstationLayoutDebugSnapshot,
             });
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
-            const liveSituationArtifact = reply.situationContextPack?.live_situation_artifact ?? null;
-            const missionMemoryArtifact = reply.situationContextPack?.mission_memory ?? null;
-            const liveSituationLines = missionMemoryArtifact
-              ? {
-                  now: missionMemoryArtifact.now_line,
-                  goal: missionMemoryArtifact.goal_line,
-                  risk: missionMemoryArtifact.risk_line,
-                  progress: missionMemoryArtifact.progress_line,
-                  unknowns: missionMemoryArtifact.unknowns_line,
-                  last_decision: missionMemoryArtifact.last_decision_line,
-                }
-              : liveSituationArtifact?.current_state_lines ?? null;
-            const displaySituationLine = (line: unknown, prefixes: string[]): string => {
-              let value = typeof line === "string" ? line.trim() : "";
-              for (const prefix of prefixes) {
-                value = value.replace(new RegExp(`^${prefix}:\\s*`, "i"), "").trim();
-              }
-              return value;
-            };
-            const liveSituationSubgoals = Array.isArray(liveSituationArtifact?.subgoals)
-              ? liveSituationArtifact.subgoals
-              : [];
+            const liveSituationArtifact =
+              reply.liveSituationArtifact ?? reply.situationContextPack?.live_situation_artifact ?? null;
+            const liveSituationThreadId =
+              liveSituationArtifact?.thread_id ??
+              reply.situationContextPack?.thread_id ??
+              "helix-ask:desktop";
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
             const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
@@ -27423,6 +27527,13 @@ export function HelixAskPill({
                 String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
             );
             const isLatestReply = replyIndex === 0;
+            const shouldRenderLiveSituationProjection =
+              Boolean(liveSituationArtifact) ||
+              (isLatestReply &&
+                /\b(?:minecraft|minehut)\b/i.test(`${reply.question ?? ""}\n${reply.content ?? ""}`) &&
+                /\b(?:situation|watch|danger|progress|monitor|goal session)\b/i.test(
+                  `${reply.question ?? ""}\n${reply.content ?? ""}`,
+                ));
             const historySummary = clipText(
               transcriptTerminal.text || reply.content || reply.question || "Previous Helix Ask turn",
               180,
@@ -27462,54 +27573,13 @@ export function HelixAskPill({
                     </div>
                   </div>
                 ) : null}
-                {liveSituationArtifact ? (
-                  <div className="mb-2 w-full rounded-lg border border-emerald-300/20 bg-emerald-950/15 px-3 py-2 text-left text-xs text-emerald-50">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-200">
-                          Minecraft Situation
-                        </p>
-                        <p className="mt-1 break-words text-sm text-emerald-50">
-                          {liveSituationArtifact.objective}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded border border-emerald-300/35 bg-emerald-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-emerald-100">
-                        {liveSituationArtifact.status} · {liveSituationArtifact.mode}
-                      </span>
-                    </div>
-                    {liveSituationLines ? (
-                      <div className="mt-2 grid gap-1.5 text-[11px] text-emerald-50/90">
-                        <p>
-                          <span className="text-emerald-200/80">Now: </span>
-                          {displaySituationLine(liveSituationLines.now, ["Now"])}
-                        </p>
-                        <p>
-                          <span className="text-emerald-200/80">Goal: </span>
-                          {displaySituationLine(liveSituationLines.goal, ["Goal", "Likely goal"])}
-                        </p>
-                        <p>
-                          <span className="text-emerald-200/80">Risk: </span>
-                          {displaySituationLine(liveSituationLines.risk, ["Risk"])}
-                        </p>
-                        <p>
-                          <span className="text-emerald-200/80">Last decision: </span>
-                          {displaySituationLine(liveSituationLines.last_decision, ["Last decision"])}
-                        </p>
-                      </div>
-                    ) : null}
-                    {liveSituationSubgoals.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {liveSituationSubgoals.slice(0, 4).map((subgoal) => (
-                          <span
-                            key={subgoal.subgoal_id}
-                            className="rounded border border-emerald-300/25 bg-black/20 px-2 py-0.5 text-[10px] text-emerald-100"
-                          >
-                            {subgoal.label}: {subgoal.status}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
+                {shouldRenderLiveSituationProjection ? (
+                  <HelixAskLiveSituationProjection
+                    threadId={liveSituationThreadId}
+                    initialArtifact={liveSituationArtifact}
+                    onAskHelix={(prompt) => syncAskDraftValue(prompt, { focus: true, forceMoodHint: true })}
+                    onOpenSituation={() => openPanelById("situation-room-pipelines")}
+                  />
                 ) : null}
                 <div className="space-y-3">
                   {reply.question ? (

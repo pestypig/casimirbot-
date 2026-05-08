@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "shared/quantum-spacetime-congruence.ts",
+    "tests/quantum-spacetime-congruence.spec.ts"
+  ],
+  "compilerOptions": {
+    "incremental": false
+  }
+}

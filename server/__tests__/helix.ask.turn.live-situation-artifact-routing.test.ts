@@ -95,6 +95,56 @@ describe("Helix Ask live situation artifact routing", () => {
         risk: expect.any(String),
       },
     });
-    expect(String(response.body.assistant_answer ?? "")).toContain("Minecraft situation monitoring is active.");
+    expect(String(response.body.assistant_answer ?? "")).toContain("Minecraft situation is active");
+  }, 60000);
+
+  it("direct Minecraft questions prefer the latest live artifact snapshot after world-event deltas", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/goal-session/start")
+      .send({
+        thread_id: "thread:live-delta-context",
+        room_id: "room:minecraft-minehut",
+        source_id: "source:minecraft-server",
+        world_id: "minecraft:minehut",
+        objective: "Watch for danger and progress.",
+        standby_mode: "text_only",
+      })
+      .expect(200);
+
+    await request(app)
+      .post("/api/agi/situation/world-event")
+      .send({
+        schema: "helix.world_event.v1",
+        world_id: "minecraft:minehut",
+        room_id: "room:minecraft-minehut",
+        source_id: "source:minecraft-server",
+        ts: "2026-05-08T10:00:00.000Z",
+        actor_id: "player:datdampig",
+        actor_label: "DatDamPig",
+        event_type: "player_damage",
+        location: { dimension: "minecraft:overworld", x: 279, y: 66, z: -405 },
+        health_delta: { current_health: 4, previous_health: 10, damage: 6, cause: "test" },
+        text: "Queued simulated damage event.",
+        evidence_refs: ["minecraft:event:live-delta-risk"],
+        meta: { simulated: true, hostile_nearby: true },
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is my current Minecraft situation?",
+        mode: "read",
+        debug: true,
+        sessionId: "thread:live-delta-context",
+      })
+      .expect(200);
+
+    expect(response.body.situation_context_pack?.live_situation_artifact?.current_state_lines).toMatchObject({
+      risk: "DatDamPig is in danger at 4 health.",
+    });
+    expect(String(response.body.assistant_answer ?? "")).toContain("DatDamPig is in danger at 4 health.");
+    expect(String(response.body.assistant_answer ?? "")).not.toContain("Minecraft situation monitoring is active.");
   }, 60000);
 });
