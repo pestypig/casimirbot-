@@ -1793,6 +1793,38 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "QST_PROXY",
+    module: "shared/quantum-spacetime-congruence.ts",
+    stage: "exploratory",
+    notes: "Quantum-spacetime congruence proxy contract for entropy stretch, holographic area proxy, and vacuum-channel gating.",
+    motivation:
+      "Keep Big Bang expansion, ER=EPR, and entropy-stretch ideas in a diagnostic proxy lane that cannot bypass metric, stress-energy, or QI gates.",
+    conceptualWaypoints: [
+      "Separate entropy stretch from cosmological area/volume stretch.",
+      "Encode holographic area as erDensityProxy, not wormhole inventory.",
+      "Block Hubble-rate-only dynamic Casimir photon-production links.",
+    ],
+    checks: [
+      { type: "test", path: "tests/quantum-spacetime-congruence.spec.ts" },
+      { type: "policy", path: "docs/warp-tree-dag-congruence-policy.md" },
+    ],
+    units: {
+      deltaS_nats: "1",
+      lambda: "1",
+      hbarEffectiveRatio: "1",
+      quantumVisibility: "1",
+      H0_sInv: "T^-1",
+      scaleFactorRatio: "1",
+      areaStretch: "1",
+      volumeStretch: "1",
+      entanglementEntropy_nats: "1",
+      rtAreaProxy_m2: "L^2",
+      erDensityProxy: "1",
+      localDriveFrequency_Hz: "T^-1",
+      expansionFrequency_Hz: "T^-1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",

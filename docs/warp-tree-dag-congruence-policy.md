@@ -14,6 +14,17 @@ Establish a deterministic policy that restricts tree and DAG relations to those 
 4. CL3: Stress-energy equivalence (rho_E or T_mu_nu).
 5. CL4: Guardrail congruence (repo constraints judge geometry-derived quantities).
 
+## Quantum-Spacetime Proxy Ladder (QCL0-QCL4)
+QCL is a parallel diagnostic lane, not a promotion path into CL0-CL4.
+
+1. QCL0: dimensionless bookkeeping, such as H0, 1+z, area stretch, and volume stretch.
+2. QCL1: entropy-stretch proxy, where lambda_S = exp(deltaS_eff) and hbar_eff/hbar is bookkeeping equal to 1/lambda_S.
+3. QCL2: vacuum-field channel with an explicit static Casimir, dynamic Casimir, or curved-spacetime QFT model.
+4. QCL3: holographic area proxy, such as A_info = 4 l_P^2 S_ent, marked as toy-model/holographic unless a stronger dual is supplied.
+5. QCL4: semiclassical backreaction candidate requiring audited T_mu_nu, energy-condition checks, QI checks, causality checks, and consistency with CL3/CL4 machinery.
+
+QCL artifacts must use `spacetimeCL: "proxy_only"` unless a separate metric/ADM/geometry/stress-energy derivation satisfies the CL ladder independently. ER=EPR and holographic entropy entries are diagnostics, not wormhole inventory. The supported graph edge is `edgeType: "holographic_entropy_proxy"` with `mayPromoteToCL4: false`.
+
 ## Edge Types and Required CL
 | edgeType | requiresCL | definition |
 | --- | --- | --- |
@@ -27,6 +38,7 @@ Establish a deterministic policy that restricts tree and DAG relations to those 
 | conditional_region | CL0-CL3 | Same as above but only in stated region (B=1, etc.). |
 | chart_dependent | CL1-CL3 | Same as above but only in stated chart. |
 | proxy_only | none | Explicitly not geometry-congruent. |
+| holographic_entropy_proxy | none | Quantum-spacetime proxy lane; never satisfies CL0-CL4 by itself. |
 
 ## Region and Chart Rules
 - If an equivalence only holds in a region (example: Van Den Broeck where B=1), the edge must include `condition` text and use `conditional_region`.
@@ -36,6 +48,8 @@ Establish a deterministic policy that restricts tree and DAG relations to those 
 - If CL4 VdB-band equivalence depends on derivative support, the edge should include `condition: "vdb_two_wall_derivative_support=true"` and the walk config should set `region.vdb_two_wall_derivative_support_equals_true=true` only when region-II/IV derivative support is present.
 - If CL4 TS-ratio equivalence depends on metric/proper-distance derivation, the edge should include `condition: "ts_metric_derived=true"` and the walk config should set `region.ts_metric_derived_equals_true=true` only when that derivation is active.
 - If an equivalence is based on a proxy (thetaProxy, curvature proxy), the edge must be `proxy_only` and never satisfy CL4.
+- If a relation comes from Big Bang expansion context, ER=EPR, or entropy-stretch bookkeeping, the edge must be `holographic_entropy_proxy` or `proxy_only`. Present-day Hubble expansion may set cosmological context or horizon-scale priors, but it must not be wired as a local dynamic Casimir photon-production rate.
+- If a vacuum claim requires photon production, it must identify a local high-frequency boundary drive or a valid curved-spacetime particle-creation model. Static Casimir stress and dynamic Casimir photon creation remain separate channel modes.
 
 Recommended chart labels:
 - `lab_cartesian`

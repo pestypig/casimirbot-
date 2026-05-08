@@ -34,6 +34,14 @@ type StandbyBatchObservationInput = {
   evidenceRefs: string[];
 };
 
+type StandbyBatchExtraItemInput = {
+  itemId: string;
+  itemType: "toolObservation" | "validation";
+  kind: string;
+  observationRef: Record<string, unknown>;
+  sourceItemIds?: string[];
+};
+
 export async function appendStandbyObservationBatch(args: {
   threadId: string;
   turnId?: string | null;
@@ -42,12 +50,14 @@ export async function appendStandbyObservationBatch(args: {
   route?: "/ask" | "/ask/conversation-turn";
   roomId?: string | null;
   observations: StandbyBatchObservationInput[];
+  extraItems?: StandbyBatchExtraItemInput[];
   now?: () => Date;
 }): Promise<HelixStandbyObservationBatchReceipt> {
   const clock = args.now ?? (() => new Date());
   const started = clock();
   const startedAt = started.toISOString();
   const observations = args.observations.slice();
+  const extraItems = args.extraItems?.slice() ?? [];
   const batchId = `standby_batch:${hashShort([
     args.threadId,
     args.roomId ?? null,
@@ -57,7 +67,7 @@ export async function appendStandbyObservationBatch(args: {
   const turnId = args.turnId ?? `standby_batch_turn:${hashShort([batchId, args.threadId], 16)}`;
   const route = args.route ?? "/ask";
 
-  if (observations.length > 0) {
+  if (observations.length > 0 || extraItems.length > 0) {
     appendHelixThreadEvent({
       route,
       event_type: "turn_started",
@@ -114,6 +124,46 @@ export async function appendStandbyObservationBatch(args: {
       });
     }
 
+    for (const extra of extraItems) {
+      appendHelixThreadEvent({
+        route,
+        event_type: "item_started",
+        thread_id: args.threadId,
+        turn_id: turnId,
+        session_id: args.sessionId ?? null,
+        trace_id: args.traceId ?? null,
+        item_id: extra.itemId,
+        item_type: extra.itemType,
+        item_status: "in_progress",
+        item_stream: "observation",
+        source_item_ids: extra.sourceItemIds ?? null,
+        meta: {
+          kind: extra.kind,
+          batch_id: batchId,
+        },
+      });
+      appendHelixThreadEvent({
+        route,
+        event_type: "item_completed",
+        thread_id: args.threadId,
+        turn_id: turnId,
+        session_id: args.sessionId ?? null,
+        trace_id: args.traceId ?? null,
+        item_id: extra.itemId,
+        item_type: extra.itemType,
+        item_status: "completed",
+        item_stream: "observation",
+        source_item_ids: extra.sourceItemIds ?? null,
+        observation_ref: extra.observationRef,
+        meta: {
+          kind: extra.kind,
+          batch_id: batchId,
+          model_invoked: false,
+          context_role: "observation_not_assistant_answer",
+        },
+      });
+    }
+
     appendHelixThreadEvent({
       route,
       event_type: "turn_completed",
@@ -125,7 +175,7 @@ export async function appendStandbyObservationBatch(args: {
       meta: {
         kind: "standby_observation_batch",
         batch_id: batchId,
-        item_count: observations.length,
+        item_count: observations.length + extraItems.length,
       },
     });
   }
@@ -152,7 +202,7 @@ export async function appendStandbyObservationBatch(args: {
     schema: HELIX_STANDBY_OBSERVATION_BATCH_SCHEMA,
     batch_id: batchId,
     thread_id: args.threadId,
-    turn_id: observations.length > 0 ? turnId : null,
+    turn_id: observations.length > 0 || extraItems.length > 0 ? turnId : null,
     room_id: args.roomId ?? null,
     source_ids: uniqueStrings(observations.map((observation: StandbyBatchObservationInput) => observation.sourceId)),
     world_ids: uniqueStrings(observations.map((observation: StandbyBatchObservationInput) => observation.worldId)),

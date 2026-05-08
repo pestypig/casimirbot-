@@ -49,6 +49,12 @@
           "rel": "see-also",
           "to": "proxy-bridge-target",
           "edgeType": "proxy_only"
+        },
+        {
+          "rel": "see-also",
+          "to": "qst-proxy-target",
+          "edgeType": "holographic_entropy_proxy",
+          "requiresCL": "none"
         }
       ],
       "childMeta": {
@@ -148,6 +154,22 @@
       "links": [],
       "validity": {
         "maturity_ceiling": "diagnostic"
+      }
+    },
+    {
+      "id": "qst-proxy-target",
+      "title": "Quantum Spacetime Proxy Target",
+      "nodeType": "bridge",
+      "tags": [
+        "quantum-spacetime",
+        "holographic",
+        "proxy"
+      ],
+      "children": [],
+      "links": [],
+      "validity": {
+        "maturity_ceiling": "diagnostic",
+        "proxy_semantics": "holographic_entropy_proxy"
       }
     }
   ]

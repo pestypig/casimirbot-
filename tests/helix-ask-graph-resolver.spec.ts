@@ -253,6 +253,21 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(neighbors).toContain("conceptual-child");
   });
 
+  it("blocks holographic entropy proxy traversal under strict CL walks", () => {
+    const neighbors = __testOnlyResolveTreeNeighborIds({
+      treeId: "condition-fixture",
+      treePath: "tests/fixtures/graph-congruence-conditions-tree.json",
+      nodeId: "condition-root",
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: false,
+        allowProxies: false,
+      },
+    });
+
+    expect(neighbors).not.toContain("qst-proxy-target");
+  });
+
   it("blocks proxy/physics bridge traversal when equation_ref is missing", () => {
     const neighbors = __testOnlyResolveTreeNeighborIds({
       treeId: "condition-fixture",

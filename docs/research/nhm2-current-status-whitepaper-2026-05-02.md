@@ -6,6 +6,10 @@ This whitepaper presents NHM2 as a same-chart 3+1 lapse-shift metric-evaluation 
 
 The May 2026 red-team update narrows the paper's status claim further. NHM2 is now treated as a lapse-extended Natario-style diagnostic / reduced-order candidate lane with bounded solve-backed outputs under review. The validation-hardening branch defines the current divergence surface: the metric-required same-chart tensor route is relatively well-formed, while the tile-effective source mechanism has not yet supplied an authoritative same-basis regional counterpart tensor, observer artifacts still require single-run reconciliation, and QEI / convergence / independent reproduction evidence remains promotion-blocking. The paper therefore claims a bounded, artifact-limited mathematical framework and a well-defined blocker map, not physical viability or experimental validation.
 
+The May 8 validation-hardening update adds the next piece of that map: source-side tile-effective full-tensor counterpart contracts, a full-tensor source producer, conservation-diagnostic shell, source-independence audit, and ledger integration. This is not a source-closure pass. It is the mechanism that lets a future frozen run distinguish five different states that were previously easy to blur: counterpart missing, counterpart present but tensor authority insufficient, counterpart present but QEI missing, counterpart present but conservation unknown, and counterpart present with source-to-geometry residual exceeded. The immediate achievement is therefore epistemic and procedural: NHM2 can now say more precisely why a source-side claim fails.
+
+The same update also adds a quantum-spacetime proxy lane for entropy stretch, cosmological expansion context, ER=EPR / holographic-area analogies, and vacuum-channel separation. This lane is diagnostic only. It does not change Planck's constant, count wormholes per hull area, turn Hubble expansion into a local photon source, or promote any NHM2 row through CL0-CL4. Its purpose is narrower: preserve useful quantum-spacetime bookkeeping while making unsupported causal links machine-detectable.
+
 ## Executive scientific claim boundary
 
 NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or lower-alpha profile promotion. Repository artifacts define which NHM2 rows are pass-level under a named contract, review-level, diagnostic, runtime-blocked, or unsupported.
@@ -16,6 +20,10 @@ The selected-profile clocking-law anchor is not a blanket full-loop certified pa
 
 The red-team baseline changes the practical scientific question. The immediate question is no longer "can the dashboard be made green?" It is: can one frozen NHM2 reference run make the bridge from metric-required stress-energy to tile-effective stress-energy impossible to misread, region by region, observer by observer, with QEI/QFT and reproducibility evidence attached?
 
+The current source-side full-tensor producer should be read in that frame. It permits a `nhm2_tile_effective_full_tensor_source/v1` candidate only when the source path is declared source-side, not derived from the metric-required tensor, and free of metric-required input references. It keeps `validationClaimAllowed = false`, `physicalMechanismClaimAllowed = false`, and `promotionAllowed = false`. Its purpose is to move the next ledger from "we do not have the semantic counterpart" toward a more specific quantitative or physical blocker, not to promote NHM2.
+
+The new quantum-spacetime congruence contract should be read even more conservatively. It creates `QST_PROXY` as a Stage 0 diagnostic helper and forces `spacetimeCL = "proxy_only"` with `mayPromoteToCL4 = false`. ER=EPR, Ryu-Takayanagi-style area estimates, and entropy-stretch ratios can appear as context or toy-model diagnostics, but they do not satisfy the same-chart metric, ADM, derived-geometry, stress-energy, or guardrail-congruence ladder.
+
 ## 1. Motivation and problem statement
 
 The scientific problem addressed here is narrower than a flight-ready warp-drive claim. NHM2 asks whether a bounded lapse-shift profile can be represented, evaluated, and audited in one declared chart with enough mathematical discipline that observer quantities, energy-condition surfaces, and centerline proper-time targets are not confused with coordinate artifacts or mechanism-side assumptions.
@@ -23,6 +31,10 @@ The scientific problem addressed here is narrower than a flight-ready warp-drive
 That problem has three recurring failure modes. First, a shift vector can be misread as an ordinary ship speed. Second, a diagonal stress-energy proxy can be mistaken for a full observer tensor. Third, an expected clocking law such as `tau = alpha T` can be mistaken for a promoted route result. The whitepaper is structured to prevent those errors: accepted equations first, NHM2 instantiation second, computation/evidence surfaces third, and artifact status last.
 
 The red-team branch adds a fourth failure mode: a summary artifact can be mistaken for a validation surface when its inputs are not frozen to one run. The new reference-run harness therefore treats `latest` aliases, profile mismatch, observer summary/detail disagreement, missing regional source counterparts, diagonal-proxy authority, missing QEI dossier, null reproducibility fields, and certificate-overrides-review behavior as first-class blockers.
+
+The follow-up source-side full-tensor work adds a fifth failure mode: a tile-side tensor can be mistaken for a legitimate source counterpart merely because it has the right shape. The current contracts therefore reject metric echoes, metric-required tensor input references, proxy tensor authority, diagonal-only authority for promotion-sensitive claims, unknown region masks, unknown aggregation / normalization, missing sample counts, and missing QEI or conservation linkage. A source tensor is not legitimate because it numerically resembles the metric-required tensor; it is legitimate only if its provenance is source-side and its comparison basis is declared.
+
+The quantum-spacetime proxy lane adds a sixth failure mode: a suggestive quantum-spacetime analogy can be mistaken for a local force law. The current contract rejects that move. Big Bang expansion and horizon-scale entropy can inform cosmological context; they cannot by themselves drive local dynamic Casimir photon production. ER=EPR and holographic-area relations can motivate `erDensityProxy`; they cannot be reported as a physical wormhole inventory for the hull. Entropy stretch can demote quantum-visibility claims; it cannot alter the physical value of `hbar`.
 
 The implementation records calculations through repository artifacts. Those artifacts are not the theory itself; they are the evidence surfaces used to determine which NHM2 rows are admitted, review-level, diagnostic, runtime-blocked, or unsupported.
 
@@ -280,6 +292,127 @@ R\in\{{\rm global,hull,wall,exterior\ shell}\}.
 This equation defines where future novelty could live. If a future source model supplies a conserved, observer-auditable, QEI-bounded, same-basis tile-effective tensor whose regional residuals close against the metric-required tensor, then NHM2 would have a novel reduced-order source-to-geometry result to report. If that tensor cannot be supplied, then NHM2 remains a geometry-first diagnostic lane whose metric can be evaluated but whose proposed Casimir/tile source mechanism is not physically closed.
 
 The term "new physics" should therefore be used carefully. The current paper does not claim that new physics has been found. It identifies the exact bridge any new physics, material mechanism, renormalized stress-tensor model, boundary-state construction, or source-coupling correction would have to cross.
+
+### 4.7 Source-side full-tensor counterpart producer
+
+The newest validation-hardening surface makes the missing bridge executable as a contract. The added source-side artifact is:
+
+```text
+nhm2_tile_effective_full_tensor_source/v1
+```
+
+It describes a candidate regional source tensor, not a metric echo. The source model must satisfy:
+
+```text
+sourceSideOnly = true
+notDerivedFromMetricRequiredTensor = true
+metricRequiredInputRefs = []
+```
+
+and each controlled region must provide chart, units, region mask, aggregation mode, normalization basis, sample count, source support metadata, provenance, and either full tensor authority or explicit symmetric full-tensor authority. Diagonal-only and proxy tensors remain diagnostic. If a source path copies or depends on `T_ab_metric_required`, it is not source closure; it is a forbidden metric echo.
+
+This producer changes the progression but not the claim tier. The previous frozen ledger's first source-side blocker was:
+
+```text
+primaryBlockerClass = tile_counterpart
+nextPatchRecommendation = emit non-proxy same-basis tile_effective_counterpart tensors for hull, wall, and exterior_shell
+```
+
+The new producer is designed to retire or refine that blocker on a future frozen run. If it emits only diagonal or proxy evidence, the ledger should remain blocked at tensor authority. If it emits a non-metric-derived full/symmetric tensor but no QEI dossier, the blocker should move to QEI. If QEI is present but conservation is unknown, the blocker should move to conservation. If all provenance, QEI, conservation, and basis checks are present and residuals remain large, the blocker should move to `residual_exceeded`. That transition is progress because it turns an ambiguous semantic gap into a specific scientific failure mode.
+
+The conservation companion artifact:
+
+```text
+nhm2_tile_counterpart_conservation/v1
+```
+
+does not prove physical realizability. It records whether `div T`, continuity, and momentum residual diagnostics have been emitted on the same chart and region masks. Missing conservation remains a blocker before residual tuning should be interpreted as source-closure evidence.
+
+### 4.8 Current frozen ledger state
+
+The first frozen blocker ledger in this workspace is:
+
+```text
+runId = nhm2-reference-ledger-2026-05-05-v1
+overallState = fail
+primaryBlockerClass = tile_counterpart
+validationClaimAllowed = false
+physicalMechanismClaimAllowed = false
+promotionAllowed = false
+```
+
+Its regional source-to-geometry divergence report identifies:
+
+| Region | First divergence boundary | Tile role | relLInf | Status | Next evidence |
+|---|---|---|---:|---|---|
+| global | `tensor_authority_insufficient` | `tile_effective_counterpart` | `4.6143808140791624e-10` | review | emit full tensor evidence or explicit symmetry authority |
+| hull | `counterpart_missing` | `gr_matter_channel_observation` | `0.9771894650674532` | fail | publish a regional `tile_effective_counterpart` tensor on the same basis |
+| wall | `counterpart_missing` | `gr_matter_channel_observation` | `14.950679233985802` | fail | publish a regional `tile_effective_counterpart` tensor on the same basis |
+| exterior_shell | `counterpart_missing` | `gr_matter_channel_observation` | `2.0213853465619396` | fail | publish a regional `tile_effective_counterpart` tensor on the same basis |
+
+This ledger is a blocker ledger, not a validation result. Its scientific value is that it makes the current non-promotion state precise.
+
+### 4.9 Quantum-spacetime proxy lane
+
+NHM2 now has a separate quantum-spacetime diagnostic lane:
+
+```text
+QST_PROXY = shared/quantum-spacetime-congruence.ts
+```
+
+This lane exists to keep entropy stretch, cosmological expansion context, holographic-area analogies, and vacuum-channel claims out of the source-closure path unless a separate same-chart stress-energy calculation earns admission. Its first bookkeeping quantity is:
+
+\[
+\lambda_S(R,t)=\exp(\Delta S_{\rm eff}(R,t)).
+\]
+
+The associated visibility ratio is:
+
+\[
+\frac{\hbar_{\rm eff}}{\hbar}=\frac{1}{\lambda_S}.
+\]
+
+This is not a claim that the physical constant `hbar` changes. It is an epistemic / diagnostic visibility ratio: higher entropy stretch means the model should demote quantum-structure visibility unless a separate channel justifies the claim.
+
+Cosmological expansion is tracked separately:
+
+\[
+R_a=1+z,\qquad \lambda_A=R_a^2,\qquad \lambda_V=R_a^3.
+\]
+
+By contract, `lambda_S` is not automatically equal to `lambda_A` or `lambda_V`. A model may calibrate an entropy-stretch proxy from cosmological context, but that calibration must be explicit.
+
+The holographic branch is also proxy-only. If an entanglement entropy is supplied for a region, the diagnostic area proxy is:
+
+\[
+A_{\rm info}=4\ell_P^2S_{\rm ent},
+\qquad
+\rho_{\rm ER,proxy}=\frac{A_{\rm info}}{A_R}.
+\]
+
+The field name is intentionally `erDensityProxy`, not `wormholeCountPerArea`. The former is a dimensionless holographic analogy; the latter would overclaim the ontology.
+
+The vacuum branch separates three cases:
+
+```text
+static_casimir_stress
+dynamic_casimir_photon_creation
+curved_spacetime_particle_creation
+```
+
+Static Casimir stress remains a boundary-condition stress model. Dynamic Casimir photon creation requires an explicit local high-frequency boundary drive. Present-day Hubble expansion is too slow and too global to be wired as a local photon-production engine, so the contract records that causal link as:
+
+```text
+H0_to_local_virtual_photon_production_rate
+```
+
+and blocks it. The graph edge type for this lane is:
+
+```text
+holographic_entropy_proxy
+```
+
+The congruence policy treats it as proxy-only. It never satisfies CL0-CL4 by itself, and it cannot bypass source-to-geometry closure, observer closure, QEI/QFT, Ford-Roman, conservation, causality, or reproducibility gates.
 
 ## 5. Full-tensor observer closure
 
@@ -567,13 +700,15 @@ The cited GR and warp-drive literature defines the mathematical language and the
 
 ### 8.4 What a future novel claim could be
 
-The current novel contribution is not a claim of physical transport. It is the explicit localization of the source-to-geometry divergence under a same-chart red-team harness. The future publishable claim, if earned, would be narrower and stronger:
+The current novel contribution is not a claim of physical transport. It is the explicit localization of the source-to-geometry divergence under a same-chart red-team harness, plus the new source-side full-tensor counterpart pathway that can turn "missing counterpart" into a more specific blocker. The future publishable claim, if earned, would be narrower and stronger:
 
 ```text
 NHM2 Reference Solve v1 supplies a frozen reduced-order same-chart source-to-geometry closure result: regional metric-required tensors and independently defined tile-effective counterpart tensors close within declared tolerance, observer artifacts agree from one run, QEI/QFT bounds are explicit, and convergence/reproduction evidence is emitted.
 ```
 
 That would still not automatically imply experimental propulsion, ambient causality violation, or full quantum-gravity validation. It would be a defensible reduced-order GR result with a specific source-mechanism dossier. The reason to update this whitepaper now is to define the exact evidence bridge before trying to cross it.
+
+The next useful whitepaper update after this one should not be based on better mission-time numbers. It should be based on a frozen ledger whose primary blocker has moved from `tile_counterpart` to a later, more physical surface such as `qei`, `conservation_unknown`, or `residual_exceeded`. That would mean the semantic counterpart problem has been replaced by an auditable physics or numerical mismatch.
 
 ## Appendix A. Repository artifact status and claim-tier table
 
@@ -595,6 +730,14 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | QEI/QFT dossier | missing / not promotion-safe | physical-mechanism language remains blocked |
 | reproducibility fields | incomplete / null in current full-loop evidence | convergence, boundary, smoothing, independent reproduction, and hash consistency block validation language |
 | certificate_policy_result | `pass` in current artifact stack | policy sub-surface pass does not override top-level review state |
+| frozen blocker ledger | `nhm2-reference-ledger-2026-05-05-v1`, `overallState = fail` | compact reference-run ledger; not a validation claim |
+| ledger claim locks | `validationClaimAllowed = false`, `physicalMechanismClaimAllowed = false`, `promotionAllowed = false` | no promotion or physical-mechanism language allowed |
+| ledger primaryBlockerClass | `tile_counterpart` | next blocker is semantic/source-side counterpart authority |
+| tile-effective full-tensor source producer | implemented as `nhm2_tile_effective_full_tensor_source/v1` | source-side candidate path; does not itself retire source closure |
+| tile counterpart conservation artifact | implemented as `nhm2_tile_counterpart_conservation/v1` | diagnostic conservation surface; missing/failing conservation remains a blocker |
+| quantum-spacetime proxy contract | implemented as `QST_PROXY` / `shared/quantum-spacetime-congruence.ts` | Stage 0 diagnostic only; `spacetimeCL = proxy_only`, `mayPromoteToCL4 = false` |
+| holographic entropy graph edge | `edgeType = holographic_entropy_proxy` | treated as proxy-only by strict graph walks; no CL0-CL4 promotion |
+| Hubble-only photon-production link | blocked as `H0_to_local_virtual_photon_production_rate` | cosmological context only, not local dynamic Casimir drive |
 | 0p7000 | `runtime_blocked` due to `selected_transport_timeout` | runtime-blocked, not physics-failed |
 | 0p5000 | exploratory expected target | not promoted |
 
@@ -618,6 +761,29 @@ npm run nhm2:validate-reference-run
 
 The freeze step is allowed to produce an audit-only blocker ledger while `latest` aliases remain in the current artifact graph. A validation-ready reference run must have one commit, one selected profile, one run ID, one artifact set, no `latest` aliases, and no profile mismatches.
 
+The May 8 source-side full-tensor update adds the following validation-hardening commands:
+
+```text
+npm run nhm2:publish-tile-effective-full-tensor-source
+npm run nhm2:publish-tile-counterpart-conservation
+npm run nhm2:audit-tile-counterpart-source-independence
+```
+
+The intended chain is:
+
+```text
+freeze reference run
+publish source-side tile-effective full-tensor candidate
+publish conservation diagnostics
+publish tile-effective counterpart
+publish regional source-closure evidence
+render source-to-geometry divergence report
+validate reference run
+build and render blocker ledger
+```
+
+This chain may end in `fail` or `review`. That is acceptable when the ledger identifies the first remaining blocker precisely.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -628,6 +794,12 @@ The freeze step is allowed to produce an audit-only blocker ledger while `latest
 | `T_ij`, `T_0i`, `T_00` reconstruction | reconstruct coordinate tensor components | prevents diagonal-only proxy promotion | valid only from same-chart projected quantities |
 | `G_mu_nu=8piT_mu_nu` | Einstein tensor route | geometry-first stress-energy evaluation | repo-internal evaluator, not experimental validation |
 | `Delta T_mu_nu^(R)=T_required^(R)-T_tile_effective^(R)` | red-team divergence surface | identifies where source-to-geometry closure must be proven | requires same-basis regional counterpart tensor |
+| `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
+| `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |
+| `lambda_S = exp(Delta S_eff)` | entropy-stretch bookkeeping | quantum-visibility diagnostic in `QST_PROXY` | does not physically change `hbar` |
+| `hbar_eff / hbar = 1 / lambda_S` | high-entropy quantum-visibility ratio | demotes quantum-structure claims unless separately justified | epistemic diagnostic, not local force |
+| `A_info = 4 l_P^2 S_ent` and `erDensityProxy = A_info / A_R` | holographic area proxy | ER=EPR / RT-inspired comparison lane | not wormhole inventory |
+| `H0_to_local_virtual_photon_production_rate` | unsupported causal-link marker | blocks Hubble-only dynamic Casimir photon-production claims | Hubble rate is context, not local drive |
 | WEC/NEC/SEC/DEC | energy-condition tests | observer audit | passing audit is not physical viability |
 | `tau=alpha T` | frozen centerline clocking target | lapse sweep expectation | lower-alpha rows remain targets until artifacts pass |
 | `E/A=-pi^2 hbar c/(720a^3)` | mechanism-side source model | tile energy baseline | not GR-coupled physical source proof |
@@ -645,6 +817,7 @@ The freeze step is allowed to produce an audit-only blocker ledger while `latest
 | Pfenning and Ford, The unphysical nature of Warp Drive: https://arxiv.org/abs/gr-qc/9702026 | negative-energy and warp limitation context | does not validate NHM2 |
 | Fewster and Roman, Null energy conditions in quantum field theory: https://arxiv.org/abs/gr-qc/0209036 | energy-condition and quantum-field-theory caution context | does not validate NHM2 |
 | Santiago, Schuster, Visser, Generic warp drives violate the null energy condition: https://arxiv.org/abs/2105.03079 | generic warp-drive NEC caution context | does not validate NHM2 |
+| Karcassi, Landini, Aidala, Classical mechanics as the high-entropy limit of quantum mechanics: https://arxiv.org/abs/2411.00972 | entropy-stretch / high-entropy quantum-visibility context | supports QST diagnostic bookkeeping only; does not validate NHM2 |
 | Maldacena, The Large N Limit of Superconformal Field Theories and Supergravity: https://arxiv.org/abs/hep-th/9711200 | controlled holographic context | does not validate NHM2 source closure or transport |
 | Ryu and Takayanagi, Holographic Derivation of Entanglement Entropy from AdS/CFT: https://arxiv.org/abs/hep-th/0603001 | holographic geometry / entropy context | does not validate a local Casimir-tile source |
 | Penington, Entanglement Wedge Reconstruction and the Information Paradox: https://arxiv.org/abs/1905.08255 | entanglement-wedge / Page-time context | does not validate NHM2 |
@@ -658,4 +831,4 @@ The freeze step is allowed to produce an audit-only blocker ledger while `latest
 
 NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a metric-required tensor, observer projections define energy-condition gates, and the centerline-lapse law computes expected timing targets.
 
-The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, or promoted deep-clock rows. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, attach a QEI/QFT dossier, emit convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. Any future novel claim should be made at that bridge, after the bridge passes, not before.
+The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, attach a QEI/QFT dossier, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.

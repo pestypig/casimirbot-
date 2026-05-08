@@ -625,6 +625,9 @@ const resolveCLIndex = (value: string | undefined): number => {
 
 const CL_ORDER: CongruenceWalkConfig["allowedCL"][] = ["CL0", "CL1", "CL2", "CL3", "CL4"];
 
+const isProxyOnlyEdgeType = (edgeType: string): boolean =>
+  edgeType === "proxy_only" || edgeType === "holographic_entropy_proxy";
+
 const evaluateCongruenceEdge = (
   meta: GraphEdgeMeta | undefined,
   config: CongruenceWalkConfig,
@@ -641,7 +644,7 @@ const evaluateCongruenceEdge = (
       ? { allowed: true }
       : { allowed: false, reason: "conceptual_disallowed" };
   }
-  if (edgeType === "proxy_only") {
+  if (isProxyOnlyEdgeType(edgeType)) {
     return config.allowProxies
       ? { allowed: true }
       : { allowed: false, reason: "proxy_disallowed" };
@@ -770,7 +773,7 @@ const requiresEquationBindingRail = (
 ): boolean => {
   if (isEquationBindingGuardedNode(node, guardedNodeTypes)) return true;
   const edgeType = String(edgeMeta?.edgeType ?? "").trim().toLowerCase();
-  return edgeType === "proxy_only";
+  return isProxyOnlyEdgeType(edgeType);
 };
 const shouldIncludeEdge = (
   meta: GraphEdgeMeta | undefined,

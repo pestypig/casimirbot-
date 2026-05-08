@@ -8,6 +8,13 @@ export type SituationContextPack = {
   room_id: string;
   session_id?: string | null;
   mission_memory?: import("./helix-mission-memory").HelixMissionMemory | null;
+  live_situation_artifact?: {
+    artifact_id: string;
+    objective: string;
+    current_state_lines: import("./helix-live-situation-artifact").LiveSituationArtifact["current_state_lines"];
+    subgoals: import("./helix-live-situation-artifact").LiveSituationSubgoal[];
+    latest_evaluation?: import("./helix-live-situation-artifact").LiveSituationEvaluation | null;
+  } | null;
   objective?: string | null;
   current_goal?: string | null;
   latest_projection?: Record<string, unknown> | null;

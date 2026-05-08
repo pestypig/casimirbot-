@@ -113,6 +113,12 @@ Stage 3 (Certified / Policy-gated)
 | --- | --- | --- | --- | --- |
 | NEURO | shared/neuro-config.ts | Stage 0 | Neuro coherence defaults (gamma band + equilibrium thresholds). | docs/stellar-consciousness-orch-or-review.md |
 
+## Quantum-Spacetime Proxy Modules
+
+| Tag | Module | Stage | Notes | Checks |
+| --- | --- | --- | --- | --- |
+| QST_PROXY | shared/quantum-spacetime-congruence.ts | Stage 0 | Quantum-spacetime proxy contract for entropy stretch, holographic area proxy, and vacuum-channel gating. | tests/quantum-spacetime-congruence.spec.ts, docs/warp-tree-dag-congruence-policy.md |
+
 ## DP Collapse Modules
 
 | Tag | Module | Stage | Notes | Checks |

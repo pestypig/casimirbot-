@@ -9,6 +9,7 @@ import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import type { SituationContextPack } from "@shared/helix-situation-context-pack";
 import type {
   HelixAudioIdentityResult,
   HelixAudioIdentitySessionSnapshot,
@@ -267,6 +268,7 @@ export type LocalAskResponse = {
   fail_class?: string | null;
   memory_citation?: HelixMemoryCitation | null;
   context_capsule?: ContextCapsuleSummary;
+  situation_context_pack?: SituationContextPack | null;
   mode?: "read" | "observe" | "act" | "verify";
   action?: { tool?: string; output?: unknown | HaloBankActionOutput };
   proof?: LocalAskProof;

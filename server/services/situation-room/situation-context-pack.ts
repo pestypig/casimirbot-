@@ -10,6 +10,7 @@ import {
   getSituationGoalSessionLedger,
 } from "./situation-goal-session-store";
 import { getMissionMemoryForThread } from "./mission-memory-reducer";
+import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
 
 const hashShort = (value: unknown, size = 14): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -40,6 +41,7 @@ export function buildSituationContextPack(args: {
   const sessionId = args.sessionId ?? activeSession?.session_id ?? null;
   const ledger = sessionId ? getSituationGoalSessionLedger(sessionId) : null;
   const missionMemory = getMissionMemoryForThread({ threadId: args.threadId }).memory ?? null;
+  const liveArtifact = getActiveLiveSituationArtifactForThread(args.threadId);
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -62,6 +64,15 @@ export function buildSituationContextPack(args: {
     room_id: roomId,
     thread_id: args.threadId,
     mission_memory: missionMemory,
+    live_situation_artifact: liveArtifact
+      ? {
+          artifact_id: liveArtifact.artifact_id,
+          objective: liveArtifact.objective,
+          current_state_lines: liveArtifact.current_state_lines,
+          subgoals: liveArtifact.subgoals,
+          latest_evaluation: liveArtifact.latest_evaluation ?? null,
+        }
+      : null,
     objective: activeSession?.objective ?? ledger?.objective ?? null,
     current_goal: activeSession?.current_goal ?? ledger?.current_goal ?? null,
     latest_projection: null,

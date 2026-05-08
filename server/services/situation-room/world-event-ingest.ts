@@ -20,6 +20,10 @@ import type {
   StandbyCalloutDeliveryReceipt,
   StandbyCalloutProposal,
 } from "@shared/helix-standby-callout";
+import type {
+  LiveSituationArtifact,
+  LiveSituationArtifactDelta,
+} from "@shared/helix-live-situation-artifact";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -66,6 +70,12 @@ import {
   predictFromSituationEpisode,
   reduceSituationEpisodes,
 } from "./situation-episode-reducer";
+import {
+  buildLiveSituationEvaluation,
+  getActiveLiveSituationArtifactForRoom,
+  updateLiveSituationArtifact,
+  upsertLiveSituationSubgoal,
+} from "./live-situation-artifact-store";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -150,6 +160,8 @@ export type WorldEventIngestResult = {
   append_candidate?: WorldEventAppendCandidate | null;
   callout_proposal?: StandbyCalloutProposal | null;
   callout_delivery_receipt?: StandbyCalloutDeliveryReceipt | null;
+  live_situation_artifact?: LiveSituationArtifact | null;
+  live_situation_artifact_delta?: LiveSituationArtifactDelta | null;
 };
 
 export type WorldEventIngestBatchResult = {
@@ -575,6 +587,122 @@ const recordCompletedQueueItem = (input: {
   return completeStandbyQueueItem(item.queue_item_id, input.resultRef ?? null, input.ts) ?? item;
 };
 
+const buildLiveSituationUpdate = (input: {
+  artifact: LiveSituationArtifact | null;
+  event: HelixWorldEvent;
+  signal: SituationEventSignal;
+  salienceReceipt?: SituationSalienceReceipt | null;
+  episodes: SituationEpisode[];
+  goalHypotheses: SituationGoalHypothesis[];
+  turnId: string;
+  ts: string;
+}): { artifact: LiveSituationArtifact; delta: LiveSituationArtifactDelta } | null => {
+  const artifact = input.artifact;
+  if (!artifact || artifact.status !== "active") return null;
+  const reason = input.salienceReceipt?.reason;
+  const meaningful =
+    reason === "risk_detected" ||
+    reason === "goal_progress" ||
+    reason === "goal_blocked" ||
+    reason === "source_health" ||
+    input.episodes.length > 0;
+  if (!meaningful) return null;
+  const evidenceRefs = Array.from(new Set([
+    ...input.signal.evidence_refs,
+    ...(input.salienceReceipt?.evidence_refs ?? []),
+    ...input.episodes.flatMap((episode) => episode.evidence_refs),
+  ])).slice(-24);
+  const trigger =
+    reason === "risk_detected"
+      ? "risk_update"
+      : reason === "goal_progress"
+        ? "goal_progress"
+        : reason === "goal_blocked"
+          ? "goal_blocked"
+          : input.episodes.length > 0
+            ? "episode_update"
+            : "source_event";
+  const summary =
+    input.salienceReceipt?.summary ??
+    input.episodes.at(-1)?.summary_seed ??
+    `${input.event.event_type} observed in the bound Minecraft source.`;
+  const evaluation = buildLiveSituationEvaluation({
+    artifact,
+    trigger,
+    summary,
+    recommendation:
+      reason === "risk_detected"
+        ? "Keep the event in context and surface it according to callout policy."
+        : reason === "goal_progress"
+          ? "Update progress tracking."
+          : null,
+    interjection_decision:
+      input.salienceReceipt?.should_request_user_input
+        ? "request_user_input"
+        : input.salienceReceipt?.should_notify_helix
+          ? "show_text"
+          : "silent_keep_in_context",
+    model_invoked: false,
+    deterministic_gate: true,
+    evidence_refs: evidenceRefs,
+    now: input.ts,
+  });
+  const latestGoal = input.goalHypotheses.at(-1);
+  const subgoals =
+    reason === "risk_detected"
+      ? upsertLiveSituationSubgoal({
+          artifact,
+          label: "Detect danger signals",
+          status: "progress",
+          confidence: 0.86,
+          evidence_refs: evidenceRefs,
+          now: input.ts,
+        })
+      : reason === "goal_progress"
+        ? upsertLiveSituationSubgoal({
+            artifact,
+            label: latestGoal?.goal_label ?? "Track meaningful progress",
+            status: "progress",
+            confidence: latestGoal?.confidence ?? 0.78,
+            evidence_refs: evidenceRefs,
+            now: input.ts,
+          })
+        : reason === "goal_blocked"
+          ? upsertLiveSituationSubgoal({
+              artifact,
+              label: latestGoal?.goal_label ?? "Resolve blocked goal",
+              status: "blocked",
+              confidence: latestGoal?.confidence ?? 0.75,
+              evidence_refs: evidenceRefs,
+              now: input.ts,
+            })
+          : artifact.subgoals;
+  return updateLiveSituationArtifact({
+    artifact_id: artifact.artifact_id,
+    turn_id: input.turnId,
+    reason:
+      reason === "risk_detected"
+        ? "risk_update"
+        : reason === "goal_progress"
+          ? "goal_progress"
+          : reason === "goal_blocked"
+            ? "goal_blocked"
+            : input.episodes.length > 0
+              ? "episode_update"
+              : "source_event",
+    current_state_lines: {
+      now: summary,
+      risk: reason === "risk_detected" ? summary : artifact.current_state_lines.risk,
+      progress: reason === "goal_progress" ? summary : artifact.current_state_lines.progress,
+      last_decision: evaluation.interjection_decision,
+    },
+    subgoals,
+    latest_evaluation: evaluation,
+    evidence_refs: evidenceRefs,
+    now: input.ts,
+  });
+};
+
 export const ingestWorldEvent = async (
   event: HelixWorldEvent,
   options: WorldEventIngestOptions = {},
@@ -826,28 +954,78 @@ export const ingestWorldEvent = async (
           dedupeKey: salienceReceipt?.dedupe_key ?? null,
           evidenceRefs: signal.evidence_refs,
         };
+  const standbyTurnId =
+    resolvedBinding?.turn_id ??
+    explicitTurnId ??
+    (resolvedBinding ? `standby_batch_turn:${hashShort([resolvedBinding.binding_id, signal.signal_id], 16)}` : null);
+  const liveArtifactBeforeUpdate =
+    resolvedBinding && options.appendToThread !== false
+      ? getActiveLiveSituationArtifactForRoom(resolvedBinding.room_id)
+      : null;
+  const liveArtifactUpdate =
+    liveArtifactBeforeUpdate && standbyTurnId
+      ? buildLiveSituationUpdate({
+          artifact: liveArtifactBeforeUpdate,
+          event,
+          signal,
+          salienceReceipt,
+          episodes,
+          goalHypotheses,
+          turnId: standbyTurnId,
+          ts: signal.ts,
+        })
+      : null;
   const batchReceipt =
-    appendCandidate && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
-          threadId: appendCandidate.threadId,
-          turnId: resolvedBinding?.turn_id ?? explicitTurnId ?? null,
-          sessionId: appendCandidate.sessionId,
-          traceId: appendCandidate.traceId,
-          roomId: appendCandidate.roomId,
+          threadId: resolvedBinding.thread_id,
+          turnId: standbyTurnId,
+          sessionId: appendCandidate?.sessionId ?? resolvedBinding.session_id ?? options.sessionId ?? null,
+          traceId: appendCandidate?.traceId ?? resolvedBinding.trace_id ?? options.traceId ?? null,
+          roomId: resolvedBinding.room_id,
           now: options.now,
-          observations: [
-            {
-              eventId: appendCandidate.eventId,
-              worldId: appendCandidate.worldId,
-              sourceId: appendCandidate.sourceId,
-              graphId: appendCandidate.graphId,
-              observationRef: appendCandidate.observationRef,
-              salienceReason: appendCandidate.salienceReason,
-              saliencePriority: appendCandidate.saliencePriority,
-              dedupeKey: appendCandidate.dedupeKey,
-              evidenceRefs: appendCandidate.evidenceRefs,
-            },
-          ],
+          observations: appendCandidate
+            ? [
+                {
+                  eventId: appendCandidate.eventId,
+                  worldId: appendCandidate.worldId,
+                  sourceId: appendCandidate.sourceId,
+                  graphId: appendCandidate.graphId,
+                  observationRef: appendCandidate.observationRef,
+                  salienceReason: appendCandidate.salienceReason,
+                  saliencePriority: appendCandidate.saliencePriority,
+                  dedupeKey: appendCandidate.dedupeKey,
+                  evidenceRefs: appendCandidate.evidenceRefs,
+                },
+              ]
+            : [],
+          extraItems: liveArtifactUpdate
+            ? [
+                {
+                  itemId: `live_situation_evaluation:${hashShort([liveArtifactUpdate.delta.delta_id, "evaluation"], 14)}`,
+                  itemType: "validation",
+                  kind: "live_situation_evaluation",
+                  observationRef: {
+                    ...(liveArtifactUpdate.artifact.latest_evaluation ?? {}),
+                    provenance: "deterministic_world_reduction",
+                    model_invoked: false,
+                    context_role: "observation_not_assistant_answer",
+                  } as Record<string, unknown>,
+                },
+                {
+                  itemId: `live_situation_delta:${hashShort([liveArtifactUpdate.delta.delta_id], 14)}`,
+                  itemType: "validation",
+                  kind: "live_situation_artifact_delta",
+                  observationRef: {
+                    ...liveArtifactUpdate.delta,
+                    provenance: "deterministic_world_reduction",
+                    model_invoked: false,
+                    context_role: "observation_not_assistant_answer",
+                    safe_for_future_context: true,
+                  } as Record<string, unknown>,
+                },
+              ]
+            : [],
         })
       : null;
   const batchDecision = batchReceipt?.decisions[0] ?? null;
@@ -949,6 +1127,8 @@ export const ingestWorldEvent = async (
     append_candidate: appendCandidate,
     callout_proposal: calloutProposal,
     callout_delivery_receipt: calloutDeliveryReceipt,
+    live_situation_artifact: liveArtifactUpdate?.artifact ?? liveArtifactBeforeUpdate ?? null,
+    live_situation_artifact_delta: liveArtifactUpdate?.delta ?? null,
   };
 };
 

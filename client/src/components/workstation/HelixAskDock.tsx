@@ -1,6 +1,4 @@
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
-import { HelixMissionReadoutCard } from "@/components/helix/HelixMissionReadoutCard";
-import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import {
   useWorkstationLayoutStore,
@@ -50,11 +48,6 @@ export function HelixAskDock({
         </div>
         {!collapsed ? (
           <>
-            <HelixMissionReadoutCard
-              threadId="helix-ask:desktop"
-              onOpenSituation={() => onOpenPanel("situation-room-pipelines")}
-              onAskHelix={(prompt: string) => launchHelixAskPrompt({ question: prompt })}
-            />
             <HelixAskPill
               className="flex h-full min-h-0 w-full flex-col"
               contextId={HELIX_ASK_CONTEXT_ID.desktop}

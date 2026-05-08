@@ -152,6 +152,7 @@ import {
 } from "@shared/helix-context-capsule";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import type { SituationContextPack } from "@shared/helix-situation-context-pack";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import {
@@ -5299,6 +5300,7 @@ type HelixAskReply = {
   needs_confirmation?: boolean;
   interpreter_confirm_prompt?: string | null;
   contextCapsule?: ContextCapsuleSummary;
+  situationContextPack?: SituationContextPack | null;
   mode?: "read" | "observe" | "act" | "verify";
   proof?: {
     verdict?: "PASS" | "FAIL";
@@ -19436,6 +19438,7 @@ export function HelixAskPill({
                   mode: modeForTimeline,
                   proof: response.proof,
                   contextCapsule: response.context_capsule,
+                  situationContextPack: response.situation_context_pack ?? null,
                   sources:
                     responseDebugWithClientMode?.context_files ??
                     responseDebugWithClientMode?.prompt_context_files ??
@@ -23836,6 +23839,7 @@ export function HelixAskPill({
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
         let responseContextCapsule: ContextCapsuleSummary | undefined;
+        let responseSituationContextPack: SituationContextPack | null | undefined;
         try {
           const localResponse = await resumeHelixAskJob(pending.jobId, {
             signal: controller.signal,
@@ -23855,6 +23859,7 @@ export function HelixAskPill({
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
+          responseSituationContextPack = localResponse.situation_context_pack;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -23945,6 +23950,7 @@ export function HelixAskPill({
                 mode: responseMode,
                 proof: responseProof,
                 contextCapsule: responseContextCapsule,
+                situationContextPack: responseSituationContextPack ?? null,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
@@ -24554,6 +24560,7 @@ export function HelixAskPill({
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
         let responseContextCapsule: ContextCapsuleSummary | undefined;
+        let responseSituationContextPack: SituationContextPack | null | undefined;
         let responseDebugWithClientMode: HelixAskReply["debug"] | undefined;
         let timelineDebugContext: Record<string, unknown> | null = null;
         let localResponseForTerminal: AskLocalResult | null = null;
@@ -24664,6 +24671,7 @@ export function HelixAskPill({
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
+          responseSituationContextPack = localResponse.situation_context_pack;
           const firstEnvelopeAction = Array.isArray(responseActionEnvelope?.workstation_actions)
             ? responseActionEnvelope.workstation_actions[0]
             : undefined;
@@ -25084,6 +25092,7 @@ export function HelixAskPill({
                   mode: responseMode,
                   proof: responseProof,
                   contextCapsule: responseContextCapsule,
+                  situationContextPack: responseSituationContextPack ?? null,
                   sources:
                     responseDebugPayload?.context_files ??
                     responseDebugPayload?.prompt_context_files ??
@@ -27303,6 +27312,28 @@ export function HelixAskPill({
               workstationLayoutState: workstationLayoutDebugSnapshot,
             });
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
+            const liveSituationArtifact = reply.situationContextPack?.live_situation_artifact ?? null;
+            const missionMemoryArtifact = reply.situationContextPack?.mission_memory ?? null;
+            const liveSituationLines = missionMemoryArtifact
+              ? {
+                  now: missionMemoryArtifact.now_line,
+                  goal: missionMemoryArtifact.goal_line,
+                  risk: missionMemoryArtifact.risk_line,
+                  progress: missionMemoryArtifact.progress_line,
+                  unknowns: missionMemoryArtifact.unknowns_line,
+                  last_decision: missionMemoryArtifact.last_decision_line,
+                }
+              : liveSituationArtifact?.current_state_lines ?? null;
+            const displaySituationLine = (line: unknown, prefixes: string[]): string => {
+              let value = typeof line === "string" ? line.trim() : "";
+              for (const prefix of prefixes) {
+                value = value.replace(new RegExp(`^${prefix}:\\s*`, "i"), "").trim();
+              }
+              return value;
+            };
+            const liveSituationSubgoals = Array.isArray(liveSituationArtifact?.subgoals)
+              ? liveSituationArtifact.subgoals
+              : [];
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
             const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
@@ -27429,6 +27460,55 @@ export function HelixAskPill({
                         auto
                       </span>
                     </div>
+                  </div>
+                ) : null}
+                {liveSituationArtifact ? (
+                  <div className="mb-2 w-full rounded-lg border border-emerald-300/20 bg-emerald-950/15 px-3 py-2 text-left text-xs text-emerald-50">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-200">
+                          Minecraft Situation
+                        </p>
+                        <p className="mt-1 break-words text-sm text-emerald-50">
+                          {liveSituationArtifact.objective}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded border border-emerald-300/35 bg-emerald-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-emerald-100">
+                        {liveSituationArtifact.status} · {liveSituationArtifact.mode}
+                      </span>
+                    </div>
+                    {liveSituationLines ? (
+                      <div className="mt-2 grid gap-1.5 text-[11px] text-emerald-50/90">
+                        <p>
+                          <span className="text-emerald-200/80">Now: </span>
+                          {displaySituationLine(liveSituationLines.now, ["Now"])}
+                        </p>
+                        <p>
+                          <span className="text-emerald-200/80">Goal: </span>
+                          {displaySituationLine(liveSituationLines.goal, ["Goal", "Likely goal"])}
+                        </p>
+                        <p>
+                          <span className="text-emerald-200/80">Risk: </span>
+                          {displaySituationLine(liveSituationLines.risk, ["Risk"])}
+                        </p>
+                        <p>
+                          <span className="text-emerald-200/80">Last decision: </span>
+                          {displaySituationLine(liveSituationLines.last_decision, ["Last decision"])}
+                        </p>
+                      </div>
+                    ) : null}
+                    {liveSituationSubgoals.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {liveSituationSubgoals.slice(0, 4).map((subgoal) => (
+                          <span
+                            key={subgoal.subgoal_id}
+                            className="rounded border border-emerald-300/25 bg-black/20 px-2 py-0.5 text-[10px] text-emerald-100"
+                          >
+                            {subgoal.label}: {subgoal.status}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className="space-y-3">

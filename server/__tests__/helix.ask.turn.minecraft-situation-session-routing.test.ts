@@ -51,7 +51,7 @@ describe("helix ask Minecraft situation session routing", () => {
     );
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
     expect(sessionAction).toBeTruthy();
-    expect(sessionAction?.args?.thread_id).toBe(sessionId);
+    expect(sessionAction?.args?.thread_id).toBe("helix-ask:desktop");
     expect(sessionAction?.args?.room_id).toBe("room:minecraft-minehut");
     expect(sessionAction?.args?.source_id).toBe("source:minecraft-server");
     expect(sessionAction?.args?.world_id).toBe("minecraft:minehut");
@@ -159,6 +159,51 @@ describe("helix ask Minecraft situation session routing", () => {
       raw_audio_included: false,
       raw_transcript_included: false,
     });
+    expect(answerText(response.body)).not.toContain("Started a Minecraft Situation Goal Session action");
+  }, 60000);
+
+  it("uses the stable desktop situation session for transient Ask turn ids", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+
+    const { app } = await createApp();
+    await request(app)
+      .post("/api/agi/situation/goal-session/start")
+      .send({
+        thread_id: "helix-ask:desktop",
+        room_id: "room:minecraft-minehut",
+        source_id: "source:minecraft-server",
+        world_id: "minecraft:minehut",
+        objective: "Monitor danger and progress.",
+        standby_mode: "text_only",
+        append_policy: "salient_only",
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is my current Minecraft situation and what should I watch next?",
+        mode: "read",
+        debug: true,
+        sessionId: `transient-ask-turn-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.situation_context_pack).toMatchObject({
+      schema: "helix.situation_context_pack.v1",
+      thread_id: "helix-ask:desktop",
+      mission_memory: {
+        schema: "helix.mission_memory.v1",
+        status: "active",
+      },
+    });
+    expect(response.body?.ok).toBe(true);
+    expect(response.body?.response_type).toBe("final_answer");
+    expect(response.body?.final_status).toBe("final_answer");
+    expect(response.body?.terminal_error_code).toBeNull();
+    expect(answerText(response.body)).not.toContain("model backend was unavailable");
     expect(answerText(response.body)).not.toContain("Started a Minecraft Situation Goal Session action");
   }, 60000);
 });
