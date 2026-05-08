@@ -4,7 +4,9 @@ import {
   type HelixStandbyActivityItem,
   type HelixStandbyActivityResponse,
 } from "@shared/helix-standby-activity";
+import type { SituationGoalSession } from "@shared/helix-situation-goal-session";
 import { getHelixThreadLedgerEvents } from "../helix-thread/ledger";
+import { listSituationGoalSessions } from "./situation-goal-session-store";
 
 const hashShort = (value: unknown, size = 14): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -72,8 +74,89 @@ function buildActivityBase(args: {
     visibility: args.visibility ?? "runtime_only",
     provenance: deterministicProvenance,
     evidence_refs: Array.from(new Set(args.evidenceRefs ?? [])),
+    metadata: {
+      source: "minecraft",
+      source_kind: "world_event",
+    },
     ts: args.ts,
   };
+}
+
+function buildActivityFromSituationGoalReceipt(args: {
+  threadId: string;
+  turnId?: string | null;
+  itemId?: string | null;
+  ts: string;
+  receipt: Record<string, unknown>;
+}): HelixStandbyActivityItem[] {
+  const session = asRecord(args.receipt.session);
+  if (!session) return [];
+  const sessionId = asString(session.session_id) ?? "unknown";
+  const worldId = asString(session.world_id);
+  const sourceId = asString(session.source_id) ?? asStringArray(session.source_ids)[0] ?? null;
+  return [
+    {
+      schema: HELIX_STANDBY_ACTIVITY_ITEM_SCHEMA,
+      activity_id: `standby_activity:${hashShort([args.threadId, sessionId, "situation_goal_started"], 18)}`,
+      thread_id: args.threadId,
+      turn_id: args.turnId ?? null,
+      item_id: args.itemId ?? null,
+      room_id: asString(session.room_id),
+      source_id: sourceId,
+      graph_id: asString(session.graph_id),
+      world_id: worldId,
+      actor_label: null,
+      kind: "situation_goal_started",
+      priority: "info",
+      title: "Minecraft situation active",
+      summary:
+        asString(session.objective) ??
+        "Minecraft situation monitoring is active for danger and progress.",
+      decision: "silent_keep_in_context",
+      visibility: "helix_dock",
+      provenance: deterministicProvenance,
+      evidence_refs: asStringArray(args.receipt.evidence_refs).length > 0
+        ? asStringArray(args.receipt.evidence_refs)
+        : [`situation_goal_session:${sessionId}`],
+      metadata: {
+        source: "minecraft",
+        source_kind: "situation_goal_session",
+        session_id: sessionId,
+      },
+      ts: args.ts,
+    },
+  ];
+}
+
+function buildActivitiesFromActiveSessions(threadId: string): HelixStandbyActivityItem[] {
+  return listSituationGoalSessions({ thread_id: threadId })
+    .filter((session: SituationGoalSession) => session.status === "active")
+    .map((session: SituationGoalSession) => ({
+      schema: HELIX_STANDBY_ACTIVITY_ITEM_SCHEMA,
+      activity_id: `standby_activity:${hashShort([threadId, session.session_id, "active_session"], 18)}`,
+      thread_id: threadId,
+      turn_id: null,
+      item_id: null,
+      room_id: session.room_id,
+      source_id: session.source_id ?? session.source_ids[0] ?? null,
+      graph_id: session.graph_id ?? null,
+      world_id: session.world_id ?? null,
+      actor_label: null,
+      kind: "situation_goal_started",
+      priority: "info",
+      title: "Minecraft situation active",
+      summary: session.objective,
+      decision: "silent_keep_in_context",
+      visibility: "helix_dock",
+      provenance: deterministicProvenance,
+      evidence_refs: [`situation_goal_session:${session.session_id}`],
+      metadata: {
+        source: "minecraft",
+        source_kind: "situation_goal_session",
+        session_id: session.session_id,
+      },
+      ts: session.updated_at,
+    }));
 }
 
 export function buildStandbyActivitiesFromObservation(args: {
@@ -249,6 +332,17 @@ export function getStandbyActivityForThread(args: {
         }),
       );
     }
+    if (observation.schema === "helix.situation_goal_session_receipt.v1") {
+      activities.push(
+        ...buildActivityFromSituationGoalReceipt({
+          threadId: event.thread_id,
+          turnId: event.turn_id,
+          itemId: event.item_id ?? null,
+          ts: event.ts,
+          receipt: observation,
+        }),
+      );
+    }
     if (observation.schema === "helix.standby_reasoning_result.v1") {
       activities.push({
         schema: HELIX_STANDBY_ACTIVITY_ITEM_SCHEMA,
@@ -278,18 +372,26 @@ export function getStandbyActivityForThread(args: {
       });
     }
   }
+  activities.push(...buildActivitiesFromActiveSessions(args.threadId));
   const unique = new Map<string, HelixStandbyActivityItem>();
   for (const item of activities) unique.set(item.activity_id, item);
+  const sortedActivities = Array.from(unique.values())
+    .sort(
+      (a: HelixStandbyActivityItem, b: HelixStandbyActivityItem) =>
+        a.ts.localeCompare(b.ts) || a.activity_id.localeCompare(b.activity_id),
+    )
+    .slice(-limit);
   return {
     ok: true,
     schema: "helix.standby_activity_response.v1",
     thread_id: args.threadId,
     limit,
-    activities: Array.from(unique.values())
-      .sort(
-        (a: HelixStandbyActivityItem, b: HelixStandbyActivityItem) =>
-          a.ts.localeCompare(b.ts) || a.activity_id.localeCompare(b.activity_id),
-      )
-      .slice(-limit),
+    activities: sortedActivities,
+    diagnostics: {
+      last_loaded_at: new Date().toISOString(),
+      activity_count: sortedActivities.length,
+      thread_id: args.threadId,
+      last_fetch_error: null,
+    },
   };
 }

@@ -1,0 +1,108 @@
+import express from "express";
+import request from "supertest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const createApp = async (): Promise<{ app: express.Express; agi: typeof import("../routes/agi.plan") }> => {
+  const agi = await import("../routes/agi.plan");
+  const app = express();
+  app.use(express.json());
+  app.use("/api/agi", agi.planRouter);
+  return { app, agi };
+};
+
+const answerText = (body: any): string => String(body?.assistant_answer ?? body?.answer ?? body?.text ?? "");
+const executedActions = (body: any): any[] =>
+  Array.isArray(body?.execution_trace) ? body.execution_trace.map((step: any) => step?.action).filter(Boolean) : [];
+
+describe("helix ask Minecraft situation session routing", () => {
+  afterEach(() => {
+    delete process.env.HELIX_E11_MODEL_DECISION_LLM;
+    delete process.env.HELIX_E14_OBSERVATION_MODEL_DECISION;
+    vi.resetModules();
+  });
+
+  it("routes Minecraft monitor phrasing to the Situation Goal Session workstation action", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+
+    const { app } = await createApp();
+    const sessionId = `minecraft-session-routing-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Monitor my Minecraft session and only tell me about danger or progress.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "situation-room-pipelines",
+          hasSituationRoomContext: true,
+        },
+      })
+      .expect(200);
+
+    const actions = executedActions(response.body);
+    const sessionAction = actions.find(
+      (action) =>
+        action?.panel_id === "situation-room-pipelines" &&
+        action?.action_id === "start_situation_goal_session",
+    );
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(sessionAction).toBeTruthy();
+    expect(sessionAction?.args?.thread_id).toBe(sessionId);
+    expect(sessionAction?.args?.room_id).toBe("room:minecraft-minehut");
+    expect(sessionAction?.args?.source_id).toBe("source:minecraft-server");
+    expect(sessionAction?.args?.world_id).toBe("minecraft:minehut");
+    expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+    expect(answerText(response.body)).not.toContain("terminal resolver detected inconsistent");
+    expect(
+      response.body?.current_turn_artifact_ledger?.some(
+        (entry: any) =>
+          entry?.kind === "workspace_action_receipt" &&
+          entry?.payload?.target_id === "situation-room-pipelines" &&
+          entry?.payload?.action_id === "start_situation_goal_session",
+      ),
+    ).toBe(true);
+  }, 60000);
+
+  it("clears stale workspace clarify state when the next prompt is unrelated conversation", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+
+    const { app, agi } = await createApp();
+    const sessionId = `stale-pending-routing-${Date.now()}`;
+    agi.__testHelixAskPendingInputStore.set(sessionId, {
+      turnId: "ask:previous-turn",
+      requestId: "pending:test",
+      kind: "clarify",
+      reason: "clarify:missing_args",
+      prompt: "I could not map that workspace command to a known capability. Please rephrase the target action.",
+      createdAtMs: Date.now(),
+      requiredFields: ["action_command"],
+      unresolvedFields: ["action_command"],
+      candidateAction: null,
+      status: "pending",
+      pendingScope: "action_args",
+      originIntentHash: "stale",
+      originActionFamily: "workspace",
+      expiresAtMs: Date.now() + 10 * 60 * 1000,
+    });
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "hello",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(answerText(response.body)).not.toContain("I could not map that workspace command");
+    expect(response.body?.pending_resolution_reason).toBe("pending_cleared_for_unrelated_conversation");
+    expect(response.body?.pending_server_request).toBeNull();
+  }, 60000);
+});

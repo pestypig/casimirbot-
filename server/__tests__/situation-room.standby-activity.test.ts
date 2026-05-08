@@ -85,9 +85,16 @@ describe("standby activity stream", () => {
         thread_id: "helix-ask:desktop",
         room_id: "room:minecraft-minehut",
         source_ids: ["source:minecraft-server"],
-        context_policy: "explicit_attachment_only",
+        source_id: "source:minecraft-server",
+        context_policy: "compact_context_pack_only",
+        attachment_policy: "manual_or_session_bound",
         command_lane_enabled: false,
         status: "active",
+        mode: "text_callouts",
+        voice_output_enabled: false,
+      },
+      ledger: {
+        objective: "Monitor danger and progress.",
       },
     });
   });
@@ -112,10 +119,14 @@ describe("standby activity stream", () => {
       schema: "helix.situation_context_pack.v1",
       thread_id: threadId,
       room_id: event.room_id,
-      context_policy: "explicit_attachment_only",
+      context_policy: "compact_context_pack_only",
+      raw_transcript_included: false,
+      raw_audio_included: false,
+      deterministic_content_role: "observation_not_assistant_answer",
     });
     expect(pack.callouts.length).toBeGreaterThan(0);
     expect(JSON.stringify(pack)).not.toContain("worldEvents");
-    expect(JSON.stringify(pack)).not.toContain("raw");
+    expect(JSON.stringify(pack)).not.toContain("raw_transcript_text");
+    expect(JSON.stringify(pack)).not.toContain("raw_audio_bytes");
   });
 });

@@ -111,7 +111,7 @@ function postSituationThreadBinding(body: Record<string, unknown>): void {
 
 function postSituationGoalSession(body: Record<string, unknown>): void {
   if (typeof fetch !== "function") return;
-  void fetch("/api/agi/situation/goal-session", {
+  void fetch("/api/agi/situation/goal-session/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

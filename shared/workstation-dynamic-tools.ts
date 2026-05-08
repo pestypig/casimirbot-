@@ -245,7 +245,7 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     panel_id: "situation-room-pipelines",
     action_id: "start_situation_goal_session",
     required_args: ["thread_id"],
-    optional_args: ["room_id", "source_id", "world_id", "graph_id", "objective", "standby_mode", "append_policy"],
+    optional_args: ["room_id", "source_id", "world_id", "graph_id", "objective", "mode", "standby_mode", "append_policy"],
     risk: "medium",
     returns_artifact: true,
   },

@@ -2,6 +2,11 @@ export const HELIX_STANDBY_ACTIVITY_ITEM_SCHEMA =
   "helix.standby_activity_item.v1" as const;
 
 export type HelixStandbyActivityKind =
+  | "situation_goal_started"
+  | "observed"
+  | "episode_created"
+  | "prediction_updated"
+  | "salience_evaluated"
   | "source_event"
   | "episode"
   | "narration"
@@ -51,6 +56,11 @@ export type HelixStandbyActivityItem = {
   };
   evidence_refs: string[];
   linked_activity_ids?: string[];
+  metadata?: {
+    source?: string | null;
+    source_kind?: string | null;
+    [key: string]: unknown;
+  };
   ts: string;
 };
 
@@ -60,4 +70,10 @@ export type HelixStandbyActivityResponse = {
   thread_id: string;
   limit: number;
   activities: HelixStandbyActivityItem[];
+  diagnostics?: {
+    last_loaded_at: string;
+    activity_count: number;
+    thread_id: string;
+    last_fetch_error?: string | null;
+  };
 };
