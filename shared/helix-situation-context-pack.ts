@@ -19,6 +19,7 @@ export type SituationContextPack = {
     environment_id: string;
     objective: string;
     lines: import("./helix-live-answer-environment").LiveAnswerLineState[];
+    subgoals?: import("./helix-live-answer-environment").LiveAnswerEnvironmentSubgoal[];
     latest_summary: string;
     evidence_refs: string[];
     updated_at: string;

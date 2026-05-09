@@ -9,6 +9,9 @@ export type LiveAnswerLineUpdatePolicy =
   | "projection_only"
   | "salience_only"
   | "episode_based"
+  | "computation_tick"
+  | "stability_window"
+  | "anomaly_only"
   | "model_reviewed";
 
 export type LiveAnswerLineVisibility =
@@ -18,6 +21,9 @@ export type LiveAnswerLineVisibility =
 
 export type LiveAnswerEnvironmentPreset =
   | "minecraft_run_monitor"
+  | "calculator_prime_stream"
+  | "physics_stability_tracker"
+  | "browser_video_argument_tracker"
   | "discord_interpreter"
   | "browser_video_tracker"
   | "research_session"
@@ -41,10 +47,21 @@ export type LiveAnswerLineDefinition = {
 export type LiveAnswerLineState = LiveAnswerLineDefinition & {
   value: string;
   confidence?: number | null;
+  source_event_ids?: string[];
   evidence_refs: string[];
   updated_at: string;
   source: "deterministic_reducer" | "tool_observation" | "model_review" | "manual";
   model_invoked: boolean;
+  deterministic?: boolean;
+};
+
+export type LiveAnswerEnvironmentSubgoal = {
+  subgoal_id: string;
+  label: string;
+  status: "hypothesis" | "active" | "progress" | "blocked" | "completed" | "stale";
+  confidence: number;
+  evidence_refs: string[];
+  updated_at: string;
 };
 
 export type LiveAnswerEnvironment = {
@@ -53,6 +70,7 @@ export type LiveAnswerEnvironment = {
   thread_id: string;
   created_turn_id: string;
   objective: string;
+  preset?: string | null;
   room_id?: string | null;
   source_ids: string[];
   graph_id?: string | null;
@@ -60,6 +78,7 @@ export type LiveAnswerEnvironment = {
   mode: LiveAnswerEnvironmentMode;
   line_schema: LiveAnswerLineDefinition[];
   lines: LiveAnswerLineState[];
+  subgoals: LiveAnswerEnvironmentSubgoal[];
   latest_summary: string;
   evidence_refs: string[];
   created_at: string;
@@ -80,6 +99,8 @@ export type LiveAnswerEnvironmentDelta = {
     | "episode_update"
     | "salience_update"
     | "line_schema_update"
+    | "computation_tick"
+    | "subgoal_update"
     | "model_review"
     | "manual_refresh";
   changed_line_keys: string[];
@@ -135,6 +156,33 @@ export const LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS: Record<
     answer("unknowns", "Unknowns", "projection_only", "Known sensor or context gaps."),
     answer("last_decision", "Last decision", "salience_only", "Latest interjection decision."),
     answer("next_check", "Next check", "episode_based", "What the monitor should watch next."),
+  ],
+  calculator_prime_stream: [
+    answer("current_candidate", "Current candidate", "computation_tick", "Current integer being checked."),
+    answer("latest_prime", "Latest prime", "salience_only", "Most recent prime emitted by the stream."),
+    answer("prime_count", "Prime count", "computation_tick", "Number of primes found so far."),
+    answer("gap", "Gap", "computation_tick", "Gap from the previous prime."),
+    answer("last_test", "Last test", "computation_tick", "Latest deterministic primality result."),
+    answer("stability_rate", "Stability / rate", "stability_window", "Compact stream progress rate."),
+    answer("next_check", "Next check", "computation_tick", "Next candidate expected from the stream."),
+  ],
+  physics_stability_tracker: [
+    answer("current_parameters", "Current parameters", "projection_only", "Current simulation parameters."),
+    answer("latest_result", "Latest result", "computation_tick", "Latest simulation output."),
+    answer("residual", "Residual", "computation_tick", "Latest residual or error value."),
+    answer("stability_window", "Stability window", "stability_window", "Windowed stability summary."),
+    answer("margin_of_accuracy", "Margin of accuracy", "stability_window", "Tolerance or confidence margin."),
+    answer("anomaly", "Anomaly", "anomaly_only", "Current anomaly state."),
+    answer("next_sample", "Next sample", "computation_tick", "Next expected sample."),
+  ],
+  browser_video_argument_tracker: [
+    answer("claim", "Claim", "episode_based"),
+    answer("evidence", "Evidence", "episode_based"),
+    answer("counterpoint", "Counterpoint", "episode_based"),
+    answer("contradiction", "Contradiction", "salience_only"),
+    answer("confidence", "Confidence", "model_reviewed"),
+    answer("open_question", "Open question", "episode_based"),
+    answer("next_segment", "Next segment", "projection_only"),
   ],
   discord_interpreter: [
     answer("speaker_a", "Speaker A", "projection_only"),

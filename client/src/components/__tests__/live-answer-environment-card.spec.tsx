@@ -17,6 +17,7 @@ const environment: LiveAnswerEnvironment = {
   status: "active",
   mode: "text_only",
   line_schema: [],
+  subgoals: [],
   lines: [
     {
       key: "risk",

@@ -13,6 +13,7 @@ import { formatScientificCalculatorDebugLog } from "@/lib/scientific-calculator/
 import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
+import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
@@ -213,6 +214,8 @@ export default function ScientificCalculatorPanel() {
           </Button>
         </div>
       </div>
+
+      <ScientificCalculatorLiveSourceControls />
 
       <div className="mt-3 space-y-3 rounded-md border border-slate-800 bg-slate-900/40 p-3">
         {lastSolve ? (

@@ -34,6 +34,29 @@ describe("live answer environment", () => {
     expect(getActiveLiveAnswerEnvironmentForRoom("room:minecraft-minehut")?.environment_id).toBe(environment.environment_id);
   });
 
+  it("creates a calculator prime stream environment from the generic preset", () => {
+    const { environment, receipt } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:test",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      now: "2026-05-08T16:00:00.000Z",
+    });
+
+    expect(receipt.line_keys).toEqual([
+      "current_candidate",
+      "latest_prime",
+      "prime_count",
+      "gap",
+      "last_test",
+      "stability_rate",
+      "next_check",
+    ]);
+    expect(environment.subgoals).toEqual([]);
+    expect(environment.lines.find((line) => line.key === "latest_prime")?.model_invoked).toBe(false);
+  });
+
   it("updates matching lines from a salient Minecraft risk event", () => {
     const { environment } = createLiveAnswerEnvironment({
       thread_id: "helix-ask:test",

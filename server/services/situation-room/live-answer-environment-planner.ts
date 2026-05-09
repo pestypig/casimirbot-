@@ -13,14 +13,18 @@ export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
   if (/\btrack\s+this\s+video\b/.test(normalized)) return true;
   if (/\bfollow\s+this\s+research\s+session\b/.test(normalized)) return true;
   if (/\bwatch\s+my\s+minecraft\s+run\b/.test(normalized)) return true;
-  if (/\bcreate\s+(?:a\s+)?live\s+.*\b(?:discord|minecraft|video|research)\b/.test(normalized)) return true;
+  if (/\b(?:prime\s+number|next\s+primes|prime\s+generator|calculator\s+(?:series|stream)|live\s+prime)\b/.test(normalized)) return true;
+  if (/\b(?:track|monitor|set\s+up).*?\b(?:simulation|residual|stability)\b/.test(normalized)) return true;
+  if (/\bcreate\s+(?:a\s+)?live\s+.*\b(?:discord|minecraft|video|research|calculator|prime|simulation)\b/.test(normalized)) return true;
   return false;
 }
 
 export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswerEnvironmentPreset {
   const normalized = transcript.trim().toLowerCase();
+  if (has(normalized, /\bprime\s+number|next\s+primes|prime\s+generator|calculator\s+(?:series|stream)|live\s+prime\b/)) return "calculator_prime_stream";
+  if (has(normalized, /\bphysics|simulation|residual|stability|stabilizes?|tolerance\b/)) return "physics_stability_tracker";
   if (has(normalized, /\bdiscord|call|speaker|interpreter|translation\b/)) return "discord_interpreter";
-  if (has(normalized, /\bvideo|claim|evidence|contradiction|segment\b/)) return "browser_video_tracker";
+  if (has(normalized, /\bvideo|claim|evidence|contradiction|segment\b/)) return "browser_video_argument_tracker";
   if (has(normalized, /\bresearch|hypothesis|caveat|computation|paper\b/)) return "research_session";
   if (has(normalized, /\bminecraft|minehut|mine\s*hut|game|run\b/)) return "minecraft_run_monitor";
   return "custom";
@@ -36,6 +40,16 @@ export function inferLiveAnswerEnvironmentSourceArgs(transcript: string): {
     return {
       room_id: "room:minecraft-minehut",
       source_ids: ["source:minecraft-server"],
+    };
+  }
+  if (preset === "calculator_prime_stream") {
+    return {
+      source_ids: ["source:calculator-prime-stream"],
+    };
+  }
+  if (preset === "physics_stability_tracker") {
+    return {
+      source_ids: ["source:physics-simulation"],
     };
   }
   return {};
@@ -62,6 +76,17 @@ export function buildLiveAnswerEnvironmentArgs(args: {
     preset,
     mode,
     ...inferLiveAnswerEnvironmentSourceArgs(args.transcript),
+    ...(preset === "calculator_prime_stream"
+      ? {
+          source_config: {
+            generator: "next_prime",
+            start: 2,
+            tick_rate_ms: 1000,
+            max_ticks: 100,
+            primality_check: "trial_division",
+          },
+        }
+      : {}),
     ...(args.line_schema ? { line_schema: args.line_schema } : {}),
   };
 }

@@ -595,6 +595,22 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         required_args: ["graph_id"],
         returns_artifact: true,
       },
+      {
+        id: "create_live_answer_environment",
+        title: "Create Live Answer Environment",
+        description: "Create a turn-owned live answer card backed by Situation Room source updates.",
+        risk: "medium",
+        aliases: [
+          "create live answer environment",
+          "start live answer",
+          "watch my minecraft run",
+          "set up prime stream",
+          "track this simulation",
+        ],
+        required_args: ["objective"],
+        optional_args: ["thread_id", "room_id", "source_ids", "graph_id", "preset", "line_schema", "mode", "source_config"],
+        returns_artifact: true,
+      },
     ],
   }),
   "workstation-clipboard-history": makeCapabilities({

@@ -80,6 +80,7 @@ export function buildSituationContextPack(args: {
           environment_id: liveAnswerEnvironment.environment_id,
           objective: liveAnswerEnvironment.objective,
           lines: liveAnswerEnvironment.lines,
+          subgoals: liveAnswerEnvironment.subgoals,
           latest_summary: liveAnswerEnvironment.latest_summary,
           evidence_refs: liveAnswerEnvironment.evidence_refs,
           updated_at: liveAnswerEnvironment.updated_at,

@@ -1596,6 +1596,10 @@ export function executeHelixPanelAction(
         preset: asNonEmptyString(args.preset) ?? "custom",
         line_schema: Array.isArray(args.line_schema) ? args.line_schema : undefined,
         mode: asNonEmptyString(args.mode) ?? "text_only",
+        source_config:
+          args.source_config && typeof args.source_config === "object"
+            ? args.source_config as Record<string, unknown>
+            : undefined,
       };
       postLiveAnswerEnvironment(request);
       context.openPanel(panelId, undefined);

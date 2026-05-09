@@ -263,7 +263,7 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     panel_id: "situation-room-pipelines",
     action_id: "create_live_answer_environment",
     required_args: ["objective"],
-    optional_args: ["thread_id", "room_id", "source_ids", "graph_id", "preset", "line_schema", "mode"],
+    optional_args: ["thread_id", "room_id", "source_ids", "graph_id", "preset", "line_schema", "mode", "source_config"],
     risk: "medium",
     returns_artifact: true,
   },
