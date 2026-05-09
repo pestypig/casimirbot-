@@ -269,6 +269,46 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   },
   {
     panel_id: "situation-room-pipelines",
+    action_id: "attach_live_source",
+    required_args: ["environment_id", "source_id"],
+    optional_args: ["thread_id", "source_family", "kind", "panel_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "pause_live_answer_environment",
+    required_args: ["environment_id"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "resume_live_answer_environment",
+    required_args: ["environment_id"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "stop_live_answer_environment",
+    required_args: ["environment_id"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "set_live_line_schema",
+    required_args: ["environment_id", "line_schema"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
     action_id: "mission_memory.refresh",
     required_args: ["thread_id"],
     optional_args: ["room_id", "session_id"],
@@ -293,6 +333,38 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "scientific-calculator", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "scientific-calculator",
+    action_id: "start_prime_stream",
+    required_args: [],
+    optional_args: ["environment_id", "source_id", "tick_rate_ms", "max_ticks", "start"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "scientific-calculator",
+    action_id: "stop_live_source",
+    required_args: [],
+    optional_args: ["source_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "scientific-calculator",
+    action_id: "restart_live_source",
+    required_args: [],
+    optional_args: ["environment_id", "source_id", "tick_rate_ms", "max_ticks", "start"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "scientific-calculator",
+    action_id: "emit_live_tick",
+    required_args: [],
+    optional_args: ["environment_id", "source_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
 ];
 
 export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
@@ -529,6 +601,8 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "lane") return { enum: ["audio", "speaker_identity", "transcript", "translation", "context", "command", "voice_output"] };
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
+  if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
+  if (arg === "tick_rate_ms" || arg === "max_ticks" || arg === "start") return { type: "number" };
   return { type: "string" };
 }
 
@@ -564,6 +638,9 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "attach_standby_to_helix_thread") return "situation_thread_binding_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "start_situation_goal_session") return "situation_goal_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "create_live_answer_environment") return "live_answer_environment_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "attach_live_source") return "workstation_live_source_receipt";
+  if (panelId === "situation-room-pipelines" && ["pause_live_answer_environment", "resume_live_answer_environment", "stop_live_answer_environment", "set_live_line_schema"].includes(actionId)) return "live_answer_environment_receipt";
+  if (panelId === "scientific-calculator" && ["start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "mission_memory.refresh") return "mission_memory_update";
   if (panelId === "situation-room-pipelines" && actionId === "interjection_investigator.review_latest") return "interjection_decision";
   if (panelId === "situation-room-pipelines" && actionId === "situation_context.attach_to_ask") return "situation_context_pack";

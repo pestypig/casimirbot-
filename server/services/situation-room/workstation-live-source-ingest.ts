@@ -3,6 +3,7 @@ import {
   HELIX_WORKSTATION_LIVE_SOURCE_EVENT_SCHEMA,
   HELIX_WORKSTATION_LIVE_SOURCE_SCHEMA,
   type WorkstationLiveSource,
+  type WorkstationLiveSourceFamily,
   type WorkstationLiveSourceEvent,
   type WorkstationLiveSourceKind,
 } from "@shared/helix-workstation-live-source";
@@ -40,14 +41,33 @@ const cleanString = (value: unknown): string | null => {
 const normalizeKind = (value: unknown): WorkstationLiveSourceKind => {
   if (
     value === "minecraft_world_events" ||
+    value === "minecraft_world" ||
     value === "calculator_series" ||
+    value === "calculator_stream" ||
     value === "physics_simulation" ||
     value === "browser_audio_transcript" ||
+    value === "browser_audio" ||
     value === "screen_summary" ||
     value === "manual_feed" ||
+    value === "manual_debug" ||
     value === "custom_panel"
-  ) return value;
+  ) {
+    if (value === "minecraft_world") return "minecraft_world_events";
+    if (value === "calculator_stream") return "calculator_series";
+    if (value === "browser_audio") return "browser_audio_transcript";
+    if (value === "manual_debug") return "manual_feed";
+    return value;
+  }
   return "custom_panel";
+};
+
+const sourceFamilyForKind = (kind: WorkstationLiveSourceKind): WorkstationLiveSourceFamily => {
+  if (kind === "minecraft_world_events") return "minecraft_world";
+  if (kind === "calculator_series") return "calculator_stream";
+  if (kind === "physics_simulation") return "physics_simulation";
+  if (kind === "browser_audio_transcript") return "browser_audio";
+  if (kind === "screen_summary") return "screen_summary";
+  return "manual_debug";
 };
 
 export function upsertWorkstationLiveSource(input: {
@@ -122,14 +142,19 @@ export function ingestWorkstationLiveSourceEvent(input: {
   const event: WorkstationLiveSourceEvent = {
     schema: HELIX_WORKSTATION_LIVE_SOURCE_EVENT_SCHEMA,
     event_id: `live_source_event:${hashShort([source.source_id, environment?.environment_id ?? null, seq, input.event_type, payload], 18)}`,
+    source_event_id: `live_source_event:${hashShort([source.source_id, environment?.environment_id ?? null, seq, input.event_type, payload], 18)}`,
     source_id: source.source_id,
     environment_id: environment?.environment_id ?? source.environment_id ?? null,
+    thread_id: environment?.thread_id ?? source.thread_id ?? cleanString(input.thread_id),
     seq,
+    tick_index: seq,
     ts,
     kind,
+    source_family: sourceFamilyForKind(kind),
     event_type: cleanString(input.event_type) ?? "source_tick",
     payload,
     evidence_refs: Array.from(new Set([...(input.evidence_refs ?? []), `source:${source.source_id}:seq:${seq}`])).slice(-24),
+    deterministic: input.trace?.deterministic === false ? false : true,
     trace: input.trace ?? null,
   };
   eventsBySource.set(source.source_id, [...(eventsBySource.get(source.source_id) ?? []), event].slice(-256));
@@ -157,6 +182,22 @@ export function listWorkstationLiveSources(): WorkstationLiveSource[] {
 export function listWorkstationLiveSourceEvents(sourceId?: string | null): WorkstationLiveSourceEvent[] {
   if (sourceId) return eventsBySource.get(sourceId) ?? [];
   return Array.from(eventsBySource.values()).flat().sort((a: WorkstationLiveSourceEvent, b: WorkstationLiveSourceEvent) => a.ts.localeCompare(b.ts));
+}
+
+export function setWorkstationLiveSourceStatus(input: {
+  source_id: string;
+  status: WorkstationLiveSource["status"];
+  now?: string;
+}): WorkstationLiveSource | null {
+  const existing = sources.get(input.source_id);
+  if (!existing) return null;
+  const next: WorkstationLiveSource = {
+    ...existing,
+    status: input.status,
+    updated_at: input.now ?? new Date().toISOString(),
+  };
+  sources.set(next.source_id, next);
+  return next;
 }
 
 export function resetWorkstationLiveSources(): void {

@@ -20,6 +20,7 @@ export type SituationContextPack = {
     objective: string;
     lines: import("./helix-live-answer-environment").LiveAnswerLineState[];
     subgoals?: import("./helix-live-answer-environment").LiveAnswerEnvironmentSubgoal[];
+    latest_evaluation?: import("./helix-live-answer-environment").LiveAnswerEvaluation | null;
     latest_summary: string;
     evidence_refs: string[];
     updated_at: string;
@@ -54,6 +55,7 @@ export type SituationContextPack = {
   evidence_refs: string[];
   created_at: string;
   context_policy: "compact_context_pack_only";
+  raw_logs_included?: false;
   raw_transcript_included: false;
   raw_audio_included: false;
   deterministic_content_role: "observation_not_assistant_answer";

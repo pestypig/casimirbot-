@@ -4,6 +4,7 @@ import {
   getActiveLiveAnswerEnvironmentForRoom,
   listLiveAnswerEnvironmentDeltas,
   resetLiveAnswerEnvironments,
+  setLiveAnswerEnvironmentStatus,
 } from "../services/situation-room/live-answer-environment-store";
 import { reduceLiveAnswerEnvironmentFromWorldEvent } from "../services/situation-room/live-answer-line-reducer";
 
@@ -54,7 +55,34 @@ describe("live answer environment", () => {
       "next_check",
     ]);
     expect(environment.subgoals).toEqual([]);
+    expect(environment.raw_logs_included).toBe(false);
+    expect(environment.lines_by_key?.latest_prime?.model_invoked).toBe(false);
     expect(environment.lines.find((line) => line.key === "latest_prime")?.model_invoked).toBe(false);
+  });
+
+  it("updates live environment lifecycle without creating answer content", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:test",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      now: "2026-05-08T16:00:00.000Z",
+    });
+
+    const paused = setLiveAnswerEnvironmentStatus({
+      environment_id: environment.environment_id,
+      status: "paused",
+      now: "2026-05-08T16:00:01.000Z",
+    });
+
+    expect(paused?.environment.status).toBe("paused");
+    expect(paused?.environment.latest_evaluation).toMatchObject({
+      model_invoked: false,
+      deterministic: true,
+      summary: "Live answer environment paused.",
+    });
+    expect(paused?.delta.reason).toBe("manual_refresh");
   });
 
   it("updates matching lines from a salient Minecraft risk event", () => {

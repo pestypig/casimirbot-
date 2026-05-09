@@ -10,6 +10,14 @@ export type WorkstationLiveSourceKind =
   | "manual_feed"
   | "custom_panel";
 
+export type WorkstationLiveSourceFamily =
+  | "minecraft_world"
+  | "calculator_stream"
+  | "physics_simulation"
+  | "browser_audio"
+  | "screen_summary"
+  | "manual_debug";
+
 export type WorkstationLiveSource = {
   schema: typeof HELIX_WORKSTATION_LIVE_SOURCE_SCHEMA;
   source_id: string;
@@ -27,13 +35,18 @@ export type WorkstationLiveSource = {
 export type WorkstationLiveSourceEvent = {
   schema: typeof HELIX_WORKSTATION_LIVE_SOURCE_EVENT_SCHEMA;
   event_id: string;
+  source_event_id?: string;
   source_id: string;
   environment_id?: string | null;
+  thread_id?: string | null;
   seq: number;
+  tick_index?: number | null;
   ts: string;
   kind: WorkstationLiveSourceKind;
+  source_family?: WorkstationLiveSourceFamily;
   event_type: string;
   payload: Record<string, unknown>;
   evidence_refs: string[];
+  deterministic?: boolean;
   trace?: Record<string, unknown> | null;
 };

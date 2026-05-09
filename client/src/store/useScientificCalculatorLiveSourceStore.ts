@@ -53,16 +53,18 @@ const postTick = async (args: {
   tick: PrimeSeriesTick;
 }) => {
   if (typeof fetch !== "function") return null;
-  const response = await fetch("/api/agi/situation/workstation-live-source/event", {
+  const response = await fetch("/api/agi/situation/live-source/event", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       source_id: args.sourceId,
       environment_id: args.environmentId,
       kind: "calculator_series",
+      source_family: "calculator_stream",
       panel_id: "scientific-calculator",
       event_type: args.tick.event_type,
       seq: args.tick.state.seq,
+      tick_index: args.tick.state.seq,
       payload: args.tick.payload,
       trace: args.tick.trace,
       evidence_refs: [`calculator:prime:${args.tick.payload.candidate}`],

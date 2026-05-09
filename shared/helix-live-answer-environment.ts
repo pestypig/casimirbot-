@@ -9,6 +9,8 @@ export type LiveAnswerLineUpdatePolicy =
   | "projection_only"
   | "salience_only"
   | "episode_based"
+  | "tick_based"
+  | "windowed_summary"
   | "computation_tick"
   | "stability_window"
   | "anomaly_only"
@@ -34,6 +36,12 @@ export type LiveAnswerEnvironmentMode =
   | "voice_on_confirm"
   | "critical_voice"
   | "direct_address_only";
+
+export type LiveAnswerEnvironmentStatus =
+  | "active"
+  | "paused"
+  | "completed"
+  | "error";
 
 export type LiveAnswerLineDefinition = {
   key: string;
@@ -64,6 +72,27 @@ export type LiveAnswerEnvironmentSubgoal = {
   updated_at: string;
 };
 
+export type LiveAnswerEvaluation = {
+  evaluation_id: string;
+  reason:
+    | "source_event"
+    | "episode_update"
+    | "salience_update"
+    | "line_schema_update"
+    | "tick_based"
+    | "windowed_summary"
+    | "model_review"
+    | "manual_refresh";
+  summary: string;
+  priority: "info" | "warn" | "critical" | "action";
+  model_invoked: boolean;
+  deterministic: boolean;
+  evidence_refs: string[];
+  ts: string;
+};
+
+export type LiveAnswerSubgoal = LiveAnswerEnvironmentSubgoal;
+
 export type LiveAnswerEnvironment = {
   schema: typeof HELIX_LIVE_ANSWER_ENVIRONMENT_SCHEMA;
   environment_id: string;
@@ -74,16 +103,19 @@ export type LiveAnswerEnvironment = {
   room_id?: string | null;
   source_ids: string[];
   graph_id?: string | null;
-  status: "active" | "paused" | "completed" | "error";
+  status: LiveAnswerEnvironmentStatus;
   mode: LiveAnswerEnvironmentMode;
   line_schema: LiveAnswerLineDefinition[];
   lines: LiveAnswerLineState[];
+  lines_by_key?: Record<string, LiveAnswerLineState>;
   subgoals: LiveAnswerEnvironmentSubgoal[];
+  latest_evaluation?: LiveAnswerEvaluation | null;
   latest_summary: string;
   evidence_refs: string[];
   created_at: string;
   updated_at: string;
   context_policy: "compact_context_pack_only";
+  raw_logs_included?: false;
   raw_transcript_included: false;
   raw_audio_included: false;
   deterministic_content_role: "observation_not_assistant_answer";
@@ -100,6 +132,8 @@ export type LiveAnswerEnvironmentDelta = {
     | "salience_update"
     | "line_schema_update"
     | "computation_tick"
+    | "tick_based"
+    | "windowed_summary"
     | "subgoal_update"
     | "model_review"
     | "manual_refresh";
@@ -163,7 +197,7 @@ export const LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS: Record<
     answer("prime_count", "Prime count", "computation_tick", "Number of primes found so far."),
     answer("gap", "Gap", "computation_tick", "Gap from the previous prime."),
     answer("last_test", "Last test", "computation_tick", "Latest deterministic primality result."),
-    answer("stability_rate", "Stability / rate", "stability_window", "Compact stream progress rate."),
+    answer("stability_rate", "Rate", "windowed_summary", "Compact stream progress rate."),
     answer("next_check", "Next check", "computation_tick", "Next candidate expected from the stream."),
   ],
   physics_stability_tracker: [

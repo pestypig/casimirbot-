@@ -8,6 +8,7 @@ import {
   type LiveAnswerEnvironmentDelta,
   type LiveAnswerEnvironmentMode,
   type LiveAnswerEnvironmentPreset,
+  type LiveAnswerEnvironmentStatus,
   type LiveAnswerEnvironmentReceipt,
   type LiveAnswerLineDefinition,
   type LiveAnswerLineState,
@@ -74,7 +75,9 @@ const normalizeLineDefinition = (line: LiveAnswerLineDefinition): LiveAnswerLine
     line.update_policy === "projection_only" ||
     line.update_policy === "salience_only" ||
     line.update_policy === "computation_tick" ||
+    line.update_policy === "tick_based" ||
     line.update_policy === "stability_window" ||
+    line.update_policy === "windowed_summary" ||
     line.update_policy === "anomaly_only" ||
     line.update_policy === "model_reviewed"
       ? line.update_policy
@@ -123,6 +126,7 @@ const initialValueForLine = (line: LiveAnswerLineDefinition, objective: string):
   if (line.key === "gap") return "Waiting for a prime gap.";
   if (line.key === "last_test") return "No primality test yet.";
   if (line.key === "stability_rate") return "Waiting for stream ticks.";
+  if (line.key === "rate") return "Waiting for stream ticks.";
   return "Waiting for source evidence.";
 };
 
@@ -146,6 +150,9 @@ const buildEnvironmentId = (input: {
 }): string =>
   `live_answer:${hashShort([input.thread_id, input.created_turn_id, input.room_id ?? null, input.objective], 18)}`;
 
+const buildLinesByKey = (lines: LiveAnswerLineState[]): Record<string, LiveAnswerLineState> =>
+  Object.fromEntries(lines.map((line: LiveAnswerLineState) => [line.key, line]));
+
 export const hashLiveAnswerEnvironment = (environment: LiveAnswerEnvironment): string =>
   hashShort({
     environment_id: environment.environment_id,
@@ -156,7 +163,9 @@ export const hashLiveAnswerEnvironment = (environment: LiveAnswerEnvironment): s
     preset: environment.preset ?? null,
     line_schema: environment.line_schema,
     lines: environment.lines,
+    lines_by_key: environment.lines_by_key ?? buildLinesByKey(environment.lines),
     subgoals: environment.subgoals,
+    latest_evaluation: environment.latest_evaluation ?? null,
     latest_summary: environment.latest_summary,
     evidence_refs: environment.evidence_refs,
     updated_at: environment.updated_at,
@@ -214,12 +223,17 @@ export function createLiveAnswerEnvironment(input: {
     lines: existing?.lines?.length
       ? existing.lines
       : lineSchema.map((line: LiveAnswerLineDefinition) => makeLineState(line, objective, now, setupEvidence)),
+    lines_by_key: buildLinesByKey(existing?.lines?.length
+      ? existing.lines
+      : lineSchema.map((line: LiveAnswerLineDefinition) => makeLineState(line, objective, now, setupEvidence))),
     subgoals: existing?.subgoals ?? [],
+    latest_evaluation: existing?.latest_evaluation ?? null,
     latest_summary: existing?.latest_summary ?? "Live answer environment is active.",
     evidence_refs: uniqueStrings([...(existing?.evidence_refs ?? []), ...setupEvidence]),
     created_at: existing?.created_at ?? now,
     updated_at: now,
     context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
     raw_transcript_included: false,
     raw_audio_included: false,
     deterministic_content_role: "observation_not_assistant_answer",
@@ -315,6 +329,30 @@ export function updateLiveAnswerEnvironment(input: {
   const next: LiveAnswerEnvironment = {
     ...existing,
     lines: nextLines,
+    lines_by_key: buildLinesByKey(nextLines),
+    latest_evaluation: {
+      evaluation_id: `live_answer_eval:${hashShort([existing.environment_id, input.reason, changedLineKeys, now], 18)}`,
+      reason:
+        input.reason === "computation_tick"
+          ? "tick_based"
+          : input.reason === "subgoal_update"
+            ? "windowed_summary"
+            : input.reason,
+      summary: normalizeString(input.latest_summary) ?? nextLines.find((line: LiveAnswerLineState) => line.key === changedLineKeys[0])?.value ?? existing.latest_summary,
+      priority: changedLineKeys.some((key: string) => nextLines.find((line: LiveAnswerLineState) => line.key === key)?.priority === "critical")
+        ? "critical"
+        : changedLineKeys.some((key: string) => nextLines.find((line: LiveAnswerLineState) => line.key === key)?.priority === "warn")
+          ? "warn"
+          : "info",
+      model_invoked: Object.values(input.line_values).some((value: {
+        model_invoked?: boolean;
+      }) => value.model_invoked === true),
+      deterministic: !Object.values(input.line_values).some((value: {
+        model_invoked?: boolean;
+      }) => value.model_invoked === true),
+      evidence_refs: uniqueStrings(input.evidence_refs ?? []),
+      ts: now,
+    },
     latest_summary: normalizeString(input.latest_summary) ?? nextLines.find((line: LiveAnswerLineState) => line.key === changedLineKeys[0])?.value ?? existing.latest_summary,
     evidence_refs: uniqueStrings([...(existing.evidence_refs ?? []), ...(input.evidence_refs ?? [])]).slice(-48),
     updated_at: now,
@@ -339,6 +377,124 @@ export function updateLiveAnswerEnvironment(input: {
 
 export function listLiveAnswerEnvironmentDeltas(environmentId: string): LiveAnswerEnvironmentDelta[] {
   return deltasByEnvironment.get(environmentId) ?? [];
+}
+
+export function setLiveAnswerEnvironmentStatus(input: {
+  environment_id: string;
+  status: LiveAnswerEnvironmentStatus;
+  now?: string;
+}): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
+  const existing = environments.get(input.environment_id);
+  if (!existing) return null;
+  const now = input.now ?? new Date().toISOString();
+  if (existing.status === input.status) {
+    return {
+      environment: existing,
+      delta: {
+        schema: HELIX_LIVE_ANSWER_ENVIRONMENT_DELTA_SCHEMA,
+        delta_id: `live_answer_delta:${hashShort([existing.environment_id, "status_noop", input.status, now], 18)}`,
+        environment_id: existing.environment_id,
+        thread_id: existing.thread_id,
+        reason: "manual_refresh",
+        changed_line_keys: [],
+        previous_hash: hashLiveAnswerEnvironment(existing),
+        next_hash: hashLiveAnswerEnvironment(existing),
+        environment_snapshot: existing,
+        evidence_refs: [`live_answer_environment:${existing.environment_id}:status:${input.status}`],
+        ts: now,
+      },
+    };
+  }
+  const previousHash = hashLiveAnswerEnvironment(existing);
+  const next: LiveAnswerEnvironment = {
+    ...existing,
+    status: input.status,
+    lines_by_key: buildLinesByKey(existing.lines),
+    latest_evaluation: {
+      evaluation_id: `live_answer_eval:${hashShort([existing.environment_id, "status", input.status, now], 18)}`,
+      reason: "manual_refresh",
+      summary: `Live answer environment ${input.status}.`,
+      priority: "info",
+      model_invoked: false,
+      deterministic: true,
+      evidence_refs: [`live_answer_environment:${existing.environment_id}:status:${input.status}`],
+      ts: now,
+    },
+    latest_summary: `Live answer environment ${input.status}.`,
+    updated_at: now,
+  };
+  environments.set(next.environment_id, next);
+  const delta: LiveAnswerEnvironmentDelta = {
+    schema: HELIX_LIVE_ANSWER_ENVIRONMENT_DELTA_SCHEMA,
+    delta_id: `live_answer_delta:${hashShort([next.environment_id, "status", input.status, now], 18)}`,
+    environment_id: next.environment_id,
+    thread_id: next.thread_id,
+    reason: "manual_refresh",
+    changed_line_keys: [],
+    previous_hash: previousHash,
+    next_hash: hashLiveAnswerEnvironment(next),
+    environment_snapshot: next,
+    evidence_refs: [`live_answer_environment:${next.environment_id}:status:${input.status}`],
+    ts: now,
+  };
+  deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
+  return { environment: next, delta };
+}
+
+export function setLiveAnswerEnvironmentLineSchema(input: {
+  environment_id: string;
+  line_schema: LiveAnswerLineDefinition[];
+  now?: string;
+}): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
+  const existing = environments.get(input.environment_id);
+  if (!existing) return null;
+  const now = input.now ?? new Date().toISOString();
+  const previousHash = hashLiveAnswerEnvironment(existing);
+  const normalizedSchema = input.line_schema
+    .map((line: LiveAnswerLineDefinition) => normalizeLineDefinition(line))
+    .filter((line: LiveAnswerLineDefinition | null): line is LiveAnswerLineDefinition => Boolean(line))
+    .slice(0, 16);
+  if (normalizedSchema.length === 0) return null;
+  const existingByKey = buildLinesByKey(existing.lines);
+  const nextLines = normalizedSchema.map((line: LiveAnswerLineDefinition) =>
+    existingByKey[line.key]
+      ? { ...existingByKey[line.key], ...line }
+      : makeLineState(line, existing.objective, now, [`live_answer_environment:${existing.environment_id}:line_schema`]),
+  );
+  const next: LiveAnswerEnvironment = {
+    ...existing,
+    line_schema: normalizedSchema,
+    lines: nextLines,
+    lines_by_key: buildLinesByKey(nextLines),
+    latest_evaluation: {
+      evaluation_id: `live_answer_eval:${hashShort([existing.environment_id, "line_schema", now], 18)}`,
+      reason: "line_schema_update",
+      summary: "Live answer line schema updated.",
+      priority: "info",
+      model_invoked: false,
+      deterministic: true,
+      evidence_refs: [`live_answer_environment:${existing.environment_id}:line_schema`],
+      ts: now,
+    },
+    latest_summary: "Live answer line schema updated.",
+    updated_at: now,
+  };
+  environments.set(next.environment_id, next);
+  const delta: LiveAnswerEnvironmentDelta = {
+    schema: HELIX_LIVE_ANSWER_ENVIRONMENT_DELTA_SCHEMA,
+    delta_id: `live_answer_delta:${hashShort([next.environment_id, "line_schema", now], 18)}`,
+    environment_id: next.environment_id,
+    thread_id: next.thread_id,
+    reason: "line_schema_update",
+    changed_line_keys: normalizedSchema.map((line: LiveAnswerLineDefinition) => line.key),
+    previous_hash: previousHash,
+    next_hash: hashLiveAnswerEnvironment(next),
+    environment_snapshot: next,
+    evidence_refs: [`live_answer_environment:${next.environment_id}:line_schema`],
+    ts: now,
+  };
+  deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
+  return { environment: next, delta };
 }
 
 export function resetLiveAnswerEnvironments(): void {

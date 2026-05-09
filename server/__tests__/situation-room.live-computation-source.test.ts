@@ -56,7 +56,18 @@ describe("workstation live computation source", () => {
       reason: "computation_tick",
       changed_line_keys: expect.arrayContaining(["current_candidate", "latest_prime", "prime_count", "last_test"]),
     });
+    expect(result.event).toMatchObject({
+      source_event_id: result.event.event_id,
+      source_family: "calculator_stream",
+      tick_index: 6,
+      deterministic: true,
+    });
     expect(result.live_answer_environment?.lines.find((line) => line.key === "latest_prime")?.value).toBe("7");
+    expect(result.live_answer_environment?.latest_evaluation).toMatchObject({
+      reason: "tick_based",
+      model_invoked: false,
+      deterministic: true,
+    });
     expect(result.live_answer_environment?.lines.find((line) => line.key === "last_test")?.value).toBe("7 is prime.");
   });
 });

@@ -13,6 +13,7 @@ import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
 import {
   useSituationRoomStore,
   selectSituationRoomEvents,
@@ -120,10 +121,19 @@ function postSituationGoalSession(body: Record<string, unknown>): void {
 
 function postLiveAnswerEnvironment(body: Record<string, unknown>): void {
   if (typeof fetch !== "function") return;
-  void fetch("/api/agi/situation/live-answer-environment/start", {
+  void fetch("/api/agi/situation/live-answer-environment/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
+function postLiveEnvironmentControl(path: string, body?: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
   }).catch(() => undefined);
 }
 
@@ -1620,6 +1630,67 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (
+      actionId === "pause_live_answer_environment" ||
+      actionId === "resume_live_answer_environment" ||
+      actionId === "stop_live_answer_environment" ||
+      actionId === "set_live_line_schema" ||
+      actionId === "attach_live_source"
+    ) {
+      const environmentId = asNonEmptyString(args.environment_id ?? args.environmentId);
+      if (!environmentId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `${actionId} requires environment_id.`,
+        };
+      }
+      if (actionId === "pause_live_answer_environment") {
+        postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/pause`);
+      } else if (actionId === "resume_live_answer_environment") {
+        postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/resume`);
+      } else if (actionId === "stop_live_answer_environment") {
+        postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/stop`);
+      } else if (actionId === "set_live_line_schema") {
+        postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/line-schema`, {
+          line_schema: Array.isArray(args.line_schema) ? args.line_schema : [],
+        });
+      } else {
+        const sourceId = asNonEmptyString(args.source_id ?? args.sourceId);
+        postLiveEnvironmentControl("/api/agi/situation/live-source/event", {
+          source_id: sourceId ?? "source:manual-feed",
+          environment_id: environmentId,
+          thread_id: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
+          kind: asNonEmptyString(args.kind) ?? asNonEmptyString(args.source_family) ?? "manual_feed",
+          panel_id: asNonEmptyString(args.panel_id) ?? panelId,
+          event_type: "source_attached",
+          payload: {
+            attached: true,
+            source_id: sourceId ?? "source:manual-feed",
+          },
+          evidence_refs: [`live_answer_environment:${environmentId}:source_attached`],
+        });
+      }
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: actionId === "attach_live_source" ? "workstation_live_source_receipt" : "live_answer_environment_receipt",
+          ok: true,
+          environment_id: environmentId,
+          request: args,
+          deterministic: true,
+          model_invoked: false,
+          context_role: "observation_not_assistant_answer",
+        },
+        message: `Queued ${actionId.replace(/_/g, " ")} for ${environmentId}.`,
+      };
+    }
+
     if (actionId === "mission_memory.refresh") {
       const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
       const body = {
@@ -2133,6 +2204,51 @@ export function executeHelixPanelAction(
           cleared: true,
           debug_event: useScientificCalculatorStore.getState().debugEvents[0] ?? null,
           debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
+        },
+      };
+    }
+
+    if (
+      actionId === "start_prime_stream" ||
+      actionId === "restart_live_source" ||
+      actionId === "stop_live_source" ||
+      actionId === "emit_live_tick"
+    ) {
+      const liveSource = useScientificCalculatorLiveSourceStore.getState();
+      const streamInput = {
+        environmentId: asNonEmptyString(args.environment_id ?? args.environmentId),
+        sourceId: asNonEmptyString(args.source_id ?? args.sourceId),
+        tickRateMs: typeof args.tick_rate_ms === "number" ? args.tick_rate_ms : undefined,
+        maxTicks: typeof args.max_ticks === "number" ? args.max_ticks : undefined,
+        start: typeof args.start === "number" ? args.start : undefined,
+      };
+      if (actionId === "start_prime_stream") {
+        void liveSource.startPrimeStream(streamInput);
+      } else if (actionId === "restart_live_source") {
+        void liveSource.startPrimeStream(streamInput);
+      } else if (actionId === "stop_live_source") {
+        liveSource.stopPrimeStream();
+      } else {
+        void liveSource.emitNextTick();
+      }
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      const latestLiveSource = useScientificCalculatorLiveSourceStore.getState();
+      return {
+        ok: latestLiveSource.status !== "error",
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "workstation_live_source_receipt",
+          source_id: latestLiveSource.sourceId,
+          environment_id: latestLiveSource.environmentId,
+          status: latestLiveSource.status,
+          seq: latestLiveSource.state.seq,
+          latest_tick: latestLiveSource.latestTick,
+          deterministic: true,
+          model_invoked: false,
+          context_role: "observation_not_assistant_answer",
+          debug_log_tail: latestLiveSource.debugLog.slice(0, 12),
         },
       };
     }
