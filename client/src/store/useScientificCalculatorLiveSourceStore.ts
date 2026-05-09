@@ -73,6 +73,20 @@ const postTick = async (args: {
   return response.ok ? response.json() : null;
 };
 
+const postSourceLifecycle = async (
+  sourceId: string,
+  action: "resume" | "stop" | "reset-counters" | "tick-rate",
+  body?: Record<string, unknown>,
+) => {
+  if (typeof fetch !== "function") return null;
+  const response = await fetch(`/api/agi/situation/live-source/${encodeURIComponent(sourceId)}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return response.ok ? response.json() : null;
+};
+
 const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> = (set, get) => ({
   status: "idle",
   sourceId: DEFAULT_SOURCE_ID,
@@ -88,9 +102,13 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
     const environmentId = input.environmentId ?? await resolveEnvironmentId();
     const tickRateMs = Math.max(250, Math.floor(input.tickRateMs ?? 1000));
     const maxTicks = Math.max(1, Math.floor(input.maxTicks ?? 100));
+    const sourceId = input.sourceId ?? DEFAULT_SOURCE_ID;
+    void postSourceLifecycle(sourceId, "reset-counters");
+    void postSourceLifecycle(sourceId, "tick-rate", { tick_rate_ms: tickRateMs });
+    void postSourceLifecycle(sourceId, "resume");
     set({
       status: "active",
-      sourceId: input.sourceId ?? DEFAULT_SOURCE_ID,
+      sourceId,
       environmentId,
       tickRateMs,
       maxTicks,
@@ -106,6 +124,7 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
   stopPrimeStream: () => {
     if (timer) clearInterval(timer);
     timer = null;
+    void postSourceLifecycle(get().sourceId, "stop");
     set((state: CalculatorLiveSourceState) => ({
       status: state.status === "active" ? "stopped" : state.status,
       debugLog: [`Prime stream stopped at ${new Date().toISOString()}`, ...state.debugLog].slice(0, 120),

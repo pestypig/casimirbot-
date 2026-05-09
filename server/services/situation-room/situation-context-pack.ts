@@ -12,6 +12,14 @@ import {
 import { getMissionMemoryForThread } from "./mission-memory-reducer";
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
 import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
+import {
+  listWorkstationLiveSourceWindows,
+  listWorkstationLiveSources,
+} from "./workstation-live-source-ingest";
+import type {
+  LiveSourceWindowSummary,
+  WorkstationLiveSource,
+} from "@shared/helix-workstation-live-source";
 
 const hashShort = (value: unknown, size = 14): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -44,6 +52,28 @@ export function buildSituationContextPack(args: {
   const missionMemory = getMissionMemoryForThread({ threadId: args.threadId }).memory ?? null;
   const liveArtifact = getActiveLiveSituationArtifactForThread(args.threadId);
   const liveAnswerEnvironment = getActiveLiveAnswerEnvironmentForThread(args.threadId);
+  const liveSourceIds = new Set(liveAnswerEnvironment?.source_ids ?? []);
+  const liveSourceStatus = listWorkstationLiveSources()
+    .filter((source: WorkstationLiveSource) => liveSourceIds.has(source.source_id) || source.environment_id === liveAnswerEnvironment?.environment_id)
+    .map((source: WorkstationLiveSource) => ({
+      source_id: source.source_id,
+      status: source.status,
+      kind: source.kind,
+      last_tick_index: source.last_tick_index ?? null,
+      event_count: source.event_count ?? 0,
+      last_event_ts: source.last_event_ts ?? null,
+    }));
+  const liveWindowSummary = listWorkstationLiveSourceWindows()
+    .filter((window: LiveSourceWindowSummary) => liveSourceIds.has(window.source_id) || window.environment_id === liveAnswerEnvironment?.environment_id)
+    .slice(-3)
+    .map((window: LiveSourceWindowSummary) => ({
+      window_id: window.window_id,
+      source_id: window.source_id,
+      event_count: window.event_count,
+      policy: window.policy.emit_line_delta_on,
+      from_ts: window.from_ts,
+      to_ts: window.to_ts,
+    }));
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -81,6 +111,9 @@ export function buildSituationContextPack(args: {
           objective: liveAnswerEnvironment.objective,
           lines: liveAnswerEnvironment.lines,
           subgoals: liveAnswerEnvironment.subgoals,
+          latest_evaluation: liveAnswerEnvironment.latest_evaluation ?? null,
+          source_status: liveSourceStatus,
+          window_summary: liveWindowSummary,
           latest_summary: liveAnswerEnvironment.latest_summary,
           evidence_refs: liveAnswerEnvironment.evidence_refs,
           updated_at: liveAnswerEnvironment.updated_at,
@@ -123,6 +156,7 @@ export function buildSituationContextPack(args: {
     ).slice(-24),
     created_at: new Date().toISOString(),
     context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
     raw_transcript_included: false,
     raw_audio_included: false,
     deterministic_content_role: "observation_not_assistant_answer",

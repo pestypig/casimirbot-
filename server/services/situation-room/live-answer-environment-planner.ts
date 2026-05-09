@@ -2,6 +2,7 @@ import type {
   LiveAnswerEnvironmentPreset,
   LiveAnswerLineDefinition,
 } from "@shared/helix-live-answer-environment";
+import { findLiveAnswerEnvironmentRecipe } from "@shared/helix-live-answer-recipes";
 
 const has = (transcript: string, pattern: RegExp): boolean => pattern.test(transcript);
 
@@ -21,6 +22,12 @@ export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
 
 export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswerEnvironmentPreset {
   const normalized = transcript.trim().toLowerCase();
+  const recipe = findLiveAnswerEnvironmentRecipe(normalized);
+  if (recipe) {
+    if (recipe.recipe_id === "research_session_tracker") return "research_session";
+    if (recipe.recipe_id === "custom_live_answer") return "custom";
+    return recipe.recipe_id;
+  }
   if (has(normalized, /\bprime\s+number|next\s+primes|prime\s+generator|calculator\s+(?:series|stream)|live\s+prime\b/)) return "calculator_prime_stream";
   if (has(normalized, /\bphysics|simulation|residual|stability|stabilizes?|tolerance\b/)) return "physics_stability_tracker";
   if (has(normalized, /\bdiscord|call|speaker|interpreter|translation\b/)) return "discord_interpreter";
@@ -84,6 +91,21 @@ export function buildLiveAnswerEnvironmentArgs(args: {
             tick_rate_ms: 1000,
             max_ticks: 100,
             primality_check: "trial_division",
+          },
+        }
+      : {}),
+    ...(preset === "physics_stability_tracker"
+      ? {
+          source_config: {
+            expression: "expected + amplitude / (sample_index + decay)",
+            variable_bindings: {
+              expected: 1,
+              amplitude: 0.08,
+              decay: 3,
+            },
+            tolerance: 0.01,
+            stable_window_size: 5,
+            tick_rate_ms: 1000,
           },
         }
       : {}),

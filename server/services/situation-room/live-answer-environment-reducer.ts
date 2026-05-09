@@ -90,6 +90,12 @@ export function reduceLiveAnswerEnvironmentFromSourceEvent(input: {
     line_values: lineValues,
     latest_summary: summary,
     evidence_refs: evidenceRefs,
+    source_event_count: input.event.window_event_count ?? 1,
+    window_id: input.event.window_id ?? null,
+    window_count:
+      input.event.trace && typeof input.event.trace.window_count === "number"
+        ? input.event.trace.window_count
+        : null,
     now: input.now ?? input.event.ts,
   });
 }

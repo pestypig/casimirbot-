@@ -301,6 +301,9 @@ export function updateLiveAnswerEnvironment(input: {
   }>;
   latest_summary?: string | null;
   evidence_refs?: string[];
+  source_event_count?: number | null;
+  window_id?: string | null;
+  window_count?: number | null;
   now?: string;
 }): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
   const existing = environments.get(input.environment_id);
@@ -365,10 +368,17 @@ export function updateLiveAnswerEnvironment(input: {
     thread_id: next.thread_id,
     reason: input.reason,
     changed_line_keys: changedLineKeys,
+    changed_fields: changedLineKeys,
     previous_hash: previousHash,
     next_hash: hashLiveAnswerEnvironment(next),
     environment_snapshot: next,
     evidence_refs: uniqueStrings(input.evidence_refs ?? next.evidence_refs).slice(-24),
+    source_event_count: input.source_event_count ?? null,
+    window_id: input.window_id ?? null,
+    window_count: input.window_count ?? null,
+    model_invoked: next.latest_evaluation?.model_invoked ?? false,
+    context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
@@ -397,10 +407,17 @@ export function setLiveAnswerEnvironmentStatus(input: {
         thread_id: existing.thread_id,
         reason: "manual_refresh",
         changed_line_keys: [],
+        changed_fields: [],
         previous_hash: hashLiveAnswerEnvironment(existing),
         next_hash: hashLiveAnswerEnvironment(existing),
         environment_snapshot: existing,
         evidence_refs: [`live_answer_environment:${existing.environment_id}:status:${input.status}`],
+        source_event_count: null,
+        window_id: null,
+        window_count: null,
+        model_invoked: false,
+        context_policy: "compact_context_pack_only",
+        raw_logs_included: false,
         ts: now,
       },
     };
@@ -431,10 +448,17 @@ export function setLiveAnswerEnvironmentStatus(input: {
     thread_id: next.thread_id,
     reason: "manual_refresh",
     changed_line_keys: [],
+    changed_fields: [],
     previous_hash: previousHash,
     next_hash: hashLiveAnswerEnvironment(next),
     environment_snapshot: next,
     evidence_refs: [`live_answer_environment:${next.environment_id}:status:${input.status}`],
+    source_event_count: null,
+    window_id: null,
+    window_count: null,
+    model_invoked: false,
+    context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
@@ -487,10 +511,17 @@ export function setLiveAnswerEnvironmentLineSchema(input: {
     thread_id: next.thread_id,
     reason: "line_schema_update",
     changed_line_keys: normalizedSchema.map((line: LiveAnswerLineDefinition) => line.key),
+    changed_fields: normalizedSchema.map((line: LiveAnswerLineDefinition) => line.key),
     previous_hash: previousHash,
     next_hash: hashLiveAnswerEnvironment(next),
     environment_snapshot: next,
     evidence_refs: [`live_answer_environment:${next.environment_id}:line_schema`],
+    source_event_count: null,
+    window_id: null,
+    window_count: null,
+    model_invoked: false,
+    context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));

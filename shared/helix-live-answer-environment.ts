@@ -138,10 +138,17 @@ export type LiveAnswerEnvironmentDelta = {
     | "model_review"
     | "manual_refresh";
   changed_line_keys: string[];
+  changed_fields?: string[];
   previous_hash?: string | null;
   next_hash: string;
   environment_snapshot: LiveAnswerEnvironment;
   evidence_refs: string[];
+  source_event_count?: number | null;
+  window_id?: string | null;
+  window_count?: number | null;
+  model_invoked?: boolean;
+  context_policy?: "compact_context_pack_only";
+  raw_logs_included?: false;
   ts: string;
 };
 

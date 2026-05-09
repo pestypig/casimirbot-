@@ -1635,6 +1635,7 @@ export function executeHelixPanelAction(
       actionId === "resume_live_answer_environment" ||
       actionId === "stop_live_answer_environment" ||
       actionId === "set_live_line_schema" ||
+      actionId === "set_live_answer_line_schema" ||
       actionId === "attach_live_source"
     ) {
       const environmentId = asNonEmptyString(args.environment_id ?? args.environmentId);
@@ -1652,7 +1653,7 @@ export function executeHelixPanelAction(
         postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/resume`);
       } else if (actionId === "stop_live_answer_environment") {
         postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/stop`);
-      } else if (actionId === "set_live_line_schema") {
+      } else if (actionId === "set_live_line_schema" || actionId === "set_live_answer_line_schema") {
         postLiveEnvironmentControl(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/line-schema`, {
           line_schema: Array.isArray(args.line_schema) ? args.line_schema : [],
         });
@@ -1688,6 +1689,49 @@ export function executeHelixPanelAction(
           context_role: "observation_not_assistant_answer",
         },
         message: `Queued ${actionId.replace(/_/g, " ")} for ${environmentId}.`,
+      };
+    }
+
+    if (
+      actionId === "pause_live_source" ||
+      actionId === "resume_live_source" ||
+      actionId === "stop_live_source" ||
+      actionId === "set_live_source_tick_rate"
+    ) {
+      const sourceId = asNonEmptyString(args.source_id ?? args.sourceId);
+      if (!sourceId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `${actionId} requires source_id.`,
+        };
+      }
+      const actionPath =
+        actionId === "pause_live_source"
+          ? "pause"
+          : actionId === "resume_live_source"
+            ? "resume"
+            : actionId === "stop_live_source"
+              ? "stop"
+              : "tick-rate";
+      postLiveEnvironmentControl(`/api/agi/situation/live-source/${encodeURIComponent(sourceId)}/${actionPath}`, {
+        tick_rate_ms: typeof args.tick_rate_ms === "number" ? args.tick_rate_ms : undefined,
+      });
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "workstation_live_source_receipt",
+          ok: true,
+          source_id: sourceId,
+          action_id: actionId,
+          thread_id: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
+          raw_logs_included: false,
+          context_policy: "compact_context_pack_only",
+        },
+        message: `Queued ${actionId.replace(/_/g, " ")} for ${sourceId}.`,
       };
     }
 

@@ -21,6 +21,22 @@ export type SituationContextPack = {
     lines: import("./helix-live-answer-environment").LiveAnswerLineState[];
     subgoals?: import("./helix-live-answer-environment").LiveAnswerEnvironmentSubgoal[];
     latest_evaluation?: import("./helix-live-answer-environment").LiveAnswerEvaluation | null;
+    source_status?: Array<{
+      source_id: string;
+      status: string;
+      kind: string;
+      last_tick_index?: number | null;
+      event_count?: number;
+      last_event_ts?: string | null;
+    }>;
+    window_summary?: Array<{
+      window_id: string;
+      source_id: string;
+      event_count: number;
+      policy: string;
+      from_ts: string;
+      to_ts: string;
+    }>;
     latest_summary: string;
     evidence_refs: string[];
     updated_at: string;

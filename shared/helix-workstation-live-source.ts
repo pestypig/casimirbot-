@@ -28,8 +28,31 @@ export type WorkstationLiveSource = {
   status: "active" | "paused" | "stopped" | "error";
   tick_rate_ms?: number | null;
   config: Record<string, unknown>;
+  run_id?: string | null;
+  last_tick_index?: number | null;
+  last_event_ts?: string | null;
+  event_count?: number;
   created_at: string;
   updated_at: string;
+};
+
+export type LiveSourceWindowPolicy = {
+  window_ms: number;
+  max_events_per_window: number;
+  emit_line_delta_on: "every_tick" | "value_changed" | "window_close" | "salience_only";
+  max_thread_appends_per_minute: number;
+};
+
+export type LiveSourceWindowSummary = {
+  window_id: string;
+  source_id: string;
+  environment_id?: string | null;
+  from_ts: string;
+  to_ts: string;
+  event_count: number;
+  window_count: number;
+  policy: LiveSourceWindowPolicy;
+  evidence_refs: string[];
 };
 
 export type WorkstationLiveSourceEvent = {
@@ -48,5 +71,7 @@ export type WorkstationLiveSourceEvent = {
   payload: Record<string, unknown>;
   evidence_refs: string[];
   deterministic?: boolean;
+  window_id?: string | null;
+  window_event_count?: number | null;
   trace?: Record<string, unknown> | null;
 };
