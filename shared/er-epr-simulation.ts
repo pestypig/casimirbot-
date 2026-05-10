@@ -5,6 +5,13 @@ import {
   quantumSpacetimeCongruenceInputSchema,
   rtAreaProxyM2,
 } from "./quantum-spacetime-congruence";
+import {
+  getErEprStage1CitationsForClaimIds,
+  getErEprStage1ClaimIdsForEvidence,
+  getErEprStage1SourceRoles,
+  getErEprStage1UncertaintyNotes,
+  type ErEprStage1SourceRole,
+} from "./er-epr-research-claims";
 
 export const erEprModelFamilySchema = z.enum([
   "two_sided_SYK",
@@ -120,6 +127,9 @@ export type ErEprSimulationEvaluation = ParsedErEprSimulationInput & {
     claimTier: "Stage1_falsifiable_model_support";
     verdict: ErEprSimulationVerdict;
     citations: string[];
+    claimIds: string[];
+    uncertaintyNotes: string[];
+    sourceRoles: Record<string, ErEprStage1SourceRole>;
   };
 };
 
@@ -215,6 +225,20 @@ export function evaluateErEprSimulation(
     diagnosticComposite,
     strongSupportMin,
   });
+  const claimIds = getErEprStage1ClaimIdsForEvidence({
+    verdict,
+    blockedClaims,
+    entropyVisibilityPass: gates.entropyVisibilityPass,
+  });
+  const baseCitations = [
+    "https://arxiv.org/abs/1306.0533",
+    "https://arxiv.org/abs/hep-th/0603001",
+    "https://arxiv.org/abs/1005.3035",
+    "https://arxiv.org/abs/1608.05687",
+    "https://www.nature.com/articles/s41586-022-05424-3",
+    "https://doi.org/10.1038/s41586-025-08939-7",
+    "https://doi.org/10.1038/s41586-025-08995-z",
+  ];
 
   return {
     ...parsed,
@@ -238,15 +262,10 @@ export function evaluateErEprSimulation(
       stage: "ER_EPR_STAGE1_SIM",
       claimTier: "Stage1_falsifiable_model_support",
       verdict,
-      citations: [
-        "https://arxiv.org/abs/1306.0533",
-        "https://arxiv.org/abs/hep-th/0603001",
-        "https://arxiv.org/abs/1005.3035",
-        "https://arxiv.org/abs/1608.05687",
-        "https://www.nature.com/articles/s41586-022-05424-3",
-        "https://doi.org/10.1038/s41586-025-08939-7",
-        "https://doi.org/10.1038/s41586-025-08995-z",
-      ],
+      citations: [...new Set([...baseCitations, ...getErEprStage1CitationsForClaimIds(claimIds)])],
+      claimIds,
+      uncertaintyNotes: getErEprStage1UncertaintyNotes(claimIds),
+      sourceRoles: getErEprStage1SourceRoles(claimIds),
     },
   };
 }

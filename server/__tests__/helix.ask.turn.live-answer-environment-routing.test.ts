@@ -147,13 +147,37 @@ describe("helix ask live answer environment routing", () => {
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
     vi.resetModules();
     const { app } = await createApp();
-    await request(app)
+    const createResponse = await request(app)
       .post("/api/agi/situation/live-answer-environment/create")
       .send({
         thread_id: "helix-ask:desktop",
         objective: "Set up a live prime number generator and show the next primes as they are found.",
         preset: "calculator_prime_stream",
         source_ids: ["source:calculator-prime-stream"],
+      })
+      .expect(200);
+    const environmentId =
+      createResponse.body?.live_answer_environment?.environment_id ??
+      createResponse.body?.environment?.environment_id ??
+      createResponse.body?.environment_id;
+    await request(app)
+      .post("/api/agi/situation/live-source/event")
+      .send({
+        source_id: "source:calculator-prime-stream",
+        environment_id: environmentId,
+        kind: "calculator_series",
+        event_type: "prime_found",
+        seq: 6,
+        payload: {
+          candidate: 7,
+          is_prime: true,
+          latest_prime: 7,
+          prime_count: 4,
+          gap: 2,
+          next_candidate: 8,
+          algorithm: "trial_division",
+        },
+        evidence_refs: ["calculator:prime:7"],
       })
       .expect(200);
 
@@ -172,5 +196,6 @@ describe("helix ask live answer environment routing", () => {
     });
     expect(response.body?.final_answer_source).toBe("artifact_synthesis");
     expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Current candidate");
+    expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Latest prime: 7");
   }, 60000);
 });

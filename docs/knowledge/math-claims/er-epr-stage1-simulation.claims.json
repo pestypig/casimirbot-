@@ -1,0 +1,246 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "er-epr-stage1-simulation-claims.v1",
+  "domain": "quantum-spacetime-proxy",
+  "updatedAt": "2026-05-10",
+  "claims": [
+    {
+      "claimId": "er_epr_entangled_black_hole_bridge_context.v1",
+      "statement": "ER=EPR motivates interpreting certain maximally entangled black-hole states as Einstein-Rosen bridge states.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "entangled black holes and holographic quantum gravity context",
+        "constraints": [
+          "applies only to ER=EPR research interpretation of entangled black-hole states",
+          "does not imply generic real-universe wormhole inventory",
+          "does not provide propulsion, metric-equivalence, or local engineering evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena, J. and Susskind, L. (2013). Cool horizons for entangled black holes. Fortschritte der Physik. arXiv:1306.0533.",
+          "equation": "ER=EPR conjectural bridge/entanglement identification",
+          "url": "https://arxiv.org/abs/1306.0533",
+          "note": "Introduces the ER=EPR conjectural context used by this Stage 1 proxy lane."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "docs/research/er-epr-stage1-simulation.md"
+      ],
+      "notes": "Research context only; no CL0-CL4 promotion."
+    },
+    {
+      "claimId": "rt_holographic_entropy_area_proxy.v1",
+      "statement": "In AdS/CFT contexts, entanglement entropy can be related to minimal-surface area, motivating A_info-style proxy bookkeeping.",
+      "maturity": "reduced-order",
+      "validityDomain": {
+        "system": "holographic and AdS/CFT-style models",
+        "constraints": [
+          "area/entropy bookkeeping is valid only inside holographic proxy contexts",
+          "does not apply to arbitrary spacetime geometries",
+          "does not certify metric, stress-energy, or wormhole-count claims"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Ryu, S. and Takayanagi, T. (2006). Holographic derivation of entanglement entropy from AdS/CFT. Physical Review Letters. arXiv:hep-th/0603001.",
+          "url": "https://arxiv.org/abs/hep-th/0603001",
+          "note": "Primary source for holographic entropy-area relation motivating proxy bookkeeping."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "shared/quantum-spacetime-congruence.ts",
+        "docs/warp-tree-dag-congruence-policy.md"
+      ],
+      "notes": "Reduced-order holographic proxy only."
+    },
+    {
+      "claimId": "van_raamsdonk_entanglement_connectivity_context.v1",
+      "statement": "Entanglement changes can correspond to changes in spacetime connectedness in holographic quantum-gravity reasoning.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "holographic quantum-gravity interpretation",
+        "constraints": [
+          "used as interpretive context for entanglement/connectivity reasoning",
+          "does not establish real-universe bridge inventory",
+          "does not replace metric, ADM, geometry, stress-energy, or guardrail congruence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Van Raamsdonk, M. (2010). Building up spacetime with quantum entanglement. General Relativity and Gravitation. arXiv:1005.3035.",
+          "url": "https://arxiv.org/abs/1005.3035",
+          "note": "Context source for entanglement/connectivity interpretation."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "docs/research/er-epr-stage1-simulation.md"
+      ],
+      "notes": "Interpretive support only."
+    },
+    {
+      "claimId": "gjw_double_trace_traversability_model.v1",
+      "statement": "In a two-boundary eternal BTZ setup, a double-trace interaction can produce negative average null energy whose backreaction makes the ER bridge traversable without enabling causality violation.",
+      "maturity": "reduced-order",
+      "validityDomain": {
+        "system": "specific holographic two-boundary traversable-wormhole model family",
+        "constraints": [
+          "requires the double-trace traversability setup and model assumptions",
+          "not a general local engineering mechanism",
+          "does not provide propulsion, energy-source, or CL0-CL4 promotion evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Gao, P., Jafferis, D. L. and Wall, A. C. (2017). Traversable wormholes via a double trace deformation. Journal of High Energy Physics. arXiv:1608.05687.",
+          "url": "https://arxiv.org/abs/1608.05687",
+          "note": "Specific reduced-order model motivating the correct-sign double-trace gate."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "tests/er-epr-simulation.spec.ts"
+      ],
+      "notes": "Model-family support only."
+    },
+    {
+      "claimId": "syk_processor_simulation_precedent.v1",
+      "statement": "The 2022 quantum-processor experiment is a precedent for simulating traversable-wormhole-like dynamics in a sparsified SYK-like model.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "small quantum processor and sparsified SYK-like toy model",
+        "constraints": [
+          "simulation precedent only",
+          "not proof of real-universe wormholes",
+          "must be interpreted with control and critique guardrails"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Jafferis, D. et al. (2022). Traversable wormhole dynamics on a quantum processor. Nature 612, 51-55.",
+          "url": "https://www.nature.com/articles/s41586-022-05424-3",
+          "note": "Processor simulation precedent for toy-model dynamics."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "docs/research/er-epr-stage1-simulation.md"
+      ],
+      "notes": "Exploratory simulation precedent only."
+    },
+    {
+      "claimId": "small_commuting_model_critique_guardrail.v1",
+      "statement": "Published criticism of the 2022 experiment argues that small commuting models may lack gravitational features, making thermalization, scrambling, noncommuting controls, and control leakage checks mandatory.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "guardrail for interpreting small toy simulations",
+        "constraints": [
+          "requires explicit thermalization and scrambling diagnostics",
+          "requires noncommuting/control-leakage checks",
+          "prevents toy-simulation results from being treated as settled gravitational evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Kobrin, B. et al. (2025). Comment on traversable wormhole dynamics on a quantum processor. Nature. DOI:10.1038/s41586-025-08939-7.",
+          "url": "https://doi.org/10.1038/s41586-025-08939-7",
+          "note": "Matters Arising critique motivating guardrail diagnostics."
+        },
+        {
+          "kind": "paper",
+          "citation": "Jafferis, D. et al. (2025). Reply to comment on traversable wormhole dynamics on a quantum processor. Nature. DOI:10.1038/s41586-025-08995-z.",
+          "url": "https://doi.org/10.1038/s41586-025-08995-z",
+          "note": "Reply documenting that interpretation remains actively contested."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "tests/er-epr-research-claims.spec.ts"
+      ],
+      "notes": "Guardrail claim, not negative proof of all toy-model value."
+    },
+    {
+      "claimId": "entropy_stretch_quantum_visibility_demotes_claims.v1",
+      "statement": "High entropy can mask quantum effects, motivating lambda_S = exp(deltaS_eff) and quantum-visibility demotion.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "QST diagnostic bookkeeping",
+        "constraints": [
+          "lambda_S and hbar_eff/hbar are diagnostic bookkeeping variables",
+          "hbar is not physically changed",
+          "entropy stretch can demote visible proxy support but cannot promote CL0-CL4 evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Zurek, W. H. (2003). Decoherence, einselection, and the quantum origins of the classical. Reviews of Modern Physics. arXiv:quant-ph/0306072.",
+          "equation": "lambda_S = exp(deltaS_eff)",
+          "url": "https://arxiv.org/abs/quant-ph/0306072",
+          "note": "Context for environmental decoherence and reduced visibility of quantum effects."
+        },
+        {
+          "kind": "paper",
+          "citation": "Schlosshauer, M. (2005). Decoherence, the measurement problem, and interpretations of quantum mechanics. Reviews of Modern Physics. arXiv:quant-ph/0312059.",
+          "url": "https://arxiv.org/abs/quant-ph/0312059",
+          "note": "Review context for decoherence masking quantum coherence in effective descriptions."
+        }
+      ],
+      "repoBindings": [
+        "shared/quantum-spacetime-congruence.ts",
+        "shared/er-epr-simulation.ts"
+      ],
+      "notes": "Diagnostic demotion only; no physical hbar mutation."
+    },
+    {
+      "claimId": "starsim_astrometry_structure_prior_only.v1",
+      "statement": "StarSim / Gaia-like astrometric structure may be used as ordinary cosmological structure prior, not direct ER=EPR evidence.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "observational astrophysics prior and null-model context",
+        "constraints": [
+          "astrometric or stellar-activity structure may supply ordinary astrophysical priors",
+          "does not count as direct ER=EPR evidence",
+          "does not support local wormhole density, propulsion, or photon-production claims"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Herrero, E. et al. (2016). Modelling the photosphere of active stars for planet detection and characterization. Astronomy & Astrophysics. arXiv:1511.06717.",
+          "equation": "StarSim astrometry is not direct ER=EPR evidence",
+          "url": "https://arxiv.org/abs/1511.06717",
+          "note": "StarSim modelling context for stellar activity and ordinary astrophysical signal simulation."
+        },
+        {
+          "kind": "paper",
+          "citation": "Eriksson, U. et al. (2018). Spotting stellar activity cycles in Gaia astrometry. Monthly Notices of the Royal Astronomical Society. arXiv:1802.09943.",
+          "url": "https://arxiv.org/abs/1802.09943",
+          "note": "Gaia astrometry context for stellar activity signals as observational astrophysics, not ER=EPR evidence."
+        },
+        {
+          "kind": "paper",
+          "citation": "Gaia Collaboration et al. (2016). The Gaia mission. Astronomy & Astrophysics 595, A1. arXiv:1609.04153.",
+          "url": "https://arxiv.org/abs/1609.04153",
+          "note": "Gaia mission reference for astrometric structure data context."
+        }
+      ],
+      "repoBindings": [
+        "shared/er-epr-simulation.ts",
+        "tests/er-epr-simulation.spec.ts",
+        "docs/research/er-epr-stage1-simulation.md"
+      ],
+      "notes": "Astrometry remains a prior/null-model source only."
+    }
+  ]
+}

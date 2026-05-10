@@ -42,6 +42,8 @@ describe("ER=EPR Stage 1 simulation verdict lane", () => {
     expect(evaluation.guards.overclaimWarnings).toContain("not_real_universe_er_bridge_proof");
     expect(evaluation.qst.congruenceGate.spacetimeCL).toBe("proxy_only");
     expect(evaluation.qst.congruenceGate.mayPromoteToCL4).toBe(false);
+    expect(evaluation.evidence.claimIds.length).toBeGreaterThan(0);
+    expect(evaluation.evidence.uncertaintyNotes.length).toBeGreaterThan(0);
   });
 
   it("fails when ordinary controls also carry the signal", () => {
@@ -66,6 +68,13 @@ describe("ER=EPR Stage 1 simulation verdict lane", () => {
 
     expect(evaluation.evidence.verdict).toBe("overclaim_blocked");
     expect(evaluation.guards.blockedClaims).toContain("er_epr_sim_to_spacetime_CL_promotion");
+    expect(evaluation.evidence.claimIds).toEqual(
+      expect.arrayContaining([
+        "er_epr_entangled_black_hole_bridge_context.v1",
+        "rt_holographic_entropy_area_proxy.v1",
+        "gjw_double_trace_traversability_model.v1",
+      ]),
+    );
     expect(evaluation.guards.spacetimeCL).toBe("proxy_only");
     expect(evaluation.qst.guards.blockedCausalLinks).toContain("qst_proxy_to_spacetime_CL_promotion");
   });
@@ -83,6 +92,7 @@ describe("ER=EPR Stage 1 simulation verdict lane", () => {
 
     expect(evaluation.evidence.verdict).toBe("overclaim_blocked");
     expect(evaluation.guards.blockedClaims).toContain("astrometric_prior_as_direct_er_epr_evidence");
+    expect(evaluation.evidence.claimIds).toContain("starsim_astrometry_structure_prior_only.v1");
     expect(evaluation.guards.overclaimWarnings).toContain("starsim_is_structure_prior_only");
   });
 
@@ -99,6 +109,7 @@ describe("ER=EPR Stage 1 simulation verdict lane", () => {
     });
 
     expect(evaluation.evidence.verdict).toBe("proxy_only_structure_prior");
+    expect(evaluation.evidence.claimIds).toContain("starsim_astrometry_structure_prior_only.v1");
     expect(evaluation.gates.holographicModel).toBe(false);
     expect(evaluation.guards.blockedClaims).not.toContain("astrometric_prior_as_direct_er_epr_evidence");
     expect(evaluation.guards.overclaimWarnings).toContain("starsim_is_structure_prior_only");
@@ -115,5 +126,8 @@ describe("ER=EPR Stage 1 simulation verdict lane", () => {
     expect(lowEntropy.values.visibilityAdjustedSignal).toBeGreaterThan(highEntropy.values.visibilityAdjustedSignal);
     expect(highEntropy.gates.entropyVisibilityPass).toBe(false);
     expect(highEntropy.evidence.verdict).toBe("ordinary_control_explains_signal");
+    expect(highEntropy.evidence.claimIds).toContain(
+      "entropy_stretch_quantum_visibility_demotes_claims.v1",
+    );
   });
 });
