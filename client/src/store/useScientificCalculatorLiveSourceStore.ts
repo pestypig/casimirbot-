@@ -35,16 +35,24 @@ let lastStartInput: StartPrimeStreamInput = {};
 
 const DEFAULT_SOURCE_ID = "source:calculator-prime-stream";
 
-const resolveEnvironmentId = async (): Promise<string | null> => {
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+
+const resolveEnvironmentId = async (attempts = 1): Promise<string | null> => {
   if (typeof fetch !== "function") return null;
-  try {
-    const response = await fetch("/api/agi/situation/live-answer-environment?thread_id=helix-ask:desktop&limit=1");
-    if (!response.ok) return null;
-    const body = await response.json() as { environment?: { environment_id?: string; preset?: string } | null };
-    return body.environment?.environment_id ?? null;
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < Math.max(1, attempts); attempt += 1) {
+    try {
+      const response = await fetch("/api/agi/situation/live-answer-environment?thread_id=helix-ask:desktop&limit=1");
+      if (response.ok) {
+        const body = await response.json() as { environment?: { environment_id?: string; preset?: string } | null };
+        const environmentId = body.environment?.environment_id ?? null;
+        if (environmentId) return environmentId;
+      }
+    } catch {
+      // Retry below; the setup action may still be creating the environment.
+    }
+    if (attempt < attempts - 1) await sleep(200);
   }
+  return null;
 };
 
 const postTick = async (args: {
@@ -99,7 +107,7 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
   startPrimeStream: async (input = {}) => {
     get().stopPrimeStream();
     lastStartInput = input;
-    const environmentId = input.environmentId ?? await resolveEnvironmentId();
+    const environmentId = input.environmentId ?? await resolveEnvironmentId(input.environmentId ? 1 : 10);
     const tickRateMs = Math.max(250, Math.floor(input.tickRateMs ?? 1000));
     const maxTicks = Math.max(1, Math.floor(input.maxTicks ?? 100));
     const sourceId = input.sourceId ?? DEFAULT_SOURCE_ID;

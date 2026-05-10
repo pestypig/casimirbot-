@@ -2,7 +2,9 @@
   "extends": "./tsconfig.json",
   "include": [
     "shared/quantum-spacetime-congruence.ts",
-    "tests/quantum-spacetime-congruence.spec.ts"
+    "shared/er-epr-simulation.ts",
+    "tests/quantum-spacetime-congruence.spec.ts",
+    "tests/er-epr-simulation.spec.ts"
   ],
   "compilerOptions": {
     "incremental": false

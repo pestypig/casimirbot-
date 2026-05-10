@@ -87,6 +87,90 @@ describe("helix ask live answer environment routing", () => {
         primality_check: "trial_division",
       }),
     });
+    expect(actions(response.body)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          panel_id: "scientific-calculator",
+          action_id: "start_prime_stream",
+          args: expect.objectContaining({
+            source_id: "source:calculator-prime-stream",
+            wait_for_environment: true,
+          }),
+        }),
+      ]),
+    );
     expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+  }, 60000);
+
+  it("does not let an active prime stream hijack unrelated concept questions", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "Set up a live prime number generator and show the next primes as they are found.",
+        preset: "calculator_prime_stream",
+        source_ids: ["source:calculator-prime-stream"],
+        source_config: {
+          generator: "next_prime",
+          start: 2,
+          tick_rate_ms: 1000,
+          max_ticks: 100,
+          primality_check: "trial_division",
+        },
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is a neutron star glitch?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+      })
+      .expect(200);
+
+    expect(response.body?.live_environment_turn_relevance).toMatchObject({
+      relevance: "background_only",
+      artifact_synthesis_allowed: false,
+    });
+    expect(response.body?.final_answer_source).not.toBe("artifact_synthesis");
+    expect(String(response.body?.answer ?? response.body?.text ?? "")).not.toContain("Current candidate");
+  }, 60000);
+
+  it("allows explicit prime stream state questions to synthesize from the live environment", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "Set up a live prime number generator and show the next primes as they are found.",
+        preset: "calculator_prime_stream",
+        source_ids: ["source:calculator-prime-stream"],
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What prime are we on?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+      })
+      .expect(200);
+
+    expect(response.body?.live_environment_turn_relevance).toMatchObject({
+      artifact_synthesis_allowed: true,
+    });
+    expect(response.body?.final_answer_source).toBe("artifact_synthesis");
+    expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Current candidate");
   }, 60000);
 });

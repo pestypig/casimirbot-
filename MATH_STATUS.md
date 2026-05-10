@@ -118,6 +118,7 @@ Stage 3 (Certified / Policy-gated)
 | Tag | Module | Stage | Notes | Checks |
 | --- | --- | --- | --- | --- |
 | QST_PROXY | shared/quantum-spacetime-congruence.ts | Stage 0 | Quantum-spacetime proxy contract for entropy stretch, holographic area proxy, and vacuum-channel gating. | tests/quantum-spacetime-congruence.spec.ts, docs/warp-tree-dag-congruence-policy.md |
+| ER_EPR_STAGE1_SIM | shared/er-epr-simulation.ts | Stage 1 | ER=EPR simulation verdict contract for controlled holographic toy models, QST entropy-stretch demotion, and StarSim structure-prior boundaries. | tests/er-epr-simulation.spec.ts, docs/research/er-epr-stage1-simulation.md, docs/warp-tree-dag-congruence-policy.md |
 
 ## DP Collapse Modules
 

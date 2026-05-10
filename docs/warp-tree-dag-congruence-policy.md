@@ -27,6 +27,8 @@ QCL artifacts must use `spacetimeCL: "proxy_only"` unless a separate metric/ADM/
 
 `QST_PROXY` estimates loss of quantum distinguishability under entropy stretch and optionally reports holographic analogy variables; it is not a metric-equivalence lane, not a stress-energy source, not a wormhole inventory, and not a local photon-production model.
 
+`ER_EPR_STAGE1_SIM` may report model-internal support when a controlled holographic/toy-dual simulation passes entanglement, double-trace coupling, causal-order, time-delay, size-winding, scrambling, thermalization, entropy-area tracking, and failed-control gates. It is still a simulation verdict, not a CL0-CL4 spacetime congruence claim. StarSim astrometry may enter only as ordinary cosmological structure prior, never as direct ER=EPR evidence.
+
 ## Edge Types and Required CL
 | edgeType | requiresCL | definition |
 | --- | --- | --- |
