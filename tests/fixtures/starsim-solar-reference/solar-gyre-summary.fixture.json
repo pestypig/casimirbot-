@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "starsim-gyre-summary.v1",
+  "objectId": "Sun",
+  "summaryHash": "fixture-gyre-summary-solar-reference-v1",
+  "source": "fixture_only",
+  "largeSeparation_uHz": 134.9,
+  "smallSeparation_uHz": 9.0,
+  "modeCount": 32,
+  "lowDegreeModesAvailable": true,
+  "soundSpeedProfileAvailable": true
+}

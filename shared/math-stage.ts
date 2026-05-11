@@ -2232,6 +2232,78 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1",
+    module: "shared/starsim-solar-reference-run.ts",
+    stage: "diagnostic",
+    notes:
+      "Canonical solar reference reproduction runner that composes fixture/import solver policy, profile validation, benchmark handoff, and Stage 2 gate handoff.",
+    motivation:
+      "Create the first replayable solar reference artifact that can feed the Stage 2 gate while clearly separating fixture-only and solver-backed evidence.",
+    conceptualWaypoints: [
+      "Explicit runtime policy prevents silent fixture fallback.",
+      "Solar profile validation, benchmark, and Stage 2 gate artifacts are linked.",
+      "Safe reports preserve proxy-only QST and no direct ER=EPR boundary.",
+    ],
+    checks: [
+      { type: "test", path: "tests/starsim-solar-reference-run.spec.ts" },
+      { type: "stability", path: "tests/starsim-solar-reference-run.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/starsim-solar-reference/solar-reference-plan.fixture.json" },
+      { type: "doc", path: "docs/research/starsim-solar-reference-repro-run-v1.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/starsim-solar-reference-run.claims.json" },
+    ],
+    units: {
+      runCount: "1",
+      closureStatusCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+    },
+  },
+  {
+    tag: "STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1",
+    module: "server/modules/starsim/external/mesa-solar-runner.ts",
+    stage: "diagnostic",
+    notes: "MESA solar runtime adapter with explicit fixture-only and unavailable external solver behavior.",
+    checks: [
+      { type: "test", path: "tests/mesa-solar-runner.spec.ts" },
+      { type: "stability", path: "tests/mesa-solar-runner.spec.ts" },
+    ],
+    units: {
+      profileHash: "1",
+      inlistHash: "1",
+      runtimeStatus: "1",
+    },
+  },
+  {
+    tag: "STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1",
+    module: "server/modules/starsim/external/gyre-summary-import.ts",
+    stage: "diagnostic",
+    notes: "GYRE summary import helper for optional solar oscillation closure.",
+    checks: [
+      { type: "test", path: "tests/gyre-summary-import.spec.ts" },
+      { type: "stability", path: "tests/gyre-summary-import.spec.ts" },
+    ],
+    units: {
+      largeSeparation_uHz: "T^-1",
+      smallSeparation_uHz: "T^-1",
+      modeCount: "1",
+    },
+  },
+  {
+    tag: "STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1",
+    module: "shared/starsim-solar-reference-safe-language.ts",
+    stage: "diagnostic",
+    notes: "Safe-language renderer for solar reference reproduction reports.",
+    checks: [
+      { type: "test", path: "tests/starsim-solar-reference-safe-language.spec.ts" },
+      { type: "stability", path: "tests/starsim-solar-reference-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",

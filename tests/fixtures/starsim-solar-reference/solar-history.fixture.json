@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "starsim-solar-history-fixture.v1",
+  "objectId": "Sun",
+  "historyHash": "fixture-solar-reference-history-v1",
+  "age_Gyr": 4.57,
+  "luminosity_Lsun": 1,
+  "radius_Rsun": 1,
+  "effectiveTemperature_K": 5772
+}

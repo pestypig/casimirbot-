@@ -1,0 +1,178 @@
+{
+  "schemaVersion": "starsim-fusion-benchmark-report.v1",
+  "runId": "starsim-fusion-benchmark:7e6ff624-c2c2-49f1-a4fa-b81fea98edcd",
+  "planId": "solar-reference-fixture-v1:benchmark",
+  "createdAt": "2026-05-11T17:15:13.078Z",
+  "profileResults": [
+    {
+      "schemaVersion": "starsim-fusion-profile-validation.v1",
+      "objectId": "Sun",
+      "importedProfileSummary": {
+        "shellCount": 3,
+        "source": "mesa_fixture",
+        "reproducibilityStatus": "fixture_only"
+      },
+      "integratedFusion": {
+        "integratedNucLuminosity_Lsun": 1,
+        "surfaceLuminosity_Lsun": 1,
+        "luminosityClosureRelErr": 0,
+        "ppFraction": 1,
+        "cnoFraction": 0,
+        "tripleAlphaFraction": 0,
+        "dominantFusionChannel": "pp_chain"
+      },
+      "fusionZone": {
+        "mode": "core_fusion",
+        "r10_Rstar": 0.05,
+        "r50_Rstar": 0.05,
+        "r90_Rstar": 0.3,
+        "activeVolumeFraction": 0.026999999999999996
+      },
+      "comparisonToStage1Proxy": {
+        "compared": false,
+        "notes": [
+          "No Stage 1 proxy evaluation was supplied for comparison."
+        ]
+      },
+      "qstBoundary": {
+        "qstRole": "stellar_quantum_microphysics_prior",
+        "spacetimeCL": "proxy_only",
+        "mayPromoteToCL4": false,
+        "caveats": [
+          "Profile validation prepares Stage 2 review but remains Stage 1-to-Stage 2 prep.",
+          "Profile output is not direct ER=EPR evidence and cannot promote CL0-CL4."
+        ]
+      },
+      "evidence": {
+        "stage": "STARSIM_FUSION_PROFILE_IMPORT_STAGE2_PREP",
+        "claimTier": "Stage1_to_Stage2_profile_validation_prep",
+        "claimIds": [
+          "mesa_profile_import_profile_validation.v1",
+          "starsim_profile_import_not_direct_er_epr_evidence.v1",
+          "h_spectral_fit_calibration_only_exact_si_guardrail.v1",
+          "fusion_luminosity_mass_shell_integration.v1",
+          "fusion_channel_fraction_from_integrated_eps.v1",
+          "fusion_zone_radii_from_cumulative_luminosity.v1",
+          "surface_luminosity_not_identical_to_nuclear_luminosity_guardrail.v1"
+        ],
+        "citations": [
+          "https://arxiv.org/abs/1009.1622",
+          "https://arxiv.org/abs/1306.0533",
+          "https://www.nist.gov/si-redefinition/meet-constants",
+          "https://arxiv.org/abs/1004.2318"
+        ],
+        "uncertaintyNotes": [
+          "Profile import validates a shell schema and provenance; it does not certify the upstream stellar model.",
+          "Profile validation can strengthen astrophysical priors but cannot directly establish ER=EPR or CL0-CL4 evidence.",
+          "Spectral h-fit metadata is calibration only because the SI value of h is exact.",
+          "Mass-shell integration depends on shell masses and epsilon fields being provided or reconstructable.",
+          "Channel fractions require component epsilon fields; missing components limit channel attribution.",
+          "Fusion-zone radii are cumulative-luminosity diagnostics and inherit profile resolution limits.",
+          "Surface luminosity and integrated nuclear luminosity can differ because of transport, storage, and profile truncation."
+        ]
+      }
+    }
+  ],
+  "uncertaintySummaries": [
+    {
+      "mode": "interval",
+      "samples": 2,
+      "intervals": {
+        "ppFraction": [
+          1,
+          1
+        ],
+        "cnoFraction": [
+          0,
+          0
+        ],
+        "tripleAlphaFraction": [
+          0,
+          0
+        ],
+        "r90_Rstar": [
+          0.3,
+          0.3
+        ],
+        "activeVolumeFraction": [
+          0.026999999999999996,
+          0.026999999999999996
+        ],
+        "luminosityClosureRelErr": [
+          0.04390491118077344,
+          0.0567366771159874
+        ]
+      },
+      "robustDominantFusionChannel": "pp_chain",
+      "robustFusionZoneMode": "core_fusion",
+      "caveats": [
+        "Uncertainty propagation uses fixture perturbations, not full stellar-evolution reruns."
+      ]
+    }
+  ],
+  "closureSummaries": [
+    {
+      "effectiveTemperatureFromLR_K": 5772.003429145849,
+      "surfaceGravityLogg_cgs": 4.438080760123278,
+      "luminosityClosureRelErr": 0,
+      "warnings": [
+        "surface_teff_not_core_temperature",
+        "profile_fixture_not_external_reproduction"
+      ]
+    }
+  ],
+  "aggregate": {
+    "profileCount": 1,
+    "passedClosureCount": 1,
+    "failedClosureCount": 0,
+    "warningCount": 2,
+    "uncertaintyCoverageRate": 1,
+    "strongestVerdict": "fixture_only_profile_support"
+  },
+  "blockers": [],
+  "evidence": {
+    "stage": "STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE",
+    "claimTier": "Stage2_candidate_benchmark_support",
+    "claimIds": [
+      "mesa_profile_benchmark_requires_metadata.v1",
+      "stellar_profile_luminosity_closure_check.v1",
+      "stellar_profile_uncertainty_propagation_required.v1",
+      "fusion_channel_benchmark_from_integrated_eps.v1",
+      "fusion_zone_benchmark_from_cumulative_luminosity.v1",
+      "surface_teff_is_observable_closure_not_core_temperature.v1",
+      "starsim_fusion_benchmark_not_direct_er_epr_evidence.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1009.1622",
+      "https://arxiv.org/abs/2411.00972",
+      "https://arxiv.org/abs/1004.2318",
+      "https://www.astronomy.swin.edu.au/cosmos/E/Effective%2BTemperature",
+      "https://arxiv.org/abs/1306.0533"
+    ],
+    "sourceRoles": {
+      "mesa_profile_benchmark_requires_metadata.v1": "supports_model",
+      "stellar_profile_luminosity_closure_check.v1": "supports_model",
+      "stellar_profile_uncertainty_propagation_required.v1": "supports_model",
+      "fusion_channel_benchmark_from_integrated_eps.v1": "supports_model",
+      "fusion_zone_benchmark_from_cumulative_luminosity.v1": "supports_model",
+      "surface_teff_is_observable_closure_not_core_temperature.v1": "supports_model",
+      "starsim_fusion_benchmark_not_direct_er_epr_evidence.v1": "supports_model"
+    },
+    "uncertaintyNotes": [
+      "Benchmark support depends on profile metadata quality and cannot certify the upstream MESA run by itself.",
+      "Luminosity closure is a diagnostic tolerance, not proof that the imported profile is complete.",
+      "Uncertainty propagation is fixture-level unless backed by full profile ensembles or reproduced solver runs.",
+      "Integrated epsilon channel fractions inherit the imported profile's nuclear network and resolution limits.",
+      "Fusion-zone radii inherit shell spacing and energy-generation profile resolution.",
+      "Surface effective temperature is an observable closure check and does not provide core temperature.",
+      "Benchmark support cannot directly establish ER=EPR, propulsion, stress-energy sourcing, or CL0-CL4 evidence."
+    ]
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Benchmark support remains an astrophysical prior and cannot promote QST, ER=EPR, Needle Hull, or warp claims."
+    ]
+  }
+}

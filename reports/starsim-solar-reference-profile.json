@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "starsim-fusion-profile-import.v1",
+  "objectId": "Sun",
+  "source": "mesa_fixture",
+  "sourceRef": "fixture://starsim/solar-reference/mesa-profile",
+  "sourceHash": "fixture-solar-reference-profile-v1",
+  "stellarClass": {
+    "spectralType": "G2V",
+    "luminosityClass": "V",
+    "objectClass": "main_sequence"
+  },
+  "global": {
+    "mass_Msun": 1,
+    "radius_Rsun": 1,
+    "luminosity_Lsun": 1,
+    "effectiveTemperature_K": 5772,
+    "metallicity_feh": 0,
+    "age_Gyr": 4.57
+  },
+  "mesaMetadata": {
+    "mesaVersion": "fixture-mesa-r23.05.1",
+    "inlistHash": "fixture-inlist-solar-reference-v1",
+    "profileHash": "fixture-solar-reference-profile-v1",
+    "historyHash": "fixture-solar-reference-history-v1",
+    "network": "pp_cno_extras.net",
+    "eos": "mesa-default-fixture",
+    "opacity": "mesa-default-fixture",
+    "metallicity_Z": 0.0142,
+    "mixingLengthAlpha": 1.9,
+    "initialMass_Msun": 1,
+    "age_Gyr": 4.57
+  },
+  "shells": [
+    {
+      "shellIndex": 0,
+      "radius_Rstar": 0.05,
+      "shellMass_g": 1e+32,
+      "temperature_K": 15500000,
+      "density_g_cm3": 150,
+      "epsNuc_erg_g_s": 20,
+      "epsPp_erg_g_s": 20,
+      "hydrogenMassFraction": 0.35,
+      "heliumMassFraction": 0.63,
+      "metallicityMassFraction": 0.02
+    },
+    {
+      "shellIndex": 1,
+      "radius_Rstar": 0.15,
+      "shellMass_g": 6e+31,
+      "temperature_K": 12500000,
+      "density_g_cm3": 90,
+      "epsNuc_erg_g_s": 20,
+      "epsPp_erg_g_s": 20
+    },
+    {
+      "shellIndex": 2,
+      "radius_Rstar": 0.3,
+      "shellMass_g": 3.14e+31,
+      "temperature_K": 8500000,
+      "density_g_cm3": 40,
+      "epsNuc_erg_g_s": 20,
+      "epsPp_erg_g_s": 20
+    }
+  ],
+  "hSpectralFit": {
+    "role": "calibration_only"
+  },
+  "provenance": {
+    "reproducibilityStatus": "fixture_only",
+    "qstRole": "stellar_quantum_microphysics_prior",
+    "claimIds": [
+      "solar_reference_run_fixture_not_external_reproduction.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1009.1622"
+    ],
+    "caveats": [
+      "Fixture-only MESA-like solar shell profile for the solar reference runner."
+    ]
+  }
+}

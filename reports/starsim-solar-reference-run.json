@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "starsim-solar-reference-run-artifact.v1",
+  "runId": "starsim-solar-reference:1211abd8-6e1f-477a-acf0-32db9ba0fa9b",
+  "planId": "solar-reference-fixture-v1",
+  "createdAt": "2026-05-11T17:15:13.083Z",
+  "reproducibilityStatus": "fixture_only",
+  "mesaMetadata": {
+    "mesaVersion": "fixture-mesa-r23.05.1",
+    "inlistHash": "fixture-inlist-solar-reference-v1",
+    "profileHash": "fixture-solar-reference-profile-v1",
+    "historyHash": "fixture-solar-reference-history-v1",
+    "network": "pp_cno_extras.net",
+    "ratesSource": "jina-reaclib-fixture",
+    "eos": "mesa-default-fixture",
+    "opacity": "mesa-default-fixture",
+    "atmosphere": "photosphere-table-fixture",
+    "initialMass_Msun": 1,
+    "initialMetallicity_Z": 0.0142,
+    "initialHelium_Y": 0.27,
+    "mixingLengthAlpha": 1.9,
+    "age_Gyr": 4.57
+  },
+  "importedProfileRef": "reports/starsim-solar-reference-profile.json",
+  "fusionProfileValidationRef": "reports/starsim-solar-reference-profile-validation.json",
+  "benchmarkReportRef": "reports/starsim-solar-reference-benchmark.json",
+  "stage2GateReportRef": "reports/starsim-solar-reference-stage2-gate.json",
+  "closures": {
+    "luminosityClosureStatus": "pass",
+    "neutrinoClosureStatus": "pass",
+    "asteroseismicClosureStatus": "pass"
+  },
+  "evidence": {
+    "stage": "STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1",
+    "claimTier": "fixture_only_solar_reference",
+    "claimIds": [
+      "solar_reference_run_requires_solver_metadata.v1",
+      "solar_reference_run_fixture_not_external_reproduction.v1",
+      "mesa_solar_profile_reproduction_context.v1",
+      "solar_pp_chain_cross_sections_context.v1",
+      "solar_reference_run_not_er_epr_evidence.v1",
+      "solar_reference_run_proxy_only_qst_boundary.v1",
+      "h_spectral_fit_solar_reference_calibration_only.v1",
+      "borexino_neutrino_closure_context.v1",
+      "gyre_solar_oscillation_summary_context.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1009.1622",
+      "https://arxiv.org/abs/1004.2318",
+      "https://arxiv.org/abs/1306.0533",
+      "https://arxiv.org/abs/2411.00972",
+      "https://www.nist.gov/si-redefinition/meet-constants",
+      "https://www.nature.com/articles/s41586-018-0624-y",
+      "https://academic.oup.com/mnras/article/435/4/3406/1033475"
+    ],
+    "sourceRoles": {
+      "solar_reference_run_requires_solver_metadata.v1": "supports_model",
+      "solar_reference_run_fixture_not_external_reproduction.v1": "supports_model",
+      "mesa_solar_profile_reproduction_context.v1": "supports_model",
+      "solar_pp_chain_cross_sections_context.v1": "supports_model",
+      "solar_reference_run_not_er_epr_evidence.v1": "supports_boundary",
+      "solar_reference_run_proxy_only_qst_boundary.v1": "supports_boundary",
+      "h_spectral_fit_solar_reference_calibration_only.v1": "supports_boundary",
+      "borexino_neutrino_closure_context.v1": "supports_observational_closure",
+      "gyre_solar_oscillation_summary_context.v1": "supports_observational_closure"
+    },
+    "uncertaintyNotes": [
+      "Solar reference runs require solver fingerprints before they can be treated as solver-backed.",
+      "Fixture-only runs are useful regression artifacts but are not external reproduction.",
+      "MESA profile fidelity depends on inlist, physics options, network, opacity, EOS, and age calibration.",
+      "PP-chain and CNO closure inherit nuclear reaction-rate and solar composition uncertainties.",
+      "Solar reference fidelity cannot directly establish ER=EPR or QST metric evidence.",
+      "QST use remains proxy-only and cannot promote CL0-CL4 claims.",
+      "hSpectralFit remains calibration-only because h is exact in the revised SI.",
+      "Neutrino closure residuals depend on solar model choices and neutrino flavor-conversion assumptions.",
+      "GYRE summary closure depends on imported mode summaries and does not certify a full pulsation run."
+    ]
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Solar reference runs strengthen stellar microphysics checks only and cannot promote QST, ER=EPR, Needle Hull, warp, stress-energy, or CL0-CL4 claims."
+    ]
+  },
+  "safeSummary": "Solar reference run: starsim-solar-reference:1211abd8-6e1f-477a-acf0-32db9ba0fa9b\nReproducibility status: fixture_only\nClaim tier: fixture_only_solar_reference\nMESA metadata: profileHash=present; inlistHash=present; network=pp_cno_extras.net; rates=jina-reaclib-fixture\nProfile validation: reports/starsim-solar-reference-profile-validation.json\nBenchmark report: reports/starsim-solar-reference-benchmark.json\nStage 2 gate report: reports/starsim-solar-reference-stage2-gate.json\nClosures: luminosity=pass; neutrino=pass; asteroseismic=pass\nClaim IDs: solar_reference_run_requires_solver_metadata.v1, solar_reference_run_fixture_not_external_reproduction.v1, mesa_solar_profile_reproduction_context.v1, solar_pp_chain_cross_sections_context.v1, solar_reference_run_not_er_epr_evidence.v1, solar_reference_run_proxy_only_qst_boundary.v1, h_spectral_fit_solar_reference_calibration_only.v1, borexino_neutrino_closure_context.v1, gyre_solar_oscillation_summary_context.v1\nCitations: https://arxiv.org/abs/1009.1622, https://arxiv.org/abs/1004.2318, https://arxiv.org/abs/1306.0533, https://arxiv.org/abs/2411.00972, https://www.nist.gov/si-redefinition/meet-constants, https://www.nature.com/articles/s41586-018-0624-y, https://academic.oup.com/mnras/article/435/4/3406/1033475\nSource roles: solar_reference_run_requires_solver_metadata.v1:supports_model, solar_reference_run_fixture_not_external_reproduction.v1:supports_model, mesa_solar_profile_reproduction_context.v1:supports_model, solar_pp_chain_cross_sections_context.v1:supports_model, solar_reference_run_not_er_epr_evidence.v1:supports_boundary, solar_reference_run_proxy_only_qst_boundary.v1:supports_boundary, h_spectral_fit_solar_reference_calibration_only.v1:supports_boundary, borexino_neutrino_closure_context.v1:supports_observational_closure, gyre_solar_oscillation_summary_context.v1:supports_observational_closure\nUncertainty notes: Solar reference runs require solver fingerprints before they can be treated as solver-backed. | Fixture-only runs are useful regression artifacts but are not external reproduction. | MESA profile fidelity depends on inlist, physics options, network, opacity, EOS, and age calibration. | PP-chain and CNO closure inherit nuclear reaction-rate and solar composition uncertainties. | Solar reference fidelity cannot directly establish ER=EPR or QST metric evidence. | QST use remains proxy-only and cannot promote CL0-CL4 claims. | hSpectralFit remains calibration-only because h is exact in the revised SI. | Neutrino closure residuals depend on solar model choices and neutrino flavor-conversion assumptions. | GYRE summary closure depends on imported mode summaries and does not certify a full pulsation run.\nQST boundary: proxy_only; mayPromoteToCL4=false\nAllowed claim: solar reference run for a proxy-only stellar microphysics prior; not direct ER=EPR evidence; requires independent reproduction for stronger status.\nCaveats: Solar reference runs strengthen stellar microphysics checks only and cannot promote QST, ER=EPR, Needle Hull, warp, stress-energy, or CL0-CL4 claims."
+}

@@ -1,0 +1,22 @@
+{
+  "objectId": "Sun",
+  "modelFluxes": {
+    "pp": 6.05e10,
+    "be7": 4.85e9,
+    "pep": 1.29e8,
+    "b8": 5.55e6,
+    "cno": 7.4e8,
+    "units": "cm^-2 s^-1"
+  },
+  "referenceFluxes": {
+    "pp": 6.1e10,
+    "be7": 4.99e9,
+    "pep": 1.27e8,
+    "b8": 5.68e6,
+    "cno": 7.0e8,
+    "units": "cm^-2 s^-1",
+    "sourceRef": "Borexino"
+  },
+  "warnRelErrMax": 0.15,
+  "failRelErrMax": 0.35
+}

@@ -29,9 +29,17 @@
     "shared/starsim-fusion-stage2-gate.ts",
     "shared/starsim-fusion-stage2-gate-artifact.ts",
     "shared/starsim-fusion-stage2-gate-safe-language.ts",
+    "shared/starsim-solar-reference-claims.ts",
+    "shared/starsim-solar-reference-run.ts",
+    "shared/starsim-solar-reference-artifact.ts",
+    "shared/starsim-solar-reference-safe-language.ts",
+    "server/modules/starsim/external/solver-runtime-policy.ts",
+    "server/modules/starsim/external/mesa-solar-runner.ts",
+    "server/modules/starsim/external/gyre-summary-import.ts",
     "tools/erEprStage1Run.ts",
     "tools/starsimFusionBenchmarkRun.ts",
     "tools/starsimFusionStage2GateRun.ts",
+    "tools/starsimSolarReferenceRun.ts",
     "tests/quantum-spacetime-congruence.spec.ts",
     "tests/er-epr-simulation.spec.ts",
     "tests/er-epr-stage1-runner.spec.ts",
@@ -57,7 +65,13 @@
     "tests/starsim-fusion-asteroseismic-closure.spec.ts",
     "tests/starsim-fusion-stage2-gate.spec.ts",
     "tests/starsim-fusion-stage2-gate-artifact.spec.ts",
-    "tests/starsim-fusion-stage2-gate-safe-language.spec.ts"
+    "tests/starsim-fusion-stage2-gate-safe-language.spec.ts",
+    "tests/starsim-solar-reference-run.spec.ts",
+    "tests/starsim-solar-reference-artifact.spec.ts",
+    "tests/starsim-solar-reference-safe-language.spec.ts",
+    "tests/starsim-solar-reference-claims.spec.ts",
+    "tests/mesa-solar-runner.spec.ts",
+    "tests/gyre-summary-import.spec.ts"
   ],
   "compilerOptions": {
     "incremental": false

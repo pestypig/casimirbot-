@@ -135,6 +135,10 @@ Stage 3 (Certified / Policy-gated)
 | STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-neutrino-closure.ts | Stage 1 | Solar neutrino residual closure for pp-chain observational gate checks. | tests/starsim-fusion-neutrino-closure.spec.ts |
 | STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-asteroseismic-closure.ts | Stage 1 | GYRE-style asteroseismic closure summaries for Stage 2 gate review. | tests/starsim-fusion-asteroseismic-closure.spec.ts |
 | STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-stage2-gate-safe-language.ts | Stage 1 | Claim-safe Stage 2 gate renderer blocking certification, direct ER=EPR, propulsion, stress-energy, CL4, and Planck-constant overclaims. | tests/starsim-fusion-stage2-gate-safe-language.spec.ts |
+| STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | shared/starsim-solar-reference-run.ts | Stage 1 | Canonical solar reference runner that links runtime policy, profile validation, benchmark handoff, and Stage 2 gate handoff. | tests/starsim-solar-reference-run.spec.ts, tests/fixtures/starsim-solar-reference/solar-reference-plan.fixture.json, docs/research/starsim-solar-reference-repro-run-v1.md |
+| STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | server/modules/starsim/external/mesa-solar-runner.ts | Stage 1 | MESA solar runtime adapter with explicit fixture-only and unavailable external solver behavior. | tests/mesa-solar-runner.spec.ts |
+| STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | server/modules/starsim/external/gyre-summary-import.ts | Stage 1 | GYRE summary import helper for optional solar oscillation closure. | tests/gyre-summary-import.spec.ts |
+| STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | shared/starsim-solar-reference-safe-language.ts | Stage 1 | Claim-safe solar reference renderer blocking solver, ER=EPR, propulsion, stress-energy, CL4, and Planck-constant overclaims. | tests/starsim-solar-reference-safe-language.spec.ts |
 
 ## DP Collapse Modules
 

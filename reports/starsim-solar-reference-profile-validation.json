@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "starsim-fusion-profile-validation.v1",
+  "objectId": "Sun",
+  "importedProfileSummary": {
+    "shellCount": 3,
+    "source": "mesa_fixture",
+    "reproducibilityStatus": "fixture_only"
+  },
+  "integratedFusion": {
+    "integratedNucLuminosity_Lsun": 1,
+    "surfaceLuminosity_Lsun": 1,
+    "luminosityClosureRelErr": 0,
+    "ppFraction": 1,
+    "cnoFraction": 0,
+    "tripleAlphaFraction": 0,
+    "dominantFusionChannel": "pp_chain"
+  },
+  "fusionZone": {
+    "mode": "core_fusion",
+    "r10_Rstar": 0.05,
+    "r50_Rstar": 0.05,
+    "r90_Rstar": 0.3,
+    "activeVolumeFraction": 0.026999999999999996
+  },
+  "comparisonToStage1Proxy": {
+    "compared": false,
+    "notes": [
+      "No Stage 1 proxy evaluation was supplied for comparison."
+    ]
+  },
+  "qstBoundary": {
+    "qstRole": "stellar_quantum_microphysics_prior",
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Profile validation prepares Stage 2 review but remains Stage 1-to-Stage 2 prep.",
+      "Profile output is not direct ER=EPR evidence and cannot promote CL0-CL4."
+    ]
+  },
+  "evidence": {
+    "stage": "STARSIM_FUSION_PROFILE_IMPORT_STAGE2_PREP",
+    "claimTier": "Stage1_to_Stage2_profile_validation_prep",
+    "claimIds": [
+      "mesa_profile_import_profile_validation.v1",
+      "starsim_profile_import_not_direct_er_epr_evidence.v1",
+      "h_spectral_fit_calibration_only_exact_si_guardrail.v1",
+      "fusion_luminosity_mass_shell_integration.v1",
+      "fusion_channel_fraction_from_integrated_eps.v1",
+      "fusion_zone_radii_from_cumulative_luminosity.v1",
+      "surface_luminosity_not_identical_to_nuclear_luminosity_guardrail.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1009.1622",
+      "https://arxiv.org/abs/1306.0533",
+      "https://www.nist.gov/si-redefinition/meet-constants",
+      "https://arxiv.org/abs/1004.2318"
+    ],
+    "uncertaintyNotes": [
+      "Profile import validates a shell schema and provenance; it does not certify the upstream stellar model.",
+      "Profile validation can strengthen astrophysical priors but cannot directly establish ER=EPR or CL0-CL4 evidence.",
+      "Spectral h-fit metadata is calibration only because the SI value of h is exact.",
+      "Mass-shell integration depends on shell masses and epsilon fields being provided or reconstructable.",
+      "Channel fractions require component epsilon fields; missing components limit channel attribution.",
+      "Fusion-zone radii are cumulative-luminosity diagnostics and inherit profile resolution limits.",
+      "Surface luminosity and integrated nuclear luminosity can differ because of transport, storage, and profile truncation."
+    ]
+  }
+}

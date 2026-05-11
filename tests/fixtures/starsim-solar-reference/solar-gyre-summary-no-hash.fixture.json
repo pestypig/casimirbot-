@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "starsim-gyre-summary.v1",
+  "objectId": "Sun",
+  "source": "gyre_external_run",
+  "largeSeparation_uHz": 134.9,
+  "smallSeparation_uHz": 9.0,
+  "modeCount": 32,
+  "lowDegreeModesAvailable": true,
+  "soundSpeedProfileAvailable": true
+}

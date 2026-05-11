@@ -1,0 +1,81 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-solar-reference-run-claims.v1",
+  "domain": "starsim-solar-reference-repro-run-v1",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "solar_reference_run_requires_solver_metadata.v1",
+      "statement": "A solar reference reproduction run requires solver metadata and hashes before it can be treated as solver-backed.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA solver context for stellar model reproduction metadata." }],
+      "repoBindings": ["shared/starsim-solar-reference-run.ts", "tools/starsimSolarReferenceRun.ts", "docs/research/starsim-solar-reference-repro-run-v1.md"]
+    },
+    {
+      "claimId": "solar_reference_run_fixture_not_external_reproduction.v1",
+      "statement": "Fixture-only solar reference runs must not be described as external solver reproduction.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "url": "https://arxiv.org/abs/1009.1622", "note": "External reproduction requires solver artifacts, not fixtures." }],
+      "repoBindings": ["server/modules/starsim/external/solver-runtime-policy.ts", "shared/starsim-solar-reference-safe-language.ts"]
+    },
+    {
+      "claimId": "mesa_solar_profile_reproduction_context.v1",
+      "statement": "MESA-style solar profile reproduction provides stellar-structure context for profile validation and benchmark handoff.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "url": "https://arxiv.org/abs/1009.1622", "note": "Reference for MESA stellar evolution/profile context." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-solar-runner.ts", "shared/starsim-solar-reference-run.ts"]
+    },
+    {
+      "claimId": "solar_pp_chain_cross_sections_context.v1",
+      "statement": "Solar pp-chain and CNO microphysics context should be citation-backed when interpreting solar fusion closure.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Adelberger, E. G. et al. (2011). Solar fusion cross sections II: the pp chain and CNO cycles.", "url": "https://arxiv.org/abs/1004.2318", "note": "Reference for pp-chain and CNO-cycle reaction-rate context." }],
+      "repoBindings": ["shared/starsim-solar-reference-run.ts"]
+    },
+    {
+      "claimId": "borexino_neutrino_closure_context.v1",
+      "statement": "Borexino-style solar neutrino closure provides observational context for solar-core fusion diagnostics.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Borexino Collaboration (2018). Comprehensive measurement of pp-chain solar neutrinos.", "url": "https://www.nature.com/articles/s41586-018-0624-y", "note": "Reference for pp-chain solar neutrino observational closure." }],
+      "repoBindings": ["shared/starsim-fusion-neutrino-closure.ts", "shared/starsim-solar-reference-run.ts"]
+    },
+    {
+      "claimId": "gyre_solar_oscillation_summary_context.v1",
+      "statement": "GYRE-style solar oscillation summaries can provide optional asteroseismic closure context for solar reference runs.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Townsend, R. H. D. and Teitler, S. A. (2013). GYRE: an open-source stellar oscillation code.", "url": "https://academic.oup.com/mnras/article/435/4/3406/1033475", "note": "Reference for GYRE mode calculations." }],
+      "repoBindings": ["server/modules/starsim/external/gyre-summary-import.ts", "shared/starsim-solar-reference-run.ts"]
+    },
+    {
+      "claimId": "solar_reference_run_not_er_epr_evidence.v1",
+      "statement": "Solar reference reproduction can improve StarSim stellar-microphysics fidelity but is not direct ER=EPR evidence.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Maldacena, J. and Susskind, L. (2013). Cool horizons for entangled black holes.", "equation": "spacetimeCL = proxy_only; mayPromoteToCL4 = false", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR conjectural context; not a stellar fusion evidence claim." }],
+      "repoBindings": ["shared/starsim-solar-reference-run.ts", "shared/starsim-solar-reference-safe-language.ts"]
+    },
+    {
+      "claimId": "solar_reference_run_proxy_only_qst_boundary.v1",
+      "statement": "Solar reference run outputs remain proxy-only QST context and cannot promote CL0-CL4 claims.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Carcassi, G., Landini, G. and Aidala, C. (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "equation": "spacetimeCL = proxy_only; mayPromoteToCL4 = false", "url": "https://arxiv.org/abs/2411.00972", "note": "Supports entropy/ensemble guardrail framing for QST-adjacent claims." }],
+      "repoBindings": ["shared/starsim-solar-reference-run.ts"]
+    },
+    {
+      "claimId": "h_spectral_fit_solar_reference_calibration_only.v1",
+      "statement": "hSpectralFit in solar reference reports remains calibration-only and cannot claim a new Planck constant.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_reference_reproduction", "constraints": ["solver-backed or explicitly fixture-only", "requires hashes for external reproduction", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "reference", "citation": "NIST. Meet the Constants.", "equation": "h = 6.62607015e-34 J s exactly in the revised SI", "url": "https://www.nist.gov/si-redefinition/meet-constants", "note": "Reference for exact Planck constant value." }],
+      "repoBindings": ["shared/starsim-solar-reference-safe-language.ts", "shared/starsim-solar-reference-artifact.ts"]
+    }
+  ]
+}
