@@ -1977,6 +1977,32 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "STARSIM_FUSION_SAFE_LANGUAGE",
+    module: "shared/starsim-fusion-safe-language.ts",
+    stage: "reduced-order",
+    notes:
+      "Claim-safe StarSim fusion report renderer and forbidden-language validator with source roles, uncertainty notes, and validity domains.",
+    motivation:
+      "Prevent reduced-order stellar microphysics priors from being rendered as direct ER=EPR, wormhole, propulsion, stress-energy, metric, or Planck-constant claims.",
+    conceptualWaypoints: [
+      "Render claim IDs, citations, source roles, uncertainty notes, validity domains, and caveats together.",
+      "Block predictive overclaims while allowing explicit negative boundary language.",
+      "Treat the renderer as reporting and policy support, not primary physics evidence.",
+    ],
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-safe-language.spec.ts" },
+      { type: "test", path: "tests/starsim-fusion-claims.spec.ts" },
+      { type: "doc", path: "docs/research/starsim-fusion-microphysics-stage1.md" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+      uncertaintyNoteCount: "1",
+      validityDomainCount: "1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",

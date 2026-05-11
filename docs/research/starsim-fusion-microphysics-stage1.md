@@ -76,7 +76,74 @@ Neutron stars are classified as `compact_object_not_fusing`. Their relevant Stag
 
 This lane can improve astrophysical priors for entropy, stellar population structure, and quantum-process intensity. It cannot directly support ER=EPR. Direct ER=EPR support remains restricted to controlled holographic/toy-dual simulations under `ER_EPR_STAGE1_SIM`.
 
-## 11. Research-backed claim matrix
+## 11. Claim provenance and predictive-language policy
+
+Stage 1 output is rendered through safe-language policy. The renderer must include claim IDs, citations, source roles, uncertainty notes, validity domains, and caveats. It must not turn a reduced-order astrophysical prior into predictive language about wormholes, propulsion, stress-energy sourcing, or spacetime metric evidence.
+
+The source ledger lives in `shared/starsim-fusion-claims.ts` as `STARSIM_FUSION_SOURCE_REFERENCES`, and the registry form lives in `docs/knowledge/math-claims/starsim-fusion-microphysics.claims.json`.
+
+Forbidden meanings include:
+
+- stars proving ER=EPR
+- wormhole density or inventory
+- Needle Hull propulsion evidence
+- CL4 support
+- stress-energy sourcing
+- spacetime metric evidence
+- derived Planck constant
+
+Allowed meanings include:
+
+- astrophysical prior
+- reduced-order Stage 1 model
+- proxy-only
+- stellar microphysics context
+- calibration-only `hSpectralFit`
+- not direct ER=EPR evidence
+
+## 12. Source roles
+
+Source roles separate what a citation is allowed to support:
+
+- `supports_model`: backs a reduced-order model relationship or channel classification.
+- `supports_guardrail`: backs a boundary that prevents overinterpretation.
+- `supports_boundary`: backs a claim limit, such as not using StarSim as direct ER=EPR evidence.
+- `supports_context`: backs broader astrophysical or QST context.
+
+Reports should preserve these roles so downstream text cannot cite a context source as if it were a solver result.
+
+## 13. Uncertainty notes
+
+Every claim ID has an uncertainty note. The notes are mandatory because Stage 1 uses reduced-order priors and imported metadata boundaries, not a full stellar-evolution solve. In particular:
+
+- Effective temperature is a surface proxy.
+- PP/CNO selection is a channel prior, not a reaction-network solve.
+- Fusion-zone radii are reduced-order metadata unless imported from a profile.
+- Cool-star spectral inference requires atmosphere-model support.
+- StarMap graph structure is ordinary astrophysical context only.
+
+## 14. Why citations are required
+
+The experimental mathematical realm can outrun ordinary predictive language. For that reason, every generated claim must carry concrete citations and uncertainty labels. The citation does not make the claim stronger than its source; it limits the claim to the source's validity domain.
+
+## 15. What Stage 1 cannot say
+
+Stage 1 cannot say:
+
+- Star positions prove ER=EPR.
+- Fusion tunneling maps to wormhole inventory.
+- StarSim output is metric evidence.
+- `hSpectralFit` derives a new Planck constant.
+- Neutron-star glitches are pp-chain fusion.
+- StarSim fusion priors support Needle Hull propulsion.
+
+## 16. What would justify Stage 2
+
+A future Stage 2 candidate requires either an actual stellar-structure solver integration, imported MESA profiles, or externally reproducible simulation artifacts. Reduced-order fixture outputs are not enough.
+
+Stage 2 should add profile provenance, solver versioning, reaction-network metadata, uncertainty propagation, and replayable artifacts before it strengthens any fusion-zone claim.
+
+## 17. Research-backed claim matrix
 
 | Claim | Safe support | Not supported |
 | --- | --- | --- |

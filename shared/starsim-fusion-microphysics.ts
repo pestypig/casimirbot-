@@ -341,7 +341,7 @@ export function evaluateStarSimFusionMicrophysics(
   ];
   if (input.qstUse.role === "direct_er_epr_evidence") {
     blockedClaims.push("direct_er_epr_evidence");
-    caveats.push("Direct StarSim ER=EPR evidence is blocked by the Stage 1 claim boundary.");
+    caveats.push("StarSim-to-ER=EPR direct-evidence claims are blocked by the Stage 1 claim boundary.");
   }
   if (input.qstUse.spacetimeCL !== "proxy_only") {
     blockedClaims.push(`requested_spacetimeCL_${input.qstUse.spacetimeCL}`);

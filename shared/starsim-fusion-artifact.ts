@@ -21,6 +21,21 @@ export const starSimFusionArtifactSchema = z
     claimIds: z.array(z.string()).min(1),
     citations: z.array(z.string()).min(1),
     caveats: z.array(z.string()).min(1),
+    evidence: z
+      .object({
+        claimIds: z.array(z.string()).min(1),
+        citations: z.array(z.string()).min(1),
+        sourceRoles: z.record(z.string(), z.string()),
+        uncertaintyNotes: z.array(z.string()).min(1),
+        validityDomains: z.record(
+          z.string(),
+          z.object({
+            system: z.string().min(1),
+            constraints: z.array(z.string()).min(1),
+          }),
+        ),
+      })
+      .optional(),
     reproducibilityStatus: starSimFusionReproducibilityStatusSchema,
   })
   .superRefine((artifact, ctx) => {
@@ -44,6 +59,22 @@ export const starSimFusionArtifactSchema = z
         path: ["evaluation", "qstPrior", "mayPromoteToCL4"],
         message: "StarSim fusion artifacts cannot promote to CL4.",
       });
+    }
+    if (artifact.evidence) {
+      if (artifact.evidence.claimIds.length !== artifact.claimIds.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["evidence", "claimIds"],
+          message: "Artifact evidence claimIds must mirror top-level claimIds.",
+        });
+      }
+      if (artifact.evidence.citations.length !== artifact.citations.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["evidence", "citations"],
+          message: "Artifact evidence citations must mirror top-level citations.",
+        });
+      }
     }
   });
 

@@ -1,11 +1,11 @@
 # Math Report
 
-Generated: 2026-05-11T15:09:17.069Z
-Registry entries: 85
+Generated: 2026-05-11T15:21:49.233Z
+Registry entries: 86
 
 ## Coverage by Stage
 - exploratory: 19
-- reduced-order: 34
+- reduced-order: 35
 - diagnostic: 25
 - certified: 7
 
@@ -59,8 +59,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 963
-- edges: 2068
+- nodes: 964
+- edges: 2071
 
 ## Stage Violations (Edges)
 none
@@ -76,7 +76,7 @@ none
 none
 
 ## Unit Coverage
-- entries with units: 85/85
+- entries with units: 86/86
 - missing units: none
 
 ## Unit Violations

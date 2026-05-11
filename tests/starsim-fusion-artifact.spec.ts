@@ -4,6 +4,12 @@ import {
   evaluateStarSimFusionMicrophysics,
   type StarSimFusionMicrophysicsInput,
 } from "../shared/starsim-fusion-microphysics";
+import {
+  sourceRolesForStarSimFusionClaims,
+  uncertaintyNotesForStarSimFusionClaims,
+  validityDomainsForStarSimFusionClaims,
+  type StarSimFusionClaimId,
+} from "../shared/starsim-fusion-claims";
 
 function input(
   overrides: Partial<StarSimFusionMicrophysicsInput> = {},
@@ -30,6 +36,7 @@ function input(
 
 function artifactFor(rawInput: StarSimFusionMicrophysicsInput, status = "fixture_only") {
   const evaluation = evaluateStarSimFusionMicrophysics(rawInput);
+  const claimIds = evaluation.evidence.claimIds as StarSimFusionClaimId[];
   return {
     schemaVersion: "1.0.0",
     artifactId: `${rawInput.objectId}-artifact`,
@@ -39,6 +46,13 @@ function artifactFor(rawInput: StarSimFusionMicrophysicsInput, status = "fixture
     claimIds: evaluation.evidence.claimIds,
     citations: evaluation.evidence.citations,
     caveats: evaluation.qstPrior.caveats,
+    evidence: {
+      claimIds: evaluation.evidence.claimIds,
+      citations: evaluation.evidence.citations,
+      sourceRoles: sourceRolesForStarSimFusionClaims(claimIds),
+      uncertaintyNotes: uncertaintyNotesForStarSimFusionClaims(claimIds),
+      validityDomains: validityDomainsForStarSimFusionClaims(claimIds),
+    },
     reproducibilityStatus: status,
   };
 }
@@ -90,6 +104,13 @@ describe("StarSim fusion artifacts", () => {
     expect(() => starSimFusionArtifactSchema.parse(artifactFor(rawInput))).toThrow(
       /direct ER=EPR evidence/,
     );
+  });
+
+  it("accepts provenance evidence with source roles, uncertainty notes, and validity domains", () => {
+    const artifact = starSimFusionArtifactSchema.parse(artifactFor(input()));
+    expect(Object.keys(artifact.evidence?.sourceRoles ?? {}).length).toBeGreaterThan(0);
+    expect(artifact.evidence?.uncertaintyNotes.length).toBeGreaterThan(0);
+    expect(Object.keys(artifact.evidence?.validityDomains ?? {}).length).toBeGreaterThan(0);
   });
 
   it("requires a declared reproducibility status", () => {

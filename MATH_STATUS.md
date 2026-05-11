@@ -123,6 +123,7 @@ Stage 3 (Certified / Policy-gated)
 | ER_EPR_STAGE1_RUNNER | shared/er-epr-safe-language.ts | Stage 1 | Claim-safe ER=EPR Stage 1 report language renderer and forbidden-phrase validator. | tests/er-epr-safe-language.spec.ts |
 | STARSIM_FUSION_MICROPHYSICS_STAGE1 | shared/starsim-fusion-microphysics.ts | Stage 1 | StarSim reduced-order stellar fusion microphysics prior for fusion channels, fusion-zone volumes, hSpectralFit calibration, compact-object context, and star-map structure priors; proxy-only and not direct ER=EPR evidence. | tests/starsim-fusion-microphysics.spec.ts, docs/research/starsim-fusion-microphysics-stage1.md, docs/knowledge/math-claims/starsim-fusion-microphysics.claims.json |
 | STARSIM_FUSION_MICROPHYSICS_STAGE1 | shared/starsim-fusion-artifact.ts | Stage 1 | Artifact schema for StarSim fusion evaluations with claim IDs, citations, caveats, and reproducibility status. | tests/starsim-fusion-artifact.spec.ts |
+| STARSIM_FUSION_SAFE_LANGUAGE | shared/starsim-fusion-safe-language.ts | Stage 1 | Claim-safe StarSim fusion report renderer with forbidden-phrase validation, source roles, uncertainty notes, and validity domains. | tests/starsim-fusion-safe-language.spec.ts, tests/starsim-fusion-claims.spec.ts |
 
 ## DP Collapse Modules
 

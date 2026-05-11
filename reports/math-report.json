@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-11T15:09:17.069Z",
-  "registryCount": 85,
+  "generatedAt": "2026-05-11T15:21:49.233Z",
+  "registryCount": 86,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -27,7 +27,7 @@
       ]
     },
     "reduced-order": {
-      "count": 34,
+      "count": 35,
       "modules": [
         "modules/gr/stress-energy.ts",
         "server/gr/gr-constraint-policy.ts",
@@ -58,6 +58,7 @@
         "shared/er-epr-safe-language.ts",
         "shared/starsim-fusion-microphysics.ts",
         "shared/starsim-fusion-artifact.ts",
+        "shared/starsim-fusion-safe-language.ts",
         "shared/curvature-proxy.ts",
         "client/src/physics/curvature.ts",
         "client/src/lib/warp-proof-math.ts",
@@ -169,7 +170,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 85,
+    "entriesWithUnits": 86,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -178,8 +179,8 @@
         "missing": []
       },
       "reduced-order": {
-        "total": 34,
-        "withUnits": 34,
+        "total": 35,
+        "withUnits": 35,
         "missing": []
       },
       "diagnostic": {
@@ -205,8 +206,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 963,
-    "edgeCount": 2068
+    "nodeCount": 964,
+    "edgeCount": 2071
   },
   "evidenceProfiles": [
     {
