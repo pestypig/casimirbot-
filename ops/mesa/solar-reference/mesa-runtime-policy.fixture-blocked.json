@@ -1,0 +1,14 @@
+{
+  "runtimeKind": "fixture_only",
+  "allowFixtureFallback": false,
+  "requireInlistHash": true,
+  "requireProfileHash": true,
+  "requireHistoryHash": true,
+  "requireRunLogHash": true,
+  "inputs": {
+    "inlistProjectPath": "ops/mesa/solar-reference/inlist_project"
+  },
+  "outputs": {
+    "profilePath": "ops/mesa/solar-reference/profile_solar_reference.data"
+  }
+}

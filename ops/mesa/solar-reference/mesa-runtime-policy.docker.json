@@ -1,0 +1,20 @@
+{
+  "runtimeKind": "docker",
+  "mesaCommand": "docker compose run --rm mesa-solar-reference",
+  "dockerImage": "mesa-runtime:example",
+  "workingDirectory": "ops/mesa/solar-reference",
+  "outputDirectory": "reports",
+  "allowFixtureFallback": false,
+  "requireInlistHash": true,
+  "requireProfileHash": true,
+  "requireHistoryHash": true,
+  "requireRunLogHash": true,
+  "inputs": {
+    "inlistProjectPath": "ops/mesa/solar-reference/inlist_project",
+    "inlistSolarPath": "ops/mesa/solar-reference/inlist_solar_reference"
+  },
+  "outputs": {
+    "profilePath": "ops/mesa/solar-reference/LOGS/profile1.data",
+    "historyPath": "ops/mesa/solar-reference/LOGS/history.data"
+  }
+}

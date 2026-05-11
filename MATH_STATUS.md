@@ -139,6 +139,10 @@ Stage 3 (Certified / Policy-gated)
 | STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | server/modules/starsim/external/mesa-solar-runner.ts | Stage 1 | MESA solar runtime adapter with explicit fixture-only and unavailable external solver behavior. | tests/mesa-solar-runner.spec.ts |
 | STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | server/modules/starsim/external/gyre-summary-import.ts | Stage 1 | GYRE summary import helper for optional solar oscillation closure. | tests/gyre-summary-import.spec.ts |
 | STARSIM_SOLAR_REFERENCE_REPRO_RUN_V1 | shared/starsim-solar-reference-safe-language.ts | Stage 1 | Claim-safe solar reference renderer blocking solver, ER=EPR, propulsion, stress-energy, CL4, and Planck-constant overclaims. | tests/starsim-solar-reference-safe-language.spec.ts |
+| STARSIM_SOLAR_MESA_DOCKER_REPRO_V1 | server/modules/starsim/external/mesa-runtime-adapter.ts | Stage 1 | External/import MESA runtime adapter with no fixture fallback and hash requirements. | tests/mesa-runtime-adapter.spec.ts, ops/mesa/solar-reference/mesa-runtime-policy.import-fixture.json, docs/research/starsim-solar-mesa-docker-repro-v1.md |
+| STARSIM_SOLAR_MESA_DOCKER_REPRO_V1 | server/modules/starsim/external/mesa-output-parser.ts | Stage 1 | MESA-like profile/history parser for StarSim solar fusion profile imports. | tests/mesa-output-parser.spec.ts |
+| STARSIM_SOLAR_MESA_DOCKER_REPRO_V1 | shared/starsim-solar-mesa-repro-artifact.ts | Stage 1 | Artifact contract for MESA solar reproduction/import reports with QST boundaries. | tests/starsim-solar-mesa-repro-artifact.spec.ts |
+| STARSIM_SOLAR_MESA_DOCKER_REPRO_V1 | shared/starsim-solar-mesa-repro-safe-language.ts | Stage 1 | Safe-language renderer for MESA solar reproduction/import reports. | tests/starsim-solar-mesa-repro-safe-language.spec.ts |
 
 ## DP Collapse Modules
 

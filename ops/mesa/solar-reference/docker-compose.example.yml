@@ -1,0 +1,7 @@
+services:
+  mesa-solar-reference:
+    image: mesa-runtime:example
+    working_dir: /work
+    volumes:
+      - ./:/work
+    command: ["./rn"]

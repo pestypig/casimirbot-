@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "starsim-solar-mesa-repro-artifact.v1",
+  "runId": "starsim-solar-mesa-repro:0f84bb16-5e6e-43f4-b265-d5d4c1c8ee86",
+  "createdAt": "2026-05-11T17:42:25.112Z",
+  "runtime": {
+    "runtimeKind": "local",
+    "mesaCommand": "import-declared-mesa-output",
+    "mesaVersion": "import-fixture",
+    "mesaRevision": "not-executed",
+    "exitCode": 0,
+    "runLogPath": "reports\\starsim-solar-mesa-run.log",
+    "runLogHash": "1c7396523caf509a594bdb623463a6b1fa159417ee74264b5bf297e5e9cb4a8c"
+  },
+  "inputs": {
+    "inlistProjectPath": "ops/mesa/solar-reference/inlist_project",
+    "inlistProjectHash": "345ea8ba9472f0222309024028adeef1ce1b7b6a0eea4e907c655837823dcb48",
+    "inlistSolarPath": "ops/mesa/solar-reference/inlist_solar_reference",
+    "inlistSolarHash": "115bb520defd56f1cfb401c1a56a5e7a2448169cbe9c608d43a6f4c065634ca7",
+    "network": "pp_cno_extras.net",
+    "ratesSource": "jina-reaclib-fixture",
+    "eos": "mesa-default-fixture",
+    "opacity": "mesa-default-fixture",
+    "atmosphere": "photosphere-table-fixture"
+  },
+  "outputs": {
+    "profilePath": "ops/mesa/solar-reference/profile_solar_reference.data",
+    "profileHash": "a2d94a3b148387d3f936d62507e8b2af0077dd935a968a630122a73e7a2fcf89",
+    "historyPath": "ops/mesa/solar-reference/history_solar_reference.data",
+    "historyHash": "edbdc135072e5c16198aacd342a8812d94d1275cf7f2933b24f3519da1d646a1",
+    "photosHash": "",
+    "gyreSummaryHash": ""
+  },
+  "parsed": {
+    "profileImportRef": "reports/starsim-solar-mesa-profile-import.json",
+    "profileValidationRef": "reports/starsim-solar-mesa-profile-validation.json",
+    "benchmarkReportRef": "reports/starsim-solar-mesa-benchmark.json",
+    "stage2GateReportRef": "reports/starsim-solar-mesa-stage2-gate.json"
+  },
+  "evidence": {
+    "stage": "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
+    "claimTier": "mesa_imported_solar_reference",
+    "claimIds": [
+      "mesa_external_runtime_requires_hashes.v1",
+      "mesa_solar_repro_fixture_not_external.v1",
+      "mesa_profile_parser_requires_integration_basis.v1",
+      "mesa_profile_hash_supports_reproducibility.v1",
+      "mesa_history_hash_supports_reproducibility.v1",
+      "mesa_run_log_hash_supports_reproducibility.v1",
+      "mesa_solar_repro_stage2_gate_handoff.v1",
+      "solar_mesa_repro_not_er_epr_evidence.v1",
+      "solar_mesa_repro_proxy_only_qst_boundary.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1009.1622",
+      "https://arxiv.org/abs/1004.2318",
+      "https://www.nature.com/articles/s41586-018-0624-y",
+      "https://arxiv.org/abs/1306.0533",
+      "https://arxiv.org/abs/2411.00972"
+    ],
+    "uncertaintyNotes": [
+      "External MESA runtime evidence depends on retained input and output hashes.",
+      "Fixture data must remain fixture or import evidence and cannot be labeled reproduced.",
+      "Profile parsing requires mass/radius integration basis and numeric shell fields.",
+      "Profile hashes support reproducibility checks but do not certify physical completeness.",
+      "History hashes support provenance checks for temporal solar calibration outputs.",
+      "Run-log hashes support auditability of solver execution or import actions.",
+      "Stage 2 gate handoff is a review gate and not automatic certification.",
+      "MESA solar reproduction cannot directly establish ER=EPR or local spacetime bridge evidence.",
+      "QST use remains proxy-only and cannot promote CL0-CL4 claims."
+    ],
+    "caveats": [
+      "MESA repro artifacts are stellar microphysics evidence only and cannot promote QST, ER=EPR, Needle Hull, warp, stress-energy, or CL0-CL4 claims.",
+      "parser_warning:missing_eps_3alpha"
+    ]
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Solar MESA reproduction remains proxy-only QST context."
+    ]
+  },
+  "safeSummary": "Solar MESA reproduction run: starsim-solar-mesa-repro:0f84bb16-5e6e-43f4-b265-d5d4c1c8ee86\nRuntime: local; exitCode=0\nRuntime image: n/a; digest=n/a\nInputs: inlistProjectHash=345ea8ba9472f0222309024028adeef1ce1b7b6a0eea4e907c655837823dcb48; inlistSolarHash=115bb520defd56f1cfb401c1a56a5e7a2448169cbe9c608d43a6f4c065634ca7\nOutputs: profileHash=a2d94a3b148387d3f936d62507e8b2af0077dd935a968a630122a73e7a2fcf89; historyHash=edbdc135072e5c16198aacd342a8812d94d1275cf7f2933b24f3519da1d646a1; runLogHash=1c7396523caf509a594bdb623463a6b1fa159417ee74264b5bf297e5e9cb4a8c\nParsed refs: profile=reports/starsim-solar-mesa-profile-import.json; validation=reports/starsim-solar-mesa-profile-validation.json; benchmark=reports/starsim-solar-mesa-benchmark.json; gate=reports/starsim-solar-mesa-stage2-gate.json\nClaim tier: mesa_imported_solar_reference\nClaim IDs: mesa_external_runtime_requires_hashes.v1, mesa_solar_repro_fixture_not_external.v1, mesa_profile_parser_requires_integration_basis.v1, mesa_profile_hash_supports_reproducibility.v1, mesa_history_hash_supports_reproducibility.v1, mesa_run_log_hash_supports_reproducibility.v1, mesa_solar_repro_stage2_gate_handoff.v1, solar_mesa_repro_not_er_epr_evidence.v1, solar_mesa_repro_proxy_only_qst_boundary.v1\nCitations: https://arxiv.org/abs/1009.1622, https://arxiv.org/abs/1004.2318, https://www.nature.com/articles/s41586-018-0624-y, https://arxiv.org/abs/1306.0533, https://arxiv.org/abs/2411.00972\nUncertainty notes: External MESA runtime evidence depends on retained input and output hashes. | Fixture data must remain fixture or import evidence and cannot be labeled reproduced. | Profile parsing requires mass/radius integration basis and numeric shell fields. | Profile hashes support reproducibility checks but do not certify physical completeness. | History hashes support provenance checks for temporal solar calibration outputs. | Run-log hashes support auditability of solver execution or import actions. | Stage 2 gate handoff is a review gate and not automatic certification. | MESA solar reproduction cannot directly establish ER=EPR or local spacetime bridge evidence. | QST use remains proxy-only and cannot promote CL0-CL4 claims.\nCaveats: MESA repro artifacts are stellar microphysics evidence only and cannot promote QST, ER=EPR, Needle Hull, warp, stress-energy, or CL0-CL4 claims. | parser_warning:missing_eps_3alpha\nQST boundary: proxy_only; mayPromoteToCL4=false\nAllowed claim: MESA-imported or MESA-reproduced solar reference evidence for a proxy-only stellar microphysics prior; not direct ER=EPR evidence."
+}

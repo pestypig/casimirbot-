@@ -2304,6 +2304,80 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
+    module: "server/modules/starsim/external/mesa-runtime-adapter.ts",
+    stage: "diagnostic",
+    notes:
+      "External/import MESA runtime adapter with strict no-fixture-fallback policy and hash requirements.",
+    motivation:
+      "Move the solar reference pipeline from fixture-only routing toward auditable MESA output import and eventual solver reproduction.",
+    conceptualWaypoints: [
+      "Reject fixture_only mode in the MESA repro tool.",
+      "Require inlist, profile, history, and run-log hashes for reproduced claims.",
+      "Feed parsed MESA output through profile validation, benchmark, and Stage 2 gate contracts.",
+    ],
+    checks: [
+      { type: "test", path: "tests/mesa-runtime-adapter.spec.ts" },
+      { type: "stability", path: "tests/mesa-runtime-adapter.spec.ts" },
+      { type: "fixture", path: "ops/mesa/solar-reference/mesa-runtime-policy.import-fixture.json" },
+      { type: "doc", path: "docs/research/starsim-solar-mesa-docker-repro-v1.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/starsim-solar-mesa-repro.claims.json" },
+    ],
+    units: {
+      inlistHash: "1",
+      profileHash: "1",
+      historyHash: "1",
+      runLogHash: "1",
+    },
+  },
+  {
+    tag: "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
+    module: "server/modules/starsim/external/mesa-output-parser.ts",
+    stage: "diagnostic",
+    notes: "MESA-like profile/history parser for StarSim solar fusion profile imports.",
+    checks: [
+      { type: "test", path: "tests/mesa-output-parser.spec.ts" },
+      { type: "stability", path: "tests/mesa-output-parser.spec.ts" },
+    ],
+    units: {
+      radius_Rstar: "1",
+      shellMass_g: "M",
+      temperature_K: "Theta",
+      density_g_cm3: "M L^-3",
+      epsNuc_erg_g_s: "L^2 T^-3",
+    },
+  },
+  {
+    tag: "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
+    module: "shared/starsim-solar-mesa-repro-artifact.ts",
+    stage: "diagnostic",
+    notes: "Artifact contract for MESA solar reproduction/import reports with QST boundaries.",
+    checks: [
+      { type: "test", path: "tests/starsim-solar-mesa-repro-artifact.spec.ts" },
+      { type: "stability", path: "tests/starsim-solar-mesa-repro-artifact.spec.ts" },
+    ],
+    units: {
+      claimIdCount: "1",
+      citationCount: "1",
+      caveatCount: "1",
+    },
+  },
+  {
+    tag: "STARSIM_SOLAR_MESA_DOCKER_REPRO_V1",
+    module: "shared/starsim-solar-mesa-repro-safe-language.ts",
+    stage: "diagnostic",
+    notes: "Safe-language renderer for MESA solar reproduction/import reports.",
+    checks: [
+      { type: "test", path: "tests/starsim-solar-mesa-repro-safe-language.spec.ts" },
+      { type: "stability", path: "tests/starsim-solar-mesa-repro-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",

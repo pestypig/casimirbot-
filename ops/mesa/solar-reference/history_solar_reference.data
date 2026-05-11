@@ -1,0 +1,4 @@
+# MESA-like history fixture for parser tests.
+star_age luminosity radius Teff
+1.0 0.70 0.90 5600
+4.57 1.00 1.00 5772

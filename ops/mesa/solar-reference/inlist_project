@@ -1,0 +1,11 @@
+! StarSim solar reference fixture inlist_project.
+! This is a minimal provenance fixture, not a complete MESA inlist.
+&star_job
+  show_log_description_at_start = .false.
+/
+
+&controls
+  initial_mass = 1.0
+  initial_z = 0.0142
+  max_age = 4.57d9
+/

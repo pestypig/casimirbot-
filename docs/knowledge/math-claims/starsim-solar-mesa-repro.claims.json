@@ -1,0 +1,84 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-solar-mesa-repro-claims.v1",
+  "domain": "starsim-solar-mesa-docker-repro-v1",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "mesa_external_runtime_requires_hashes.v1",
+      "statement": "External MESA runtime evidence requires input and output hashes for reproducibility review.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA stellar evolution solver context." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-runtime-adapter.ts", "server/modules/starsim/external/mesa-hash-manifest.ts", "tools/starsimSolarMesaReproRun.ts"]
+    },
+    {
+      "claimId": "mesa_solar_repro_fixture_not_external.v1",
+      "statement": "Fixture data cannot be labeled as external MESA reproduction.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "url": "https://arxiv.org/abs/1009.1622", "note": "Solver-backed evidence requires actual solver artifacts." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-runtime-adapter.ts", "shared/starsim-solar-mesa-repro-safe-language.ts"]
+    },
+    {
+      "claimId": "mesa_profile_parser_requires_integration_basis.v1",
+      "statement": "MESA profile parsing requires a usable radius/mass integration basis and numeric shell fields.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "equation": "dL_shell = eps_nuc dm", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA profile shell context for stellar-structure integration." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-output-parser.ts"]
+    },
+    {
+      "claimId": "mesa_profile_hash_supports_reproducibility.v1",
+      "statement": "Profile hashes support reproducibility review of imported or externally generated MESA output.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA output provenance context." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-hash-manifest.ts", "shared/starsim-solar-mesa-repro-artifact.ts"]
+    },
+    {
+      "claimId": "mesa_history_hash_supports_reproducibility.v1",
+      "statement": "History hashes support reproducibility review of solar calibration trajectory outputs.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA history output provenance context." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-output-parser.ts", "shared/starsim-solar-mesa-repro-artifact.ts"]
+    },
+    {
+      "claimId": "mesa_run_log_hash_supports_reproducibility.v1",
+      "statement": "Run-log hashes support auditability of MESA execution or explicit import actions.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "url": "https://arxiv.org/abs/1009.1622", "note": "Reproducible solver run context." }],
+      "repoBindings": ["server/modules/starsim/external/mesa-run-log.ts", "shared/starsim-solar-mesa-repro-artifact.ts"]
+    },
+    {
+      "claimId": "mesa_solar_repro_stage2_gate_handoff.v1",
+      "statement": "MESA solar reproduction can feed profile validation, benchmark, and Stage 2 gate review without certification.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Adelberger et al. (2011). Solar fusion cross sections II.", "url": "https://arxiv.org/abs/1004.2318", "note": "pp-chain and CNO microphysics context." },
+        { "kind": "paper", "citation": "Borexino Collaboration (2018). Comprehensive measurement of pp-chain solar neutrinos.", "url": "https://www.nature.com/articles/s41586-018-0624-y", "note": "Solar neutrino closure context." }
+      ],
+      "repoBindings": ["tools/starsimSolarMesaReproRun.ts", "shared/starsim-solar-mesa-repro-artifact.ts"]
+    },
+    {
+      "claimId": "solar_mesa_repro_not_er_epr_evidence.v1",
+      "statement": "Solar MESA reproduction is stellar microphysics evidence and is not direct ER=EPR evidence.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Maldacena and Susskind (2013). Cool horizons for entangled black holes.", "equation": "spacetimeCL = proxy_only; mayPromoteToCL4 = false", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR boundary context; not stellar fusion evidence." }],
+      "repoBindings": ["shared/starsim-solar-mesa-repro-safe-language.ts", "tools/starsimSolarMesaReproRun.ts"]
+    },
+    {
+      "claimId": "solar_mesa_repro_proxy_only_qst_boundary.v1",
+      "statement": "Solar MESA reproduction remains proxy-only QST context and cannot promote CL0-CL4 claims.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar_mesa_reproduction", "constraints": ["requires external solver or explicit import metadata", "requires input and output hashes", "requires parser warnings", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Carcassi, Landini and Aidala (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "equation": "spacetimeCL = proxy_only; mayPromoteToCL4 = false", "url": "https://arxiv.org/abs/2411.00972", "note": "Entropy/ensemble guardrail context for QST-adjacent claims." }],
+      "repoBindings": ["shared/starsim-solar-mesa-repro-artifact.ts", "docs/research/starsim-solar-mesa-docker-repro-v1.md"]
+    }
+  ]
+}

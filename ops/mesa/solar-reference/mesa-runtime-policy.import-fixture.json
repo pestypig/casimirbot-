@@ -1,0 +1,35 @@
+{
+  "runtimeKind": "local",
+  "mesaCommand": "import-declared-mesa-output",
+  "workingDirectory": "ops/mesa/solar-reference",
+  "outputDirectory": "reports",
+  "allowFixtureFallback": false,
+  "requireInlistHash": true,
+  "requireProfileHash": true,
+  "requireHistoryHash": true,
+  "requireRunLogHash": true,
+  "integrationTestMode": true,
+  "importOnly": true,
+  "inputs": {
+    "inlistProjectPath": "ops/mesa/solar-reference/inlist_project",
+    "inlistSolarPath": "ops/mesa/solar-reference/inlist_solar_reference"
+  },
+  "outputs": {
+    "profilePath": "ops/mesa/solar-reference/profile_solar_reference.data",
+    "historyPath": "ops/mesa/solar-reference/history_solar_reference.data"
+  },
+  "mesa": {
+    "mesaVersion": "import-fixture",
+    "mesaRevision": "not-executed",
+    "network": "pp_cno_extras.net",
+    "ratesSource": "jina-reaclib-fixture",
+    "eos": "mesa-default-fixture",
+    "opacity": "mesa-default-fixture",
+    "atmosphere": "photosphere-table-fixture",
+    "initialMass_Msun": 1,
+    "initialMetallicity_Z": 0.0142,
+    "initialHelium_Y": 0.27,
+    "mixingLengthAlpha": 1.9,
+    "age_Gyr": 4.57
+  }
+}
