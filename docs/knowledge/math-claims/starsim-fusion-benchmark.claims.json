@@ -1,0 +1,89 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-fusion-benchmark-claims.v1",
+  "domain": "starsim-fusion-benchmark-stage2-candidate",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "mesa_profile_benchmark_requires_metadata.v1",
+      "statement": "MESA-import benchmark support requires profile hashes and model metadata such as inlist and network references.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "MESA profile benchmark metadata", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA reference for profile-backed stellar models." }],
+      "repoBindings": ["shared/starsim-fusion-benchmark-runner.ts", "docs/research/starsim-fusion-benchmark-stage2-candidate.md"]
+    },
+    {
+      "claimId": "stellar_profile_luminosity_closure_check.v1",
+      "statement": "Benchmark support should compare integrated nuclear luminosity and surface luminosity with an explicit closure tolerance.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "stellar profile luminosity closure", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "equation": "luminosityClosureRelErr = abs(L_nuc - L_surface) / L_surface", "url": "https://arxiv.org/abs/1009.1622", "note": "Stellar structure context for comparing profile and observable luminosity." }],
+      "repoBindings": ["shared/starsim-fusion-profile-closure.ts", "shared/starsim-fusion-benchmark-runner.ts"]
+    },
+    {
+      "claimId": "stellar_profile_uncertainty_propagation_required.v1",
+      "statement": "Stage 2 candidate benchmark support requires uncertainty propagation or an explicit blocker.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "benchmark uncertainty propagation", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Carcassi, G., Landini, G. and Aidala, C. (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "url": "https://arxiv.org/abs/2411.00972", "note": "Motivates uncertainty-aware ensemble framing for QST-adjacent claims." }],
+      "repoBindings": ["shared/starsim-fusion-uncertainty.ts", "shared/starsim-fusion-benchmark-runner.ts"]
+    },
+    {
+      "claimId": "fusion_channel_benchmark_from_integrated_eps.v1",
+      "statement": "Benchmark dominant fusion channel should be derived from integrated component epsilon contributions.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "fusion channel benchmark", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Adelberger, E. G. et al. (2011). Solar fusion cross sections II: the pp chain and CNO cycles.", "equation": "channelFraction_i = integratedLuminosity_i / integratedNucLuminosity", "url": "https://arxiv.org/abs/1004.2318", "note": "Reference for pp-chain and CNO-cycle microphysics context." }],
+      "repoBindings": ["shared/starsim-fusion-benchmark-runner.ts", "shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "fusion_zone_benchmark_from_cumulative_luminosity.v1",
+      "statement": "Benchmark fusion-zone radii should be derived from cumulative nuclear luminosity.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "fusion zone benchmark", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "equation": "r90 encloses 90 percent of cumulative nuclear luminosity", "url": "https://arxiv.org/abs/1009.1622", "note": "Profile energy-generation context for fusion-zone diagnostics." }],
+      "repoBindings": ["shared/starsim-fusion-benchmark-runner.ts", "shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "surface_teff_is_observable_closure_not_core_temperature.v1",
+      "statement": "Effective surface temperature is an observable closure check and should not be treated as core or fusion-zone temperature.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "surface temperature closure", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "reference", "citation": "Swinburne COSMOS. Effective Temperature.", "equation": "L = 4 pi R^2 sigma T_eff^4", "url": "https://www.astronomy.swin.edu.au/cosmos/E/Effective%2BTemperature", "note": "Reference for surface effective-temperature relationship." }],
+      "repoBindings": ["shared/starsim-fusion-profile-closure.ts"]
+    },
+    {
+      "claimId": "h_spectral_fit_benchmark_calibration_only.v1",
+      "statement": "hSpectralFit in benchmark reports is calibration-only and cannot claim a new or varying Planck constant.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "spectral calibration benchmark", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "reference", "citation": "NIST. Meet the Constants.", "equation": "h = 6.62607015e-34 J s exactly in the revised SI", "url": "https://www.nist.gov/si-redefinition/meet-constants", "note": "Reference for exact Planck constant value." }],
+      "repoBindings": ["shared/starsim-fusion-benchmark-artifact.ts", "shared/starsim-fusion-benchmark-safe-language.ts"]
+    },
+    {
+      "claimId": "neutron_star_glitch_benchmark_not_fusion.v1",
+      "statement": "Neutron-star benchmark fixtures are compact-object dense-matter context and not stellar fusion benchmarks.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "compact-object benchmark branch", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Khomenko, V. et al. (2020). Turbulent, pinned superfluids in neutron stars and pulsar glitch recoveries.", "url": "https://academic.oup.com/mnras/article/499/1/161/5901443", "note": "Neutron-star glitch and superfluid context." }],
+      "repoBindings": ["shared/starsim-fusion-benchmark-runner.ts"]
+    },
+    {
+      "claimId": "gaia_population_prior_benchmark_boundary.v1",
+      "statement": "Gaia-like star maps are population-prior context for benchmarks and not direct quantum-spacetime evidence.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "Gaia-like population prior", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Gaia Collaboration (2023). Gaia Data Release 3: Summary of the content and survey properties.", "url": "https://www.aanda.org/articles/aa/full_html/2023/06/aa43940-22/aa43940-22.html", "note": "Gaia DR3 observational context." }],
+      "repoBindings": ["docs/research/starsim-fusion-benchmark-stage2-candidate.md"]
+    },
+    {
+      "claimId": "starsim_fusion_benchmark_not_direct_er_epr_evidence.v1",
+      "statement": "StarSim fusion benchmarks can support astrophysical priors but cannot directly support ER=EPR or promote QST/warp claims to CL0-CL4.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "StarSim benchmark to QST boundary", "constraints": ["benchmark-support only", "requires profile metadata", "requires uncertainty notes", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Maldacena, J. and Susskind, L. (2013). Cool horizons for entangled black holes.", "equation": "ER=EPR context only; no stellar benchmark equation is asserted.", "url": "https://arxiv.org/abs/1306.0533", "note": "Boundary source for separating ER=EPR from StarSim benchmarks." }],
+      "repoBindings": ["shared/starsim-fusion-benchmark-runner.ts", "docs/research/starsim-fusion-benchmark-stage2-candidate.md"]
+    }
+  ]
+}

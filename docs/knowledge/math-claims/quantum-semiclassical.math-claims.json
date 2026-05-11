@@ -56,6 +56,7 @@
         {
           "kind": "paper",
           "citation": "Penrose, On Gravity's Role in Quantum State Reduction, DOI 10.1007/BF02105068",
+          "equation": "tau ~ hbar / E_G",
           "note": "Collapse-time proposal."
         },
         {

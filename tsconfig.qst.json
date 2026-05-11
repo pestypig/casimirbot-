@@ -14,7 +14,15 @@
     "shared/starsim-fusion-profile-import.ts",
     "shared/starsim-fusion-profile-validation.ts",
     "shared/starsim-fusion-profile-artifact.ts",
+    "shared/starsim-fusion-profile-closure.ts",
+    "shared/starsim-fusion-uncertainty.ts",
+    "shared/starsim-fusion-benchmark-claims.ts",
+    "shared/starsim-fusion-benchmark-verdict.ts",
+    "shared/starsim-fusion-benchmark-runner.ts",
+    "shared/starsim-fusion-benchmark-artifact.ts",
+    "shared/starsim-fusion-benchmark-safe-language.ts",
     "tools/erEprStage1Run.ts",
+    "tools/starsimFusionBenchmarkRun.ts",
     "tests/quantum-spacetime-congruence.spec.ts",
     "tests/er-epr-simulation.spec.ts",
     "tests/er-epr-stage1-runner.spec.ts",
@@ -27,7 +35,13 @@
     "tests/starsim-fusion-claims.spec.ts",
     "tests/starsim-fusion-profile-import.spec.ts",
     "tests/starsim-fusion-profile-validation.spec.ts",
-    "tests/starsim-fusion-profile-artifact.spec.ts"
+    "tests/starsim-fusion-profile-artifact.spec.ts",
+    "tests/starsim-fusion-profile-closure.spec.ts",
+    "tests/starsim-fusion-uncertainty.spec.ts",
+    "tests/starsim-fusion-benchmark-runner.spec.ts",
+    "tests/starsim-fusion-benchmark-verdict.spec.ts",
+    "tests/starsim-fusion-benchmark-artifact.spec.ts",
+    "tests/starsim-fusion-benchmark-safe-language.spec.ts"
   ],
   "compilerOptions": {
     "incremental": false

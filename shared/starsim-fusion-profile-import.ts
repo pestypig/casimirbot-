@@ -60,6 +60,21 @@ export const starSimFusionProfileImportSchema = z
       metallicity_feh: z.number().optional(),
       age_Gyr: z.number().nonnegative().optional(),
     }),
+    mesaMetadata: z
+      .object({
+        mesaVersion: z.string().optional(),
+        inlistHash: z.string().optional(),
+        profileHash: z.string().min(1),
+        historyHash: z.string().optional(),
+        network: z.string().optional(),
+        eos: z.string().optional(),
+        opacity: z.string().optional(),
+        metallicity_Z: z.number().nonnegative().optional(),
+        mixingLengthAlpha: z.number().positive().optional(),
+        initialMass_Msun: z.number().positive().optional(),
+        age_Gyr: z.number().nonnegative().optional(),
+      })
+      .optional(),
     shells: z.array(starSimFusionProfileShellSchema).min(1),
     hSpectralFit: z
       .object({

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-11T15:45:01.503Z",
-  "registryCount": 89,
+  "generatedAt": "2026-05-11T16:08:10.832Z",
+  "registryCount": 93,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 25,
+      "count": 29,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -94,6 +94,10 @@
         "server/services/observability/constraint-pack-normalizer.ts",
         "server/services/observability/constraint-pack-telemetry.ts",
         "server/routes/agi.constraint-packs.ts",
+        "shared/starsim-fusion-benchmark-runner.ts",
+        "shared/starsim-fusion-uncertainty.ts",
+        "shared/starsim-fusion-profile-closure.ts",
+        "shared/starsim-fusion-benchmark-safe-language.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts"
@@ -173,7 +177,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 89,
+    "entriesWithUnits": 93,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -187,8 +191,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 25,
-        "withUnits": 25,
+        "total": 29,
+        "withUnits": 29,
         "missing": []
       },
       "certified": {
@@ -209,8 +213,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 968,
-    "edgeCount": 2079
+    "nodeCount": 976,
+    "edgeCount": 2095
   },
   "evidenceProfiles": [
     {

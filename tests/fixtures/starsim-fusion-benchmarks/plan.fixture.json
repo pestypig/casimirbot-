@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "starsim-fusion-benchmark-plan.v1",
+  "planId": "starsim-fusion-benchmark-fixture",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "benchmarkSet": "mixed_fixture_pack",
+  "profileRefs": [
+    {
+      "objectId": "solar-mesa-fixture",
+      "profilePath": "tests/fixtures/starsim-fusion-profiles/solar-mesa-profile.fixture.json",
+      "profileHash": "fixture-solar-001",
+      "source": "mesa_fixture"
+    },
+    {
+      "objectId": "high-mass-cno-fixture",
+      "profilePath": "tests/fixtures/starsim-fusion-profiles/high-mass-cno-profile.fixture.json",
+      "profileHash": "fixture-cno-001",
+      "source": "mesa_fixture"
+    }
+  ],
+  "thresholds": {
+    "luminosityClosureRelErrMax": 100,
+    "r90DeltaMax": 0.2,
+    "channelFractionAgreementMin": 0.8,
+    "stage1ProxyAgreementMin": 0.8,
+    "uncertaintyCoverageMin": 0.8
+  },
+  "uncertaintyPolicy": {
+    "mode": "interval",
+    "samples": 2,
+    "seed": 7,
+    "perturb": "profile_shells_only"
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "role": "stellar_quantum_microphysics_prior"
+  }
+}

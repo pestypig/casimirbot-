@@ -187,6 +187,7 @@
         {
           "kind": "web",
           "citation": "NASA GSFC, Nutation and Precession.",
+          "equation": "external Moon/Sun torque on Earth's equatorial bulge drives spin-axis precession; tau_ext = dL/dt is the shared torque balance.",
           "note": "Primary source for Moon/Sun torque on Earth's bulge and axial precession."
         },
         {

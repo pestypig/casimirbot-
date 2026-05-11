@@ -2076,6 +2076,86 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE",
+    module: "shared/starsim-fusion-benchmark-runner.ts",
+    stage: "diagnostic",
+    notes:
+      "Benchmark runner for StarSim fusion profile packs with closure, uncertainty, blockers, and Stage 2 candidate verdicts.",
+    motivation:
+      "Make profile-grounded StarSim fusion claims auditable through deterministic benchmark reports while preserving proxy-only QST boundaries.",
+    conceptualWaypoints: [
+      "Compute benchmark verdicts from imported profile validations.",
+      "Block Stage 2 candidate readiness without metadata, profile hashes, closure, and uncertainty.",
+      "Emit citation-backed reports without direct ER=EPR, propulsion, stress-energy, or CL4 claims.",
+    ],
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-benchmark-runner.spec.ts" },
+      { type: "test", path: "tests/starsim-fusion-benchmark-verdict.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-benchmark-runner.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/starsim-fusion-benchmarks/plan.fixture.json" },
+      { type: "doc", path: "docs/research/starsim-fusion-benchmark-stage2-candidate.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/starsim-fusion-benchmark.claims.json" },
+    ],
+    units: {
+      profileCount: "1",
+      passedClosureCount: "1",
+      failedClosureCount: "1",
+      warningCount: "1",
+      channelAgreementRate: "1",
+      fusionZoneAgreementRate: "1",
+      uncertaintyCoverageRate: "1",
+    },
+  },
+  {
+    tag: "STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE",
+    module: "shared/starsim-fusion-uncertainty.ts",
+    stage: "diagnostic",
+    notes: "Interval and fixture Monte Carlo uncertainty propagation for benchmark profile outputs.",
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-uncertainty.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-uncertainty.spec.ts" },
+    ],
+    units: {
+      samples: "1",
+      ppFraction: "1",
+      cnoFraction: "1",
+      tripleAlphaFraction: "1",
+      r90_Rstar: "1",
+      activeVolumeFraction: "1",
+      luminosityClosureRelErr: "1",
+    },
+  },
+  {
+    tag: "STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE",
+    module: "shared/starsim-fusion-profile-closure.ts",
+    stage: "diagnostic",
+    notes: "Observable closure checks for StarSim fusion benchmark reports.",
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-profile-closure.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-profile-closure.spec.ts" },
+    ],
+    units: {
+      effectiveTemperatureFromLR_K: "Theta",
+      surfaceGravityLogg_cgs: "1",
+      luminosityClosureRelErr: "1",
+    },
+  },
+  {
+    tag: "STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE",
+    module: "shared/starsim-fusion-benchmark-safe-language.ts",
+    stage: "diagnostic",
+    notes: "Safe-language renderer for StarSim fusion benchmark reports.",
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-benchmark-safe-language.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-benchmark-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",
