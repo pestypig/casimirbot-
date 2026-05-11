@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "starsim-fusion-asteroseismic-closure.v1",
+  "objectId": "Sun",
+  "source": "gyre_imported_summary",
+  "modelSummary": {
+    "largeSeparation_uHz": 134.9,
+    "smallSeparation_uHz": 9.0,
+    "modeCount": 32,
+    "lowDegreeModesAvailable": true,
+    "soundSpeedProfileAvailable": true
+  },
+  "referenceSummary": {
+    "largeSeparation_uHz": 135.1,
+    "smallSeparation_uHz": 9.05,
+    "modeCount": 32,
+    "sourceRef": "solar-low-degree-fixture"
+  },
+  "residuals": {
+    "largeSeparationRelErr": 0.0014803849000740089,
+    "smallSeparationRelErr": 0.0055248618784530384,
+    "maxFrequencyResidual_uHz": 0.7465568305780055
+  },
+  "status": "pass",
+  "caveats": [
+    "Asteroseismic closure is a model-summary comparison and does not certify the upstream GYRE run."
+  ]
+}

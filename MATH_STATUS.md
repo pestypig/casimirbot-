@@ -131,6 +131,10 @@ Stage 3 (Certified / Policy-gated)
 | STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE | shared/starsim-fusion-uncertainty.ts | Stage 1 | Interval and deterministic fixture Monte Carlo uncertainty propagation for profile-derived fusion quantities. | tests/starsim-fusion-uncertainty.spec.ts |
 | STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE | shared/starsim-fusion-profile-closure.ts | Stage 1 | Surface Teff, logg, luminosity closure, and metadata warning checks for benchmark reports. | tests/starsim-fusion-profile-closure.spec.ts |
 | STARSIM_FUSION_BENCHMARK_STAGE2_CANDIDATE | shared/starsim-fusion-benchmark-safe-language.ts | Stage 1 | Claim-safe benchmark report renderer blocking direct ER=EPR, propulsion, stress-energy, CL4, and Planck-constant overclaims. | tests/starsim-fusion-benchmark-safe-language.spec.ts |
+| STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-stage2-gate.ts | Stage 1 | External-reproduction Stage 2 gate for MESA/GYRE metadata, solar closure, blockers, and ready-for-review verdicts without certification. | tests/starsim-fusion-stage2-gate.spec.ts, tests/fixtures/starsim-fusion-stage2-gate/solar-mesa-repro.fixture.json, docs/research/starsim-fusion-external-repro-stage2-gate.md |
+| STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-neutrino-closure.ts | Stage 1 | Solar neutrino residual closure for pp-chain observational gate checks. | tests/starsim-fusion-neutrino-closure.spec.ts |
+| STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-asteroseismic-closure.ts | Stage 1 | GYRE-style asteroseismic closure summaries for Stage 2 gate review. | tests/starsim-fusion-asteroseismic-closure.spec.ts |
+| STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE | shared/starsim-fusion-stage2-gate-safe-language.ts | Stage 1 | Claim-safe Stage 2 gate renderer blocking certification, direct ER=EPR, propulsion, stress-energy, CL4, and Planck-constant overclaims. | tests/starsim-fusion-stage2-gate-safe-language.spec.ts |
 
 ## DP Collapse Modules
 

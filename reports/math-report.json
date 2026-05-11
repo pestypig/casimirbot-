@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-11T16:08:10.832Z",
-  "registryCount": 93,
+  "generatedAt": "2026-05-11T16:35:42.278Z",
+  "registryCount": 97,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 29,
+      "count": 33,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -98,6 +98,10 @@
         "shared/starsim-fusion-uncertainty.ts",
         "shared/starsim-fusion-profile-closure.ts",
         "shared/starsim-fusion-benchmark-safe-language.ts",
+        "shared/starsim-fusion-stage2-gate.ts",
+        "shared/starsim-fusion-neutrino-closure.ts",
+        "shared/starsim-fusion-asteroseismic-closure.ts",
+        "shared/starsim-fusion-stage2-gate-safe-language.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts"
@@ -177,7 +181,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 93,
+    "entriesWithUnits": 97,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -191,8 +195,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 29,
-        "withUnits": 29,
+        "total": 33,
+        "withUnits": 33,
         "missing": []
       },
       "certified": {
@@ -213,8 +217,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 976,
-    "edgeCount": 2095
+    "nodeCount": 985,
+    "edgeCount": 2114
   },
   "evidenceProfiles": [
     {

@@ -2156,6 +2156,82 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE",
+    module: "shared/starsim-fusion-stage2-gate.ts",
+    stage: "diagnostic",
+    notes:
+      "External-reproduction Stage 2 gate for StarSim fusion benchmark reports with MESA/GYRE metadata, solar closure, blockers, and proxy-only boundaries.",
+    motivation:
+      "Require solver fingerprints and observational closures before treating StarSim fusion profiles as ready for Stage 2 review.",
+    conceptualWaypoints: [
+      "Require MESA profile, inlist, network, and reaction-rate metadata.",
+      "Gate solar neutrino and optional asteroseismic closure without certification.",
+      "Block ER=EPR, propulsion, stress-energy, Planck-constant, and CL0-CL4 overclaims.",
+    ],
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-stage2-gate.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-stage2-gate.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/starsim-fusion-stage2-gate/solar-mesa-repro.fixture.json" },
+      { type: "doc", path: "docs/research/starsim-fusion-external-repro-stage2-gate.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/starsim-fusion-stage2-gate.claims.json" },
+    ],
+    units: {
+      blockerCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+      uncertaintyNoteCount: "1",
+    },
+  },
+  {
+    tag: "STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE",
+    module: "shared/starsim-fusion-neutrino-closure.ts",
+    stage: "diagnostic",
+    notes: "Solar neutrino residual closure for StarSim fusion Stage 2 gate review.",
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-neutrino-closure.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-neutrino-closure.spec.ts" },
+    ],
+    units: {
+      ppFlux: "L^-2 T^-1",
+      be7Flux: "L^-2 T^-1",
+      pepFlux: "L^-2 T^-1",
+      b8Flux: "L^-2 T^-1",
+      cnoFlux: "L^-2 T^-1",
+      maxRelErr: "1",
+    },
+  },
+  {
+    tag: "STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE",
+    module: "shared/starsim-fusion-asteroseismic-closure.ts",
+    stage: "diagnostic",
+    notes: "GYRE-style asteroseismic closure summaries for Stage 2 gate review.",
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-asteroseismic-closure.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-asteroseismic-closure.spec.ts" },
+    ],
+    units: {
+      largeSeparation_uHz: "T^-1",
+      smallSeparation_uHz: "T^-1",
+      modeCount: "1",
+      maxFrequencyResidual_uHz: "T^-1",
+    },
+  },
+  {
+    tag: "STARSIM_FUSION_EXTERNAL_REPRO_STAGE2_GATE",
+    module: "shared/starsim-fusion-stage2-gate-safe-language.ts",
+    stage: "diagnostic",
+    notes: "Safe-language renderer for Stage 2 gate reports.",
+    checks: [
+      { type: "test", path: "tests/starsim-fusion-stage2-gate-safe-language.spec.ts" },
+      { type: "stability", path: "tests/starsim-fusion-stage2-gate-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",

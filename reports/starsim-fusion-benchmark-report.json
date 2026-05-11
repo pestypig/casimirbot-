@@ -1,8 +1,8 @@
 {
   "schemaVersion": "starsim-fusion-benchmark-report.v1",
-  "runId": "starsim-fusion-benchmark:45d70e5c-6896-4561-a0be-4c546cc06517",
+  "runId": "starsim-fusion-benchmark:c17840c5-ce78-4dab-a5bd-526da77b9460",
   "planId": "starsim-fusion-benchmark-fixture",
-  "createdAt": "2026-05-11T16:04:58.508Z",
+  "createdAt": "2026-05-11T16:34:12.748Z",
   "profileResults": [
     {
       "schemaVersion": "starsim-fusion-profile-validation.v1",

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "starsim-fusion-neutrino-closure.v1",
+  "objectId": "Sun",
+  "modelFluxes": {
+    "pp": 6.05e10,
+    "be7": 4.85e9,
+    "pep": 1.29e8,
+    "b8": 5.55e6,
+    "cno": 7.4e8,
+    "units": "cm^-2 s^-1"
+  },
+  "referenceFluxes": {
+    "pp": 6.1e10,
+    "be7": 4.99e9,
+    "pep": 1.27e8,
+    "b8": 5.68e6,
+    "cno": 7.0e8,
+    "units": "cm^-2 s^-1",
+    "sourceRef": "Borexino"
+  },
+  "residuals": {
+    "ppRelErr": 0.00819672131147541,
+    "be7RelErr": 0.0280561122244489,
+    "pepRelErr": 0.015748031496062992,
+    "b8RelErr": 0.022887323943661973,
+    "cnoRelErr": 0.05714285714285714,
+    "maxRelErr": 0.05714285714285714
+  },
+  "status": "pass",
+  "caveats": [
+    "Solar neutrino closure is an observational residual check and not a standalone certification.",
+    "Residuals inherit solar composition, opacity, reaction-rate, and neutrino flavor-conversion assumptions."
+  ]
+}

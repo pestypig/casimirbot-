@@ -1,0 +1,142 @@
+{
+  "externalReproManifest": {
+    "schemaVersion": "starsim-fusion-external-repro-manifest.v1",
+    "runId": "starsim-stage2-gate-solar-fixture",
+    "createdAt": "2026-05-11T00:00:00.000Z",
+    "objectId": "Sun",
+    "profileSource": "mesa_external_run",
+    "mesa": {
+      "mesaVersion": "r23.05.1-fixture",
+      "mesaRevision": "fixture-rev",
+      "inlistHash": "sha256-inlist-solar-fixture",
+      "profileHash": "sha256-profile-solar-fixture",
+      "historyHash": "sha256-history-solar-fixture",
+      "network": "pp_cno_extras.net",
+      "ratesSource": "jina-reaclib-fixture",
+      "eos": "mesa-default-fixture",
+      "opacity": "mesa-default-fixture",
+      "atmosphere": "photosphere-table-fixture",
+      "initialMass_Msun": 1,
+      "initialMetallicity_Z": 0.0142,
+      "initialHelium_Y": 0.27,
+      "mixingLengthAlpha": 1.9,
+      "diffusionEnabled": true,
+      "age_Gyr": 4.57
+    },
+    "gyre": {
+      "gyreVersion": "8.0-fixture",
+      "gyreInputHash": "sha256-gyre-input-fixture",
+      "modeSummaryHash": "sha256-mode-summary-fixture",
+      "adiabatic": true,
+      "nonAdiabatic": false
+    },
+    "artifacts": {
+      "profilePath": "tests/fixtures/starsim-fusion-profiles/solar-mesa-profile.fixture.json",
+      "historyPath": "tests/fixtures/starsim-fusion-stage2-gate/solar-history.fixture.data",
+      "gyreSummaryPath": "tests/fixtures/starsim-fusion-stage2-gate/solar-asteroseismic-closure.fixture.json",
+      "benchmarkReportPath": "reports/starsim-fusion-benchmark-report.json"
+    },
+    "reproducibilityStatus": "mesa_gyre_reproduced",
+    "claimRole": "not_direct_er_epr_evidence",
+    "hSpectralFit": {
+      "role": "calibration_only",
+      "mayInferNewH": false
+    }
+  },
+  "solarAnchor": {
+    "schemaVersion": "starsim-solar-fusion-anchor.v1",
+    "objectId": "Sun",
+    "referenceObservables": {
+      "age_Gyr": 4.57,
+      "luminosity_Lsun": 1,
+      "radius_Rsun": 1,
+      "effectiveTemperature_K": 5772,
+      "mass_Msun": 1,
+      "surfaceZoverX": 0.0181,
+      "convectionZoneBase_Rsun": 0.713,
+      "surfaceHeliumY": 0.248
+    },
+    "neutrinoTargets": {
+      "pp": 6.1e10,
+      "be7": 4.99e9,
+      "pep": 1.27e8,
+      "b8": 5.68e6,
+      "cno": 7.0e8,
+      "units": "cm^-2 s^-1",
+      "sourceRef": "Borexino"
+    },
+    "validityDomain": {
+      "system": "solar_calibration",
+      "constraints": [
+        "Stage 2 gate only",
+        "proxy-only QST boundary",
+        "not direct ER=EPR evidence"
+      ]
+    },
+    "evidence": {
+      "claimIds": ["solar_anchor_requires_neutrino_closure.v1"],
+      "citations": ["https://www.nature.com/articles/s41586-018-0624-y"],
+      "caveats": ["Solar anchor remains observational closure only."]
+    }
+  },
+  "neutrinoClosure": {
+    "schemaVersion": "starsim-fusion-neutrino-closure.v1",
+    "objectId": "Sun",
+    "modelFluxes": {
+      "pp": 6.05e10,
+      "be7": 4.85e9,
+      "pep": 1.29e8,
+      "b8": 5.55e6,
+      "cno": 7.4e8,
+      "units": "cm^-2 s^-1"
+    },
+    "referenceFluxes": {
+      "pp": 6.1e10,
+      "be7": 4.99e9,
+      "pep": 1.27e8,
+      "b8": 5.68e6,
+      "cno": 7.0e8,
+      "units": "cm^-2 s^-1",
+      "sourceRef": "Borexino"
+    },
+    "residuals": {
+      "ppRelErr": 0.00819672131147541,
+      "be7RelErr": 0.0280561122244489,
+      "pepRelErr": 0.015748031496062992,
+      "b8RelErr": 0.022887323943661973,
+      "cnoRelErr": 0.05714285714285714,
+      "maxRelErr": 0.05714285714285714
+    },
+    "status": "pass",
+    "caveats": [
+      "Solar neutrino closure is an observational residual check and not a standalone certification."
+    ]
+  },
+  "asteroseismicClosure": {
+    "schemaVersion": "starsim-fusion-asteroseismic-closure.v1",
+    "objectId": "Sun",
+    "source": "gyre_imported_summary",
+    "modelSummary": {
+      "largeSeparation_uHz": 134.9,
+      "smallSeparation_uHz": 9.0,
+      "modeCount": 32,
+      "lowDegreeModesAvailable": true,
+      "soundSpeedProfileAvailable": true
+    },
+    "referenceSummary": {
+      "largeSeparation_uHz": 135.1,
+      "smallSeparation_uHz": 9.05,
+      "modeCount": 32,
+      "sourceRef": "solar-low-degree-fixture"
+    },
+    "residuals": {
+      "largeSeparationRelErr": 0.0014803849000740089,
+      "smallSeparationRelErr": 0.0055248618784530384,
+      "maxFrequencyResidual_uHz": 0.7465568305780055
+    },
+    "status": "pass",
+    "caveats": [
+      "Asteroseismic closure is a model-summary comparison and does not certify the upstream GYRE run."
+    ]
+  }
+}

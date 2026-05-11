@@ -21,8 +21,17 @@
     "shared/starsim-fusion-benchmark-runner.ts",
     "shared/starsim-fusion-benchmark-artifact.ts",
     "shared/starsim-fusion-benchmark-safe-language.ts",
+    "shared/starsim-fusion-stage2-gate-claims.ts",
+    "shared/starsim-fusion-external-repro.ts",
+    "shared/starsim-fusion-solar-anchor.ts",
+    "shared/starsim-fusion-neutrino-closure.ts",
+    "shared/starsim-fusion-asteroseismic-closure.ts",
+    "shared/starsim-fusion-stage2-gate.ts",
+    "shared/starsim-fusion-stage2-gate-artifact.ts",
+    "shared/starsim-fusion-stage2-gate-safe-language.ts",
     "tools/erEprStage1Run.ts",
     "tools/starsimFusionBenchmarkRun.ts",
+    "tools/starsimFusionStage2GateRun.ts",
     "tests/quantum-spacetime-congruence.spec.ts",
     "tests/er-epr-simulation.spec.ts",
     "tests/er-epr-stage1-runner.spec.ts",
@@ -41,7 +50,14 @@
     "tests/starsim-fusion-benchmark-runner.spec.ts",
     "tests/starsim-fusion-benchmark-verdict.spec.ts",
     "tests/starsim-fusion-benchmark-artifact.spec.ts",
-    "tests/starsim-fusion-benchmark-safe-language.spec.ts"
+    "tests/starsim-fusion-benchmark-safe-language.spec.ts",
+    "tests/starsim-fusion-external-repro.spec.ts",
+    "tests/starsim-fusion-solar-anchor.spec.ts",
+    "tests/starsim-fusion-neutrino-closure.spec.ts",
+    "tests/starsim-fusion-asteroseismic-closure.spec.ts",
+    "tests/starsim-fusion-stage2-gate.spec.ts",
+    "tests/starsim-fusion-stage2-gate-artifact.spec.ts",
+    "tests/starsim-fusion-stage2-gate-safe-language.spec.ts"
   ],
   "compilerOptions": {
     "incremental": false

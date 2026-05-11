@@ -1,0 +1,92 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-fusion-stage2-gate-claims.v1",
+  "domain": "starsim-fusion-external-repro-stage2-gate",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "mesa_external_reproduction_requires_inlist_and_profile_hash.v1",
+      "statement": "External reproduction gate evidence requires MESA-style input hashes, profile hashes, and retained model metadata.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "MESA external reproduction gate", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "url": "https://arxiv.org/abs/1009.1622", "note": "MESA reference for solver-backed stellar evolution and profile artifacts." }],
+      "repoBindings": ["shared/starsim-fusion-external-repro.ts", "shared/starsim-fusion-stage2-gate.ts", "docs/research/starsim-fusion-external-repro-stage2-gate.md"]
+    },
+    {
+      "claimId": "solar_anchor_requires_neutrino_closure.v1",
+      "statement": "A solar Stage 2 gate should include neutrino closure because solar neutrinos probe core fusion reactions more directly than surface observables.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar observational closure", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Borexino Collaboration (2018). Comprehensive measurement of pp-chain solar neutrinos.", "url": "https://www.nature.com/articles/s41586-018-0624-y", "note": "Solar pp-chain neutrino measurement reference." }],
+      "repoBindings": ["shared/starsim-fusion-solar-anchor.ts", "shared/starsim-fusion-neutrino-closure.ts"]
+    },
+    {
+      "claimId": "solar_neutrino_pp_chain_observational_probe.v1",
+      "statement": "Solar neutrino residuals are useful observational probes of pp-chain model closure, with composition and flavor-conversion caveats.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "solar neutrino closure", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Borexino Collaboration (2018). Comprehensive measurement of pp-chain solar neutrinos.", "url": "https://www.nature.com/articles/s41586-018-0624-y", "note": "Reference for pp, Be-7, pep, B-8, and related solar neutrino closure context." }],
+      "repoBindings": ["shared/starsim-fusion-neutrino-closure.ts"]
+    },
+    {
+      "claimId": "gyre_asteroseismic_closure_model_comparison.v1",
+      "statement": "GYRE-style mode summaries can support asteroseismic closure checks against stellar model outputs.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "asteroseismic closure", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Townsend, R. H. D. and Teitler, S. A. (2013). GYRE: an open-source stellar oscillation code.", "url": "https://academic.oup.com/mnras/article/435/4/3406/1033475", "note": "GYRE stellar oscillation code reference." },
+        { "kind": "reference", "citation": "GYRE documentation.", "url": "https://gyre.readthedocs.io/en/stable/index.html", "note": "Documentation for GYRE stellar oscillation outputs." }
+      ],
+      "repoBindings": ["shared/starsim-fusion-asteroseismic-closure.ts"]
+    },
+    {
+      "claimId": "stellar_profile_stage2_gate_requires_uncertainty.v1",
+      "statement": "Stage 2 gate readiness requires uncertainty notes or a blocker, because one deterministic profile is not a population-level proof.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "Stage 2 gate uncertainty", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Carcassi, G., Landini, G. and Aidala, C. (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "url": "https://arxiv.org/abs/2411.00972", "note": "Supports uncertainty-aware ensemble framing for QST-adjacent claims." }],
+      "repoBindings": ["shared/starsim-fusion-stage2-gate.ts"]
+    },
+    {
+      "claimId": "stellar_profile_stage2_gate_not_certification.v1",
+      "statement": "A Stage 2 gate ready-for-review verdict is not a certified Stage 2 promotion.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "Stage 2 gate verdict boundary", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).", "url": "https://arxiv.org/abs/1009.1622", "note": "External solver artifacts support review gates but do not certify repo claim maturity by themselves." }],
+      "repoBindings": ["shared/starsim-fusion-stage2-gate.ts", "shared/starsim-fusion-stage2-gate-safe-language.ts"]
+    },
+    {
+      "claimId": "h_spectral_fit_stage2_gate_calibration_only.v1",
+      "statement": "hSpectralFit remains calibration-only at the Stage 2 gate and cannot claim a new or varying Planck constant.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "spectral calibration boundary", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "reference", "citation": "NIST. Meet the Constants.", "equation": "h = 6.62607015e-34 J s exactly in the revised SI", "url": "https://www.nist.gov/si-redefinition/meet-constants", "note": "Reference for exact Planck constant value." }],
+      "repoBindings": ["shared/starsim-fusion-stage2-gate.ts", "shared/starsim-fusion-stage2-gate-safe-language.ts"]
+    },
+    {
+      "claimId": "neutron_star_stage2_gate_compact_object_only.v1",
+      "statement": "Neutron-star Stage 2 gate context is compact-object dense matter, not PP/CNO fusion closure.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "compact-object gate boundary", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Khomenko, V. et al. (2020). Turbulent, pinned superfluids in neutron stars and pulsar glitch recoveries.", "url": "https://academic.oup.com/mnras/article/499/1/161/5901443", "note": "Neutron-star glitch and dense-matter context." }],
+      "repoBindings": ["shared/starsim-fusion-stage2-gate.ts"]
+    },
+    {
+      "claimId": "gaia_population_prior_stage2_boundary.v1",
+      "statement": "Gaia-like star maps remain population-prior context and not direct quantum-spacetime evidence.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "Gaia population prior boundary", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Gaia Collaboration (2023). Gaia Data Release 3: Summary of the content and survey properties.", "url": "https://www.aanda.org/articles/aa/full_html/2023/06/aa43940-22/aa43940-22.html", "note": "Gaia DR3 observational context for population priors." }],
+      "repoBindings": ["docs/research/starsim-fusion-external-repro-stage2-gate.md"]
+    },
+    {
+      "claimId": "starsim_fusion_stage2_gate_not_direct_er_epr_evidence.v1",
+      "statement": "StarSim fusion external reproduction is not direct ER=EPR evidence and cannot promote QST, Needle Hull, or warp claims to CL0-CL4.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER=EPR/QST boundary", "constraints": ["Stage 2 gate only", "requires external reproduction metadata", "requires uncertainty notes", "proxy-only QST boundary", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Maldacena, J. and Susskind, L. (2013). Cool horizons for entangled black holes.", "equation": "spacetimeCL = proxy_only; mayPromoteToCL4 = false", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR conjectural context; not a stellar population bridge-inventory claim." }],
+      "repoBindings": ["shared/starsim-fusion-stage2-gate.ts", "docs/research/starsim-fusion-external-repro-stage2-gate.md"]
+    }
+  ]
+}

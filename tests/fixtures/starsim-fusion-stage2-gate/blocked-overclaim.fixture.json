@@ -1,0 +1,26 @@
+{
+  "externalReproManifest": {
+    "schemaVersion": "starsim-fusion-external-repro-manifest.v1",
+    "runId": "starsim-stage2-gate-blocked-fixture",
+    "createdAt": "2026-05-11T00:00:00.000Z",
+    "objectId": "Sun",
+    "profileSource": "mesa_external_run",
+    "mesa": {
+      "inlistHash": "sha256-inlist",
+      "profileHash": "sha256-profile",
+      "network": "pp_cno_extras.net",
+      "ratesSource": "jina-reaclib"
+    },
+    "artifacts": {
+      "profilePath": "tests/fixtures/starsim-fusion-profiles/solar-mesa-profile.fixture.json",
+      "benchmarkReportPath": "reports/starsim-fusion-benchmark-report.json"
+    },
+    "reproducibilityStatus": "mesa_reproduced",
+    "requestedSpacetimeCL": "CL4",
+    "claimRole": "direct_er_epr_evidence",
+    "hSpectralFit": {
+      "role": "new_measurement_of_h",
+      "mayInferNewH": true
+    }
+  }
+}
