@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "starsim-accordion-galactic-null-plan.v1",
+  "planId": "blocked-er-epr-overclaim",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "cosmology": {
+    "redshift": 0.01,
+    "systemKind": "bound_galaxy"
+  },
+  "starNodes": [],
+  "rotation": {
+    "galaxyId": "SPARC:blocked",
+    "points": [{ "radius_kpc": 1, "observedVelocity_km_s": 100, "baryonicVelocity_km_s": 80 }],
+    "interpretationRequest": "direct_er_epr"
+  },
+  "qstBoundary": {
+    "qstRole": "astrophysical_population_prior",
+    "edgeType": "cosmological_structure_context",
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false
+  }
+}

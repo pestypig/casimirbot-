@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "starsim-gaia-structure-import.v1",
+  "rows": [
+    {
+      "objectId": "GaiaDR3:fixture-g",
+      "ra_deg": 10,
+      "dec_deg": 2,
+      "parallax_mas": 20,
+      "distance_pc": 50,
+      "pmra_masyr": 12,
+      "pmdec_masyr": -6,
+      "radialVelocity_km_s": 11,
+      "spectralType": "G2V",
+      "objectClass": "main_sequence"
+    },
+    {
+      "objectId": "GaiaDR3:fixture-ns",
+      "ra_deg": 11,
+      "dec_deg": 3,
+      "parallax_mas": 2,
+      "distance_pc": 500,
+      "spectralType": "NS",
+      "objectClass": "neutron_star"
+    }
+  ]
+}

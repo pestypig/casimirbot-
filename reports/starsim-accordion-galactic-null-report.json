@@ -1,0 +1,373 @@
+{
+  "schemaVersion": "starsim-accordion-galactic-null-evaluation.v1",
+  "runId": "starsim-accordion-galactic-null:8cdae82c-4005-4a64-bdf2-acede094e682",
+  "createdAt": "2026-05-11T21:25:30.846Z",
+  "accordionContext": {
+    "schemaVersion": "starsim-accordion-cosmology-context.v1",
+    "epoch": {
+      "redshift": 0.01,
+      "scaleFactor": 0.9900990099009901
+    },
+    "distances": {
+      "comovingDistance_Mpc": 42,
+      "properDistance_Mpc": 41.6
+    },
+    "expansionRole": "bound_system_not_locally_expanding",
+    "caveats": [
+      "cosmic_expansion_context_not_local_stellar_core_expansion",
+      "bound_galactic_systems_require_dynamics_model"
+    ]
+  },
+  "starPopulation": {
+    "nodes": [
+      {
+        "objectId": "GaiaDR3:fixture-1",
+        "coordinates": {
+          "ra_deg": 12,
+          "dec_deg": -4,
+          "parallax_mas": 10,
+          "distance_pc": 100,
+          "position_pc": [
+            10,
+            20,
+            5
+          ],
+          "properMotion_masyr": [
+            4,
+            -2
+          ],
+          "radialVelocity_km_s": 18,
+          "velocity_km_s": [
+            12,
+            8,
+            4
+          ]
+        },
+        "stellarClassification": {
+          "spectralType": "G2V",
+          "objectClass": "main_sequence"
+        },
+        "fusionPrior": {
+          "dominantFusionChannel": "pp_chain",
+          "fusionZoneMode": "core_fusion",
+          "quantumMicrophysicsRole": "microphysical_rate_law"
+        },
+        "qstAnnotation": {
+          "qstRole": "astrophysical_population_prior",
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "caveat": "stellar_node_is_not_direct_er_epr_evidence"
+        }
+      },
+      {
+        "objectId": "GaiaDR3:fixture-2",
+        "coordinates": {
+          "ra_deg": 13,
+          "dec_deg": -5,
+          "parallax_mas": 8,
+          "distance_pc": 125,
+          "position_pc": [
+            15,
+            21,
+            8
+          ],
+          "properMotion_masyr": [
+            3,
+            -1
+          ],
+          "radialVelocity_km_s": 21,
+          "velocity_km_s": [
+            14,
+            9,
+            5
+          ]
+        },
+        "stellarClassification": {
+          "spectralType": "B2V",
+          "objectClass": "main_sequence"
+        },
+        "fusionPrior": {
+          "dominantFusionChannel": "cno_cycle",
+          "fusionZoneMode": "distributed_convective_core",
+          "quantumMicrophysicsRole": "microphysical_rate_law"
+        },
+        "qstAnnotation": {
+          "qstRole": "astrophysical_population_prior",
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "caveat": "stellar_node_is_not_direct_er_epr_evidence"
+        }
+      }
+    ],
+    "populationSummary": {
+      "nodeCount": 2,
+      "spectralTypeHistogram": {
+        "G2V": 1,
+        "B2V": 1
+      },
+      "fusionChannelHistogram": {
+        "pp_chain": 1,
+        "cno_cycle": 1
+      },
+      "localDensityContrast": 2,
+      "velocityDispersion_km_s": 1.224744871391589,
+      "clusteringEntropy_nats": 0.6931471805599453,
+      "streamCoherence": 0.976090757026384
+    }
+  },
+  "galacticDynamics": {
+    "galaxyId": "SPARC:fixture-galaxy",
+    "controls": [
+      {
+        "galaxyId": "SPARC:fixture-galaxy",
+        "model": "baryonic_newtonian",
+        "rotationCurve": [
+          {
+            "radius_kpc": 2,
+            "observedVelocity_km_s": 130,
+            "modelVelocity_km_s": 95,
+            "baryonicVelocity_km_s": 95,
+            "residual_km_s": 35
+          },
+          {
+            "radius_kpc": 5,
+            "observedVelocity_km_s": 180,
+            "modelVelocity_km_s": 125,
+            "baryonicVelocity_km_s": 125,
+            "residual_km_s": 55
+          },
+          {
+            "radius_kpc": 9,
+            "observedVelocity_km_s": 195,
+            "modelVelocity_km_s": 132,
+            "baryonicVelocity_km_s": 132,
+            "residual_km_s": 63
+          }
+        ],
+        "summary": {
+          "rmsResidual_km_s": 52.34182521336705,
+          "maxAbsResidual_km_s": 63,
+          "baryonicToObservedRatio": 0.697029702970297,
+          "fitQuality": "fail"
+        },
+        "caveats": [
+          "rotation_control_is_null_model_comparison",
+          "galactic_dynamics_result_does_not_select_physics_winner"
+        ]
+      },
+      {
+        "galaxyId": "SPARC:fixture-galaxy",
+        "model": "dark_matter_halo_nfw",
+        "rotationCurve": [
+          {
+            "radius_kpc": 2,
+            "observedVelocity_km_s": 130,
+            "modelVelocity_km_s": 126,
+            "baryonicVelocity_km_s": 95,
+            "residual_km_s": 4
+          },
+          {
+            "radius_kpc": 5,
+            "observedVelocity_km_s": 180,
+            "modelVelocity_km_s": 174,
+            "baryonicVelocity_km_s": 125,
+            "residual_km_s": 6
+          },
+          {
+            "radius_kpc": 9,
+            "observedVelocity_km_s": 195,
+            "modelVelocity_km_s": 190,
+            "baryonicVelocity_km_s": 132,
+            "residual_km_s": 5
+          }
+        ],
+        "summary": {
+          "rmsResidual_km_s": 5.066228051190222,
+          "maxAbsResidual_km_s": 6,
+          "baryonicToObservedRatio": 0.697029702970297,
+          "fitQuality": "pass"
+        },
+        "caveats": [
+          "rotation_control_is_null_model_comparison",
+          "galactic_dynamics_result_does_not_select_physics_winner"
+        ]
+      },
+      {
+        "galaxyId": "SPARC:fixture-galaxy",
+        "model": "dark_matter_halo_burkert",
+        "rotationCurve": [
+          {
+            "radius_kpc": 2,
+            "observedVelocity_km_s": 130,
+            "modelVelocity_km_s": 120,
+            "baryonicVelocity_km_s": 95,
+            "residual_km_s": 10
+          },
+          {
+            "radius_kpc": 5,
+            "observedVelocity_km_s": 180,
+            "modelVelocity_km_s": 169,
+            "baryonicVelocity_km_s": 125,
+            "residual_km_s": 11
+          },
+          {
+            "radius_kpc": 9,
+            "observedVelocity_km_s": 195,
+            "modelVelocity_km_s": 184,
+            "baryonicVelocity_km_s": 132,
+            "residual_km_s": 11
+          }
+        ],
+        "summary": {
+          "rmsResidual_km_s": 10.677078252031311,
+          "maxAbsResidual_km_s": 11,
+          "baryonicToObservedRatio": 0.697029702970297,
+          "fitQuality": "pass"
+        },
+        "caveats": [
+          "rotation_control_is_null_model_comparison",
+          "galactic_dynamics_result_does_not_select_physics_winner"
+        ]
+      },
+      {
+        "galaxyId": "SPARC:fixture-galaxy",
+        "model": "mond_low_acceleration",
+        "rotationCurve": [
+          {
+            "radius_kpc": 2,
+            "observedVelocity_km_s": 130,
+            "modelVelocity_km_s": 128,
+            "baryonicVelocity_km_s": 95,
+            "residual_km_s": 2
+          },
+          {
+            "radius_kpc": 5,
+            "observedVelocity_km_s": 180,
+            "modelVelocity_km_s": 176,
+            "baryonicVelocity_km_s": 125,
+            "residual_km_s": 4
+          },
+          {
+            "radius_kpc": 9,
+            "observedVelocity_km_s": 195,
+            "modelVelocity_km_s": 188,
+            "baryonicVelocity_km_s": 132,
+            "residual_km_s": 7
+          }
+        ],
+        "summary": {
+          "rmsResidual_km_s": 4.795831523312719,
+          "maxAbsResidual_km_s": 7,
+          "baryonicToObservedRatio": 0.697029702970297,
+          "fitQuality": "pass"
+        },
+        "caveats": [
+          "rotation_control_is_null_model_comparison",
+          "galactic_dynamics_result_does_not_select_physics_winner"
+        ]
+      },
+      {
+        "galaxyId": "SPARC:fixture-galaxy",
+        "model": "empirical_sparc_reference",
+        "rotationCurve": [
+          {
+            "radius_kpc": 2,
+            "observedVelocity_km_s": 130,
+            "modelVelocity_km_s": 130,
+            "baryonicVelocity_km_s": 95,
+            "residual_km_s": 0
+          },
+          {
+            "radius_kpc": 5,
+            "observedVelocity_km_s": 180,
+            "modelVelocity_km_s": 180,
+            "baryonicVelocity_km_s": 125,
+            "residual_km_s": 0
+          },
+          {
+            "radius_kpc": 9,
+            "observedVelocity_km_s": 195,
+            "modelVelocity_km_s": 195,
+            "baryonicVelocity_km_s": 132,
+            "residual_km_s": 0
+          }
+        ],
+        "summary": {
+          "rmsResidual_km_s": 0,
+          "maxAbsResidual_km_s": 0,
+          "baryonicToObservedRatio": 0.697029702970297,
+          "fitQuality": "pass"
+        },
+        "caveats": [
+          "rotation_control_is_null_model_comparison",
+          "galactic_dynamics_result_does_not_select_physics_winner"
+        ]
+      }
+    ],
+    "preferredInterpretation": "none",
+    "reason": "null_model_layer_does_not_select_physics_winner"
+  },
+  "qstBoundary": {
+    "qstRole": "astrophysical_population_prior",
+    "edgeType": "cosmological_structure_context",
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "erDensityProxy": 1e-20,
+    "caveat": "erDensityProxy_is_not_wormhole_density"
+  },
+  "evidence": {
+    "stage": "STARSIM_ACCORDION_GALACTIC_DYNAMICS_NULL_MODEL_V1",
+    "claimTier": "Stage1_astrophysical_null_context",
+    "claimIds": [
+      "accordion_expansion_is_cosmological_context.v1",
+      "bound_systems_not_local_hubble_flow_guardrail.v1",
+      "gaia_astrometry_population_prior.v1",
+      "stellar_fusion_microphysics_not_er_epr_evidence.v1",
+      "fusion_based_quantum_computation_term_guardrail.v1",
+      "sparc_rotation_curve_null_model_context.v1",
+      "mond_control_model_context.v1",
+      "hydrostatic_equilibrium_is_stellar_interior_not_galactic_rotation.v1",
+      "qst_entropy_annotation_proxy_only.v1",
+      "er_epr_stays_toy_dual_solver_lane.v1",
+      "er_density_proxy_not_wormhole_density.v1"
+    ],
+    "citations": [
+      "https://www.frontiersin.org/articles/10.3389/fspas.2023.1071743/full",
+      "https://www.cosmos.esa.int/web/gaia/dr3",
+      "https://arxiv.org/abs/1004.2318",
+      "https://arxiv.org/abs/1306.0533",
+      "https://www.nature.com/articles/s41467-023-36493-1",
+      "https://www.osti.gov/biblio/22663739",
+      "https://ui.adsabs.harvard.edu/abs/1983ApJ...270..365M/abstract",
+      "https://arxiv.org/abs/1009.1622",
+      "https://arxiv.org/abs/2411.00972",
+      "https://arxiv.org/abs/hep-th/0603001"
+    ],
+    "sourceRoles": {
+      "accordion_expansion_is_cosmological_context.v1": "supports_model",
+      "bound_systems_not_local_hubble_flow_guardrail.v1": "supports_guardrail",
+      "gaia_astrometry_population_prior.v1": "supports_observational_context",
+      "stellar_fusion_microphysics_not_er_epr_evidence.v1": "supports_boundary",
+      "fusion_based_quantum_computation_term_guardrail.v1": "supports_guardrail",
+      "sparc_rotation_curve_null_model_context.v1": "supports_observational_context",
+      "mond_control_model_context.v1": "supports_model",
+      "hydrostatic_equilibrium_is_stellar_interior_not_galactic_rotation.v1": "supports_guardrail",
+      "qst_entropy_annotation_proxy_only.v1": "supports_boundary",
+      "er_epr_stays_toy_dual_solver_lane.v1": "supports_boundary",
+      "er_density_proxy_not_wormhole_density.v1": "supports_boundary"
+    },
+    "uncertaintyNotes": [
+      "Accordion distances and epochs are coordinate/context variables, not local claims about bound-system expansion.",
+      "Bound stellar and galactic systems require local dynamics; Hubble-flow expansion should not be assigned to stellar cores.",
+      "Gaia-like data support population structure priors, with survey selection and astrometric uncertainties carried separately.",
+      "Stellar fusion is quantum nuclear microphysics and cannot directly establish ER=EPR or bridge inventories.",
+      "Quantum-information fusion and thermonuclear fusion share a term but not a mechanism; reports must keep them separate.",
+      "SPARC-like rotation residuals are dynamics controls and do not select a fundamental explanation by themselves.",
+      "MOND is included as a comparison control without endorsing it as the selected physical model.",
+      "Hydrostatic equilibrium is a stellar interior constraint and should not be used as a standalone galaxy-rotation explanation.",
+      "QST entropy annotations demote visibility claims and cannot promote to metric or stress-energy congruence.",
+      "ER=EPR support remains restricted to controlled holographic or toy-dual simulations.",
+      "An ER-density proxy is an analogy variable and must not be read as physical wormhole density."
+    ]
+  }
+}

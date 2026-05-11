@@ -1,0 +1,85 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "er-epr-solver-adapter-claims.v1",
+  "domain": "er-epr-stage1-solver-adapter-v1",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "er_epr_raw_telemetry_before_interpretation.v1",
+      "statement": "ER=EPR solver-adapter reports must preserve raw telemetry before normalized scores are interpreted.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER_EPR_STAGE1_SOLVER_ADAPTER_V1", "constraints": ["raw telemetry required", "model-internal only", "not real-universe ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Jafferis et al. (2022). Traversable wormhole dynamics on a quantum processor.", "equation": "raw diagnostics precede model-internal interpretation", "url": "https://www.nature.com/articles/s41586-022-05424-3", "note": "Processor simulation precedent with reported telemetry-style diagnostics." },
+        { "kind": "paper", "citation": "Kobrin et al. (2025). Experiments implementing small commuting models lack gravitational features.", "equation": "raw diagnostics and controls constrain interpretation", "url": "https://www.nature.com/articles/s41586-025-08939-7", "note": "Critique motivating raw diagnostics and guardrails." }
+      ],
+      "repoBindings": ["shared/er-epr-raw-observables.ts", "shared/er-epr-solver-adapter.ts"]
+    },
+    {
+      "claimId": "er_epr_declared_toy_dual_backend_only.v1",
+      "statement": "Solver output supports only declared toy-dual or control-backend model-internal claims.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER=EPR toy-dual backend boundary", "constraints": ["declared backend required", "not real-universe wormhole proof", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Maldacena and Susskind (2013). Cool horizons for entangled black holes.", "equation": "ER=EPR context is model-bound here", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR context." },
+        { "kind": "paper", "citation": "Ryu and Takayanagi (2006). Holographic derivation of entanglement entropy from AdS/CFT.", "url": "https://arxiv.org/abs/hep-th/0603001", "note": "Holographic entropy-area context." }
+      ],
+      "repoBindings": ["shared/er-epr-raw-observables.ts", "shared/er-epr-solver-artifact.ts"]
+    },
+    {
+      "claimId": "er_epr_double_trace_traversability_protocol_context.v1",
+      "statement": "A declared double-trace-like coupling is the correct protocol context for traversable-channel toy-dual claims.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER=EPR toy-dual traversability protocol", "constraints": ["specific model context", "not propulsion", "not stress-energy source"] },
+      "sources": [{ "kind": "paper", "citation": "Gao, Jafferis and Wall (2017). Traversable wormholes via a double trace deformation.", "equation": "H_int ~ h(t) O_L O_R", "url": "https://link.springer.com/article/10.1007/JHEP12(2017)151", "note": "Double-trace traversability context." }],
+      "repoBindings": ["shared/er-epr-solver-adapter.ts", "shared/er-epr-observable-normalizer.ts"]
+    },
+    {
+      "claimId": "er_epr_syk_teleportation_protocol_context.v1",
+      "statement": "SYK teleportation protocols can provide model-internal traversable-wormhole-like telemetry in declared toy settings.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "two-sided SYK toy-dual model", "constraints": ["model-internal only", "controls required", "not real-universe proof"] },
+      "sources": [{ "kind": "paper", "citation": "Gao and Jafferis (2021). A traversable wormhole teleportation protocol in the SYK model.", "url": "https://link.springer.com/article/10.1007/JHEP07(2021)097", "note": "SYK teleportation protocol context." }],
+      "repoBindings": ["tests/fixtures/er-epr-solver/two-sided-syk-raw.fixture.json", "shared/er-epr-solver-adapter.ts"]
+    },
+    {
+      "claimId": "er_epr_solver_control_battery_required.v1",
+      "statement": "Solver-backed model-internal support requires wrong-sign, no-coupling, disentangled, shuffled-Hamiltonian, random-matrix, and spin-chain controls.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER=EPR Stage 1 controls", "constraints": ["controls required", "ordinary-control leakage demotes support", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Kobrin et al. (2025). Experiments implementing small commuting models lack gravitational features.", "url": "https://www.nature.com/articles/s41586-025-08939-7", "note": "Critique motivating strong controls." },
+        { "kind": "paper", "citation": "Jafferis et al. (2025). Reply to: Experiments implementing small commuting models lack gravitational features.", "url": "https://www.nature.com/articles/s41586-025-08995-z", "note": "Reply narrowing interpretation to specific two-sided process." }
+      ],
+      "repoBindings": ["shared/er-epr-control-suite.ts", "shared/er-epr-solver-adapter.ts"]
+    },
+    {
+      "claimId": "er_epr_entropy_washout_demotes_solver_signal.v1",
+      "statement": "QST entropy-stretch washout can demote ER=EPR-like solver signal visibility without physically changing Planck's constant.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "QST entropy washout for solver telemetry", "constraints": ["visibility diagnostic only", "not physical hbar change", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Carcassi, Landini and Aidala (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "equation": "lambda = exp(Delta S); hbar_eff / hbar = 1 / lambda", "url": "https://arxiv.org/abs/2411.00972", "note": "Entropy-stretch visibility context." }],
+      "repoBindings": ["shared/er-epr-solver-adapter.ts", "shared/quantum-spacetime-congruence.ts"]
+    },
+    {
+      "claimId": "er_epr_solver_telemetry_not_real_universe_wormholes.v1",
+      "statement": "ER=EPR solver telemetry is not evidence for real-universe wormholes or physical wormhole inventories.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER=EPR solver safe-language boundary", "constraints": ["model-internal only", "not wormhole inventory", "not real-universe proof"] },
+      "sources": [{ "kind": "paper", "citation": "Maldacena and Susskind (2013). Cool horizons for entangled black holes.", "equation": "ER=EPR does not imply arbitrary stellar/galaxy wormhole inventory", "url": "https://arxiv.org/abs/1306.0533", "note": "Boundary context." }],
+      "repoBindings": ["shared/er-epr-solver-safe-language.ts"]
+    },
+    {
+      "claimId": "er_epr_solver_telemetry_not_nhm2_propulsion.v1",
+      "statement": "ER=EPR solver telemetry is a QST sidecar result and cannot validate NHM2 propulsion, source closure, stress-energy sourcing, or CL0-CL4 claims.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "NHM2 to ER=EPR sidecar boundary", "constraints": ["sidecar only", "not propulsion evidence", "not stress-energy source", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Maldacena and Susskind (2013). Cool horizons for entangled black holes.", "equation": "sidecar ER=EPR context; no NHM2 CL promotion", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR context." },
+        { "kind": "paper", "citation": "Carcassi, Landini and Aidala (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "equation": "lambda = exp(Delta S); hbar_eff / hbar = 1 / lambda", "url": "https://arxiv.org/abs/2411.00972", "note": "QST entropy sidecar context." }
+      ],
+      "repoBindings": ["shared/er-epr-solver-safe-language.ts", "docs/research/er-epr-stage1-solver-adapter-v1.md"]
+    }
+  ]
+}

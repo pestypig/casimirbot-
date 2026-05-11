@@ -1,0 +1,346 @@
+{
+  "schemaVersion": "er-epr-solver-adapter-result.v1",
+  "adapterRunId": "er-epr-solver-adapter:de4790da-e118-46f2-ab94-8129b3f9fedd",
+  "createdAt": "2026-05-11T21:36:30.418Z",
+  "raw": {
+    "schemaVersion": "er-epr-raw-solver-observables.v1",
+    "runId": "two-sided-syk-raw",
+    "createdAt": "2026-05-11T00:00:00.000Z",
+    "backend": "two_sided_syk_tiny_exact_diag",
+    "model": {
+      "nQubitsOrModes": 8,
+      "qBodyOrder": 4,
+      "beta": 4,
+      "temperatureRegime": "low",
+      "statePreparation": "thermofield_double",
+      "coupling": "double_trace_correct_sign",
+      "hamiltonianHash": "sha256:toy-syk-hamiltonian",
+      "seed": 1337
+    },
+    "rawTelemetry": {
+      "leftRightMutualInformation": 3.4,
+      "entanglementEntropy_nats": 3.8,
+      "injectionTime": -2,
+      "couplingTime": 0,
+      "extractionTime": 2,
+      "teleportationFidelityRaw": 0.88,
+      "preCouplingLeakageRaw": 0.12,
+      "wrongSignFidelityRaw": 0.16,
+      "noCouplingFidelityRaw": 0.14,
+      "disentangledFidelityRaw": 0.1,
+      "shuffledHamiltonianFidelityRaw": 0.18,
+      "twoPointCorrelator": [
+        0.8,
+        0.55,
+        0.3,
+        0.22,
+        0.2,
+        0.2
+      ],
+      "outOfTimeOrderCorrelator": [
+        1,
+        0.85,
+        0.55,
+        0.25,
+        0.1
+      ],
+      "spectralFormFactor": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "operatorSizeCurve": [
+        {
+          "time": -2,
+          "size": 0.2
+        },
+        {
+          "time": -1,
+          "size": 0.45
+        },
+        {
+          "time": 0,
+          "size": 0.75
+        },
+        {
+          "time": 1,
+          "size": 1.05
+        },
+        {
+          "time": 2,
+          "size": 1.3
+        }
+      ],
+      "timeDelayEstimate": 0.86,
+      "causalOrderingPass": true
+    },
+    "normalization": {
+      "thresholdProfileId": "er-epr-stage1-default",
+      "teleportationFidelityScale": "0_to_1",
+      "diagnosticsScale": "0_to_1",
+      "notes": [
+        "toy raw telemetry fixture shaped like solver output"
+      ]
+    },
+    "provenance": {
+      "reproducibilityStatus": "solver_simulated",
+      "claimIds": [
+        "er_epr_raw_telemetry_before_interpretation.v1"
+      ],
+      "citations": [
+        "https://link.springer.com/article/10.1007/JHEP07(2021)097"
+      ],
+      "caveats": [
+        "toy solver-shaped fixture; exact diagonalization backend not implemented in this patch"
+      ]
+    }
+  },
+  "normalizedInput": {
+    "modelFamily": "two_sided_SYK",
+    "nQubitsOrModes": 8,
+    "temperatureRegime": "low",
+    "initialState": "thermofield_double",
+    "coupling": "double_trace_correct_sign",
+    "probeInsertionTime": -2,
+    "measurementWindow": 4,
+    "requestedSpacetimeCL": "proxy_only",
+    "entropyStretch": {
+      "deltaS_nats": 0
+    },
+    "observables": {
+      "mutualInformation": 3.4,
+      "entanglementEntropy_nats": 3.8,
+      "teleportationFidelity": 0.88,
+      "causalOrderingScore": 1,
+      "timeDelayScore": 0.86,
+      "operatorSizeWindingScore": 1,
+      "scramblingScore": 1,
+      "thermalizationScore": 0.9991111111111111,
+      "entropyAreaProxyTrackingScore": 0.85,
+      "ordinaryTeleportationControlScore": 0.12,
+      "shuffledHamiltonianControlScore": 0.18,
+      "disentangledControlScore": 0.1,
+      "wrongSignCouplingControlScore": 0.16
+    },
+    "starSim": {
+      "role": "not_used"
+    }
+  },
+  "evaluation": {
+    "modelFamily": "two_sided_SYK",
+    "nQubitsOrModes": 8,
+    "temperatureRegime": "low",
+    "initialState": "thermofield_double",
+    "coupling": "double_trace_correct_sign",
+    "probeInsertionTime": -2,
+    "measurementWindow": 4,
+    "requestedSpacetimeCL": "proxy_only",
+    "entropyStretch": {
+      "deltaS_nats": 0
+    },
+    "observables": {
+      "mutualInformation": 3.4,
+      "entanglementEntropy_nats": 3.8,
+      "teleportationFidelity": 0.88,
+      "causalOrderingScore": 1,
+      "timeDelayScore": 0.86,
+      "operatorSizeWindingScore": 1,
+      "scramblingScore": 1,
+      "thermalizationScore": 0.9991111111111111,
+      "entropyAreaProxyTrackingScore": 0.85,
+      "ordinaryTeleportationControlScore": 0.12,
+      "shuffledHamiltonianControlScore": 0.18,
+      "disentangledControlScore": 0.1,
+      "wrongSignCouplingControlScore": 0.16
+    },
+    "starSim": {
+      "role": "not_used"
+    },
+    "qst": {
+      "claimTier": "toy_model",
+      "entropyStretch": {
+        "deltaS_nats": 0,
+        "lambda": 1,
+        "logLambda": 0,
+        "hbarEffectiveRatio": 1,
+        "hbarEffectiveLogRatio": 0,
+        "quantumVisibility": 1,
+        "usesLogSpace": false
+      },
+      "cosmology": {},
+      "holographicProxy": {
+        "erEprEligible": true,
+        "entanglementEntropy_nats": 3.8,
+        "regionArea_m2": 1,
+        "rtAreaProxy_m2": 3.9706659420380003e-69,
+        "erDensityProxy": 3.9706659420380003e-69,
+        "caveat": "not_a_wormhole_count"
+      },
+      "vacuumChannel": {
+        "mode": "none"
+      },
+      "congruenceGate": {
+        "spacetimeCL": "proxy_only",
+        "quantumCL": "QCL3_holographic_area_proxy",
+        "edgeType": "holographic_entropy_proxy",
+        "mayPromoteToCL4": false,
+        "unsupportedCausalLinks": []
+      },
+      "values": {
+        "deltaS": 0,
+        "lambda": 1,
+        "logLambda": 0,
+        "hbarEffectiveRatio": 1,
+        "hbarEffectiveLogRatio": 0,
+        "quantumVisibility": 1,
+        "usesLogSpace": false,
+        "erDensityProxy": 3.9706659420380003e-69
+      },
+      "guards": {
+        "spacetimeCL": "proxy_only",
+        "mayPromoteToCL4": false,
+        "blockedCausalLinks": [],
+        "allowedVacuumChannels": [
+          "static_casimir_stress",
+          "none"
+        ],
+        "overclaimWarnings": [
+          "not_metric_equivalence_lane",
+          "not_stress_energy_source",
+          "not_wormhole_inventory",
+          "not_local_photon_production_model"
+        ]
+      },
+      "evidence": {
+        "qcl": "QCL3_holographic_area_proxy",
+        "stage": "QST_PROXY",
+        "citations": [
+          "https://arxiv.org/abs/2411.00972",
+          "https://arxiv.org/abs/1306.0533",
+          "https://arxiv.org/abs/hep-th/0603001",
+          "https://www.nature.com/articles/nature10561"
+        ]
+      }
+    },
+    "values": {
+      "rtAreaProxy_m2": 3.9706659420380003e-69,
+      "signalComposite": 0.913333,
+      "controlLeakage": 0.18,
+      "diagnosticComposite": 0.999704,
+      "entropyVisibility": 1,
+      "visibilityAdjustedSignal": 0.913333
+    },
+    "gates": {
+      "holographicModel": true,
+      "entangledTwoSidedState": true,
+      "correctTraversableCoupling": true,
+      "entangledStateSignal": true,
+      "ordinaryControlsFail": true,
+      "diagnosticChecksPass": true,
+      "entropyAreaProxyTracksSignal": true,
+      "entropyVisibilityPass": true,
+      "canClaimModelInternalSupport": true
+    },
+    "guards": {
+      "spacetimeCL": "proxy_only",
+      "mayPromoteToCL4": false,
+      "blockedClaims": [],
+      "overclaimWarnings": [
+        "not_real_universe_er_bridge_proof",
+        "not_metric_equivalence_lane",
+        "not_stress_energy_source",
+        "not_wormhole_inventory"
+      ]
+    },
+    "evidence": {
+      "stage": "ER_EPR_STAGE1_SIM",
+      "claimTier": "Stage1_falsifiable_model_support",
+      "verdict": "dual_model_support_strong",
+      "citations": [
+        "https://arxiv.org/abs/1306.0533",
+        "https://arxiv.org/abs/hep-th/0603001",
+        "https://arxiv.org/abs/1005.3035",
+        "https://arxiv.org/abs/1608.05687",
+        "https://www.nature.com/articles/s41586-022-05424-3",
+        "https://doi.org/10.1038/s41586-025-08939-7",
+        "https://doi.org/10.1038/s41586-025-08995-z",
+        "https://arxiv.org/abs/quant-ph/0306072",
+        "https://arxiv.org/abs/quant-ph/0312059"
+      ],
+      "claimIds": [
+        "gjw_double_trace_traversability_model.v1",
+        "syk_processor_simulation_precedent.v1",
+        "small_commuting_model_critique_guardrail.v1",
+        "rt_holographic_entropy_area_proxy.v1",
+        "entropy_stretch_quantum_visibility_demotes_claims.v1"
+      ],
+      "uncertaintyNotes": [
+        "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+        "The processor result is a small toy-model simulation precedent, not proof of real-universe wormholes.",
+        "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+        "The area/entropy relation is a holographic proxy and is not arbitrary-spacetime metric equivalence.",
+        "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+      ],
+      "sourceRoles": {
+        "gjw_double_trace_traversability_model.v1": "supports_model",
+        "syk_processor_simulation_precedent.v1": "supports_model",
+        "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+        "rt_holographic_entropy_area_proxy.v1": "supports_model",
+        "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+      }
+    }
+  },
+  "evidence": {
+    "stage": "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
+    "claimTier": "solver_simulated_model_internal_adapter",
+    "claimIds": [
+      "er_epr_raw_telemetry_before_interpretation.v1",
+      "er_epr_declared_toy_dual_backend_only.v1",
+      "er_epr_double_trace_traversability_protocol_context.v1",
+      "er_epr_syk_teleportation_protocol_context.v1",
+      "er_epr_solver_control_battery_required.v1",
+      "er_epr_entropy_washout_demotes_solver_signal.v1",
+      "er_epr_solver_telemetry_not_real_universe_wormholes.v1",
+      "er_epr_solver_telemetry_not_nhm2_propulsion.v1"
+    ],
+    "citations": [
+      "https://www.nature.com/articles/s41586-022-05424-3",
+      "https://www.nature.com/articles/s41586-025-08939-7",
+      "https://arxiv.org/abs/1306.0533",
+      "https://arxiv.org/abs/hep-th/0603001",
+      "https://link.springer.com/article/10.1007/JHEP12(2017)151",
+      "https://link.springer.com/article/10.1007/JHEP07(2021)097",
+      "https://www.nature.com/articles/s41586-025-08995-z",
+      "https://arxiv.org/abs/2411.00972"
+    ],
+    "sourceRoles": {
+      "er_epr_raw_telemetry_before_interpretation.v1": "supports_guardrail",
+      "er_epr_declared_toy_dual_backend_only.v1": "supports_boundary",
+      "er_epr_double_trace_traversability_protocol_context.v1": "supports_model",
+      "er_epr_syk_teleportation_protocol_context.v1": "supports_model",
+      "er_epr_solver_control_battery_required.v1": "supports_guardrail",
+      "er_epr_entropy_washout_demotes_solver_signal.v1": "supports_guardrail",
+      "er_epr_solver_telemetry_not_real_universe_wormholes.v1": "supports_boundary",
+      "er_epr_solver_telemetry_not_nhm2_propulsion.v1": "supports_boundary"
+    },
+    "uncertaintyNotes": [
+      "Raw solver telemetry must be preserved before normalized scores are interpreted.",
+      "Backend declarations bound the claim to a toy-dual or control model family.",
+      "Double-trace traversability applies to specific holographic setups and is not a propulsion mechanism.",
+      "SYK teleportation protocols are model-internal analogues and need controls before interpretation.",
+      "Wrong-sign, no-coupling, disentangled, shuffled, random-matrix, and spin-chain controls constrain false positives.",
+      "Entropy stretch is a visibility/demotion diagnostic and does not physically change hbar.",
+      "Solver telemetry cannot prove real-universe Einstein-Rosen bridges or wormhole inventories.",
+      "Solver telemetry is a QST sidecar result and cannot validate NHM2 propulsion or stress-energy sourcing."
+    ]
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Solver adapter output is model-internal only.",
+      "Raw telemetry is not real-universe ER=EPR evidence.",
+      "No NHM2 propulsion, stress-energy, wormhole-inventory, or CL0-CL4 claim is allowed."
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "er-epr-raw-solver-observables.v1",
+  "runId": "disentangled-control-raw",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "backend": "two_sided_syk_tiny_exact_diag",
+  "model": {
+    "nQubitsOrModes": 8,
+    "temperatureRegime": "low",
+    "statePreparation": "disentangled_control",
+    "coupling": "double_trace_correct_sign",
+    "hamiltonianHash": "sha256:toy-syk-hamiltonian",
+    "seed": 1338
+  },
+  "rawTelemetry": {
+    "leftRightMutualInformation": 0.1,
+    "entanglementEntropy_nats": 0.05,
+    "injectionTime": -2,
+    "couplingTime": 0,
+    "extractionTime": 2,
+    "teleportationFidelityRaw": 0.18,
+    "disentangledFidelityRaw": 0.18,
+    "timeDelayEstimate": 0.1,
+    "causalOrderingPass": true
+  },
+  "normalization": {
+    "thresholdProfileId": "er-epr-stage1-default",
+    "teleportationFidelityScale": "0_to_1",
+    "diagnosticsScale": "0_to_1",
+    "notes": ["disentangled control raw fixture"]
+  },
+  "provenance": {
+    "reproducibilityStatus": "solver_simulated",
+    "claimIds": ["er_epr_solver_control_battery_required.v1"],
+    "citations": ["https://www.nature.com/articles/s41586-025-08939-7"],
+    "caveats": ["control fixture"]
+  }
+}

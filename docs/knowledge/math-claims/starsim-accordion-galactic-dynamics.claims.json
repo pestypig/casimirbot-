@@ -1,0 +1,106 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-accordion-galactic-dynamics-claims.v1",
+  "domain": "starsim-accordion-galactic-dynamics-null-model-v1",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "accordion_expansion_is_cosmological_context.v1",
+      "statement": "Observable Universe Accordion expansion variables provide cosmological coordinate and epoch context, not a local expansion claim for bound systems.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "Accordion cosmology context", "constraints": ["proxy-only", "not direct ER=EPR evidence", "not CL0-CL4", "not local stellar-core expansion"] },
+      "sources": [{ "kind": "paper", "citation": "Carrera and Giulini, Gravitational orbits in the expanding Universe revisited.", "url": "https://www.frontiersin.org/articles/10.3389/fspas.2023.1071743/full", "note": "Context for treating expansion and bound systems carefully." }],
+      "repoBindings": ["shared/starsim-accordion-cosmology-context.ts", "shared/starsim-accordion-galactic-null-model.ts"]
+    },
+    {
+      "claimId": "bound_systems_not_local_hubble_flow_guardrail.v1",
+      "statement": "Bound galactic and stellar systems require local dynamics models and must not be treated as locally expanding stellar-core Hubble-flow markers.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "Accordion bound-system guardrail", "constraints": ["proxy-only", "not direct ER=EPR evidence", "not CL0-CL4", "bound systems require dynamics"] },
+      "sources": [{ "kind": "paper", "citation": "Carrera and Giulini, Gravitational orbits in the expanding Universe revisited.", "url": "https://www.frontiersin.org/articles/10.3389/fspas.2023.1071743/full", "note": "Expansion guardrail for gravitationally bound structures." }],
+      "repoBindings": ["shared/starsim-accordion-cosmology-context.ts"]
+    },
+    {
+      "claimId": "gaia_astrometry_population_prior.v1",
+      "statement": "Gaia-like astrometry can support stellar population, stream, velocity-field, and density priors, but not direct quantum-spacetime evidence.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "StarSim Gaia-like population import", "constraints": ["population prior only", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Gaia Collaboration, Gaia Data Release 3 content summary.", "url": "https://www.cosmos.esa.int/web/gaia/dr3", "note": "Gaia DR3 observational context." }],
+      "repoBindings": ["server/modules/starsim/accordion/gaia-structure-import.ts", "shared/starsim-accordion-galactic-null-model.ts"]
+    },
+    {
+      "claimId": "stellar_fusion_microphysics_not_er_epr_evidence.v1",
+      "statement": "Stellar fusion rates are quantum nuclear microphysics and can support a stellar microphysics prior, but they do not directly imply ER=EPR bridges or wormhole inventories.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "StarSim stellar population and QST annotation layer", "constraints": ["proxy-only", "not direct ER=EPR evidence", "not CL0-CL4", "not wormhole inventory", "not propulsion support"] },
+      "sources": [
+        { "kind": "paper", "citation": "Adelberger et al. (2011). Solar fusion cross sections II.", "url": "https://arxiv.org/abs/1004.2318", "note": "pp-chain and CNO-cycle fusion-rate context." },
+        { "kind": "paper", "citation": "Maldacena and Susskind (2013). Cool horizons for entangled black holes.", "equation": "ER=EPR boundary; not inferred from stellar fusion", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR boundary context." }
+      ],
+      "repoBindings": ["shared/starsim-accordion-galactic-null-model.ts", "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md"]
+    },
+    {
+      "claimId": "fusion_based_quantum_computation_term_guardrail.v1",
+      "statement": "Fusion-based quantum computation uses entangling operations on resource states and must not be conflated with thermonuclear stellar fusion.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "fusion terminology guardrail", "constraints": ["term-disambiguation only", "not stellar ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Bartolucci et al. (2023). Fusion-based quantum computation.", "url": "https://www.nature.com/articles/s41467-023-36493-1", "note": "Quantum-information meaning of fusion." }],
+      "repoBindings": ["tests/fixtures/starsim-accordion/quantum-fusion-term-guardrail.fixture.json", "shared/starsim-galactic-dynamics-safe-language.ts"]
+    },
+    {
+      "claimId": "sparc_rotation_curve_null_model_context.v1",
+      "statement": "SPARC-like rotation curves and baryonic mass models are suitable galactic-dynamics null-model inputs.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "galactic rotation controls", "constraints": ["null-model comparison only", "does not select physics winner", "not direct ER=EPR evidence"] },
+      "sources": [{ "kind": "paper", "citation": "Lelli, McGaugh and Schombert (2016). SPARC mass models for 175 disk galaxies.", "url": "https://www.osti.gov/biblio/22663739", "note": "Rotation curves and baryonic mass model context." }],
+      "repoBindings": ["shared/starsim-galactic-rotation-controls.ts", "server/modules/starsim/accordion/sparc-rotation-import.ts"]
+    },
+    {
+      "claimId": "mond_control_model_context.v1",
+      "statement": "MOND can be included as a low-acceleration galactic rotation control model without being selected as the winning explanation.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "galactic rotation controls", "constraints": ["control model only", "does not select physics winner", "not direct ER=EPR evidence"] },
+      "sources": [{ "kind": "paper", "citation": "Milgrom (1983). A modification of Newtonian dynamics as a possible alternative to the hidden mass hypothesis.", "url": "https://ui.adsabs.harvard.edu/abs/1983ApJ...270..365M/abstract", "note": "MOND control-model context." }],
+      "repoBindings": ["shared/starsim-galactic-rotation-controls.ts"]
+    },
+    {
+      "claimId": "hydrostatic_equilibrium_is_stellar_interior_not_galactic_rotation.v1",
+      "statement": "Hydrostatic equilibrium is a stellar interior structure condition and cannot by itself explain galactic rotation residuals.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "stellar profile to galactic dynamics boundary", "constraints": ["boundary claim", "not a galaxy-rotation explanation", "not direct ER=EPR evidence"] },
+      "sources": [
+        { "kind": "paper", "citation": "Paxton et al. (2011). Modules for Experiments in Stellar Astrophysics.", "url": "https://arxiv.org/abs/1009.1622", "note": "Stellar structure context." },
+        { "kind": "paper", "citation": "Lelli, McGaugh and Schombert (2016). SPARC mass models for 175 disk galaxies.", "url": "https://www.osti.gov/biblio/22663739", "note": "Galaxy rotation context." }
+      ],
+      "repoBindings": ["shared/starsim-galactic-rotation-controls.ts", "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md"]
+    },
+    {
+      "claimId": "qst_entropy_annotation_proxy_only.v1",
+      "statement": "QST entropy annotations are proxy-only visibility diagnostics and cannot promote StarSim outputs to metric or stress-energy congruence.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "QST annotation boundary", "constraints": ["proxy-only", "not CL0-CL4", "not stress-energy source"] },
+      "sources": [{ "kind": "paper", "citation": "Carcassi, Landini and Aidala (2024). Classical mechanics as the high-entropy limit of quantum mechanics.", "equation": "lambda = exp(Delta S); hbar_eff / hbar = 1 / lambda", "url": "https://arxiv.org/abs/2411.00972", "note": "Entropy visibility guardrail." }],
+      "repoBindings": ["shared/starsim-accordion-galactic-null-model.ts", "shared/quantum-spacetime-congruence.ts"]
+    },
+    {
+      "claimId": "er_epr_stays_toy_dual_solver_lane.v1",
+      "statement": "ER=EPR support remains restricted to controlled holographic or toy-dual simulations and is not inferred from star maps.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "ER=EPR to StarSim boundary", "constraints": ["controlled toy-dual solver only", "not star-map evidence", "not CL0-CL4"] },
+      "sources": [
+        { "kind": "paper", "citation": "Maldacena and Susskind (2013). Cool horizons for entangled black holes.", "equation": "ER=EPR context remains toy-dual/model-bound here", "url": "https://arxiv.org/abs/1306.0533", "note": "ER=EPR conjectural context." },
+        { "kind": "paper", "citation": "Ryu and Takayanagi (2006). Holographic derivation of entanglement entropy from AdS/CFT.", "url": "https://arxiv.org/abs/hep-th/0603001", "note": "Holographic entropy-area context." }
+      ],
+      "repoBindings": ["shared/er-epr-simulation.ts", "shared/starsim-accordion-galactic-null-model.ts"]
+    },
+    {
+      "claimId": "er_density_proxy_not_wormhole_density.v1",
+      "statement": "An erDensityProxy value is a holographic analogy variable and must not be reported as physical wormhole density.",
+      "maturity": "diagnostic",
+      "validityDomain": { "system": "QST holographic proxy annotation", "constraints": ["proxy-only", "not wormhole inventory", "not direct ER=EPR evidence", "not CL0-CL4"] },
+      "sources": [{ "kind": "paper", "citation": "Ryu and Takayanagi (2006). Holographic derivation of entanglement entropy from AdS/CFT.", "equation": "S_ent = A_min / (4 G_N)", "url": "https://arxiv.org/abs/hep-th/0603001", "note": "Entropy-area proxy context, not arbitrary wormhole counting." }],
+      "repoBindings": ["shared/starsim-galactic-dynamics-safe-language.ts", "shared/starsim-accordion-galactic-null-model.ts"]
+    }
+  ]
+}

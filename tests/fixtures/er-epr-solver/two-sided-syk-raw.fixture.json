@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "er-epr-solver-adapter-request.v1",
+  "requestId": "two-sided-syk-raw-request",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "raw": {
+    "schemaVersion": "er-epr-raw-solver-observables.v1",
+    "runId": "two-sided-syk-raw",
+    "createdAt": "2026-05-11T00:00:00.000Z",
+    "backend": "two_sided_syk_tiny_exact_diag",
+    "model": {
+      "nQubitsOrModes": 8,
+      "qBodyOrder": 4,
+      "beta": 4,
+      "temperatureRegime": "low",
+      "statePreparation": "thermofield_double",
+      "coupling": "double_trace_correct_sign",
+      "hamiltonianHash": "sha256:toy-syk-hamiltonian",
+      "seed": 1337
+    },
+    "rawTelemetry": {
+      "leftRightMutualInformation": 3.4,
+      "entanglementEntropy_nats": 3.8,
+      "injectionTime": -2,
+      "couplingTime": 0,
+      "extractionTime": 2,
+      "teleportationFidelityRaw": 0.88,
+      "preCouplingLeakageRaw": 0.12,
+      "wrongSignFidelityRaw": 0.16,
+      "noCouplingFidelityRaw": 0.14,
+      "disentangledFidelityRaw": 0.1,
+      "shuffledHamiltonianFidelityRaw": 0.18,
+      "twoPointCorrelator": [0.8, 0.55, 0.3, 0.22, 0.2, 0.2],
+      "outOfTimeOrderCorrelator": [1, 0.85, 0.55, 0.25, 0.1],
+      "spectralFormFactor": [0.1, 0.2, 0.3],
+      "operatorSizeCurve": [
+        { "time": -2, "size": 0.2 },
+        { "time": -1, "size": 0.45 },
+        { "time": 0, "size": 0.75 },
+        { "time": 1, "size": 1.05 },
+        { "time": 2, "size": 1.3 }
+      ],
+      "timeDelayEstimate": 0.86,
+      "causalOrderingPass": true
+    },
+    "normalization": {
+      "thresholdProfileId": "er-epr-stage1-default",
+      "teleportationFidelityScale": "0_to_1",
+      "diagnosticsScale": "0_to_1",
+      "notes": ["toy raw telemetry fixture shaped like solver output"]
+    },
+    "provenance": {
+      "reproducibilityStatus": "solver_simulated",
+      "claimIds": ["er_epr_raw_telemetry_before_interpretation.v1"],
+      "citations": ["https://link.springer.com/article/10.1007/JHEP07(2021)097"],
+      "caveats": ["toy solver-shaped fixture; exact diagonalization backend not implemented in this patch"]
+    }
+  },
+  "thresholds": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "normalizationThresholds": {
+    "timeDelayScale": 1,
+    "sizeWindingGrowthScale": 1,
+    "scramblingDropScale": 0.8,
+    "thermalizationVarianceScale": 0.1,
+    "entropyAreaProxyScale": 4
+  },
+  "entropyStretch": { "deltaS_nats": 0 },
+  "requestedSpacetimeCL": "proxy_only"
+}

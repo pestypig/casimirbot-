@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "er-epr-solver-adapter-request.v1",
+  "requestId": "high-entropy-washout-raw-request",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "raw": {
+    "schemaVersion": "er-epr-raw-solver-observables.v1",
+    "runId": "high-entropy-washout-raw",
+    "createdAt": "2026-05-11T00:00:00.000Z",
+    "backend": "two_sided_syk_tiny_exact_diag",
+    "model": {
+      "nQubitsOrModes": 8,
+      "temperatureRegime": "high",
+      "statePreparation": "thermofield_double",
+      "coupling": "double_trace_correct_sign",
+      "hamiltonianHash": "sha256:toy-syk-hamiltonian",
+      "seed": 1337
+    },
+    "rawTelemetry": {
+      "leftRightMutualInformation": 3.4,
+      "entanglementEntropy_nats": 3.8,
+      "injectionTime": -2,
+      "couplingTime": 0,
+      "extractionTime": 2,
+      "teleportationFidelityRaw": 0.88,
+      "preCouplingLeakageRaw": 0.12,
+      "wrongSignFidelityRaw": 0.16,
+      "disentangledFidelityRaw": 0.1,
+      "shuffledHamiltonianFidelityRaw": 0.18,
+      "twoPointCorrelator": [0.8, 0.55, 0.3, 0.22, 0.2, 0.2],
+      "outOfTimeOrderCorrelator": [1, 0.85, 0.55, 0.25, 0.1],
+      "operatorSizeCurve": [{ "time": 0, "size": 0.2 }, { "time": 1, "size": 1.2 }],
+      "timeDelayEstimate": 0.86,
+      "causalOrderingPass": true
+    },
+    "normalization": {
+      "thresholdProfileId": "er-epr-stage1-default",
+      "teleportationFidelityScale": "0_to_1",
+      "diagnosticsScale": "0_to_1",
+      "notes": ["high entropy washout raw fixture"]
+    },
+    "provenance": {
+      "reproducibilityStatus": "solver_simulated",
+      "claimIds": ["er_epr_entropy_washout_demotes_solver_signal.v1"],
+      "citations": ["https://arxiv.org/abs/2411.00972"],
+      "caveats": ["entropy washout fixture"]
+    }
+  },
+  "normalizationThresholds": {
+    "timeDelayScale": 1,
+    "sizeWindingGrowthScale": 1,
+    "scramblingDropScale": 0.8,
+    "thermalizationVarianceScale": 0.1,
+    "entropyAreaProxyScale": 4
+  },
+  "entropyStretch": { "deltaS_nats": 5 },
+  "requestedSpacetimeCL": "proxy_only"
+}

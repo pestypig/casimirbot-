@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-11T17:43:05.359Z",
-  "registryCount": 105,
+  "generatedAt": "2026-05-11T21:37:00.376Z",
+  "registryCount": 113,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 41,
+      "count": 49,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -94,6 +94,10 @@
         "server/services/observability/constraint-pack-normalizer.ts",
         "server/services/observability/constraint-pack-telemetry.ts",
         "server/routes/agi.constraint-packs.ts",
+        "shared/er-epr-raw-observables.ts",
+        "shared/er-epr-observable-normalizer.ts",
+        "shared/er-epr-solver-adapter.ts",
+        "shared/er-epr-solver-safe-language.ts",
         "shared/starsim-fusion-benchmark-runner.ts",
         "shared/starsim-fusion-uncertainty.ts",
         "shared/starsim-fusion-profile-closure.ts",
@@ -110,6 +114,10 @@
         "server/modules/starsim/external/mesa-output-parser.ts",
         "shared/starsim-solar-mesa-repro-artifact.ts",
         "shared/starsim-solar-mesa-repro-safe-language.ts",
+        "shared/starsim-accordion-cosmology-context.ts",
+        "shared/starsim-galactic-rotation-controls.ts",
+        "shared/starsim-accordion-galactic-null-model.ts",
+        "shared/starsim-galactic-dynamics-safe-language.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts"
@@ -189,7 +197,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 105,
+    "entriesWithUnits": 113,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -203,8 +211,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 41,
-        "withUnits": 41,
+        "total": 49,
+        "withUnits": 49,
         "missing": []
       },
       "certified": {
@@ -225,8 +233,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 999,
-    "edgeCount": 2143
+    "nodeCount": 1016,
+    "edgeCount": 2164
   },
   "evidenceProfiles": [
     {

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "starsim-accordion-galactic-null-plan.v1",
+  "planId": "accordion-local-volume-fixture",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "cosmology": {
+    "redshift": 0.01,
+    "comovingDistance_Mpc": 42,
+    "properDistance_Mpc": 41.6,
+    "systemKind": "bound_galaxy"
+  },
+  "starNodes": [
+    {
+      "objectId": "GaiaDR3:fixture-1",
+      "coordinates": {
+        "ra_deg": 12,
+        "dec_deg": -4,
+        "parallax_mas": 10,
+        "distance_pc": 100,
+        "position_pc": [10, 20, 5],
+        "properMotion_masyr": [4, -2],
+        "radialVelocity_km_s": 18,
+        "velocity_km_s": [12, 8, 4]
+      },
+      "stellarClassification": {
+        "spectralType": "G2V",
+        "objectClass": "main_sequence"
+      },
+      "fusionPrior": {
+        "dominantFusionChannel": "pp_chain",
+        "fusionZoneMode": "core_fusion",
+        "quantumMicrophysicsRole": "microphysical_rate_law"
+      }
+    },
+    {
+      "objectId": "GaiaDR3:fixture-2",
+      "coordinates": {
+        "ra_deg": 13,
+        "dec_deg": -5,
+        "parallax_mas": 8,
+        "distance_pc": 125,
+        "position_pc": [15, 21, 8],
+        "properMotion_masyr": [3, -1],
+        "radialVelocity_km_s": 21,
+        "velocity_km_s": [14, 9, 5]
+      },
+      "stellarClassification": {
+        "spectralType": "B2V",
+        "objectClass": "main_sequence"
+      },
+      "fusionPrior": {
+        "dominantFusionChannel": "cno_cycle",
+        "fusionZoneMode": "distributed_convective_core",
+        "quantumMicrophysicsRole": "microphysical_rate_law"
+      }
+    }
+  ],
+  "rotation": {
+    "galaxyId": "SPARC:fixture-galaxy",
+    "points": [
+      {
+        "radius_kpc": 2,
+        "observedVelocity_km_s": 130,
+        "baryonicVelocity_km_s": 95,
+        "modelVelocities": {
+          "dark_matter_halo_nfw": 126,
+          "dark_matter_halo_burkert": 120,
+          "mond_low_acceleration": 128,
+          "empirical_sparc_reference": 130
+        }
+      },
+      {
+        "radius_kpc": 5,
+        "observedVelocity_km_s": 180,
+        "baryonicVelocity_km_s": 125,
+        "modelVelocities": {
+          "dark_matter_halo_nfw": 174,
+          "dark_matter_halo_burkert": 169,
+          "mond_low_acceleration": 176,
+          "empirical_sparc_reference": 180
+        }
+      },
+      {
+        "radius_kpc": 9,
+        "observedVelocity_km_s": 195,
+        "baryonicVelocity_km_s": 132,
+        "modelVelocities": {
+          "dark_matter_halo_nfw": 190,
+          "dark_matter_halo_burkert": 184,
+          "mond_low_acceleration": 188,
+          "empirical_sparc_reference": 195
+        }
+      }
+    ],
+    "models": [
+      "baryonic_newtonian",
+      "dark_matter_halo_nfw",
+      "dark_matter_halo_burkert",
+      "mond_low_acceleration",
+      "empirical_sparc_reference"
+    ],
+    "passRmsResidual_km_s": 12,
+    "warnRmsResidual_km_s": 35,
+    "interpretationRequest": "null_model_only"
+  },
+  "qstBoundary": {
+    "qstRole": "astrophysical_population_prior",
+    "edgeType": "cosmological_structure_context",
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "erDensityProxy": 0.00000000000000000001
+  }
+}

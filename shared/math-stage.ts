@@ -1910,6 +1910,94 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
+    module: "shared/er-epr-raw-observables.ts",
+    stage: "diagnostic",
+    notes:
+      "Raw ER=EPR solver telemetry contract for declared toy-dual and control backends before interpretation.",
+    motivation:
+      "Prevent normalized-only scores from being mistaken for solver evidence by preserving backend, Hamiltonian, seed, correlator, operator-size, and provenance telemetry.",
+    conceptualWaypoints: [
+      "Declare backend family and model parameters.",
+      "Preserve raw fidelity, correlator, time-delay, and operator-size telemetry.",
+      "Require provenance, claim IDs, citations, and caveats.",
+    ],
+    checks: [
+      { type: "test", path: "tests/er-epr-raw-observables.spec.ts" },
+      { type: "stability", path: "tests/er-epr-raw-observables.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/er-epr-solver/two-sided-syk-raw.fixture.json" },
+      { type: "doc", path: "docs/research/er-epr-stage1-solver-adapter-v1.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/er-epr-solver-adapter.claims.json" },
+    ],
+    units: {
+      nQubitsOrModes: "1",
+      beta: "1",
+      injectionTime: "T",
+      couplingTime: "T",
+      extractionTime: "T",
+      teleportationFidelityRaw: "1",
+      leftRightMutualInformation: "1",
+      entanglementEntropy_nats: "1",
+    },
+  },
+  {
+    tag: "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
+    module: "shared/er-epr-observable-normalizer.ts",
+    stage: "diagnostic",
+    notes:
+      "Normalizes raw solver telemetry into the existing ER_EPR_STAGE1_SIM observable contract.",
+    checks: [
+      { type: "test", path: "tests/er-epr-observable-normalizer.spec.ts" },
+      { type: "stability", path: "tests/er-epr-observable-normalizer.spec.ts" },
+    ],
+    units: {
+      teleportationFidelity: "1",
+      causalOrderingScore: "1",
+      timeDelayScore: "1",
+      operatorSizeWindingScore: "1",
+      scramblingScore: "1",
+      thermalizationScore: "1",
+      entropyAreaProxyTrackingScore: "1",
+    },
+  },
+  {
+    tag: "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
+    module: "shared/er-epr-solver-adapter.ts",
+    stage: "diagnostic",
+    notes:
+      "Solver adapter connecting raw declared toy-dual telemetry to ER_EPR_STAGE1_SIM evaluations with provenance gates.",
+    checks: [
+      { type: "test", path: "tests/er-epr-solver-adapter.spec.ts" },
+      { type: "stability", path: "tests/er-epr-solver-adapter.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/er-epr-solver/high-entropy-washout-raw.fixture.json" },
+      { type: "doc", path: "docs/research/er-epr-stage1-solver-adapter-v1.md" },
+    ],
+    units: {
+      signalComposite: "1",
+      controlLeakage: "1",
+      entropyVisibility: "1",
+      visibilityAdjustedSignal: "1",
+    },
+  },
+  {
+    tag: "ER_EPR_STAGE1_SOLVER_ADAPTER_V1",
+    module: "shared/er-epr-solver-safe-language.ts",
+    stage: "diagnostic",
+    notes:
+      "Safe-language renderer blocking real-universe, wormhole, NHM2 propulsion, stress-energy, and CL4 claims from solver telemetry.",
+    checks: [
+      { type: "test", path: "tests/er-epr-solver-safe-language.spec.ts" },
+      { type: "test", path: "tests/er-epr-solver-artifact.spec.ts" },
+      { type: "stability", path: "tests/er-epr-solver-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+      uncertaintyNoteCount: "1",
+    },
+  },
+  {
     tag: "STARSIM_FUSION_MICROPHYSICS_STAGE1",
     module: "shared/starsim-fusion-microphysics.ts",
     stage: "reduced-order",
@@ -2375,6 +2463,94 @@ export const mathStageRegistry: MathStageEntry[] = [
       forbiddenPhraseCount: "1",
       claimIdCount: "1",
       citationCount: "1",
+    },
+  },
+  {
+    tag: "STARSIM_ACCORDION_GALACTIC_DYNAMICS_NULL_MODEL_V1",
+    module: "shared/starsim-accordion-cosmology-context.ts",
+    stage: "diagnostic",
+    notes:
+      "Observable Universe Accordion cosmology context with bound-system expansion guardrails.",
+    motivation:
+      "Use Accordion coordinates as cosmological context without turning bound stars or galaxies into local Hubble-flow claims.",
+    conceptualWaypoints: [
+      "Map redshift to scale factor when present.",
+      "Mark galaxies and stellar cores as bound systems that require local dynamics.",
+      "Preserve proxy-only QST boundaries.",
+    ],
+    checks: [
+      { type: "test", path: "tests/starsim-accordion-cosmology-context.spec.ts" },
+      { type: "stability", path: "tests/starsim-accordion-cosmology-context.spec.ts" },
+      { type: "doc", path: "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/starsim-accordion-galactic-dynamics.claims.json" },
+    ],
+    units: {
+      redshift: "1",
+      scaleFactor: "1",
+      cosmicTime_Gyr: "T",
+      lookbackTime_Gyr: "T",
+      comovingDistance_Mpc: "L",
+      properDistance_Mpc: "L",
+    },
+  },
+  {
+    tag: "STARSIM_ACCORDION_GALACTIC_DYNAMICS_NULL_MODEL_V1",
+    module: "shared/starsim-galactic-rotation-controls.ts",
+    stage: "diagnostic",
+    notes:
+      "Galactic rotation null controls for baryonic, dark-matter, MOND, and SPARC-like reference comparisons.",
+    checks: [
+      { type: "test", path: "tests/starsim-galactic-rotation-controls.spec.ts" },
+      { type: "stability", path: "tests/starsim-galactic-rotation-controls.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/starsim-accordion/sparc-rotation-curve.fixture.json" },
+      { type: "policy", path: "docs/knowledge/math-claims/starsim-accordion-galactic-dynamics.claims.json" },
+    ],
+    units: {
+      radius_kpc: "L",
+      observedVelocity_km_s: "L T^-1",
+      modelVelocity_km_s: "L T^-1",
+      baryonicVelocity_km_s: "L T^-1",
+      residual_km_s: "L T^-1",
+      rmsResidual_km_s: "L T^-1",
+    },
+  },
+  {
+    tag: "STARSIM_ACCORDION_GALACTIC_DYNAMICS_NULL_MODEL_V1",
+    module: "shared/starsim-accordion-galactic-null-model.ts",
+    stage: "diagnostic",
+    notes:
+      "Composes Accordion context, StarSim star nodes, fusion priors, rotation controls, and proxy-only QST annotations into a null-model report.",
+    checks: [
+      { type: "test", path: "tests/starsim-accordion-galactic-null-model.spec.ts" },
+      { type: "stability", path: "tests/starsim-accordion-galactic-null-model.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/starsim-accordion/accordion-local-volume.fixture.json" },
+      { type: "doc", path: "docs/research/starsim-accordion-galactic-dynamics-null-model-v1.md" },
+    ],
+    units: {
+      nodeCount: "1",
+      localDensityContrast: "1",
+      velocityDispersion_km_s: "L T^-1",
+      clusteringEntropy_nats: "1",
+      streamCoherence: "1",
+      erDensityProxy: "1",
+    },
+  },
+  {
+    tag: "STARSIM_ACCORDION_GALACTIC_DYNAMICS_NULL_MODEL_V1",
+    module: "shared/starsim-galactic-dynamics-safe-language.ts",
+    stage: "diagnostic",
+    notes:
+      "Safe-language renderer blocking direct ER=EPR, wormhole, propulsion, stress-energy, hydrostatic-rotation, and CL4 overclaims.",
+    checks: [
+      { type: "test", path: "tests/starsim-galactic-dynamics-safe-language.spec.ts" },
+      { type: "test", path: "tests/starsim-galactic-dynamics-artifact.spec.ts" },
+      { type: "stability", path: "tests/starsim-galactic-dynamics-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+      uncertaintyNoteCount: "1",
     },
   },
   {

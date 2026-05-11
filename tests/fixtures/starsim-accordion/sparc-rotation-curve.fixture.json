@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "starsim-sparc-rotation-import.v1",
+  "galaxyId": "SPARC:fixture-galaxy",
+  "points": [
+    {
+      "radius_kpc": 2,
+      "observedVelocity_km_s": 130,
+      "baryonicVelocity_km_s": 95,
+      "nfwVelocity_km_s": 126,
+      "burkertVelocity_km_s": 120,
+      "mondVelocity_km_s": 128
+    },
+    {
+      "radius_kpc": 5,
+      "observedVelocity_km_s": 180,
+      "baryonicVelocity_km_s": 125,
+      "nfwVelocity_km_s": 174,
+      "burkertVelocity_km_s": 169,
+      "mondVelocity_km_s": 176
+    }
+  ]
+}
