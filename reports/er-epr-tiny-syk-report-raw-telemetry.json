@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "er-epr-tiny-syk-raw-telemetry.v1",
+  "runId": "tiny-syk:4bd619b2-24d4-4afa-8b52-47447f15bc31",
+  "createdAt": "2026-05-11T22:12:02.756Z",
+  "backend": "two_sided_syk_tiny_exact_diag",
+  "model": {
+    "nMajoranasPerSide": 4,
+    "qBodyOrder": 4,
+    "beta": 2.5,
+    "seed": 4242,
+    "hamiltonianHash": "3aaa0096f0f99ac99bcc1321fb65055a121b3a582125874292bb512c0942b7c3",
+    "statePreparation": "thermofield_double_approx",
+    "coupling": "double_trace_correct_sign"
+  },
+  "spectra": {
+    "eigenvalueCount": 16,
+    "groundStateEnergy": -0.175271,
+    "gapEstimate": 0.175,
+    "spectralFormFactor": [
+      1,
+      0.931063,
+      0.866878,
+      0.807118,
+      0.751477
+    ]
+  },
+  "state": {
+    "tfdApproximationScore": 0.86,
+    "entanglementEntropy_nats": 1.386294,
+    "leftRightMutualInformation": 2.772589
+  },
+  "protocol": {
+    "injectionTime": 0,
+    "couplingTime": 0.5,
+    "extractionTime": 1,
+    "teleportationFidelityRaw": 0.731891,
+    "preCouplingLeakageRaw": 0.08,
+    "causalOrderingPass": true,
+    "timeDelayEstimate": 0.9
+  },
+  "diagnostics": {
+    "twoPointCorrelator": [
+      1,
+      0.839929,
+      0.659483,
+      0.476651,
+      0.305119
+    ],
+    "outOfTimeOrderCorrelator": [
+      1,
+      0.816757,
+      0.633514,
+      0.45027,
+      0.267027
+    ],
+    "operatorSizeCurve": [
+      {
+        "time": 0,
+        "size": 1
+      },
+      {
+        "time": 0.25,
+        "size": 1.529351
+      },
+      {
+        "time": 0.5,
+        "size": 2.058702
+      },
+      {
+        "time": 0.75,
+        "size": 2.588053
+      },
+      {
+        "time": 1,
+        "size": 3.117404
+      }
+    ],
+    "sizeWindingScoreRaw": 0.7318910441977491,
+    "scramblingScoreRaw": 0.732973,
+    "thermalizationScoreRaw": 0.74,
+    "nonCommutativityIndex": 0.074456
+  },
+  "provenance": {
+    "reproducibilityStatus": "solver_simulated",
+    "claimIds": [
+      "tiny_syk_solver_is_toy_model.v1",
+      "tiny_syk_hamiltonian_seeded_reproducibility.v1",
+      "two_sided_syk_traversable_protocol_context.v1",
+      "double_trace_coupling_traversability_context.v1",
+      "operator_size_winding_guardrail.v1",
+      "small_model_gravity_feature_critique_guardrail.v1",
+      "noncommutativity_thermalization_scrambling_required.v1",
+      "entropy_washout_qst_visibility_guardrail.v1",
+      "tiny_syk_not_real_universe_er_epr_evidence.v1",
+      "tiny_syk_not_nhm2_propulsion_evidence.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1306.0533",
+      "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+      "https://arxiv.org/abs/1608.05687",
+      "https://link.springer.com/article/10.1007/JHEP07(2021)097",
+      "https://www.nature.com/articles/s41586-022-05424-3",
+      "https://www.nature.com/articles/s41586-025-08939-7",
+      "https://arxiv.org/abs/2411.00972"
+    ],
+    "caveats": [
+      "Tiny SYK-like solver telemetry is model-internal only.",
+      "Numerical evolution uses tiny-matrix Taylor exponentials and does not solve bulk gravity.",
+      "No real-universe ER bridge, stress-energy, NHM2, propulsion, or CL0-CL4 claim is supported."
+    ]
+  }
+}

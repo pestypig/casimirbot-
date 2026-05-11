@@ -45,6 +45,7 @@
     "collapse:bench": "tsx cli/collapse-bench.ts",
     "er-epr:stage1": "tsx tools/erEprStage1Run.ts",
     "er-epr:solver": "tsx tools/erEprSolverRun.ts",
+    "er-epr:tiny-syk": "tsx tools/erEprTinySykRun.ts",
     "starsim:fusion:benchmark": "tsx tools/starsimFusionBenchmarkRun.ts",
     "starsim:fusion:stage2-gate": "tsx tools/starsimFusionStage2GateRun.ts",
     "starsim:solar:reference": "tsx tools/starsimSolarReferenceRun.ts",

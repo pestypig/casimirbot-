@@ -1,0 +1,15 @@
+{
+  "mutualInformation": 2.772589,
+  "entanglementEntropy_nats": 1.386294,
+  "teleportationFidelity": 0.731891,
+  "causalOrderingScore": 1,
+  "timeDelayScore": 0.9,
+  "operatorSizeWindingScore": 1,
+  "scramblingScore": 1,
+  "thermalizationScore": 0.7906393202844444,
+  "entropyAreaProxyTrackingScore": 1,
+  "ordinaryTeleportationControlScore": 0.08,
+  "shuffledHamiltonianControlScore": 0.24,
+  "disentangledControlScore": 0.12,
+  "wrongSignCouplingControlScore": 0.18
+}

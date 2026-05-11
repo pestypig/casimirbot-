@@ -416,6 +416,14 @@ holographic_entropy_proxy
 
 The congruence policy treats it as proxy-only. It never satisfies CL0-CL4 by itself, and it cannot bypass source-to-geometry closure, observer closure, QEI/QFT, Ford-Roman, conservation, causality, or reproducibility gates.
 
+### 4.10 Quantum-spacetime sidecar: ER_EPR_STAGE1 solver status
+
+`ER_EPR_STAGE1` is a sidecar quantum-spacetime simulation lane. It is not part of the NHM2 source mechanism, not part of the tile-effective stress-energy closure path, and not a propulsion validation layer. Its purpose is to test whether controlled toy-dual models can produce model-internal ER=EPR-like observables under strict null controls.
+
+The current solver path supports raw telemetry normalization through `ER_EPR_STAGE1_SOLVER_ADAPTER_V1` and adds a tiny two-sided SYK-like backend under `ER_EPR_TINY_SYK_EXACT_DIAG_V1`. The backend constructs tested Majorana operators, builds a seeded q=4 Hamiltonian, evolves a controlled two-sided toy protocol, and emits raw telemetry for the existing Stage 1 evaluator.
+
+Any successful result from that backend remains model-internal support only. It would not prove real-universe ER bridges, would not inventory wormholes, would not source stress-energy, and would not promote NHM2, Needle Hull, or warp claims to CL0-CL4.
+
 ## 5. Full-tensor observer closure
 
 ### 5.1 Why diagonal-only was insufficient

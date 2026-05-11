@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "er-epr-tiny-syk-artifact.v1",
+  "runId": "tiny-syk-artifact:43eed800-6334-4d80-9eb7-4660beb8f785",
+  "planId": "tiny-syk-plan.fixture.v1",
+  "createdAt": "2026-05-11T22:12:02.760Z",
+  "backend": "two_sided_syk_tiny_exact_diag",
+  "numerical": {
+    "numericalMethod": "matrix_exponential_taylor",
+    "numericalTolerance": 1e-8,
+    "dimension": 16,
+    "nMajoranasPerSide": 4
+  },
+  "hashes": {
+    "planHash": "3aaf73bd8a7cd2e77461d514c766f5108925d4c3ff6c82268869bacc1dd0d5d9",
+    "hamiltonianHash": "3aaa0096f0f99ac99bcc1321fb65055a121b3a582125874292bb512c0942b7c3",
+    "rawTelemetryHash": "49004a8fe1899cb5f903a37ead5962c7704a539d69bd459ffefa4080effb197c",
+    "normalizedObservablesHash": "77428aa0fd97951a84028231ad45f788052916b311b80d770fecb3aefe0d5db6"
+  },
+  "outputs": {
+    "rawTelemetryRef": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\reports\\er-epr-tiny-syk-report-raw-telemetry.json",
+    "normalizedObservablesRef": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\reports\\er-epr-tiny-syk-report-normalized-observables.json",
+    "erEprEvaluationRef": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\reports\\er-epr-tiny-syk-report-stage1-evaluation.json"
+  },
+  "verdict": {
+    "solverVerdict": "solver_simulated_model_internal_support"
+  },
+  "evidence": {
+    "stage": "ER_EPR_TINY_SYK_EXACT_DIAG_V1",
+    "claimTier": "Stage1_model_internal_toy_solver",
+    "claimIds": [
+      "tiny_syk_solver_is_toy_model.v1",
+      "tiny_syk_hamiltonian_seeded_reproducibility.v1",
+      "two_sided_syk_traversable_protocol_context.v1",
+      "double_trace_coupling_traversability_context.v1",
+      "operator_size_winding_guardrail.v1",
+      "small_model_gravity_feature_critique_guardrail.v1",
+      "noncommutativity_thermalization_scrambling_required.v1",
+      "entropy_washout_qst_visibility_guardrail.v1",
+      "tiny_syk_not_real_universe_er_epr_evidence.v1",
+      "tiny_syk_not_nhm2_propulsion_evidence.v1"
+    ],
+    "citations": [
+      "https://arxiv.org/abs/1306.0533",
+      "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+      "https://arxiv.org/abs/1608.05687",
+      "https://link.springer.com/article/10.1007/JHEP07(2021)097",
+      "https://www.nature.com/articles/s41586-022-05424-3",
+      "https://www.nature.com/articles/s41586-025-08939-7",
+      "https://arxiv.org/abs/2411.00972"
+    ],
+    "sourceRoles": {
+      "https://arxiv.org/abs/1306.0533": "supports_boundary",
+      "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002": "supports_model",
+      "https://arxiv.org/abs/1608.05687": "supports_model",
+      "https://link.springer.com/article/10.1007/JHEP07(2021)097": "supports_model",
+      "https://www.nature.com/articles/s41586-022-05424-3": "supports_precedent",
+      "https://www.nature.com/articles/s41586-025-08939-7": "supports_guardrail",
+      "https://arxiv.org/abs/2411.00972": "supports_guardrail"
+    },
+    "uncertaintyNotes": [
+      "Tiny SYK telemetry is model-internal and dimension-limited.",
+      "Taylor time evolution is a deterministic tiny-matrix numerical method, not a gravity solution.",
+      "Control failure and entropy washout are required before any model-internal support language is allowed."
+    ]
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Tiny SYK-like output remains model-internal.",
+      "QST annotations are proxy-only and cannot promote to CL0-CL4.",
+      "No NHM2 source-closure or propulsion claim is supported."
+    ]
+  }
+}

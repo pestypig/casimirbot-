@@ -1,0 +1,199 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "er-epr-tiny-syk-claims.v1",
+  "domain": "er-epr-tiny-syk-exact-diag-v1",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "tiny_syk_solver_is_toy_model.v1",
+      "statement": "The tiny SYK backend is a dimension-limited toy model for model-internal telemetry, not a real gravity solver.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "tiny two-sided SYK-like toy simulation",
+        "constraints": ["model-internal only", "requires controls", "not real-universe ER=EPR evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena and Stanford 2016, Remarks on the Sachdev-Ye-Kitaev model",
+          "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+          "note": "SYK model context and correlator diagnostics",
+          "equation": "SYK Hamiltonian and two/four-point function context"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk.ts", "docs/research/er-epr-tiny-syk-exact-diag-v1.md"]
+    },
+    {
+      "claimId": "tiny_syk_hamiltonian_seeded_reproducibility.v1",
+      "statement": "Seeded Hamiltonian construction and hashes support deterministic replay of tiny toy-model telemetry.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK Hamiltonian generator",
+        "constraints": ["requires seed", "requires Hamiltonian hash", "not external reproduction"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena and Stanford 2016, Remarks on the Sachdev-Ye-Kitaev model",
+          "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+          "note": "Random-coupling SYK model context",
+          "equation": "Seeded q=4 random-coupling Hamiltonian implementation"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-hamiltonian.ts", "tests/er-epr-tiny-syk-hamiltonian.spec.ts"]
+    },
+    {
+      "claimId": "two_sided_syk_traversable_protocol_context.v1",
+      "statement": "Two-sided SYK-like teleportation protocols can be used as controlled toy models for traversable-channel-like telemetry within the declared model domain.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "two-sided tiny SYK-like protocol",
+        "constraints": ["model-internal only", "requires controls", "requires telemetry hashes", "not real-universe ER=EPR evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Gao and Jafferis 2021, A traversable wormhole teleportation protocol in the SYK model",
+          "url": "https://link.springer.com/article/10.1007/JHEP07(2021)097",
+          "note": "SYK teleportation protocol context",
+          "equation": "Two-sided SYK teleportation protocol context"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk.ts", "shared/er-epr-tiny-syk-telemetry.ts"]
+    },
+    {
+      "claimId": "double_trace_coupling_traversability_context.v1",
+      "statement": "A double-trace-like two-sided coupling is a protocol ingredient inspired by traversable wormhole models, but here it is only a toy interaction.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "tiny two-sided coupling protocol",
+        "constraints": ["declared coupling only", "requires wrong-sign and no-coupling controls", "not a stress-energy source"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Gao, Jafferis, and Wall 2017, Traversable wormholes via a double trace deformation",
+          "url": "https://arxiv.org/abs/1608.05687",
+          "note": "Double-trace traversability context",
+          "equation": "Two-boundary double-trace coupling context"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-hamiltonian.ts", "shared/er-epr-tiny-syk-controls.ts"]
+    },
+    {
+      "claimId": "operator_size_winding_guardrail.v1",
+      "statement": "Operator-size and related diagnostics are guardrails for model-internal interpretation rather than standalone evidence.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK telemetry diagnostics",
+        "constraints": ["requires controls", "requires telemetry caveats", "not sufficient alone"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Jafferis et al. 2022, Traversable wormhole dynamics on a quantum processor",
+          "url": "https://www.nature.com/articles/s41586-022-05424-3",
+          "note": "Precedent for size-winding and protocol telemetry",
+          "equation": "Telemetry precedent, not a repo claim of physical wormholes"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk.ts", "tests/er-epr-tiny-syk-telemetry.spec.ts"]
+    },
+    {
+      "claimId": "small_model_gravity_feature_critique_guardrail.v1",
+      "statement": "Small models require explicit noncommutativity, thermalization, scrambling, and control-leakage guardrails before model-internal support language is allowed.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny ER=EPR toy-model reports",
+        "constraints": ["small-model caveat", "requires controls", "not certified quantum gravity"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Kobrin et al. 2025, Experiments implementing small commuting models lack gravitational features",
+          "url": "https://www.nature.com/articles/s41586-025-08939-7",
+          "note": "Critique motivating control and diagnostic guardrails",
+          "equation": "Small-model critique guardrail"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-controls.ts", "shared/er-epr-tiny-syk-safe-language.ts"]
+    },
+    {
+      "claimId": "noncommutativity_thermalization_scrambling_required.v1",
+      "statement": "Model-internal ER=EPR-like support requires diagnostics beyond a single teleportation score, including noncommutativity, thermalization, and scrambling proxies.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK telemetry diagnostics",
+        "constraints": ["requires diagnostic telemetry", "requires uncertainty notes", "not standalone proof"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena and Stanford 2016, Remarks on the Sachdev-Ye-Kitaev model",
+          "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+          "note": "SYK diagnostic and correlator context",
+          "equation": "Two- and four-point diagnostic context"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk.ts", "shared/er-epr-observable-normalizer.ts"]
+    },
+    {
+      "claimId": "entropy_washout_qst_visibility_guardrail.v1",
+      "statement": "QST entropy stretch is a visibility/demotion guardrail and does not change Planck's constant or promote spacetime congruence.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "QST entropy washout for tiny SYK telemetry",
+        "constraints": ["proxy-only", "hbar ratio is bookkeeping", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Carcassi, Landini, and Aidala 2024, Classical mechanics as the high-entropy limit of quantum mechanics",
+          "url": "https://arxiv.org/abs/2411.00972",
+          "note": "Entropy-stretch demotion context",
+          "equation": "High-entropy quantum-visibility demotion context"
+        }
+      ],
+      "repoBindings": ["shared/quantum-spacetime-congruence.ts", "shared/er-epr-tiny-syk.ts"]
+    },
+    {
+      "claimId": "tiny_syk_not_real_universe_er_epr_evidence.v1",
+      "statement": "Tiny SYK-like telemetry is not evidence for real-universe ER bridges or a wormhole inventory.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK safe-language boundary",
+        "constraints": ["model-internal only", "not real-universe evidence", "not wormhole inventory"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena and Susskind 2013, Cool horizons for entangled black holes",
+          "url": "https://arxiv.org/abs/1306.0533",
+          "note": "ER=EPR context and boundary",
+          "equation": "Entangled black-hole context, not arbitrary physical inventory"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-safe-language.ts", "docs/research/er-epr-tiny-syk-exact-diag-v1.md"]
+    },
+    {
+      "claimId": "tiny_syk_not_nhm2_propulsion_evidence.v1",
+      "statement": "Tiny SYK-like telemetry is not NHM2 propulsion evidence, not source closure, and not CL0-CL4 congruence support.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "NHM2/QST sidecar boundary",
+        "constraints": ["sidecar only", "not stress-energy", "not propulsion", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "repo_policy",
+          "citation": "CasimirBot QST and ER=EPR congruence policy",
+          "url": "docs/research/er-epr-stage1-solver-adapter-v1.md",
+          "note": "Repo-local sidecar and non-promotion boundary",
+          "equation": "spacetimeCL=proxy_only and mayPromoteToCL4=false"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-artifact.ts", "docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]
+    }
+  ]
+}

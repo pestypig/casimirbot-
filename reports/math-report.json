@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-11T21:37:00.376Z",
-  "registryCount": 113,
+  "generatedAt": "2026-05-11T22:12:42.727Z",
+  "registryCount": 117,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 49,
+      "count": 53,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -118,6 +118,10 @@
         "shared/starsim-galactic-rotation-controls.ts",
         "shared/starsim-accordion-galactic-null-model.ts",
         "shared/starsim-galactic-dynamics-safe-language.ts",
+        "shared/er-epr-majorana-operators.ts",
+        "shared/er-epr-tiny-syk-hamiltonian.ts",
+        "shared/er-epr-tiny-syk.ts",
+        "shared/er-epr-tiny-syk-safe-language.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts"
@@ -197,7 +201,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 113,
+    "entriesWithUnits": 117,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -211,8 +215,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 49,
-        "withUnits": 49,
+        "total": 53,
+        "withUnits": 53,
         "missing": []
       },
       "certified": {
@@ -233,8 +237,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1016,
-    "edgeCount": 2164
+    "nodeCount": 1026,
+    "edgeCount": 2180
   },
   "evidenceProfiles": [
     {
