@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "er-epr-stage1-fixture/1",
+  "fixtureId": "high-entropy-washout",
+  "reproducibilityStatus": "fixture_only",
+  "inputHash": "fnv1a32:entropy-washout",
+  "modelRef": "fixture:two_sided_syk_entropy_scan",
+  "thresholdProfile": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "claimIds": [
+    "entropy_stretch_quantum_visibility_demotes_claims.v1",
+    "small_commuting_model_critique_guardrail.v1"
+  ],
+  "citations": [
+    "https://arxiv.org/abs/quant-ph/0306072",
+    "https://arxiv.org/abs/quant-ph/0312059",
+    "https://doi.org/10.1038/s41586-025-08939-7"
+  ],
+  "caveats": [
+    "fixture-only normalized observables",
+    "entropy stretch demotes visibility",
+    "no physical hbar mutation"
+  ],
+  "observables": {
+    "mutualInformation": 1.8,
+    "entanglementEntropy_nats": 3.2,
+    "teleportationFidelity": 0.86,
+    "causalOrderingScore": 0.84,
+    "timeDelayScore": 0.82,
+    "operatorSizeWindingScore": 0.85,
+    "scramblingScore": 0.83,
+    "thermalizationScore": 0.84,
+    "entropyAreaProxyTrackingScore": 0.86,
+    "ordinaryTeleportationControlScore": 0.12,
+    "shuffledHamiltonianControlScore": 0.18,
+    "disentangledControlScore": 0.1,
+    "wrongSignCouplingControlScore": 0.14
+  }
+}

@@ -120,6 +120,13 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.attach_standby_to_helix_thread",
   "situation-room-pipelines.start_situation_goal_session",
   "situation-room-pipelines.create_live_answer_environment",
+  "situation-room-pipelines.create_live_workstation_pipeline",
+  "situation-room-pipelines.pause_live_workstation_pipeline",
+  "situation-room-pipelines.resume_live_workstation_pipeline",
+  "situation-room-pipelines.stop_live_workstation_pipeline",
+  "situation-room-pipelines.set_pipeline_transform",
+  "situation-room-pipelines.set_pipeline_sink",
+  "situation-room-pipelines.attach_pipeline_to_live_answer_environment",
   "situation-room-pipelines.mission_memory.refresh",
   "situation-room-pipelines.interjection_investigator.review_latest",
   "situation-room-pipelines.episode_timeline.summarize_window",
@@ -164,6 +171,8 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "workstation-notes", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-notes", action_id: "create_note", required_args: [], optional_args: ["title", "topic", "body", "note_id"], returns_artifact: true },
   { panel_id: "workstation-notes", action_id: "append_to_note", required_args: ["text"], optional_args: ["note_id", "title"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "create_live_note_sink", required_args: [], optional_args: ["note_id", "title", "topic"], returns_artifact: true },
+  { panel_id: "workstation-notes", action_id: "append_live_note_chunk", required_args: ["chunk_text"], optional_args: ["note_id", "title", "topic", "trace_id"], returns_artifact: true },
   { panel_id: "workstation-notes", action_id: "set_active_note", required_args: [], optional_args: ["note_id", "title"], returns_artifact: true },
   { panel_id: "workstation-notes", action_id: "rename_note", required_args: ["title"], optional_args: ["note_id", "from_title"], returns_artifact: true },
   { panel_id: "workstation-notes", action_id: "delete_note", required_args: [], optional_args: ["note_id", "title", "confirmed"], requires_confirmation: true, returns_artifact: true },
@@ -264,6 +273,62 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     action_id: "create_live_answer_environment",
     required_args: ["objective"],
     optional_args: ["thread_id", "room_id", "source_ids", "graph_id", "preset", "line_schema", "mode", "source_config"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "create_live_workstation_pipeline",
+    required_args: ["objective"],
+    optional_args: ["thread_id", "source_ids", "source_id", "environment_id", "mode", "line_schema"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "pause_live_workstation_pipeline",
+    required_args: ["pipeline_id"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "resume_live_workstation_pipeline",
+    required_args: ["pipeline_id"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "stop_live_workstation_pipeline",
+    required_args: ["pipeline_id"],
+    optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "set_pipeline_transform",
+    required_args: ["pipeline_id", "transform_id"],
+    optional_args: ["params", "model_policy"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "set_pipeline_sink",
+    required_args: ["pipeline_id", "sink_id"],
+    optional_args: ["params", "write_policy"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "attach_pipeline_to_live_answer_environment",
+    required_args: ["pipeline_id", "environment_id"],
+    optional_args: ["thread_id"],
     risk: "medium",
     returns_artifact: true,
   },
@@ -678,6 +743,8 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "attach_standby_to_helix_thread") return "situation_thread_binding_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "start_situation_goal_session") return "situation_goal_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "create_live_answer_environment") return "live_answer_environment_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "create_live_workstation_pipeline") return "live_workstation_pipeline_receipt";
+  if (panelId === "situation-room-pipelines" && ["pause_live_workstation_pipeline", "resume_live_workstation_pipeline", "stop_live_workstation_pipeline", "set_pipeline_transform", "set_pipeline_sink", "attach_pipeline_to_live_answer_environment"].includes(actionId)) return "live_workstation_pipeline_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "attach_live_source") return "workstation_live_source_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_answer_environment", "resume_live_answer_environment", "stop_live_answer_environment", "set_live_line_schema", "set_live_answer_line_schema"].includes(actionId)) return "live_answer_environment_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
@@ -694,6 +761,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {
     return "note_update_receipt";
   }
+  if (panelId === "workstation-notes" && ["create_live_note_sink", "append_live_note_chunk"].includes(actionId)) return "live_output_sink_receipt";
   if (panelId === "docs-viewer" && actionId !== "open") return "doc_context";
   if (panelId === "workstation-clipboard-history" && actionId !== "open") return "clipboard_context";
   return null;

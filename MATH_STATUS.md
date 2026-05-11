@@ -119,6 +119,10 @@ Stage 3 (Certified / Policy-gated)
 | --- | --- | --- | --- | --- |
 | QST_PROXY | shared/quantum-spacetime-congruence.ts | Stage 0 | Quantum-spacetime proxy contract for entropy stretch, holographic area proxy, and vacuum-channel gating. | tests/quantum-spacetime-congruence.spec.ts, docs/warp-tree-dag-congruence-policy.md |
 | ER_EPR_STAGE1_SIM | shared/er-epr-simulation.ts | Stage 1 | ER=EPR simulation verdict contract for controlled holographic toy models, QST entropy-stretch demotion, and StarSim structure-prior boundaries. | tests/er-epr-simulation.spec.ts, docs/research/er-epr-stage1-simulation.md, docs/warp-tree-dag-congruence-policy.md |
+| ER_EPR_STAGE1_RUNNER | shared/er-epr-stage1-runner.ts | Stage 1 | Reproducible ER=EPR Stage 1 fixture/null-control runner and batch report contract; report artifacts are generated evidence, not primary math source. | tests/er-epr-stage1-runner.spec.ts, tests/er-epr-stage1-report.spec.ts, tests/fixtures/er-epr-stage1/plan.fixture.json |
+| ER_EPR_STAGE1_RUNNER | shared/er-epr-safe-language.ts | Stage 1 | Claim-safe ER=EPR Stage 1 report language renderer and forbidden-phrase validator. | tests/er-epr-safe-language.spec.ts |
+| STARSIM_FUSION_MICROPHYSICS_STAGE1 | shared/starsim-fusion-microphysics.ts | Stage 1 | StarSim reduced-order stellar fusion microphysics prior for fusion channels, fusion-zone volumes, hSpectralFit calibration, compact-object context, and star-map structure priors; proxy-only and not direct ER=EPR evidence. | tests/starsim-fusion-microphysics.spec.ts, docs/research/starsim-fusion-microphysics-stage1.md, docs/knowledge/math-claims/starsim-fusion-microphysics.claims.json |
+| STARSIM_FUSION_MICROPHYSICS_STAGE1 | shared/starsim-fusion-artifact.ts | Stage 1 | Artifact schema for StarSim fusion evaluations with claim IDs, citations, caveats, and reproducibility status. | tests/starsim-fusion-artifact.spec.ts |
 
 ## DP Collapse Modules
 

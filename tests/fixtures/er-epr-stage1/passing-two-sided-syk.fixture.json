@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "er-epr-stage1-fixture/1",
+  "fixtureId": "passing-two-sided-syk",
+  "reproducibilityStatus": "fixture_only",
+  "inputHash": "fnv1a32:passing-syk",
+  "modelRef": "fixture:two_sided_syk_stage1_controlled",
+  "thresholdProfile": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "claimIds": [
+    "gjw_double_trace_traversability_model.v1",
+    "syk_processor_simulation_precedent.v1",
+    "small_commuting_model_critique_guardrail.v1",
+    "rt_holographic_entropy_area_proxy.v1",
+    "entropy_stretch_quantum_visibility_demotes_claims.v1"
+  ],
+  "citations": [
+    "https://arxiv.org/abs/1608.05687",
+    "https://www.nature.com/articles/s41586-022-05424-3",
+    "https://doi.org/10.1038/s41586-025-08939-7",
+    "https://doi.org/10.1038/s41586-025-08995-z",
+    "https://arxiv.org/abs/hep-th/0603001"
+  ],
+  "caveats": [
+    "fixture-only normalized observables",
+    "model-internal support only",
+    "proxy-only"
+  ],
+  "observables": {
+    "mutualInformation": 1.8,
+    "entanglementEntropy_nats": 3.2,
+    "teleportationFidelity": 0.86,
+    "causalOrderingScore": 0.84,
+    "timeDelayScore": 0.82,
+    "operatorSizeWindingScore": 0.85,
+    "scramblingScore": 0.83,
+    "thermalizationScore": 0.84,
+    "entropyAreaProxyTrackingScore": 0.86,
+    "ordinaryTeleportationControlScore": 0.12,
+    "shuffledHamiltonianControlScore": 0.18,
+    "disentangledControlScore": 0.1,
+    "wrongSignCouplingControlScore": 0.14
+  }
+}

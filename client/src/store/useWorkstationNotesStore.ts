@@ -45,6 +45,15 @@ type WorkstationNotesState = {
     snippets: WorkstationNoteSnippet[];
     trace_id?: string;
   }) => WorkstationNote;
+  appendLiveNoteChunk: (input: {
+    note_id: string;
+    title: string;
+    topic: string;
+    chunk_text: string;
+    citation: WorkstationNoteCitation;
+    snippet: WorkstationNoteSnippet;
+    trace_id: string;
+  }) => WorkstationNote;
   setActiveNote: (noteId: string) => void;
   updateNoteBody: (noteId: string, body: string) => void;
   renameNote: (noteId: string, title: string) => void;
@@ -99,6 +108,62 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
               snippets_count: note.snippets.length,
               citations_count: note.citations.length,
               trace_id: traceId,
+            },
+          },
+        });
+        return note;
+      },
+      appendLiveNoteChunk: (input) => {
+        const current = get().notes[input.note_id];
+        const nowIso = new Date().toISOString();
+        const normalizedChunk = input.chunk_text.trim();
+        const body = [
+          current?.body?.trim() ?? "",
+          normalizedChunk ? `- ${normalizedChunk}` : "",
+        ].filter(Boolean).join("\n");
+        const citations = current
+          ? [...current.citations.filter((citation) => citation.id !== input.citation.id), input.citation]
+          : [input.citation];
+        const snippets = current
+          ? [...current.snippets.filter((snippet) => snippet.id !== input.snippet.id), input.snippet]
+          : [input.snippet];
+        const note: WorkstationNote = {
+          id: input.note_id,
+          title: input.title.trim() || current?.title || "Live note",
+          topic: input.topic.trim() || current?.topic || "live-source",
+          body,
+          citations,
+          snippets,
+          created_at: current?.created_at ?? nowIso,
+          updated_at: nowIso,
+          trace_id: input.trace_id,
+        };
+        set((state) => ({
+          notes: { ...state.notes, [note.id]: note },
+          order: [note.id, ...state.order.filter((entry) => entry !== note.id)],
+          active_note_id: note.id,
+        }));
+        recordWorkstationTimelineEntry({
+          lane: "notes",
+          label: `Appended live note chunk "${note.title}"`,
+          detail: `topic=${note.topic} trace=${input.trace_id}`,
+          traceId: input.trace_id,
+          panelId: "workstation-notes",
+        });
+        emitHelixAskLiveEvent({
+          contextId: HELIX_ASK_CONTEXT_ID.desktop,
+          traceId: input.trace_id,
+          entry: {
+            id: `workstation-live-note:${note.id}:${Date.now()}`,
+            text: `appended live note chunk to "${note.title}"`,
+            tool: "workstation.notes",
+            ts: nowIso,
+            meta: {
+              kind: "workstation_live_note_chunk",
+              note_id: note.id,
+              topic: note.topic,
+              trace_id: input.trace_id,
+              raw_transcript_included: false,
             },
           },
         });

@@ -3,8 +3,21 @@
   "include": [
     "shared/quantum-spacetime-congruence.ts",
     "shared/er-epr-simulation.ts",
+    "shared/er-epr-control-suite.ts",
+    "shared/er-epr-stage1-runner.ts",
+    "shared/er-epr-safe-language.ts",
+    "shared/starsim-fusion-claims.ts",
+    "shared/starsim-fusion-microphysics.ts",
+    "shared/starsim-fusion-artifact.ts",
+    "tools/erEprStage1Run.ts",
     "tests/quantum-spacetime-congruence.spec.ts",
-    "tests/er-epr-simulation.spec.ts"
+    "tests/er-epr-simulation.spec.ts",
+    "tests/er-epr-stage1-runner.spec.ts",
+    "tests/er-epr-control-suite.spec.ts",
+    "tests/er-epr-safe-language.spec.ts",
+    "tests/er-epr-stage1-report.spec.ts",
+    "tests/starsim-fusion-microphysics.spec.ts",
+    "tests/starsim-fusion-artifact.spec.ts"
   ],
   "compilerOptions": {
     "incremental": false

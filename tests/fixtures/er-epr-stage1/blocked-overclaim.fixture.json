@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "er-epr-stage1-fixture/1",
+  "fixtureId": "blocked-overclaim",
+  "reproducibilityStatus": "fixture_only",
+  "inputHash": "fnv1a32:blocked-overclaim",
+  "modelRef": "fixture:blocked_cl4_or_starsim_direct",
+  "thresholdProfile": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "claimIds": [
+    "er_epr_entangled_black_hole_bridge_context.v1",
+    "rt_holographic_entropy_area_proxy.v1",
+    "gjw_double_trace_traversability_model.v1",
+    "starsim_astrometry_structure_prior_only.v1"
+  ],
+  "citations": [
+    "https://arxiv.org/abs/1306.0533",
+    "https://arxiv.org/abs/hep-th/0603001",
+    "https://arxiv.org/abs/1608.05687",
+    "https://arxiv.org/abs/1511.06717"
+  ],
+  "caveats": [
+    "fixture-only normalized observables",
+    "overclaim must be blocked",
+    "proxy-only"
+  ],
+  "observables": {
+    "mutualInformation": 1.8,
+    "entanglementEntropy_nats": 3.2,
+    "teleportationFidelity": 0.86,
+    "causalOrderingScore": 0.84,
+    "timeDelayScore": 0.82,
+    "operatorSizeWindingScore": 0.85,
+    "scramblingScore": 0.83,
+    "thermalizationScore": 0.84,
+    "entropyAreaProxyTrackingScore": 0.86,
+    "ordinaryTeleportationControlScore": 0.12,
+    "shuffledHamiltonianControlScore": 0.18,
+    "disentangledControlScore": 0.1,
+    "wrongSignCouplingControlScore": 0.14
+  }
+}

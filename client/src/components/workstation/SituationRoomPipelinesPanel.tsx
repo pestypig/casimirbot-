@@ -23,6 +23,7 @@ import {
   type MinecraftWorldSourceView,
 } from "@/components/workstation/MinecraftWorldBindingPanel";
 import { LiveAnswerEnvironmentPanel } from "@/components/workstation/LiveAnswerEnvironmentPanel";
+import { LiveWorkstationPipelinePanel } from "@/components/workstation/LiveWorkstationPipelinePanel";
 import {
   draftJobFromNaturalLanguage,
   draftJobFromRecipe,
@@ -1221,6 +1222,7 @@ export default function SituationRoomPipelinesPanel() {
               onAttachDetected={() => handleAttachThreadBinding("detected_source")}
             />
             <LiveAnswerEnvironmentPanel threadId="helix-ask:desktop" />
+            <LiveWorkstationPipelinePanel />
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

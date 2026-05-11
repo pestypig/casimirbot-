@@ -25,6 +25,27 @@ const has = (text: string, pattern: RegExp): boolean => pattern.test(text);
 
 const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
   const preset = String(environment.preset ?? "").trim();
+  const objective = String(environment.objective ?? "").toLowerCase();
+  if (/\b(?:transcript|sentence|speaker|browser\s+tab|video)\b/.test(objective)) {
+    return [
+      /\btranscript\b/,
+      /\bsentence\b/,
+      /\bspeaker\b/,
+      /\bvideo\b/,
+      /\bwhat\s+did\s+(?:it|they|the\s+video|the\s+speaker)\s+(?:just\s+)?say\b/,
+      /\blatest\s+summary\b/,
+    ];
+  }
+  if (/\b(?:zen|stoic|philosophy|philosophical)\b/.test(objective)) {
+    return [
+      /\bzen\b/,
+      /\bstoic(?:ism)?\b/,
+      /\bphilosoph(?:y|ical)\b/,
+      /\bcomparison\b/,
+      /\bparallel\b/,
+      /\breflection\b/,
+    ];
+  }
   if (preset === "calculator_prime_stream") {
     return [
       /\bprime(?:s| number| stream)?\b/,

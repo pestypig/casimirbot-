@@ -20,6 +20,11 @@ import {
 } from "./live-answer-environment-store";
 import { normalizeComputationLiveSourceEvent } from "./computation-live-source-normalizer";
 import { reduceLiveAnswerEnvironmentFromSourceEvent } from "./live-answer-environment-reducer";
+import { listLiveWorkstationPipelinesForSource } from "./live-workstation-pipeline-store";
+import { runLiveTransformsForSourceEvent } from "./live-transform-runner";
+import { runLiveOutputSinks } from "./live-output-sink-runner";
+import type { LiveTransformResult } from "@shared/helix-live-transform";
+import type { LiveOutputSinkReceipt } from "@shared/helix-live-output-sink";
 
 const sources = new Map<string, WorkstationLiveSource>();
 const eventsBySource = new Map<string, WorkstationLiveSourceEvent[]>();
@@ -201,6 +206,11 @@ export function ingestWorkstationLiveSourceEvent(input: {
   computation_event: LiveComputationEvent | null;
   live_answer_environment: LiveAnswerEnvironment | null;
   live_answer_environment_delta: LiveAnswerEnvironmentDelta | null;
+  pipeline_results?: Array<{
+    pipeline_id: string;
+    transform_results: LiveTransformResult[];
+    sink_receipts: LiveOutputSinkReceipt[];
+  }>;
 } {
   const ts = input.ts ?? new Date().toISOString();
   const kind = normalizeKind(input.kind);
@@ -250,6 +260,7 @@ export function ingestWorkstationLiveSourceEvent(input: {
       computation_event: null,
       live_answer_environment: environment,
       live_answer_environment_delta: null,
+      pipeline_results: [],
     };
   }
   const baseEvidenceRefs = Array.from(new Set([...(input.evidence_refs ?? []), `source:${source.source_id}:seq:${seq}`])).slice(-24);
@@ -295,6 +306,23 @@ export function ingestWorkstationLiveSourceEvent(input: {
     computationEvent,
     now: ts,
   });
+  const pipelineResults = listLiveWorkstationPipelinesForSource(source.source_id).map((pipeline) => {
+    const transformResults = runLiveTransformsForSourceEvent({
+      pipeline,
+      event,
+      now: ts,
+    });
+    const sinkReceipts = runLiveOutputSinks({
+      pipeline,
+      results: transformResults,
+      now: ts,
+    });
+    return {
+      pipeline_id: pipeline.pipeline_id,
+      transform_results: transformResults,
+      sink_receipts: sinkReceipts,
+    };
+  });
   return {
     ok: true,
     source,
@@ -302,6 +330,7 @@ export function ingestWorkstationLiveSourceEvent(input: {
     computation_event: computationEvent,
     live_answer_environment: reduction?.environment ?? environment,
     live_answer_environment_delta: reduction?.delta ?? null,
+    pipeline_results: pipelineResults,
   };
 }
 

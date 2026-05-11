@@ -27628,8 +27628,10 @@ export function HelixAskPill({
                 ));
             const shouldRenderLiveAnswerEnvironmentProjection =
               Boolean(liveAnswerEnvironment) ||
+              visibleDebugActualArtifacts.includes("live_workstation_pipeline_receipt") ||
+              visibleDebugActionIds.includes("situation-room-pipelines.create_live_workstation_pipeline") ||
               (isLatestReply &&
-                /\b(?:live answer environment|track this video|follow this research session|watch my minecraft run|claims?|evidence|contradictions?|prime(?:s)?|calculator|computation|simulation|live source|live stream|generator)\b/i.test(
+                /\b(?:live answer environment|live workstation pipeline|live browser tab|live transcript|transcript|sentence summary|track this video|follow this research session|watch my minecraft run|claims?|evidence|contradictions?|prime(?:s)?|calculator|computation|simulation|live source|live stream|generator)\b/i.test(
                   `${reply.question ?? ""}\n${reply.content ?? ""}`,
                 ));
             const historySummary = clipText(

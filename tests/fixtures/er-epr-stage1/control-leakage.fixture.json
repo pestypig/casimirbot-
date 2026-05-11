@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "er-epr-stage1-fixture/1",
+  "fixtureId": "control-leakage",
+  "reproducibilityStatus": "fixture_only",
+  "inputHash": "fnv1a32:control-leakage",
+  "modelRef": "fixture:two_sided_syk_shuffled_leakage",
+  "thresholdProfile": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "claimIds": [
+    "small_commuting_model_critique_guardrail.v1",
+    "entropy_stretch_quantum_visibility_demotes_claims.v1"
+  ],
+  "citations": [
+    "https://doi.org/10.1038/s41586-025-08939-7",
+    "https://doi.org/10.1038/s41586-025-08995-z",
+    "https://arxiv.org/abs/quant-ph/0306072"
+  ],
+  "caveats": [
+    "fixture-only normalized observables",
+    "ordinary control carries signal",
+    "support must demote"
+  ],
+  "observables": {
+    "mutualInformation": 1.8,
+    "entanglementEntropy_nats": 3.2,
+    "teleportationFidelity": 0.84,
+    "causalOrderingScore": 0.82,
+    "timeDelayScore": 0.8,
+    "operatorSizeWindingScore": 0.84,
+    "scramblingScore": 0.82,
+    "thermalizationScore": 0.83,
+    "entropyAreaProxyTrackingScore": 0.84,
+    "ordinaryTeleportationControlScore": 0.12,
+    "shuffledHamiltonianControlScore": 0.72,
+    "disentangledControlScore": 0.12,
+    "wrongSignCouplingControlScore": 0.14
+  }
+}

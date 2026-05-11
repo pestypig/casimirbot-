@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import {
+  isLiveWorkstationPipelineIntent,
+  planLiveWorkstationPipeline,
+} from "../services/helix-ask/live-workstation-pipeline-planner";
+
+describe("live workstation pipeline planner", () => {
+  it("plans sentence summaries into a note sink", () => {
+    const plan = planLiveWorkstationPipeline({
+      prompt: "Summarize each sentence from this live browser tab into a note.",
+      sourceIds: ["source:browser-tab-transcript"],
+    });
+
+    expect(isLiveWorkstationPipelineIntent("Summarize each sentence from this live browser tab into a note.")).toBe(true);
+    expect(plan.pipeline_recipe_id).toBe("transcript_sentence_note");
+    expect(plan.transforms.map((transform) => transform.kind)).toEqual(["sentence_summary"]);
+    expect(plan.sinks.map((sink) => sink.kind)).toEqual(expect.arrayContaining(["workstation_note", "live_answer_environment"]));
+    expect(plan.missing_bindings).toEqual([]);
+  });
+
+  it("plans Zen comparison as a bounded transform pipeline", () => {
+    const plan = planLiveWorkstationPipeline({
+      prompt: "Watch this live transcript and compare each segment to Zen philosophy.",
+      sourceIds: ["source:browser-tab-transcript"],
+    });
+
+    expect(plan.pipeline_recipe_id).toBe("philosophy_compare");
+    expect(plan.transforms.map((transform) => transform.kind)).toEqual(["sentence_summary", "philosophy_compare"]);
+    expect(plan.line_schema.map((line) => line.key)).toContain("zen_parallel");
+    expect(plan.raw_transcript_included).toBeUndefined();
+  });
+
+  it("returns missing source requirements instead of silently starting capture", () => {
+    const plan = planLiveWorkstationPipeline({
+      prompt: "Track this physics simulation and write a rolling methods note every 20 samples.",
+    });
+
+    expect(plan.pipeline_recipe_id).toBe("methods_note_writer");
+    expect(plan.missing_bindings).toEqual(["physics_simulation"]);
+    expect(plan.next_actions[0]).toMatchObject({ action: "request_live_source" });
+  });
+});

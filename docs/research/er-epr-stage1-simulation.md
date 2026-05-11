@@ -81,6 +81,76 @@ starSim.role = "direct_er_epr_evidence"
 
 Stellar positions, groups, and local-rest-frame structure are gravitational/cosmological context. They are not a direct fusion-tunneling map and not direct evidence for ER=EPR.
 
+## Stage 1 Runner Workflow
+
+`ER_EPR_STAGE1_RUNNER` turns normalized candidate/control observables into reproducible JSON and Markdown reports. The runner consumes a plan:
+
+```txt
+tests/fixtures/er-epr-stage1/plan.fixture.json
+```
+
+and emits:
+
+```txt
+reports/er-epr-stage1-report.json
+reports/er-epr-stage1-report.md
+```
+
+The workflow is:
+
+1. Parse a run plan with candidate runs, control runs, entropy sweep points, StarSim policy, threshold profile, claim IDs, and citations.
+2. Evaluate each run through `evaluateErEprSimulation`.
+3. Require all null controls before preserving a support verdict.
+4. Demote the batch if a control carries signal above the declared threshold.
+5. Render bounded report language from machine verdicts, claim IDs, source roles, caveats, and uncertainty notes.
+
+The CLI entrypoint is:
+
+```bash
+npm run er-epr:stage1 -- --plan tests/fixtures/er-epr-stage1/plan.fixture.json --out reports/er-epr-stage1-report.json
+```
+
+## Fixture-Only Versus Simulated Versus Reproduced
+
+`fixture_only` means the inputs are normalized observables used to test the evaluator, control gates, report schema, and language policy. It is not raw quantum-simulation output and must not be described as a solver reproduction.
+
+`simulated` is reserved for an actual local solver or adapter that emits normalized observables from declared Hamiltonian/model inputs.
+
+`reproduced` is reserved for an independently replayable simulation artifact with enough model, seed, Hamiltonian, environment, and output metadata to reproduce the declared observables.
+
+## Control Suite
+
+Required controls are:
+
+- `disentangled_control`
+- `random_state_control`
+- `wrong_sign_coupling_control`
+- `no_coupling_control`
+- `shuffled_hamiltonian_control`
+- `random_matrix_control`
+- `spin_chain_control`
+- `high_entropy_washout_control`
+- `starsim_structure_prior_only_control`
+
+Strong model-internal support is impossible unless these controls are present and ordinary controls fail below the declared threshold. High-entropy washout is tracked separately as a QST visibility-demotion check.
+
+## Safe Language Policy
+
+Report language is rendered by `shared/er-epr-safe-language.ts`. It must include:
+
+- claim tier,
+- verdict,
+- claim IDs,
+- caveats,
+- source roles,
+- uncertainty notes.
+
+It blocks language that would imply real-universe proof, wormhole inventory, stress-energy sourcing, Hubble-driven photon production, CL promotion, or Needle Hull/propulsion evidence.
+
+## What Would Upgrade This Beyond Stage 1
+
+A future Stage 2 candidate requires an actual solver or externally reproducible simulation, not just normalized fixtures. At minimum it needs declared Hamiltonian/model inputs, reproducible seeds, raw-to-normalized observable transforms, out-of-training controls, thermalization/scrambling checks, and artifact integrity metadata sufficient for independent replay.
+
 ## Research-backed claim matrix
 
 The Stage 1 lane is claim-hardened through `docs/knowledge/math-claims/er-epr-stage1-simulation.claims.json` and `shared/er-epr-research-claims.ts`. Every verdict returned by `evaluateErEprSimulation` must carry claim IDs, citations, source roles, and uncertainty notes.

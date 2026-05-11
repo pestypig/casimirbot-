@@ -1,0 +1,276 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-fusion-microphysics-claims.v1",
+  "domain": "starsim-astrophysical-prior",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "stellar_effective_temperature_surface_proxy.v1",
+      "statement": "Effective temperature is a surface luminosity-radius proxy and does not directly determine stellar core temperature.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "stellar surface observable proxy",
+        "constraints": [
+          "surface proxy only",
+          "not a core-temperature solver",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "reference",
+          "citation": "Swinburne COSMOS. Effective Temperature.",
+          "url": "https://www.astronomy.swin.edu.au/cosmos/E/Effective%2BTemperature",
+          "note": "Reference for the Stefan-Boltzmann effective temperature relation."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "docs/research/starsim-fusion-microphysics-stage1.md"
+      ]
+    },
+    {
+      "claimId": "stellar_structure_hydrostatic_equilibrium_proxy.v1",
+      "statement": "Fusion-zone estimates require stellar-structure context rather than spectral class alone.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "reduced-order stellar structure and profile import",
+        "constraints": [
+          "reduced-order proxy unless a full profile is imported",
+          "MESA-backed profiles are preferred for real stellar evolution work",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA). Astrophysical Journal Supplement Series 192, 3.",
+          "url": "https://scixplorer.org/abs/2011ApJS..192....3P/abstract",
+          "note": "MESA solves coupled stellar structure and composition equations with configurable physics modules."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "docs/research/starsim-fusion-microphysics-stage1.md"
+      ]
+    },
+    {
+      "claimId": "pp_chain_fusion_rate_microphysics.v1",
+      "statement": "The pp chain is the dominant hydrogen-burning channel for Sun-like and lower-mass main-sequence stars in this Stage 1 prior.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "normal hydrogen-burning stars",
+        "constraints": [
+          "reduced-order channel classification",
+          "rate uncertainties remain explicit",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Adelberger, E. G. et al. (2011). Solar fusion cross sections II: the pp chain and CNO cycles. Reviews of Modern Physics.",
+          "url": "https://www.osti.gov/biblio/1013019",
+          "note": "Solar fusion cross-section source for pp-chain and CNO-cycle microphysics."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "tests/starsim-fusion-microphysics.spec.ts"
+      ]
+    },
+    {
+      "claimId": "cno_cycle_fusion_rate_microphysics.v1",
+      "statement": "The CNO cycle may dominate hydrogen burning in hotter, higher-mass main-sequence stars in this Stage 1 prior.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "hotter and higher-mass hydrogen-burning stars",
+        "constraints": [
+          "reduced-order channel classification",
+          "rate uncertainties remain explicit",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Adelberger, E. G. et al. (2011). Solar fusion cross sections II: the pp chain and CNO cycles. Reviews of Modern Physics.",
+          "url": "https://www.osti.gov/biblio/1013019",
+          "note": "Solar fusion cross-section source for pp-chain and CNO-cycle microphysics."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "tests/starsim-fusion-microphysics.spec.ts"
+      ]
+    },
+    {
+      "claimId": "fusion_zone_volume_from_energy_generation.v1",
+      "statement": "Fusion-zone volume is represented by cumulative nuclear luminosity radii such as r10, r50, and r90 rather than by the whole stellar volume.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "stellar nuclear energy-generation profiles",
+        "constraints": [
+          "Stage 1 uses reduced-order or imported profile metadata",
+          "not a raw stellar-evolution solver",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA). Astrophysical Journal Supplement Series 192, 3.",
+          "url": "https://scixplorer.org/abs/2011ApJS..192....3P/abstract",
+          "note": "MESA profile context for stellar energy-generation and structure modeling."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "docs/research/starsim-fusion-microphysics-stage1.md"
+      ]
+    },
+    {
+      "claimId": "stellar_spectral_h_fit_calibration_only.v1",
+      "statement": "Spectral recovery of h is calibration/inference bookkeeping only because the SI value of the Planck constant is exact.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "spectral calibration diagnostics",
+        "constraints": [
+          "does not measure a varying h",
+          "does not infer a new fundamental constant value",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "reference",
+          "citation": "NIST. Meet the Constants.",
+          "url": "https://www.nist.gov/si-redefinition/meet-constants",
+          "note": "NIST reference for the exact SI value of the Planck constant."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "tests/starsim-fusion-microphysics.spec.ts"
+      ]
+    },
+    {
+      "claimId": "stellar_atmosphere_molecular_opacity_guardrail.v1",
+      "statement": "Cool-star spectral inference needs stellar-atmosphere model support when molecular opacity and bands dominate the spectrum.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "cool-star and molecular-band spectral inference",
+        "constraints": [
+          "blackbody-only fits are surface proxies",
+          "atmosphere model support is required for higher-confidence spectral inference",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Husser, T. O. et al. (2013). A new extensive library of PHOENIX stellar atmospheres and synthetic spectra. Astronomy & Astrophysics.",
+          "url": "https://www.aanda.org/articles/aa/full_html/2013/05/aa19058-12/aa19058-12.html",
+          "note": "Synthetic stellar atmosphere framework used as a guardrail against blackbody-only overinterpretation."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "tests/starsim-fusion-microphysics.spec.ts"
+      ]
+    },
+    {
+      "claimId": "astrometric_fusion_graph_structure_prior.v1",
+      "statement": "A StarMap fusion graph can provide an astrometric and population-structure prior, not direct quantum-gravity evidence.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Gaia-like astrometric stellar population graph",
+        "constraints": [
+          "ordinary astrophysical structure prior only",
+          "not a wormhole inventory",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Gaia Collaboration (2023). Gaia Data Release 3: Summary of the content and survey properties. Astronomy & Astrophysics.",
+          "url": "https://www.aanda.org/articles/aa/full_html/2023/06/aa43940-22/aa43940-22.html",
+          "note": "Gaia DR3 provides positions, parallax, proper motions, photometry, and radial velocities for large stellar samples."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "docs/research/starsim-fusion-microphysics-stage1.md"
+      ]
+    },
+    {
+      "claimId": "neutron_star_glitch_compact_quantum_fluid_proxy.v1",
+      "statement": "Neutron-star glitch context is a compact-object quantum-fluid proxy and is not PP-chain fusion.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "neutron-star compact-object diagnostics",
+        "constraints": [
+          "compact-object context only",
+          "not stellar fusion microphysics",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Khomenko, V. et al. (2020). Turbulent, pinned superfluids in neutron stars and pulsar glitch recoveries. Monthly Notices of the Royal Astronomical Society.",
+          "url": "https://academic.oup.com/mnras/article/499/1/161/5901443",
+          "note": "Glitch context for pinned superfluid/vortex and crust-core coupling models."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "tests/starsim-fusion-microphysics.spec.ts"
+      ]
+    },
+    {
+      "claimId": "stellar_microphysics_not_direct_er_epr_evidence.v1",
+      "statement": "Stellar fusion microphysics may inform astrophysical QST priors but cannot directly support ER=EPR, wormhole density, spacetime metric equivalence, propulsion, or stress-energy claims.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "StarSim to QST boundary",
+        "constraints": [
+          "QST context only",
+          "not a real-universe ER-bridge proof",
+          "proxy-only",
+          "not direct ER=EPR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena, J. and Susskind, L. (2013). Cool horizons for entangled black holes. arXiv:1306.0533.",
+          "equation": "ER=EPR boundary context only; no stellar-fusion equation or inventory relation is asserted.",
+          "url": "https://arxiv.org/abs/1306.0533",
+          "note": "ER=EPR context is not a direct stellar-fusion inference."
+        },
+        {
+          "kind": "paper",
+          "citation": "Carcassi, G., Landini, G. and Aidala, C. (2024). Classical mechanics as the high-entropy limit of quantum mechanics. arXiv:2411.00972.",
+          "url": "https://arxiv.org/abs/2411.00972",
+          "note": "Entropy visibility context for QST-style priors."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-microphysics.ts",
+        "docs/research/starsim-fusion-microphysics-stage1.md"
+      ]
+    }
+  ]
+}

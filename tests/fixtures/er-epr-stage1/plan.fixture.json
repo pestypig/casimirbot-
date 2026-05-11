@@ -1,0 +1,440 @@
+{
+  "schemaVersion": "er-epr-stage1-run-plan/1",
+  "planId": "er-epr-stage1-fixture-plan",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "modelRefs": [
+    "fixture:two_sided_syk_stage1_controlled",
+    "fixture:random_matrix_control",
+    "fixture:spin_chain_control",
+    "fixture:starsim_structure_prior_only"
+  ],
+  "thresholdProfile": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "candidateRuns": [
+    {
+      "runId": "candidate-two-sided-syk",
+      "modelRef": "fixture:two_sided_syk_stage1_controlled",
+      "inputHash": "fnv1a32:passing-syk",
+      "claimIds": [
+        "gjw_double_trace_traversability_model.v1",
+        "syk_processor_simulation_precedent.v1",
+        "small_commuting_model_critique_guardrail.v1",
+        "rt_holographic_entropy_area_proxy.v1",
+        "entropy_stretch_quantum_visibility_demotes_claims.v1"
+      ],
+      "citations": [
+        "https://arxiv.org/abs/1608.05687",
+        "https://www.nature.com/articles/s41586-022-05424-3",
+        "https://doi.org/10.1038/s41586-025-08939-7",
+        "https://doi.org/10.1038/s41586-025-08995-z",
+        "https://arxiv.org/abs/hep-th/0603001"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "model-internal support only",
+        "proxy-only"
+      ],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        }
+      }
+    }
+  ],
+  "controlRuns": [
+    {
+      "runId": "control-disentangled",
+      "controlKind": "disentangled_control",
+      "modelRef": "fixture:two_sided_syk_disentangled",
+      "inputHash": "fnv1a32:control-disentangled",
+      "claimIds": ["small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "failed-control run"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "disentangled_control",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 0.2,
+          "entanglementEntropy_nats": 0.4,
+          "teleportationFidelity": 0.18,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.22,
+          "scramblingScore": 0.2,
+          "thermalizationScore": 0.18,
+          "entropyAreaProxyTrackingScore": 0.2,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    },
+    {
+      "runId": "control-random-state",
+      "controlKind": "random_state_control",
+      "modelRef": "fixture:two_sided_syk_random_state",
+      "inputHash": "fnv1a32:control-random-state",
+      "claimIds": ["small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "failed-control run"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 0.25,
+          "entanglementEntropy_nats": 0.5,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.18,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    },
+    {
+      "runId": "control-wrong-sign",
+      "controlKind": "wrong_sign_coupling_control",
+      "modelRef": "fixture:two_sided_syk_wrong_sign",
+      "inputHash": "fnv1a32:control-wrong-sign",
+      "claimIds": ["gjw_double_trace_traversability_model.v1", "small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://arxiv.org/abs/1608.05687", "https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "wrong-sign control"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_wrong_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 1.2,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.22,
+          "causalOrderingScore": 0.2,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.35,
+          "scramblingScore": 0.32,
+          "thermalizationScore": 0.31,
+          "entropyAreaProxyTrackingScore": 0.34,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.12
+        }
+      }
+    },
+    {
+      "runId": "control-no-coupling",
+      "controlKind": "no_coupling_control",
+      "modelRef": "fixture:two_sided_syk_no_coupling",
+      "inputHash": "fnv1a32:control-no-coupling",
+      "claimIds": ["small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "no-coupling control"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 1.2,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.18,
+          "timeDelayScore": 0.16,
+          "operatorSizeWindingScore": 0.34,
+          "scramblingScore": 0.32,
+          "thermalizationScore": 0.31,
+          "entropyAreaProxyTrackingScore": 0.34,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    },
+    {
+      "runId": "control-shuffled-hamiltonian",
+      "controlKind": "shuffled_hamiltonian_control",
+      "modelRef": "fixture:two_sided_syk_shuffled",
+      "inputHash": "fnv1a32:control-shuffled",
+      "claimIds": ["small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "shuffled-Hamiltonian control"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 1.1,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.24,
+          "causalOrderingScore": 0.2,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.3,
+          "scramblingScore": 0.3,
+          "thermalizationScore": 0.28,
+          "entropyAreaProxyTrackingScore": 0.3,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.12,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    },
+    {
+      "runId": "control-random-matrix",
+      "controlKind": "random_matrix_control",
+      "modelRef": "fixture:random_matrix_control",
+      "inputHash": "fnv1a32:control-random-matrix",
+      "claimIds": ["small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "non-holographic control"],
+      "input": {
+        "modelFamily": "random_matrix_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.18,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    },
+    {
+      "runId": "control-spin-chain",
+      "controlKind": "spin_chain_control",
+      "modelRef": "fixture:spin_chain_control",
+      "inputHash": "fnv1a32:control-spin-chain",
+      "claimIds": ["small_commuting_model_critique_guardrail.v1"],
+      "citations": ["https://doi.org/10.1038/s41586-025-08939-7"],
+      "caveats": ["fixture-only normalized observables", "non-holographic control"],
+      "input": {
+        "modelFamily": "spin_chain_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    },
+    {
+      "runId": "control-high-entropy",
+      "controlKind": "high_entropy_washout_control",
+      "modelRef": "fixture:two_sided_syk_entropy_scan",
+      "inputHash": "fnv1a32:control-high-entropy",
+      "claimIds": ["entropy_stretch_quantum_visibility_demotes_claims.v1"],
+      "citations": ["https://arxiv.org/abs/quant-ph/0306072", "https://arxiv.org/abs/quant-ph/0312059"],
+      "caveats": ["fixture-only normalized observables", "entropy washout control"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 4.605170185988092 },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        }
+      }
+    },
+    {
+      "runId": "control-starsim-prior",
+      "controlKind": "starsim_structure_prior_only_control",
+      "modelRef": "fixture:starsim_structure_prior_only",
+      "inputHash": "fnv1a32:control-starsim-prior",
+      "claimIds": ["starsim_astrometry_structure_prior_only.v1"],
+      "citations": ["https://arxiv.org/abs/1511.06717", "https://arxiv.org/abs/1802.09943", "https://arxiv.org/abs/1609.04153"],
+      "caveats": ["fixture-only normalized observables", "StarSim structure-prior control"],
+      "input": {
+        "modelFamily": "random_matrix_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "starSim": {
+          "role": "cosmological_structure_prior",
+          "clusteringEntropy_nats": 3
+        },
+        "entropyStretch": { "deltaS_nats": 0 },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        }
+      }
+    }
+  ],
+  "entropySweep": [
+    {
+      "runId": "entropy-sweep-high",
+      "modelRef": "fixture:two_sided_syk_entropy_scan",
+      "inputHash": "fnv1a32:entropy-washout",
+      "claimIds": ["entropy_stretch_quantum_visibility_demotes_claims.v1"],
+      "citations": ["https://arxiv.org/abs/quant-ph/0306072", "https://arxiv.org/abs/quant-ph/0312059"],
+      "caveats": ["fixture-only normalized observables", "entropy sweep point"],
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "entropyStretch": { "deltaS_nats": 4.605170185988092 },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        }
+      }
+    }
+  ],
+  "starSimPolicy": {
+    "allowedRole": "cosmological_structure_prior",
+    "directEvidenceAllowed": false
+  },
+  "citationPolicy": {
+    "requiredClaimIds": [
+      "er_epr_entangled_black_hole_bridge_context.v1",
+      "rt_holographic_entropy_area_proxy.v1",
+      "gjw_double_trace_traversability_model.v1",
+      "small_commuting_model_critique_guardrail.v1",
+      "entropy_stretch_quantum_visibility_demotes_claims.v1"
+    ],
+    "requiredCitations": [
+      "https://arxiv.org/abs/1306.0533",
+      "https://arxiv.org/abs/hep-th/0603001",
+      "https://arxiv.org/abs/1608.05687",
+      "https://doi.org/10.1038/s41586-025-08939-7",
+      "https://arxiv.org/abs/quant-ph/0306072"
+    ]
+  },
+  "reproducibilityStatus": "fixture_only"
+}

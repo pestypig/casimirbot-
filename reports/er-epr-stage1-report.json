@@ -1,0 +1,2363 @@
+{
+  "schemaVersion": "er-epr-stage1-batch-report/1",
+  "runId": "er-epr-stage1-fixture-plan:run",
+  "planId": "er-epr-stage1-fixture-plan",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "candidateEvaluations": [
+    {
+      "runId": "candidate-two-sided-syk",
+      "modelRef": "fixture:two_sided_syk_stage1_controlled",
+      "inputHash": "fnv1a32:passing-syk",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "gjw_double_trace_traversability_model.v1",
+        "syk_processor_simulation_precedent.v1",
+        "small_commuting_model_critique_guardrail.v1",
+        "rt_holographic_entropy_area_proxy.v1",
+        "entropy_stretch_quantum_visibility_demotes_claims.v1"
+      ],
+      "citations": [
+        "https://arxiv.org/abs/1608.05687",
+        "https://www.nature.com/articles/s41586-022-05424-3",
+        "https://doi.org/10.1038/s41586-025-08939-7",
+        "https://doi.org/10.1038/s41586-025-08995-z",
+        "https://arxiv.org/abs/hep-th/0603001"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "model-internal support only",
+        "proxy-only"
+      ],
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 3.2,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 3.3437186880320007e-69,
+            "erDensityProxy": 3.3437186880320007e-69,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false,
+            "erDensityProxy": 3.3437186880320007e-69
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 3.3437186880320007e-69,
+          "signalComposite": 0.84,
+          "controlLeakage": 0.18,
+          "diagnosticComposite": 0.84,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.84
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": true,
+          "correctTraversableCoupling": true,
+          "entangledStateSignal": true,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": true,
+          "entropyAreaProxyTracksSignal": true,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": true
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "dual_model_support_strong",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "syk_processor_simulation_precedent.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "rt_holographic_entropy_area_proxy.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The processor result is a small toy-model simulation precedent, not proof of real-universe wormholes.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "The area/entropy relation is a holographic proxy and is not arbitrary-spacetime metric equivalence.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "syk_processor_simulation_precedent.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "rt_holographic_entropy_area_proxy.v1": "supports_model",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    }
+  ],
+  "controlEvaluations": [
+    {
+      "runId": "control-disentangled",
+      "modelRef": "fixture:two_sided_syk_disentangled",
+      "inputHash": "fnv1a32:control-disentangled",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "disentangled_control",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.2,
+          "entanglementEntropy_nats": 0.4,
+          "teleportationFidelity": 0.18,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.22,
+          "scramblingScore": 0.2,
+          "thermalizationScore": 0.18,
+          "entropyAreaProxyTrackingScore": 0.2,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "failed-control run"
+      ],
+      "controlKind": "disentangled_control",
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "disentangled_control",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.2,
+          "entanglementEntropy_nats": 0.4,
+          "teleportationFidelity": 0.18,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.22,
+          "scramblingScore": 0.2,
+          "thermalizationScore": 0.18,
+          "entropyAreaProxyTrackingScore": 0.2,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 0.4,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 4.179648360040001e-70,
+            "erDensityProxy": 4.179648360040001e-70,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false,
+            "erDensityProxy": 4.179648360040001e-70
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 4.179648360040001e-70,
+          "signalComposite": 0.16,
+          "controlLeakage": 0.1,
+          "diagnosticComposite": 0.2,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.16
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": false,
+          "correctTraversableCoupling": true,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-random-state",
+      "modelRef": "fixture:two_sided_syk_random_state",
+      "inputHash": "fnv1a32:control-random-state",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.25,
+          "entanglementEntropy_nats": 0.5,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.18,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "failed-control run"
+      ],
+      "controlKind": "random_state_control",
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.25,
+          "entanglementEntropy_nats": 0.5,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.18,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 0.5,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 5.2245604500500006e-70,
+            "erDensityProxy": 5.2245604500500006e-70,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false,
+            "erDensityProxy": 5.2245604500500006e-70
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 5.2245604500500006e-70,
+          "signalComposite": 0.186667,
+          "controlLeakage": 0.12,
+          "diagnosticComposite": 0.22,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.186667
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": false,
+          "correctTraversableCoupling": true,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-wrong-sign",
+      "modelRef": "fixture:two_sided_syk_wrong_sign",
+      "inputHash": "fnv1a32:control-wrong-sign",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_wrong_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.2,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.22,
+          "causalOrderingScore": 0.2,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.35,
+          "scramblingScore": 0.32,
+          "thermalizationScore": 0.31,
+          "entropyAreaProxyTrackingScore": 0.34,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.12
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "gjw_double_trace_traversability_model.v1",
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://arxiv.org/abs/1608.05687",
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "wrong-sign control"
+      ],
+      "controlKind": "wrong_sign_coupling_control",
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_wrong_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.2,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.22,
+          "causalOrderingScore": 0.2,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.35,
+          "scramblingScore": 0.32,
+          "thermalizationScore": 0.31,
+          "entropyAreaProxyTrackingScore": 0.34,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.12
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 2,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 2.0898241800200003e-69,
+            "erDensityProxy": 2.0898241800200003e-69,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false,
+            "erDensityProxy": 2.0898241800200003e-69
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 2.0898241800200003e-69,
+          "signalComposite": 0.2,
+          "controlLeakage": 0.12,
+          "diagnosticComposite": 0.326667,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.2
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": true,
+          "correctTraversableCoupling": false,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-no-coupling",
+      "modelRef": "fixture:two_sided_syk_no_coupling",
+      "inputHash": "fnv1a32:control-no-coupling",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.2,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.18,
+          "timeDelayScore": 0.16,
+          "operatorSizeWindingScore": 0.34,
+          "scramblingScore": 0.32,
+          "thermalizationScore": 0.31,
+          "entropyAreaProxyTrackingScore": 0.34,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "no-coupling control"
+      ],
+      "controlKind": "no_coupling_control",
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.2,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.18,
+          "timeDelayScore": 0.16,
+          "operatorSizeWindingScore": 0.34,
+          "scramblingScore": 0.32,
+          "thermalizationScore": 0.31,
+          "entropyAreaProxyTrackingScore": 0.34,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 2,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 2.0898241800200003e-69,
+            "erDensityProxy": 2.0898241800200003e-69,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false,
+            "erDensityProxy": 2.0898241800200003e-69
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 2.0898241800200003e-69,
+          "signalComposite": 0.18,
+          "controlLeakage": 0.12,
+          "diagnosticComposite": 0.323333,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.18
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": true,
+          "correctTraversableCoupling": false,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-shuffled-hamiltonian",
+      "modelRef": "fixture:two_sided_syk_shuffled",
+      "inputHash": "fnv1a32:control-shuffled",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.1,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.24,
+          "causalOrderingScore": 0.2,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.3,
+          "scramblingScore": 0.3,
+          "thermalizationScore": 0.28,
+          "entropyAreaProxyTrackingScore": 0.3,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.12,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "shuffled-Hamiltonian control"
+      ],
+      "controlKind": "shuffled_hamiltonian_control",
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 1.1,
+          "entanglementEntropy_nats": 2,
+          "teleportationFidelity": 0.24,
+          "causalOrderingScore": 0.2,
+          "timeDelayScore": 0.18,
+          "operatorSizeWindingScore": 0.3,
+          "scramblingScore": 0.3,
+          "thermalizationScore": 0.28,
+          "entropyAreaProxyTrackingScore": 0.3,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.12,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 2,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 2.0898241800200003e-69,
+            "erDensityProxy": 2.0898241800200003e-69,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false,
+            "erDensityProxy": 2.0898241800200003e-69
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 2.0898241800200003e-69,
+          "signalComposite": 0.206667,
+          "controlLeakage": 0.12,
+          "diagnosticComposite": 0.293333,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.206667
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": true,
+          "correctTraversableCoupling": true,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-random-matrix",
+      "modelRef": "fixture:random_matrix_control",
+      "inputHash": "fnv1a32:control-random-matrix",
+      "input": {
+        "modelFamily": "random_matrix_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.18,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "non-holographic control"
+      ],
+      "controlKind": "random_matrix_control",
+      "evaluation": {
+        "modelFamily": "random_matrix_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.18,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": false,
+            "entanglementEntropy_nats": 0.8,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 8.359296720080002e-70,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 8.359296720080002e-70,
+          "signalComposite": 0.16,
+          "controlLeakage": 0.1,
+          "diagnosticComposite": 0.22,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.16
+        },
+        "gates": {
+          "holographicModel": false,
+          "entangledTwoSidedState": false,
+          "correctTraversableCoupling": false,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-spin-chain",
+      "modelRef": "fixture:spin_chain_control",
+      "inputHash": "fnv1a32:control-spin-chain",
+      "input": {
+        "modelFamily": "spin_chain_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "small_commuting_model_critique_guardrail.v1"
+      ],
+      "citations": [
+        "https://doi.org/10.1038/s41586-025-08939-7"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "non-holographic control"
+      ],
+      "controlKind": "spin_chain_control",
+      "evaluation": {
+        "modelFamily": "spin_chain_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": false,
+            "entanglementEntropy_nats": 0.8,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 8.359296720080002e-70,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 8.359296720080002e-70,
+          "signalComposite": 0.166667,
+          "controlLeakage": 0.1,
+          "diagnosticComposite": 0.22,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.166667
+        },
+        "gates": {
+          "holographicModel": false,
+          "entangledTwoSidedState": false,
+          "correctTraversableCoupling": false,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-high-entropy",
+      "modelRef": "fixture:two_sided_syk_entropy_scan",
+      "inputHash": "fnv1a32:control-high-entropy",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 4.605170185988092
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "entropy_stretch_quantum_visibility_demotes_claims.v1"
+      ],
+      "citations": [
+        "https://arxiv.org/abs/quant-ph/0306072",
+        "https://arxiv.org/abs/quant-ph/0312059"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "entropy washout control"
+      ],
+      "controlKind": "high_entropy_washout_control",
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 4.605170185988092
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 4.605170185988092,
+            "lambda": 100.00000000000004,
+            "logLambda": 4.605170185988092,
+            "hbarEffectiveRatio": 0.009999999999999995,
+            "hbarEffectiveLogRatio": -4.605170185988092,
+            "quantumVisibility": 0.009999999999999995,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 3.2,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 3.3437186880320007e-69,
+            "erDensityProxy": 3.3437186880320007e-69,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 4.605170185988092,
+            "lambda": 100.00000000000004,
+            "logLambda": 4.605170185988092,
+            "hbarEffectiveRatio": 0.009999999999999995,
+            "hbarEffectiveLogRatio": -4.605170185988092,
+            "quantumVisibility": 0.009999999999999995,
+            "usesLogSpace": false,
+            "erDensityProxy": 3.3437186880320007e-69
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 3.3437186880320007e-69,
+          "signalComposite": 0.84,
+          "controlLeakage": 0.18,
+          "diagnosticComposite": 0.84,
+          "entropyVisibility": 0.01,
+          "visibilityAdjustedSignal": 0.0084
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": true,
+          "correctTraversableCoupling": true,
+          "entangledStateSignal": true,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": true,
+          "entropyAreaProxyTracksSignal": true,
+          "entropyVisibilityPass": false,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    },
+    {
+      "runId": "control-starsim-prior",
+      "modelRef": "fixture:starsim_structure_prior_only",
+      "inputHash": "fnv1a32:control-starsim-prior",
+      "input": {
+        "modelFamily": "random_matrix_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "cosmological_structure_prior",
+          "clusteringEntropy_nats": 3
+        }
+      },
+      "claimIds": [
+        "starsim_astrometry_structure_prior_only.v1"
+      ],
+      "citations": [
+        "https://arxiv.org/abs/1511.06717",
+        "https://arxiv.org/abs/1802.09943",
+        "https://arxiv.org/abs/1609.04153"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "StarSim structure-prior control"
+      ],
+      "controlKind": "starsim_structure_prior_only_control",
+      "evaluation": {
+        "modelFamily": "random_matrix_control",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "random_control",
+        "coupling": "none",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 0
+        },
+        "observables": {
+          "mutualInformation": 0.3,
+          "entanglementEntropy_nats": 0.8,
+          "teleportationFidelity": 0.2,
+          "causalOrderingScore": 0.16,
+          "timeDelayScore": 0.14,
+          "operatorSizeWindingScore": 0.24,
+          "scramblingScore": 0.22,
+          "thermalizationScore": 0.2,
+          "entropyAreaProxyTrackingScore": 0.22,
+          "ordinaryTeleportationControlScore": 0.1,
+          "shuffledHamiltonianControlScore": 0.1,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.1
+        },
+        "starSim": {
+          "role": "cosmological_structure_prior",
+          "clusteringEntropy_nats": 3
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": false,
+            "entanglementEntropy_nats": 0.8,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 8.359296720080002e-70,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 0,
+            "lambda": 1,
+            "logLambda": 0,
+            "hbarEffectiveRatio": 1,
+            "hbarEffectiveLogRatio": 0,
+            "quantumVisibility": 1,
+            "usesLogSpace": false
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 8.359296720080002e-70,
+          "signalComposite": 0.166667,
+          "controlLeakage": 0.1,
+          "diagnosticComposite": 0.22,
+          "entropyVisibility": 1,
+          "visibilityAdjustedSignal": 0.166667
+        },
+        "gates": {
+          "holographicModel": false,
+          "entangledTwoSidedState": false,
+          "correctTraversableCoupling": false,
+          "entangledStateSignal": false,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": false,
+          "entropyAreaProxyTracksSignal": false,
+          "entropyVisibilityPass": true,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory",
+            "starsim_is_structure_prior_only"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "proxy_only_structure_prior",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/1511.06717",
+            "https://arxiv.org/abs/1802.09943",
+            "https://arxiv.org/abs/1609.04153",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "starsim_astrometry_structure_prior_only.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "StarSim/Gaia-like astrometry is an ordinary structure prior or null-model context, not direct ER=EPR evidence.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "starsim_astrometry_structure_prior_only.v1": "supports_boundary",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    }
+  ],
+  "entropySweepResults": [
+    {
+      "runId": "entropy-sweep-high",
+      "modelRef": "fixture:two_sided_syk_entropy_scan",
+      "inputHash": "fnv1a32:entropy-washout",
+      "input": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 4.605170185988092
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        },
+        "starSim": {
+          "role": "not_used"
+        }
+      },
+      "claimIds": [
+        "entropy_stretch_quantum_visibility_demotes_claims.v1"
+      ],
+      "citations": [
+        "https://arxiv.org/abs/quant-ph/0306072",
+        "https://arxiv.org/abs/quant-ph/0312059"
+      ],
+      "caveats": [
+        "fixture-only normalized observables",
+        "entropy sweep point"
+      ],
+      "evaluation": {
+        "modelFamily": "two_sided_SYK",
+        "nQubitsOrModes": 12,
+        "temperatureRegime": "low",
+        "initialState": "thermofield_double",
+        "coupling": "double_trace_correct_sign",
+        "probeInsertionTime": -4,
+        "measurementWindow": 8,
+        "requestedSpacetimeCL": "proxy_only",
+        "entropyStretch": {
+          "deltaS_nats": 4.605170185988092
+        },
+        "observables": {
+          "mutualInformation": 1.8,
+          "entanglementEntropy_nats": 3.2,
+          "teleportationFidelity": 0.86,
+          "causalOrderingScore": 0.84,
+          "timeDelayScore": 0.82,
+          "operatorSizeWindingScore": 0.85,
+          "scramblingScore": 0.83,
+          "thermalizationScore": 0.84,
+          "entropyAreaProxyTrackingScore": 0.86,
+          "ordinaryTeleportationControlScore": 0.12,
+          "shuffledHamiltonianControlScore": 0.18,
+          "disentangledControlScore": 0.1,
+          "wrongSignCouplingControlScore": 0.14
+        },
+        "starSim": {
+          "role": "not_used"
+        },
+        "qst": {
+          "claimTier": "toy_model",
+          "entropyStretch": {
+            "deltaS_nats": 4.605170185988092,
+            "lambda": 100.00000000000004,
+            "logLambda": 4.605170185988092,
+            "hbarEffectiveRatio": 0.009999999999999995,
+            "hbarEffectiveLogRatio": -4.605170185988092,
+            "quantumVisibility": 0.009999999999999995,
+            "usesLogSpace": false
+          },
+          "cosmology": {},
+          "holographicProxy": {
+            "erEprEligible": true,
+            "entanglementEntropy_nats": 3.2,
+            "regionArea_m2": 1,
+            "rtAreaProxy_m2": 3.3437186880320007e-69,
+            "erDensityProxy": 3.3437186880320007e-69,
+            "caveat": "not_a_wormhole_count"
+          },
+          "vacuumChannel": {
+            "mode": "none"
+          },
+          "congruenceGate": {
+            "spacetimeCL": "proxy_only",
+            "quantumCL": "QCL3_holographic_area_proxy",
+            "edgeType": "holographic_entropy_proxy",
+            "mayPromoteToCL4": false,
+            "unsupportedCausalLinks": []
+          },
+          "values": {
+            "deltaS": 4.605170185988092,
+            "lambda": 100.00000000000004,
+            "logLambda": 4.605170185988092,
+            "hbarEffectiveRatio": 0.009999999999999995,
+            "hbarEffectiveLogRatio": -4.605170185988092,
+            "quantumVisibility": 0.009999999999999995,
+            "usesLogSpace": false,
+            "erDensityProxy": 3.3437186880320007e-69
+          },
+          "guards": {
+            "spacetimeCL": "proxy_only",
+            "mayPromoteToCL4": false,
+            "blockedCausalLinks": [],
+            "allowedVacuumChannels": [
+              "static_casimir_stress",
+              "none"
+            ],
+            "overclaimWarnings": [
+              "not_metric_equivalence_lane",
+              "not_stress_energy_source",
+              "not_wormhole_inventory",
+              "not_local_photon_production_model"
+            ]
+          },
+          "evidence": {
+            "qcl": "QCL3_holographic_area_proxy",
+            "stage": "QST_PROXY",
+            "citations": [
+              "https://arxiv.org/abs/2411.00972",
+              "https://arxiv.org/abs/1306.0533",
+              "https://arxiv.org/abs/hep-th/0603001",
+              "https://www.nature.com/articles/nature10561"
+            ]
+          }
+        },
+        "values": {
+          "rtAreaProxy_m2": 3.3437186880320007e-69,
+          "signalComposite": 0.84,
+          "controlLeakage": 0.18,
+          "diagnosticComposite": 0.84,
+          "entropyVisibility": 0.01,
+          "visibilityAdjustedSignal": 0.0084
+        },
+        "gates": {
+          "holographicModel": true,
+          "entangledTwoSidedState": true,
+          "correctTraversableCoupling": true,
+          "entangledStateSignal": true,
+          "ordinaryControlsFail": true,
+          "diagnosticChecksPass": true,
+          "entropyAreaProxyTracksSignal": true,
+          "entropyVisibilityPass": false,
+          "canClaimModelInternalSupport": false
+        },
+        "guards": {
+          "spacetimeCL": "proxy_only",
+          "mayPromoteToCL4": false,
+          "blockedClaims": [],
+          "overclaimWarnings": [
+            "not_real_universe_er_bridge_proof",
+            "not_metric_equivalence_lane",
+            "not_stress_energy_source",
+            "not_wormhole_inventory"
+          ]
+        },
+        "evidence": {
+          "stage": "ER_EPR_STAGE1_SIM",
+          "claimTier": "Stage1_falsifiable_model_support",
+          "verdict": "ordinary_control_explains_signal",
+          "citations": [
+            "https://arxiv.org/abs/1306.0533",
+            "https://arxiv.org/abs/hep-th/0603001",
+            "https://arxiv.org/abs/1005.3035",
+            "https://arxiv.org/abs/1608.05687",
+            "https://www.nature.com/articles/s41586-022-05424-3",
+            "https://doi.org/10.1038/s41586-025-08939-7",
+            "https://doi.org/10.1038/s41586-025-08995-z",
+            "https://arxiv.org/abs/quant-ph/0306072",
+            "https://arxiv.org/abs/quant-ph/0312059"
+          ],
+          "claimIds": [
+            "gjw_double_trace_traversability_model.v1",
+            "small_commuting_model_critique_guardrail.v1",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1"
+          ],
+          "uncertaintyNotes": [
+            "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+            "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+            "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar."
+          ],
+          "sourceRoles": {
+            "gjw_double_trace_traversability_model.v1": "supports_model",
+            "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+            "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail"
+          }
+        }
+      }
+    }
+  ],
+  "failedControlSummary": {
+    "requiredControlsPresent": true,
+    "missingRequiredControls": [],
+    "signalCarryingControls": [],
+    "overclaimBlockedControls": [],
+    "entropyWashoutObserved": true,
+    "starSimPriorOnlyOk": true,
+    "batchShouldDemote": false
+  },
+  "strongestVerdict": "dual_model_support_strong",
+  "strongestAllowedClaim": {
+    "claimTier": "Stage1_falsifiable_model_support",
+    "statement": "Stage 1 simulated evidence: strong model-internal support in the declared controlled holographic/toy-dual simulation after required controls failed."
+  },
+  "blockedOverclaims": [],
+  "claimIds": [
+    "er_epr_entangled_black_hole_bridge_context.v1",
+    "rt_holographic_entropy_area_proxy.v1",
+    "gjw_double_trace_traversability_model.v1",
+    "small_commuting_model_critique_guardrail.v1",
+    "entropy_stretch_quantum_visibility_demotes_claims.v1",
+    "syk_processor_simulation_precedent.v1",
+    "starsim_astrometry_structure_prior_only.v1"
+  ],
+  "citations": [
+    "https://arxiv.org/abs/1306.0533",
+    "https://arxiv.org/abs/hep-th/0603001",
+    "https://arxiv.org/abs/1608.05687",
+    "https://doi.org/10.1038/s41586-025-08939-7",
+    "https://arxiv.org/abs/quant-ph/0306072",
+    "https://doi.org/10.1038/s41586-025-08995-z",
+    "https://arxiv.org/abs/quant-ph/0312059",
+    "https://www.nature.com/articles/s41586-022-05424-3",
+    "https://arxiv.org/abs/1511.06717",
+    "https://arxiv.org/abs/1802.09943",
+    "https://arxiv.org/abs/1609.04153"
+  ],
+  "sourceRoles": {
+    "er_epr_entangled_black_hole_bridge_context.v1": "supports_context",
+    "rt_holographic_entropy_area_proxy.v1": "supports_model",
+    "gjw_double_trace_traversability_model.v1": "supports_model",
+    "small_commuting_model_critique_guardrail.v1": "supports_guardrail",
+    "entropy_stretch_quantum_visibility_demotes_claims.v1": "supports_guardrail",
+    "syk_processor_simulation_precedent.v1": "supports_model",
+    "starsim_astrometry_structure_prior_only.v1": "supports_boundary"
+  },
+  "uncertaintyNotes": [
+    "ER=EPR is used only as holographic/black-hole research context, not a generic real-universe wormhole inventory.",
+    "The area/entropy relation is a holographic proxy and is not arbitrary-spacetime metric equivalence.",
+    "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+    "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+    "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar.",
+    "The processor result is a small toy-model simulation precedent, not proof of real-universe wormholes.",
+    "StarSim/Gaia-like astrometry is an ordinary structure prior or null-model context, not direct ER=EPR evidence."
+  ],
+  "reproducibilityStatus": "fixture_only",
+  "caveats": [
+    "Stage 1 simulated evidence only",
+    "proxy-only",
+    "requires independent theoretical and experimental validation",
+    "fixture-only inputs are normalized observables, not raw solver output",
+    "no CL0-CL4 promotion",
+    "fixture-only normalized observables",
+    "model-internal support only",
+    "Double-trace traversability applies to a specific holographic model family and is not a local propulsion mechanism.",
+    "The processor result is a small toy-model simulation precedent, not proof of real-universe wormholes.",
+    "The toy-model interpretation is contested; thermalization, scrambling, noncommuting controls, and leakage checks remain mandatory.",
+    "The area/entropy relation is a holographic proxy and is not arbitrary-spacetime metric equivalence.",
+    "Entropy stretch is diagnostic bookkeeping that can demote visibility; it does not physically alter hbar.",
+    "failed-control run",
+    "wrong-sign control",
+    "no-coupling control",
+    "shuffled-Hamiltonian control",
+    "non-holographic control",
+    "entropy washout control",
+    "StarSim structure-prior control",
+    "StarSim/Gaia-like astrometry is an ordinary structure prior or null-model context, not direct ER=EPR evidence.",
+    "entropy sweep point",
+    "StarSim policy: cosmological_structure_prior; directEvidenceAllowed=false"
+  ]
+}

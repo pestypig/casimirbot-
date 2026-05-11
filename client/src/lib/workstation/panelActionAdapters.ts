@@ -128,6 +128,15 @@ function postLiveAnswerEnvironment(body: Record<string, unknown>): void {
   }).catch(() => undefined);
 }
 
+function postLiveWorkstationPipeline(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/live-workstation-pipeline/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
 function postLiveEnvironmentControl(path: string, body?: Record<string, unknown>): void {
   if (typeof fetch !== "function") return;
   void fetch(path, {
@@ -786,6 +795,64 @@ export function executeHelixPanelAction(
           body_length: updated?.body.length ?? nextBody.length,
           created_note: created,
         },
+      };
+    }
+
+    if (actionId === "create_live_note_sink" || actionId === "append_live_note_chunk") {
+      const title = asNonEmptyString(args.title) ?? "Live source note";
+      const topic = asNonEmptyString(args.topic) ?? "live-source";
+      const noteId = asNonEmptyString(args.note_id) ?? buildDeterministicNoteId(title, Object.keys(notesState.notes));
+      const chunk = asNonEmptyString(args.chunk_text ?? args.text) ?? "";
+      const traceId = asNonEmptyString(args.trace_id) ?? `live-note:${noteId}:${Date.now()}`;
+      const note = actionId === "append_live_note_chunk"
+        ? notesState.appendLiveNoteChunk({
+            note_id: noteId,
+            title,
+            topic,
+            chunk_text: chunk,
+            trace_id: traceId,
+            citation: {
+              id: `citation:${traceId}`,
+              path: `live-pipeline://${traceId}`,
+              heading: "Live pipeline transform",
+              start_offset: 0,
+              end_offset: chunk.length,
+            },
+            snippet: {
+              id: `snippet:${traceId}`,
+              citation_id: `citation:${traceId}`,
+              excerpt: chunk.slice(0, 240),
+            },
+          })
+        : notesState.upsertWorkflowNote({
+            id: noteId,
+            title,
+            topic,
+            body: "",
+            citations: [],
+            snippets: [],
+            trace_id: traceId,
+          });
+      context.openPanel("workstation-notes", undefined);
+      context.focusPanel("workstation-notes", undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "live_output_sink_receipt",
+          schema: "helix.live_output_sink_receipt.v1",
+          sink_id: `sink:${note.id}`,
+          pipeline_id: asNonEmptyString(args.pipeline_id) ?? "client_live_note_sink",
+          target_id: note.id,
+          ok: true,
+          action: actionId === "append_live_note_chunk" ? "append" : "replace_section",
+          written_chars: actionId === "append_live_note_chunk" ? chunk.length : 0,
+          source_event_ids: [],
+          evidence_refs: [`note:${note.id}`, `trace:${traceId}`],
+          raw_transcript_included: false,
+        },
+        message: actionId === "append_live_note_chunk" ? `Appended live chunk to ${note.title}.` : `Created live note sink ${note.title}.`,
       };
     }
 
@@ -1627,6 +1694,87 @@ export function executeHelixPanelAction(
           command_lane_enabled: false,
         },
         message: `Created a live answer environment for ${objective}.`,
+      };
+    }
+
+    if (actionId === "create_live_workstation_pipeline") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const objective =
+        asNonEmptyString(args.objective) ??
+        "Create a live workstation pipeline.";
+      const request = {
+        thread_id: threadId,
+        objective,
+        source_ids: Array.from(new Set([
+          ...asStringArray(args.source_ids ?? args.sourceIds),
+          ...asStringArray(args.source_id ?? args.sourceId),
+        ])),
+        environment_id: asNonEmptyString(args.environment_id ?? args.environmentId) ?? undefined,
+        mode: asNonEmptyString(args.mode) ?? "text_only",
+        line_schema: Array.isArray(args.line_schema) ? args.line_schema : undefined,
+      };
+      postLiveWorkstationPipeline(request);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "live_workstation_pipeline_receipt",
+          ok: true,
+          request,
+          context_policy: "compact_context_pack_only",
+          raw_logs_included: false,
+          raw_transcript_included: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        },
+        message: `Created a live workstation pipeline for ${objective}.`,
+      };
+    }
+
+    if (
+      actionId === "pause_live_workstation_pipeline" ||
+      actionId === "resume_live_workstation_pipeline" ||
+      actionId === "stop_live_workstation_pipeline" ||
+      actionId === "set_pipeline_transform" ||
+      actionId === "set_pipeline_sink" ||
+      actionId === "attach_pipeline_to_live_answer_environment"
+    ) {
+      const pipelineId = asNonEmptyString(args.pipeline_id ?? args.pipelineId);
+      if (!pipelineId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `${actionId} requires pipeline_id.`,
+        };
+      }
+      const actionPath =
+        actionId === "pause_live_workstation_pipeline"
+          ? "pause"
+          : actionId === "resume_live_workstation_pipeline"
+            ? "resume"
+            : actionId === "stop_live_workstation_pipeline"
+              ? "stop"
+              : null;
+      if (actionPath) {
+        postLiveEnvironmentControl(`/api/agi/situation/live-workstation-pipeline/${encodeURIComponent(pipelineId)}/${actionPath}`);
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "live_workstation_pipeline_receipt",
+          ok: true,
+          pipeline_id: pipelineId,
+          request: args,
+          raw_logs_included: false,
+          raw_transcript_included: false,
+          context_policy: "compact_context_pack_only",
+        },
+        message: `Queued ${actionId.replace(/_/g, " ")} for ${pipelineId}.`,
       };
     }
 

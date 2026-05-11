@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "er-epr-stage1-fixture/1",
+  "fixtureId": "starsim-prior-only",
+  "reproducibilityStatus": "fixture_only",
+  "inputHash": "fnv1a32:starsim-prior",
+  "modelRef": "fixture:starsim_structure_prior_only",
+  "thresholdProfile": {
+    "signalMin": 0.7,
+    "controlMax": 0.35,
+    "diagnosticMin": 0.6,
+    "entropyAreaTrackingMin": 0.6,
+    "entropyVisibilityMin": 0.05,
+    "strongSupportMin": 0.82
+  },
+  "claimIds": [
+    "starsim_astrometry_structure_prior_only.v1",
+    "entropy_stretch_quantum_visibility_demotes_claims.v1"
+  ],
+  "citations": [
+    "https://arxiv.org/abs/1511.06717",
+    "https://arxiv.org/abs/1802.09943",
+    "https://arxiv.org/abs/1609.04153",
+    "https://arxiv.org/abs/quant-ph/0306072"
+  ],
+  "caveats": [
+    "fixture-only normalized observables",
+    "StarSim is structure prior only",
+    "not direct ER=EPR evidence"
+  ],
+  "observables": {
+    "mutualInformation": 0.4,
+    "entanglementEntropy_nats": 0.8,
+    "teleportationFidelity": 0.2,
+    "causalOrderingScore": 0.16,
+    "timeDelayScore": 0.14,
+    "operatorSizeWindingScore": 0.24,
+    "scramblingScore": 0.22,
+    "thermalizationScore": 0.2,
+    "entropyAreaProxyTrackingScore": 0.24,
+    "ordinaryTeleportationControlScore": 0.1,
+    "shuffledHamiltonianControlScore": 0.1,
+    "disentangledControlScore": 0.1,
+    "wrongSignCouplingControlScore": 0.1
+  }
+}
