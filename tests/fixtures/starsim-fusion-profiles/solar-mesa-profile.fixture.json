@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "starsim-fusion-profile-import.v1",
+  "objectId": "solar-mesa-fixture",
+  "source": "mesa_fixture",
+  "sourceRef": "fixture://starsim/solar-mesa-profile",
+  "sourceHash": "fixture-solar-001",
+  "stellarClass": {
+    "spectralType": "G2V",
+    "luminosityClass": "V",
+    "objectClass": "main_sequence"
+  },
+  "global": {
+    "mass_Msun": 1,
+    "radius_Rsun": 1,
+    "luminosity_Lsun": 1,
+    "effectiveTemperature_K": 5772,
+    "metallicity_feh": 0,
+    "age_Gyr": 4.57
+  },
+  "shells": [
+    {
+      "shellIndex": 0,
+      "radius_Rstar": 0.05,
+      "shellMass_g": 1.0e32,
+      "temperature_K": 1.55e7,
+      "density_g_cm3": 150,
+      "epsNuc_erg_g_s": 20,
+      "epsPp_erg_g_s": 20,
+      "hydrogenMassFraction": 0.35,
+      "heliumMassFraction": 0.63,
+      "metallicityMassFraction": 0.02
+    },
+    {
+      "shellIndex": 1,
+      "radius_Rstar": 0.15,
+      "shellMass_g": 6.0e31,
+      "temperature_K": 1.25e7,
+      "density_g_cm3": 90,
+      "epsNuc_erg_g_s": 20,
+      "epsPp_erg_g_s": 20
+    },
+    {
+      "shellIndex": 2,
+      "radius_Rstar": 0.30,
+      "shellMass_g": 3.14e31,
+      "temperature_K": 8.5e6,
+      "density_g_cm3": 40,
+      "epsNuc_erg_g_s": 20,
+      "epsPp_erg_g_s": 20
+    }
+  ],
+  "hSpectralFit": {
+    "role": "calibration_only"
+  },
+  "provenance": {
+    "reproducibilityStatus": "fixture_only",
+    "qstRole": "stellar_quantum_microphysics_prior",
+    "claimIds": ["mesa_profile_import_profile_validation.v1"],
+    "citations": ["https://arxiv.org/abs/1009.1622"],
+    "caveats": ["Fixture-only MESA-like shell profile for validation tests."]
+  }
+}

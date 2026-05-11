@@ -1,0 +1,183 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "starsim-fusion-profile-import-claims.v1",
+  "domain": "starsim-profile-validation-prior",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "mesa_profile_import_profile_validation.v1",
+      "statement": "MESA-like stellar shell profiles can be imported as profile-validation inputs for StarSim fusion estimates.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "MESA-compatible profile import",
+        "constraints": ["profile-import validation only", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA). Astrophysical Journal Supplement Series.",
+          "url": "https://arxiv.org/abs/1009.1622",
+          "note": "MESA is the preferred profile source family for stellar-structure imports."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-profile-import.ts",
+        "shared/starsim-fusion-profile-validation.ts",
+        "docs/research/starsim-fusion-profile-import-stage2-prep.md"
+      ]
+    },
+    {
+      "claimId": "fusion_luminosity_mass_shell_integration.v1",
+      "statement": "Imported shell profiles can estimate nuclear luminosity by integrating epsilon_nuc over shell mass.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "stellar shell integration",
+        "constraints": ["profile-import validation only", "requires shell mass or reconstructable radius-density basis", "proxy-only", "not direct ER=EPR evidence"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).",
+          "equation": "dL/dm = epsilon_nuc",
+          "url": "https://arxiv.org/abs/1009.1622",
+          "note": "Stellar profile and energy-generation context for mass-shell integration."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "fusion_channel_fraction_from_integrated_eps.v1",
+      "statement": "PP, CNO, and triple-alpha channel fractions are profile diagnostics computed from integrated component epsilon contributions.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "stellar nuclear channel diagnostics",
+        "constraints": ["requires component epsilon fields", "profile-import validation only", "proxy-only", "not direct ER=EPR evidence"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Adelberger, E. G. et al. (2011). Solar fusion cross sections II: the pp chain and CNO cycles.",
+          "equation": "channelFraction_i = integratedLuminosity_i / integratedNucLuminosity",
+          "url": "https://arxiv.org/abs/1004.2318",
+          "note": "Reference for pp-chain and CNO-cycle nuclear astrophysics context."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "fusion_zone_radii_from_cumulative_luminosity.v1",
+      "statement": "Fusion-zone radii such as r10, r50, and r90 are cumulative-luminosity profile diagnostics.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "stellar fusion-zone diagnostics",
+        "constraints": ["profile resolution dependent", "profile-import validation only", "proxy-only", "not direct ER=EPR evidence"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).",
+          "equation": "L_nuc(<m)=integral epsilon_nuc dm",
+          "url": "https://arxiv.org/abs/1009.1622",
+          "note": "Profile energy-generation context for cumulative luminosity diagnostics."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "surface_luminosity_not_identical_to_nuclear_luminosity_guardrail.v1",
+      "statement": "Integrated nuclear luminosity and surface luminosity are related profile diagnostics but should not be treated as automatically identical in imported fixtures.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "stellar luminosity closure guardrail",
+        "constraints": ["closure tolerance required", "profile-import validation only", "proxy-only", "not direct ER=EPR evidence"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Paxton, B. et al. (2011). Modules for Experiments in Stellar Astrophysics (MESA).",
+          "url": "https://arxiv.org/abs/1009.1622",
+          "note": "Stellar structure context for comparing profile luminosity and observable luminosity."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "neutron_star_profile_not_fusion_profile.v1",
+      "statement": "Neutron-star profile fixtures are compact-object dense-matter context and must not be interpreted as PP/CNO fusion profiles.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "neutron-star compact-object branch",
+        "constraints": ["not fusion", "profile-import validation only", "proxy-only", "not direct ER=EPR evidence"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Khomenko, V. et al. (2020). Turbulent, pinned superfluids in neutron stars and pulsar glitch recoveries.",
+          "url": "https://academic.oup.com/mnras/article/499/1/161/5901443",
+          "note": "Compact-object quantum-fluid context for neutron-star glitches."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-validation.ts"]
+    },
+    {
+      "claimId": "h_spectral_fit_calibration_only_exact_si_guardrail.v1",
+      "statement": "hSpectralFit metadata is calibration-only because the revised SI fixes the Planck constant exactly.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "spectral calibration guardrail",
+        "constraints": ["calibration only", "no varying h claim", "proxy-only", "not direct ER=EPR evidence"]
+      },
+      "sources": [
+        {
+          "kind": "reference",
+          "citation": "NIST. Meet the Constants.",
+          "url": "https://www.nist.gov/si-redefinition/meet-constants",
+          "note": "Reference for the exact revised-SI value of the Planck constant."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-artifact.ts"]
+    },
+    {
+      "claimId": "gaia_starmap_population_prior_only.v1",
+      "statement": "Gaia-like star-map data can support population priors, not direct quantum-spacetime evidence.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Gaia-like StarMap graph",
+        "constraints": ["population prior only", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Gaia Collaboration (2023). Gaia Data Release 3: Summary of the content and survey properties.",
+          "url": "https://www.aanda.org/articles/aa/full_html/2023/06/aa43940-22/aa43940-22.html",
+          "note": "Gaia DR3 observational backbone for astrometric population priors."
+        }
+      ],
+      "repoBindings": ["shared/starsim-fusion-profile-import.ts"]
+    },
+    {
+      "claimId": "starsim_profile_import_not_direct_er_epr_evidence.v1",
+      "statement": "StarSim profile import can strengthen astrophysical priors but cannot directly support ER=EPR or promote QST/warp claims to CL0-CL4.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "StarSim profile import to QST boundary",
+        "constraints": ["profile-import validation only", "proxy-only", "not direct ER=EPR evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena, J. and Susskind, L. (2013). Cool horizons for entangled black holes.",
+          "equation": "ER=EPR context only; no stellar-profile equation is asserted.",
+          "url": "https://arxiv.org/abs/1306.0533",
+          "note": "Boundary source for keeping ER=EPR claims separate from StarSim profile imports."
+        }
+      ],
+      "repoBindings": [
+        "shared/starsim-fusion-profile-import.ts",
+        "shared/starsim-fusion-profile-validation.ts",
+        "docs/research/starsim-fusion-profile-import-stage2-prep.md"
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@
     {
       "claimId": "claim:microphysics.transport:effective_microphysics",
       "statement": "Effective microphysics is the reduced parameter layer that turns particle-level interactions into usable potentials, collision rates, opacity, conductivity, friction, and elastic response coefficients.",
-      "maturity": "definition",
+      "maturity": "exploratory",
       "validityDomain": {
         "system": "microphysics transport parent lane",
         "constraints": [
@@ -45,7 +45,7 @@
     {
       "claimId": "claim:microphysics.transport:effective_interaction_hamiltonian",
       "statement": "An effective interaction Hamiltonian captures conservative reduced interactions after microscopic degrees of freedom are eliminated, including pair potentials and explicit coupling to external fields or potentials.",
-      "maturity": "definition",
+      "maturity": "exploratory",
       "validityDomain": {
         "system": "microphysics transport parent lane",
         "constraints": [
@@ -81,7 +81,7 @@
     {
       "claimId": "claim:microphysics.transport:many_body_hamiltonian",
       "statement": "The many-body Hamiltonian is the ensemble-level conservative description from which partition functions, correlation functions, and response formulas are derived before closure is imposed.",
-      "maturity": "definition",
+      "maturity": "exploratory",
       "validityDomain": {
         "system": "microphysics transport parent lane",
         "constraints": [
@@ -112,7 +112,7 @@
     {
       "claimId": "claim:microphysics.transport:kinetic_theory",
       "statement": "Kinetic theory is the reduced distribution-function description that replaces the full many-body state with evolution equations for occupancies, collision terms, and hierarchy truncations.",
-      "maturity": "definition",
+      "maturity": "exploratory",
       "validityDomain": {
         "system": "microphysics transport parent lane",
         "constraints": [
@@ -174,7 +174,7 @@
     {
       "claimId": "claim:microphysics.transport:constitutive_response",
       "statement": "Constitutive response is the reduced bulk relation between stress, strain, pressure, strength, viscosity, friction, and other material closure variables that follows from the effective microphysics layer.",
-      "maturity": "definition",
+      "maturity": "exploratory",
       "validityDomain": {
         "system": "microphysics transport parent lane",
         "constraints": [
@@ -247,7 +247,7 @@
     {
       "claimId": "claim:microphysics.transport:collective_observable_response",
       "statement": "Collective observable response is the endpoint where closure-level microphysics produces measurable shape, spin, tidal, wave, flare, or helioseismic outputs.",
-      "maturity": "definition",
+      "maturity": "exploratory",
       "validityDomain": {
         "system": "microphysics transport parent lane",
         "constraints": [

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "starsim-fusion-profile-import.v1",
+  "objectId": "red-giant-shell-fixture",
+  "source": "mesa_fixture",
+  "sourceRef": "fixture://starsim/red-giant-shell-profile",
+  "stellarClass": {
+    "spectralType": "K1III",
+    "luminosityClass": "III",
+    "objectClass": "red_giant"
+  },
+  "global": {
+    "mass_Msun": 1.1,
+    "radius_Rsun": 12,
+    "luminosity_Lsun": 65,
+    "effectiveTemperature_K": 4500,
+    "age_Gyr": 8
+  },
+  "shells": [
+    {
+      "shellIndex": 0,
+      "radius_Rstar": 0.015,
+      "shellMass_g": 5.0e30,
+      "temperature_K": 1.0e7,
+      "density_g_cm3": 20,
+      "epsNuc_erg_g_s": 0.1,
+      "epsPp_erg_g_s": 0.1
+    },
+    {
+      "shellIndex": 1,
+      "radius_Rstar": 0.08,
+      "shellMass_g": 1.0e32,
+      "temperature_K": 2.2e7,
+      "density_g_cm3": 60,
+      "epsNuc_erg_g_s": 1200,
+      "epsPp_erg_g_s": 1000,
+      "epsTripleAlpha_erg_g_s": 200
+    },
+    {
+      "shellIndex": 2,
+      "radius_Rstar": 0.12,
+      "shellMass_g": 8.0e31,
+      "temperature_K": 1.8e7,
+      "density_g_cm3": 30,
+      "epsNuc_erg_g_s": 900,
+      "epsPp_erg_g_s": 780,
+      "epsTripleAlpha_erg_g_s": 120
+    }
+  ],
+  "provenance": {
+    "reproducibilityStatus": "fixture_only",
+    "qstRole": "stellar_quantum_microphysics_prior",
+    "claimIds": ["mesa_profile_import_profile_validation.v1"],
+    "citations": ["https://arxiv.org/abs/1009.1622"],
+    "caveats": ["Fixture-only red-giant shell-burning profile."]
+  }
+}

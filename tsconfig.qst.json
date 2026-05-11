@@ -10,6 +10,10 @@
     "shared/starsim-fusion-microphysics.ts",
     "shared/starsim-fusion-artifact.ts",
     "shared/starsim-fusion-safe-language.ts",
+    "shared/starsim-fusion-profile-claims.ts",
+    "shared/starsim-fusion-profile-import.ts",
+    "shared/starsim-fusion-profile-validation.ts",
+    "shared/starsim-fusion-profile-artifact.ts",
     "tools/erEprStage1Run.ts",
     "tests/quantum-spacetime-congruence.spec.ts",
     "tests/er-epr-simulation.spec.ts",
@@ -20,7 +24,10 @@
     "tests/starsim-fusion-microphysics.spec.ts",
     "tests/starsim-fusion-artifact.spec.ts",
     "tests/starsim-fusion-safe-language.spec.ts",
-    "tests/starsim-fusion-claims.spec.ts"
+    "tests/starsim-fusion-claims.spec.ts",
+    "tests/starsim-fusion-profile-import.spec.ts",
+    "tests/starsim-fusion-profile-validation.spec.ts",
+    "tests/starsim-fusion-profile-artifact.spec.ts"
   ],
   "compilerOptions": {
     "incremental": false

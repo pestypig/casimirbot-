@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "starsim-fusion-profile-import.v1",
+  "objectId": "neutron-star-glitch-fixture",
+  "source": "compact_object_glitch_fixture",
+  "sourceRef": "fixture://starsim/neutron-star-glitch-profile",
+  "stellarClass": {
+    "objectClass": "neutron_star"
+  },
+  "global": {
+    "mass_Msun": 1.4,
+    "radius_Rsun": 0.00002
+  },
+  "shells": [
+    {
+      "shellIndex": 0,
+      "radius_Rstar": 0.5,
+      "density_g_cm3": 1.0e14,
+      "temperature_K": 1.0e8
+    },
+    {
+      "shellIndex": 1,
+      "radius_Rstar": 1.0,
+      "density_g_cm3": 1.0e11,
+      "temperature_K": 5.0e7
+    }
+  ],
+  "provenance": {
+    "reproducibilityStatus": "fixture_only",
+    "qstRole": "not_direct_er_epr_evidence",
+    "claimIds": ["neutron_star_profile_not_fusion_profile.v1"],
+    "citations": ["https://academic.oup.com/mnras/article/499/1/161/5901443"],
+    "caveats": ["Compact-object glitch fixture; not a stellar fusion profile."]
+  }
+}
