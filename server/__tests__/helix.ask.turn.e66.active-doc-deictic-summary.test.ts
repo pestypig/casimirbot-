@@ -44,6 +44,32 @@ describe("helix ask E66 active document deictic summary", () => {
     expect(response.body?.resolved_turn_summary?.final_answer_source).toBe("artifact_synthesis");
   }, 90000);
 
+  it("summarizes descriptor-qualified current documents", async () => {
+    const app = createApp();
+    const sessionId = `e66-current-nhm2-doc-summary-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Summarize the current NHM2 document in three bullets",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          hasDocContext: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("active_doc_summary");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_summary");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(String(response.body?.selected_final_answer ?? "")).toContain(activePath);
+  }, 90000);
+
   it("fails cleanly when a deictic doc summary has no active document", async () => {
     const app = createApp();
 

@@ -788,7 +788,11 @@ export function normalizeTerminalAnswerText(value: string | null | undefined): s
 export function isInvalidTerminalAnswerText(value: string | null | undefined): boolean {
   const normalized = normalizeTerminalAnswerText(value);
   if (!normalized) return true;
-  return /^no final answer returned\.?$/i.test(normalized);
+  return (
+    /^no final answer returned\.?$/i.test(normalized) ||
+    /^I could not produce a substantive direct answer for this background-only turn\.?$/i.test(normalized) ||
+    /^I couldn't produce a final answer for that turn\. Please retry once\.?$/i.test(normalized)
+  );
 }
 
 export function registerTurnTerminalOutcome(args: {
@@ -6235,6 +6239,47 @@ const readLatestAuthoritativeFinalLiveEventText = (reply?: HelixAskReply | null)
   return null;
 };
 
+const normalizeVisibleDocPath = (value: string): string | null => {
+  const path = value.trim().replace(/:(?:L)?\d+(?:-L?\d+)?$/i, "");
+  return path.startsWith("/") ? path : null;
+};
+
+const renderDocOpenTerminalFromLocationText = (args: {
+  text: string;
+  goalKind: string;
+  terminalKind: string;
+}): string | null => {
+  if (args.terminalKind !== "doc_open_receipt") return null;
+  if (args.goalKind !== "latest_doc_navigation" && args.goalKind !== "doc_open_best") return null;
+  if (!/^\s*Locations?:/i.test(args.text)) return null;
+  const pathMatch = args.text.match(/\bPath:\s*(\/[^\s]+?\.md)(?::L?\d+(?:-L?\d+)?)?/i);
+  const path = pathMatch?.[1] ? normalizeVisibleDocPath(pathMatch[1]) : null;
+  if (!path) return null;
+  const titleMatch = args.text.match(/^\s*-\s+(.+?),\s+L\d+/m);
+  const title = titleMatch?.[1]?.trim() || path.split(/[\\/]/).pop() || path;
+  const heading = args.goalKind === "latest_doc_navigation" ? "Opened latest verified document:" : "Opened document:";
+  return [heading, "Document:", `- ${title}`, `  Path: ${path}`].join("\n");
+};
+
+const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): string | null => {
+  const pack = readAgentLoopAuditRecord(contextPack);
+  const environment = readAgentLoopAuditRecord(pack?.live_answer_environment);
+  if (!environment) return null;
+  const summary = coerceText(environment.latest_summary).trim();
+  const lines = Array.isArray(environment.lines) ? environment.lines : [];
+  const renderedLines = lines
+    .map((line) => readAgentLoopAuditRecord(line))
+    .filter((line): line is Record<string, unknown> => Boolean(line && line.visibility === "answer_card"))
+    .map((line) => {
+      const label = coerceText(line.label).trim() || coerceText(line.key).trim() || "Line";
+      const value = coerceText(line.value).trim();
+      return value ? `${label}: ${value}` : "";
+    })
+    .filter(Boolean);
+  const text = [summary, ...renderedLines].filter(Boolean).join("\n").trim();
+  return text || null;
+};
+
 export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedTurn {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
@@ -6269,13 +6314,21 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     (isTypedFailure
       ? renderTypedFailureFallback(terminalErrorCode)
       : coerceText(reply.text).trim() || coerceText(reply.content).trim());
-  const selectedFinalAnswer =
+  const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
+  const terminalArtifactKind = coerceText(summary?.terminal_artifact_kind).trim();
+  const selectedFinalAnswerRaw =
     liveFinalAnswer && (isTypedFailure || isInvalidTerminalAnswerText(selectedFinalAnswerCandidate))
       ? liveFinalAnswer
       : selectedFinalAnswerCandidate;
+  const selectedFinalAnswer =
+    renderDocOpenTerminalFromLocationText({
+      text: selectedFinalAnswerRaw,
+      goalKind: canonicalGoalKind,
+      terminalKind: terminalArtifactKind,
+    }) ?? selectedFinalAnswerRaw;
   const routeLabel =
     coerceText(summary?.resolved_route_label).trim() ||
-    `${readHelixCanonicalGoalKind(reply)} / ${finalAnswerSource}`;
+    `${canonicalGoalKind} / ${finalAnswerSource}`;
   return {
     active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
     primary_route_label: routeLabel,
@@ -9916,17 +9969,38 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     .find((artifact) => artifact?.kind === "typed_failure");
   const typedFailure = readAgentLoopAuditRecord(typedFailureArtifact?.payload);
   const workspaceActionSource = receipt ?? typedFailure;
-  const selectedFinalAnswer =
+  const situationContextPackForDebug =
+    debug?.situation_context_pack ??
+    agentLoop?.situation_context_pack ??
+    null;
+  const liveEnvironmentRelevanceForDebug =
+    debug?.live_environment_turn_relevance ??
+    agentLoop?.live_environment_turn_relevance ??
+    null;
+  const liveEnvironmentAnswerForDebug =
+    readAgentLoopAuditRecord(liveEnvironmentRelevanceForDebug)?.artifact_synthesis_allowed === true
+      ? renderLiveAnswerEnvironmentContextPackAnswer(situationContextPackForDebug)
+      : null;
+  const selectedFinalAnswerCandidate =
     coerceText(payload.selectedDebugFinalAnswer).trim() ||
     coerceText(payload.finalAnswer).trim() ||
     coerceText(agentLoop?.selected_final_answer).trim() ||
     coerceText(debug?.selected_final_answer).trim() ||
     reply.content ||
     null;
+  const liveEnvironmentAnswerApplied =
+    Boolean(liveEnvironmentAnswerForDebug) &&
+    (isInvalidTerminalAnswerText(selectedFinalAnswerCandidate) ||
+      normalizeTerminalAnswerText(selectedFinalAnswerCandidate) === normalizeTerminalAnswerText(liveEnvironmentAnswerForDebug));
+  const selectedFinalAnswer =
+    liveEnvironmentAnswerForDebug && liveEnvironmentAnswerApplied
+      ? liveEnvironmentAnswerForDebug
+      : selectedFinalAnswerCandidate;
   const terminalArtifactKind =
     coerceText(agentLoop?.terminal_artifact_kind).trim() ||
     coerceText(debug?.terminal_artifact_kind).trim() ||
     coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim() ||
+    (liveEnvironmentAnswerApplied ? "situation_context_pack" : null) ||
     null;
   const terminalErrorCode =
     coerceText(agentLoop?.terminal_error_code).trim() ||
@@ -9959,13 +10033,17 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       coerceText(agentLoop?.final_answer_source).trim() ||
       coerceText(debug?.final_answer_source).trim() ||
       null,
+    situation_context_pack: situationContextPackForDebug,
+    live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
     resolved_turn_summary: {
       turn_id: activeTurnId,
       final_status:
+        (liveEnvironmentAnswerApplied ? "final_answer" : null) ||
         coerceText(resolvedTurnSummary?.final_status).trim() ||
         coerceText(payload.visible_projection_invariant).trim() ||
         "final_answer",
       resolved_route_label:
+        (liveEnvironmentAnswerApplied ? "live_answer_environment / artifact_synthesis" : null) ||
         coerceText(resolvedTurnSummary?.resolved_route_label).trim() ||
         coerceText(payload.debugAuditSummary && readAgentLoopAuditRecord(payload.debugAuditSummary)?.route).trim() ||
         "unknown",
@@ -25228,34 +25306,84 @@ export function HelixAskPill({
             });
             responseText = evidenceGateDecision.safe_text ?? responseText;
           }
+          const responseSituationContextPackForDebug =
+            localResponseForTerminal?.situation_context_pack ??
+            responseDebugPayload?.situation_context_pack ??
+            null;
+          const responseLiveEnvironmentRelevanceForDebug =
+            localResponseRecord.live_environment_turn_relevance ??
+            responseDebugPayload?.live_environment_turn_relevance ??
+            null;
+          const responseLiveEnvironmentAnswerForDebug =
+            readAgentLoopAuditRecord(responseLiveEnvironmentRelevanceForDebug)?.artifact_synthesis_allowed === true
+              ? renderLiveAnswerEnvironmentContextPackAnswer(responseSituationContextPackForDebug)
+              : null;
+          const responseDebugSelectedFinalAnswer =
+            responseLiveEnvironmentAnswerForDebug && isInvalidTerminalAnswerText(responseText)
+              ? responseLiveEnvironmentAnswerForDebug
+              : responseText;
+          const responseDebugUsedLiveEnvironmentAnswer =
+            Boolean(responseLiveEnvironmentAnswerForDebug) &&
+            (isInvalidTerminalAnswerText(responseText) ||
+              normalizeTerminalAnswerText(responseText) === normalizeTerminalAnswerText(responseLiveEnvironmentAnswerForDebug));
           const responseDebugForReply =
             responseDebugPayload && typeof responseDebugPayload === "object"
               ? {
                   ...responseDebugPayload,
+                  selected_final_answer: responseDebugSelectedFinalAnswer,
+                  final_answer_source:
+                    typeof localResponseRecord.final_answer_source === "string"
+                      ? localResponseRecord.final_answer_source
+                      : responseDebugPayload.final_answer_source,
+                  terminal_artifact_kind:
+                    typeof localResponseRecord.terminal_artifact_kind === "string"
+                      ? localResponseRecord.terminal_artifact_kind
+                      : responseDebugUsedLiveEnvironmentAnswer
+                        ? "situation_context_pack"
+                        : responseDebugPayload.terminal_artifact_kind,
+                  terminal_artifact_id:
+                    typeof localResponseRecord.terminal_artifact_id === "string"
+                      ? localResponseRecord.terminal_artifact_id
+                      : responseDebugPayload.terminal_artifact_id,
+                  terminal_error_code:
+                    typeof localResponseRecord.terminal_error_code === "string"
+                      ? localResponseRecord.terminal_error_code
+                      : responseDebugPayload.terminal_error_code,
+                  situation_context_pack: responseSituationContextPackForDebug,
+                  live_environment_turn_relevance: responseLiveEnvironmentRelevanceForDebug,
+                  resolved_turn_summary:
+                    responseDebugUsedLiveEnvironmentAnswer && responseDebugPayload.resolved_turn_summary
+                      ? {
+                          ...(responseDebugPayload.resolved_turn_summary as Record<string, unknown>),
+                          final_status: "final_answer",
+                          resolved_route_label: "live_answer_environment / artifact_synthesis",
+                          terminal_artifact_kind: "situation_context_pack",
+                        }
+                      : responseDebugPayload.resolved_turn_summary,
                   turn_truth_table: responseDebugPayload.turn_truth_table &&
                     typeof responseDebugPayload.turn_truth_table === "object"
                     ? {
                         ...(responseDebugPayload.turn_truth_table as Record<string, unknown>),
-                        visible_answer_text: responseText,
+                        visible_answer_text: responseDebugSelectedFinalAnswer,
                         backend_terminal_answer: terminalResolutionForFinal.backendTerminalText,
                         terminal_source: terminalResolutionForFinal.source,
                         terminal_mismatch: Boolean(
                           terminalResolutionForFinal.backendTerminalText &&
-                            responseText &&
+                            responseDebugSelectedFinalAnswer &&
                             normalizeTerminalAnswerText(terminalResolutionForFinal.backendTerminalText) !==
-                              normalizeTerminalAnswerText(responseText),
+                              normalizeTerminalAnswerText(responseDebugSelectedFinalAnswer),
                         ),
                       }
                     : {
                         schema: "helix.ask.turn_truth_table.v1",
-                        visible_answer_text: responseText,
+                        visible_answer_text: responseDebugSelectedFinalAnswer,
                         backend_terminal_answer: terminalResolutionForFinal.backendTerminalText,
                         terminal_source: terminalResolutionForFinal.source,
                         terminal_mismatch: Boolean(
                           terminalResolutionForFinal.backendTerminalText &&
-                            responseText &&
+                            responseDebugSelectedFinalAnswer &&
                             normalizeTerminalAnswerText(terminalResolutionForFinal.backendTerminalText) !==
-                              normalizeTerminalAnswerText(responseText),
+                              normalizeTerminalAnswerText(responseDebugSelectedFinalAnswer),
                         ),
                       },
                 }

@@ -266,7 +266,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(apiSource).toContain("equation_attempt_debug?: Record<string, unknown> | null");
     expect(apiSource).toContain("resolved_turn_summary?: Record<string, unknown> | null");
     expect(source).toContain("turn_truth_table: localResponse.turn_truth_table ?? null");
-    expect(source).toContain("visible_answer_text: responseText");
+    expect(source).toContain("visible_answer_text: responseDebugSelectedFinalAnswer");
     expect(source).toContain("turnTruthTable");
     expect(source).toContain("visible_answer_text: args.reply.content");
     expect(source).toContain("equation_attempt_debug");

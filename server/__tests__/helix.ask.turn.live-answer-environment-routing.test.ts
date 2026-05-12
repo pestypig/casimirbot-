@@ -198,4 +198,65 @@ describe("helix ask live answer environment routing", () => {
     expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Current candidate");
     expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Latest prime: 7");
   }, 60000);
+
+  it("targets desktop live environments from unrelated UI conversation sessions", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    const createResponse = await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "Set up a live prime number generator and show the next primes as they are found.",
+        preset: "calculator_prime_stream",
+        source_ids: ["source:calculator-prime-stream"],
+      })
+      .expect(200);
+    const environmentId =
+      createResponse.body?.live_answer_environment?.environment_id ??
+      createResponse.body?.environment?.environment_id ??
+      createResponse.body?.environment_id;
+    await request(app)
+      .post("/api/agi/situation/live-source/event")
+      .send({
+        source_id: "source:calculator-prime-stream",
+        environment_id: environmentId,
+        kind: "calculator_series",
+        event_type: "prime_found",
+        seq: 10,
+        payload: {
+          candidate: 11,
+          is_prime: true,
+          latest_prime: 11,
+          prime_count: 5,
+          gap: 4,
+          next_candidate: 12,
+          algorithm: "trial_division",
+        },
+        evidence_refs: ["calculator:prime:11"],
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What prime are we on?",
+        mode: "read",
+        debug: true,
+        context_mode: "attached",
+        sessionId: `ui-session-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.live_environment_turn_relevance).toMatchObject({
+      artifact_synthesis_allowed: true,
+    });
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(response.body?.final_answer_source).toBe("artifact_synthesis");
+    expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Latest prime: 11");
+  }, 60000);
 });

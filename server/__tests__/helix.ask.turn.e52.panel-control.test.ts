@@ -182,6 +182,26 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(findAction(response.body, "docs-viewer")).toBeTruthy();
   }, 60000);
 
+  it("routes calculator solve requests to the scientific calculator action", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "solve x^2-4=0 in the scientific calculator",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-solve-${Date.now()}`,
+      })
+      .expect(200);
+
+    const action = findAction(response.body, "scientific-calculator", "solve_expression");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(action).toBeTruthy();
+    expect(action?.args?.latex).toBe("x^2-4=0");
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+  }, 60000);
+
   it("does not steal real document acquisition prompts", async () => {
     const app = createApp();
     const response = await request(app)

@@ -72,6 +72,26 @@ describe("helix ask E26 latest doc selection", () => {
     expect(response.body?.latest_doc_contract_pass).toBe(true);
   }, 60000);
 
+  it("opens the latest NHM2 whitepaper doc without requiring evidence-location output", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "go to the latest white paper doc about NHM2",
+        mode: "read",
+        sessionId: `e26-latest-whitepaper-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("latest_doc_navigation");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(response.body?.final_status).not.toBe("final_failure");
+    expect(response.body?.open_doc_selected_path ?? response.body?.latest_doc_selected_path).toBe(
+      "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    );
+    expect(answerText(response.body)).toContain("/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+  }, 60000);
+
   it("does not apply latest-doc wording to explicit path opens", async () => {
     const app = createApp();
     const explicitPath = "/docs/helix-ask-readiness-debug-loop.md";
