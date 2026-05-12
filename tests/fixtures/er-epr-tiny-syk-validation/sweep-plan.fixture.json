@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "er-epr-tiny-syk-validation-sweep-plan.v1",
+  "planId": "tiny-syk-validation-sweep.fixture.v1",
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "backend": "two_sided_syk_tiny_exact_diag",
+  "ensemble": {
+    "seeds": [4242, 4243, 4244],
+    "nMajoranasPerSide": [4],
+    "qBodyOrder": 4,
+    "betaValues": [2.5],
+    "couplingMuValues": [0.7]
+  },
+  "numericalSweep": {
+    "methods": ["matrix_exponential_taylor"],
+    "tolerances": [1e-8, 1e-7],
+    "requireMethodAgreement": true,
+    "maxAllowedMethodDelta": 0.000001
+  },
+  "controls": {
+    "wrongSign": true,
+    "noCoupling": true,
+    "disentangled": true,
+    "shuffledHamiltonian": true,
+    "randomMatrix": true,
+    "spinChain": true
+  },
+  "entropySweep": {
+    "deltaS_nats": [0, 1, 2, 3],
+    "requireMonotonicDemotion": true
+  },
+  "thresholds": {
+    "candidateSignalMin": 0.7,
+    "controlLeakageMax": 0.35,
+    "diagnosticMin": 0.6,
+    "thermalizationMin": 0.6,
+    "scramblingMin": 0.5,
+    "nonCommutativityMin": 0.01,
+    "entropyAreaTrackingMin": 0.6,
+    "ensemblePassRateMin": 0.66
+  },
+  "claimBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "claimTier": "Stage1_model_internal_validation_sweep"
+  }
+}

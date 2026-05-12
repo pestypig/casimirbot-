@@ -2633,6 +2633,79 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
+    module: "shared/er-epr-tiny-syk-validation-sweep.ts",
+    stage: "diagnostic",
+    notes: "Validation sweep aggregating seeded tiny SYK-like runs, required controls, numerical honesty, and entropy washout.",
+    motivation:
+      "Require repeatability across a declared ensemble before any model-internal ER=EPR-like support language is allowed.",
+    conceptualWaypoints: [
+      "Expand seeds and toy-model parameters into candidate runs.",
+      "Aggregate required control leakage and diagnostic blockers.",
+      "Require monotonic QST entropy-stretch demotion.",
+    ],
+    checks: [
+      { type: "test", path: "tests/er-epr-tiny-syk-validation-sweep.spec.ts" },
+      { type: "stability", path: "tests/er-epr-tiny-syk-validation-sweep.spec.ts" },
+      { type: "fixture", path: "tests/fixtures/er-epr-tiny-syk-validation/sweep-plan.fixture.json" },
+      { type: "doc", path: "docs/research/er-epr-tiny-syk-validation-sweep-v1.md" },
+      { type: "policy", path: "docs/knowledge/math-claims/er-epr-tiny-syk-validation.claims.json" },
+    ],
+    units: {
+      totalCandidateRuns: "1",
+      candidatePassRate: "1",
+      controlLeakageCount: "1",
+      entropyWashoutPassCount: "1",
+    },
+  },
+  {
+    tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
+    module: "shared/er-epr-tiny-syk-convergence.ts",
+    stage: "diagnostic",
+    notes: "Numerical-method honesty checks for tiny SYK validation sweeps.",
+    checks: [
+      { type: "test", path: "tests/er-epr-tiny-syk-convergence.spec.ts" },
+      { type: "stability", path: "tests/er-epr-tiny-syk-convergence.spec.ts" },
+    ],
+    units: {
+      numericalTolerance: "1",
+      maxObservedDelta: "1",
+      methodCount: "1",
+    },
+  },
+  {
+    tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
+    module: "shared/er-epr-tiny-syk-control-aggregate.ts",
+    stage: "diagnostic",
+    notes: "Required-control aggregation for wrong-sign, no-coupling, disentangled, shuffled, random-matrix, and spin-chain controls.",
+    checks: [
+      { type: "test", path: "tests/er-epr-tiny-syk-control-aggregate.spec.ts" },
+      { type: "stability", path: "tests/er-epr-tiny-syk-control-aggregate.spec.ts" },
+    ],
+    units: {
+      controlLeakageMax: "1",
+      leakageCount: "1",
+      missingRequiredControlCount: "1",
+    },
+  },
+  {
+    tag: "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
+    module: "shared/er-epr-tiny-syk-validation-safe-language.ts",
+    stage: "diagnostic",
+    notes: "Safe-language renderer for tiny SYK validation reports, blocking real-universe, NHM2, stress-energy, exact-label, and CL4 overclaims.",
+    checks: [
+      { type: "test", path: "tests/er-epr-tiny-syk-validation-safe-language.spec.ts" },
+      { type: "test", path: "tests/er-epr-tiny-syk-validation-artifact.spec.ts" },
+      { type: "stability", path: "tests/er-epr-tiny-syk-validation-safe-language.spec.ts" },
+    ],
+    units: {
+      forbiddenPhraseCount: "1",
+      claimIdCount: "1",
+      citationCount: "1",
+      uncertaintyNoteCount: "1",
+    },
+  },
+  {
     tag: "DP_COLLAPSE",
     module: "shared/dp-collapse.ts",
     stage: "exploratory",

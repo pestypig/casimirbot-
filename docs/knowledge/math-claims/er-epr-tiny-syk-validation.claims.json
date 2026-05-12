@@ -1,0 +1,149 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "er-epr-tiny-syk-validation-claims.v1",
+  "domain": "er-epr-tiny-syk-validation-sweep-v1",
+  "updatedAt": "2026-05-11",
+  "claims": [
+    {
+      "claimId": "tiny_syk_validation_requires_seed_ensemble.v1",
+      "statement": "Tiny SYK-like ER=EPR validation requires an ensemble of seeded runs rather than one hand-selected run.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny two-sided SYK-like validation sweep",
+        "constraints": ["model-internal only", "requires seed ensemble", "not real-universe ER=EPR evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena and Stanford 2016, Remarks on the Sachdev-Ye-Kitaev model",
+          "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+          "note": "SYK random-coupling model context",
+          "equation": "Seeded ensemble replay of random-coupling toy Hamiltonians"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-validation-sweep.ts", "shared/er-epr-tiny-syk-seed-ensemble.ts"]
+    },
+    {
+      "claimId": "tiny_syk_validation_requires_control_battery.v1",
+      "statement": "Tiny SYK-like ER=EPR model-internal support requires required null controls to fail below declared thresholds.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny two-sided SYK-like validation sweep",
+        "constraints": ["requires wrong-sign/no-coupling/disentangled/shuffled/random-matrix/spin-chain controls", "not NHM2 evidence", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Kobrin, Schuster, and Yao 2025, Experiments implementing small commuting models lack gravitational features",
+          "url": "https://www.nature.com/articles/s41586-025-08939-7",
+          "note": "Guardrail motivating thermalization, noncommutativity, and control-leakage checks",
+          "equation": "Control leakage blocks model-internal support"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-control-aggregate.ts", "tests/er-epr-tiny-syk-control-aggregate.spec.ts"]
+    },
+    {
+      "claimId": "tiny_syk_validation_requires_numerical_convergence.v1",
+      "statement": "Tiny SYK-like validation must record numerical method and tolerance and must not label Taylor evolution as exact diagonalization.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK numerical validation",
+        "constraints": ["method-label honesty", "requires tolerance", "exact diagonalization requires an actual eigensolver"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Maldacena and Stanford 2016, Remarks on the Sachdev-Ye-Kitaev model",
+          "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+          "note": "SYK computations depend on explicit model and numerical diagnostics",
+          "equation": "Numerical method metadata required for toy-model interpretation"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-convergence.ts", "tests/er-epr-tiny-syk-convergence.spec.ts"]
+    },
+    {
+      "claimId": "tiny_syk_validation_requires_entropy_washout.v1",
+      "statement": "Tiny SYK-like validation requires QST entropy-stretch washout to monotonically demote visibility-adjusted signal.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "QST entropy washout validation",
+        "constraints": ["proxy-only", "not a physical change in hbar", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Carcassi, Landini, and Aidala 2024, Classical mechanics as the high-entropy limit of quantum mechanics",
+          "url": "https://arxiv.org/abs/2411.00972",
+          "note": "High entropy masks quantum effects",
+          "equation": "lambda_S=exp(deltaS_eff), quantumVisibility=1/lambda_S"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-washout-sweep.ts", "shared/quantum-spacetime-congruence.ts"]
+    },
+    {
+      "claimId": "tiny_syk_validation_small_model_critique_guardrail.v1",
+      "statement": "Small-model ER=EPR-like validation must include guardrails for thermalization, scrambling, noncommutativity, and control leakage.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK validation guardrails",
+        "constraints": ["small-model caveat", "requires diagnostics", "not certified quantum gravity"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Kobrin, Schuster, and Yao 2025, Experiments implementing small commuting models lack gravitational features",
+          "url": "https://www.nature.com/articles/s41586-025-08939-7",
+          "note": "Critique of small commuting models",
+          "equation": "Small-model critique guardrail"
+        },
+        {
+          "kind": "paper",
+          "citation": "Jafferis et al. 2025, Reply to: Experiments implementing small commuting models lack gravitational features",
+          "url": "https://www.nature.com/articles/s41586-025-08995-z",
+          "note": "Reply narrowing interpretation to the specific two-sided process",
+          "equation": "Two-sided process interpretation boundary"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-validation-sweep.ts", "shared/er-epr-tiny-syk-validation-safe-language.ts"]
+    },
+    {
+      "claimId": "tiny_syk_validation_model_internal_only.v1",
+      "statement": "A passing tiny SYK validation sweep can support only model-internal ER=EPR-like telemetry language.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "tiny SYK validation report",
+        "constraints": ["model-internal only", "not real-universe evidence", "not wormhole inventory"]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Gao and Jafferis 2021, A traversable wormhole teleportation protocol in the SYK model",
+          "url": "https://link.springer.com/article/10.1007/JHEP07(2021)097",
+          "note": "SYK teleportation protocol context",
+          "equation": "Model-internal SYK protocol context"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-validation-artifact.ts", "docs/research/er-epr-tiny-syk-validation-sweep-v1.md"]
+    },
+    {
+      "claimId": "tiny_syk_validation_not_nhm2_evidence.v1",
+      "statement": "Tiny SYK validation is not NHM2 propulsion evidence, not source closure, and not CL0-CL4 spacetime congruence support.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "NHM2/QST sidecar boundary",
+        "constraints": ["sidecar only", "not stress-energy", "not propulsion", "not CL0-CL4"]
+      },
+      "sources": [
+        {
+          "kind": "repo_policy",
+          "citation": "CasimirBot ER=EPR tiny SYK validation sidecar policy",
+          "url": "docs/research/er-epr-tiny-syk-validation-sweep-v1.md",
+          "note": "Repo-local sidecar and non-promotion boundary",
+          "equation": "spacetimeCL=proxy_only and mayPromoteToCL4=false"
+        }
+      ],
+      "repoBindings": ["shared/er-epr-tiny-syk-validation-safe-language.ts", "docs/research/nhm2-current-status-whitepaper-2026-05-02.md"]
+    }
+  ]
+}

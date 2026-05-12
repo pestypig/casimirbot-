@@ -1,0 +1,29 @@
+[
+  {
+    "seed": 4242,
+    "nMajoranasPerSide": 4,
+    "hamiltonianHash": "3aaa0096f0f99ac99bcc1321fb65055a121b3a582125874292bb512c0942b7c3",
+    "candidateVerdict": "dual_model_support_strong",
+    "controlLeakageMax": 0.24,
+    "entropyWashoutMonotonic": true,
+    "numericalMethodAgreement": true
+  },
+  {
+    "seed": 4243,
+    "nMajoranasPerSide": 4,
+    "hamiltonianHash": "739a8da9af915cf996b2ce247f8b62d1506eb23fbe1989a839368030f417fb80",
+    "candidateVerdict": "dual_model_support_strong",
+    "controlLeakageMax": 0.24,
+    "entropyWashoutMonotonic": true,
+    "numericalMethodAgreement": true
+  },
+  {
+    "seed": 4244,
+    "nMajoranasPerSide": 4,
+    "hamiltonianHash": "acc8bfb5eb3836eb66c493a76d7ac163aba07d636c35f34d9764a028ed3bf22c",
+    "candidateVerdict": "dual_model_support_strong",
+    "controlLeakageMax": 0.24,
+    "entropyWashoutMonotonic": true,
+    "numericalMethodAgreement": true
+  }
+]

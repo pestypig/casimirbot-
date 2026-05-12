@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "er-epr-tiny-syk-validation-sweep-report.v1",
+  "runId": "tiny-syk-validation:b3ba6b93-1e62-4af2-b93a-4d4e9404a50d",
+  "planId": "tiny-syk-validation-sweep.fixture.v1",
+  "createdAt": "2026-05-11T23:46:14.523Z",
+  "aggregate": {
+    "totalCandidateRuns": 3,
+    "candidatePassCount": 3,
+    "candidatePassRate": 1,
+    "controlLeakageCount": 0,
+    "entropyWashoutPassCount": 3,
+    "numericalAgreementPassCount": 3,
+    "strongestAllowedVerdict": "model_internal_validation_support_observed"
+  },
+  "perSeedSummaries": [
+    {
+      "seed": 4242,
+      "nMajoranasPerSide": 4,
+      "hamiltonianHash": "3aaa0096f0f99ac99bcc1321fb65055a121b3a582125874292bb512c0942b7c3",
+      "candidateVerdict": "dual_model_support_strong",
+      "controlLeakageMax": 0.24,
+      "entropyWashoutMonotonic": true,
+      "numericalMethodAgreement": true
+    },
+    {
+      "seed": 4243,
+      "nMajoranasPerSide": 4,
+      "hamiltonianHash": "739a8da9af915cf996b2ce247f8b62d1506eb23fbe1989a839368030f417fb80",
+      "candidateVerdict": "dual_model_support_strong",
+      "controlLeakageMax": 0.24,
+      "entropyWashoutMonotonic": true,
+      "numericalMethodAgreement": true
+    },
+    {
+      "seed": 4244,
+      "nMajoranasPerSide": 4,
+      "hamiltonianHash": "acc8bfb5eb3836eb66c493a76d7ac163aba07d636c35f34d9764a028ed3bf22c",
+      "candidateVerdict": "dual_model_support_strong",
+      "controlLeakageMax": 0.24,
+      "entropyWashoutMonotonic": true,
+      "numericalMethodAgreement": true
+    }
+  ],
+  "blockers": [],
+  "evidence": {
+    "stage": "ER_EPR_TINY_SYK_VALIDATION_SWEEP_V1",
+    "claimTier": "Stage1_model_internal_validation_sweep",
+    "claimIds": [
+      "tiny_syk_validation_requires_seed_ensemble.v1",
+      "tiny_syk_validation_requires_control_battery.v1",
+      "tiny_syk_validation_requires_numerical_convergence.v1",
+      "tiny_syk_validation_requires_entropy_washout.v1",
+      "tiny_syk_validation_small_model_critique_guardrail.v1",
+      "tiny_syk_validation_model_internal_only.v1",
+      "tiny_syk_validation_not_nhm2_evidence.v1"
+    ],
+    "citations": [
+      "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002",
+      "https://link.springer.com/article/10.1007/JHEP12(2017)151",
+      "https://link.springer.com/article/10.1007/JHEP07(2021)097",
+      "https://www.nature.com/articles/s41586-022-05424-3",
+      "https://www.nature.com/articles/s41586-025-08939-7",
+      "https://www.nature.com/articles/s41586-025-08995-z",
+      "https://arxiv.org/abs/2411.00972"
+    ],
+    "sourceRoles": {
+      "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.94.106002": "supports_model",
+      "https://link.springer.com/article/10.1007/JHEP12(2017)151": "supports_model",
+      "https://link.springer.com/article/10.1007/JHEP07(2021)097": "supports_model",
+      "https://www.nature.com/articles/s41586-022-05424-3": "supports_precedent",
+      "https://www.nature.com/articles/s41586-025-08939-7": "supports_guardrail",
+      "https://www.nature.com/articles/s41586-025-08995-z": "supports_guardrail",
+      "https://arxiv.org/abs/2411.00972": "supports_guardrail"
+    },
+    "uncertaintyNotes": [
+      "Validation is an ensemble check over tiny toy-model runs, not external reproduction.",
+      "The current backend records Taylor matrix evolution and does not claim exact diagonalization.",
+      "Model-internal support remains blocked by any required control leakage or nonmonotonic entropy washout."
+    ]
+  },
+  "qstBoundary": {
+    "spacetimeCL": "proxy_only",
+    "mayPromoteToCL4": false,
+    "caveats": [
+      "Tiny SYK validation is model-internal only.",
+      "Taylor matrix evolution is not exact diagonalization.",
+      "No real-universe ER=EPR, NHM2, stress-energy, or CL0-CL4 claim is allowed."
+    ]
+  }
+}
