@@ -6763,19 +6763,46 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
 }
 
 function resolveHelixTurnTranscriptEvents(reply: HelixAskReply): Record<string, unknown>[] {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const finalAnswerSource =
+    coerceText(replyRecord?.final_answer_source).trim() ||
+    coerceText(debugRecord?.final_answer_source).trim();
+  const terminalArtifactKind =
+    coerceText(replyRecord?.terminal_artifact_kind).trim() ||
+    coerceText(debugRecord?.terminal_artifact_kind).trim() ||
+    coerceText(readHelixResolvedTurnSummary(reply)?.terminal_artifact_kind).trim();
+  const filterSatisfiedWorkstationArtifacts =
+    finalAnswerSource === "workstation_tool_evaluation" ||
+    terminalArtifactKind === "workstation_tool_evaluation";
+  const normalizeEvents = (events: unknown[]): Record<string, unknown>[] => {
+    const records = events
+      .map((entry) => readAgentLoopAuditRecord(entry))
+      .filter(Boolean) as Record<string, unknown>[];
+    const visible = filterSatisfiedWorkstationArtifacts
+      ? records.filter((event) => {
+          const status = coerceText(event.status).trim().toLowerCase();
+          const text = coerceText(event.text).trim();
+          const detail = coerceText(event.detail).trim();
+          const combined = `${text}\n${detail}`;
+          return (
+            status !== "request_input" &&
+            status !== "final_failure" &&
+            !/\b(?:missing_artifacts|missing_required_artifacts|Need user input|Request input|final_failure)\b/i.test(combined)
+          );
+        })
+      : records;
+    return dedupeHelixVisibleTranscriptEvents(visible);
+  };
   const directEvents = Array.isArray(reply.debug?.turn_transcript_events)
     ? reply.debug.turn_transcript_events
     : [];
   if (directEvents.length > 0) {
-    return dedupeHelixVisibleTranscriptEvents(
-      directEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[],
-    );
+    return normalizeEvents(directEvents);
   }
   const audit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
   const auditEvents = Array.isArray(audit?.turn_transcript_events) ? audit.turn_transcript_events : [];
-  return dedupeHelixVisibleTranscriptEvents(
-    auditEvents.map((entry) => readAgentLoopAuditRecord(entry)).filter(Boolean) as Record<string, unknown>[],
-  );
+  return normalizeEvents(auditEvents);
 }
 
 function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
@@ -24062,6 +24089,25 @@ export function HelixAskPill({
   }, []);
 
   const resolveReplyEvents = useCallback((reply: HelixAskReply): AskLiveEventEntry[] => {
+    const replyRecord = readAgentLoopAuditRecord(reply);
+    const debugRecord = readAgentLoopAuditRecord(reply.debug);
+    const shouldFilterSatisfiedWorkstationEvents =
+      coerceText(replyRecord?.final_answer_source).trim() === "workstation_tool_evaluation" ||
+      coerceText(debugRecord?.final_answer_source).trim() === "workstation_tool_evaluation" ||
+      coerceText(replyRecord?.terminal_artifact_kind).trim() === "workstation_tool_evaluation" ||
+      coerceText(debugRecord?.terminal_artifact_kind).trim() === "workstation_tool_evaluation";
+    const isStaleWorkstationEvent = (event: AskLiveEventEntry): boolean => {
+      if (!shouldFilterSatisfiedWorkstationEvents) return false;
+      const status = coerceText(event.meta?.status).trim().toLowerCase();
+      const detail = coerceText(event.meta?.detail).trim();
+      const text = coerceText(event.text).trim();
+      const combined = `${text}\n${detail}`;
+      return (
+        status === "request_input" ||
+        status === "final_failure" ||
+        /\b(?:missing_artifacts|missing_required_artifacts|Need user input|Request input|final_failure)\b/i.test(combined)
+      );
+    };
     const transcriptEvents = Array.isArray(reply.debug?.turn_transcript_events)
       ? reply.debug.turn_transcript_events
       : [];
@@ -24104,10 +24150,10 @@ export function HelixAskPill({
             },
           };
         })
-        .filter((event): event is AskLiveEventEntry => event !== null);
+        .filter((event): event is AskLiveEventEntry => event !== null && !isStaleWorkstationEvent(event));
     }
     if (reply.liveEvents && reply.liveEvents.length > 0) {
-      return reply.liveEvents;
+      return reply.liveEvents.filter((event) => !isStaleWorkstationEvent(event));
     }
     const debugEvents = reply.debug?.live_events;
     if (!debugEvents || debugEvents.length === 0) {
@@ -24128,7 +24174,7 @@ export function HelixAskPill({
             ? entry.meta
             : undefined,
       };
-    });
+    }).filter((event) => !isStaleWorkstationEvent(event));
   }, []);
 
   const resolveReplyConvergenceSnapshot = useCallback(

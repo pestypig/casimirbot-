@@ -550,6 +550,13 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "scientific-calculator", action_id: "open", required_args: [], optional_args: [] },
   {
     panel_id: "scientific-calculator",
+    action_id: "ingest_latex",
+    required_args: ["latex"],
+    optional_args: ["source_path", "anchor"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "scientific-calculator",
     action_id: "solve_expression",
     required_args: ["latex"],
     optional_args: ["source_path", "anchor"],
@@ -892,7 +899,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") return "companion_policy_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
-  if (panelId === "scientific-calculator" && ["solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
+  if (panelId === "scientific-calculator" && ["ingest_latex", "solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
   if (panelId === "scientific-calculator" && ["start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "mission_memory.refresh") return "mission_memory_update";
   if (panelId === "situation-room-pipelines" && actionId === "interjection_investigator.review_latest") return "interjection_decision";
@@ -997,7 +1004,7 @@ function resolveAffordanceBackendEndpoint(panelId: string, actionId: string): st
 }
 
 function resolveExpectedStateChange(panelId: string, actionId: string): HelixWorkstationAffordance["expected_state_change"] {
-  if (panelId === "scientific-calculator" && (actionId === "solve_expression" || actionId === "solve_with_steps")) {
+  if (panelId === "scientific-calculator" && (actionId === "ingest_latex" || actionId === "solve_expression" || actionId === "solve_with_steps")) {
     return { store: "useScientificCalculatorStore", selector_hint: "lastSolve", proof_key: "trace" };
   }
   if (panelId === "scientific-calculator" && (actionId.includes("stream") || actionId.includes("live") || actionId.includes("tick"))) {

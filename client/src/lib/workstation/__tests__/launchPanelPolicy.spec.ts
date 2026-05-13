@@ -17,6 +17,13 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);
   });
 
+  it("shows the main Ideology & Zen panel but hides its source/debug variant", () => {
+    expect(isUserLaunchPanel("mission-ethos")).toBe(true);
+    expect(isUnfinishedPanel("mission-ethos")).toBe(false);
+    expect(isUserLaunchPanel("mission-ethos-source")).toBe(false);
+    expect(isUnfinishedPanel("mission-ethos-source")).toBe(true);
+  });
+
   it("keeps unknown ids out of the launch panel list", () => {
     expect(isUserLaunchPanel("not-a-real-panel")).toBe(false);
   });
@@ -26,7 +33,6 @@ describe("launchPanelPolicy", () => {
       "agi-contribution-workbench",
       "code-admin",
       "helix-noise-gens",
-      "mission-ethos",
       "mission-ethos-source",
       "rag-admin",
     ];

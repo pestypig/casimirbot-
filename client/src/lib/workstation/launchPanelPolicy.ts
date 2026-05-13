@@ -8,13 +8,13 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "agi-essence-console",
   "agi-task-history",
   "scientific-calculator",
+  "mission-ethos",
 ]);
 
 const UNFINISHED_PANEL_IDS = new Set<string>([
   "agi-contribution-workbench",
   "code-admin",
   "helix-noise-gens",
-  "mission-ethos",
   "mission-ethos-source",
   "rag-admin",
 ]);
