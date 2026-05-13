@@ -9,11 +9,14 @@ DISCORD_BOT_TOKEN=
 DISCORD_CLIENT_ID=
 DISCORD_GUILD_ID=
 HELIX_API_BASE=http://127.0.0.1:5050
-HELIX_DISCORD_DEV_TOKEN=
+HELIX_DISCORD_BOT_SHARED_TOKEN=
+HELIX_DISCORD_LINK_BASE_URL=https://casimirbot.com/link-discord
 HELIX_PUBLIC_BASE_URL=https://casimirbot.com
 DISCORD_VOICE_RECEIVE_ENABLED=0
 DISCORD_VOICE_OUTPUT_ENABLED=0
 ```
+
+When the Helix server is started with `HELIX_DISCORD_BOT_REQUIRE_TOKEN=1`, bot requests must send `Authorization: Bearer $HELIX_DISCORD_BOT_SHARED_TOKEN`. Do not reuse profile ingress tokens for bot-service auth.
 
 ## Commands
 

@@ -20,8 +20,23 @@ type DiscordSessionView = {
   updated_at: string;
 };
 
+type DiscordPolicyView = {
+  companion_mode?: string;
+  commentary_mode?: string;
+  voice_output_enabled?: boolean;
+};
+
+type DiscordDiagnosticView = {
+  last_source_event?: { event_type?: string; text?: string | null; ts?: string } | null;
+  last_output_receipt?: { channel?: string; reason?: string; delivered?: boolean; ts?: string } | null;
+  raw_audio_included?: false;
+  raw_transcript_included?: false;
+};
+
 export function DiscordSessionPanel() {
   const [sessions, setSessions] = React.useState<DiscordSessionView[]>([]);
+  const [policies, setPolicies] = React.useState<Record<string, DiscordPolicyView>>({});
+  const [diagnostics, setDiagnostics] = React.useState<Record<string, DiscordDiagnosticView>>({});
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
@@ -30,6 +45,8 @@ export function DiscordSessionPanel() {
       if (!response.ok) throw new Error(`status ${response.status}`);
       const body = await response.json();
       setSessions(Array.isArray(body.sessions) ? body.sessions : []);
+      setPolicies(body.policies && typeof body.policies === "object" ? body.policies : {});
+      setDiagnostics(body.diagnostics && typeof body.diagnostics === "object" ? body.diagnostics : {});
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load Discord sessions.");
@@ -70,6 +87,8 @@ export function DiscordSessionPanel() {
             const commander = session.participants.find(
               (participant) => participant.discord_user_id === session.commander_discord_user_id,
             );
+            const policy = policies[session.session_id] ?? {};
+            const diagnostic = diagnostics[session.session_id] ?? {};
             return (
               <div key={session.session_id} className="rounded border border-white/10 bg-slate-950/70 p-3 text-xs">
                 <div className="grid gap-2 md:grid-cols-[1fr_120px_160px]">
@@ -93,6 +112,25 @@ export function DiscordSessionPanel() {
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
                     commander {commander?.display_name ?? "none"}
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-3">
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
+                    companion {policy.companion_mode ?? "unknown"}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
+                    commentary {policy.commentary_mode ?? "unknown"}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
+                    voice output {String(policy.voice_output_enabled ?? false)}
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-400">
+                    last event {diagnostic.last_source_event?.event_type ?? "none"}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-400">
+                    last output {diagnostic.last_output_receipt?.reason ?? "none"}
                   </span>
                 </div>
                 {session.participants.length ? (

@@ -2,6 +2,17 @@ import React from "react";
 import { KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
 import type { HelixAccountSessionStatus } from "@shared/helix-account-session";
 
+type DiscordSessionView = {
+  session_id: string;
+  status: string;
+  linked_profile_id?: string | null;
+  commander_discord_user_id?: string | null;
+  thread_id?: string | null;
+  live_environment_ids: string[];
+  participants: Array<{ discord_user_id: string; display_name: string; role: string; authority: string }>;
+  updated_at: string;
+};
+
 const emptyStatus: HelixAccountSessionStatus = {
   schema: "helix.account_session_status.v1",
   ok: false,
@@ -39,6 +50,13 @@ async function fetchStatus(): Promise<HelixAccountSessionStatus> {
   return response.json();
 }
 
+async function fetchDiscordSessions(): Promise<DiscordSessionView[]> {
+  const response = await fetch("/api/discord/sessions");
+  if (!response.ok) return [];
+  const body = await response.json();
+  return Array.isArray(body.sessions) ? body.sessions : [];
+}
+
 export default function AccountSessionPanel() {
   const [status, setStatus] = React.useState<HelixAccountSessionStatus>(emptyStatus);
   const [loading, setLoading] = React.useState(false);
@@ -47,12 +65,15 @@ export default function AccountSessionPanel() {
   const [displayName, setDisplayName] = React.useState("DatDamPig");
   const [ingressLabel, setIngressLabel] = React.useState("Profile ingress");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
+  const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setStatus(await fetchStatus());
+      const [nextStatus, nextDiscordSessions] = await Promise.all([fetchStatus(), fetchDiscordSessions()]);
+      setStatus(nextStatus);
+      setDiscordSessions(nextDiscordSessions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load account session.");
     } finally {
@@ -257,6 +278,46 @@ export default function AccountSessionPanel() {
                   <span className="text-slate-300">{account.authority ?? "viewer"}</span>
                 </div>
               ))
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <Link2 className="h-3.5 w-3.5" />
+            Discord Companion Sessions
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Linked Discord sessions use web profile linking. The bot never collects account passwords.
+          </p>
+          <div className="mt-3 space-y-2">
+            {discordSessions.length === 0 ? (
+              <p className="text-xs text-slate-500">No Discord companion sessions are active.</p>
+            ) : (
+              discordSessions.map((discordSession) => {
+                const commander = discordSession.participants.find(
+                  (participant) => participant.discord_user_id === discordSession.commander_discord_user_id,
+                );
+                return (
+                  <div
+                    key={discordSession.session_id}
+                    className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[1fr_110px_160px]"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-200">{discordSession.session_id}</div>
+                      <div className="mt-1 truncate text-slate-500">thread {discordSession.thread_id ?? "unbound"}</div>
+                    </div>
+                    <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">
+                      {discordSession.status}
+                    </span>
+                    <div className="text-slate-300">
+                      <div>profile {discordSession.linked_profile_id ?? "unlinked"}</div>
+                      <div className="mt-1">commander {commander?.display_name ?? "none"}</div>
+                      <div className="mt-1">live envs {discordSession.live_environment_ids.length}</div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </section>

@@ -6,13 +6,50 @@ import {
   createDiscordVoiceSession,
   getDiscordVoiceSession,
   ingestDiscordSourceEvent,
+  listDiscordSourceEvents,
+  listDiscordVoiceOutputReceipts,
   listDiscordVoiceSessions,
   recordDiscordVoiceOutputReceipt,
   updateDiscordVoiceSessionStatus,
 } from "../services/situation-room/discord-session-store";
-import { upsertCompanionPolicy } from "../services/situation-room/companion-policy-engine";
+import { getCompanionPolicy, upsertCompanionPolicy } from "../services/situation-room/companion-policy-engine";
 
 export const discordRouter = Router();
+
+const normalize = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const tokenRequirementEnabled = (): boolean =>
+  process.env.HELIX_DISCORD_BOT_REQUIRE_TOKEN === "1";
+
+const configuredBotToken = (): string =>
+  normalize(process.env.HELIX_DISCORD_BOT_SHARED_TOKEN || process.env.HELIX_DISCORD_DEV_TOKEN);
+
+function resolveBearerToken(header: unknown): string {
+  const value = normalize(header);
+  const match = /^Bearer\s+(.+)$/i.exec(value);
+  return match?.[1]?.trim() ?? "";
+}
+
+discordRouter.use((req, res, next) => {
+  if (!tokenRequirementEnabled()) return next();
+  if (req.method === "GET" && req.path === "/sessions") return next();
+  if (req.method === "POST" && req.path === "/session/complete-link") return next();
+  const expected = configuredBotToken();
+  const received =
+    resolveBearerToken(req.headers.authorization) ||
+    normalize(req.headers["x-helix-discord-dev-token"]);
+  if (!expected || received !== expected) {
+    return res.status(401).json({
+      ok: false,
+      message: "Discord bot route requires bot-service authorization.",
+      error: "discord_bot_auth_required",
+      credential_collection_allowed: false,
+      context_policy: "compact_context_pack_only",
+    });
+  }
+  return next();
+});
 
 discordRouter.post("/session/start", (req, res) => {
   const receipt = createDiscordVoiceSession({
@@ -26,9 +63,26 @@ discordRouter.post("/session/start", (req, res) => {
 });
 
 discordRouter.get("/sessions", (_req, res) => {
+  const sessions = listDiscordVoiceSessions();
   res.json({
     ok: true,
-    sessions: listDiscordVoiceSessions(),
+    sessions,
+    policies: Object.fromEntries(
+      sessions
+        .filter((session) => session.thread_id)
+        .map((session) => [session.session_id, getCompanionPolicy(session.thread_id!)]),
+    ),
+    diagnostics: Object.fromEntries(
+      sessions.map((session) => [
+        session.session_id,
+        {
+          last_source_event: listDiscordSourceEvents(session.session_id).at(-1) ?? null,
+          last_output_receipt: listDiscordVoiceOutputReceipts(session.session_id).at(-1) ?? null,
+          raw_audio_included: false,
+          raw_transcript_included: false,
+        },
+      ]),
+    ),
     credential_collection_allowed: false,
     context_policy: "compact_context_pack_only",
   });
@@ -61,6 +115,15 @@ discordRouter.get("/session/:sessionId", (req, res) => {
   res.status(session ? 200 : 404).json({
     ok: Boolean(session),
     session,
+    policy: session?.thread_id ? getCompanionPolicy(session.thread_id) : null,
+    diagnostics: session
+      ? {
+          last_source_event: listDiscordSourceEvents(session.session_id).at(-1) ?? null,
+          last_output_receipt: listDiscordVoiceOutputReceipts(session.session_id).at(-1) ?? null,
+          raw_audio_included: false,
+          raw_transcript_included: false,
+        }
+      : null,
     credential_collection_allowed: false,
     context_policy: "compact_context_pack_only",
   });

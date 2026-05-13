@@ -74,3 +74,31 @@ export type HelixDiscordAskTurnBridge = {
   answer_created: false;
   credential_collection_allowed: false;
 };
+
+export type HelixDiscordDirectAddressReceipt = {
+  schema: "helix.discord_direct_address_receipt.v1";
+  ok: boolean;
+  session_id: string;
+  thread_id: string;
+  decision: "start_user_turn" | "request_confirmation" | "ignored";
+  prompt_text?: string | null;
+  participant_authority: HelixDiscordParticipantAuthority | "none";
+  evidence_refs: string[];
+  answer_created: false;
+  credential_collection_allowed: false;
+  context_policy: "compact_context_pack_only";
+};
+
+export type HelixDiscordMinecraftSourceResolution = {
+  resolved: boolean;
+  source_id?: string | null;
+  room_id?: string | null;
+  world_id?: string | null;
+  reason:
+    | "explicit_source"
+    | "profile_source_match"
+    | "world_match"
+    | "latest_active_source"
+    | "missing_source"
+    | "ambiguous_source";
+};

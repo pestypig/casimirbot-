@@ -5,14 +5,20 @@ type JsonRecord = Record<string, unknown>;
 export class HelixClient {
   constructor(private readonly config: DiscordHelixBotConfig) {}
 
+  private authHeaders(): Record<string, string> {
+    return this.config.helixDiscordBotSharedToken
+      ? { Authorization: `Bearer ${this.config.helixDiscordBotSharedToken}` }
+      : this.config.helixDiscordDevToken
+        ? { "X-Helix-Discord-Dev-Token": this.config.helixDiscordDevToken }
+        : {};
+  }
+
   private async post<T = JsonRecord>(path: string, body: JsonRecord): Promise<T> {
     const response = await fetch(`${this.config.helixApiBase}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(this.config.helixDiscordDevToken
-          ? { "X-Helix-Discord-Dev-Token": this.config.helixDiscordDevToken }
-          : {}),
+        ...this.authHeaders(),
       },
       body: JSON.stringify(body),
     });
@@ -25,9 +31,7 @@ export class HelixClient {
 
   private async get<T = JsonRecord>(path: string): Promise<T> {
     const response = await fetch(`${this.config.helixApiBase}${path}`, {
-      headers: this.config.helixDiscordDevToken
-        ? { "X-Helix-Discord-Dev-Token": this.config.helixDiscordDevToken }
-        : undefined,
+      headers: this.authHeaders(),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -59,7 +63,7 @@ export class HelixClient {
       session_id: input.sessionId,
       discord_user_id: input.discordUserId,
       display_name: input.displayName ?? null,
-      public_base_url: this.config.helixPublicBaseUrl,
+      public_base_url: this.config.helixDiscordLinkBaseUrl,
     });
   }
 
@@ -68,10 +72,7 @@ export class HelixClient {
   }
 
   attachMinecraft(sessionId: string): Promise<JsonRecord> {
-    return this.post(`/api/discord/session/${encodeURIComponent(sessionId)}/attach-minecraft`, {
-      source_id: "source:minecraft-server",
-      world_id: "minecraft:minehut",
-    });
+    return this.post(`/api/discord/session/${encodeURIComponent(sessionId)}/attach-minecraft`, {});
   }
 
   setCompanionMode(input: {

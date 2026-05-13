@@ -5,6 +5,11 @@ import { discordRouter } from "../routes/discord";
 import {
   resetDiscordSessionStore,
 } from "../services/situation-room/discord-session-store";
+import {
+  createProfileIngressToken,
+  ingestProfileIngressEvent,
+  resetProfileIngressStore,
+} from "../services/helix-account/profile-ingress-store";
 import { getCompanionPolicy, resetCompanionPolicies } from "../services/situation-room/companion-policy-engine";
 import {
   getLiveAnswerEnvironment,
@@ -24,10 +29,43 @@ const createApp = (): express.Express => {
 
 describe("Discord session bridge", () => {
   beforeEach(() => {
+    delete process.env.HELIX_DISCORD_BOT_REQUIRE_TOKEN;
+    delete process.env.HELIX_DISCORD_BOT_SHARED_TOKEN;
     resetDiscordSessionStore();
     resetCompanionPolicies();
     resetLiveAnswerEnvironments();
+    resetProfileIngressStore();
     __resetHelixThreadLedgerStore();
+  });
+
+  it("requires bot-service auth when configured without leaking the token", async () => {
+    process.env.HELIX_DISCORD_BOT_REQUIRE_TOKEN = "1";
+    process.env.HELIX_DISCORD_BOT_SHARED_TOKEN = "super-secret-discord-token";
+    const app = createApp();
+
+    const missing = await request(app)
+      .post("/api/discord/session/start")
+      .send({
+        guild_id: "guild-auth",
+        voice_channel_id: "voice-auth",
+      })
+      .expect(401);
+
+    expect(missing.body).toMatchObject({
+      ok: false,
+      error: "discord_bot_auth_required",
+      credential_collection_allowed: false,
+    });
+    expect(JSON.stringify(missing.body)).not.toContain("super-secret-discord-token");
+
+    await request(app)
+      .post("/api/discord/session/start")
+      .set("Authorization", "Bearer super-secret-discord-token")
+      .send({
+        guild_id: "guild-auth",
+        voice_channel_id: "voice-auth",
+      })
+      .expect(200);
   });
 
   it("starts an unlinked voice session without credential collection fields", async () => {
@@ -176,6 +214,12 @@ describe("Discord session bridge", () => {
         decision: "queued",
         answer_created: false,
       },
+      direct_address_receipt: {
+        decision: "start_user_turn",
+        prompt_text: "Helix, what just happened?",
+        answer_created: false,
+        credential_collection_allowed: false,
+      },
       credential_collection_allowed: false,
     });
     const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:discord-voice" });
@@ -274,7 +318,49 @@ describe("Discord session bridge", () => {
     expect(events.some((ledgerEvent) => ledgerEvent.item_type === "answer")).toBe(false);
   });
 
-  it("attaches Minecraft to a linked Discord session thread", async () => {
+  it("does not invent a Minecraft source when the linked profile has no active ingress source", async () => {
+    const app = createApp();
+    const started = await request(app)
+      .post("/api/discord/session/start")
+      .send({
+        guild_id: "guild-missing-mc",
+        voice_channel_id: "voice-missing-mc",
+        thread_id: "helix-ask:discord-missing-minecraft",
+      })
+      .expect(200);
+    const linkCode = await request(app)
+      .post("/api/discord/session/link-code")
+      .send({
+        session_id: started.body.session.session_id,
+        discord_user_id: "discord-missing-mc-user",
+      })
+      .expect(200);
+    await request(app)
+      .post("/api/discord/session/complete-link")
+      .send({
+        code: linkCode.body.code.code,
+        profile_id: "profile:no-mc",
+        discord_user_id: "discord-missing-mc-user",
+      })
+      .expect(200);
+
+    const attached = await request(app)
+      .post(`/api/discord/session/${encodeURIComponent(started.body.session.session_id)}/attach-minecraft`)
+      .send({})
+      .expect(400);
+
+    expect(attached.body).toMatchObject({
+      ok: false,
+      error: "missing_source",
+      resolution: {
+        resolved: false,
+        reason: "missing_source",
+      },
+      credential_collection_allowed: false,
+    });
+  });
+
+  it("attaches Minecraft from a linked profile ingress source", async () => {
     const app = createApp();
     const started = await request(app)
       .post("/api/discord/session/start")
@@ -299,6 +385,24 @@ describe("Discord session bridge", () => {
         discord_user_id: "discord-mc-user",
       })
       .expect(200);
+    const token = createProfileIngressToken({
+      profile_id: "profile:mc",
+      label: "Minehut bridge",
+      scopes: ["source_event", "minecraft_bridge"],
+    });
+    expect(token.ok).toBe(true);
+    const ingress = ingestProfileIngressEvent({
+      profile_id: "profile:mc",
+      authorization: `Bearer ${token.token_value}`,
+      source_id: "source:minehut:datdampig",
+      payload: {
+        source_family: "minecraft_events",
+        world_id: "minecraft:minehut",
+        room_id: "room:minehut",
+        event_type: "source_health",
+      },
+    });
+    expect(ingress.ok).toBe(true);
 
     const attached = await request(app)
       .post(`/api/discord/session/${encodeURIComponent(started.body.session.session_id)}/attach-minecraft`)
@@ -308,6 +412,10 @@ describe("Discord session bridge", () => {
     expect(attached.body).toMatchObject({
       ok: true,
       credential_collection_allowed: false,
+      resolution: {
+        resolved: true,
+        source_id: "source:minehut:datdampig",
+      },
       session: {
         thread_id: "helix-ask:discord-minecraft",
       },
@@ -321,7 +429,7 @@ describe("Discord session bridge", () => {
       raw_audio_included: false,
     });
     expect(environment?.source_ids).toEqual(
-      expect.arrayContaining(["source:minecraft-server", `discord:${started.body.session.session_id}:voice`]),
+      expect.arrayContaining(["source:minehut:datdampig", `discord:${started.body.session.session_id}:voice`]),
     );
   });
 });

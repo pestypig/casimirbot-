@@ -10,6 +10,8 @@ import {
 import type {
   HelixDiscordParticipant,
   HelixDiscordAskTurnBridge,
+  HelixDiscordDirectAddressReceipt,
+  HelixDiscordMinecraftSourceResolution,
   HelixDiscordSessionReceipt,
   HelixDiscordVoiceSession,
 } from "@shared/helix-discord-session";
@@ -31,6 +33,7 @@ import { appendHelixThreadEvent } from "../helix-thread/ledger";
 import { upsertCompanionPolicy } from "./companion-policy-engine";
 import { ingestVoiceLaneEvent } from "./voice-interjection-router";
 import { createLiveAnswerEnvironment } from "./live-answer-environment-store";
+import { listProfileIngressSourceEvents } from "../helix-account/profile-ingress-store";
 
 const sessions = new Map<string, HelixDiscordVoiceSession>();
 const linkCodes = new Map<string, HelixCommanderProfileLinkCode>();
@@ -101,6 +104,7 @@ function appendDiscordObservation(input: {
   thread_id: string;
   item_kind: string;
   observation_ref: Record<string, unknown>;
+  item_type?: "toolObservation" | "validation";
   ts?: string;
 }): string {
   const itemId = `discord:${input.item_kind}:${shortHash([input.thread_id, input.observation_ref], 18)}`;
@@ -111,7 +115,7 @@ function appendDiscordObservation(input: {
     session_id: input.thread_id,
     event_type: "item_completed",
     item_id: itemId,
-    item_type: "toolObservation",
+    item_type: input.item_type ?? "toolObservation",
     item_stream: "observation",
     item_status: "completed",
     observation_ref: input.observation_ref,
@@ -126,6 +130,92 @@ function appendDiscordObservation(input: {
     ts: input.ts ?? nowIso(),
   });
   return itemId;
+}
+
+function extractString(payload: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function payloadLooksMinecraft(payload: Record<string, unknown>, sourceId: string): boolean {
+  const family = extractString(payload, ["source_family", "sourceFamily", "kind", "source_kind", "sourceKind"]);
+  const worldId = extractString(payload, ["world_id", "worldId"]);
+  const eventType = extractString(payload, ["event_type", "eventType", "type"]);
+  return /\bminecraft|minehut|world_event/i.test([sourceId, family, worldId, eventType].join(" "));
+}
+
+function resolveMinecraftSourceForSession(input: {
+  session: HelixDiscordVoiceSession;
+  source_id?: string | null;
+  room_id?: string | null;
+  world_id?: string | null;
+}): HelixDiscordMinecraftSourceResolution {
+  const explicitSourceId = normalize(input.source_id);
+  if (explicitSourceId) {
+    return {
+      resolved: true,
+      source_id: explicitSourceId,
+      room_id: normalize(input.room_id) || input.session.room_id || null,
+      world_id: normalize(input.world_id) || "minecraft:minehut",
+      reason: "explicit_source",
+    };
+  }
+  const profileId = normalize(input.session.linked_profile_id);
+  if (!profileId) {
+    return { resolved: false, source_id: null, room_id: null, world_id: null, reason: "missing_source" };
+  }
+  const targetWorldId = normalize(input.world_id) || "minecraft:minehut";
+  const sourceEvents = listProfileIngressSourceEvents(profileId)
+    .map((event) => ({
+      ...event,
+      source_id: normalize(event.source_id),
+      room_id: extractString(event.payload, ["room_id", "roomId"]) || null,
+      world_id: extractString(event.payload, ["world_id", "worldId"]) || null,
+      source_family: extractString(event.payload, ["source_family", "sourceFamily", "kind", "source_kind", "sourceKind"]),
+    }))
+    .filter((event) => payloadLooksMinecraft(event.payload, event.source_id));
+  if (sourceEvents.length === 0) {
+    return { resolved: false, source_id: null, room_id: null, world_id: targetWorldId, reason: "missing_source" };
+  }
+  const exactWorld = sourceEvents.filter((event) => event.world_id === targetWorldId);
+  if (exactWorld.length === 1) {
+    return {
+      resolved: true,
+      source_id: exactWorld[0].source_id,
+      room_id: exactWorld[0].room_id,
+      world_id: exactWorld[0].world_id || targetWorldId,
+      reason: "world_match",
+    };
+  }
+  if (exactWorld.length > 1) {
+    const uniqueSourceIds = Array.from(new Set(exactWorld.map((event) => event.source_id)));
+    if (uniqueSourceIds.length === 1) {
+      return {
+        resolved: true,
+        source_id: uniqueSourceIds[0],
+        room_id: exactWorld[0].room_id,
+        world_id: exactWorld[0].world_id || targetWorldId,
+        reason: "profile_source_match",
+      };
+    }
+    return { resolved: false, source_id: null, room_id: null, world_id: targetWorldId, reason: "ambiguous_source" };
+  }
+  const activeFamily = sourceEvents.filter((event) => /\bminecraft/i.test(event.source_family));
+  const candidates = activeFamily.length ? activeFamily : sourceEvents;
+  const uniqueSourceIds = Array.from(new Set(candidates.map((event) => event.source_id)));
+  if (uniqueSourceIds.length === 1) {
+    return {
+      resolved: true,
+      source_id: uniqueSourceIds[0],
+      room_id: candidates[0].room_id,
+      world_id: candidates[0].world_id || targetWorldId,
+      reason: "latest_active_source",
+    };
+  }
+  return { resolved: false, source_id: null, room_id: null, world_id: targetWorldId, reason: "ambiguous_source" };
 }
 
 export function createDiscordVoiceSession(input: {
@@ -150,7 +240,7 @@ export function createDiscordVoiceSession(input: {
   }
   const createdAt = nowIso();
   const sessionId = `discord_session:${crypto.randomUUID()}`;
-  const threadId = normalize(input.thread_id) || `helix-ask:discord:${sessionId.split(":").at(-1)}`;
+  const threadId = normalize(input.thread_id) || `helix-ask:discord:${guildId}:${voiceChannelId}`;
   const session: HelixDiscordVoiceSession = {
     schema: HELIX_DISCORD_VOICE_SESSION_SCHEMA,
     session_id: sessionId,
@@ -263,6 +353,9 @@ export function createDiscordLinkCode(input: {
   let code = createCode();
   while (linkCodes.has(code)) code = createCode();
   const base = normalize(input.public_base_url) || "https://casimirbot.com";
+  const linkBase = /\/link-discord\/?$/i.test(base)
+    ? base.replace(/\/$/, "")
+    : `${base.replace(/\/$/, "")}/link-discord`;
   const linkCode: HelixCommanderProfileLinkCode = {
     schema: HELIX_COMMANDER_PROFILE_LINK_CODE_SCHEMA,
     code,
@@ -271,7 +364,7 @@ export function createDiscordLinkCode(input: {
     voice_channel_id: session.voice_channel_id,
     discord_user_id: discordUserId,
     display_name: normalize(input.display_name) || null,
-    link_url: `${base.replace(/\/$/, "")}/link-discord?code=${encodeURIComponent(code)}`,
+    link_url: `${linkBase}?code=${encodeURIComponent(code)}`,
     expires_at: new Date(Date.parse(createdAt) + ttlMs).toISOString(),
     consumed_at: null,
     created_at: createdAt,
@@ -390,6 +483,36 @@ export function completeDiscordProfileLink(input: {
       },
       ts: consumedAt,
     });
+    appendDiscordObservation({
+      thread_id: updated.thread_id ?? `helix-ask:discord:${updated.session_id}`,
+      item_kind: "discord_commander_profile_set",
+      item_type: "validation",
+      observation_ref: {
+        schema: "helix.discord_commander_profile_set.v1",
+        session_id: updated.session_id,
+        linked_profile_id: profileId,
+        commander_discord_user_id: discordUserId,
+        participant_authority: participant.authority,
+        credential_collection_allowed: false,
+        context_policy: "compact_context_pack_only",
+      },
+      ts: consumedAt,
+    });
+    appendDiscordObservation({
+      thread_id: updated.thread_id ?? `helix-ask:discord:${updated.session_id}`,
+      item_kind: "discord_default_companion_policy_set",
+      item_type: "validation",
+      observation_ref: {
+        schema: "helix.discord_default_companion_policy_set.v1",
+        session_id: updated.session_id,
+        companion_mode: "direct_address_only",
+        commentary_mode: "off",
+        voice_output_enabled: false,
+        credential_collection_allowed: false,
+        context_policy: "compact_context_pack_only",
+      },
+      ts: consumedAt,
+    });
   }
   return {
     schema: HELIX_COMMANDER_PROFILE_LINK_RECEIPT_SCHEMA,
@@ -417,6 +540,7 @@ export function ingestDiscordSourceEvent(input: {
   event: HelixDiscordSourceEvent | null;
   voice_lane_receipt?: ReturnType<typeof ingestVoiceLaneEvent> | null;
   ask_turn_bridge?: HelixDiscordAskTurnBridge | null;
+  direct_address_receipt?: HelixDiscordDirectAddressReceipt | null;
   message: string;
   error?: string | null;
   credential_collection_allowed: false;
@@ -428,6 +552,7 @@ export function ingestDiscordSourceEvent(input: {
       event: null,
       voice_lane_receipt: null,
       ask_turn_bridge: null,
+      direct_address_receipt: null,
       message: "Discord source event requires an active session.",
       error: "missing_session",
       credential_collection_allowed: false,
@@ -482,6 +607,7 @@ export function ingestDiscordSourceEvent(input: {
   });
   let voiceLaneReceipt: ReturnType<typeof ingestVoiceLaneEvent> | null = null;
   let askTurnBridge: HelixDiscordAskTurnBridge | null = null;
+  let directAddressReceipt: HelixDiscordDirectAddressReceipt | null = null;
   if (
     event.text &&
     ["voice_transcript", "direct_address", "command_candidate", "ambient_context"].includes(
@@ -516,12 +642,42 @@ export function ingestDiscordSourceEvent(input: {
           ? "Direct-address Discord event queued for a normal Helix Ask turn by caller."
           : "Discord participant lacks commander authority for a user turn.",
     });
+    const wasDirectAddress = voiceLaneReceipt.classification?.direct_addressed === true;
+    directAddressReceipt = {
+      schema: "helix.discord_direct_address_receipt.v1",
+      ok: wasDirectAddress,
+      session_id: session.session_id,
+      thread_id: threadId,
+      decision: !wasDirectAddress
+        ? "ignored"
+        : allowedStartTurn
+          ? "start_user_turn"
+          : participant?.authority === "command_confirm"
+            ? "request_confirmation"
+            : "ignored",
+      prompt_text: wasDirectAddress ? event.text : null,
+      participant_authority: participant?.authority ?? "none",
+      evidence_refs: event.evidence_refs,
+      answer_created: false,
+      credential_collection_allowed: false,
+      context_policy: "compact_context_pack_only",
+    };
+    if (wasDirectAddress) {
+      appendDiscordObservation({
+        thread_id: threadId,
+        item_kind: "discord_direct_address_receipt",
+        item_type: "validation",
+        observation_ref: directAddressReceipt,
+        ts,
+      });
+    }
   }
   return {
     ok: true,
     event,
     voice_lane_receipt: voiceLaneReceipt,
     ask_turn_bridge: askTurnBridge,
+    direct_address_receipt: directAddressReceipt,
     message: "Discord source event recorded as observation; no hidden answer turn was started.",
     error: null,
     credential_collection_allowed: false,
@@ -536,6 +692,7 @@ export function attachMinecraftToDiscordSession(input: {
   ok: boolean;
   session: HelixDiscordVoiceSession | null;
   environment_id?: string | null;
+  resolution?: HelixDiscordMinecraftSourceResolution | null;
   message: string;
   error?: string | null;
   credential_collection_allowed: false;
@@ -546,6 +703,7 @@ export function attachMinecraftToDiscordSession(input: {
       ok: false,
       session: null,
       environment_id: null,
+      resolution: null,
       message: "Discord session not found.",
       error: "missing_session",
       credential_collection_allowed: false,
@@ -556,21 +714,41 @@ export function attachMinecraftToDiscordSession(input: {
       ok: false,
       session,
       environment_id: null,
+      resolution: null,
       message: "Discord session must be linked before attaching Minecraft.",
       error: "session_not_linked",
       credential_collection_allowed: false,
     };
   }
+  const resolution = resolveMinecraftSourceForSession({
+    session,
+    source_id: input.source_id,
+    world_id: input.world_id,
+  });
+  if (!resolution.resolved || !resolution.source_id) {
+    return {
+      ok: false,
+      session,
+      environment_id: null,
+      resolution,
+      message:
+        resolution.reason === "ambiguous_source"
+          ? "Multiple Minecraft sources matched this profile. Ask the commander to choose a source."
+          : "No active Minecraft source is linked to this profile. Create a profile ingress source first.",
+      error: resolution.reason,
+      credential_collection_allowed: false,
+    };
+  }
   const now = nowIso();
   const sourceIds = [
-    normalize(input.source_id) || "source:minecraft-server",
+    resolution.source_id,
     `discord:${session.session_id}:voice`,
   ];
   const { environment } = createLiveAnswerEnvironment({
     thread_id: session.thread_id ?? `helix-ask:discord:${session.session_id}`,
     created_turn_id: `turn:discord-minecraft:${shortHash(session.session_id, 12)}`,
     objective: "Watch the linked Discord and Minecraft session for danger, progress, and direct questions.",
-    room_id: session.room_id ?? `discord:${session.guild_id}:${session.voice_channel_id}`,
+    room_id: resolution.room_id ?? session.room_id ?? `discord:${session.guild_id}:${session.voice_channel_id}`,
     source_ids: sourceIds,
     preset: "minecraft_run_monitor",
     mode: "text_only",
@@ -599,7 +777,8 @@ export function attachMinecraftToDiscordSession(input: {
       schema: "helix.discord_minecraft_attached.v1",
       session_id: updated.session_id,
       source_ids: sourceIds,
-      world_id: normalize(input.world_id) || "minecraft:minehut",
+      resolution,
+      world_id: resolution.world_id || "minecraft:minehut",
       environment_id: environment.environment_id,
       command_lane_enabled: false,
       credential_collection_allowed: false,
@@ -611,6 +790,7 @@ export function attachMinecraftToDiscordSession(input: {
     ok: true,
     session: updated,
     environment_id: environment.environment_id,
+    resolution,
     message: "Minecraft source attached to the Discord session thread.",
     error: null,
     credential_collection_allowed: false,
@@ -686,6 +866,13 @@ export function listDiscordSourceEvents(sessionId?: string | null): HelixDiscord
   const normalizedSessionId = normalize(sessionId);
   return sourceEvents.filter(
     (event) => !normalizedSessionId || event.session_id === normalizedSessionId,
+  );
+}
+
+export function listDiscordVoiceOutputReceipts(sessionId?: string | null): HelixDiscordVoiceOutputReceipt[] {
+  const normalizedSessionId = normalize(sessionId);
+  return voiceReceipts.filter(
+    (receipt) => !normalizedSessionId || receipt.session_id === normalizedSessionId,
   );
 }
 

@@ -25,9 +25,20 @@ type ProfileIngressUsageEvent = {
   ts: string;
 };
 
+export type ProfileIngressAcceptedSourceEvent = {
+  event_id: string;
+  profile_id: string;
+  token_id: string;
+  source_id: string;
+  thread_id: string;
+  payload: Record<string, unknown>;
+  ts: string;
+};
+
 const tokensById = new Map<string, StoredProfileIngressToken>();
 const tokenIdByHash = new Map<string, string>();
 const usageEvents: ProfileIngressUsageEvent[] = [];
+const acceptedSourceEvents: ProfileIngressAcceptedSourceEvent[] = [];
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -39,6 +50,11 @@ const sha256 = (value: string): string =>
 
 const estimateTokens = (value: unknown): number =>
   Math.max(1, Math.ceil(JSON.stringify(value ?? {}).length / 4));
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 const publicBaseUrl = (): string =>
   normalize(process.env.PUBLIC_BASE_URL) || "https://casimirbot.com";
@@ -234,6 +250,9 @@ export function ingestProfileIngressEvent(input: {
   };
   tokensById.set(token.token_id, nextToken);
   const eventId = `profile_ingress_event:${crypto.randomUUID()}`;
+  const threadId = normalize(input.thread_id) || `helix-ask:profile:${profileId}`;
+  const sourceId = normalize(input.source_id) || "profile_ingress";
+  const payload = asRecord(input.payload);
   recordUsage({
     profile_id: profileId,
     token_id: token.token_id,
@@ -241,9 +260,21 @@ export function ingestProfileIngressEvent(input: {
     estimated_token_count: estimated,
     ts: now,
   });
+  acceptedSourceEvents.push({
+    event_id: eventId,
+    profile_id: profileId,
+    token_id: token.token_id,
+    source_id: sourceId,
+    thread_id: threadId,
+    payload,
+    ts: now,
+  });
+  if (acceptedSourceEvents.length > 5000) {
+    acceptedSourceEvents.splice(0, acceptedSourceEvents.length - 5000);
+  }
   appendHelixThreadEvent({
     route: "/ask",
-    thread_id: normalize(input.thread_id) || `helix-ask:profile:${profileId}`,
+    thread_id: threadId,
     turn_id: `profile_ingress_turn:${crypto.randomUUID()}`,
     event_type: "item_completed",
     item_id: eventId,
@@ -255,8 +286,8 @@ export function ingestProfileIngressEvent(input: {
       event_id: eventId,
       profile_id: profileId,
       token_id: token.token_id,
-      source_id: normalize(input.source_id) || "profile_ingress",
-      payload: input.payload ?? {},
+      source_id: sourceId,
+      payload,
       estimated_token_count: estimated,
       raw_secret_included: false,
       context_policy: "compact_context_pack_only",
@@ -285,8 +316,16 @@ export function ingestProfileIngressEvent(input: {
   };
 }
 
+export function listProfileIngressSourceEvents(profileId?: string | null): ProfileIngressAcceptedSourceEvent[] {
+  const normalizedProfileId = normalize(profileId);
+  return acceptedSourceEvents
+    .filter((event) => !normalizedProfileId || event.profile_id === normalizedProfileId)
+    .sort((a, b) => b.ts.localeCompare(a.ts));
+}
+
 export function resetProfileIngressStore(): void {
   tokensById.clear();
   tokenIdByHash.clear();
   usageEvents.splice(0, usageEvents.length);
+  acceptedSourceEvents.splice(0, acceptedSourceEvents.length);
 }
