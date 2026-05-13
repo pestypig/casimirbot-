@@ -22,6 +22,9 @@ export type HelixCategorizationCategory =
   | "evidence"
   | "context_reference"
   | "motive_framework"
+  | "minecraft_spatial_pattern"
+  | "structure_hypothesis"
+  | "hazard_context"
   | "unknown";
 
 export type HelixCategorizationEvent = {

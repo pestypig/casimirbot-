@@ -17,6 +17,7 @@ import {
   listWorkstationLiveSources,
 } from "./workstation-live-source-ingest";
 import { listWorldSourcesSeen } from "./world-source-registry";
+import { getLatestMinecraftSpatialEpisodeForRoom } from "./minecraft-spatial-window";
 import type {
   LiveSourceWindowSummary,
   WorkstationLiveSource,
@@ -94,6 +95,7 @@ export function buildSituationContextPack(args: {
       append_reason: source.latest_debug?.append_reason ?? null,
       salience_class: source.latest_debug?.salience_class ?? null,
     }));
+  const minecraftSpatialEpisode = getLatestMinecraftSpatialEpisodeForRoom(roomId);
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -110,6 +112,7 @@ export function buildSituationContextPack(args: {
       roomId,
       sessionId,
       missionMemory?.updated_at ?? null,
+      minecraftSpatialEpisode?.episode_id ?? null,
       activities.map((activity: HelixStandbyActivityItem) => activity.activity_id).slice(-12),
     ], 18)}`,
     session_id: sessionId,
@@ -140,6 +143,7 @@ export function buildSituationContextPack(args: {
         }
       : null,
     world_sources: worldSources,
+    minecraft_spatial_episode: minecraftSpatialEpisode,
     objective: activeSession?.objective ?? ledger?.objective ?? null,
     current_goal: activeSession?.current_goal ?? ledger?.current_goal ?? null,
     latest_projection: null,

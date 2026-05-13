@@ -28,6 +28,10 @@ import type {
   LiveAnswerEnvironment,
   LiveAnswerEnvironmentDelta,
 } from "@shared/helix-live-answer-environment";
+import type { HelixCategorizationEvent } from "@shared/helix-categorization-event";
+import type { HelixSyntheticEvidence } from "@shared/helix-synthetic-evidence";
+import type { HelixMinecraftSpatialEvent } from "@shared/helix-minecraft-spatial-event";
+import type { HelixMinecraftSpatialEpisode } from "@shared/helix-minecraft-spatial-episode";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -82,6 +86,13 @@ import {
 } from "./live-situation-artifact-store";
 import { getActiveLiveAnswerEnvironmentForRoom } from "./live-answer-environment-store";
 import { reduceLiveAnswerEnvironmentFromWorldEvent } from "./live-answer-line-reducer";
+import {
+  ingestMinecraftSpatialWorldEvent,
+  resetMinecraftSpatialWindows,
+} from "./minecraft-spatial-window";
+import {
+  reduceMinecraftSpatialIntent,
+} from "./minecraft-intent-hypothesis-reducer";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -170,6 +181,10 @@ export type WorldEventIngestResult = {
   live_situation_artifact_delta?: LiveSituationArtifactDelta | null;
   live_answer_environment?: LiveAnswerEnvironment | null;
   live_answer_environment_delta?: LiveAnswerEnvironmentDelta | null;
+  minecraft_spatial_event?: HelixMinecraftSpatialEvent | null;
+  minecraft_spatial_episode?: HelixMinecraftSpatialEpisode | null;
+  categorization_events?: HelixCategorizationEvent[];
+  synthetic_evidence?: HelixSyntheticEvidence[];
 };
 
 export type WorldEventIngestBatchResult = {
@@ -231,6 +246,7 @@ type RoomRuntimeState = {
 };
 
 const runtimeStateByKey = new Map<string, RoomRuntimeState>();
+const spatialEpisodeSignatureByThread = new Map<string, string>();
 
 const stableJson = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -279,7 +295,9 @@ const readBooleanMeta = (event: HelixWorldEvent, key: string): boolean =>
 
 export const resetWorldEventIngestState = (): void => {
   runtimeStateByKey.clear();
+  spatialEpisodeSignatureByThread.clear();
   resetWorldSourceRegistry();
+  resetMinecraftSpatialWindows();
 };
 
 const getOrCreateState = (
@@ -711,6 +729,31 @@ const buildLiveSituationUpdate = (input: {
   });
 };
 
+const spatialEpisodeSignature = (episode: HelixMinecraftSpatialEpisode): string =>
+  hashShort([
+    episode.room_id,
+    episode.world_id,
+    episode.actor_label ?? null,
+    episode.structure_hypotheses.map((hypothesis) => [
+      hypothesis.structure_type,
+      Math.round(hypothesis.confidence * 10),
+      hypothesis.missing_evidence,
+    ]),
+    episode.risk_notes,
+  ], 18);
+
+const shouldPublishSpatialEpisode = (
+  threadId: string | null | undefined,
+  episode: HelixMinecraftSpatialEpisode | null | undefined,
+): boolean => {
+  if (!threadId || !episode || episode.structure_hypotheses.length === 0) return false;
+  const key = `${threadId}:${episode.room_id}:${episode.actor_label ?? "actor"}`;
+  const signature = spatialEpisodeSignature(episode);
+  if (spatialEpisodeSignatureByThread.get(key) === signature) return false;
+  spatialEpisodeSignatureByThread.set(key, signature);
+  return true;
+};
+
 export const ingestWorldEvent = async (
   event: HelixWorldEvent,
   options: WorldEventIngestOptions = {},
@@ -722,6 +765,7 @@ export const ingestWorldEvent = async (
   const state = getOrCreateState(event, graphId);
   const signalId = buildSignalId(event);
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
+  const spatialResult = ingestMinecraftSpatialWorldEvent(event);
   state.signals.push(signal);
   state.signals.sort((a: SituationEventSignal, b: SituationEventSignal) =>
     a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id),
@@ -999,8 +1043,48 @@ export const ingestWorldEvent = async (
           now: signal.ts,
         })
       : null;
+  const shouldPublishSpatial =
+    resolvedBinding && options.appendToThread !== false
+      ? shouldPublishSpatialEpisode(resolvedBinding.thread_id, spatialResult.spatial_episode)
+      : false;
+  const spatialReduction =
+    shouldPublishSpatial && resolvedBinding && spatialResult.spatial_episode
+      ? reduceMinecraftSpatialIntent({
+          threadId: resolvedBinding.thread_id,
+          episode: spatialResult.spatial_episode,
+        })
+      : null;
+  const spatialArtifactUpdate =
+    liveArtifactBeforeUpdate && standbyTurnId && spatialReduction && spatialResult.spatial_episode
+      ? updateLiveSituationArtifact({
+          artifact_id: liveArtifactBeforeUpdate.artifact_id,
+          turn_id: standbyTurnId,
+          reason: "episode_update",
+          current_state_lines: {
+            now: spatialReduction.structure_line,
+            progress: spatialReduction.summary,
+            risk: spatialReduction.hazard_line,
+            unknowns: spatialReduction.missing_evidence_line,
+            last_decision: "silent_keep_in_context",
+          },
+          subgoals: liveArtifactBeforeUpdate.subgoals,
+          latest_evaluation: buildLiveSituationEvaluation({
+            artifact: liveArtifactBeforeUpdate,
+            trigger: "episode_update",
+            summary: spatialReduction.summary,
+            recommendation: null,
+            interjection_decision: "silent_keep_in_context",
+            model_invoked: false,
+            deterministic_gate: true,
+            evidence_refs: spatialResult.spatial_episode.evidence_refs,
+            now: signal.ts,
+          }),
+          evidence_refs: spatialResult.spatial_episode.evidence_refs,
+          now: signal.ts,
+        })
+      : null;
   const batchReceipt =
-    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate) && resolvedBinding && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
           threadId: resolvedBinding.thread_id,
           turnId: standbyTurnId,
@@ -1023,31 +1107,49 @@ export const ingestWorldEvent = async (
                 },
               ]
             : [],
-          extraItems: liveArtifactUpdate
+          extraItems: liveArtifactUpdate || spatialArtifactUpdate
             ? [
                 {
-                  itemId: `live_situation_evaluation:${hashShort([liveArtifactUpdate.delta.delta_id, "evaluation"], 14)}`,
+                  itemId: `live_situation_evaluation:${hashShort([(liveArtifactUpdate ?? spatialArtifactUpdate)!.delta.delta_id, "evaluation"], 14)}`,
                   itemType: "validation",
                   kind: "live_situation_evaluation",
                   observationRef: {
-                    ...(liveArtifactUpdate.artifact.latest_evaluation ?? {}),
+                    ...((liveArtifactUpdate ?? spatialArtifactUpdate)!.artifact.latest_evaluation ?? {}),
                     provenance: "deterministic_world_reduction",
                     model_invoked: false,
                     context_role: "observation_not_assistant_answer",
                   } as Record<string, unknown>,
                 },
                 {
-                  itemId: `live_situation_delta:${hashShort([liveArtifactUpdate.delta.delta_id], 14)}`,
+                  itemId: `live_situation_delta:${hashShort([(liveArtifactUpdate ?? spatialArtifactUpdate)!.delta.delta_id], 14)}`,
                   itemType: "validation",
                   kind: "live_situation_artifact_delta",
                   observationRef: {
-                    ...liveArtifactUpdate.delta,
+                    ...(liveArtifactUpdate ?? spatialArtifactUpdate)!.delta,
                     provenance: "deterministic_world_reduction",
                     model_invoked: false,
                     context_role: "observation_not_assistant_answer",
                     safe_for_future_context: true,
                   } as Record<string, unknown>,
                 },
+                ...(spatialReduction && spatialResult.spatial_episode
+                  ? [
+                      {
+                        itemId: `minecraft_spatial_episode:${hashShort([spatialResult.spatial_episode.episode_id], 14)}`,
+                        itemType: "validation" as const,
+                        kind: "minecraft_spatial_episode",
+                        observationRef: {
+                          ...spatialResult.spatial_episode,
+                          summary: spatialReduction.summary,
+                          provenance: "deterministic_spatial_reduction",
+                          model_invoked: false,
+                          context_role: "observation_not_assistant_answer",
+                          raw_logs_included: false,
+                          safe_for_future_context: true,
+                        } as Record<string, unknown>,
+                      },
+                    ]
+                  : []),
                 ...(liveAnswerEnvironmentUpdate
                   ? [
                       {
@@ -1065,8 +1167,28 @@ export const ingestWorldEvent = async (
                     ]
                   : []),
               ]
-            : liveAnswerEnvironmentUpdate
+            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode)
               ? [
+                  ...(spatialReduction && spatialResult.spatial_episode
+                    ? [
+                        {
+                          itemId: `minecraft_spatial_episode:${hashShort([spatialResult.spatial_episode.episode_id], 14)}`,
+                          itemType: "validation" as const,
+                          kind: "minecraft_spatial_episode",
+                          observationRef: {
+                            ...spatialResult.spatial_episode,
+                            summary: spatialReduction.summary,
+                            provenance: "deterministic_spatial_reduction",
+                            model_invoked: false,
+                            context_role: "observation_not_assistant_answer",
+                            raw_logs_included: false,
+                            safe_for_future_context: true,
+                          } as Record<string, unknown>,
+                        },
+                      ]
+                    : []),
+                  ...(liveAnswerEnvironmentUpdate
+                    ? [
                   {
                     itemId: `live_answer_environment_delta:${hashShort([liveAnswerEnvironmentUpdate.delta.delta_id], 14)}`,
                     itemType: "validation" as const,
@@ -1079,6 +1201,8 @@ export const ingestWorldEvent = async (
                       safe_for_future_context: true,
                     } as Record<string, unknown>,
                   },
+                    ]
+                    : []),
                 ]
               : [],
         })
@@ -1182,10 +1306,14 @@ export const ingestWorldEvent = async (
     append_candidate: appendCandidate,
     callout_proposal: calloutProposal,
     callout_delivery_receipt: calloutDeliveryReceipt,
-    live_situation_artifact: liveArtifactUpdate?.artifact ?? liveArtifactBeforeUpdate ?? null,
-    live_situation_artifact_delta: liveArtifactUpdate?.delta ?? null,
+    live_situation_artifact: spatialArtifactUpdate?.artifact ?? liveArtifactUpdate?.artifact ?? liveArtifactBeforeUpdate ?? null,
+    live_situation_artifact_delta: spatialArtifactUpdate?.delta ?? liveArtifactUpdate?.delta ?? null,
     live_answer_environment: liveAnswerEnvironmentUpdate?.environment ?? liveAnswerEnvironmentBeforeUpdate ?? null,
     live_answer_environment_delta: liveAnswerEnvironmentUpdate?.delta ?? null,
+    minecraft_spatial_event: spatialResult.spatial_event,
+    minecraft_spatial_episode: spatialResult.spatial_episode,
+    categorization_events: spatialReduction?.categorization_events ?? [],
+    synthetic_evidence: spatialReduction?.synthetic_evidence ?? [],
   };
 };
 
