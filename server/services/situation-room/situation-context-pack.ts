@@ -16,6 +16,7 @@ import {
   listWorkstationLiveSourceWindows,
   listWorkstationLiveSources,
 } from "./workstation-live-source-ingest";
+import { listWorldSourcesSeen } from "./world-source-registry";
 import type {
   LiveSourceWindowSummary,
   WorkstationLiveSource,
@@ -77,6 +78,22 @@ export function buildSituationContextPack(args: {
       from_ts: window.from_ts,
       to_ts: window.to_ts,
     }));
+  const worldSources = listWorldSourcesSeen()
+    .filter((source) => source.room_id === roomId)
+    .slice(0, 8)
+    .map((source) => ({
+      room_id: source.room_id,
+      source_id: source.source_id,
+      world_id: source.world_id,
+      latest_actor_id: source.latest_actor_id ?? null,
+      latest_actor_label: source.latest_actor_label ?? null,
+      latest_event_type: source.latest_event_type,
+      latest_ts: source.latest_ts,
+      event_count: source.event_count,
+      append_decision: source.latest_debug?.append_decision ?? null,
+      append_reason: source.latest_debug?.append_reason ?? null,
+      salience_class: source.latest_debug?.salience_class ?? null,
+    }));
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -122,6 +139,7 @@ export function buildSituationContextPack(args: {
           updated_at: liveAnswerEnvironment.updated_at,
         }
       : null,
+    world_sources: worldSources,
     objective: activeSession?.objective ?? ledger?.objective ?? null,
     current_goal: activeSession?.current_goal ?? ledger?.current_goal ?? null,
     latest_projection: null,

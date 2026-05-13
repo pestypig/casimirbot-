@@ -41,6 +41,19 @@ export type SituationContextPack = {
     evidence_refs: string[];
     updated_at: string;
   } | null;
+  world_sources?: Array<{
+    room_id: string;
+    source_id: string;
+    world_id: string;
+    latest_actor_id?: string | null;
+    latest_actor_label?: string | null;
+    latest_event_type: string;
+    latest_ts: string;
+    event_count: number;
+    append_decision?: "appended" | "not_appended" | null;
+    append_reason?: string | null;
+    salience_class?: string | null;
+  }>;
   objective?: string | null;
   current_goal?: string | null;
   latest_projection?: Record<string, unknown> | null;
