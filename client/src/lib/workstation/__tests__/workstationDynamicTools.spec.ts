@@ -129,4 +129,26 @@ describe("workstation dynamic tools", () => {
       action_id: "save_job_as_note",
     });
   });
+
+  it("exposes ideology and Zen framework actions as receipt-backed tools", () => {
+    const tools = getWorkstationDynamicTools();
+    const compare = tools.find((tool) => tool.name === "mission_ethos.compare_motive_to_zen");
+
+    expect(compare).toMatchObject({
+      namespace: "workstation",
+      panel_id: "mission-ethos",
+      action_id: "compare_motive_to_zen",
+      risk: "low",
+      returns_artifact: true,
+      terminal_artifact_kind: "ideology_motive_comparison_receipt",
+    });
+    expect(compare?.inputSchema).toMatchObject({
+      required: ["motive"],
+      properties: {
+        motive: { type: "string" },
+        framework: { enum: ["zen", "mission_ethos", "custom"] },
+        node_ids: { type: "array", items: { type: "string" } },
+      },
+    });
+  });
 });

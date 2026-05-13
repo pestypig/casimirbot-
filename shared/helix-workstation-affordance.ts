@@ -12,6 +12,7 @@ export type HelixWorkstationAffordanceFamily =
   | "situation_room"
   | "clipboard"
   | "history"
+  | "ideology"
   | "debug"
   | "admin";
 

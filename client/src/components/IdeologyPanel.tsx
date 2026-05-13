@@ -140,6 +140,17 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const handleOpenNode = (event: Event) => {
+      const detail = (event as CustomEvent<{ node_id?: string; nodeId?: string; id?: string }>).detail;
+      const nextNodeId = detail?.node_id ?? detail?.nodeId ?? detail?.id;
+      if (nextNodeId) setSelectedId(nextNodeId);
+    };
+    window.addEventListener("helix-ideology-open-node", handleOpenNode);
+    return () => window.removeEventListener("helix-ideology-open-node", handleOpenNode);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (selectedId) {
       url.searchParams.set("node", selectedId);
