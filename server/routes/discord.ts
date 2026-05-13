@@ -1,12 +1,16 @@
 import { Router } from "express";
 import {
+  attachMinecraftToDiscordSession,
   completeDiscordProfileLink,
   createDiscordLinkCode,
   createDiscordVoiceSession,
   getDiscordVoiceSession,
   ingestDiscordSourceEvent,
+  listDiscordVoiceSessions,
   recordDiscordVoiceOutputReceipt,
+  updateDiscordVoiceSessionStatus,
 } from "../services/situation-room/discord-session-store";
+import { upsertCompanionPolicy } from "../services/situation-room/companion-policy-engine";
 
 export const discordRouter = Router();
 
@@ -19,6 +23,15 @@ discordRouter.post("/session/start", (req, res) => {
     room_id: typeof req.body?.room_id === "string" ? req.body.room_id : null,
   });
   res.status(receipt.ok ? 200 : 400).json(receipt);
+});
+
+discordRouter.get("/sessions", (_req, res) => {
+  res.json({
+    ok: true,
+    sessions: listDiscordVoiceSessions(),
+    credential_collection_allowed: false,
+    context_policy: "compact_context_pack_only",
+  });
 });
 
 discordRouter.post("/session/link-code", (req, res) => {
@@ -51,6 +64,68 @@ discordRouter.get("/session/:sessionId", (req, res) => {
     credential_collection_allowed: false,
     context_policy: "compact_context_pack_only",
   });
+});
+
+discordRouter.post("/session/:sessionId/stop", (req, res) => {
+  const receipt = updateDiscordVoiceSessionStatus({
+    session_id: req.params.sessionId,
+    status: "ended",
+  });
+  res.status(receipt.ok ? 200 : 404).json(receipt);
+});
+
+discordRouter.post("/session/:sessionId/pause", (req, res) => {
+  const receipt = updateDiscordVoiceSessionStatus({
+    session_id: req.params.sessionId,
+    status: "paused",
+  });
+  res.status(receipt.ok ? 200 : 404).json(receipt);
+});
+
+discordRouter.post("/session/:sessionId/resume", (req, res) => {
+  const receipt = updateDiscordVoiceSessionStatus({
+    session_id: req.params.sessionId,
+    status: "active",
+  });
+  res.status(receipt.ok ? 200 : 404).json(receipt);
+});
+
+discordRouter.post("/session/:sessionId/companion-mode", (req, res) => {
+  const session = getDiscordVoiceSession(req.params.sessionId);
+  if (!session?.thread_id) {
+    return res.status(404).json({
+      ok: false,
+      message: "Discord session not found.",
+      credential_collection_allowed: false,
+    });
+  }
+  const policy = upsertCompanionPolicy({
+    thread_id: session.thread_id,
+    voice_input_active: true,
+    voice_output_enabled: req.body?.voice_output_enabled === true,
+    companion_mode:
+      typeof req.body?.companion_mode === "string" ? req.body.companion_mode : "direct_address_only",
+    commentary_mode:
+      typeof req.body?.commentary_mode === "string" ? req.body.commentary_mode : undefined,
+    direct_address_names: Array.isArray(req.body?.direct_address_names)
+      ? req.body.direct_address_names
+      : ["helix", "dottie"],
+  });
+  return res.json({
+    ok: true,
+    session_id: session.session_id,
+    policy,
+    credential_collection_allowed: false,
+  });
+});
+
+discordRouter.post("/session/:sessionId/attach-minecraft", (req, res) => {
+  const receipt = attachMinecraftToDiscordSession({
+    session_id: req.params.sessionId,
+    source_id: typeof req.body?.source_id === "string" ? req.body.source_id : null,
+    world_id: typeof req.body?.world_id === "string" ? req.body.world_id : null,
+  });
+  res.status(receipt.ok ? 200 : 400).json(receipt);
 });
 
 discordRouter.post("/source-event", (req, res) => {

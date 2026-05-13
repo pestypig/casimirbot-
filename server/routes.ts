@@ -199,6 +199,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/search", searchRouter);
   app.use("/api/dev-terminal", devTerminalRouter);
   app.use("/api/voice", voiceRouter);
+  const { discordLinkRouter } = await import("./routes/discord-link");
+  app.use(discordLinkRouter);
+  const { accountSessionRouter } = await import("./routes/account-session");
+  const { profileIngressRouter } = await import("./routes/profile-ingress");
+  app.use("/api/account", accountSessionRouter);
+  app.use("/api/profile-ingress", profileIngressRouter);
   app.use("/api/mission-board", missionBoardRouter);
   app.use("/api", halobankSolarRouter);
   const evolutionAuthEnabled = flagEnabled(

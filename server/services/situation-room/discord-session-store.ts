@@ -9,6 +9,7 @@ import {
 } from "@shared/helix-commander-profile-link";
 import type {
   HelixDiscordParticipant,
+  HelixDiscordAskTurnBridge,
   HelixDiscordSessionReceipt,
   HelixDiscordVoiceSession,
 } from "@shared/helix-discord-session";
@@ -29,6 +30,7 @@ import {
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
 import { upsertCompanionPolicy } from "./companion-policy-engine";
 import { ingestVoiceLaneEvent } from "./voice-interjection-router";
+import { createLiveAnswerEnvironment } from "./live-answer-environment-store";
 
 const sessions = new Map<string, HelixDiscordVoiceSession>();
 const linkCodes = new Map<string, HelixCommanderProfileLinkCode>();
@@ -63,6 +65,36 @@ const buildParticipant = (input: {
 function updateSession(session: HelixDiscordVoiceSession): HelixDiscordVoiceSession {
   sessions.set(session.session_id, session);
   return session;
+}
+
+function participantCanCommand(participant: HelixDiscordParticipant | null): boolean {
+  return (
+    participant?.role === "commander" &&
+    (participant.authority === "command_allowed" || participant.authority === "command_confirm")
+  );
+}
+
+function buildAskTurnBridge(input: {
+  session: HelixDiscordVoiceSession;
+  participant: HelixDiscordParticipant | null;
+  prompt?: string | null;
+  requested: boolean;
+  allowed: boolean;
+  reason: string;
+}): HelixDiscordAskTurnBridge {
+  return {
+    schema: "helix.discord_ask_turn_bridge.v1",
+    ok: input.requested && input.allowed,
+    session_id: input.session.session_id,
+    thread_id: input.session.thread_id ?? `helix-ask:discord:${input.session.session_id}`,
+    participant: input.participant,
+    decision: !input.requested ? "not_requested" : input.allowed ? "queued" : "blocked",
+    reason: input.reason,
+    prompt: input.prompt ?? null,
+    compact_context_attached: input.requested && input.allowed,
+    answer_created: false,
+    credential_collection_allowed: false,
+  };
 }
 
 function appendDiscordObservation(input: {
@@ -160,6 +192,50 @@ export function createDiscordVoiceSession(input: {
 
 export function getDiscordVoiceSession(sessionId: string): HelixDiscordVoiceSession | null {
   return sessions.get(normalize(sessionId)) ?? null;
+}
+
+export function listDiscordVoiceSessions(): HelixDiscordVoiceSession[] {
+  return Array.from(sessions.values()).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+}
+
+export function updateDiscordVoiceSessionStatus(input: {
+  session_id: string;
+  status: HelixDiscordVoiceSession["status"];
+}): HelixDiscordSessionReceipt {
+  const session = getDiscordVoiceSession(input.session_id);
+  if (!session) {
+    return {
+      schema: HELIX_DISCORD_SESSION_RECEIPT_SCHEMA,
+      ok: false,
+      session: null,
+      message: "Discord session not found.",
+      error: "missing_session",
+      credential_collection_allowed: false,
+      context_policy: "compact_context_pack_only",
+    };
+  }
+  const now = nowIso();
+  const updated = updateSession({ ...session, status: input.status, updated_at: now });
+  appendDiscordObservation({
+    thread_id: updated.thread_id ?? `helix-ask:discord:${updated.session_id}`,
+    item_kind: "discord_session_status",
+    observation_ref: {
+      schema: "helix.discord_session_status.v1",
+      session_id: updated.session_id,
+      status: updated.status,
+      credential_collection_allowed: false,
+    },
+    ts: now,
+  });
+  return {
+    schema: HELIX_DISCORD_SESSION_RECEIPT_SCHEMA,
+    ok: true,
+    session: updated,
+    message: `Discord session ${updated.status}.`,
+    error: null,
+    credential_collection_allowed: false,
+    context_policy: "compact_context_pack_only",
+  };
 }
 
 export function createDiscordLinkCode(input: {
@@ -296,7 +372,9 @@ export function completeDiscordProfileLink(input: {
       voice_input_active: true,
       voice_output_enabled: false,
       companion_mode: "direct_address_only",
+      commentary_mode: "off",
       direct_address_names: ["helix", "dottie"],
+      allowed_outputs: ["silent_keep_in_context", "show_text", "start_user_turn"],
       now: consumedAt,
     });
     appendDiscordObservation({
@@ -338,6 +416,7 @@ export function ingestDiscordSourceEvent(input: {
   ok: boolean;
   event: HelixDiscordSourceEvent | null;
   voice_lane_receipt?: ReturnType<typeof ingestVoiceLaneEvent> | null;
+  ask_turn_bridge?: HelixDiscordAskTurnBridge | null;
   message: string;
   error?: string | null;
   credential_collection_allowed: false;
@@ -348,6 +427,7 @@ export function ingestDiscordSourceEvent(input: {
       ok: false,
       event: null,
       voice_lane_receipt: null,
+      ask_turn_bridge: null,
       message: "Discord source event requires an active session.",
       error: "missing_session",
       credential_collection_allowed: false,
@@ -401,6 +481,7 @@ export function ingestDiscordSourceEvent(input: {
     ts,
   });
   let voiceLaneReceipt: ReturnType<typeof ingestVoiceLaneEvent> | null = null;
+  let askTurnBridge: HelixDiscordAskTurnBridge | null = null;
   if (
     event.text &&
     ["voice_transcript", "direct_address", "command_candidate", "ambient_context"].includes(
@@ -414,15 +495,123 @@ export function ingestDiscordSourceEvent(input: {
       speaker_id: participant?.speaker_id ?? participant?.discord_user_id ?? null,
       transcript: event.text,
       transcript_is_final: true,
+      speaker_authority: participantCanCommand(participant) ? "authorized_user" : "untrusted_speaker",
       evidence_refs: event.evidence_refs,
       ts,
+    });
+    const requestedStartTurn = voiceLaneReceipt.decision === "start_user_turn";
+    const allowedStartTurn =
+      Boolean(requestedStartTurn) &&
+      session.status === "active" &&
+      participantCanCommand(participant);
+    askTurnBridge = buildAskTurnBridge({
+      session,
+      participant,
+      prompt: event.text,
+      requested: requestedStartTurn,
+      allowed: allowedStartTurn,
+      reason: !requestedStartTurn
+        ? "Voice lane did not request a user turn."
+        : allowedStartTurn
+          ? "Direct-address Discord event queued for a normal Helix Ask turn by caller."
+          : "Discord participant lacks commander authority for a user turn.",
     });
   }
   return {
     ok: true,
     event,
     voice_lane_receipt: voiceLaneReceipt,
+    ask_turn_bridge: askTurnBridge,
     message: "Discord source event recorded as observation; no hidden answer turn was started.",
+    error: null,
+    credential_collection_allowed: false,
+  };
+}
+
+export function attachMinecraftToDiscordSession(input: {
+  session_id: string;
+  source_id?: string | null;
+  world_id?: string | null;
+}): {
+  ok: boolean;
+  session: HelixDiscordVoiceSession | null;
+  environment_id?: string | null;
+  message: string;
+  error?: string | null;
+  credential_collection_allowed: false;
+} {
+  const session = getDiscordVoiceSession(input.session_id);
+  if (!session) {
+    return {
+      ok: false,
+      session: null,
+      environment_id: null,
+      message: "Discord session not found.",
+      error: "missing_session",
+      credential_collection_allowed: false,
+    };
+  }
+  if (session.status !== "active") {
+    return {
+      ok: false,
+      session,
+      environment_id: null,
+      message: "Discord session must be linked before attaching Minecraft.",
+      error: "session_not_linked",
+      credential_collection_allowed: false,
+    };
+  }
+  const now = nowIso();
+  const sourceIds = [
+    normalize(input.source_id) || "source:minecraft-server",
+    `discord:${session.session_id}:voice`,
+  ];
+  const { environment } = createLiveAnswerEnvironment({
+    thread_id: session.thread_id ?? `helix-ask:discord:${session.session_id}`,
+    created_turn_id: `turn:discord-minecraft:${shortHash(session.session_id, 12)}`,
+    objective: "Watch the linked Discord and Minecraft session for danger, progress, and direct questions.",
+    room_id: session.room_id ?? `discord:${session.guild_id}:${session.voice_channel_id}`,
+    source_ids: sourceIds,
+    preset: "minecraft_run_monitor",
+    mode: "text_only",
+    now,
+    line_schema: [
+      { key: "now", label: "Now", update_policy: "episode_based", visibility: "answer_card" },
+      { key: "commander", label: "Commander", update_policy: "projection_only", visibility: "answer_card" },
+      { key: "participants", label: "Participants", update_policy: "projection_only", visibility: "situation_panel" },
+      { key: "goal", label: "Goal", update_policy: "episode_based", visibility: "answer_card" },
+      { key: "risk", label: "Risk", update_policy: "salience_only", visibility: "answer_card", priority: "warn" },
+      { key: "progress", label: "Progress", update_policy: "episode_based", visibility: "answer_card" },
+      { key: "unknowns", label: "Unknowns", update_policy: "projection_only", visibility: "answer_card" },
+      { key: "last_decision", label: "Last decision", update_policy: "salience_only", visibility: "answer_card" },
+      { key: "next_check", label: "Next check", update_policy: "episode_based", visibility: "answer_card" },
+    ],
+  });
+  const updated = updateSession({
+    ...session,
+    live_environment_ids: Array.from(new Set([...session.live_environment_ids, environment.environment_id])),
+    updated_at: now,
+  });
+  appendDiscordObservation({
+    thread_id: updated.thread_id ?? `helix-ask:discord:${updated.session_id}`,
+    item_kind: "discord_minecraft_attached",
+    observation_ref: {
+      schema: "helix.discord_minecraft_attached.v1",
+      session_id: updated.session_id,
+      source_ids: sourceIds,
+      world_id: normalize(input.world_id) || "minecraft:minehut",
+      environment_id: environment.environment_id,
+      command_lane_enabled: false,
+      credential_collection_allowed: false,
+      context_policy: "compact_context_pack_only",
+    },
+    ts: now,
+  });
+  return {
+    ok: true,
+    session: updated,
+    environment_id: environment.environment_id,
+    message: "Minecraft source attached to the Discord session thread.",
     error: null,
     credential_collection_allowed: false,
   };

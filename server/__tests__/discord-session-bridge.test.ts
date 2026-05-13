@@ -5,7 +5,11 @@ import { discordRouter } from "../routes/discord";
 import {
   resetDiscordSessionStore,
 } from "../services/situation-room/discord-session-store";
-import { resetCompanionPolicies } from "../services/situation-room/companion-policy-engine";
+import { getCompanionPolicy, resetCompanionPolicies } from "../services/situation-room/companion-policy-engine";
+import {
+  getLiveAnswerEnvironment,
+  resetLiveAnswerEnvironments,
+} from "../services/situation-room/live-answer-environment-store";
 import {
   __resetHelixThreadLedgerStore,
   getHelixThreadLedgerEvents,
@@ -22,6 +26,7 @@ describe("Discord session bridge", () => {
   beforeEach(() => {
     resetDiscordSessionStore();
     resetCompanionPolicies();
+    resetLiveAnswerEnvironments();
     __resetHelixThreadLedgerStore();
   });
 
@@ -101,6 +106,13 @@ describe("Discord session bridge", () => {
       commander_discord_user_id: "discord-user-1",
       credential_collection_allowed: false,
     });
+    expect(getCompanionPolicy("helix-ask:discord-link")).toMatchObject({
+      voice_input_active: true,
+      voice_output_enabled: false,
+      companion_mode: "direct_address_only",
+      commentary_mode: "off",
+      allowed_outputs: ["silent_keep_in_context", "show_text", "start_user_turn"],
+    });
 
     await request(app)
       .post("/api/discord/session/complete-link")
@@ -159,6 +171,11 @@ describe("Discord session bridge", () => {
           conversation_mode: "direct_address",
         },
       },
+      ask_turn_bridge: {
+        ok: true,
+        decision: "queued",
+        answer_created: false,
+      },
       credential_collection_allowed: false,
     });
     const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:discord-voice" });
@@ -200,5 +217,111 @@ describe("Discord session bridge", () => {
     const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:discord-output" });
     expect(events.some((event) => event.item_type === "toolObservation")).toBe(true);
     expect(events.some((event) => event.item_type === "answer")).toBe(false);
+  });
+
+  it("keeps unlinked participants from command-authorized direct-address turns", async () => {
+    const app = createApp();
+    const started = await request(app)
+      .post("/api/discord/session/start")
+      .send({
+        guild_id: "guild-guest",
+        voice_channel_id: "voice-guest",
+        thread_id: "helix-ask:discord-guest",
+      })
+      .expect(200);
+    const linkCode = await request(app)
+      .post("/api/discord/session/link-code")
+      .send({
+        session_id: started.body.session.session_id,
+        discord_user_id: "commander-user",
+      })
+      .expect(200);
+    await request(app)
+      .post("/api/discord/session/complete-link")
+      .send({
+        code: linkCode.body.code.code,
+        profile_id: "profile:commander",
+        discord_user_id: "commander-user",
+      })
+      .expect(200);
+
+    const event = await request(app)
+      .post("/api/discord/source-event")
+      .send({
+        session_id: started.body.session.session_id,
+        event_type: "direct_address",
+        discord_user_id: "guest-user",
+        display_name: "Guest",
+        text: "Helix, open the calculator",
+        evidence_refs: ["discord:test:guest"],
+      })
+      .expect(200);
+
+    expect(event.body).toMatchObject({
+      ok: true,
+      voice_lane_receipt: {
+        decision: "record_context",
+        classification: {
+          speaker_authority: "untrusted_speaker",
+        },
+      },
+      ask_turn_bridge: {
+        decision: "not_requested",
+        answer_created: false,
+      },
+    });
+    const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:discord-guest" });
+    expect(events.some((ledgerEvent) => ledgerEvent.item_type === "answer")).toBe(false);
+  });
+
+  it("attaches Minecraft to a linked Discord session thread", async () => {
+    const app = createApp();
+    const started = await request(app)
+      .post("/api/discord/session/start")
+      .send({
+        guild_id: "guild-mc",
+        voice_channel_id: "voice-mc",
+        thread_id: "helix-ask:discord-minecraft",
+      })
+      .expect(200);
+    const linkCode = await request(app)
+      .post("/api/discord/session/link-code")
+      .send({
+        session_id: started.body.session.session_id,
+        discord_user_id: "discord-mc-user",
+      })
+      .expect(200);
+    await request(app)
+      .post("/api/discord/session/complete-link")
+      .send({
+        code: linkCode.body.code.code,
+        profile_id: "profile:mc",
+        discord_user_id: "discord-mc-user",
+      })
+      .expect(200);
+
+    const attached = await request(app)
+      .post(`/api/discord/session/${encodeURIComponent(started.body.session.session_id)}/attach-minecraft`)
+      .send({})
+      .expect(200);
+
+    expect(attached.body).toMatchObject({
+      ok: true,
+      credential_collection_allowed: false,
+      session: {
+        thread_id: "helix-ask:discord-minecraft",
+      },
+    });
+    expect(attached.body.environment_id).toBeTruthy();
+    const environment = getLiveAnswerEnvironment(attached.body.environment_id);
+    expect(environment).toMatchObject({
+      thread_id: "helix-ask:discord-minecraft",
+      preset: "minecraft_run_monitor",
+      raw_transcript_included: false,
+      raw_audio_included: false,
+    });
+    expect(environment?.source_ids).toEqual(
+      expect.arrayContaining(["source:minecraft-server", `discord:${started.body.session.session_id}:voice`]),
+    );
   });
 });

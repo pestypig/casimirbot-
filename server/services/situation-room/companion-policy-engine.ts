@@ -50,6 +50,7 @@ export function upsertCompanionPolicy(input: {
   companion_mode?: string | null;
   commentary_mode?: HelixCompanionPolicy["commentary_mode"];
   direct_address_names?: string[];
+  allowed_outputs?: HelixCompanionPolicy["allowed_outputs"];
   now?: string;
 }): HelixCompanionPolicy {
   const threadId = input.thread_id?.trim() || "helix-ask:desktop";
@@ -64,6 +65,7 @@ export function upsertCompanionPolicy(input: {
     companion_mode: normalizeCompanionMode(input.companion_mode ?? existing.companion_mode),
     commentary_mode: input.commentary_mode ?? existing.commentary_mode,
     direct_address_names: Array.from(new Set(names)),
+    allowed_outputs: input.allowed_outputs ?? existing.allowed_outputs,
     updated_at: input.now ?? new Date().toISOString(),
   };
   policiesByThread.set(threadId, policy);
@@ -81,9 +83,15 @@ export function decideVoiceLaneAction(input: {
   const { policy, classification } = input;
   if (!policy.voice_input_active) return "silent_keep_in_context";
   if (policy.companion_mode === "off") return "record_context";
+  if (
+    classification.direct_addressed &&
+    classification.speaker_authority !== "authorized_user"
+  ) {
+    return "record_context";
+  }
   if (classification.command_candidate && classification.direct_addressed) return "start_user_turn";
   if (classification.direct_addressed) return "start_user_turn";
-  if (classification.active_companion_requested && policy.companion_mode !== "off") {
+  if (classification.active_companion_requested) {
     return "request_agentic_review";
   }
   if (policy.companion_mode === "active_companion" && classification.conversation_mode === "active_companion") {

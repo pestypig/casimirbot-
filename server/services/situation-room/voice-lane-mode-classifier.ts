@@ -18,6 +18,7 @@ const companionPattern =
 export function classifyVoiceLaneEvent(input: {
   event: HelixVoiceLaneEvent;
   policy: HelixCompanionPolicy;
+  speaker_authority?: HelixConversationModeClassification["speaker_authority"];
 }): HelixConversationModeClassification {
   const text = input.event.transcript.trim();
   const normalized = text.toLowerCase();
@@ -60,7 +61,7 @@ export function classifyVoiceLaneEvent(input: {
     direct_addressed: directAddressed,
     command_candidate: commandCandidate,
     active_companion_requested: activeCompanionRequested,
-    speaker_authority: directAddressed ? "authorized_user" : "ambient",
+    speaker_authority: input.speaker_authority ?? (directAddressed ? "authorized_user" : "ambient"),
     confidence: directAddressed || activeCompanionRequested ? 0.86 : 0.72,
     reason,
     evidence_refs: input.event.evidence_refs,

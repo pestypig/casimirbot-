@@ -1,0 +1,359 @@
+import React from "react";
+import { KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import type { HelixAccountSessionStatus } from "@shared/helix-account-session";
+
+const emptyStatus: HelixAccountSessionStatus = {
+  schema: "helix.account_session_status.v1",
+  ok: false,
+  session: null,
+  linked_accounts: [],
+  profile_ingress_tokens: [],
+  profile_ingress_usage: {
+    request_count: 0,
+    accepted_count: 0,
+    rejected_count: 0,
+    estimated_token_count: 0,
+    last_event_at: null,
+  },
+  usage: {
+    thread_count: 0,
+    item_count: 0,
+    answer_count: 0,
+    tool_observation_count: 0,
+    validation_count: 0,
+    estimated_token_count: 0,
+    window_started_at: "",
+    window_ended_at: "",
+  },
+  auth_boundary: {
+    credential_collection_allowed_in_agents: false,
+    raw_password_stored: false,
+    discord_bot_password_collection_allowed: false,
+    recommended_flow: "web_auth_or_oauth_link",
+  },
+};
+
+async function fetchStatus(): Promise<HelixAccountSessionStatus> {
+  const response = await fetch("/api/account/session");
+  if (!response.ok) throw new Error(`status ${response.status}`);
+  return response.json();
+}
+
+export default function AccountSessionPanel() {
+  const [status, setStatus] = React.useState<HelixAccountSessionStatus>(emptyStatus);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [profileId, setProfileId] = React.useState("DatDamPig");
+  const [displayName, setDisplayName] = React.useState("DatDamPig");
+  const [ingressLabel, setIngressLabel] = React.useState("Profile ingress");
+  const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
+
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setStatus(await fetchStatus());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load account session.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
+
+  const signIn = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/session/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_id: profileId, display_name: displayName }),
+      });
+      if (!response.ok) throw new Error(`sign-in ${response.status}`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start local session.");
+    } finally {
+      setLoading(false);
+    }
+  }, [displayName, profileId, refresh]);
+
+  const signOut = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/session/sign-out", { method: "POST" });
+      if (!response.ok) throw new Error(`sign-out ${response.status}`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to sign out.");
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh]);
+
+  const createIngressToken = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setNewTokenValue(null);
+    try {
+      const response = await fetch("/api/account/profile-ingress/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: ingressLabel, scopes: ["source_event", "live_environment_event"] }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `profile-ingress ${response.status}`);
+      setNewTokenValue(body.token_value ?? null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create profile ingress token.");
+    } finally {
+      setLoading(false);
+    }
+  }, [ingressLabel, refresh]);
+
+  const revokeIngressToken = React.useCallback(
+    async (tokenId: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/account/profile-ingress/${encodeURIComponent(tokenId)}/revoke`, {
+          method: "POST",
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body?.message ?? `revoke ${response.status}`);
+        await refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to revoke profile ingress token.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [refresh],
+  );
+
+  const session = status.session;
+  const usage = status.usage;
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950 text-slate-100">
+      <header className="border-b border-white/10 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <UserCircle className="h-4 w-4 text-cyan-300" />
+              Account & Sessions
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Profile, linked sources, memory scope, and usage for the current workstation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={refresh}
+            className="rounded border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
+          >
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+        {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,360px)_1fr]">
+          <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Session
+            </div>
+            {session ? (
+              <div className="mt-3 space-y-2 text-sm">
+                <p className="font-medium text-white">{session.profile.display_name}</p>
+                <p className="break-all text-xs text-slate-400">{session.profile.profile_id}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span className="rounded bg-white/5 px-2 py-1">status {session.status}</span>
+                  <span className="rounded bg-white/5 px-2 py-1">memory {session.memory_scope}</span>
+                  <span className="rounded bg-white/5 px-2 py-1">auth {session.profile.auth_mode}</span>
+                  <span className="rounded bg-white/5 px-2 py-1">agent passwords off</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="mt-2 inline-flex items-center gap-2 rounded border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-100 hover:bg-rose-500/20"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                <label className="block text-xs text-slate-300">
+                  Profile ID
+                  <input
+                    value={profileId}
+                    onChange={(event) => setProfileId(event.target.value)}
+                    className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+                  />
+                </label>
+                <label className="block text-xs text-slate-300">
+                  Display name
+                  <input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={signIn}
+                  className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  Start local session
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Usage</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
+              <Metric label="Threads" value={usage.thread_count} />
+              <Metric label="Items" value={usage.item_count} />
+              <Metric label="Answers" value={usage.answer_count} />
+              <Metric label="Observations" value={usage.tool_observation_count} />
+              <Metric label="Est. tokens" value={usage.estimated_token_count} />
+            </div>
+            <div className="mt-4 text-xs text-slate-400">
+              Window: {usage.window_started_at || "none"} {"->"} {usage.window_ended_at || "none"}
+            </div>
+          </section>
+        </div>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <Link2 className="h-3.5 w-3.5" />
+            Linked Accounts & Sessions
+          </div>
+          <div className="mt-3 space-y-2">
+            {status.linked_accounts.length === 0 ? (
+              <p className="text-xs text-slate-500">No linked accounts yet.</p>
+            ) : (
+              status.linked_accounts.map((account) => (
+                <div
+                  key={`${account.provider}:${account.external_id}`}
+                  className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs md:grid-cols-[120px_1fr_120px_120px]"
+                >
+                  <span className="font-medium text-slate-200">{account.provider}</span>
+                  <span className="break-all text-slate-400">{account.display_name || account.external_id}</span>
+                  <span className="text-slate-300">{account.status}</span>
+                  <span className="text-slate-300">{account.authority ?? "viewer"}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <KeyRound className="h-3.5 w-3.5" />
+            Profile Ingress
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Per-profile API links for live sources. Secrets are shown once and only a hash is retained server-side.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+            <input
+              value={ingressLabel}
+              onChange={(event) => setIngressLabel(event.target.value)}
+              disabled={!session}
+              className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-50"
+              placeholder="Token label"
+            />
+            <button
+              type="button"
+              onClick={createIngressToken}
+              disabled={!session || loading}
+              className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Create ingress token
+            </button>
+          </div>
+          {newTokenValue ? (
+            <div className="mt-3 rounded border border-amber-300/30 bg-amber-400/10 p-2 text-xs text-amber-100">
+              <div className="font-medium">Token shown once</div>
+              <div className="mt-1 break-all font-mono text-[11px]">{newTokenValue}</div>
+            </div>
+          ) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+            <Metric label="Ingress requests" value={status.profile_ingress_usage.request_count} />
+            <Metric label="Accepted" value={status.profile_ingress_usage.accepted_count} />
+            <Metric label="Rejected" value={status.profile_ingress_usage.rejected_count} />
+            <Metric label="Ingress tokens" value={status.profile_ingress_tokens.length} />
+          </div>
+          <div className="mt-3 space-y-2">
+            {status.profile_ingress_tokens.length === 0 ? (
+              <p className="text-xs text-slate-500">No profile ingress tokens yet.</p>
+            ) : (
+              status.profile_ingress_tokens.map((token) => (
+                <div
+                  key={token.token_id}
+                  className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[160px_1fr_100px_90px]"
+                >
+                  <div>
+                    <div className="font-medium text-slate-200">{token.label}</div>
+                    <div className="mt-1 text-[10px] text-slate-500">{token.status}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="break-all text-slate-400">{token.public_ingress_url}</div>
+                    <div className="mt-1 text-[10px] text-slate-500">prefix {token.token_prefix}...</div>
+                  </div>
+                  <div className="text-slate-300">{token.request_count} requests</div>
+                  <button
+                    type="button"
+                    onClick={() => revokeIngressToken(token.token_id)}
+                    disabled={token.status !== "active" || loading}
+                    className="rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
+          <div className="font-semibold uppercase tracking-[0.12em] text-slate-400">Boundary</div>
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
+            <span className="rounded bg-white/5 px-2 py-1">
+              agent credentials: {String(status.auth_boundary.credential_collection_allowed_in_agents)}
+            </span>
+            <span className="rounded bg-white/5 px-2 py-1">
+              raw passwords stored: {String(status.auth_boundary.raw_password_stored)}
+            </span>
+            <span className="rounded bg-white/5 px-2 py-1">
+              Discord password collection: {String(status.auth_boundary.discord_bot_password_collection_allowed)}
+            </span>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded border border-white/10 bg-slate-950/60 p-2">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-white">{value.toLocaleString()}</div>
+    </div>
+  );
+}

@@ -23,6 +23,7 @@ import {
   type MinecraftWorldSourceView,
 } from "@/components/workstation/MinecraftWorldBindingPanel";
 import SituationRoomSourcesPanel from "@/components/workstation/SituationRoomSourcesPanel";
+import { DiscordSessionPanel } from "@/components/workstation/DiscordSessionPanel";
 import { LiveAnswerEnvironmentPanel } from "@/components/workstation/LiveAnswerEnvironmentPanel";
 import { LiveWorkstationPipelinePanel } from "@/components/workstation/LiveWorkstationPipelinePanel";
 import {
@@ -2675,6 +2676,7 @@ export default function SituationRoomPipelinesPanel() {
               </div>
             </section>
 
+            <DiscordSessionPanel />
             <LiveAnswerEnvironmentPanel threadId="helix-ask:desktop" />
             <LiveWorkstationPipelinePanel />
 

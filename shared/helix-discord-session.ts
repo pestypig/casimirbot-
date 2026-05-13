@@ -10,7 +10,8 @@ export type HelixDiscordVoiceSessionStatus =
   | "link_pending"
   | "active"
   | "paused"
-  | "ended";
+  | "ended"
+  | "error";
 
 export type HelixDiscordParticipantRole =
   | "commander"
@@ -58,4 +59,18 @@ export type HelixDiscordSessionReceipt = {
   error?: string | null;
   credential_collection_allowed: false;
   context_policy: "compact_context_pack_only";
+};
+
+export type HelixDiscordAskTurnBridge = {
+  schema: "helix.discord_ask_turn_bridge.v1";
+  ok: boolean;
+  session_id: string;
+  thread_id: string;
+  participant?: HelixDiscordParticipant | null;
+  decision: "not_requested" | "queued" | "blocked";
+  reason: string;
+  prompt?: string | null;
+  compact_context_attached: boolean;
+  answer_created: false;
+  credential_collection_allowed: false;
 };

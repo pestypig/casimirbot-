@@ -1,0 +1,12 @@
+{
+  "name": "discord-helix-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "register": "tsx src/commands.ts",
+    "dev": "tsx src/index.ts",
+    "simulate": "tsx src/voiceEventSimulator.ts"
+  },
+  "dependencies": {}
+}

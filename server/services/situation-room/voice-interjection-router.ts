@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { HelixVoiceLaneEvent, HelixVoiceLaneIngestReceipt } from "@shared/helix-voice-lane-event";
+import type { HelixConversationModeClassification } from "@shared/helix-conversation-mode";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
 import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
 import {
@@ -64,6 +65,7 @@ export function ingestVoiceLaneEvent(input: {
   transcript: string;
   transcript_is_final?: boolean;
   confidence?: number | null;
+  speaker_authority?: HelixConversationModeClassification["speaker_authority"];
   evidence_refs?: string[];
   ts?: string;
 }): HelixVoiceLaneIngestReceipt {
@@ -102,7 +104,11 @@ export function ingestVoiceLaneEvent(input: {
     context_policy: "compact_context_pack_only",
   };
   const policy = getCompanionPolicy(threadId);
-  const classification = classifyVoiceLaneEvent({ event, policy });
+  const classification = classifyVoiceLaneEvent({
+    event,
+    policy,
+    speaker_authority: input.speaker_authority,
+  });
   const decision = decideVoiceLaneAction({ policy, classification });
   const itemIds = [appendVoiceObservation({ event, classification, decision })];
   let reviewId: string | null = null;

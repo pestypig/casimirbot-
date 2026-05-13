@@ -1003,6 +1003,20 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
       },
     ],
   }),
+  "account-session": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Account Sessions",
+        description: "Open and focus the Account & Sessions panel.",
+        risk: "low",
+        aliases: ["open account", "show sessions", "show token usage", "open profile"],
+      },
+    ],
+  }),
 };
 
 export function getWorkstationPanelCapabilities(panelId: string): WorkstationPanelCapabilities | null {

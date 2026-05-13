@@ -256,6 +256,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultPosition: { x: 220, y: 140 },
   },
   {
+    id: "account-session",
+    title: "Account & Sessions",
+    loader: load(() => import("@/components/workstation/AccountSessionPanel")),
+    defaultSize: { w: 900, h: 640 },
+    defaultPosition: { x: 240, y: 130 },
+    keywords: ["account", "session", "profile", "discord", "usage", "memory", "tokens", "sign in"],
+  },
+  {
     id: "situation-room-sources",
     title: "Situation Room",
     loader: load(() => import("@/components/workstation/SituationRoomPipelinesPanel")),
