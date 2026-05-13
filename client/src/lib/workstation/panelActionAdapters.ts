@@ -2474,6 +2474,11 @@ export function executeHelixPanelAction(
       });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
+      const latestDebugEvents = useScientificCalculatorStore.getState().debugEvents;
+      const ingestDebugEvent =
+        latestDebugEvents.find((event) => event.action_id === "ingest_latex" && event.source === "workstation_action") ??
+        latestDebugEvents[0] ??
+        null;
       return {
         ok: true,
         panel_id: panelId,
@@ -2483,8 +2488,8 @@ export function executeHelixPanelAction(
           source_path: entry.sourcePath,
           anchor: entry.anchor,
           history_id: entry.id,
-          debug_event: useScientificCalculatorStore.getState().debugEvents[0] ?? null,
-          debug_log_tail: buildScientificCalculatorDebugSnapshot(useScientificCalculatorStore.getState().debugEvents, 8),
+          debug_event: ingestDebugEvent,
+          debug_log_tail: buildScientificCalculatorDebugSnapshot(latestDebugEvents, 8),
         },
       };
     }

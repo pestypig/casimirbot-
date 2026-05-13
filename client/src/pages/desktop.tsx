@@ -25,7 +25,7 @@ import {
   coerceHelixWorkstationActions,
   type HelixWorkstationAction,
 } from "@/lib/workstation/workstationActionContract";
-import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
+import { executeWorkstationActionWithLedger } from "@/lib/workstation/workstationActionExecutor";
 import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
 import { emitHelixWorkstationProceduralStep } from "@/lib/workstation/proceduralPlaybackContract";
 import { startWorkstationClipboardCapture } from "@/lib/workstation/workstationClipboard";
@@ -413,13 +413,15 @@ export default function DesktopPage({
               await sleep(WORKSTATION_PROCEDURAL_STEP_DELAY_MS + 80);
             }
 
-            const result = executeHelixPanelAction(
-              {
+            const execution = await executeWorkstationActionWithLedger({
+              request: {
                 panel_id: action.panel_id,
                 action_id: action.action_id,
                 args: action.args,
               },
-              {
+              thread_id: HELIX_ASK_CONTEXT_ID.desktop,
+              trace_id: traceId,
+              context: {
                 openPanel: (panelId, groupId) => {
                   if (groupId && workstationEnabled) {
                     store.openPanelInGroup(groupId, panelId);
@@ -459,7 +461,8 @@ export default function DesktopPage({
                 },
                 openSettings: (tab) => openSettings(tab ?? "preferences"),
               },
-            );
+            });
+            const result = execution.result;
             if (result.ok && isProceduralDocsAction) {
               const path =
                 result.artifact && typeof result.artifact.path === "string"

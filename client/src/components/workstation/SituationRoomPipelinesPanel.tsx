@@ -26,6 +26,7 @@ import SituationRoomSourcesPanel from "@/components/workstation/SituationRoomSou
 import { DiscordSessionPanel } from "@/components/workstation/DiscordSessionPanel";
 import { LiveAnswerEnvironmentPanel } from "@/components/workstation/LiveAnswerEnvironmentPanel";
 import { LiveWorkstationPipelinePanel } from "@/components/workstation/LiveWorkstationPipelinePanel";
+import { WorkstationActionTrace } from "@/components/workstation/WorkstationActionTrace";
 import {
   dispatchHelixWorkstationActions,
   type HelixWorkstationAction,
@@ -1741,7 +1742,7 @@ export default function SituationRoomPipelinesPanel() {
                         <option value="__room__">Whole active room</option>
                         {activeSources.map((source) => (
                           <option key={source.source_id} value={source.source_id}>
-                            {source.label} ({source.kind})
+                            {source.label} ({source.capture_source})
                           </option>
                         ))}
                       </select>
@@ -2013,6 +2014,22 @@ export default function SituationRoomPipelinesPanel() {
               <p className="mt-3 text-xs text-slate-400">
                 Monitor and execution receipts are observations only. Graph runtime does not start capture, inject transcript context, or grant command authority.
               </p>
+            </section>
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Workstation Action Trace</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    These are receipt-backed action executions from Helix Ask or panel controls. Completed means receipt or state proof was observed.
+                  </p>
+                </div>
+                <span className="rounded border border-white/15 px-2 py-0.5 text-[10px] uppercase text-slate-400">
+                  receipt-backed
+                </span>
+              </div>
+              <div className="mt-3">
+                <WorkstationActionTrace limit={8} />
+              </div>
             </section>
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">

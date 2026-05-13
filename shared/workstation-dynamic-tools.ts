@@ -1,3 +1,9 @@
+import {
+  HELIX_WORKSTATION_AFFORDANCE_SCHEMA,
+  type HelixWorkstationAffordance,
+  type HelixWorkstationAffordanceFamily,
+} from "./helix-workstation-affordance";
+
 export type WorkstationDynamicToolRisk = "low" | "medium" | "high";
 
 export type WorkstationDynamicToolActionDefinition = {
@@ -875,6 +881,135 @@ export function buildWorkstationDynamicToolSpec(action: WorkstationDynamicToolAc
         }
       : {}),
   };
+}
+
+export const WORKSTATION_AFFORDANCE_VERSION = "e301.workstation-affordance.v1";
+
+function resolveAffordanceFamily(panelId: string, actionId: string): HelixWorkstationAffordanceFamily {
+  if (panelId === "scientific-calculator") {
+    return actionId.includes("live") || actionId.includes("stream") || actionId.includes("tick")
+      ? "live_source"
+      : "calculation";
+  }
+  if (panelId === "workstation-notes") return "notes";
+  if (panelId === "docs-viewer") return "documents";
+  if (panelId === "workstation-clipboard-history") return "clipboard";
+  if (panelId === "workstation-workflow-timeline" || panelId === "agi-task-history") return "history";
+  if (panelId === "agi-essence-console") return "debug";
+  if (panelId === "situation-room-sources") return "live_source";
+  if (panelId === "situation-room-pipelines") {
+    if (actionId.includes("live_answer") || actionId.includes("line_schema")) return "live_answer_environment";
+    if (actionId.includes("live_source") || actionId === "attach_live_source") return "live_source";
+    return "situation_room";
+  }
+  return "admin";
+}
+
+function resolveAffordanceExecutionTarget(panelId: string, actionId: string): HelixWorkstationAffordance["execution_target"] {
+  if (panelId.startsWith("situation-room")) return "hybrid";
+  if (panelId === "scientific-calculator" && (actionId.includes("stream") || actionId.includes("live") || actionId.includes("tick"))) {
+    return "hybrid";
+  }
+  return "client";
+}
+
+function resolveAffordanceBackendEndpoint(panelId: string, actionId: string): string | null {
+  if (panelId === "situation-room-pipelines" && actionId === "create_live_answer_environment") {
+    return "/api/agi/situation/live-answer-environment/create";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "create_live_workstation_pipeline") {
+    return "/api/agi/situation/live-workstation-pipeline/create";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "start_situation_goal_session") {
+    return "/api/agi/situation/goal-session/start";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") {
+    return "/api/agi/situation/live-commentary/session";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") {
+    return "/api/agi/situation/live-agentic-review/request";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") {
+    return "/api/agi/situation/companion-policy";
+  }
+  if (panelId === "scientific-calculator" && (actionId.includes("stream") || actionId.includes("live") || actionId.includes("tick"))) {
+    return "/api/agi/situation/live-source/event";
+  }
+  return null;
+}
+
+function resolveExpectedStateChange(panelId: string, actionId: string): HelixWorkstationAffordance["expected_state_change"] {
+  if (panelId === "scientific-calculator" && (actionId === "solve_expression" || actionId === "solve_with_steps")) {
+    return { store: "useScientificCalculatorStore", selector_hint: "lastSolve", proof_key: "trace" };
+  }
+  if (panelId === "scientific-calculator" && (actionId.includes("stream") || actionId.includes("live") || actionId.includes("tick"))) {
+    return { store: "useScientificCalculatorLiveSourceStore", selector_hint: "latestTick/status", proof_key: "workstation_live_source_receipt" };
+  }
+  if (panelId === "workstation-notes") {
+    return { store: "useWorkstationNotesStore", selector_hint: "notes/order/active_note_id", proof_key: "note_id" };
+  }
+  if (panelId.startsWith("situation-room")) {
+    return { store: "situation-room-runtime", selector_hint: "receipt or active artifact", proof_key: "expected_receipt_kind" };
+  }
+  return null;
+}
+
+function resolveAffordanceContextPolicy(panelId: string, actionId: string): HelixWorkstationAffordance["context_policy"] {
+  if (SITUATION_ROOM_MANUAL_ONLY_ACTIONS.has(`${panelId}.${actionId}`)) return "explicit_attachment_only";
+  if (panelId === "agi-essence-console" || actionId.includes("debug")) return "debug_only";
+  return "compact_context_only";
+}
+
+export function buildWorkstationAffordance(action: WorkstationDynamicToolActionDefinition): HelixWorkstationAffordance {
+  const tool = buildWorkstationDynamicToolSpec(action);
+  const key = `${action.panel_id}.${action.action_id}`;
+  const risk = action.risk ?? "low";
+  return {
+    schema: HELIX_WORKSTATION_AFFORDANCE_SCHEMA,
+    affordance_id: key,
+    panel_id: action.panel_id,
+    action_id: action.action_id,
+    label: action.title ?? action.action_id.replace(/_/g, " "),
+    family: resolveAffordanceFamily(action.panel_id, action.action_id),
+    description: action.description ?? tool.description,
+    input_schema: tool.inputSchema,
+    output_schema: tool.terminal_artifact_kind
+      ? {
+          type: "object",
+          required: ["ok"],
+          properties: {
+            ok: { type: "boolean" },
+            kind: { const: tool.terminal_artifact_kind },
+          },
+        }
+      : undefined,
+    risk,
+    confirmation_policy: action.requires_confirmation ? "always" : risk === "high" ? "on_high_risk" : "never",
+    execution_target: resolveAffordanceExecutionTarget(action.panel_id, action.action_id),
+    backend_endpoint: resolveAffordanceBackendEndpoint(action.panel_id, action.action_id),
+    client_handler_key: key,
+    expected_receipt_kind: tool.terminal_artifact_kind ?? "workspace_action_receipt",
+    expected_state_change: resolveExpectedStateChange(action.panel_id, action.action_id),
+    context_policy: resolveAffordanceContextPolicy(action.panel_id, action.action_id),
+    deterministic_content_role: "observation_not_assistant_answer",
+  };
+}
+
+export function buildWorkstationAffordances(
+  actions: WorkstationDynamicToolActionDefinition[] = WORKSTATION_DYNAMIC_TOOL_ACTIONS,
+): HelixWorkstationAffordance[] {
+  return actions.map(buildWorkstationAffordance);
+}
+
+export const WORKSTATION_AFFORDANCES: HelixWorkstationAffordance[] = buildWorkstationAffordances();
+
+export function findWorkstationAffordance(
+  panelId: string,
+  actionId: string,
+  affordances: readonly HelixWorkstationAffordance[] = WORKSTATION_AFFORDANCES,
+): HelixWorkstationAffordance | null {
+  const key = `${panelId}.${actionId}`;
+  return affordances.find((affordance) => affordance.affordance_id === key) ?? null;
 }
 
 export function buildWorkstationDynamicTools(

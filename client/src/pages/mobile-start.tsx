@@ -31,7 +31,7 @@ import {
   coerceHelixWorkstationActions,
   type HelixWorkstationAction,
 } from "@/lib/workstation/workstationActionContract";
-import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
+import { executeWorkstationActionWithLedger } from "@/lib/workstation/workstationActionExecutor";
 import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
 import {
   createWorkstationActionTraceId,
@@ -247,7 +247,7 @@ export default function MobileStartPage() {
       const actions = coerceHelixWorkstationActions(detail);
       if (actions.length === 0) return;
       const store = useWorkstationLayoutStore.getState();
-      const runAction = (action: HelixWorkstationAction) => {
+      const runAction = async (action: HelixWorkstationAction) => {
         const traceId = createWorkstationActionTraceId(action.action);
         const startedAtMs = Date.now();
         const publish = (args: {
@@ -334,13 +334,15 @@ export default function MobileStartPage() {
             publish({ ok: true });
             return;
           case "run_panel_action": {
-            const result = executeHelixPanelAction(
-              {
+            const execution = await executeWorkstationActionWithLedger({
+              request: {
                 panel_id: action.panel_id,
                 action_id: action.action_id,
                 args: action.args,
               },
-              {
+              thread_id: HELIX_ASK_CONTEXT_ID.mobile,
+              trace_id: traceId,
+              context: {
                 openPanel: (panelId) => openPanelUniversal(panelId),
                 focusPanel: (panelId) => {
                   openPanelUniversal(panelId);
@@ -349,7 +351,8 @@ export default function MobileStartPage() {
                 closePanel: (panelId) => close(panelId),
                 openSettings: (tab) => openSettings(tab ?? "preferences"),
               },
-            );
+            });
+            const result = execution.result;
             publish({
               ok: result.ok,
               kind:
