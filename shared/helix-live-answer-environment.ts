@@ -23,6 +23,7 @@ export type LiveAnswerLineVisibility =
 
 export type LiveAnswerEnvironmentPreset =
   | "minecraft_run_monitor"
+  | "calculator_equation_interpreter"
   | "calculator_prime_stream"
   | "physics_stability_tracker"
   | "browser_video_argument_tracker"
@@ -206,6 +207,14 @@ export const LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS: Record<
     answer("last_test", "Last test", "computation_tick", "Latest deterministic primality result."),
     answer("stability_rate", "Rate", "windowed_summary", "Compact stream progress rate."),
     answer("next_check", "Next check", "computation_tick", "Next candidate expected from the stream."),
+  ],
+  calculator_equation_interpreter: [
+    answer("current_equation", "Current equation", "computation_tick", "Equation used as the live source."),
+    answer("latest_result", "Latest result", "computation_tick", "Latest calculator solve output."),
+    answer("variables", "Variables", "computation_tick", "Variables or target symbol used by the solve."),
+    answer("interpretation", "Interpretation", "windowed_summary", "Compact meaning of the solved value in the declared context."),
+    answer("big_picture", "Big picture", "windowed_summary", "How this equation is generally being used in this live environment."),
+    answer("next_check", "Next check", "computation_tick", "What should update next."),
   ],
   physics_stability_tracker: [
     answer("current_parameters", "Current parameters", "projection_only", "Current simulation parameters."),

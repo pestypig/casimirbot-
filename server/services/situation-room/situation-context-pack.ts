@@ -11,7 +11,7 @@ import {
 } from "./situation-goal-session-store";
 import { getMissionMemoryForThread } from "./mission-memory-reducer";
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
-import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
+import { getActiveLiveAnswerEnvironmentForThread, getLiveAnswerEnvironment } from "./live-answer-environment-store";
 import {
   listWorkstationLiveSourceWindows,
   listWorkstationLiveSources,
@@ -33,6 +33,7 @@ export function buildSituationContextPack(args: {
   threadId: string;
   roomId?: string | null;
   sessionId?: string | null;
+  liveAnswerEnvironmentId?: string | null;
   limit?: number;
 }): SituationContextPack {
   const activeSession = getActiveSituationGoalSessionForThread(args.threadId);
@@ -51,7 +52,9 @@ export function buildSituationContextPack(args: {
   const ledger = sessionId ? getSituationGoalSessionLedger(sessionId) : null;
   const missionMemory = getMissionMemoryForThread({ threadId: args.threadId }).memory ?? null;
   const liveArtifact = getActiveLiveSituationArtifactForThread(args.threadId);
-  const liveAnswerEnvironment = getActiveLiveAnswerEnvironmentForThread(args.threadId);
+  const liveAnswerEnvironment =
+    (args.liveAnswerEnvironmentId ? getLiveAnswerEnvironment(args.liveAnswerEnvironmentId) : null) ??
+    getActiveLiveAnswerEnvironmentForThread(args.threadId);
   const liveSourceIds = new Set(liveAnswerEnvironment?.source_ids ?? []);
   const liveSourceStatus = listWorkstationLiveSources()
     .filter((source: WorkstationLiveSource) => liveSourceIds.has(source.source_id) || source.environment_id === liveAnswerEnvironment?.environment_id)

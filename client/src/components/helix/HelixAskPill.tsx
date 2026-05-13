@@ -166,6 +166,7 @@ import {
 } from "@/store/useLiveSituationArtifactStore";
 import {
   selectActiveLiveAnswerEnvironment,
+  selectLiveAnswerEnvironmentById,
   selectLiveAnswerEnvironmentDeltas,
   useLiveAnswerEnvironmentStore,
   type LiveAnswerEnvironmentState,
@@ -333,10 +334,19 @@ function HelixAskLiveAnswerEnvironmentProjection({
   const loadEnvironment = useLiveAnswerEnvironmentStore(
     (state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment,
   );
-  const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
+  const loadEnvironmentById = useLiveAnswerEnvironmentStore(
+    (state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironmentById,
+  );
+  const activeThreadEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectActiveLiveAnswerEnvironment(state, threadId),
   );
-  const renderedEnvironment = environment ?? initialEnvironment ?? null;
+  const pinnedEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
+    selectLiveAnswerEnvironmentById(state, initialEnvironment?.environment_id),
+  );
+  const renderedEnvironment =
+    initialEnvironment
+      ? pinnedEnvironment ?? initialEnvironment
+      : activeThreadEnvironment ?? null;
   const deltas = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectLiveAnswerEnvironmentDeltas(state, renderedEnvironment?.environment_id),
   );
@@ -366,7 +376,12 @@ function HelixAskLiveAnswerEnvironmentProjection({
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      if (!cancelled) void loadEnvironment(threadId, 30);
+      if (cancelled) return;
+      if (initialEnvironment?.environment_id) {
+        void loadEnvironmentById(threadId, initialEnvironment.environment_id, 30);
+        return;
+      }
+      void loadEnvironment(threadId, 30);
     };
     load();
     const interval = window.setInterval(load, 5000);
@@ -374,7 +389,7 @@ function HelixAskLiveAnswerEnvironmentProjection({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [loadEnvironment, threadId]);
+  }, [initialEnvironment?.environment_id, loadEnvironment, loadEnvironmentById, threadId]);
 
   if (!renderedEnvironment) return null;
 
@@ -27647,11 +27662,12 @@ export function HelixAskPill({
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
             const liveSituationArtifact =
               reply.liveSituationArtifact ?? reply.situationContextPack?.live_situation_artifact ?? null;
-            const liveAnswerEnvironment =
-              reply.liveAnswerEnvironment ?? reply.situationContextPack?.live_answer_environment ?? null;
+            const liveAnswerEnvironmentFromResponse = reply.liveAnswerEnvironment ?? null;
+            const liveAnswerEnvironmentFromContext = reply.situationContextPack?.live_answer_environment ?? null;
             const liveSituationThreadId =
               liveSituationArtifact?.thread_id ??
-              liveAnswerEnvironment?.thread_id ??
+              liveAnswerEnvironmentFromResponse?.thread_id ??
+              liveAnswerEnvironmentFromContext?.thread_id ??
               reply.situationContextPack?.thread_id ??
               "helix-ask:desktop";
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
@@ -27682,6 +27698,12 @@ export function HelixAskPill({
                   })
                   .filter((entry): entry is string => Boolean(entry))
               : [];
+            const isLiveWorkstationPipelineSetupTurn =
+              visibleDebugActionIds.includes("situation-room-pipelines.create_live_workstation_pipeline");
+            const liveAnswerEnvironment =
+              isLiveWorkstationPipelineSetupTurn
+                ? null
+                : liveAnswerEnvironmentFromResponse ?? liveAnswerEnvironmentFromContext;
             const visibleDebugActualArtifacts = Array.isArray(replyDebugRecord?.step_results)
               ? Array.from(
                   new Set(

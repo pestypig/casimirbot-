@@ -1,3 +1,6 @@
+import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
+
 export const SCIENTIFIC_CALCULATOR_PANEL_ID = "scientific-calculator";
 export const SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT = "helix:math-picked";
 
@@ -19,6 +22,12 @@ export function dispatchScientificCalculatorMathPicked(detail: {
     anchor: detail.anchor ?? null,
     ts: new Date().toISOString(),
   };
+  useScientificCalculatorLiveSourceStore.getState().stopPrimeStream();
+  useScientificCalculatorStore.getState().ingestLatex(normalized.latex, {
+    sourcePath: normalized.sourcePath,
+    anchor: normalized.anchor,
+    source: normalized.sourcePath === "clipboard" ? "clipboard" : "doc_viewer",
+  });
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent<ScientificCalculatorMathPickedDetail>(

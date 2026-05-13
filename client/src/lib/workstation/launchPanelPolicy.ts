@@ -1,7 +1,6 @@
 const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "docs-viewer",
   "workstation-notes",
-  "situation-room-sources",
   "situation-room-pipelines",
   "workstation-clipboard-history",
   "workstation-workflow-timeline",

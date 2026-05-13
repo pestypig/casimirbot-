@@ -10,6 +10,9 @@ import { updateLiveAnswerEnvironment } from "./live-answer-environment-store";
 const numberText = (value: unknown, fallback: string): string =>
   typeof value === "number" && Number.isFinite(value) ? String(value) : fallback;
 
+const stringText = (value: unknown, fallback: string): string =>
+  typeof value === "string" && value.trim() ? value.trim() : fallback;
+
 export function reduceLiveAnswerEnvironmentFromSourceEvent(input: {
   environment: LiveAnswerEnvironment | null;
   event: WorkstationLiveSourceEvent;
@@ -42,7 +45,31 @@ export function reduceLiveAnswerEnvironmentFromSourceEvent(input: {
 
   let summary = `${input.event.event_type} observed.`;
 
-  if (input.event.kind === "calculator_series" || environment.preset === "calculator_prime_stream") {
+  if (input.event.event_type === "equation_evaluated") {
+    const expression = typeof payload.expression === "string" ? payload.expression : "unknown equation";
+    const equationContext = stringText(payload.equation_context, "No equation use-context was supplied.");
+    const resultText = typeof payload.result_text === "string" && payload.result_text.trim()
+      ? payload.result_text
+      : typeof payload.error === "string" && payload.error.trim()
+        ? payload.error
+        : "No result text emitted.";
+    const ok = payload.ok !== false;
+    const variable = stringText(payload.variable, "no target variable detected");
+    const normalized = stringText(payload.normalized_expression, expression);
+    const interpretation = ok
+      ? `With ${variable}, the current solve returns ${resultText}. In context: ${equationContext}`
+      : `The calculator could not produce a usable value for ${expression}. In context: ${equationContext}`;
+    const bigPicture = `This live equation is being used as a compact source of changing calculator evidence, not as an assistant answer. Context: ${equationContext}`;
+    setLine("current_equation", expression, 0.94);
+    setLine("latest_result", resultText, ok ? 0.88 : 0.58);
+    setLine("variables", `${variable}; normalized=${normalized}`.slice(0, 180), ok ? 0.78 : 0.58);
+    setLine("interpretation", interpretation.slice(0, 220), ok ? 0.76 : 0.58);
+    setLine("big_picture", bigPicture.slice(0, 220), 0.72);
+    setLine("last_test", ok ? resultText : `Blocked: ${resultText}`, ok ? 0.86 : 0.62);
+    setLine("computation", `${expression} -> ${resultText}`.slice(0, 180), ok ? 0.82 : 0.58);
+    setLine("next_check", ok ? "Wait for the next equation tick or variable schedule." : "Review calculator capability route before continuing.", 0.68);
+    summary = ok ? `Equation source evaluated: ${resultText}. ${equationContext}` : `Equation source blocked: ${resultText}`;
+  } else if (input.event.kind === "calculator_series" || environment.preset === "calculator_prime_stream") {
     const candidate = numberText(payload.candidate, "unknown");
     const isPrime = payload.is_prime === true;
     const latestPrime = numberText(payload.latest_prime, isPrime ? candidate : "none");

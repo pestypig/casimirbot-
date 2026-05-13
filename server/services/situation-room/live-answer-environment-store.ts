@@ -47,6 +47,7 @@ const normalizeMode = (value?: string | null): LiveAnswerEnvironmentMode => {
 const normalizePreset = (value?: string | null): LiveAnswerEnvironmentPreset => {
   if (
     value === "discord_interpreter" ||
+    value === "calculator_equation_interpreter" ||
     value === "calculator_prime_stream" ||
     value === "physics_stability_tracker" ||
     value === "browser_video_argument_tracker" ||
@@ -265,26 +266,42 @@ export function getLiveAnswerEnvironment(environmentId: string): LiveAnswerEnvir
 export function getActiveLiveAnswerEnvironmentForThread(threadId: string): LiveAnswerEnvironment | null {
   return Array.from(environments.values())
     .filter((environment: LiveAnswerEnvironment) => environment.thread_id === threadId && environment.status === "active")
-    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) => b.updated_at.localeCompare(a.updated_at))
+    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
+      b.updated_at.localeCompare(a.updated_at) ||
+      b.created_at.localeCompare(a.created_at) ||
+      b.environment_id.localeCompare(a.environment_id)
+    )
     .at(0) ?? null;
 }
 
 export function getActiveLiveAnswerEnvironmentForRoom(roomId: string): LiveAnswerEnvironment | null {
   return Array.from(environments.values())
     .filter((environment: LiveAnswerEnvironment) => environment.room_id === roomId && environment.status === "active")
-    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) => b.updated_at.localeCompare(a.updated_at))
+    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
+      b.updated_at.localeCompare(a.updated_at) ||
+      b.created_at.localeCompare(a.created_at) ||
+      b.environment_id.localeCompare(a.environment_id)
+    )
     .at(0) ?? null;
 }
 
 export function getActiveLiveAnswerEnvironmentForSource(sourceId: string): LiveAnswerEnvironment | null {
   return Array.from(environments.values())
     .filter((environment: LiveAnswerEnvironment) => environment.source_ids.includes(sourceId) && environment.status === "active")
-    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) => b.updated_at.localeCompare(a.updated_at))
+    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
+      b.updated_at.localeCompare(a.updated_at) ||
+      b.created_at.localeCompare(a.created_at) ||
+      b.environment_id.localeCompare(a.environment_id)
+    )
     .at(0) ?? null;
 }
 
 export function listLiveAnswerEnvironments(): LiveAnswerEnvironment[] {
-  return Array.from(environments.values()).sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) => b.updated_at.localeCompare(a.updated_at));
+  return Array.from(environments.values()).sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
+    b.updated_at.localeCompare(a.updated_at) ||
+    b.created_at.localeCompare(a.created_at) ||
+    b.environment_id.localeCompare(a.environment_id)
+  );
 }
 
 export function updateLiveAnswerEnvironment(input: {

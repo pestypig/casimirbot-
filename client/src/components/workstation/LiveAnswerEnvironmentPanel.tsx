@@ -7,8 +7,15 @@ import {
 } from "@/store/useLiveAnswerEnvironmentStore";
 import type { WorkstationLiveSource, WorkstationLiveSourceEvent, LiveSourceWindowSummary } from "@shared/helix-workstation-live-source";
 import type { LiveAnswerEnvironmentDelta, LiveAnswerLineState } from "@shared/helix-live-answer-environment";
+import type {
+  LiveCommentaryCadence,
+  LiveCommentaryDeliveryReceipt,
+  LiveCommentaryProposal,
+  LiveCommentarySession,
+  LiveCommentaryTraceStep,
+} from "@shared/helix-live-commentary";
 
-type LiveEnvironmentTab = "overview" | "sources" | "line_schema" | "deltas" | "windows" | "debug";
+type LiveEnvironmentTab = "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "debug";
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -16,7 +23,17 @@ const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "line_schema", label: "Line Schema" },
   { id: "deltas", label: "Deltas" },
   { id: "windows", label: "Windows" },
+  { id: "commentary", label: "Commentary" },
   { id: "debug", label: "Debug" },
+];
+
+const commentaryCadences: LiveCommentaryCadence[] = [
+  "off",
+  "milestones_only",
+  "anomalies_and_milestones",
+  "windowed_companion",
+  "active_dialogue",
+  "continuous_debug",
 ];
 
 const postJson = async (path: string, body?: Record<string, unknown>) => {
@@ -38,6 +55,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [sources, setSources] = useState<WorkstationLiveSource[]>([]);
   const [events, setEvents] = useState<WorkstationLiveSourceEvent[]>([]);
   const [windows, setWindows] = useState<LiveSourceWindowSummary[]>([]);
+  const [commentarySession, setCommentarySession] = useState<LiveCommentarySession | null>(null);
+  const [commentaryProposals, setCommentaryProposals] = useState<LiveCommentaryProposal[]>([]);
+  const [commentaryDeliveries, setCommentaryDeliveries] = useState<LiveCommentaryDeliveryReceipt[]>([]);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectActiveLiveAnswerEnvironment(state, threadId),
@@ -66,19 +86,29 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const refresh = async () => {
     try {
       await loadEnvironment(threadId, 50);
-      const [sourceRes, eventRes, windowRes] = await Promise.all([
+      const loadedEnvironment = selectActiveLiveAnswerEnvironment(useLiveAnswerEnvironmentStore.getState(), threadId);
+      const activeEnvironmentId = loadedEnvironment?.environment_id ?? environment?.environment_id ?? null;
+      const commentaryPath = activeEnvironmentId
+        ? `/api/agi/situation/live-commentary?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
+        : `/api/agi/situation/live-commentary?thread_id=${encodeURIComponent(threadId)}`;
+      const [sourceRes, eventRes, windowRes, commentaryRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
+        fetch(commentaryPath),
       ]);
-      const [sourceBody, eventBody, windowBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
+        commentaryRes.json(),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
       setWindows(Array.isArray(windowBody.windows) ? windowBody.windows : []);
+      setCommentarySession(commentaryBody.session ?? null);
+      setCommentaryProposals(Array.isArray(commentaryBody.proposals) ? commentaryBody.proposals : []);
+      setCommentaryDeliveries(Array.isArray(commentaryBody.deliveries) ? commentaryBody.deliveries : []);
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -99,6 +129,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
 
   const setSourceStatus = async (sourceId: string, action: "pause" | "resume" | "stop" | "reset-counters") => {
     await postJson(`/api/agi/situation/live-source/${encodeURIComponent(sourceId)}/${action}`);
+    await refresh();
+  };
+
+  const setCommentaryCadence = async (cadence: LiveCommentaryCadence) => {
+    if (!environment) return;
+    await postJson("/api/agi/situation/live-commentary/session", {
+      environment_id: environment.environment_id,
+      cadence,
+      status: cadence === "off" ? "paused" : "active",
+    });
     await refresh();
   };
 
@@ -214,6 +254,81 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   <p className="mt-1 text-[11px] text-slate-600">{formatTime(window.from_ts)} -&gt; {formatTime(window.to_ts)}</p>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {activeTab === "commentary" ? (
+            <div className="space-y-3">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-100">Live commentary policy</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Commentary is generated from compact deltas and written as validation/tool observations, not answer text.
+                    </p>
+                  </div>
+                  <select
+                    value={commentarySession?.cadence ?? "milestones_only"}
+                    onChange={(event) => void setCommentaryCadence(event.target.value as LiveCommentaryCadence)}
+                    className="rounded border border-cyan-300/20 bg-slate-950 px-2 py-1 text-[11px] text-slate-100"
+                  >
+                    {commentaryCadences.map((cadence: LiveCommentaryCadence) => (
+                      <option key={cadence} value={cadence}>{cadence}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  <div className="rounded border border-white/10 bg-black/20 p-2">
+                    <p className="text-[10px] uppercase text-slate-500">Status</p>
+                    <p className="mt-1 text-xs text-slate-200">{commentarySession?.status ?? "not configured"}</p>
+                  </div>
+                  <div className="rounded border border-white/10 bg-black/20 p-2">
+                    <p className="text-[10px] uppercase text-slate-500">Voice mode</p>
+                    <p className="mt-1 text-xs text-slate-200">{commentarySession?.voice_mode ?? environment.mode}</p>
+                  </div>
+                  <div className="rounded border border-white/10 bg-black/20 p-2">
+                    <p className="text-[10px] uppercase text-slate-500">Last trace</p>
+                    <p className="mt-1 break-words text-xs text-slate-200">{commentarySession?.last_commentary_turn_id ?? "none"}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {commentaryProposals.length === 0 ? <p className="text-xs text-slate-500">No commentary proposals yet.</p> : null}
+                {commentaryProposals.slice(-12).reverse().map((proposal: LiveCommentaryProposal) => {
+                  const delivery = commentaryDeliveries.find((entry: LiveCommentaryDeliveryReceipt) => entry.proposal_id === proposal.proposal_id);
+                  return (
+                    <div key={proposal.proposal_id} className="rounded border border-white/10 bg-slate-950/70 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-100">{proposal.reason} / {proposal.decision}</p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {proposal.priority} / {proposal.cadence} / model_invoked={String(proposal.model_invoked)}
+                          </p>
+                        </div>
+                        <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">
+                          {delivery?.channel ?? "none"} / {delivery?.reason ?? "pending"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-200">{proposal.text}</p>
+                      <p className="mt-2 break-words text-[10px] text-slate-600">
+                        evidence {proposal.evidence_refs.slice(0, 3).join(", ") || "none"} / raw logs included false
+                      </p>
+                      {proposal.trace_steps?.length ? (
+                        <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2">
+                          {proposal.trace_steps.map((step: LiveCommentaryTraceStep) => (
+                            <div key={step.step_id} className="grid gap-1 rounded border border-white/5 bg-black/20 p-2 md:grid-cols-[120px_1fr]">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`h-1.5 w-1.5 rounded-full ${step.status === "completed" ? "bg-cyan-300" : "bg-slate-600"}`} />
+                                <span className="text-[10px] uppercase text-slate-500">{step.label}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-300">{step.summary}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
           {activeTab === "debug" ? (

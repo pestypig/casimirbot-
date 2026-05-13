@@ -1,0 +1,178 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  createLiveAnswerEnvironment,
+  resetLiveAnswerEnvironments,
+} from "../services/situation-room/live-answer-environment-store";
+import {
+  ingestWorkstationLiveSourceEvent,
+  resetWorkstationLiveSources,
+} from "../services/situation-room/workstation-live-source-ingest";
+import {
+  listLiveCommentaryDeliveries,
+  listLiveCommentaryProposals,
+  resetLiveCommentary,
+  upsertLiveCommentarySession,
+} from "../services/situation-room/live-commentary";
+import {
+  __resetHelixThreadLedgerStore,
+  getHelixThreadLedgerEvents,
+} from "../services/helix-thread/ledger";
+
+describe("live commentary for live answer environments", () => {
+  beforeEach(() => {
+    resetLiveAnswerEnvironments();
+    resetWorkstationLiveSources();
+    resetLiveCommentary();
+    __resetHelixThreadLedgerStore();
+  });
+
+  it("surfaces prime milestones as validation/tool observations, not answer items", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:commentary",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      mode: "text_only",
+      now: "2026-05-12T12:00:00.000Z",
+    });
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-prime-stream",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "prime_found",
+      seq: 5,
+      ts: "2026-05-12T12:00:05.000Z",
+      payload: {
+        candidate: 11,
+        is_prime: true,
+        latest_prime: 11,
+        prime_count: 5,
+        gap: 4,
+      },
+      evidence_refs: ["calculator:prime:11"],
+      trace: {
+        deterministic: true,
+        algorithm: "trial_division",
+      },
+    });
+
+    expect(result.live_commentary?.proposal).toMatchObject({
+      schema: "helix.live_commentary_proposal.v1",
+      reason: "prime_found",
+      decision: "show_text",
+      model_invoked: false,
+      deterministic: true,
+      raw_logs_included: false,
+    });
+    expect(result.live_commentary?.proposal.trace_steps.map((step) => step.kind)).toEqual([
+      "goal_frame",
+      "subgoal_assigned",
+      "source_observed",
+      "line_updated",
+      "evaluation_question",
+      "evaluation_result",
+      "commentary_proposed",
+      "delivery_decided",
+    ]);
+    expect(result.live_commentary?.proposal.trace_steps.every((step) => {
+      return step.model_invoked === false &&
+        step.deterministic === true &&
+        step.raw_logs_included === false &&
+        step.context_policy === "compact_context_pack_only";
+    })).toBe(true);
+    expect(result.live_commentary?.delivery).toMatchObject({
+      schema: "helix.live_commentary_delivery_receipt.v1",
+      delivered: true,
+      channel: "ui_text",
+      reason: "delivered",
+    });
+    expect(listLiveCommentaryProposals(environment.environment_id)).toHaveLength(1);
+    expect(listLiveCommentaryDeliveries(environment.environment_id)).toHaveLength(1);
+
+    const ledgerEvents = getHelixThreadLedgerEvents({ threadId: "helix-ask:commentary" });
+    expect(ledgerEvents.some((event) => event.item_type === "answer")).toBe(false);
+    expect(ledgerEvents.some((event) => event.item_type === "validation" && event.meta?.kind === "live_commentary_proposal")).toBe(true);
+    expect(ledgerEvents.every((event) => !event.assistant_text)).toBe(true);
+  });
+
+  it("keeps routine candidate checks silent under milestone cadence", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:commentary-silent",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      mode: "text_only",
+      now: "2026-05-12T12:00:00.000Z",
+    });
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-prime-stream",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "prime_candidate_checked",
+      seq: 6,
+      ts: "2026-05-12T12:00:06.000Z",
+      payload: {
+        candidate: 12,
+        is_prime: false,
+        latest_prime: 11,
+        prime_count: 5,
+        next_candidate: 13,
+      },
+      evidence_refs: ["calculator:prime:12"],
+    });
+
+    expect(result.live_commentary?.proposal).toMatchObject({
+      reason: "suppressed_routine",
+      decision: "silent_keep_in_context",
+      user_visible: false,
+    });
+    expect(result.live_commentary?.proposal.trace_steps.find((step) => step.kind === "evaluation_result")).toMatchObject({
+      status: "skipped",
+    });
+    expect(result.live_commentary?.proposal.trace_steps.find((step) => step.kind === "delivery_decided")).toMatchObject({
+      status: "skipped",
+    });
+    expect(getHelixThreadLedgerEvents({ threadId: "helix-ask:commentary-silent" })).toHaveLength(0);
+  });
+
+  it("uses voice confirmation receipts when the environment voice policy requires confirmation", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:commentary-voice",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      mode: "voice_on_confirm",
+      now: "2026-05-12T12:00:00.000Z",
+    });
+    upsertLiveCommentarySession({ environment, cadence: "milestones_only", status: "active" });
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-prime-stream",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "prime_found",
+      seq: 7,
+      ts: "2026-05-12T12:00:07.000Z",
+      payload: {
+        candidate: 13,
+        is_prime: true,
+        latest_prime: 13,
+        prime_count: 6,
+        gap: 2,
+      },
+      evidence_refs: ["calculator:prime:13"],
+    });
+
+    expect(result.live_commentary?.proposal.decision).toBe("voice_on_confirm");
+    expect(result.live_commentary?.delivery).toMatchObject({
+      delivered: false,
+      channel: "voice_on_confirm",
+      reason: "awaiting_confirmation",
+    });
+  });
+});

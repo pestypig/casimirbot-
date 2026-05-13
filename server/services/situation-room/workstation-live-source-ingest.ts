@@ -25,6 +25,12 @@ import { runLiveTransformsForSourceEvent } from "./live-transform-runner";
 import { runLiveOutputSinks } from "./live-output-sink-runner";
 import type { LiveTransformResult } from "@shared/helix-live-transform";
 import type { LiveOutputSinkReceipt } from "@shared/helix-live-output-sink";
+import { recordLiveCommentaryForDelta } from "./live-commentary";
+import type {
+  LiveCommentaryDeliveryReceipt,
+  LiveCommentaryProposal,
+  LiveCommentarySession,
+} from "@shared/helix-live-commentary";
 
 const sources = new Map<string, WorkstationLiveSource>();
 const eventsBySource = new Map<string, WorkstationLiveSourceEvent[]>();
@@ -206,6 +212,12 @@ export function ingestWorkstationLiveSourceEvent(input: {
   computation_event: LiveComputationEvent | null;
   live_answer_environment: LiveAnswerEnvironment | null;
   live_answer_environment_delta: LiveAnswerEnvironmentDelta | null;
+  live_commentary?: {
+    session: LiveCommentarySession;
+    proposal: LiveCommentaryProposal;
+    delivery: LiveCommentaryDeliveryReceipt;
+    turn_id?: string | null;
+  } | null;
   pipeline_results?: Array<{
     pipeline_id: string;
     transform_results: LiveTransformResult[];
@@ -306,6 +318,12 @@ export function ingestWorkstationLiveSourceEvent(input: {
     computationEvent,
     now: ts,
   });
+  const liveCommentary = reduction?.delta
+    ? recordLiveCommentaryForDelta({
+        delta: reduction.delta,
+        appendThread: reduction.delta.environment_snapshot.status === "active",
+      })
+    : null;
   const pipelineResults = listLiveWorkstationPipelinesForSource(source.source_id).map((pipeline) => {
     const transformResults = runLiveTransformsForSourceEvent({
       pipeline,
@@ -330,6 +348,7 @@ export function ingestWorkstationLiveSourceEvent(input: {
     computation_event: computationEvent,
     live_answer_environment: reduction?.environment ?? environment,
     live_answer_environment_delta: reduction?.delta ?? null,
+    live_commentary: liveCommentary,
     pipeline_results: pipelineResults,
   };
 }

@@ -6,8 +6,8 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("workstation-notes")).toBe(true);
   });
 
-  it("includes situation room sources in the user launch panel list", () => {
-    expect(isUserLaunchPanel("situation-room-sources")).toBe(true);
+  it("shows one unified Situation Room entry in the user launch panel list", () => {
+    expect(isUserLaunchPanel("situation-room-sources")).toBe(false);
     expect(isUserLaunchPanel("situation-room-pipelines")).toBe(true);
   });
 

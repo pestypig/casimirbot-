@@ -39,6 +39,26 @@ const summarizeSentence = (text: string): string => {
 
 const confidenceText = (value: number): string => `${Math.round(value * 100)}%`;
 
+type PrimeGapState = {
+  latestPrime?: number;
+  previousPrime?: number;
+  lastGap?: number;
+  largestGap?: number;
+};
+
+const primeGapStateByPipeline = new Map<string, PrimeGapState>();
+
+const finiteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const primeGapTrend = (gap: number | null, previousGap: number | undefined): string => {
+  if (gap === null) return "Waiting for the next prime gap.";
+  if (typeof previousGap !== "number") return "First observed gap for this derived output.";
+  if (gap > previousGap) return `Gap increased from ${previousGap} to ${gap}.`;
+  if (gap < previousGap) return `Gap decreased from ${previousGap} to ${gap}.`;
+  return `Gap held steady at ${gap}.`;
+};
+
 function runTransformSpec(args: {
   pipeline: LiveWorkstationPipeline;
   transform: LivePipelineTransformSpec;
@@ -61,6 +81,75 @@ function runTransformSpec(args: {
     evidence_refs: evidenceRefs,
     ts: args.now,
   } as const;
+
+  if (args.transform.kind === "sequence_gap_analyzer") {
+    const payload = args.event.payload ?? {};
+    const candidate = finiteNumber(payload.candidate);
+    const observedLatestPrime = finiteNumber(payload.latest_prime);
+    const emittedPrime =
+      payload.is_prime === true
+        ? candidate ?? observedLatestPrime
+        : args.event.event_type === "prime_found"
+          ? candidate ?? observedLatestPrime
+          : null;
+    const priorState = primeGapStateByPipeline.get(args.pipeline.pipeline_id) ?? {};
+    const previousPrime =
+      emittedPrime !== null
+        ? (priorState.latestPrime !== emittedPrime ? priorState.latestPrime : undefined) ?? (
+            finiteNumber(payload.gap) !== null ? emittedPrime - (finiteNumber(payload.gap) ?? 0) : priorState.previousPrime
+          )
+        : priorState.previousPrime;
+    const computedGap =
+      emittedPrime !== null && typeof previousPrime === "number" && emittedPrime !== previousPrime
+        ? emittedPrime - previousPrime
+        : emittedPrime !== null
+          ? finiteNumber(payload.gap)
+          : priorState.lastGap ?? finiteNumber(payload.gap);
+    const safeGap = computedGap !== null && Number.isFinite(computedGap) && computedGap >= 0 ? computedGap : null;
+    const largestGap = safeGap !== null
+      ? Math.max(priorState.largestGap ?? safeGap, safeGap)
+      : priorState.largestGap ?? null;
+    const latestPrime = emittedPrime ?? observedLatestPrime ?? priorState.latestPrime ?? null;
+    const nextState: PrimeGapState = {
+      latestPrime: latestPrime ?? priorState.latestPrime,
+      previousPrime: typeof previousPrime === "number" ? previousPrime : priorState.previousPrime,
+      lastGap: safeGap ?? priorState.lastGap,
+      largestGap: largestGap ?? priorState.largestGap,
+    };
+    if (emittedPrime !== null) {
+      primeGapStateByPipeline.set(args.pipeline.pipeline_id, nextState);
+    } else if (latestPrime !== null || safeGap !== null || largestGap !== null) {
+      primeGapStateByPipeline.set(args.pipeline.pipeline_id, nextState);
+    }
+    const lastTest =
+      payload.is_prime === true && candidate !== null
+        ? `${candidate} is prime.`
+        : payload.is_prime === false && candidate !== null
+          ? `${candidate} is not prime.`
+          : args.event.event_type === "prime_found" && latestPrime !== null
+            ? `${latestPrime} is prime.`
+            : `Observed ${args.event.event_type}.`;
+    const nextCandidate = finiteNumber(payload.next_candidate);
+    return {
+      ...base,
+      text: safeGap !== null && latestPrime !== null
+        ? `Prime gap update: latest=${latestPrime}, previous=${previousPrime ?? "unknown"}, gap=${safeGap}.`
+        : `Prime gap update pending: ${lastTest}`,
+      lines: {
+        current_candidate: candidate !== null ? String(candidate) : "Waiting for candidate.",
+        latest_prime: latestPrime !== null ? String(latestPrime) : "No prime emitted yet.",
+        previous_prime: typeof previousPrime === "number" ? String(previousPrime) : "Waiting for second prime.",
+        gap: safeGap !== null ? String(safeGap) : "Waiting for next prime gap.",
+        largest_gap: largestGap !== null ? String(largestGap) : "Waiting for observed gaps.",
+        gap_trend: primeGapTrend(safeGap, priorState.lastGap),
+        last_test: lastTest,
+        next_check: nextCandidate !== null ? String(nextCandidate) : `event ${args.event.seq + 1}`,
+      },
+      model_invoked: false,
+      deterministic: true,
+      confidence: safeGap !== null ? 0.92 : 0.66,
+    };
+  }
 
   if (args.transform.kind === "philosophy_compare") {
     const framework = cleanText(args.transform.params.framework) ?? "zen";
@@ -169,4 +258,8 @@ export function runLiveTransformsForSourceEvent(args: {
       now,
     }),
   );
+}
+
+export function resetLiveTransformRunnerState(): void {
+  primeGapStateByPipeline.clear();
 }

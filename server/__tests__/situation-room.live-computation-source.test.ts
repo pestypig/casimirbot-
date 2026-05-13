@@ -114,6 +114,55 @@ describe("workstation live computation source", () => {
     expect(result.live_answer_environment_delta).toBeNull();
   });
 
+  it("updates equation interpreter lines from generic equation ticks", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:test",
+      created_turn_id: "turn:equation",
+      objective: "Use the current calculator equation as a live source and explain solved values.",
+      source_ids: ["source:calculator-equation-live"],
+      preset: "calculator_equation_interpreter",
+      now: "2026-05-08T16:00:00.000Z",
+    });
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-equation-live",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "equation_evaluated",
+      seq: 1,
+      ts: "2026-05-08T16:00:01.000Z",
+      payload: {
+        expression: "x^2 - 4 = 0",
+        equation_context: "Finding roots for a simple quadratic model.",
+        ok: true,
+        mode: "equation",
+        normalized_expression: "-4+x^2 = 0",
+        result_text: "2, -2",
+        variable: "x",
+      },
+      evidence_refs: ["calculator:equation:x2-minus-4"],
+      trace: {
+        calculator_trace_id: "scicalc-equation:1:1w61eu2",
+        algorithm: "scientific_solver",
+        deterministic: true,
+      },
+    });
+
+    expect(result.live_answer_environment_delta?.changed_line_keys).toEqual(expect.arrayContaining([
+      "current_equation",
+      "latest_result",
+      "variables",
+      "interpretation",
+      "big_picture",
+    ]));
+    expect(result.live_answer_environment?.lines.find((line) => line.key === "latest_result")?.value).toBe("2, -2");
+    expect(result.live_answer_environment?.lines.find((line) => line.key === "interpretation")?.value).toContain("Finding roots");
+    expect(result.live_answer_environment?.latest_evaluation).toMatchObject({
+      model_invoked: false,
+      deterministic: true,
+    });
+  });
+
   it("updates physics stability tracker lines through the same source reducer", () => {
     const { environment } = createLiveAnswerEnvironment({
       thread_id: "helix-ask:test",

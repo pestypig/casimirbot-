@@ -30,6 +30,20 @@ describe("live workstation pipeline planner", () => {
     expect(plan.raw_transcript_included).toBeUndefined();
   });
 
+  it("plans derived prime gap live outputs against the canonical prime stream source", () => {
+    const prompt = "Create a live output from the prime stream that tracks prime gaps.";
+    const plan = planLiveWorkstationPipeline({ prompt });
+
+    expect(isLiveWorkstationPipelineIntent(prompt)).toBe(true);
+    expect(plan.pipeline_recipe_id).toBe("prime_gap_tracker");
+    expect(plan.source_requirements).toEqual(["calculator_stream"]);
+    expect(plan.missing_bindings).toEqual([]);
+    expect(plan.transforms.map((transform) => transform.kind)).toEqual(["sequence_gap_analyzer"]);
+    expect(plan.line_schema.map((line) => line.key)).toEqual(
+      expect.arrayContaining(["latest_prime", "previous_prime", "gap", "largest_gap", "gap_trend"]),
+    );
+  });
+
   it("returns missing source requirements instead of silently starting capture", () => {
     const plan = planLiveWorkstationPipeline({
       prompt: "Track this physics simulation and write a rolling methods note every 20 samples.",

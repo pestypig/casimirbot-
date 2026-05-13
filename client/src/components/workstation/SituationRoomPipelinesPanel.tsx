@@ -22,8 +22,13 @@ import {
   MinecraftWorldBindingPanel,
   type MinecraftWorldSourceView,
 } from "@/components/workstation/MinecraftWorldBindingPanel";
+import SituationRoomSourcesPanel from "@/components/workstation/SituationRoomSourcesPanel";
 import { LiveAnswerEnvironmentPanel } from "@/components/workstation/LiveAnswerEnvironmentPanel";
 import { LiveWorkstationPipelinePanel } from "@/components/workstation/LiveWorkstationPipelinePanel";
+import {
+  dispatchHelixWorkstationActions,
+  type HelixWorkstationAction,
+} from "@/lib/workstation/workstationActionContract";
 import {
   draftJobFromNaturalLanguage,
   draftJobFromRecipe,
@@ -51,12 +56,17 @@ import { buildSituationStandbyKey, useSituationStandbyStore } from "@/store/useS
 import { buildSituationEventSignal } from "@/lib/helix/situation-standby-signals";
 import { HELIX_GRAPH_CAPABILITIES } from "@shared/helix-graph-capability";
 import { HELIX_SITUATION_GRAPH_RECIPES } from "@shared/helix-situation-graph-recipes";
+import {
+  LIVE_ANSWER_ENVIRONMENT_RECIPES,
+  type LiveAnswerEnvironmentRecipe,
+} from "@shared/helix-live-answer-recipes";
 import type { SituationStandbyMode } from "@shared/helix-situation-standby";
 
 const JOB_OUTPUT_READ_PROVIDER = "elevenlabs";
 const JOB_OUTPUT_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
 const JOB_OUTPUT_READ_CHUNK_MAX = 560;
 const JOB_OUTPUT_READ_MAX_CHARS = 12_000;
+const ALL_OUTPUT_JOB_ID = "__all_output__";
 
 const JOB_KIND_OPTIONS: Array<{ kind: SituationRoomJobKind; label: string }> = [
   { kind: "translate", label: "Translate" },
@@ -94,7 +104,167 @@ const STANDBY_MODE_OPTIONS: Array<{ value: SituationStandbyMode; label: string }
   { value: "research_assistant", label: "Research assistant" },
 ];
 
-type PipelinePanelPage = "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
+type PipelinePanelPage = "setup" | "sources" | "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
+const PRIMARY_PIPELINE_PANEL_PAGES: PipelinePanelPage[] = ["setup", "sources", "output", "runtime"];
+const PIPELINE_PANEL_PAGE_LABELS: Record<PipelinePanelPage, string> = {
+  setup: "Setup",
+  sources: "Sources",
+  output: "Output",
+  runtime: "Debug",
+  jobs: "Room Workflows",
+  graph: "Graph",
+  recipes: "Graph Recipes",
+  capabilities: "Capabilities",
+  inputs: "Inputs",
+};
+type PipelineSetupIntentKind = "live_answer_environment" | "live_workstation_pipeline" | "source_job" | "situation_graph";
+type PipelineSetupIntent = {
+  id: string;
+  kind: PipelineSetupIntentKind;
+  title: string;
+  description: string;
+  objective: string;
+  sourceFamilies: string[];
+  transformSummary: string;
+  outputSummary: string;
+  actionLabel: string;
+  recipe?: LiveAnswerEnvironmentRecipe;
+  jobKind?: SituationRoomJobKind;
+  graphRecipeId?: string;
+  custom?: boolean;
+};
+
+type PipelineSetupCustomRouteDraft = {
+  title: string;
+  objective: string;
+  kind: PipelineSetupIntentKind;
+  sourceFamily: string;
+  transformSummary: string;
+  outputSummary: string;
+};
+
+const PIPELINE_SETUP_CUSTOM_ROUTES_STORAGE_KEY = "situation-room-pipelines:custom-routes:v1";
+
+const PIPELINE_SETUP_SOURCE_FAMILY_OPTIONS = [
+  "minecraft_world_events",
+  "calculator_series",
+  "physics_simulation",
+  "browser_audio_transcript",
+  "screen_summary",
+  "room_source",
+  "manual_feed",
+];
+
+const PIPELINE_SETUP_SELF_STARTING_SOURCE_FAMILIES = new Set(["calculator_series"]);
+
+const loadCustomSetupIntents = (): PipelineSetupIntent[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PIPELINE_SETUP_CUSTOM_ROUTES_STORAGE_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is PipelineSetupIntent =>
+      Boolean(entry && typeof entry.id === "string" && typeof entry.title === "string" && typeof entry.objective === "string"),
+    );
+  } catch {
+    return [];
+  }
+};
+
+const PIPELINE_SETUP_PIPELINE_INTENTS: PipelineSetupIntent[] = [
+  {
+    id: "transcript_note",
+    kind: "live_workstation_pipeline",
+    title: "Transcript to note",
+    description: "Summarize sentence/window chunks into a workstation note and compact live lines.",
+    objective: "Summarize each sentence from this live browser tab into a note.",
+    sourceFamilies: ["browser_audio_transcript"],
+    transformSummary: "sentence_summary -> workstation_note",
+    outputSummary: "Live answer card plus note sink",
+    actionLabel: "Create live note pipeline",
+  },
+  {
+    id: "zen_comparison",
+    kind: "live_workstation_pipeline",
+    title: "Zen comparison",
+    description: "Compare live transcript windows to a philosophy framework without raw transcript injection.",
+    objective: "Compare this live transcript to Zen philosophy.",
+    sourceFamilies: ["browser_audio_transcript"],
+    transformSummary: "sentence_summary -> philosophy_compare",
+    outputSummary: "Live comparison lines, optional note sink",
+    actionLabel: "Create comparison pipeline",
+  },
+  {
+    id: "methods_note",
+    kind: "live_workstation_pipeline",
+    title: "Methods note from simulation",
+    description: "Write a rolling methods note from simulation or residual windows.",
+    objective: "Track this simulation and write a methods note every 20 samples.",
+    sourceFamilies: ["physics_simulation"],
+    transformSummary: "rolling_summary -> methods_note_writer",
+    outputSummary: "Live method lines plus note sink",
+    actionLabel: "Create methods pipeline",
+  },
+];
+
+const PIPELINE_SETUP_SOURCE_JOB_INTENTS: PipelineSetupIntent[] = [
+  {
+    id: "job_translate",
+    kind: "source_job",
+    title: "Translate source",
+    description: "Create a bounded translation job over selected room/source transcript evidence.",
+    objective: "Translate the selected source.",
+    sourceFamilies: ["room_source"],
+    transformSummary: "translate",
+    outputSummary: "Job output scroll, optional Helix Ask attachment",
+    actionLabel: "Create translation job",
+    jobKind: "translate",
+  },
+  {
+    id: "job_rolling_summary",
+    kind: "source_job",
+    title: "Rolling summary job",
+    description: "Create a supervised rolling summary over selected source chunks.",
+    objective: "Create a rolling summary for the selected source.",
+    sourceFamilies: ["room_source"],
+    transformSummary: "rolling_summary",
+    outputSummary: "Job output scroll, optional note",
+    actionLabel: "Create summary job",
+    jobKind: "rolling_summary",
+  },
+];
+
+const PIPELINE_SETUP_GRAPH_INTENT: PipelineSetupIntent = {
+  id: "graph_minecraft_monitor",
+  kind: "situation_graph",
+  title: "Minecraft monitor graph",
+  description: "Create a visible source/monitor/Helix bridge graph for the Minehut world.",
+  objective: "Create or reuse the Minecraft situation monitor graph.",
+  sourceFamilies: ["minecraft_world_events"],
+  transformSummary: "world events -> salience -> standby receipts",
+  outputSummary: "Situation graph and Helix Ask binding",
+  actionLabel: "Create monitor graph",
+  graphRecipeId: "minecraft_world_monitor",
+};
+
+const PIPELINE_SETUP_INTENTS: PipelineSetupIntent[] = [
+  ...LIVE_ANSWER_ENVIRONMENT_RECIPES.filter((recipe) => recipe.recipe_id !== "custom_live_answer").map((recipe) => ({
+    id: `live:${recipe.recipe_id}`,
+    kind: "live_answer_environment" as const,
+    title: recipe.recipe_id
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase()),
+    description: recipe.objective_template,
+    objective: recipe.objective_template,
+    sourceFamilies: recipe.source_requirements,
+    transformSummary: recipe.default_line_schema.map((line) => line.label).slice(0, 4).join(", "),
+    outputSummary: "Turn-owned live answer card and compact context pack",
+    actionLabel: "Create live answer environment",
+    recipe,
+  })),
+  ...PIPELINE_SETUP_PIPELINE_INTENTS,
+  ...PIPELINE_SETUP_SOURCE_JOB_INTENTS,
+  PIPELINE_SETUP_GRAPH_INTENT,
+];
 
 type SituationThreadBindingView = {
   binding_id: string;
@@ -354,7 +524,19 @@ export default function SituationRoomPipelinesPanel() {
   const setStandbyMode = useSituationStandbyStore((state) => state.setMode);
   const ingestStandbySignal = useSituationStandbyStore((state) => state.ingestSignal);
   const dismissStandbyProposal = useSituationStandbyStore((state) => state.dismissProposal);
-  const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("graph");
+  const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("setup");
+  const [setupIntentId, setSetupIntentId] = React.useState("");
+  const [setupMode, setSetupMode] = React.useState<"text_only" | "voice_on_confirm" | "critical_voice" | "direct_address_only">("text_only");
+  const [setupStatus, setSetupStatus] = React.useState<string | null>(null);
+  const [customSetupIntents, setCustomSetupIntents] = React.useState<PipelineSetupIntent[]>(loadCustomSetupIntents);
+  const [customRouteDraft, setCustomRouteDraft] = React.useState<PipelineSetupCustomRouteDraft>({
+    title: "",
+    objective: "",
+    kind: "live_workstation_pipeline",
+    sourceFamily: "room_source",
+    transformSummary: "",
+    outputSummary: "",
+  });
   const [selectedSourceId, setSelectedSourceId] = React.useState<string>("__room__");
   const [selectedJobId, setSelectedJobId] = React.useState<string | undefined>();
   const [jobKind, setJobKind] = React.useState<SituationRoomJobKind>("translate");
@@ -414,7 +596,7 @@ export default function SituationRoomPipelinesPanel() {
     [activeRoom, jobs, outputs, roomEvents, rooms, sources],
   );
   const selectedSource = selectedSourceId !== "__room__" ? sources[selectedSourceId] : undefined;
-  const selectedJob = selectedJobId ? jobs[selectedJobId] : undefined;
+  const selectedJob = selectedJobId && selectedJobId !== ALL_OUTPUT_JOB_ID ? jobs[selectedJobId] : undefined;
   const activeGraphId = activeRoom?.room_id ? activeGraphIdByRoom[activeRoom.room_id] : undefined;
   const activeGraph = activeGraphId ? graphs[activeGraphId] : null;
   const selectedGraphNodeId = activeGraph ? selectedNodeIdByGraph[activeGraph.graph_id] : undefined;
@@ -449,6 +631,168 @@ export default function SituationRoomPipelinesPanel() {
       null
     );
   }, [activeGraph?.graph_id, activeRoom, bindingWorldId, minecraftSourceId, threadBindings]);
+  const setupIntents = React.useMemo(
+    () => [...PIPELINE_SETUP_INTENTS, ...customSetupIntents],
+    [customSetupIntents],
+  );
+  const setupIntent = React.useMemo(
+    () => setupIntents.find((intent) => intent.id === setupIntentId) ?? null,
+    [setupIntentId, setupIntents],
+  );
+  const setupObjective = setupIntent?.objective || "No active setup proposal. Ask Helix Ask to create a live workflow, or choose a saved template under Advanced.";
+  const setupActualSourceIds = React.useMemo(() => {
+    if (!setupIntent) return [];
+    if (setupIntent.sourceFamilies.includes("minecraft_world_events")) {
+      const detectedSourceId =
+        detectedMinecraftSource?.source_id ??
+        activeSources.find((source) => source.source_id === "source:minecraft-server")?.source_id ??
+        activeWorldSignals.at(-1)?.source_id;
+      return detectedSourceId ? [detectedSourceId] : [];
+    }
+    if (setupIntent.sourceFamilies.includes("room_source")) {
+      return selectedSource ? [selectedSource.source_id] : activeSources.map((source) => source.source_id);
+    }
+    return selectedSource ? [selectedSource.source_id] : [];
+  }, [activeSources, activeWorldSignals, detectedMinecraftSource?.source_id, selectedSource, setupIntent]);
+  const setupNeedsExistingSource = React.useMemo(
+    () =>
+      Boolean(
+        setupIntent?.sourceFamilies.some((family) => !PIPELINE_SETUP_SELF_STARTING_SOURCE_FAMILIES.has(family)),
+      ),
+    [setupIntent],
+  );
+  const setupMissingFields = React.useMemo(() => {
+    if (!setupIntent) return [];
+    const missing: string[] = [];
+    if (!activeRoom?.room_id) missing.push("active room");
+    if (setupNeedsExistingSource && setupActualSourceIds.length === 0) {
+      missing.push(`${setupIntent?.sourceFamilies.join(" or ") || "required"} source`);
+    }
+    if (setupIntent?.kind === "situation_graph" && !setupIntent.graphRecipeId) missing.push("graph recipe");
+    return missing;
+  }, [activeRoom?.room_id, setupActualSourceIds.length, setupIntent, setupNeedsExistingSource]);
+  const setupToolActions = React.useMemo((): HelixWorkstationAction[] => {
+    if (!setupIntent) return [];
+    const threadId = bindingThreadId.trim() || "helix-ask:desktop";
+    const roomId = activeRoom?.room_id;
+    if (setupIntent.kind === "live_answer_environment") {
+      const args: Record<string, unknown> = {
+        thread_id: threadId,
+        objective: setupObjective,
+        room_id: roomId,
+        source_ids: setupActualSourceIds,
+        graph_id: activeGraph?.graph_id,
+        preset: setupIntent.recipe?.recipe_id ?? (setupIntent.custom ? "custom" : undefined),
+        line_schema: setupIntent.recipe?.default_line_schema,
+        mode: setupMode,
+      };
+      const actions: HelixWorkstationAction[] = [
+        {
+          action: "run_panel_action",
+          panel_id: "situation-room-pipelines",
+          action_id: "create_live_answer_environment",
+          args,
+        },
+      ];
+      if (setupIntent.recipe?.recipe_id === "calculator_prime_stream") {
+        actions.push({
+          action: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "start_prime_stream",
+          args: {
+            source_id: "source:calculator-prime-stream",
+            tick_rate_ms: 1000,
+            max_ticks: 100,
+            start: 2,
+          },
+        });
+      }
+      if (setupIntent.recipe?.recipe_id === "minecraft_run_monitor") {
+        actions.push({
+          action: "run_panel_action",
+          panel_id: "situation-room-pipelines",
+          action_id: "attach_standby_to_helix_thread",
+          args: {
+            thread_id: threadId,
+            room_id: detectedMinecraftSource?.room_id ?? roomId,
+            source_id: detectedMinecraftSource?.source_id ?? minecraftSourceId,
+            world_id: detectedMinecraftSource?.world_id ?? bindingWorldId,
+            graph_id: activeGraph?.graph_id,
+          },
+        });
+      }
+      return actions;
+    }
+    if (setupIntent.kind === "live_workstation_pipeline") {
+      return [
+        {
+          action: "run_panel_action",
+          panel_id: "situation-room-pipelines",
+          action_id: "create_live_workstation_pipeline",
+          args: {
+            thread_id: threadId,
+            objective: setupObjective,
+            source_ids: setupActualSourceIds,
+            mode: setupMode,
+          },
+        },
+      ];
+    }
+    if (setupIntent.kind === "source_job") {
+      return [
+        {
+          action: "run_panel_action",
+          panel_id: "situation-room-pipelines",
+          action_id: "create_job",
+          args: {
+            room_id: roomId,
+            source_ids: setupActualSourceIds,
+            kind: setupIntent.jobKind ?? "rolling_summary",
+            target_language: targetLanguage,
+            native_language: nativeLanguage,
+            input_text_policy: inputTextPolicy,
+            output_render_policy: outputRenderPolicy,
+            attachment_policy: "manual_only",
+            context_injection: "explicit_attachment_only",
+            command_lane_enabled: false,
+          },
+        },
+      ];
+    }
+    if (setupIntent.kind === "situation_graph") {
+      return [
+        {
+          action: "run_panel_action",
+          panel_id: "situation-room-pipelines",
+          action_id: "create_graph_from_recipe",
+          args: {
+            room_id: activeRoom?.room_id,
+            recipe_id: setupIntent.graphRecipeId,
+            source_ids: setupActualSourceIds,
+            title: setupIntent.title,
+          },
+        },
+      ];
+    }
+    return [];
+  }, [
+    activeGraph?.graph_id,
+    activeRoom?.room_id,
+    bindingThreadId,
+    bindingWorldId,
+    detectedMinecraftSource,
+    inputTextPolicy,
+    minecraftSourceId,
+    nativeLanguage,
+    outputRenderPolicy,
+    selectedSource,
+    setupActualSourceIds,
+    setupIntent,
+    setupObjective,
+    setupMode,
+    targetLanguage,
+  ]);
+  const setupCanStart = setupToolActions.length > 0 && setupMissingFields.length === 0;
   const draftScope = React.useMemo(
     () => ({
       room_id: activeRoom?.room_id ?? "",
@@ -487,7 +831,7 @@ export default function SituationRoomPipelinesPanel() {
   );
 
   React.useEffect(() => {
-    if (!activeJobs.length || (selectedJobId && jobs[selectedJobId])) return;
+    if (!activeJobs.length || selectedJobId === ALL_OUTPUT_JOB_ID || (selectedJobId && jobs[selectedJobId])) return;
     setSelectedJobId(activeJobs[0]?.job_id);
   }, [activeJobs, jobs, selectedJobId]);
 
@@ -929,37 +1273,119 @@ export default function SituationRoomPipelinesPanel() {
     }
   }, [activeThreadBinding, loadThreadBindings]);
 
+  const handleRunSetup = React.useCallback(() => {
+    if (!setupIntent || setupToolActions.length === 0) {
+      setSetupStatus("No setup action is available for the selected path.");
+      return;
+    }
+    if (setupMissingFields.length > 0) {
+      setSetupStatus(`Missing required field${setupMissingFields.length === 1 ? "" : "s"}: ${setupMissingFields.join(", ")}.`);
+      return;
+    }
+    dispatchHelixWorkstationActions(setupToolActions);
+    setSetupStatus(
+      `Submitted ${setupToolActions.length} workstation action${setupToolActions.length === 1 ? "" : "s"} for ${setupIntent.title}.`,
+    );
+    setPanelPage(setupIntent.kind === "source_job" ? "jobs" : "output");
+  }, [setupIntent, setupMissingFields, setupToolActions]);
+
+  const persistCustomSetupIntents = React.useCallback((nextIntents: PipelineSetupIntent[]) => {
+    setCustomSetupIntents(nextIntents);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PIPELINE_SETUP_CUSTOM_ROUTES_STORAGE_KEY, JSON.stringify(nextIntents));
+    }
+  }, []);
+
+  const handleCreateCustomRoute = React.useCallback(() => {
+    const title = customRouteDraft.title.trim();
+    const objective = customRouteDraft.objective.trim();
+    if (!title || !objective) {
+      setSetupStatus("Custom route needs a title and objective.");
+      return;
+    }
+    const route: PipelineSetupIntent = {
+      id: `custom:${Date.now()}`,
+      kind: customRouteDraft.kind,
+      title,
+      description: objective,
+      objective,
+      sourceFamilies: customRouteDraft.sourceFamily ? [customRouteDraft.sourceFamily] : [],
+      transformSummary: customRouteDraft.transformSummary.trim() || "Prompt-selected transform",
+      outputSummary: customRouteDraft.outputSummary.trim() || "Prompt-selected output",
+      actionLabel:
+        customRouteDraft.kind === "live_answer_environment"
+          ? "Create live answer environment"
+          : customRouteDraft.kind === "source_job"
+            ? "Create source job"
+            : customRouteDraft.kind === "situation_graph"
+              ? "Create graph"
+              : "Create live pipeline",
+      jobKind: customRouteDraft.kind === "source_job" ? "rolling_summary" : undefined,
+      graphRecipeId: customRouteDraft.kind === "situation_graph" ? "minecraft_world_monitor" : undefined,
+      custom: true,
+    };
+    persistCustomSetupIntents([...customSetupIntents, route]);
+    setSetupIntentId(route.id);
+    setSetupStatus(`Saved custom route "${route.title}".`);
+    setCustomRouteDraft({
+      title: "",
+      objective: "",
+      kind: "live_workstation_pipeline",
+      sourceFamily: "room_source",
+      transformSummary: "",
+      outputSummary: "",
+    });
+  }, [customRouteDraft, customSetupIntents, persistCustomSetupIntents]);
+
+  const handleDeleteCustomRoute = React.useCallback(
+    (routeId: string) => {
+      const nextRoutes = customSetupIntents.filter((intent) => intent.id !== routeId);
+      persistCustomSetupIntents(nextRoutes);
+    if (setupIntentId === routeId) setSetupIntentId("");
+      setSetupStatus("Deleted custom route.");
+    },
+    [customSetupIntents, persistCustomSetupIntents, setupIntentId],
+  );
+
   const goBack = () => {
-    if (panelPage === "output") setPanelPage("jobs");
-    else if (panelPage === "jobs") setPanelPage("inputs");
+    if (panelPage === "output") setPanelPage("sources");
+    else if (panelPage === "jobs") setPanelPage("sources");
     else if (panelPage === "inputs") setPanelPage("recipes");
-    else if (panelPage === "runtime") setPanelPage("graph");
+    else if (panelPage === "graph") setPanelPage("setup");
+    else if (panelPage === "sources") setPanelPage("setup");
+    else if (panelPage === "runtime") setPanelPage("setup");
     else if (panelPage === "capabilities") setPanelPage("recipes");
     else if (panelPage === "recipes") setPanelPage("graph");
   };
 
   const pageTitle =
-    panelPage === "graph"
+    panelPage === "setup"
+      ? "Situation Room Setup"
+      : panelPage === "sources"
+        ? "Sources"
+        : panelPage === "output"
+          ? "Output"
+      : panelPage === "graph"
       ? "Situation Graph"
       : panelPage === "recipes"
         ? "Graph Recipes"
         : panelPage === "capabilities"
           ? "Capabilities"
           : panelPage === "runtime"
-            ? "Graph Runtime"
+            ? "Debug Trace"
       : panelPage === "inputs"
         ? "Pipeline Inputs"
         : panelPage === "jobs"
-          ? "Live Source Jobs"
-          : "Job Output Scroll";
+          ? "Room Workflows"
+          : "Output";
   const pageIcon =
-    panelPage === "graph" || panelPage === "recipes" || panelPage === "capabilities" || panelPage === "runtime" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
+    panelPage === "setup" || panelPage === "sources" || panelPage === "graph" || panelPage === "recipes" || panelPage === "capabilities" || panelPage === "runtime" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950/95 text-slate-100">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          {panelPage !== "graph" ? (
+          {panelPage !== "setup" ? (
             <button
               type="button"
               onClick={goBack}
@@ -979,7 +1405,7 @@ export default function SituationRoomPipelinesPanel() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-black/20 p-1 text-[11px]">
-          {(["graph", "recipes", "capabilities", "runtime", "inputs", "jobs", "output"] as PipelinePanelPage[]).map((page) => (
+          {PRIMARY_PIPELINE_PANEL_PAGES.map((page) => (
             <button
               key={page}
               type="button"
@@ -987,17 +1413,500 @@ export default function SituationRoomPipelinesPanel() {
                 if (page === "output" && !selectedJob) return;
                 setPanelPage(page);
               }}
-              disabled={page === "output" && !selectedJob}
+              disabled={false}
               className={cn(
                 "rounded px-2 py-1 capitalize transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                 panelPage === page ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
               )}
             >
-              {page}
+              {PIPELINE_PANEL_PAGE_LABELS[page]}
             </button>
           ))}
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded px-2 py-1 text-slate-400 hover:bg-white/5 hover:text-slate-200">
+              Advanced
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 w-44 rounded border border-white/10 bg-slate-950 p-1 shadow-xl">
+              {(["jobs", "graph", "recipes", "capabilities", "inputs"] as PipelinePanelPage[]).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setPanelPage(page)}
+                  className={cn(
+                    "block w-full rounded px-2 py-1 text-left transition-colors",
+                    panelPage === page ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                  )}
+                >
+                  {PIPELINE_PANEL_PAGE_LABELS[page]}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
       </header>
+
+      {panelPage === "setup" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-5xl space-y-4">
+            <section className="rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Setup console</p>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">
+                    Tell Helix Ask what you want. This panel shows the current route, missing setup fields, and delegated tool receipts; live products move to Output once setup is running.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPanelPage("sources")}
+                    className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                  >
+                    Sources
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPanelPage("output")}
+                    className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                  >
+                    Output
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPanelPage("runtime")}
+                    className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                  >
+                    Debug
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase text-slate-500">Setup proposal</p>
+                      <p className="mt-1 text-base font-semibold text-white">{setupIntent?.title ?? "No route selected"}</p>
+                      <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">{setupObjective}</p>
+                    </div>
+                    <span className="rounded border border-white/15 bg-black/20 px-2 py-1 text-[10px] uppercase text-slate-400">
+                      {setupIntent ? "proposal loaded" : "waiting for Helix Ask"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    <div
+                      className={cn(
+                        "rounded border p-2",
+                        !setupIntent
+                          ? "border-white/10 bg-black/20"
+                          : setupMissingFields.length
+                          ? "border-red-400/45 bg-red-500/10"
+                          : "border-emerald-400/30 bg-emerald-500/10",
+                      )}
+                    >
+                      <p className={cn("text-[10px] uppercase", !setupIntent ? "text-slate-500" : setupMissingFields.length ? "text-red-200" : "text-emerald-200")}>
+                        Readiness
+                      </p>
+                      <p className={cn("mt-1 text-xs", !setupIntent ? "text-slate-300" : setupMissingFields.length ? "text-red-100" : "text-emerald-100")}>
+                        {!setupIntent ? "No setup proposal" : setupMissingFields.length ? setupMissingFields.join(", ") : "Ready"}
+                      </p>
+                    </div>
+                    <div
+                      className={cn(
+                        "rounded border p-2",
+                        setupNeedsExistingSource && setupActualSourceIds.length === 0
+                          ? "border-red-400/45 bg-red-500/10"
+                          : "border-white/10 bg-black/20",
+                      )}
+                    >
+                      <p className="text-[10px] uppercase text-slate-500">Source</p>
+                      <p
+                        className={cn(
+                          "mt-1 truncate text-xs",
+                          setupIntent && setupNeedsExistingSource && setupActualSourceIds.length === 0 ? "text-red-100" : "text-slate-200",
+                        )}
+                      >
+                        {!setupIntent ? "Pending proposal" : setupActualSourceIds.length ? setupActualSourceIds.join(", ") : "Missing"}
+                      </p>
+                    </div>
+                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-[10px] uppercase text-slate-500">Delegated tools</p>
+                      <p className="mt-1 text-xs text-slate-200">{setupToolActions.length} action{setupToolActions.length === 1 ? "" : "s"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRunSetup}
+                      disabled={!setupIntent || !setupCanStart}
+                      className="rounded border border-cyan-300/40 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      {!setupIntent ? "Waiting for setup proposal" : setupMissingFields.length ? "Missing required fields" : setupIntent?.actionLabel ?? "Start"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPanelPage("sources")}
+                      className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
+                    >
+                      Sources
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPanelPage("output")}
+                      className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
+                    >
+                      Output
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPanelPage("runtime")}
+                      className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
+                    >
+                      Debug
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Latest setup receipt</p>
+                  <p className={cn("mt-2 text-xs leading-5", setupStatus ? "text-emerald-100" : "text-slate-400")}>
+                    {setupStatus ?? (!setupIntent ? "No active proposal yet. Use Helix Ask to describe the workflow; saved templates live under Advanced." : setupMissingFields.length ? `Waiting for ${setupMissingFields.join(", ")}.` : "Ready to start this route.")}
+                  </p>
+                  <div className="mt-3 rounded border border-white/10 bg-black/20 p-2">
+                    <p className="text-[10px] uppercase text-slate-500">Policy</p>
+                    <p className="mt-1 text-xs text-slate-200">{setupMode} / compact context only / command lane disabled</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <details className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-200">
+                Advanced setup
+              </summary>
+              <div className="mt-3 space-y-4">
+                <section>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Route templates</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {setupIntents.map((intent) => (
+                    <div
+                      key={intent.id}
+                      className={cn(
+                        "rounded-lg border p-3 transition-colors",
+                        setupIntent?.id === intent.id
+                          ? "border-cyan-300/60 bg-cyan-500/15 text-cyan-50"
+                          : "border-white/10 bg-white/[0.03] text-slate-200 hover:border-cyan-300/35 hover:bg-cyan-500/10",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSetupIntentId(intent.id);
+                          if (intent.recipe?.default_mode) setSetupMode(intent.recipe.default_mode);
+                          setSetupStatus(null);
+                        }}
+                        className="block w-full text-left"
+                      >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold">{intent.title}</p>
+                        <span className="rounded border border-white/15 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase text-slate-400">
+                          {intent.custom ? "custom" : "route"}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{intent.description}</p>
+                      <p className="mt-2 text-[10px] text-slate-500">
+                        Route preview: {intent.kind.replace(/_/g, " ")}
+                      </p>
+                      </button>
+                      {intent.custom ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomRoute(intent.id)}
+                          className="mt-2 rounded border border-red-400/30 bg-red-500/10 px-2 py-1 text-[10px] text-red-100 hover:bg-red-500/20"
+                        >
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                </section>
+                <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-200">
+                    Create a custom route card
+                  </summary>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[10px] uppercase text-slate-500">Title</span>
+                      <input
+                        value={customRouteDraft.title}
+                        onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, title: event.target.value }))}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
+                        placeholder="My live review route"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] uppercase text-slate-500">Route kind</span>
+                      <select
+                        value={customRouteDraft.kind}
+                        onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, kind: event.target.value as PipelineSetupIntentKind }))}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
+                      >
+                        <option value="live_workstation_pipeline">Live workstation pipeline</option>
+                        <option value="live_answer_environment">Live answer environment</option>
+                        <option value="source_job">Source job</option>
+                        <option value="situation_graph">Situation graph</option>
+                      </select>
+                    </label>
+                    <label className="block md:col-span-2">
+                      <span className="text-[10px] uppercase text-slate-500">Objective used by the route</span>
+                      <input
+                        value={customRouteDraft.objective}
+                        onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, objective: event.target.value }))}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
+                        placeholder="Watch this source and keep a compact comparison live."
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] uppercase text-slate-500">Required source family</span>
+                      <select
+                        value={customRouteDraft.sourceFamily}
+                        onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, sourceFamily: event.target.value }))}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
+                      >
+                        {PIPELINE_SETUP_SOURCE_FAMILY_OPTIONS.map((family) => (
+                          <option key={family} value={family}>
+                            {family}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] uppercase text-slate-500">Transform summary</span>
+                      <input
+                        value={customRouteDraft.transformSummary}
+                        onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, transformSummary: event.target.value }))}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
+                        placeholder="window summary -> comparison"
+                      />
+                    </label>
+                    <label className="block md:col-span-2">
+                      <span className="text-[10px] uppercase text-slate-500">Output summary</span>
+                      <input
+                        value={customRouteDraft.outputSummary}
+                        onChange={(event) => setCustomRouteDraft((draft) => ({ ...draft, outputSummary: event.target.value }))}
+                        className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none"
+                        placeholder="Live card plus Situation Room trace"
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateCustomRoute}
+                    className="mt-3 rounded border border-cyan-300/35 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
+                  >
+                    Save route card
+                  </button>
+                </details>
+                <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Source requirements</p>
+                  <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
+                    <div
+                      className={cn(
+                        "rounded border p-3",
+                        setupNeedsExistingSource && setupActualSourceIds.length === 0
+                          ? "border-red-400/45 bg-red-500/10"
+                          : "border-white/10 bg-black/20",
+                      )}
+                    >
+                      <p className="text-xs font-semibold text-white">{setupIntent?.title ?? "Workflow"}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Required source family: {setupIntent?.sourceFamilies.join(", ") || "manual / custom"}
+                      </p>
+                      <p
+                        className={cn(
+                          "mt-2 text-[11px]",
+                          setupNeedsExistingSource && setupActualSourceIds.length === 0 ? "text-red-100" : "text-slate-500",
+                        )}
+                      >
+                        Current source ids: {setupActualSourceIds.length ? setupActualSourceIds.join(", ") : "missing"}
+                      </p>
+                    </div>
+                    <label className="block rounded border border-white/10 bg-black/20 p-3">
+                      <span className="text-[10px] uppercase text-slate-500">Room/source selection</span>
+                      <select
+                        value={selectedSourceId}
+                        onChange={(event) => setSelectedSourceId(event.target.value)}
+                        className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-xs text-slate-100 outline-none"
+                      >
+                        <option value="__room__">Whole active room</option>
+                        {activeSources.map((source) => (
+                          <option key={source.source_id} value={source.source_id}>
+                            {source.label} ({source.kind})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Transform</p>
+                <div className="mt-3 rounded border border-white/10 bg-black/20 p-3">
+                  <p className="text-sm font-semibold text-white">{setupIntent?.transformSummary ?? "No transform selected"}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Deterministic reducers and model-reviewed windows are recorded as validation/toolObservation artifacts. They do not become assistant answers unless the user starts a normal Ask turn.
+                  </p>
+                  {setupIntent?.recipe ? (
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      {setupIntent.recipe.default_line_schema.map((line) => (
+                        <div key={line.key} className="rounded border border-white/10 bg-black/20 p-2">
+                          <p className="text-xs font-semibold text-slate-100">{line.label}</p>
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            {line.update_policy} / {line.visibility}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+                <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Output</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="rounded border border-cyan-300/20 bg-cyan-500/10 p-3">
+                    <p className="text-xs font-semibold text-cyan-50">Primary product</p>
+                    <p className="mt-1 text-[11px] text-cyan-100/80">{setupIntent?.outputSummary}</p>
+                  </div>
+                  <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                    <p className="text-xs font-semibold text-white">Helix Ask context</p>
+                    <p className="mt-1 text-[11px] text-slate-400">Compact context pack only. Raw logs/audio/transcripts stay out by default.</p>
+                  </div>
+                  <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                    <p className="text-xs font-semibold text-white">Debug</p>
+                    <p className="mt-1 text-[11px] text-slate-400">Deltas, receipts, source windows, and append decisions remain in Advanced/Runtime views.</p>
+                  </div>
+                </div>
+              </section>
+
+                <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Policy</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <label className="block rounded border border-white/10 bg-slate-950/70 p-3">
+                    <span className="text-[10px] uppercase text-slate-500">Delivery mode</span>
+                    <select
+                      value={setupMode}
+                      onChange={(event) => setSetupMode(event.target.value as typeof setupMode)}
+                      className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-xs text-slate-100 outline-none"
+                    >
+                      <option value="text_only">Text only</option>
+                      <option value="voice_on_confirm">Voice on confirm</option>
+                      <option value="critical_voice">Critical voice</option>
+                      <option value="direct_address_only">Direct address only</option>
+                    </select>
+                  </label>
+                  <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                    <p className="text-[10px] uppercase text-slate-500">Context policy</p>
+                    <p className="mt-2 text-xs text-slate-300">compact_context_pack_only</p>
+                  </div>
+                  <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                    <p className="text-[10px] uppercase text-slate-500">Command lane</p>
+                    <p className="mt-2 text-xs text-slate-300">disabled</p>
+                  </div>
+                </div>
+              </section>
+
+                <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase text-slate-500">Tool plan preview</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      These are the same workstation actions Helix Ask can emit as dynamic tool calls.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRunSetup}
+                    disabled={!setupIntent || !setupCanStart}
+                    className="rounded border border-cyan-300/40 bg-cyan-500/15 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {setupIntent?.actionLabel ?? "Start"}
+                  </button>
+                </div>
+                {setupMissingFields.length ? (
+                  <div className="mt-3 rounded border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                    Missing required field{setupMissingFields.length === 1 ? "" : "s"}: {setupMissingFields.join(", ")}.
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+                    Required fields are ready. Start will dispatch the workstation actions below.
+                  </div>
+                )}
+                <div className="mt-3 rounded border border-white/10 bg-slate-950/80 p-3">
+                  <p className="text-sm font-semibold text-white">{setupIntent?.title}</p>
+                  <p className="mt-1 text-xs text-slate-400">{setupObjective}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    The prompt stays the source of intent. The route below is the current tool plan projection, not a final assistant answer.
+                  </p>
+                  <pre className="mt-3 max-h-72 overflow-auto rounded border border-white/10 bg-black/40 p-3 text-[10px] leading-5 text-slate-200">
+                    {JSON.stringify(setupToolActions, null, 2)}
+                  </pre>
+                </div>
+                {setupStatus ? (
+                  <p className="mt-3 rounded border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+                    {setupStatus}
+                  </p>
+                ) : null}
+              </section>
+              </div>
+            </details>
+          </div>
+        </main>
+      ) : null}
+
+      {panelPage === "sources" ? (
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <section className="shrink-0 border-b border-white/10 bg-slate-950/80 px-4 py-3">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Room and source selection</p>
+                <p className="mt-1 truncate text-sm text-slate-200">
+                  {activeRoom?.title ?? "No active room"} / {selectedSource?.label ?? "whole room"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Pick the room/source first. Room-scoped workflows and outputs are available from here.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("jobs")}
+                  disabled={!activeRoom}
+                  className="rounded border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Room workflows
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("output")}
+                  className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
+                >
+                  View output
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("runtime")}
+                  className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
+                >
+                  Debug
+                </button>
+              </div>
+            </div>
+          </section>
+          <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
+            <SituationRoomSourcesPanel />
+          </div>
+        </main>
+      ) : null}
 
       {panelPage === "graph" ? (
         <SituationGraphCanvas
@@ -1221,8 +2130,6 @@ export default function SituationRoomPipelinesPanel() {
               status={bindingStatus}
               onAttachDetected={() => handleAttachThreadBinding("detected_source")}
             />
-            <LiveAnswerEnvironmentPanel threadId="helix-ask:desktop" />
-            <LiveWorkstationPipelinePanel />
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -1458,7 +2365,14 @@ export default function SituationRoomPipelinesPanel() {
       {panelPage === "jobs" ? (
         <main className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="mx-auto max-w-5xl space-y-4">
-            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <details className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <summary className="cursor-pointer list-none text-xs font-semibold text-slate-200">
+                Advanced workflow creation
+                <span className="ml-2 text-[11px] font-normal text-slate-500">
+                  recipes, prompt drafting, and manual job options
+                </span>
+              </summary>
+              <div className="mt-3">
               <p className="text-[11px] font-semibold uppercase text-slate-500">Recipes</p>
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {SITUATION_ROOM_JOB_RECIPES.map((recipe) => (
@@ -1589,11 +2503,12 @@ export default function SituationRoomPipelinesPanel() {
                   </div>
                 </div>
               </details>
-            </section>
+              </div>
+            </details>
 
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Jobs</p>
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Active workflows</p>
                 {selectedJob ? (
                   <button type="button" onClick={() => { masterScrollPinnedRef.current = true; setPanelPage("output"); }} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
                     <ScrollText className="h-3.5 w-3.5" />
@@ -1631,7 +2546,7 @@ export default function SituationRoomPipelinesPanel() {
         </main>
       ) : null}
 
-      {panelPage === "output" ? (
+      {panelPage === "output" ? selectedJob ? (
         <main className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-white/10 p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1648,6 +2563,9 @@ export default function SituationRoomPipelinesPanel() {
               </div>
               {selectedJob ? (
                 <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setSelectedJobId(ALL_OUTPUT_JOB_ID)} className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
+                    All output
+                  </button>
                   <button type="button" onClick={() => { masterScrollPinnedRef.current = true; void processJobNowAsync(selectedJob.job_id); }} className="inline-flex items-center gap-1 rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20">
                     <Play className="h-3.5 w-3.5" />
                     Run
@@ -1710,6 +2628,99 @@ export default function SituationRoomPipelinesPanel() {
           <div className="shrink-0 border-t border-white/10 p-3 text-[11px] text-slate-500">
             <FileText className="mr-1 inline h-3.5 w-3.5" />
             Job output is visible here but only reaches Helix Ask when explicitly attached.
+          </div>
+        </main>
+      ) : (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-6xl space-y-4">
+            <section className="rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Live output</p>
+                  <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">
+                    This is the product side of the Situation Room: live answer environments, pipeline outputs, and selected-room job results. Setup controls stay in Setup and source-specific workflow creation starts from Sources.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPanelPage("sources")}
+                    className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-white/10"
+                  >
+                    Sources
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPanelPage("jobs")}
+                    disabled={!activeRoom}
+                    className="rounded border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Room workflows
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Room</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-white">{activeRoom?.title ?? "No active room"}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Active workflows</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{activeJobs.length}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Selected source</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-white">{selectedSource?.label ?? "whole room"}</p>
+                </div>
+              </div>
+            </section>
+
+            <LiveAnswerEnvironmentPanel threadId="helix-ask:desktop" />
+            <LiveWorkstationPipelinePanel />
+
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Room job outputs</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    These are selected-room workflow outputs. Open a job for its evidence scroll, attach it to Helix Ask, or save it as a note.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("jobs")}
+                  disabled={!activeRoom}
+                  className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Manage workflows
+                </button>
+              </div>
+              {activeJobs.length === 0 ? (
+                <div className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-white/15 px-6 text-center text-sm text-slate-400">
+                  No room workflows have produced output yet. Pick a source, then create or run a room workflow.
+                </div>
+              ) : (
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {activeJobs.map((job) => (
+                    <JobCard
+                      key={job.job_id}
+                      job={job}
+                      selected={job.job_id === selectedJobId}
+                      onSelect={() => setSelectedJobId(job.job_id)}
+                      onRun={() => {
+                        setSelectedJobId(job.job_id);
+                        masterScrollPinnedRef.current = true;
+                        setPanelPage("output");
+                        void processJobNowAsync(job.job_id);
+                      }}
+                      onStop={() => stopJob(job.job_id)}
+                      onSave={() => saveJobAsNote(job.job_id)}
+                      onAttach={() => attachJobToHelixAsk(job.job_id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </main>
       ) : null}

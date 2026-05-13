@@ -26,6 +26,17 @@ const has = (text: string, pattern: RegExp): boolean => pattern.test(text);
 const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
   const preset = String(environment.preset ?? "").trim();
   const objective = String(environment.objective ?? "").toLowerCase();
+  if (/\bprime\s+gaps?\b/.test(objective) || /\bgaps?\b.*\bprime\b/.test(objective)) {
+    return [
+      /\bprime\s+gaps?\b/,
+      /\bgaps?\b/,
+      /\bgap\s+trend\b/,
+      /\blargest\s+gap\b/,
+      /\bprevious\s+prime\b/,
+      /\blive\s+output\b/,
+      /\bprime\s+(?:stream|sequence|generator)\b/,
+    ];
+  }
   if (/\b(?:transcript|sentence|speaker|browser\s+tab|video)\b/.test(objective)) {
     return [
       /\btranscript\b/,
@@ -52,6 +63,18 @@ const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
       /\bcandidate\b/,
       /\bprime\s+count\b/,
       /\bgap\b/,
+      /\bcalculator\b/,
+    ];
+  }
+  if (preset === "calculator_equation_interpreter") {
+    return [
+      /\bequation\b/,
+      /\bsolve(?:d|s)?\b/,
+      /\bvalue\b/,
+      /\bvariables?\b/,
+      /\bresult\b/,
+      /\binterpret(?:ation|ed)?\b/,
+      /\bbig\s+picture\b/,
       /\bcalculator\b/,
     ];
   }
@@ -84,6 +107,22 @@ const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
     /\btracker\b/,
     /\bstream\b/,
   ];
+};
+
+const environmentPromptScore = (environment: LiveAnswerEnvironment, text: string): number => {
+  let score = 0;
+  const objective = String(environment.objective ?? "").toLowerCase();
+  const lineText = environment.lines
+    .map((line) => `${line.key} ${line.label}`)
+    .join(" ")
+    .toLowerCase();
+  if (/\bprime\s+gaps?\b/.test(text) && /\bprime\s+gaps?\b/.test(objective)) score += 8;
+  if (/\bgaps?\b/.test(text) && /\b(?:previous_prime|largest_gap|gap_trend)\b/.test(lineText)) score += 6;
+  if (/\blive\s+output\b/.test(text) && /\blive\s+output\b/.test(objective)) score += 4;
+  if (/\bprime\b/.test(text) && (environment.preset === "calculator_prime_stream" || /\bprime\b/.test(objective))) score += 2;
+  if (/\bequation|result|variables?|interpret|big\s+picture\b/.test(text) && environment.preset === "calculator_equation_interpreter") score += 4;
+  if (/\bstatus|current|latest|right\s+now|what\s+.*on\b/.test(text)) score += 1;
+  return score;
 };
 
 const isGeneralConceptQuestion = (text: string): boolean =>
@@ -121,8 +160,15 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
   const matched = active.filter((environment) =>
     environmentKeywords(environment).some((keyword) => has(text, keyword)),
   );
+  const scoredMatches = matched
+    .map((environment) => ({ environment, score: environmentPromptScore(environment, text) }))
+    .sort((a, b) => b.score - a.score || b.environment.updated_at.localeCompare(a.environment.updated_at));
+  const bestScore = scoredMatches[0]?.score ?? 0;
+  const relevantMatches = bestScore > 0
+    ? scoredMatches.filter((entry) => entry.score === bestScore).map((entry) => entry.environment)
+    : matched;
 
-  if (matched.length === 0) {
+  if (relevantMatches.length === 0) {
     return {
       schema: "helix.live_environment_turn_relevance.v1",
       thread_id: args.threadId,
@@ -137,13 +183,13 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
     };
   }
 
-  if (matched.length > 1 && /\b(?:what\s+changed|status|current|what\s+is\s+happening|what\s+now)\b/.test(text)) {
+  if (relevantMatches.length > 1 && /\b(?:what\s+changed|status|current|what\s+is\s+happening|what\s+now)\b/.test(text)) {
     return {
       schema: "helix.live_environment_turn_relevance.v1",
       thread_id: args.threadId,
       turn_id: args.turnId ?? null,
       prompt,
-      relevant_environment_ids: matched.map((environment) => environment.environment_id),
+      relevant_environment_ids: relevantMatches.map((environment) => environment.environment_id),
       relevance: "context_available",
       reason: "multiple_matching_live_environments_need_clarification",
       confidence: 0.64,
@@ -158,7 +204,7 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
       thread_id: args.threadId,
       turn_id: args.turnId ?? null,
       prompt,
-      relevant_environment_ids: matched.map((environment) => environment.environment_id),
+      relevant_environment_ids: relevantMatches.map((environment) => environment.environment_id),
       relevance: "context_available",
       reason: "domain_keyword_used_as_general_concept_question",
       confidence: 0.78,
@@ -173,7 +219,7 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
     thread_id: args.threadId,
     turn_id: args.turnId ?? null,
     prompt,
-    relevant_environment_ids: matched.map((environment) => environment.environment_id),
+    relevant_environment_ids: relevantMatches.map((environment) => environment.environment_id),
     relevance: explicitEnvironmentCue
       ? "explicit_environment_question"
       : synthesize

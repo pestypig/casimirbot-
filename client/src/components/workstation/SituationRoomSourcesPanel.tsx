@@ -194,7 +194,7 @@ export default function SituationRoomSourcesPanel() {
   }, [activeRoom, attachMicAudioSource]);
 
   return (
-    <div className="grid h-full min-h-0 w-full grid-cols-1 overflow-hidden bg-slate-950/95 text-slate-100 lg:grid-cols-[240px_minmax(320px,1fr)_360px]">
+    <div className="grid min-h-full w-full grid-cols-1 overflow-visible bg-slate-950/95 text-slate-100 lg:grid-cols-[240px_minmax(320px,1fr)_360px]">
       <section className="flex min-h-0 flex-col border-b border-white/10 bg-slate-950/70 lg:border-b-0 lg:border-r">
         <div className="border-b border-white/10 p-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">

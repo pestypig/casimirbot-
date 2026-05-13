@@ -146,6 +146,76 @@ function postLiveEnvironmentControl(path: string, body?: Record<string, unknown>
   }).catch(() => undefined);
 }
 
+function normalizeLiveCommentaryCadence(value: unknown): string {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  if (
+    text === "off" ||
+    text === "milestones_only" ||
+    text === "anomalies_and_milestones" ||
+    text === "windowed_companion" ||
+    text === "active_dialogue" ||
+    text === "continuous_debug"
+  ) {
+    return text;
+  }
+  if (text === "risk_and_progress" || text === "progress_and_risk") return "anomalies_and_milestones";
+  if (text === "codex" || text === "codex_style" || text === "dialogue") return "active_dialogue";
+  return "milestones_only";
+}
+
+function normalizeLiveCommentaryStatus(value: unknown, cadence: string): "active" | "paused" | "stopped" {
+  const text = asNonEmptyString(value)?.toLowerCase();
+  if (text === "active" || text === "paused" || text === "stopped") return text;
+  return cadence === "off" ? "paused" : "active";
+}
+
+function normalizeLiveCommentaryVoiceMode(value: unknown): string | undefined {
+  const text = asNonEmptyString(value)?.toLowerCase().replace(/[\s-]+/g, "_");
+  if (text === "text_only" || text === "voice_on_confirm" || text === "critical_voice" || text === "direct_address_only") {
+    return text;
+  }
+  return undefined;
+}
+
+function postLiveCommentarySession(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/live-commentary/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
+function postLiveCommentarySessionWhenEnvironmentReady(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  const explicitEnvironmentId = asNonEmptyString(body.environment_id);
+  if (explicitEnvironmentId) {
+    postLiveCommentarySession(body);
+    return;
+  }
+  const threadId = asNonEmptyString(body.thread_id) ?? "helix-ask:desktop";
+  const attempt = (remaining: number): void => {
+    void fetch(`/api/agi/situation/live-answer-environment?thread_id=${encodeURIComponent(threadId)}&limit=1`)
+      .then((response) => response.json())
+      .then((payload: unknown) => {
+        const record = asRecord(payload);
+        const environment = asRecord(record?.environment);
+        const environmentId = asNonEmptyString(environment?.environment_id);
+        if (environmentId) {
+          postLiveCommentarySession({ ...body, environment_id: environmentId });
+          return;
+        }
+        if (remaining > 0) {
+          globalThis.setTimeout(() => attempt(remaining - 1), 250);
+        }
+      })
+      .catch(() => {
+        if (remaining > 0) globalThis.setTimeout(() => attempt(remaining - 1), 250);
+      });
+  };
+  attempt(12);
+}
+
 function postSituationMissionMemoryRefresh(body: Record<string, unknown>): void {
   if (typeof fetch !== "function") return;
   void fetch("/api/agi/situation/mission-memory/refresh", {
@@ -973,9 +1043,18 @@ export function executeHelixPanelAction(
     }
   }
 
-  if (panelId === "situation-room-sources") {
+  const situationSourceActionIds = new Set([
+    "attach_display_audio_source",
+    "attach_mic_audio_source",
+    "save_room_as_note",
+    "attach_room_to_helix_ask",
+    "stop_room",
+  ]);
+
+  if (panelId === "situation-room-sources" || (panelId === "situation-room-pipelines" && situationSourceActionIds.has(actionId))) {
     const args = asRecord(request.args) ?? {};
     const situationState = useSituationRoomStore.getState();
+    const unifiedPanelId = "situation-room-pipelines";
 
     if (actionId === "attach_display_audio_source") {
       const room = resolveSituationRoom(args, { createIfMissing: true });
@@ -987,8 +1066,8 @@ export function executeHelixPanelAction(
           message: "No situation room is available for the display audio source.",
         };
       }
-      context.openPanel(panelId, undefined);
-      context.focusPanel(panelId, undefined);
+      context.openPanel(unifiedPanelId, undefined);
+      context.focusPanel(unifiedPanelId, undefined);
       const label = asNonEmptyString(args.label ?? args.source_label ?? args.sourceLabel) ?? undefined;
       void useSituationRoomStore.getState().attachDisplayAudioSource(room.room_id, label);
       return {
@@ -1009,13 +1088,13 @@ export function executeHelixPanelAction(
       if (!room) {
         return {
           ok: false,
-          panel_id: panelId,
+          panel_id: unifiedPanelId,
           action_id: actionId,
           message: "No situation room is available for the microphone source.",
         };
       }
-      context.openPanel(panelId, undefined);
-      context.focusPanel(panelId, undefined);
+      context.openPanel(unifiedPanelId, undefined);
+      context.focusPanel(unifiedPanelId, undefined);
       const label = asNonEmptyString(args.label ?? args.source_label ?? args.sourceLabel) ?? undefined;
       void useSituationRoomStore.getState().attachMicAudioSource(room.room_id, label);
       return {
@@ -1037,7 +1116,7 @@ export function executeHelixPanelAction(
       if (!room) {
         return {
           ok: false,
-          panel_id: panelId,
+          panel_id: unifiedPanelId,
           action_id: actionId,
           message: "No situation room is available to save.",
         };
@@ -1047,7 +1126,7 @@ export function executeHelixPanelAction(
       context.focusPanel("workstation-notes", undefined);
       return {
         ok: Boolean(note),
-        panel_id: panelId,
+        panel_id: unifiedPanelId,
         action_id: actionId,
         artifact: {
           ...summarizeSituationRoom(useSituationRoomStore.getState().rooms[room.room_id] ?? room),
@@ -1072,7 +1151,7 @@ export function executeHelixPanelAction(
       situationState.attachRoomToHelixAsk(room.room_id, sourceId ?? undefined);
       return {
         ok: true,
-        panel_id: panelId,
+        panel_id: unifiedPanelId,
         action_id: actionId,
         artifact: {
           ...summarizeSituationRoom(room),
@@ -1095,7 +1174,7 @@ export function executeHelixPanelAction(
       situationState.stopRoom(room.room_id);
       return {
         ok: true,
-        panel_id: panelId,
+        panel_id: unifiedPanelId,
         action_id: actionId,
         artifact: summarizeSituationRoom(useSituationRoomStore.getState().rooms[room.room_id] ?? room),
         message: `Stopped active sources for "${room.title}".`,
@@ -1113,8 +1192,8 @@ export function executeHelixPanelAction(
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       if (receipt.setup_status === "needs_capture_permission") {
-        context.openPanel("situation-room-sources", undefined);
-        context.focusPanel("situation-room-sources", undefined);
+        context.openPanel("situation-room-pipelines", undefined);
+        context.focusPanel("situation-room-pipelines", undefined);
       }
       return {
         ok: receipt.ok,
@@ -1694,6 +1773,41 @@ export function executeHelixPanelAction(
           command_lane_enabled: false,
         },
         message: `Created a live answer environment for ${objective}.`,
+      };
+    }
+
+    if (actionId === "set_live_commentary_policy") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const cadence = normalizeLiveCommentaryCadence(args.cadence ?? args.commentary_cadence ?? args.commentaryCadence);
+      const status = normalizeLiveCommentaryStatus(args.status, cadence);
+      const voiceMode = normalizeLiveCommentaryVoiceMode(args.voice_mode ?? args.voiceMode);
+      const environmentId = asNonEmptyString(args.environment_id ?? args.environmentId);
+      const request = {
+        thread_id: threadId,
+        environment_id: environmentId ?? undefined,
+        cadence,
+        status,
+        ...(voiceMode ? { voice_mode: voiceMode } : {}),
+      };
+      postLiveCommentarySessionWhenEnvironmentReady(request);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "live_commentary_session_receipt",
+          ok: true,
+          request,
+          pending_environment_resolution: !environmentId,
+          context_policy: "compact_context_pack_only",
+          raw_logs_included: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        },
+        message: environmentId
+          ? `Set live commentary cadence to ${cadence}.`
+          : `Queued live commentary setup for the active ${threadId} environment.`,
       };
     }
 

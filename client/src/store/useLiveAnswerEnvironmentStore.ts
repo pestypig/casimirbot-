@@ -31,10 +31,12 @@ export type LiveAnswerEnvironmentDiagnostics = {
 
 export type LiveAnswerEnvironmentState = {
   environmentByThread: Record<string, LiveAnswerEnvironment | null>;
+  environmentById: Record<string, LiveAnswerEnvironment | null>;
   deltasByEnvironment: Record<string, LiveAnswerEnvironmentDelta[]>;
   diagnosticsByThread: Record<string, LiveAnswerEnvironmentDiagnostics>;
   upsertReadResponse: (threadId: string, response: LiveAnswerEnvironmentReadResponse) => void;
   loadLiveAnswerEnvironment: (threadId: string, limit?: number) => Promise<void>;
+  loadLiveAnswerEnvironmentById: (threadId: string, environmentId: string, limit?: number) => Promise<void>;
 };
 
 const uniqueDeltas = (deltas: LiveAnswerEnvironmentDelta[]): LiveAnswerEnvironmentDelta[] => {
@@ -48,6 +50,11 @@ export const selectActiveLiveAnswerEnvironment = (
   threadId: string,
 ): LiveAnswerEnvironment | null => state.environmentByThread[threadId] ?? null;
 
+export const selectLiveAnswerEnvironmentById = (
+  state: LiveAnswerEnvironmentState,
+  environmentId?: string | null,
+): LiveAnswerEnvironment | null => (environmentId ? state.environmentById[environmentId] ?? null : null);
+
 export const selectLiveAnswerEnvironmentDeltas = (
   state: LiveAnswerEnvironmentState,
   environmentId?: string | null,
@@ -57,6 +64,7 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
   persist(
     (set, get) => ({
       environmentByThread: {},
+      environmentById: {},
       deltasByEnvironment: {},
       diagnosticsByThread: {},
       upsertReadResponse: (threadId, response) => {
@@ -74,6 +82,12 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
               ...state.environmentByThread,
               [threadId]: environment,
             },
+            environmentById: environment
+              ? {
+                  ...state.environmentById,
+                  [environment.environment_id]: environment,
+                }
+              : state.environmentById,
             deltasByEnvironment,
             diagnosticsByThread: {
               ...state.diagnosticsByThread,
@@ -117,11 +131,42 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
           }));
         }
       },
+      loadLiveAnswerEnvironmentById: async (threadId, environmentId, limit = 30) => {
+        set((state) => ({
+          diagnosticsByThread: {
+            ...state.diagnosticsByThread,
+            [threadId]: {
+              ...(state.diagnosticsByThread[threadId] ?? {}),
+              last_status: "loading",
+            },
+          },
+        }));
+        try {
+          const response = await fetch(
+            `/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}?limit=${encodeURIComponent(String(limit))}`,
+          );
+          if (!response.ok) throw new Error(`live_answer_environment_read_failed:${response.status}`);
+          get().upsertReadResponse(threadId, (await response.json()) as LiveAnswerEnvironmentReadResponse);
+        } catch (error) {
+          set((state) => ({
+            diagnosticsByThread: {
+              ...state.diagnosticsByThread,
+              [threadId]: {
+                ...(state.diagnosticsByThread[threadId] ?? {}),
+                last_status: "error",
+                last_fetch_error: error instanceof Error ? error.message : "live_answer_environment_read_failed",
+                stale: true,
+              },
+            },
+          }));
+        }
+      },
     }),
     {
       name: "helix-live-answer-environment-v1",
       partialize: (state) => ({
         environmentByThread: state.environmentByThread,
+        environmentById: state.environmentById,
         deltasByEnvironment: state.deltasByEnvironment,
         diagnosticsByThread: state.diagnosticsByThread,
       }),

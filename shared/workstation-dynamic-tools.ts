@@ -120,6 +120,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.attach_standby_to_helix_thread",
   "situation-room-pipelines.start_situation_goal_session",
   "situation-room-pipelines.create_live_answer_environment",
+  "situation-room-pipelines.set_live_commentary_policy",
   "situation-room-pipelines.create_live_workstation_pipeline",
   "situation-room-pipelines.pause_live_workstation_pipeline",
   "situation-room-pipelines.resume_live_workstation_pipeline",
@@ -377,6 +378,24 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     action_id: "set_live_answer_line_schema",
     required_args: ["environment_id", "line_schema"],
     optional_args: ["thread_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "set_live_commentary_policy",
+    title: "Set Live Commentary Policy",
+    description: "Enable, pause, or adjust Codex-style live commentary for an active live answer environment.",
+    aliases: [
+      "enable live commentary",
+      "turn on commentary",
+      "talk me through this live answer",
+      "narrate the live situation",
+      "show codex style commentary",
+      "set commentary cadence",
+    ],
+    required_args: [],
+    optional_args: ["thread_id", "environment_id", "cadence", "status", "voice_mode"],
     risk: "medium",
     returns_artifact: true,
   },
@@ -721,6 +740,9 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
   if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
+  if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
+  if (arg === "status") return { enum: ["active", "paused", "stopped"] };
+  if (arg === "voice_mode") return { enum: ["text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
   if (arg === "tick_rate_ms" || arg === "max_ticks" || arg === "start") return { type: "number" };
   return { type: "string" };
 }
@@ -761,6 +783,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && ["pause_live_workstation_pipeline", "resume_live_workstation_pipeline", "stop_live_workstation_pipeline", "set_pipeline_transform", "set_pipeline_sink", "attach_pipeline_to_live_answer_environment"].includes(actionId)) return "live_workstation_pipeline_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "attach_live_source") return "workstation_live_source_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_answer_environment", "resume_live_answer_environment", "stop_live_answer_environment", "set_live_line_schema", "set_live_answer_line_schema"].includes(actionId)) return "live_answer_environment_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "scientific-calculator" && ["solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
   if (panelId === "scientific-calculator" && ["start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)) return "workstation_live_source_receipt";

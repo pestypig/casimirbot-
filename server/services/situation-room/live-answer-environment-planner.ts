@@ -15,9 +15,54 @@ export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
   if (/\bfollow\s+this\s+research\s+session\b/.test(normalized)) return true;
   if (/\bwatch\s+my\s+minecraft\s+run\b/.test(normalized)) return true;
   if (/\b(?:prime\s+number|next\s+primes|prime\s+generator|calculator\s+(?:series|stream)|live\s+prime)\b/.test(normalized)) return true;
+  if (/\b(?:live\s+equation|equation\s+(?:interpreter|live\s+source)|explain\s+(?:this\s+)?equation)\b/.test(normalized)) return true;
   if (/\b(?:track|monitor|set\s+up).*?\b(?:simulation|residual|stability)\b/.test(normalized)) return true;
   if (/\bcreate\s+(?:a\s+)?live\s+.*\b(?:discord|minecraft|video|research|calculator|prime|simulation)\b/.test(normalized)) return true;
   return false;
+}
+
+export function isLiveCommentaryPolicyIntent(transcript: string): boolean {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\b(?:enable|turn\s+on|start|set|use)\b.*\b(?:live\s+)?commentary\b/.test(normalized) ||
+    /\b(?:talk|walk|narrate)\s+(?:me\s+)?through\b/.test(normalized) ||
+    /\bcodex(?:-|\s*)style\s+(?:commentary|trace|thinking|progress)\b/.test(normalized) ||
+    /\bcommentary\s+(?:on|for)\s+(?:this|the)\s+(?:live\s+)?(?:answer|environment|situation|stream)\b/.test(normalized)
+  );
+}
+
+export function liveCommentaryRequestedForLiveEnvironment(transcript: string): boolean {
+  return isLiveCommentaryPolicyIntent(transcript);
+}
+
+export function buildLiveCommentaryPolicyArgs(args: {
+  transcript: string;
+  threadId?: string | null;
+  environmentId?: string | null;
+}): Record<string, unknown> {
+  const normalized = args.transcript.trim().toLowerCase();
+  const cadence =
+    /\b(?:debug|every\s+(?:step|tick)|continuous)\b/.test(normalized)
+      ? "continuous_debug"
+      : /\b(?:dialogue|talk|walk|codex|thinking|subgoals?)\b/.test(normalized)
+        ? "active_dialogue"
+        : /\b(?:window|periodic)\b/.test(normalized)
+          ? "windowed_companion"
+          : /\b(?:risk|anomaly|progress)\b/.test(normalized)
+            ? "anomalies_and_milestones"
+            : "milestones_only";
+  return {
+    thread_id: args.threadId ?? "helix-ask:desktop",
+    ...(args.environmentId ? { environment_id: args.environmentId } : {}),
+    cadence,
+    status: /\b(?:pause|stop|off|silent)\b/.test(normalized) ? "paused" : "active",
+    voice_mode: /\bvoice\s+on\s+confirm|confirm\s+(?:voice|speak|speaking)\b/.test(normalized)
+      ? "voice_on_confirm"
+      : /\bcritical\s+voice\b/.test(normalized)
+        ? "critical_voice"
+        : "text_only",
+  };
 }
 
 export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswerEnvironmentPreset {
@@ -29,6 +74,7 @@ export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswer
     return recipe.recipe_id;
   }
   if (has(normalized, /\bprime\s+number|next\s+primes|prime\s+generator|calculator\s+(?:series|stream)|live\s+prime\b/)) return "calculator_prime_stream";
+  if (has(normalized, /\blive\s+equation|equation\s+(?:interpreter|live\s+source)|explain\s+(?:this\s+)?equation|equation.*big\s+picture\b/)) return "calculator_equation_interpreter";
   if (has(normalized, /\bphysics|simulation|residual|stability|stabilizes?|tolerance\b/)) return "physics_stability_tracker";
   if (has(normalized, /\bdiscord|call|speaker|interpreter|translation\b/)) return "discord_interpreter";
   if (has(normalized, /\bvideo|claim|evidence|contradiction|segment\b/)) return "browser_video_argument_tracker";
@@ -52,6 +98,11 @@ export function inferLiveAnswerEnvironmentSourceArgs(transcript: string): {
   if (preset === "calculator_prime_stream") {
     return {
       source_ids: ["source:calculator-prime-stream"],
+    };
+  }
+  if (preset === "calculator_equation_interpreter") {
+    return {
+      source_ids: ["source:calculator-equation-live"],
     };
   }
   if (preset === "physics_stability_tracker") {

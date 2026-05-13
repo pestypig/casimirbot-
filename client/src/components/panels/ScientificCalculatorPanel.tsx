@@ -17,6 +17,37 @@ import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLi
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
+function isLiveRegisterSummary(value: string | null | undefined): boolean {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  return (
+    /\bcandidate\s*=/.test(normalized) &&
+    /\bisPrime\(candidate\)\s*=/.test(normalized) &&
+    /\bpreviousPrime\s*=/.test(normalized) &&
+    /\blatestPrime\s*=/.test(normalized) &&
+    /\bprimeCount\s*=/.test(normalized) &&
+    /\bnextCandidate\s*=/.test(normalized)
+  );
+}
+
+function isGeneratedLiveEquation(value: string | null | undefined): boolean {
+  return /^\s*\d+\s*\\bmod\s+\d+\s*=\s*-?\d+\s*$/i.test(String(value ?? "").trim());
+}
+
+function normalizeCalculatorInputDraft(value: string | null | undefined): string {
+  const text = String(value ?? "").trim();
+  return isLiveRegisterSummary(text) ? "" : text;
+}
+
+function resolveInitialCalculatorInput(draft: string | null | undefined, currentLatex: string): string {
+  const draftInput = normalizeCalculatorInputDraft(draft);
+  const currentInput = normalizeCalculatorInputDraft(currentLatex);
+  if (draftInput && isGeneratedLiveEquation(draftInput) && currentInput && currentInput !== draftInput) {
+    return currentInput;
+  }
+  return draftInput || currentInput;
+}
+
 function renderMathHtml(value: string, displayMode: boolean): string {
   const input = value.trim();
   if (!input) return "";
@@ -53,25 +84,40 @@ export default function ScientificCalculatorPanel() {
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
   const clearDraft = useWorkstationSessionMemoryStore((state) => state.clearDraft);
-  const [input, setInput] = useState(() => readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY) || currentLatex);
+  const [input, setInput] = useState(() =>
+    resolveInitialCalculatorInput(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY), currentLatex),
+  );
   const lastStoredLatexRef = useRef(currentLatex);
+
+  useEffect(() => {
+    if (isLiveRegisterSummary(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY))) {
+      clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
+    }
+  }, [clearDraft, readDraft]);
 
   useEffect(() => {
     if (currentLatex === lastStoredLatexRef.current) return;
     lastStoredLatexRef.current = currentLatex;
-    setInput(currentLatex);
-    rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, currentLatex);
-  }, [currentLatex, rememberDraft]);
+    const nextInput = normalizeCalculatorInputDraft(currentLatex);
+    setInput(nextInput);
+    if (nextInput) {
+      rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, nextInput);
+    } else {
+      clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
+    }
+  }, [clearDraft, currentLatex, rememberDraft]);
 
   useEffect(() => {
     const onPicked = (event: Event) => {
       const detail = (event as CustomEvent<ScientificCalculatorMathPickedDetail>).detail;
       if (!detail?.latex) return;
-      ingestLatex(detail.latex, {
-        sourcePath: detail.sourcePath,
-        anchor: detail.anchor,
-        source: detail.sourcePath === "clipboard" ? "clipboard" : "doc_viewer",
-      });
+      if (useScientificCalculatorStore.getState().currentLatex !== detail.latex) {
+        ingestLatex(detail.latex, {
+          sourcePath: detail.sourcePath,
+          anchor: detail.anchor,
+          source: detail.sourcePath === "clipboard" ? "clipboard" : "doc_viewer",
+        });
+      }
       setInput(detail.latex);
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, detail.latex);
     };
@@ -215,7 +261,7 @@ export default function ScientificCalculatorPanel() {
         </div>
       </div>
 
-      <ScientificCalculatorLiveSourceControls />
+      <ScientificCalculatorLiveSourceControls currentEquation={input} />
 
       <div className="mt-3 space-y-3 rounded-md border border-slate-800 bg-slate-900/40 p-3">
         {lastSolve ? (

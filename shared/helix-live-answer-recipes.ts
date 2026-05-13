@@ -45,6 +45,15 @@ export const LIVE_ANSWER_ENVIRONMENT_RECIPES: LiveAnswerEnvironmentRecipe[] = [
     safety_policy: safety,
   },
   {
+    recipe_id: "calculator_equation_interpreter",
+    aliases: ["live equation", "equation interpreter", "explain equation value", "equation live source"],
+    objective_template: "Use the current calculator equation as a live source and explain each solved value in context.",
+    default_line_schema: LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS.calculator_equation_interpreter,
+    source_requirements: ["calculator_series"],
+    default_mode: "text_only",
+    safety_policy: safety,
+  },
+  {
     recipe_id: "physics_stability_tracker",
     aliases: ["physics stability", "residual", "simulation", "stabilizes"],
     objective_template: "Set up a live stability tracker and report compact residual changes.",

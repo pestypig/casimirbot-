@@ -45,6 +45,17 @@ const methodsLines: LiveAnswerLineDefinition[] = [
   answerLine("next_check", "Next check", "episode_based"),
 ];
 
+const primeGapLines: LiveAnswerLineDefinition[] = [
+  answerLine("current_candidate", "Current candidate", "computation_tick"),
+  answerLine("latest_prime", "Latest prime", "computation_tick"),
+  answerLine("previous_prime", "Previous prime", "computation_tick"),
+  answerLine("gap", "Gap", "computation_tick"),
+  answerLine("largest_gap", "Largest gap", "windowed_summary"),
+  answerLine("gap_trend", "Gap trend", "windowed_summary"),
+  answerLine("last_test", "Last test", "computation_tick"),
+  answerLine("next_check", "Next check", "computation_tick"),
+];
+
 const claimLines: LiveAnswerLineDefinition[] = [
   answerLine("claim", "Claim", "episode_based"),
   answerLine("evidence", "Evidence", "episode_based"),
@@ -88,17 +99,54 @@ const sink = (
 
 const hasAny = (text: string, patterns: RegExp[]): boolean => patterns.some((pattern) => pattern.test(text));
 
+const isPrimeGapPipelinePrompt = (text: string): boolean =>
+  hasAny(text, [
+    /\bprime\s+gaps?\b/,
+    /\bgaps?\b[\s\S]*\bprime\s+(?:stream|sequence|generator|source)\b/,
+    /\blive\s+output\b[\s\S]*\bprime\b[\s\S]*\bgaps?\b/,
+    /\bprime\s+(?:stream|sequence|generator|source)\b[\s\S]*\bgaps?\b/,
+  ]);
+
 export function isLiveWorkstationPipelineIntent(prompt: string): boolean {
   const text = prompt.trim().toLowerCase();
   if (!text) return false;
   return hasAny(text, [
     /\blive\b[\s\S]*\b(?:pipeline|workflow)\b/,
+    /\blive\s+output\b[\s\S]*\b(?:from|over|using)\b[\s\S]*\b(?:stream|source|sequence|generator)\b/,
+    /\blive\s+output\b[\s\S]*\b(?:tracks?|analy[sz]es?|summari[sz]es?)\b/,
+    /\b(?:track|watch|analy[sz]e|summari[sz]e)\b[\s\S]*\bprime\s+gaps?\b/,
     /\bsummar(?:ize|ise)\b[\s\S]*\b(?:sentence|transcript)\b[\s\S]*\bnote\b/,
     /\b(?:zen|stoic|philosophy|philosophical)\b[\s\S]*\b(?:compare|comparison|relate)\b/,
     /\b(?:compare|relate)\b[\s\S]*\b(?:zen|stoic|philosophy|philosophical)\b/,
     /\b(?:simulation|residual|physics)\b[\s\S]*\b(?:methods?\s+note|rolling\s+note|write\s+a\s+note)\b/,
     /\b(?:claim|evidence|contradiction)\b[\s\S]*\b(?:watch|extract|track)\b/,
   ]);
+}
+
+export function inferLiveWorkstationPipelineSourceIds(prompt: string): string[] {
+  const text = prompt.trim().toLowerCase();
+  if (isPrimeGapPipelinePrompt(text) || /\bprime\s+(?:stream|sequence|generator|source)\b/.test(text)) {
+    return ["source:calculator-prime-stream"];
+  }
+  return [];
+}
+
+export function buildLiveWorkstationPipelineArgs(args: {
+  transcript: string;
+  threadId?: string | null;
+  sourceIds?: string[] | null;
+  environmentId?: string | null;
+  mode?: string | null;
+}): Record<string, unknown> {
+  const inferredSourceIds = inferLiveWorkstationPipelineSourceIds(args.transcript);
+  const sourceIds = Array.from(new Set([...(args.sourceIds ?? []), ...inferredSourceIds].filter(Boolean)));
+  return {
+    thread_id: args.threadId ?? "helix-ask:desktop",
+    objective: args.transcript.trim(),
+    ...(sourceIds.length > 0 ? { source_ids: sourceIds } : {}),
+    ...(args.environmentId ? { environment_id: args.environmentId } : {}),
+    mode: args.mode ?? "text_only",
+  };
 }
 
 export function planLiveWorkstationPipeline(args: {
@@ -109,14 +157,40 @@ export function planLiveWorkstationPipeline(args: {
 }): LiveWorkstationPipelinePlan {
   const text = args.prompt.trim();
   const normalized = text.toLowerCase();
-  const sourceIds = (args.sourceIds ?? []).filter(Boolean);
+  const sourceIds = Array.from(new Set([...(args.sourceIds ?? []), ...inferLiveWorkstationPipelineSourceIds(text)].filter(Boolean)));
   const hasSource = sourceIds.length > 0;
   const sourceRequirement =
-    hasAny(normalized, [/\bsimulation|residual|physics\b/])
+    isPrimeGapPipelinePrompt(normalized)
+      ? "calculator_stream"
+      : hasAny(normalized, [/\bsimulation|residual|physics\b/])
       ? "physics_simulation"
       : hasAny(normalized, [/\bbrowser|tab|video|transcript|speaker|sentence|zen|philosophy\b/])
         ? "browser_audio_transcript"
         : "manual_feed";
+
+  if (isPrimeGapPipelinePrompt(normalized)) {
+    return {
+      schema: "helix.live_workstation_pipeline_plan.v1",
+      pipeline_recipe_id: "prime_gap_tracker",
+      objective: text,
+      source_requirements: [sourceRequirement],
+      missing_bindings: hasSource ? [] : [sourceRequirement],
+      line_schema: primeGapLines,
+      transforms: [
+        transform("sequence_gap_analyzer", "sequence_gap_analyzer", "Analyze prime stream gaps", "deterministic_only", {
+          sequence: "prime_stream",
+          metric: "successive_prime_gap",
+        }),
+      ],
+      sinks: [
+        sink("live_environment", "live_answer_environment", "Update derived prime gap lines", args.environmentId ?? null),
+        sink("debug", "debug_trace", "Keep prime gap transform trace", null, "append"),
+      ],
+      next_actions: hasSource
+        ? [{ action: "create_pipeline", reason: "source_available" }]
+        : [{ action: "request_live_source", reason: `missing_${sourceRequirement}` }],
+    };
+  }
 
   if (hasAny(normalized, [/\bzen|stoic|philosophy|philosophical\b/])) {
     return {

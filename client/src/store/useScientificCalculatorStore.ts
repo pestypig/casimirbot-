@@ -14,6 +14,8 @@ export type ScientificCalculatorHistoryEntry = {
 
 export type ScientificCalculatorDebugAction =
   | "ingest_latex"
+  | "live_workbench_update"
+  | "live_solve_step"
   | "solve_expression"
   | "solve_with_steps"
   | "copy_result"
@@ -59,6 +61,14 @@ type ScientificCalculatorState = {
   recordDebugEvent: (
     event: Omit<ScientificCalculatorDebugEvent, "id" | "ts" | "panel_id">,
   ) => ScientificCalculatorDebugEvent;
+  setLiveWorkbenchExpression: (
+    latex: string,
+    meta?: {
+      traceId?: string | null;
+      message?: string;
+      source?: ScientificCalculatorDebugEvent["source"];
+    },
+  ) => void;
   clear: (meta?: { source?: ScientificCalculatorDebugEvent["source"] }) => void;
 };
 
@@ -135,6 +145,24 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
         return debugEvent;
+      },
+      setLiveWorkbenchExpression: (latex, meta) => {
+        const trimmed = latex.trim();
+        const debugEvent = makeDebugEvent({
+          action_id: "live_workbench_update",
+          source: meta?.source ?? "workstation_action",
+          ok: Boolean(trimmed),
+          input_latex: trimmed,
+          source_path: "scientific-calculator:live-source",
+          trace_id: meta?.traceId ?? null,
+          route: "scientific-calculator/live-workbench",
+          engine: "trial_division",
+          message: meta?.message ?? "live_workbench_expression_updated",
+        });
+        set((state) => ({
+          currentLatex: trimmed,
+          debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
+        }));
       },
       clear: (meta) =>
         set((state) => ({

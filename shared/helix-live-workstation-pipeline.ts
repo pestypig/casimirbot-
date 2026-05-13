@@ -8,6 +8,7 @@ export type LivePipelineStatus = "active" | "paused" | "completed" | "error";
 export type LivePipelineTransformKind =
   | "sentence_summary"
   | "rolling_summary"
+  | "sequence_gap_analyzer"
   | "philosophy_compare"
   | "claim_evidence_extract"
   | "contradiction_watch"
@@ -89,6 +90,7 @@ export type LiveWorkstationPipelinePlan = {
   schema: "helix.live_workstation_pipeline_plan.v1";
   pipeline_recipe_id:
     | "transcript_sentence_note"
+    | "prime_gap_tracker"
     | "philosophy_compare"
     | "methods_note_writer"
     | "claim_evidence_extract"

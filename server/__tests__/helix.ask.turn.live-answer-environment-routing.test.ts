@@ -102,6 +102,114 @@ describe("helix ask live answer environment routing", () => {
     expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
   }, 60000);
 
+  it("lets Helix Ask delegate commentary setup as a visible tool step", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Set up a live prime number generator and talk me through the subgoals like Codex commentary.",
+        mode: "read",
+        debug: true,
+        sessionId: `live-prime-commentary-routing-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+        },
+      })
+      .expect(200);
+
+    expect(actions(response.body)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          panel_id: "situation-room-pipelines",
+          action_id: "create_live_answer_environment",
+        }),
+        expect.objectContaining({
+          panel_id: "scientific-calculator",
+          action_id: "start_prime_stream",
+        }),
+        expect.objectContaining({
+          panel_id: "situation-room-pipelines",
+          action_id: "set_live_commentary_policy",
+          args: expect.objectContaining({
+            thread_id: "helix-ask:desktop",
+            cadence: "active_dialogue",
+            status: "active",
+          }),
+        }),
+      ]),
+    );
+    expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+  }, 60000);
+
+  it("routes commentary-only prompts to the active live environment control action", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Enable live commentary for this environment.",
+        mode: "read",
+        debug: true,
+        sessionId: `live-commentary-routing-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "situation-room-pipelines",
+        },
+      })
+      .expect(200);
+
+    const action = actions(response.body).find(
+      (entry) =>
+        entry?.panel_id === "situation-room-pipelines" &&
+        entry?.action_id === "set_live_commentary_policy",
+    );
+    expect(action).toBeTruthy();
+    expect(action?.args).toMatchObject({
+      thread_id: "helix-ask:desktop",
+      cadence: "milestones_only",
+      status: "active",
+    });
+    expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+  }, 60000);
+
+  it("routes live output from a prime stream to a derived workstation pipeline", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Create a live output from the prime stream that tracks prime gaps.",
+        mode: "read",
+        debug: true,
+        sessionId: `live-prime-gap-pipeline-routing-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+        },
+      })
+      .expect(200);
+
+    expect(actions(response.body)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          panel_id: "situation-room-pipelines",
+          action_id: "create_live_workstation_pipeline",
+          args: expect.objectContaining({
+            thread_id: "helix-ask:desktop",
+            source_ids: ["source:calculator-prime-stream"],
+          }),
+        }),
+      ]),
+    );
+    expect(actions(response.body).some((entry) => entry?.action_id === "create_live_answer_environment")).toBe(false);
+    expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+  }, 60000);
+
   it("does not let an active prime stream hijack unrelated concept questions", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
