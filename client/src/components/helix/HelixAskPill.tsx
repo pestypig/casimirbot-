@@ -87,6 +87,7 @@ import {
   reconcileWorkstationIntentDecisionWithPrompt,
   shouldProbeWorkstationIntentClassifier,
 } from "@/lib/workstation/intentClassifier";
+import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
@@ -2566,6 +2567,93 @@ const getWorkstationExecutedReplyText = (languageTag: string | null | undefined)
   if (normalized.startsWith("pt")) return "AÃ§Ã£o do espaÃ§o de trabalho executada.";
   if (normalized.startsWith("it")) return "Azione dell'area di lavoro eseguita.";
   return "Executed workstation action.";
+};
+
+const readWorkstationActionArgText = (
+  action: HelixWorkstationAction,
+  keys: string[],
+): string | null => {
+  const args = action.action === "run_panel_action" && action.args && typeof action.args === "object"
+    ? (action.args as Record<string, unknown>)
+    : {};
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+};
+
+const extractCalculatorFastPathExpressionFromPrompt = (prompt: string | null | undefined): string | null => {
+  const text = String(prompt ?? "").trim();
+  if (!text) return null;
+  const match = text.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+?)(?:\s+(?:with\s+)?(?:step|steps|step-by-step|work)\b|$)/i);
+  const raw = match?.[1]?.trim();
+  if (!raw) return null;
+  const cleaned = raw
+    .replace(/^(?:the\s+)?(?:equation|expression|latex|formula)\s+/i, "")
+    .replace(/[.?!,;:]+$/g, "")
+    .trim();
+  return cleaned && /[=^*/+\-()_\\]|\d/.test(cleaned) ? cleaned : null;
+};
+
+const renderCalculatorFastPathReply = (
+  action: HelixWorkstationAction,
+  prompt?: string | null,
+): string | null => {
+  const actionTargetsCalculatorSolve =
+    action.action === "run_panel_action" &&
+    action.panel_id === "scientific-calculator" &&
+    (action.action_id === "solve_expression" || action.action_id === "solve_with_steps");
+  const expression =
+    (actionTargetsCalculatorSolve ? readWorkstationActionArgText(action, ["latex", "expression", "text"]) : null) ??
+    extractCalculatorFastPathExpressionFromPrompt(prompt);
+  if (!expression) return null;
+  const wantsSteps =
+    (actionTargetsCalculatorSolve && action.action_id === "solve_with_steps") ||
+    /\b(?:steps?|step-by-step|show\s+work|trace)\b/i.test(String(prompt ?? ""));
+  const solve = runScientificSolve(expression, wantsSteps);
+  if (!solve.ok) {
+    return [
+      "Calculator attempted the solve.",
+      `Expression: ${expression}`,
+      `Result: ${solve.error ?? "No calculator result available."}`,
+      `Trace: ${solve.trace.engine}/${solve.trace.route}`,
+    ].join("\n");
+  }
+  return [
+    "Calculator verified the expression.",
+    `Expression: ${expression}`,
+    `Result: ${solve.result_text || solve.result_latex || "No displayed result."}`,
+    `Trace: ${solve.trace.engine}/${solve.trace.route}`,
+    solve.steps.length > 0 ? `Steps recorded: ${solve.steps.length}` : null,
+  ].filter((line): line is string => Boolean(line)).join("\n");
+};
+
+const selectWorkstationFastPathReplyAction = (
+  actions: HelixWorkstationAction[],
+): HelixWorkstationAction | null => {
+  return actions.find((action) =>
+    action.action === "run_panel_action" &&
+    action.panel_id === "scientific-calculator" &&
+    (action.action_id === "solve_expression" || action.action_id === "solve_with_steps") &&
+    Boolean(readWorkstationActionArgText(action, ["latex", "expression", "text"])),
+  ) ?? actions[0] ?? null;
+};
+
+const getWorkstationFastPathReplyText = (
+  action: HelixWorkstationAction | null | undefined,
+  languageTag: string | null | undefined,
+  prompt?: string | null,
+): string => {
+  if (action) {
+    const calculatorReply = renderCalculatorFastPathReply(action, prompt);
+    if (calculatorReply) return calculatorReply;
+  }
+  const promptOnlyCalculatorReply = extractCalculatorFastPathExpressionFromPrompt(prompt)
+    ? renderCalculatorFastPathReply({ action: "open_panel", panel_id: "scientific-calculator" }, prompt)
+    : null;
+  if (promptOnlyCalculatorReply) return promptOnlyCalculatorReply;
+  return getWorkstationExecutedReplyText(languageTag);
 };
 
 const buildWorkstationInterpretingReceiptText = (requestText: string, languageTag: string | null | undefined): string => {
@@ -20429,10 +20517,11 @@ export function HelixAskPill({
             },
           });
           setAskStatus(getWorkstationExecutingStatusText(workstationLanguageTag));
+          const voiceDispatchSequence = [workstationCommand, ...parsedWorkstationFollowupActions];
           dispatchWorkstationActionSequence({
             source: "voice_dispatch",
             question: transcript,
-            actions: [workstationCommand, ...parsedWorkstationFollowupActions],
+            actions: voiceDispatchSequence,
             traceId: input.traceId,
           });
           appendSyntheticLiveEvent(
@@ -20491,7 +20580,11 @@ export function HelixAskPill({
               addMessage(sessionId, { role: "user", content: transcript });
               addMessage(sessionId, {
                 role: "assistant",
-                content: getWorkstationExecutedReplyText(workstationLanguageTag),
+                content: getWorkstationFastPathReplyText(
+                  selectWorkstationFastPathReplyAction(voiceDispatchSequence),
+                  workstationLanguageTag,
+                  transcript,
+                ),
               });
             }
             return;
@@ -24607,7 +24700,11 @@ export function HelixAskPill({
           };
           if (!resolvedDispatchPlan.should_dispatch_reasoning) {
             const replyId = crypto.randomUUID();
-            const responseText = getWorkstationExecutedReplyText(typedPromptLanguageTag);
+            const responseText = getWorkstationFastPathReplyText(
+              selectWorkstationFastPathReplyAction(dispatchSequence),
+              typedPromptLanguageTag,
+              trimmed,
+            );
             setAskReplies((prev) =>
               [
                 {

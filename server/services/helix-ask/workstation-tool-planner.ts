@@ -105,28 +105,6 @@ export function planWorkstationToolUse(prompt: string): WorkstationToolPlannerRe
   const scores: AffordanceScore[] = [];
   const pushScore = (score: AffordanceScore) => scores.push(score);
 
-  if (isCalculatorPrompt(normalized)) {
-    const latex = extractCalculatorExpression(normalized);
-    const wantsSteps = /\b(?:steps?|show\s+work|trace|verify|check)\b/i.test(normalized);
-    const actionId = wantsSteps ? "solve_with_steps" : "solve_expression";
-    pushScore({
-      affordance_id: `scientific-calculator.${actionId}`,
-      panel_id: "scientific-calculator",
-      action_id: actionId,
-      score: latex ? 0.94 : 0.64,
-      reason: latex ? "math prompt includes a candidate expression" : "math prompt lacks a concrete expression",
-      required_args_missing: latex ? [] : ["latex"],
-    });
-    return {
-      intent: wantsSteps ? "calculator_verify" : "calculator_solve",
-      action: latex ? { panel_id: "scientific-calculator", action_id: actionId, args: { latex } } : null,
-      scores,
-      should_use_tool: true,
-      reason: "Prompt asks for math verification/evaluation; calculator affordance should run before direct answer.",
-      missing_required_args: latex ? [] : ["latex"],
-    };
-  }
-
   if (isNoteCreatePrompt(normalized)) {
     const title = extractNoteTitle(normalized);
     const body = extractNoteBody(normalized);
@@ -172,6 +150,28 @@ export function planWorkstationToolUse(prompt: string): WorkstationToolPlannerRe
       should_use_tool: true,
       reason: "Prompt asks to store text in notes; note output should be a receipt-backed action.",
       missing_required_args: body ? [] : ["text"],
+    };
+  }
+
+  if (isCalculatorPrompt(normalized)) {
+    const latex = extractCalculatorExpression(normalized);
+    const wantsSteps = /\b(?:steps?|show\s+work|trace|verify|check)\b/i.test(normalized);
+    const actionId = wantsSteps ? "solve_with_steps" : "solve_expression";
+    pushScore({
+      affordance_id: `scientific-calculator.${actionId}`,
+      panel_id: "scientific-calculator",
+      action_id: actionId,
+      score: latex ? 0.94 : 0.64,
+      reason: latex ? "math prompt includes a candidate expression" : "math prompt lacks a concrete expression",
+      required_args_missing: latex ? [] : ["latex"],
+    });
+    return {
+      intent: wantsSteps ? "calculator_verify" : "calculator_solve",
+      action: latex ? { panel_id: "scientific-calculator", action_id: actionId, args: { latex } } : null,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt asks for math verification/evaluation; calculator affordance should run before direct answer.",
+      missing_required_args: latex ? [] : ["latex"],
     };
   }
 

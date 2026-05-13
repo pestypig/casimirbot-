@@ -36,6 +36,22 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("prefers explicit note creation even when note body contains math", () => {
+    const plan = planWorkstationToolUse(
+      'Create a workstation note titled "Tool Demo" with body Calculator verified x^2 - 4 = 0 gives x = 2 and x = -2.',
+    );
+
+    expect(plan.intent).toBe("notes_create");
+    expect(plan.action).toEqual({
+      panel_id: "workstation-notes",
+      action_id: "create_note",
+      args: {
+        title: "Tool Demo",
+        body: "Calculator verified x^2 - 4 = 0 gives x = 2 and x = -2",
+      },
+    });
+  });
+
   it("does not hijack unrelated science questions", () => {
     const plan = planWorkstationToolUse("What is a neutron star glitch?");
 
