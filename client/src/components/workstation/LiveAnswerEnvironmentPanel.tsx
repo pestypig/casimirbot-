@@ -9,13 +9,22 @@ import type { WorkstationLiveSource, WorkstationLiveSourceEvent, LiveSourceWindo
 import type { LiveAnswerEnvironmentDelta, LiveAnswerLineState } from "@shared/helix-live-answer-environment";
 import type {
   LiveCommentaryCadence,
+  LiveCommentaryCandidate,
   LiveCommentaryDeliveryReceipt,
   LiveCommentaryProposal,
   LiveCommentarySession,
   LiveCommentaryTraceStep,
 } from "@shared/helix-live-commentary";
 
-type LiveEnvironmentTab = "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "debug";
+type LiveEnvironmentTab = "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type LiveAgenticReviewReadEntry = {
+  review_id: string;
+  question?: string;
+  trigger?: string;
+  decision?: string;
+  summary?: string;
+  model_invoked?: boolean;
+};
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -24,6 +33,7 @@ const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "deltas", label: "Deltas" },
   { id: "windows", label: "Windows" },
   { id: "commentary", label: "Commentary" },
+  { id: "reviews", label: "Reviews" },
   { id: "debug", label: "Debug" },
 ];
 
@@ -56,8 +66,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [events, setEvents] = useState<WorkstationLiveSourceEvent[]>([]);
   const [windows, setWindows] = useState<LiveSourceWindowSummary[]>([]);
   const [commentarySession, setCommentarySession] = useState<LiveCommentarySession | null>(null);
+  const [commentaryCandidates, setCommentaryCandidates] = useState<LiveCommentaryCandidate[]>([]);
   const [commentaryProposals, setCommentaryProposals] = useState<LiveCommentaryProposal[]>([]);
   const [commentaryDeliveries, setCommentaryDeliveries] = useState<LiveCommentaryDeliveryReceipt[]>([]);
+  const [reviewRequests, setReviewRequests] = useState<LiveAgenticReviewReadEntry[]>([]);
+  const [reviewResults, setReviewResults] = useState<LiveAgenticReviewReadEntry[]>([]);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectActiveLiveAnswerEnvironment(state, threadId),
@@ -91,24 +104,32 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       const commentaryPath = activeEnvironmentId
         ? `/api/agi/situation/live-commentary?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-commentary?thread_id=${encodeURIComponent(threadId)}`;
-      const [sourceRes, eventRes, windowRes, commentaryRes] = await Promise.all([
+      const reviewPath = activeEnvironmentId
+        ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
+        : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
         fetch(commentaryPath),
+        fetch(reviewPath),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
         commentaryRes.json(),
+        reviewRes.json(),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
       setWindows(Array.isArray(windowBody.windows) ? windowBody.windows : []);
       setCommentarySession(commentaryBody.session ?? null);
+      setCommentaryCandidates(Array.isArray(commentaryBody.candidates) ? commentaryBody.candidates : []);
       setCommentaryProposals(Array.isArray(commentaryBody.proposals) ? commentaryBody.proposals : []);
       setCommentaryDeliveries(Array.isArray(commentaryBody.deliveries) ? commentaryBody.deliveries : []);
+      setReviewRequests(Array.isArray(reviewBody.requests) ? reviewBody.requests : []);
+      setReviewResults(Array.isArray(reviewBody.results) ? reviewBody.results : []);
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -138,6 +159,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       environment_id: environment.environment_id,
       cadence,
       status: cadence === "off" ? "paused" : "active",
+    });
+    await refresh();
+  };
+
+  const requestAgenticReview = async () => {
+    if (!environment) return;
+    await postJson("/api/agi/situation/live-agentic-review/request", {
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      question: "Review the latest compact live environment state.",
+      trigger: "manual_button",
     });
     await refresh();
   };
@@ -293,6 +325,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </div>
               <div className="space-y-2">
                 {commentaryProposals.length === 0 ? <p className="text-xs text-slate-500">No commentary proposals yet.</p> : null}
+                {commentaryCandidates.length > 0 ? (
+                  <div className="rounded border border-white/10 bg-black/20 p-2">
+                    <p className="text-[10px] uppercase text-slate-500">Latest bounded commentary candidate</p>
+                    <p className="mt-1 text-xs text-slate-200">{commentaryCandidates[commentaryCandidates.length - 1]?.text}</p>
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      decision {commentaryCandidates[commentaryCandidates.length - 1]?.decision} / model_invoked=false / deterministic=true
+                    </p>
+                  </div>
+                ) : null}
                 {commentaryProposals.slice(-12).reverse().map((proposal: LiveCommentaryProposal) => {
                   const delivery = commentaryDeliveries.find((entry: LiveCommentaryDeliveryReceipt) => entry.proposal_id === proposal.proposal_id);
                   return (
@@ -329,6 +370,36 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   );
                 })}
               </div>
+            </div>
+          ) : null}
+          {activeTab === "reviews" ? (
+            <div className="space-y-3">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-100">Agentic reviews</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Reviews are explicit compact-context requests. Background results are validation items unless a direct user turn asks for an answer.
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => void requestAgenticReview()} className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10">Run review</button>
+                </div>
+              </div>
+              {reviewRequests.length === 0 && reviewResults.length === 0 ? <p className="text-xs text-slate-500">No review requests yet.</p> : null}
+              {reviewRequests.slice(-10).reverse().map((request: LiveAgenticReviewReadEntry) => (
+                <div key={request.review_id} className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-xs font-semibold text-slate-100">{request.trigger ?? "review"} / request</p>
+                  <p className="mt-1 text-xs text-slate-300">{request.question ?? "Review the latest live environment state."}</p>
+                  <p className="mt-2 text-[10px] text-slate-500">compact_context_pack_only / raw logs included false</p>
+                </div>
+              ))}
+              {reviewResults.slice(-10).reverse().map((result: LiveAgenticReviewReadEntry) => (
+                <div key={result.review_id} className="rounded border border-cyan-300/20 bg-cyan-950/20 p-3">
+                  <p className="text-xs font-semibold text-cyan-100">{result.decision ?? "review_result"}</p>
+                  <p className="mt-1 text-xs text-slate-200">{result.summary ?? "Review completed."}</p>
+                  <p className="mt-2 text-[10px] text-slate-500">model_invoked={String(result.model_invoked ?? true)} / item role validation unless user-facing</p>
+                </div>
+              ))}
             </div>
           ) : null}
           {activeTab === "debug" ? (

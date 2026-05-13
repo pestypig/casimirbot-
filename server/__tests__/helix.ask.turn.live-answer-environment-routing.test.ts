@@ -1,6 +1,9 @@
 import express from "express";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createApp = async (): Promise<{ app: express.Express }> => {
   const agi = await import("../routes/agi.plan");
@@ -14,9 +17,23 @@ const actions = (body: any): any[] =>
   Array.isArray(body?.execution_trace) ? body.execution_trace.map((step: any) => step?.action).filter(Boolean) : [];
 
 describe("helix ask live answer environment routing", () => {
+  let tempLedgerDir = "";
+
+  beforeEach(() => {
+    tempLedgerDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-live-env-routing-"));
+    process.env.HELIX_THREAD_LEDGER_PATH = path.join(tempLedgerDir, "helix-thread-ledger.jsonl");
+    process.env.HELIX_THREAD_INDEX_PATH = path.join(tempLedgerDir, "helix-thread-index.json");
+  });
+
   afterEach(() => {
     delete process.env.HELIX_E11_MODEL_DECISION_LLM;
     delete process.env.HELIX_E14_OBSERVATION_MODEL_DECISION;
+    delete process.env.HELIX_THREAD_LEDGER_PATH;
+    delete process.env.HELIX_THREAD_INDEX_PATH;
+    if (tempLedgerDir) {
+      fs.rmSync(tempLedgerDir, { recursive: true, force: true });
+      tempLedgerDir = "";
+    }
     vi.resetModules();
   });
 
@@ -172,6 +189,70 @@ describe("helix ask live answer environment routing", () => {
       thread_id: "helix-ask:desktop",
       cadence: "milestones_only",
       status: "active",
+    });
+    expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+  }, 60000);
+
+  it("routes explicit live review prompts to the agentic review workstation action", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Explain the latest equation result in context.",
+        mode: "read",
+        debug: true,
+        sessionId: `live-agentic-review-routing-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+        },
+      })
+      .expect(200);
+
+    const action = actions(response.body).find(
+      (entry) =>
+        entry?.panel_id === "situation-room-pipelines" &&
+        entry?.action_id === "request_agentic_review",
+    );
+    expect(action).toBeTruthy();
+    expect(action?.args).toMatchObject({
+      thread_id: "helix-ask:desktop",
+      trigger: "user_direct",
+      question: "Explain the latest equation result in context.",
+    });
+    expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
+  }, 60000);
+
+  it("routes keep-me-company prompts to companion policy setup", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Dottie, keep me company while I play Minecraft but only speak for danger or progress.",
+        mode: "read",
+        debug: true,
+        sessionId: `companion-policy-routing-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "situation-room-pipelines",
+        },
+      })
+      .expect(200);
+
+    const action = actions(response.body).find(
+      (entry) =>
+        entry?.panel_id === "situation-room-pipelines" &&
+        entry?.action_id === "set_companion_policy",
+    );
+    expect(action).toBeTruthy();
+    expect(action?.args).toMatchObject({
+      thread_id: "helix-ask:desktop",
+      voice_input_active: true,
+      companion_mode: "active_companion",
     });
     expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
   }, 60000);

@@ -2,6 +2,8 @@ import type { LiveAnswerEnvironmentMode } from "./helix-live-answer-environment"
 
 export const HELIX_LIVE_COMMENTARY_SESSION_SCHEMA =
   "helix.live_commentary_session.v1" as const;
+export const HELIX_LIVE_COMMENTARY_CANDIDATE_SCHEMA =
+  "helix.live_commentary_candidate.v1" as const;
 export const HELIX_LIVE_COMMENTARY_PROPOSAL_SCHEMA =
   "helix.live_commentary_proposal.v1" as const;
 export const HELIX_LIVE_COMMENTARY_DELIVERY_RECEIPT_SCHEMA =
@@ -17,11 +19,19 @@ export type LiveCommentaryCadence =
   | "active_dialogue"
   | "continuous_debug";
 
+export type LiveCommentaryMode = LiveCommentaryCadence;
+
 export type LiveCommentaryDecision =
   | "silent_keep_in_context"
   | "show_text"
   | "voice_on_confirm"
   | "request_user_input";
+
+export type LiveCommentaryCandidateDecision =
+  | "suppress"
+  | "show_text"
+  | "voice_on_confirm"
+  | "request_agentic_review";
 
 export type LiveCommentaryTraceStepKind =
   | "goal_frame"
@@ -68,6 +78,33 @@ export type LiveCommentarySession = {
   context_policy: "compact_context_pack_only";
   raw_logs_included: false;
   deterministic_content_role: "observation_not_assistant_answer";
+};
+
+export type LiveCommentaryCandidate = {
+  schema: typeof HELIX_LIVE_COMMENTARY_CANDIDATE_SCHEMA;
+  candidate_id: string;
+  environment_id: string;
+  thread_id: string;
+  source_event_ids: string[];
+  line_keys: string[];
+  trigger:
+    | "line_update"
+    | "milestone"
+    | "anomaly"
+    | "window_summary"
+    | "salience"
+    | "manual_review";
+  text: string;
+  rationale: string;
+  priority: "info" | "warn" | "critical" | "action";
+  mode: LiveCommentaryMode;
+  decision: LiveCommentaryCandidateDecision;
+  evidence_refs: string[];
+  model_invoked: false;
+  deterministic: true;
+  context_policy: "compact_context_pack_only";
+  raw_logs_included: false;
+  created_at: string;
 };
 
 export type LiveCommentaryProposal = {

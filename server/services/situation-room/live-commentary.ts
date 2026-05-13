@@ -7,10 +7,13 @@ import type {
 } from "@shared/helix-live-answer-environment";
 import {
   HELIX_LIVE_COMMENTARY_PROPOSAL_SCHEMA,
+  HELIX_LIVE_COMMENTARY_CANDIDATE_SCHEMA,
   HELIX_LIVE_COMMENTARY_DELIVERY_RECEIPT_SCHEMA,
   HELIX_LIVE_COMMENTARY_SESSION_SCHEMA,
   HELIX_LIVE_COMMENTARY_TRACE_STEP_SCHEMA,
   type LiveCommentaryCadence,
+  type LiveCommentaryCandidate,
+  type LiveCommentaryCandidateDecision,
   type LiveCommentaryDeliveryReceipt,
   type LiveCommentaryDecision,
   type LiveCommentaryProposal,
@@ -21,6 +24,7 @@ import {
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
 
 const sessionsByEnvironment = new Map<string, LiveCommentarySession>();
+const candidatesByEnvironment = new Map<string, LiveCommentaryCandidate[]>();
 const proposalsByEnvironment = new Map<string, LiveCommentaryProposal[]>();
 const deliveriesByEnvironment = new Map<string, LiveCommentaryDeliveryReceipt[]>();
 
@@ -190,6 +194,11 @@ export function getLiveCommentarySessionForEnvironment(environmentId: string): L
 export function listLiveCommentaryProposals(environmentId?: string | null): LiveCommentaryProposal[] {
   if (environmentId) return proposalsByEnvironment.get(environmentId) ?? [];
   return Array.from(proposalsByEnvironment.values()).flat().sort((a: LiveCommentaryProposal, b: LiveCommentaryProposal) => b.ts.localeCompare(a.ts));
+}
+
+export function listLiveCommentaryCandidates(environmentId?: string | null): LiveCommentaryCandidate[] {
+  if (environmentId) return candidatesByEnvironment.get(environmentId) ?? [];
+  return Array.from(candidatesByEnvironment.values()).flat().sort((a: LiveCommentaryCandidate, b: LiveCommentaryCandidate) => b.created_at.localeCompare(a.created_at));
 }
 
 export function listLiveCommentaryDeliveries(environmentId?: string | null): LiveCommentaryDeliveryReceipt[] {
@@ -391,6 +400,45 @@ export function buildLiveCommentaryProposal(input: {
         : "show_text";
   const userVisible = decision === "show_text" || decision === "voice_on_confirm";
   const proposalId = `live_commentary_proposal:${hashShort([session.session_id, input.delta.delta_id, cadence, classification.text], 18)}`;
+  const candidateDecision: LiveCommentaryCandidateDecision =
+    !shouldSurface
+      ? "suppress"
+      : environment.mode === "voice_on_confirm"
+        ? "voice_on_confirm"
+        : "show_text";
+  const candidate: LiveCommentaryCandidate = {
+    schema: HELIX_LIVE_COMMENTARY_CANDIDATE_SCHEMA,
+    candidate_id: `live_commentary_candidate:${hashShort([session.session_id, input.delta.delta_id, cadence, classification.text], 18)}`,
+    environment_id: session.environment_id,
+    thread_id: session.thread_id,
+    source_event_ids: uniqueStrings(environment.lines.flatMap((line: LiveAnswerLineState) => line.source_event_ids ?? [])).slice(-24),
+    line_keys: input.delta.changed_line_keys,
+    trigger:
+      classification.reason === "prime_found" || classification.reason === "stability_reached"
+        ? "milestone"
+        : classification.reason === "anomaly_detected"
+          ? "anomaly"
+          : classification.reason === "window_summary"
+            ? "window_summary"
+            : "line_update",
+    text: classification.text,
+    rationale: shouldSurface
+      ? `${classification.reason} passed ${cadence} commentary policy.`
+      : `${classification.reason} suppressed by ${cadence} commentary policy.`,
+    priority: classification.priority,
+    mode: cadence,
+    decision: candidateDecision,
+    evidence_refs: uniqueStrings(input.delta.evidence_refs).slice(-24),
+    model_invoked: false,
+    deterministic: true,
+    context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
+    created_at: now,
+  };
+  candidatesByEnvironment.set(session.environment_id, [
+    ...(candidatesByEnvironment.get(session.environment_id) ?? []),
+    candidate,
+  ].slice(-80));
   const traceSteps = buildTraceSteps({
     proposalId,
     session,
@@ -617,6 +665,7 @@ export function recordLiveCommentaryForDelta(input: {
 
 export function resetLiveCommentary(): void {
   sessionsByEnvironment.clear();
+  candidatesByEnvironment.clear();
   proposalsByEnvironment.clear();
   deliveriesByEnvironment.clear();
 }

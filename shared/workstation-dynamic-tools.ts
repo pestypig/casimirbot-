@@ -121,6 +121,8 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.start_situation_goal_session",
   "situation-room-pipelines.create_live_answer_environment",
   "situation-room-pipelines.set_live_commentary_policy",
+  "situation-room-pipelines.request_agentic_review",
+  "situation-room-pipelines.set_companion_policy",
   "situation-room-pipelines.create_live_workstation_pipeline",
   "situation-room-pipelines.pause_live_workstation_pipeline",
   "situation-room-pipelines.resume_live_workstation_pipeline",
@@ -401,6 +403,48 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   },
   {
     panel_id: "situation-room-pipelines",
+    action_id: "request_agentic_review",
+    title: "Request Agentic Review",
+    description: "Ask Helix Ask to review the latest compact live environment state without treating commentary as an answer.",
+    aliases: [
+      "run agentic review",
+      "review this live answer",
+      "explain latest equation result",
+      "explain the latest live update",
+      "what did the commentary mean",
+      "why did the live card update",
+    ],
+    required_args: [],
+    optional_args: ["thread_id", "environment_id", "question", "trigger"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "set_companion_policy",
+    title: "Set Companion Policy",
+    description: "Configure voice-aware companion mode without starting hidden Ask turns for every mic transcript.",
+    aliases: [
+      "set companion policy",
+      "enable active companion",
+      "keep me company",
+      "turn on dottie mode",
+      "set mic conversation mode",
+    ],
+    required_args: [],
+    optional_args: [
+      "thread_id",
+      "voice_input_active",
+      "voice_output_enabled",
+      "companion_mode",
+      "commentary_mode",
+      "direct_address_names",
+    ],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
     action_id: "pause_live_source",
     required_args: ["source_id"],
     optional_args: ["thread_id"],
@@ -639,7 +683,7 @@ export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
   "scientific-calculator",
 ] as const;
 
-export const WORKSPACE_ACTION_MANIFEST: WorkspaceActionManifestEntry[] = WORKSPACE_ACTION_REGISTRY.map((entry) => ({
+export const WORKSPACE_ACTION_MANIFEST: WorkspaceActionManifestEntry[] = WORKSPACE_ACTION_REGISTRY.map((entry: WorkspaceActionRegistryEntry) => ({
   action_key: entry.action_key,
   family: entry.family,
   target_id: entry.target_id,
@@ -652,7 +696,7 @@ export const WORKSPACE_ACTION_MANIFEST: WorkspaceActionManifestEntry[] = WORKSPA
   enabled: entry.enabled,
 }));
 
-export const WORKSPACE_ACTION_CLIENT_HANDLER_KEYS = WORKSPACE_ACTION_MANIFEST.map((entry) => entry.client_handler_key);
+export const WORKSPACE_ACTION_CLIENT_HANDLER_KEYS = WORKSPACE_ACTION_MANIFEST.map((entry: WorkspaceActionManifestEntry) => entry.client_handler_key);
 
 export function buildWorkspaceActionRegistryAudit(args?: {
   visiblePanels?: readonly string[];
@@ -664,26 +708,26 @@ export function buildWorkspaceActionRegistryAudit(args?: {
   const registry = [...(args?.registry ?? WORKSPACE_ACTION_REGISTRY)];
   const manifest = [...(args?.manifest ?? WORKSPACE_ACTION_MANIFEST)];
   const clientHandlers = [...(args?.clientHandlers ?? WORKSPACE_ACTION_CLIENT_HANDLER_KEYS)];
-  const enabledManifest = manifest.filter((entry) => entry.enabled);
-  const registryKeys = new Set(registry.filter((entry) => entry.enabled).map((entry) => entry.action_key));
+  const enabledManifest = manifest.filter((entry: WorkspaceActionManifestEntry) => entry.enabled);
+  const registryKeys = new Set(registry.filter((entry: WorkspaceActionRegistryEntry) => entry.enabled).map((entry: WorkspaceActionRegistryEntry) => entry.action_key));
   const registryTargets = registry
-    .filter((entry) => entry.enabled)
-    .map((entry) => entry.action_key);
-  const manifestKeys = new Set(enabledManifest.map((entry) => entry.action_key));
-  const manifestTargets = new Set(enabledManifest.map((entry) => entry.target_id));
+    .filter((entry: WorkspaceActionRegistryEntry) => entry.enabled)
+    .map((entry: WorkspaceActionRegistryEntry) => entry.action_key);
+  const manifestKeys = new Set(enabledManifest.map((entry: WorkspaceActionManifestEntry) => entry.action_key));
+  const manifestTargets = new Set(enabledManifest.map((entry: WorkspaceActionManifestEntry) => entry.target_id));
   const clientHandlerKeys = new Set(clientHandlers);
   const missingVisiblePanels = visiblePanels
-    .filter((panelId) => !manifestTargets.has(panelId))
-    .map((panelId) => `${panelId}.*`);
+    .filter((panelId: string) => !manifestTargets.has(panelId))
+    .map((panelId: string) => `${panelId}.*`);
   const missingManifestActions = enabledManifest
-    .filter((entry) => !registryKeys.has(entry.action_key))
-    .map((entry) => entry.action_key);
+    .filter((entry: WorkspaceActionManifestEntry) => !registryKeys.has(entry.action_key))
+    .map((entry: WorkspaceActionManifestEntry) => entry.action_key);
   const missingClientHandler = enabledManifest
-    .filter((entry) => !clientHandlerKeys.has(entry.client_handler_key))
-    .map((entry) => entry.action_key);
+    .filter((entry: WorkspaceActionManifestEntry) => !clientHandlerKeys.has(entry.client_handler_key))
+    .map((entry: WorkspaceActionManifestEntry) => entry.action_key);
   const staleRegistryEntries = registry
-    .filter((entry) => entry.enabled && !manifestKeys.has(entry.action_key))
-    .map((entry) => entry.action_key);
+    .filter((entry: WorkspaceActionRegistryEntry) => entry.enabled && !manifestKeys.has(entry.action_key))
+    .map((entry: WorkspaceActionRegistryEntry) => entry.action_key);
   const missingFromRegistry = [...missingVisiblePanels, ...missingManifestActions];
   const verdict =
     missingFromRegistry.length > 0 || missingClientHandler.length > 0
@@ -784,6 +828,8 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "attach_live_source") return "workstation_live_source_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_answer_environment", "resume_live_answer_environment", "stop_live_answer_environment", "set_live_line_schema", "set_live_answer_line_schema"].includes(actionId)) return "live_answer_environment_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") return "companion_policy_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "scientific-calculator" && ["solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
   if (panelId === "scientific-calculator" && ["start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)) return "workstation_live_source_receipt";
@@ -840,8 +886,8 @@ export function buildWorkstationDynamicTools(
 export function buildWorkstationDynamicToolsFromCapabilities(
   capabilities: PanelCapabilitiesLike,
 ): WorkstationDynamicToolSpec[] {
-  const actions = Object.entries(capabilities).flatMap(([panelId, capability]) =>
-    capability.actions.map((action) => ({
+  const actions = Object.entries(capabilities).flatMap(([panelId, capability]: [string, PanelCapabilitiesLike[string]]) =>
+    capability.actions.map((action: PanelCapabilitiesLike[string]["actions"][number]) => ({
       panel_id: panelId,
       action_id: action.id,
       title: action.title,
@@ -862,7 +908,7 @@ export function findWorkstationDynamicTool(
   tools: WorkstationDynamicToolSpec[] = buildWorkstationDynamicTools(),
 ): WorkstationDynamicToolSpec | null {
   const normalized = normalizeIdentifier(toolName);
-  return tools.find((tool) => normalizeIdentifier(tool.name) === normalized) ?? null;
+  return tools.find((tool: WorkstationDynamicToolSpec) => normalizeIdentifier(tool.name) === normalized) ?? null;
 }
 
 export function mapWorkstationDynamicToolCallToAction(
@@ -872,8 +918,8 @@ export function mapWorkstationDynamicToolCallToAction(
 ): WorkstationDynamicToolCallMapping {
   const tool = findWorkstationDynamicTool(toolName, tools);
   if (!tool) return { ok: false, reason: "unknown_tool", missing_required_args: [] };
-  const required = Array.isArray(tool.inputSchema.required) ? tool.inputSchema.required.filter((arg): arg is string => typeof arg === "string") : [];
-  const missing = required.filter((arg) => args?.[arg] === undefined || args?.[arg] === null || args?.[arg] === "");
+  const required = Array.isArray(tool.inputSchema.required) ? tool.inputSchema.required.filter((arg: unknown): arg is string => typeof arg === "string") : [];
+  const missing = required.filter((arg: string) => args?.[arg] === undefined || args?.[arg] === null || args?.[arg] === "");
   if (missing.length > 0) {
     return { ok: false, reason: "missing_required_args", missing_required_args: missing };
   }

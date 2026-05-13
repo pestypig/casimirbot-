@@ -290,6 +290,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { personaRouter } = await import("./routes/agi.persona");
     const { memoryRouter } = await import("./routes/agi.memory");
     const { planRouter } = await import("./routes/agi.plan");
+    const { discordRouter } = await import("./routes/discord");
     const { evalRouter } = await import("./routes/agi.eval");
     const { profileRouter } = await import("./routes/agi.profile");
     const { starTelemetryRouter } = await import("./routes/agi.star");
@@ -321,6 +322,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
     app.use("/api/agi/star", starTelemetryRouter);
     app.use("/api/agi", planRouter);
+    app.use("/api/discord", discordRouter);
     app.use("/api/agi/eval", evalRouter);
   }
 

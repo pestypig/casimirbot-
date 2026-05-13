@@ -216,6 +216,52 @@ function postLiveCommentarySessionWhenEnvironmentReady(body: Record<string, unkn
   attempt(12);
 }
 
+function postLiveAgenticReviewRequest(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/live-agentic-review/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
+function postLiveAgenticReviewRequestWhenEnvironmentReady(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  const explicitEnvironmentId = asNonEmptyString(body.environment_id);
+  if (explicitEnvironmentId) {
+    postLiveAgenticReviewRequest(body);
+    return;
+  }
+  const threadId = asNonEmptyString(body.thread_id) ?? "helix-ask:desktop";
+  const attempt = (remaining: number): void => {
+    void fetch(`/api/agi/situation/live-answer-environment?thread_id=${encodeURIComponent(threadId)}&limit=1`)
+      .then((response) => response.json())
+      .then((payload: unknown) => {
+        const record = asRecord(payload);
+        const environment = asRecord(record?.environment);
+        const environmentId = asNonEmptyString(environment?.environment_id);
+        if (environmentId) {
+          postLiveAgenticReviewRequest({ ...body, environment_id: environmentId });
+          return;
+        }
+        if (remaining > 0) globalThis.setTimeout(() => attempt(remaining - 1), 250);
+      })
+      .catch(() => {
+        if (remaining > 0) globalThis.setTimeout(() => attempt(remaining - 1), 250);
+      });
+  };
+  attempt(12);
+}
+
+function postCompanionPolicy(body: Record<string, unknown>): void {
+  if (typeof fetch !== "function") return;
+  void fetch("/api/agi/situation/companion-policy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
+
 function postSituationMissionMemoryRefresh(body: Record<string, unknown>): void {
   if (typeof fetch !== "function") return;
   void fetch("/api/agi/situation/mission-memory/refresh", {
@@ -1808,6 +1854,75 @@ export function executeHelixPanelAction(
         message: environmentId
           ? `Set live commentary cadence to ${cadence}.`
           : `Queued live commentary setup for the active ${threadId} environment.`,
+      };
+    }
+
+    if (actionId === "request_agentic_review") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const environmentId = asNonEmptyString(args.environment_id ?? args.environmentId);
+      const question =
+        asNonEmptyString(args.question) ??
+        "Review the latest compact live environment state.";
+      const trigger = asNonEmptyString(args.trigger) ?? "manual_button";
+      const request = {
+        thread_id: threadId,
+        environment_id: environmentId ?? undefined,
+        question,
+        trigger,
+      };
+      postLiveAgenticReviewRequestWhenEnvironmentReady(request);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "live_agentic_review_receipt",
+          ok: true,
+          request,
+          pending_environment_resolution: !environmentId,
+          context_policy: "compact_context_pack_only",
+          raw_logs_included: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        },
+        message: environmentId
+          ? "Requested an agentic review for the live environment."
+          : `Queued an agentic review request for the active ${threadId} environment.`,
+      };
+    }
+
+    if (actionId === "set_companion_policy") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const companionMode = asNonEmptyString(args.companion_mode ?? args.companionMode) ?? "active_companion";
+      const commentaryMode = asNonEmptyString(args.commentary_mode ?? args.commentaryMode) ?? "anomalies_and_milestones";
+      const request = {
+        thread_id: threadId,
+        voice_input_active: asBoolean(args.voice_input_active ?? args.voiceInputActive) ?? true,
+        voice_output_enabled: asBoolean(args.voice_output_enabled ?? args.voiceOutputEnabled) ?? false,
+        companion_mode: companionMode,
+        commentary_mode: commentaryMode,
+        direct_address_names: asStringArray(args.direct_address_names ?? args.directAddressNames).length
+          ? asStringArray(args.direct_address_names ?? args.directAddressNames)
+          : ["helix", "dottie"],
+      };
+      postCompanionPolicy(request);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "companion_policy_receipt",
+          ok: true,
+          request,
+          context_policy: "compact_context_pack_only",
+          raw_audio_included: false,
+          raw_transcript_included: false,
+          deterministic_content_role: "observation_not_assistant_answer",
+        },
+        message: `Set companion mode to ${companionMode}.`,
       };
     }
 

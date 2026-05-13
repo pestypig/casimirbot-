@@ -8,6 +8,7 @@ import {
   resetWorkstationLiveSources,
 } from "../services/situation-room/workstation-live-source-ingest";
 import {
+  listLiveCommentaryCandidates,
   listLiveCommentaryDeliveries,
   listLiveCommentaryProposals,
   resetLiveCommentary,
@@ -89,6 +90,14 @@ describe("live commentary for live answer environments", () => {
       reason: "delivered",
     });
     expect(listLiveCommentaryProposals(environment.environment_id)).toHaveLength(1);
+    expect(listLiveCommentaryCandidates(environment.environment_id)[0]).toMatchObject({
+      schema: "helix.live_commentary_candidate.v1",
+      decision: "show_text",
+      model_invoked: false,
+      deterministic: true,
+      context_policy: "compact_context_pack_only",
+      raw_logs_included: false,
+    });
     expect(listLiveCommentaryDeliveries(environment.environment_id)).toHaveLength(1);
 
     const ledgerEvents = getHelixThreadLedgerEvents({ threadId: "helix-ask:commentary" });
@@ -137,6 +146,57 @@ describe("live commentary for live answer environments", () => {
       status: "skipped",
     });
     expect(getHelixThreadLedgerEvents({ threadId: "helix-ask:commentary-silent" })).toHaveLength(0);
+  });
+
+  it("emits equation commentary as a bounded candidate and validation, not an answer", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:equation-commentary",
+      created_turn_id: "turn:equation",
+      objective: "Make this equation live and explain each new value in context.",
+      source_ids: ["source:calculator-equation-live"],
+      preset: "calculator_equation_interpreter",
+      mode: "text_only",
+      now: "2026-05-12T12:00:00.000Z",
+    });
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-equation-live",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "equation_evaluated",
+      seq: 1,
+      ts: "2026-05-12T12:00:01.000Z",
+      payload: {
+        expression: "x^2 - 4 = 0",
+        result: "2, -2",
+        variables_summary: "x solved from a quadratic equilibrium equation",
+        equation_context: "equilibrium points",
+        next_check: "Watch variable changes.",
+      },
+      evidence_refs: ["calculator:equation:x2-minus-4"],
+      trace: {
+        deterministic: true,
+      },
+    });
+
+    expect(result.live_commentary?.proposal).toMatchObject({
+      reason: "milestone",
+      decision: "show_text",
+      model_invoked: false,
+      deterministic: true,
+      raw_logs_included: false,
+    });
+    expect(listLiveCommentaryCandidates(environment.environment_id)[0]).toMatchObject({
+      schema: "helix.live_commentary_candidate.v1",
+      trigger: "line_update",
+      text: expect.stringContaining("equilibrium points"),
+      model_invoked: false,
+      deterministic: true,
+    });
+    const ledgerEvents = getHelixThreadLedgerEvents({ threadId: "helix-ask:equation-commentary" });
+    expect(ledgerEvents.some((event) => event.item_type === "answer")).toBe(false);
+    expect(ledgerEvents.some((event) => event.item_type === "validation" && event.meta?.kind === "live_commentary_proposal")).toBe(true);
+    expect(ledgerEvents.every((event) => !event.assistant_text)).toBe(true);
   });
 
   it("uses voice confirmation receipts when the environment voice policy requires confirmation", () => {
