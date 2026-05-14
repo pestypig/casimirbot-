@@ -323,7 +323,7 @@ describe("Minecraft world-event ingest", () => {
     expect(result.interjection_proposal?.text).toContain("nearby Minecraft threat");
   });
 
-  it("reports binding mismatch when an existing source binding uses different plugin ids", async () => {
+  it("reports source id mismatch when an existing source binding uses different plugin ids", async () => {
     const app = await createApp();
     const [event] = readFixture("nether-low-health.jsonl");
 
@@ -344,12 +344,41 @@ describe("Minecraft world-event ingest", () => {
     expect(response.body).toMatchObject({
       ok: true,
       appended: false,
-      reason: "binding_mismatch",
+      reason: "source_id_mismatch",
       debug: {
-        append_reason: "binding_mismatch",
+        append_reason: "source_id_mismatch",
         salience_class: "salience_candidate",
+        binding_resolution: {
+          reason: "source_id_mismatch",
+          active_binding_count: 1,
+        },
       },
     });
     expect(getHelixThreadLedgerEvents({ threadId: "thread:mismatch" })).toHaveLength(0);
   }, 15000);
+
+  it("reports spatial fidelity diagnostics for block events without usable geometry", async () => {
+    const event: HelixWorldEvent = {
+      schema: "helix.world_event.v1",
+      world_id: "minecraft:minehut",
+      room_id: "room:minecraft-minehut",
+      source_id: "source:minecraft-server",
+      ts: "2026-05-13T23:00:00.000Z",
+      actor_id: "minecraft:player:datdampig",
+      actor_label: "DatDamPig",
+      event_type: "block_broken",
+      location: { dimension: "minecraft:overworld", x: 10.25, y: 63.8, z: -4.4 },
+      evidence_refs: ["mc:spatial:bad-fidelity"],
+      meta: { block_type: "minecraft:stone" },
+    };
+
+    const result = await ingestWorldEvent(event, { appendToThread: false });
+
+    expect(result.minecraft_spatial_event).toBeNull();
+    expect(result.debug?.quality?.spatial_fidelity).toMatchObject({
+      is_spatial_edit: true,
+      geometry_usable: false,
+      missing: ["exact_block_coordinates"],
+    });
+  });
 });

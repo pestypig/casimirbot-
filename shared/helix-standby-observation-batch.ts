@@ -15,6 +15,7 @@ export type HelixStandbyObservationSuppressionReason =
   | "dedupe_cooldown"
   | "rate_limited"
   | "binding_mismatch"
+  | "source_id_mismatch"
   | "context_ineligible"
   | "batch_empty";
 
@@ -52,4 +53,3 @@ export type HelixStandbyObservationBatchReceipt = {
   completed_at: string;
   duration_ms: number;
 };
-

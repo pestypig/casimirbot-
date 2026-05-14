@@ -39,6 +39,62 @@ Every event should include:
 - deterministic `evidence_refs`
 - timestamp in ISO format
 
+## Spatial Fidelity Requirement
+
+Structure hypotheses require exact block geometry. For `block_broken`, `block_placed`, `bucket_empty`, and `bucket_fill`, the plugin must use integer coordinates from the Bukkit/Paper block or target block event, not the player's decimal location.
+
+Preferred payload shape:
+
+```json
+{
+  "schema": "helix.world_event.v1",
+  "world_id": "minecraft:minehut",
+  "room_id": "room:minecraft-minehut",
+  "source_id": "source:minecraft-server",
+  "event_type": "block_broken",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "location": {
+    "dimension": "minecraft:overworld",
+    "x": 280,
+    "y": 63,
+    "z": -406
+  },
+  "meta": {
+    "block_x": 280,
+    "block_y": 63,
+    "block_z": -406,
+    "block_type": "minecraft:stone",
+    "tool_item": "minecraft:stone_pickaxe",
+    "hand": "main",
+    "face": "north",
+    "player_yaw": 91.4,
+    "player_pitch": 13.2,
+    "light_level": 3
+  },
+  "evidence_refs": ["minecraft:minehut:event:12345"],
+  "ts": "2026-05-13T22:05:33.000Z"
+}
+```
+
+The Helix reducer now treats decimal player-location samples as movement/projection evidence only. They cannot create `descending_stair`, `parallel_trench`, `lava_lighting_channel`, or other build-structure hypotheses without exact integer block coordinates.
+
+## Config Toggles
+
+The observe-only plugin should expose:
+
+```yaml
+helix:
+  emit_block_edits: true
+  emit_bucket_events: true
+  emit_light_samples: true
+  emit_hostile_precursors: true
+  max_block_events_per_flush: 50
+  location_sample_ticks: 600
+```
+
+Block edit events should be batched through `/api/agi/situation/world-event/batch` when possible. Routine `player_location_sample` events should remain low-frequency and projection-only.
+
 ## Creeper Warning Rule
 
 Helix cannot warn before a creeper explosion from a death or damage event alone. A pre-impact warning requires at least one of:

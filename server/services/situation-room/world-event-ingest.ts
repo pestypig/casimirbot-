@@ -72,6 +72,10 @@ import {
   updateWorldSourceDebug,
   type WorldSourceSeen,
 } from "./world-source-registry";
+import {
+  recordProfileLiveSource,
+  resetProfileLiveSourcesForTest,
+} from "./profile-source-registry";
 import { summarizeWorldEventQuality, type WorldEventQualitySummary } from "./world-event-quality";
 import {
   narrateSituationEpisode,
@@ -207,6 +211,7 @@ export type WorldEventIngestDebug = {
     | "dedupe_cooldown"
     | "rate_limited"
     | "binding_mismatch"
+    | "source_id_mismatch"
     | "appended";
   salience_class: MinecraftEventSalienceClass;
   binding_id?: string | null;
@@ -214,6 +219,12 @@ export type WorldEventIngestDebug = {
   dedupe_key?: string | null;
   seen_source?: WorldSourceSeen;
   quality?: WorldEventQualitySummary;
+  binding_resolution?: {
+    reason: string;
+    detected_source_count: number;
+    active_binding_count: number;
+    mismatched_binding_ids: string[];
+  };
 };
 
 export type WorldEventAppendCandidate = {
@@ -297,6 +308,7 @@ export const resetWorldEventIngestState = (): void => {
   runtimeStateByKey.clear();
   spatialEpisodeSignatureByThread.clear();
   resetWorldSourceRegistry();
+  resetProfileLiveSourcesForTest();
   resetMinecraftSpatialWindows();
 };
 
@@ -636,7 +648,7 @@ const buildLiveSituationUpdate = (input: {
   const evidenceRefs = Array.from(new Set([
     ...input.signal.evidence_refs,
     ...(input.salienceReceipt?.evidence_refs ?? []),
-    ...input.episodes.flatMap((episode) => episode.evidence_refs),
+    ...input.episodes.flatMap((episode: SituationEpisode) => episode.evidence_refs),
   ])).slice(-24);
   const trigger =
     reason === "risk_detected"
@@ -734,7 +746,7 @@ const spatialEpisodeSignature = (episode: HelixMinecraftSpatialEpisode): string 
     episode.room_id,
     episode.world_id,
     episode.actor_label ?? null,
-    episode.structure_hypotheses.map((hypothesis) => [
+    episode.structure_hypotheses.map((hypothesis: HelixMinecraftSpatialEpisode["structure_hypotheses"][number]) => [
       hypothesis.structure_type,
       Math.round(hypothesis.confidence * 10),
       hypothesis.missing_evidence,
@@ -761,6 +773,21 @@ export const ingestWorldEvent = async (
   const graphId = options.graphId ?? null;
   const salienceClass = classifyMinecraftEventSalience(event);
   const seenSource = recordWorldSourceSeen(event);
+  const profileId =
+    readString(event.meta, "profile_id") ??
+    readString(event.meta, "linked_profile_id") ??
+    readString(event.meta, "commander_profile_id");
+  if (profileId) {
+    recordProfileLiveSource({
+      profile_id: profileId,
+      source_family: "minecraft",
+      room_id: event.room_id,
+      source_id: event.source_id ?? `minecraft:${event.world_id}`,
+      world_id: event.world_id,
+      last_seen_at: event.ts,
+      status: "active",
+    });
+  }
   const quality = summarizeWorldEventQuality(event);
   const state = getOrCreateState(event, graphId);
   const signalId = buildSignalId(event);
@@ -918,7 +945,18 @@ export const ingestWorldEvent = async (
       : null;
   const bindingResolution =
     explicitBinding || options.appendToThread === false
-      ? { binding: explicitBinding, reason: explicitBinding ? ("matched" as const) : ("no_thread_context" as const), mismatched_bindings: [] }
+      ? {
+          binding: explicitBinding,
+          reason: explicitBinding ? ("matched" as const) : ("no_thread_context" as const),
+          mismatched_bindings: [],
+          diagnostic: {
+            room_id: event.room_id,
+            source_id: event.source_id ?? null,
+            world_id: event.world_id,
+            detected_source_count: 0,
+            active_binding_count: explicitBinding ? 1 : 0,
+          },
+        }
       : resolveWorldEventThreadBinding({
           room_id: event.room_id,
           source_id: event.source_id ?? null,
@@ -927,8 +965,8 @@ export const ingestWorldEvent = async (
         });
   const resolvedBinding = bindingResolution.binding;
   const appendBlockedReason =
-    bindingResolution.reason === "binding_mismatch"
-      ? "binding_mismatch"
+    bindingResolution.reason === "binding_mismatch" || bindingResolution.reason === "source_id_mismatch"
+      ? "source_id_mismatch"
       : !resolvedBinding
         ? "no_thread_context"
         : resolvedBinding.mode === "observe_only"
@@ -1219,8 +1257,8 @@ export const ingestWorldEvent = async (
         : appendBlockedReason ?? (appendCandidate ? "batch_deferred" : "no_thread_context");
   const appendReason: WorldEventIngestDebug["append_reason"] = appended
     ? "appended"
-    : reason === "binding_mismatch"
-      ? "binding_mismatch"
+    : reason === "source_id_mismatch"
+      ? "source_id_mismatch"
       : salienceClass === "projection_only" && !salienceReceipt
         ? "projection_only"
         : reason === "binding_observe_only"
@@ -1237,6 +1275,12 @@ export const ingestWorldEvent = async (
     dedupe_key: salienceReceipt?.dedupe_key ?? null,
     seen_source: seenSource,
     quality,
+    binding_resolution: {
+      reason: bindingResolution.reason,
+      detected_source_count: bindingResolution.diagnostic.detected_source_count,
+      active_binding_count: bindingResolution.diagnostic.active_binding_count,
+      mismatched_binding_ids: bindingResolution.mismatched_bindings.map((binding: { binding_id: string }) => binding.binding_id),
+    },
   };
   updateWorldSourceDebug(event, {
     append_decision: debug.append_decision,

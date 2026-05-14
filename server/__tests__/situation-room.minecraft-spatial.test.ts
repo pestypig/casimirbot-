@@ -81,6 +81,50 @@ describe("Minecraft spatial world senses", () => {
     expect(structureTypes(result)).not.toContain("lava_lighting_channel");
   });
 
+  it("does not create build-structure hypotheses from location samples alone", async () => {
+    const result = await replayFixture("location-samples-only-no-claim.jsonl");
+
+    expect(result?.minecraft_spatial_episode).toBeNull();
+    expect(structureTypes(result)).toEqual([]);
+  });
+
+  it("uses explicit block coordinates over decimal player coordinates for edit geometry", async () => {
+    const base = {
+      schema: "helix.world_event.v1" as const,
+      world_id: "minecraft:minehut",
+      room_id: "room:minecraft-minehut",
+      source_id: "source:minecraft-server",
+      actor_id: "minecraft:player:datdampig",
+      actor_label: "DatDamPig",
+      event_type: "block_broken",
+      evidence_refs: [] as string[],
+    };
+    const events: HelixWorldEvent[] = Array.from({ length: 6 }, (_, index) => ({
+      ...base,
+      ts: `2026-05-13T22:55:0${index}.000Z`,
+      location: { dimension: "minecraft:overworld", x: 100.42 + index, y: 70.9 - index, z: -20.33 },
+      meta: {
+        block_x: index,
+        block_y: 64 - index,
+        block_z: 0,
+        block_type: "minecraft:stone",
+        tool_item: "minecraft:stone_pickaxe",
+      },
+      evidence_refs: [`mc:spatial:explicit-block:${index}`],
+    }));
+    let result = null as Awaited<ReturnType<typeof ingestWorldEvent>> | null;
+    for (const event of events) {
+      result = await ingestWorldEvent(event, { appendToThread: false });
+    }
+
+    expect(result?.minecraft_spatial_event?.location).toEqual({ x: 5, y: 59, z: 0 });
+    expect(result?.minecraft_spatial_episode?.bounding_box).toMatchObject({
+      min: { x: 0, y: 59, z: 0 },
+      max: { x: 5, y: 64, z: 0 },
+    });
+    expect(structureTypes(result)).toContain("descending_stair");
+  });
+
   it("records spatial pattern evidence as validation data, not assistant answers", async () => {
     const result = await replayFixture("stair-with-side-trench.jsonl", { threadId: "helix-ask:desktop" });
 

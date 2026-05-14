@@ -100,23 +100,31 @@ const isEditSpatialType = (eventType: HelixMinecraftSpatialEventType): boolean =
 const isIntegerBlockLocation = (x: number, y: number, z: number): boolean =>
   Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(z);
 
+const hasCompleteExplicitBlockLocation = (
+  location: Record<string, unknown> | null,
+  meta: Record<string, unknown> | null,
+): boolean =>
+  (hasOwnNumber(location, "block_x") && hasOwnNumber(location, "block_y") && hasOwnNumber(location, "block_z")) ||
+  (hasOwnNumber(meta, "block_x") && hasOwnNumber(meta, "block_y") && hasOwnNumber(meta, "block_z"));
+
 const normalizeSpatialEvent = (event: HelixWorldEvent): HelixMinecraftSpatialEvent | null => {
   const location = readRecord(event.location);
   const meta = readRecord(event.meta);
   const spatialType = mapEventType(event.event_type);
   if (!location || !spatialType) return null;
-  const x = readNumber(location.x, location.block_x, meta?.x, meta?.block_x);
-  const y = readNumber(location.y, location.block_y, meta?.y, meta?.block_y);
-  const z = readNumber(location.z, location.block_z, meta?.z, meta?.block_z);
+  const editType = isEditSpatialType(spatialType);
+  const x = editType
+    ? readNumber(location.block_x, meta?.block_x, location.x, meta?.x)
+    : readNumber(location.x, location.block_x, meta?.x, meta?.block_x);
+  const y = editType
+    ? readNumber(location.block_y, meta?.block_y, location.y, meta?.y)
+    : readNumber(location.y, location.block_y, meta?.y, meta?.block_y);
+  const z = editType
+    ? readNumber(location.block_z, meta?.block_z, location.z, meta?.z)
+    : readNumber(location.z, location.block_z, meta?.z, meta?.block_z);
   if (x === null || y === null || z === null) return null;
-  const hasExplicitBlockLocation =
-    hasOwnNumber(location, "block_x") ||
-    hasOwnNumber(location, "block_y") ||
-    hasOwnNumber(location, "block_z") ||
-    hasOwnNumber(meta, "block_x") ||
-    hasOwnNumber(meta, "block_y") ||
-    hasOwnNumber(meta, "block_z");
-  if (isEditSpatialType(spatialType) && !hasExplicitBlockLocation && !isIntegerBlockLocation(x, y, z)) {
+  const hasExplicitBlockLocation = hasCompleteExplicitBlockLocation(location, meta);
+  if (editType && !hasExplicitBlockLocation && !isIntegerBlockLocation(x, y, z)) {
     return null;
   }
   const blockRecord = readRecord(meta?.block) ?? readRecord((event as unknown as Record<string, unknown>).block);
