@@ -24,6 +24,7 @@ export type HelixPresentStateCard = {
   title: string;
   status: HelixPresentStateCardStatus;
   lines: HelixPresentStateCardLine[];
+  pending_request_input?: import("./helix-agentic-request-input").HelixAgenticRequestInput | null;
   last_interpreted_event_id?: string | null;
   go_to_log_target?: string | null;
   updated_at: string;

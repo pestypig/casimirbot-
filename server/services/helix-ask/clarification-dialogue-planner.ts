@@ -13,6 +13,7 @@ export function planClarificationDialogue(input: {
   const proposals = planClarificationQuestions({
     needs,
     visibleBudget: input.visibleBudget ?? 1,
+    roomId: input.roomId ?? null,
   });
   return {
     schema: "helix.clarification_dialogue_plan.v1" as const,

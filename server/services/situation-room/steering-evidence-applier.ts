@@ -6,16 +6,21 @@ import { getActiveLiveAnswerEnvironmentForThread, updateLiveAnswerEnvironment } 
 import { markClarificationNeedAnswered } from "./clarification-question-planner";
 import { recordInterpretedEventForUserSteering } from "./interpreted-event-builder";
 import { buildUserSteeringEvent } from "../helix-ask/user-steering-event-planner";
+import { recordSteeringMemory } from "./steering-memory-store";
+import { evaluatePatternConfirmation } from "./pattern-confirmation-evaluator";
 
 export function applyUserSteeringEvidence(input: {
   steering: HelixUserSteeringEvidence;
   roomId?: string | null;
   clarificationNeedId?: string | null;
+  profileId?: string | null;
 }): {
   synthetic_evidence: ReturnType<typeof recordSyntheticEvidence>;
   subgoal_evaluation: ReturnType<typeof recordSubgoalEvaluation>;
   live_artifact_delta: ReturnType<typeof updateLiveSituationArtifact> | null;
   live_environment_delta: ReturnType<typeof updateLiveAnswerEnvironment> | null;
+  steering_memory: ReturnType<typeof recordSteeringMemory>;
+  pattern_confirmation: ReturnType<typeof evaluatePatternConfirmation>;
 } {
   if (input.clarificationNeedId) markClarificationNeedAnswered(input.clarificationNeedId);
   const syntheticEvidence = recordSyntheticEvidence({
@@ -92,10 +97,20 @@ export function applyUserSteeringEvidence(input: {
     targetIds: input.steering.target_hypothesis_ids,
     evidenceRefs: [input.steering.steering_id, syntheticEvidence.evidence_id],
   }));
+  const steeringMemory = recordSteeringMemory({
+    steering: input.steering,
+    profileId: input.profileId,
+  });
+  const patternConfirmation = evaluatePatternConfirmation({
+    threadId: input.steering.thread_id,
+    memory: steeringMemory,
+  });
   return {
     synthetic_evidence: syntheticEvidence,
     subgoal_evaluation: subgoalEvaluation,
     live_artifact_delta: liveArtifactDelta,
     live_environment_delta: liveEnvironmentDelta,
+    steering_memory: steeringMemory,
+    pattern_confirmation: patternConfirmation,
   };
 }

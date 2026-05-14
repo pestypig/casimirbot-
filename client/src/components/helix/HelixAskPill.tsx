@@ -5395,12 +5395,20 @@ export function shouldPreserveAuthoritativeTerminalOverEvidenceGate(args: {
   evidenceGateBlocked: boolean;
   dispatchPolicy?: string | null;
   routeReasonCode?: string | null;
+  finalAnswerSource?: string | null;
+  terminalArtifactKind?: string | null;
   hasCompletedWorkspaceTool?: boolean;
   hasTerminalText?: boolean;
   hasPendingRequest?: boolean;
 }): boolean {
   if (!args.evidenceGateBlocked) return false;
   if (!args.hasTerminalText) return false;
+  if (args.finalAnswerSource === "artifact_synthesis" && args.terminalArtifactKind === "situation_context_pack") {
+    return true;
+  }
+  if (args.finalAnswerSource === "artifact_synthesis" && args.routeReasonCode === "situation_context_pack") {
+    return true;
+  }
   if (args.hasPendingRequest) return true;
   if (
     (args.dispatchPolicy === "workspace_only" || args.dispatchPolicy === "workspace_context_reasoning") &&
@@ -6419,9 +6427,23 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
       ? renderTypedFailureFallback(terminalErrorCode)
       : coerceText(reply.text).trim() || coerceText(reply.content).trim());
   const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
-  const terminalArtifactKind = coerceText(summary?.terminal_artifact_kind).trim();
+  const terminalArtifactKind =
+    coerceText(summary?.terminal_artifact_kind).trim() ||
+    coerceText(replyRecord?.terminal_artifact_kind).trim() ||
+    coerceText(debugRecord?.terminal_artifact_kind).trim();
+  const situationContextAnswer =
+    finalAnswerSource === "artifact_synthesis" && terminalArtifactKind === "situation_context_pack"
+      ? (
+          coerceText(replyRecord?.assistant_answer).trim() ||
+          coerceText(replyRecord?.answer).trim() ||
+          coerceText(replyRecord?.text).trim() ||
+          liveFinalAnswer
+        )
+      : "";
   const selectedFinalAnswerRaw =
-    liveFinalAnswer && (isTypedFailure || isInvalidTerminalAnswerText(selectedFinalAnswerCandidate))
+    situationContextAnswer
+      ? situationContextAnswer
+      : liveFinalAnswer && (isTypedFailure || isInvalidTerminalAnswerText(selectedFinalAnswerCandidate))
       ? liveFinalAnswer
       : selectedFinalAnswerCandidate;
   const selectedFinalAnswer =
@@ -25409,10 +25431,24 @@ export function HelixAskPill({
               localResponseRecord.pending_request ||
               plannerRecord?.pending_request,
           );
+          const authoritativeTerminalArtifactKind =
+            typeof localResponseRecord.terminal_artifact_kind === "string" && localResponseRecord.terminal_artifact_kind.trim()
+              ? localResponseRecord.terminal_artifact_kind.trim()
+              : typeof responseDebugPayload?.terminal_artifact_kind === "string" && responseDebugPayload.terminal_artifact_kind.trim()
+                ? responseDebugPayload.terminal_artifact_kind.trim()
+                : null;
+          const authoritativeFinalAnswerSource =
+            typeof localResponseRecord.final_answer_source === "string" && localResponseRecord.final_answer_source.trim()
+              ? localResponseRecord.final_answer_source.trim()
+              : typeof responseDebugPayload?.final_answer_source === "string" && responseDebugPayload.final_answer_source.trim()
+                ? responseDebugPayload.final_answer_source.trim()
+                : null;
           const preserveAuthoritativeTerminal = shouldPreserveAuthoritativeTerminalOverEvidenceGate({
             evidenceGateBlocked: evidenceGateDecision.blocked,
             dispatchPolicy: localDispatchPolicy,
             routeReasonCode: localRouteReason,
+            finalAnswerSource: authoritativeFinalAnswerSource,
+            terminalArtifactKind: authoritativeTerminalArtifactKind,
             hasCompletedWorkspaceTool,
             hasTerminalText: Boolean(terminalResolutionForFinal.backendTerminalText || terminalResolutionForFinal.text),
             hasPendingRequest: hasPendingRequestForTerminal,

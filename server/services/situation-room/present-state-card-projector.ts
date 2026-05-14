@@ -7,6 +7,7 @@ import {
 import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
 import { listInterpretedEvents } from "./interpreted-event-log-store";
+import { listClarificationQuestions } from "./clarification-question-store";
 
 const hashShort = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -39,6 +40,12 @@ export function projectPresentStateCard(input: {
     limit: 20,
   });
   const latestEvent = interpretedEvents.at(-1) ?? null;
+  const pendingQuestion = listClarificationQuestions({
+    threadId: input.threadId,
+    roomId: input.roomId ?? artifact?.room_id ?? environment?.room_id ?? null,
+    status: "pending",
+  }).at(-1);
+  const pendingRequestInput = pendingQuestion?.proposal?.request_input ?? null;
   const now = new Date().toISOString();
   if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
     const lines = artifact.current_state_lines;
@@ -57,6 +64,7 @@ export function projectPresentStateCard(input: {
         line({ key: "unknowns", label: "Unknowns", value: lines.unknowns, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
         line({ key: "next_check", label: "Next check", value: lines.last_decision, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
       ],
+      pending_request_input: pendingRequestInput,
       last_interpreted_event_id: latestEvent?.event_id ?? null,
       go_to_log_target: latestEvent?.event_id ?? null,
       updated_at: artifact.updated_at,
@@ -80,6 +88,7 @@ export function projectPresentStateCard(input: {
           confidence: null,
           updatedAt: entry.updated_at,
         })),
+      pending_request_input: pendingRequestInput,
       last_interpreted_event_id: latestEvent?.event_id ?? null,
       go_to_log_target: latestEvent?.event_id ?? null,
       updated_at: environment.updated_at,
@@ -102,6 +111,7 @@ export function projectPresentStateCard(input: {
         updatedAt: latestEvent?.created_at ?? now,
       }),
     ],
+    pending_request_input: pendingRequestInput,
     last_interpreted_event_id: latestEvent?.event_id ?? null,
     go_to_log_target: latestEvent?.event_id ?? null,
     updated_at: latestEvent?.created_at ?? now,

@@ -56,4 +56,6 @@ export type HelixClarificationQuestionProposal = {
   created_at: string;
   assistant_answer: false;
   raw_content_included: false;
+  ranking?: import("./helix-clarification-ranking").HelixClarificationRanking;
+  request_input?: import("./helix-agentic-request-input").HelixAgenticRequestInput;
 };

@@ -4,6 +4,17 @@ import {
   type HelixClarificationNeed,
   type HelixClarificationQuestionProposal,
 } from "@shared/helix-clarification-dialogue";
+import { buildAgenticRequestInputFromClarification } from "../helix-ask/agentic-request-input-planner";
+import {
+  clarificationQuestionForNeed,
+  rankClarificationNeed,
+  rankClarificationNeeds,
+} from "./clarification-ranker";
+import {
+  markClarificationQuestionDismissed,
+  recordClarificationQuestion,
+  recordSuppressedClarificationQuestion,
+} from "./clarification-question-store";
 
 const proposalsByThread = new Map<string, HelixClarificationQuestionProposal[]>();
 const answeredNeedIds = new Set<string>();
@@ -12,35 +23,36 @@ const dismissedProposalIds = new Set<string>();
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
-const questionForNeed = (need: HelixClarificationNeed): string => {
-  const missing = need.missing_evidence[0] ?? "the intended use";
-  if (need.trigger === "user_goal_unknown") return "What are you trying to accomplish in this situation right now?";
-  if (/lava|fluid|light/i.test(missing)) return "Is the side channel meant for lava lighting, drainage, or something else?";
-  if (/egg|hopper|chest|container|breeding|feed|farm/i.test(missing)) {
-    return "Is this animal cluster intended as a farm, temporary storage, or something else?";
-  }
-  return `Can you clarify this hypothesis? Missing evidence: ${missing}`;
-};
-
 export function proposeClarificationQuestion(input: {
   need: HelixClarificationNeed;
   surfacePolicy?: HelixClarificationQuestionProposal["surface_policy"];
+  roomId?: string | null;
   now?: string;
 }): HelixClarificationQuestionProposal | null {
   if (answeredNeedIds.has(input.need.need_id)) return null;
   const existing = proposalsByThread.get(input.need.thread_id)?.find((proposal) => proposal.need_id === input.need.need_id);
   if (existing && !dismissedProposalIds.has(existing.proposal_id)) return existing;
-  if (input.need.importance === "low" && input.need.trigger !== "manual_review") {
+  const ranking = rankClarificationNeed({
+    need: input.need,
+    roomId: input.roomId ?? null,
+    now: input.now,
+  });
+  if (ranking.suppress_reason) {
+    recordSuppressedClarificationQuestion({
+      ranking,
+      needId: input.need.need_id,
+      now: input.now,
+    });
     return null;
   }
   const now = input.now ?? new Date().toISOString();
   const proposal: HelixClarificationQuestionProposal = {
     schema: HELIX_CLARIFICATION_QUESTION_PROPOSAL_SCHEMA,
-    proposal_id: `clarification_question:${hashShort([input.need.need_id, questionForNeed(input.need)])}`,
+    proposal_id: `clarification_question:${hashShort([input.need.need_id, clarificationQuestionForNeed(input.need)])}`,
     thread_id: input.need.thread_id,
     need_id: input.need.need_id,
-    question: questionForNeed(input.need),
-    options: ["Yes", "No", "Something else"],
+    question: clarificationQuestionForNeed(input.need),
+    options: ranking.answer_options ?? ["Yes", "No", "Something else"],
     freeform_allowed: true,
     expected_effect: input.need.trigger === "user_goal_unknown"
       ? "set_user_goal"
@@ -51,25 +63,40 @@ export function proposeClarificationQuestion(input: {
     created_at: now,
     assistant_answer: false,
     raw_content_included: false,
+    ranking,
+    request_input: buildAgenticRequestInputFromClarification({ ranking }),
   };
   const existingList = proposalsByThread.get(proposal.thread_id) ?? [];
   proposalsByThread.set(proposal.thread_id, [...existingList, proposal].slice(-100));
+  recordClarificationQuestion({
+    proposal,
+    roomId: input.roomId ?? null,
+    ranking,
+    status: proposal.surface_policy === "silent_log" ? "suppressed" : "pending",
+    now,
+  });
   return proposal;
 }
 
 export function planClarificationQuestions(input: {
   needs: HelixClarificationNeed[];
   visibleBudget?: number;
+  roomId?: string | null;
 }): HelixClarificationQuestionProposal[] {
   const visibleBudget = Math.max(0, input.visibleBudget ?? 1);
   let visibleCount = 0;
   const proposals: HelixClarificationQuestionProposal[] = [];
-  for (const need of input.needs.sort((a, b) => {
-    const rank = { high: 3, medium: 2, low: 1 };
-    return rank[b.importance] - rank[a.importance] || b.created_at.localeCompare(a.created_at);
-  })) {
-    const surfacePolicy = visibleCount < visibleBudget && need.importance !== "low" ? "show_text" : "silent_log";
-    const proposal = proposeClarificationQuestion({ need, surfacePolicy });
+  const rankings = rankClarificationNeeds({
+    needs: input.needs,
+    roomId: input.roomId ?? null,
+  });
+  for (const ranking of rankings) {
+    const need = input.needs.find((candidate) => candidate.need_id === ranking.question_id.replace(/^clarification_question:/, ""))
+      ?? input.needs.find((candidate) => ranking.question_id === `clarification_question:${hashShort([candidate.need_id, clarificationQuestionForNeed(candidate)])}`)
+      ?? null;
+    if (!need) continue;
+    const surfacePolicy = visibleCount < visibleBudget && !ranking.suppress_reason ? "show_text" : "silent_log";
+    const proposal = proposeClarificationQuestion({ need, surfacePolicy, roomId: input.roomId ?? null });
     if (!proposal) continue;
     if (proposal.surface_policy !== "silent_log") visibleCount += 1;
     proposals.push(proposal);
@@ -87,6 +114,7 @@ export function markClarificationNeedAnswered(needId: string): void {
 
 export function dismissClarificationQuestionProposal(proposalId: string): void {
   dismissedProposalIds.add(proposalId);
+  markClarificationQuestionDismissed(proposalId);
 }
 
 export function clearClarificationQuestionProposalsForTest(): void {

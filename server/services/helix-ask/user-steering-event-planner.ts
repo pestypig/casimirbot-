@@ -11,9 +11,13 @@ const hashShort = (value: unknown, size = 18): string =>
 export function inferUserSteeringEffect(prompt: string): HelixUserSteeringEffect {
   const lower = prompt.toLowerCase();
   if (/\b(actually|correction|correct|not\b|instead)\b/.test(lower)) return "correct_hypothesis";
+  if (/\b(quiet|speak|voice|callout|tell me when)\b/.test(lower)) return "change_delivery_policy";
+  if (/^\s*(?:can|could|please)?\s*(?:you\s+)?(?:watch|look for)\b/i.test(prompt)) return "set_missing_evidence_target";
+  if (/^\s*(?:what|why|how|is|are|am|do|does|did|can|could|should|would|where|when|who)\b/i.test(prompt) || /\?\s*$/.test(prompt)) {
+    return "raise_relevance";
+  }
   if (/\b(i am|i'm|im|objective|goal|trying to|building|making)\b/.test(lower)) return "set_objective";
   if (/\b(watch|look for|missing evidence|next check)\b/.test(lower)) return "set_missing_evidence_target";
-  if (/\b(quiet|speak|voice|callout|tell me)\b/.test(lower)) return "change_delivery_policy";
   if (/\b(review|think through|analyze)\b/.test(lower)) return "request_review";
   return "raise_relevance";
 }
