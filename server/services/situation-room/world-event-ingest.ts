@@ -38,6 +38,7 @@ import type {
 } from "@shared/helix-minecraft-world-sense";
 import type { GameSemanticLookupReceipt } from "@shared/helix-game-semantic-dictionary";
 import type { GameUtilityHypothesis } from "@shared/helix-game-utility-hypothesis";
+import type { ContinuousCategorizationJobReceipt } from "@shared/helix-continuous-categorization-job";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -113,6 +114,11 @@ import {
   reduceMinecraftEntityUtility,
 } from "./minecraft-entity-utility-reducer";
 import { clearGameSemanticLookupReceiptsForTest } from "./game-semantic-reference";
+import { clearEventJournalForTest, recordEventJournalEvent } from "./event-journal-store";
+import { clearPatternCandidatesForTest } from "./pattern-candidate-ledger";
+import { processWorldEventForCategorizationJobs } from "./categorization-job-runner";
+import { clearContinuousCategorizationJobsForTest } from "./continuous-categorization-job-store";
+import { clearProfileSituationArchivesForTest } from "./profile-situation-archive-store";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -207,6 +213,7 @@ export type WorldEventIngestResult = {
   minecraft_world_sense_context?: HelixMinecraftWorldSenseContext | null;
   game_semantic_lookup_receipts?: GameSemanticLookupReceipt[];
   game_utility_hypotheses?: GameUtilityHypothesis[];
+  continuous_categorization_job_receipts?: ContinuousCategorizationJobReceipt[];
   categorization_events?: HelixCategorizationEvent[];
   synthetic_evidence?: HelixSyntheticEvidence[];
 };
@@ -324,15 +331,28 @@ const readString = (value: unknown, key: string): string | null => {
 const readBooleanMeta = (event: HelixWorldEvent, key: string): boolean =>
   Boolean(event.meta && typeof event.meta === "object" && event.meta[key] === true);
 
-export const resetWorldEventIngestState = (): void => {
+export type ResetWorldEventIngestStateOptions = {
+  preserveEventJournal?: boolean;
+  preserveSemanticLedgers?: boolean;
+};
+
+export const resetWorldEventIngestState = (options: ResetWorldEventIngestStateOptions = {}): void => {
   runtimeStateByKey.clear();
   spatialEpisodeSignatureByThread.clear();
   resetWorldSourceRegistry();
   resetProfileLiveSourcesForTest();
   resetMinecraftSpatialWindows();
   resetMinecraftWorldSenseWindows();
-  clearGameSemanticLookupReceiptsForTest();
-  clearGameUtilityHypothesesForTest();
+  if (!options.preserveSemanticLedgers) {
+    clearGameSemanticLookupReceiptsForTest();
+    clearGameUtilityHypothesesForTest();
+    clearPatternCandidatesForTest();
+    clearContinuousCategorizationJobsForTest();
+    clearProfileSituationArchivesForTest();
+  }
+  if (!options.preserveEventJournal) {
+    clearEventJournalForTest();
+  }
 };
 
 const getOrCreateState = (
@@ -988,6 +1008,11 @@ export const ingestWorldEvent = async (
           world_id: event.world_id,
         });
   const resolvedBinding = bindingResolution.binding;
+  recordEventJournalEvent({
+    event,
+    threadId: resolvedBinding?.thread_id ?? explicitThreadId ?? null,
+    sourceFamily: "minecraft",
+  });
   const appendBlockedReason =
     bindingResolution.reason === "binding_mismatch" || bindingResolution.reason === "source_id_mismatch"
       ? "source_id_mismatch"
@@ -1135,6 +1160,22 @@ export const ingestWorldEvent = async (
           now: signal.ts,
         })
       : null;
+  const categorizationEventsForJobs = [
+    ...(spatialReduction?.categorization_events ?? []),
+    ...(worldSenseReduction?.categorization_events ?? []),
+  ];
+  const syntheticEvidenceForJobs = [
+    ...(spatialReduction?.synthetic_evidence ?? []),
+    ...(worldSenseReduction?.synthetic_evidence ?? []),
+    ...(semanticUtilityReduction?.synthetic_evidence ?? []),
+  ];
+  const continuousCategorizationJobReceipts = processWorldEventForCategorizationJobs({
+    event,
+    threadId: resolvedBinding?.thread_id ?? explicitThreadId ?? null,
+    categorizationEvents: categorizationEventsForJobs,
+    syntheticEvidence: syntheticEvidenceForJobs,
+    utilityHypotheses: semanticUtilityReduction?.utility_hypotheses ?? [],
+  });
   const spatialArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId && spatialReduction && spatialResult.spatial_episode
       ? updateLiveSituationArtifact({
@@ -1165,7 +1206,7 @@ export const ingestWorldEvent = async (
         })
       : null;
   const batchReceipt =
-    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction || worldSenseReduction || semanticUtilityReduction) && resolvedBinding && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction || worldSenseReduction || semanticUtilityReduction || continuousCategorizationJobReceipts.length > 0) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
           threadId: resolvedBinding.thread_id,
           turnId: standbyTurnId,
@@ -1289,8 +1330,19 @@ export const ingestWorldEvent = async (
                     safe_for_future_context: true,
                   } as Record<string, unknown>,
                 })),
+                ...continuousCategorizationJobReceipts.map((receipt: ContinuousCategorizationJobReceipt) => ({
+                  itemId: `continuous_categorization_job:${hashShort([receipt.receipt_id], 14)}`,
+                  itemType: "toolObservation" as const,
+                  kind: "continuous_categorization_job_receipt",
+                  observationRef: {
+                    ...receipt,
+                    provenance: "continuous_categorization_job",
+                    context_role: "receipt_not_assistant_answer",
+                    safe_for_future_context: true,
+                  } as Record<string, unknown>,
+                })),
               ]
-            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction || semanticUtilityReduction
+            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction || semanticUtilityReduction || continuousCategorizationJobReceipts.length > 0
               ? [
                   ...(spatialReduction && spatialResult.spatial_episode
                     ? [
@@ -1365,6 +1417,17 @@ export const ingestWorldEvent = async (
                       provenance: "deterministic_game_utility_reasoner",
                       context_role: "evidence_not_assistant_answer",
                       raw_logs_included: false,
+                      safe_for_future_context: true,
+                    } as Record<string, unknown>,
+                  })),
+                  ...continuousCategorizationJobReceipts.map((receipt: ContinuousCategorizationJobReceipt) => ({
+                    itemId: `continuous_categorization_job:${hashShort([receipt.receipt_id], 14)}`,
+                    itemType: "toolObservation" as const,
+                    kind: "continuous_categorization_job_receipt",
+                    observationRef: {
+                      ...receipt,
+                      provenance: "continuous_categorization_job",
+                      context_role: "receipt_not_assistant_answer",
                       safe_for_future_context: true,
                     } as Record<string, unknown>,
                   })),
@@ -1487,15 +1550,9 @@ export const ingestWorldEvent = async (
     minecraft_world_sense_context: worldSenseResult.world_sense_context,
     game_semantic_lookup_receipts: semanticUtilityReduction?.lookup_receipts ?? [],
     game_utility_hypotheses: semanticUtilityReduction?.utility_hypotheses ?? [],
-    categorization_events: [
-      ...(spatialReduction?.categorization_events ?? []),
-      ...(worldSenseReduction?.categorization_events ?? []),
-    ],
-    synthetic_evidence: [
-      ...(spatialReduction?.synthetic_evidence ?? []),
-      ...(worldSenseReduction?.synthetic_evidence ?? []),
-      ...(semanticUtilityReduction?.synthetic_evidence ?? []),
-    ],
+    continuous_categorization_job_receipts: continuousCategorizationJobReceipts,
+    categorization_events: categorizationEventsForJobs,
+    synthetic_evidence: syntheticEvidenceForJobs,
   };
 };
 

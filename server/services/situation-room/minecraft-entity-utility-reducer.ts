@@ -7,6 +7,7 @@ import type {
 } from "@shared/helix-minecraft-world-sense";
 import { lookupGameSemanticReference } from "./game-semantic-reference";
 import { reasonGameUtilityFromEntityCluster } from "./game-utility-reasoner";
+import { recordPatternCandidateFromUtilityHypothesis } from "./pattern-candidate-ledger";
 import { recordSyntheticEvidence } from "./synthetic-evidence-ledger";
 
 const utilityHypothesesByThread = new Map<string, GameUtilityHypothesis[]>();
@@ -69,6 +70,7 @@ export function reduceMinecraftEntityUtility(input: {
         deterministic: hypothesis.deterministic,
         model_invoked: hypothesis.model_invoked,
       }));
+      recordPatternCandidateFromUtilityHypothesis({ hypothesis });
     }
   }
   if (hypotheses.length > 0) {

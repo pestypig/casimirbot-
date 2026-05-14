@@ -99,6 +99,29 @@ export const HELIX_GRAPH_CAPABILITIES: HelixGraphCapability[] = [
     execution_mode: "continuous",
   }),
   capability({
+    capability_id: "monitor.continuous_categorization_job",
+    title: "Continuous categorization job",
+    description: "Thread-owned background evidence builder for live source events; emits observations and validations, not assistant answers.",
+    family: "monitor",
+    input_ports: [{ port_id: "source_event", kind: "monitor_signal", required: true }],
+    output_ports: [
+      { port_id: "evidence", kind: "context" },
+      { port_id: "receipt", kind: "receipt" },
+    ],
+    parameter_schema: {
+      type: "object",
+      properties: {
+        source_family: { type: "string" },
+        archive_on_stop: { type: "boolean" },
+        surface_policy: { type: "string" },
+      },
+    },
+    default_params: { archive_on_stop: true, surface_policy: "danger_progress" },
+    risk: "medium",
+    requires_confirmation: true,
+    execution_mode: "continuous",
+  }),
+  capability({
     capability_id: "source.screen_summary",
     title: "Screen summary source",
     description: "Explicit screen-summary evidence source without raw screen injection.",
