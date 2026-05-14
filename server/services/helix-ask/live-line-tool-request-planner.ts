@@ -6,6 +6,7 @@ import {
   type HelixLiveLineRequestedTool,
   type HelixLiveLineToolRequest,
   type HelixLiveLineToolRequestPriority,
+  type HelixLiveLineToolRequestReason,
 } from "@shared/helix-live-line-tool-request";
 import type { GameUtilityHypothesis } from "@shared/helix-game-utility-hypothesis";
 import { recordLiveLineToolRequest } from "../situation-room/live-line-tool-request-store";
@@ -23,61 +24,119 @@ const priorityForLine = (line?: Pick<LiveAnswerLineState, "key" | "label"> | nul
   return "info";
 };
 
-const chooseTool = (input: {
+const chooseTools = (input: {
   line: Pick<LiveAnswerLineState, "key" | "label" | "value" | "evidence_refs">;
   hypothesis?: GameUtilityHypothesis | null;
-}): {
+}): Array<{
   requested_tool: HelixLiveLineRequestedTool;
   expected_evidence_kind: HelixLiveLineExpectedEvidenceKind;
-  reason: string;
-} | null => {
+  reason: HelixLiveLineToolRequestReason;
+  reason_summary: string;
+}> => {
   const text = lower(`${input.line.key} ${input.line.label} ${input.line.value} ${input.hypothesis?.utility_label ?? ""} ${(input.hypothesis?.missing_evidence ?? []).join(" ")}`);
   if (/\b(?:equation|calculate|calculator|solve|numeric|residual|function)\b/.test(text)) {
-    return {
+    return [{
       requested_tool: "scientific-calculator.solve_with_steps",
       expected_evidence_kind: "calculation",
-      reason: "Verify the numeric or equation claim before raising line confidence.",
-    };
+      reason: "verify_math",
+      reason_summary: "Verify the numeric or equation claim before raising line confidence.",
+    }];
   }
   if (/\b(?:transcript|large text|store|note|archive|preserve)\b/.test(text)) {
-    return {
+    return [{
       requested_tool: "workstation-notes.append_to_note",
       expected_evidence_kind: "storage",
-      reason: "Store large context as note references instead of injecting raw text.",
-    };
+      reason: "store_context",
+      reason_summary: "Store large context as note references instead of injecting raw text.",
+    }];
   }
   if (/\b(?:chicken|cow|zombie|entity|farm|egg|mob|semantic|affordance)\b/.test(text)) {
-    return {
-      requested_tool: "minecraft.lookup_semantics",
-      expected_evidence_kind: "semantic_reference",
-      reason: "Use Minecraft semantic references to interpret neutral entity/resource evidence.",
-    };
+    return [
+      {
+        requested_tool: "minecraft.lookup_semantics",
+        expected_evidence_kind: "semantic_reference",
+        reason: "lookup_semantics",
+        reason_summary: "Use Minecraft semantic references to interpret neutral entity/resource evidence.",
+      },
+      {
+        requested_tool: "minecraft.query_world_sense_window",
+        expected_evidence_kind: "missing_evidence",
+        reason: "missing_evidence",
+        reason_summary: "Query compact world-sense windows before upgrading an entity/use hypothesis.",
+      },
+    ];
   }
   if (
     /\b(?:minecraft|minehut|world|source events?|event window|situation room debug|raw logs?|bucket|lava|water|fluid|block|stair|trench|mine|structure|missing evidence|next check)\b/.test(text)
   ) {
-    return {
+    return [{
       requested_tool: "minecraft.query_event_window",
       expected_evidence_kind: "missing_evidence",
-      reason: "Query the event window for source evidence required by this line.",
-    };
+      reason: "query_event_window",
+      reason_summary: "Query the event window for source evidence required by this line.",
+    }];
   }
   if (/\b(?:docs?|paper|reference|citation)\b/.test(text)) {
-    return {
+    return [{
       requested_tool: "docs-viewer.lookup_reference",
       expected_evidence_kind: "verification",
-      reason: "Ground the line against a document/reference before increasing confidence.",
-    };
+      reason: "missing_evidence",
+      reason_summary: "Ground the line against a document/reference before increasing confidence.",
+    }];
   }
   if (/\b(?:review|ambiguous|uncertain|hypothesis)\b/.test(text)) {
-    return {
+    return [{
       requested_tool: "situation-room.run_agentic_review",
       expected_evidence_kind: "review",
-      reason: "Run an agentic review because the line is ambiguous.",
-    };
+      reason: "review_uncertainty",
+      reason_summary: "Run an agentic review because the line is ambiguous.",
+    }];
   }
-  return null;
+  return [];
 };
+
+const buildLiveLineToolRequest = (input: {
+  threadId: string;
+  environmentId?: string | null;
+  artifactId?: string | null;
+  line: Pick<LiveAnswerLineState, "key" | "label" | "value" | "evidence_refs">;
+  hypothesis?: GameUtilityHypothesis | null;
+  subgoalId?: string | null;
+  tool: ReturnType<typeof chooseTools>[number];
+  now: string;
+}): HelixLiveLineToolRequest => ({
+  schema: HELIX_LIVE_LINE_TOOL_REQUEST_SCHEMA,
+  request_id: `live_line_tool_request:${hashShort([
+    input.threadId,
+    input.environmentId ?? null,
+    input.artifactId ?? null,
+    input.line.key,
+    input.line.value,
+    input.hypothesis?.hypothesis_id ?? null,
+    input.tool.requested_tool,
+  ])}`,
+  thread_id: input.threadId,
+  environment_id: input.environmentId ?? null,
+  artifact_id: input.artifactId ?? null,
+  line_key: input.line.key,
+  line_label: input.line.label,
+  hypothesis_id: input.hypothesis?.hypothesis_id ?? null,
+  subgoal_id: input.subgoalId ?? null,
+  requested_tool: input.tool.requested_tool,
+  reason: input.tool.reason,
+  reason_summary: input.tool.reason_summary,
+  expected_evidence_kind: input.tool.expected_evidence_kind,
+  priority: priorityForLine(input.line),
+  status: "proposed",
+  evidence_refs: Array.from(new Set([
+    ...(input.line.evidence_refs ?? []),
+    ...(input.hypothesis?.supporting_evidence_refs ?? []),
+  ])),
+  deterministic_content_role: "evidence_not_assistant_answer",
+  raw_content_included: false,
+  assistant_answer: false,
+  created_at: input.now,
+});
 
 export function planLiveLineToolRequest(input: {
   threadId: string;
@@ -89,41 +148,15 @@ export function planLiveLineToolRequest(input: {
   now?: string;
   autoRecord?: boolean;
 }): HelixLiveLineToolRequest | null {
-  const tool = chooseTool({ line: input.line, hypothesis: input.hypothesis ?? null });
+  const tool = chooseTools({ line: input.line, hypothesis: input.hypothesis ?? null })[0] ?? null;
   if (!tool) return null;
   const now = input.now ?? new Date().toISOString();
-  const request: HelixLiveLineToolRequest = {
-    schema: HELIX_LIVE_LINE_TOOL_REQUEST_SCHEMA,
-    request_id: `live_line_tool_request:${hashShort([
-      input.threadId,
-      input.environmentId ?? null,
-      input.artifactId ?? null,
-      input.line.key,
-      input.line.value,
-      input.hypothesis?.hypothesis_id ?? null,
-      tool.requested_tool,
-    ])}`,
-    thread_id: input.threadId,
-    environment_id: input.environmentId ?? null,
-    artifact_id: input.artifactId ?? null,
-    line_key: input.line.key,
-    line_label: input.line.label,
-    hypothesis_id: input.hypothesis?.hypothesis_id ?? null,
-    subgoal_id: input.subgoalId ?? null,
-    requested_tool: tool.requested_tool,
-    reason: tool.reason,
-    expected_evidence_kind: tool.expected_evidence_kind,
-    priority: priorityForLine(input.line),
-    status: "proposed",
-    evidence_refs: Array.from(new Set([
-      ...(input.line.evidence_refs ?? []),
-      ...(input.hypothesis?.supporting_evidence_refs ?? []),
-    ])),
-    deterministic_content_role: "evidence_not_assistant_answer",
-    raw_content_included: false,
-    assistant_answer: false,
-    created_at: now,
-  };
+  const request = buildLiveLineToolRequest({
+    ...input,
+    hypothesis: input.hypothesis ?? null,
+    tool,
+    now,
+  });
   return input.autoRecord === false ? request : recordLiveLineToolRequest(request);
 }
 
@@ -137,18 +170,24 @@ export function planLiveLineToolRequests(input: {
   autoRecord?: boolean;
 }): HelixLiveLineToolRequest[] {
   const latestHypothesis = input.hypotheses?.at(-1) ?? null;
-  const planned = input.lines
-    .map((line) => planLiveLineToolRequest({
-      threadId: input.threadId,
-      environmentId: input.environmentId,
-      artifactId: input.artifactId,
-      line,
-      hypothesis: latestHypothesis,
-      now: input.now,
-      autoRecord: input.autoRecord,
-    }))
-    .filter((entry): entry is HelixLiveLineToolRequest => Boolean(entry));
+  const planned: HelixLiveLineToolRequest[] = [];
+  const now = input.now ?? new Date().toISOString();
+  for (const line of input.lines) {
+    for (const tool of chooseTools({ line, hypothesis: latestHypothesis })) {
+      planned.push(buildLiveLineToolRequest({
+        threadId: input.threadId,
+        environmentId: input.environmentId,
+        artifactId: input.artifactId,
+        line,
+        hypothesis: latestHypothesis,
+        tool,
+        now,
+      }));
+    }
+  }
   const byKey = new Map<string, HelixLiveLineToolRequest>();
   for (const request of planned) byKey.set(`${request.line_key}:${request.requested_tool}`, request);
-  return Array.from(byKey.values());
+  const requests = Array.from(byKey.values());
+  if (input.autoRecord === false) return requests;
+  return requests.map((request) => recordLiveLineToolRequest(request));
 }

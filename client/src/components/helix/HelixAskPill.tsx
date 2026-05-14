@@ -11154,7 +11154,8 @@ const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] 
   { id: "live-energy", aliases: ["helix core", "core"] },
   { id: "docs-viewer", aliases: ["docs", "documentation", "papers"] },
   { id: "resonance-orchestra", aliases: ["resonance", "resonance orchestra"] },
-  { id: "agi-essence-console", aliases: ["essence console", "helix console", "conversation panel"] },
+  { id: "workstation-workflow-timeline", aliases: ["workflow timeline", "tool trace", "helix trace", "helix timeline", "conversation panel"] },
+  { id: "agi-essence-console", aliases: ["essence console", "legacy essence console"] },
 ];
 
 const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition["id"] }> = [
@@ -11162,7 +11163,8 @@ const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition[
   { pattern: /(energy-pipeline|warp-pipeline-adapter|pipeline)/i, panelId: "live-energy" },
   { pattern: /(helix-core\.ts|server\/helix-core|\/helix\/pipeline)/i, panelId: "live-energy" },
   { pattern: /(code-lattice|resonance)/i, panelId: "resonance-orchestra" },
-  { pattern: /(agi\.plan|training-trace|essence|trace)/i, panelId: "agi-essence-console" },
+  { pattern: /(workflow-timeline|training-trace|tool-trace|trace|timeline)/i, panelId: "workstation-workflow-timeline" },
+  { pattern: /(agi\.plan|essence)/i, panelId: "agi-essence-console" },
   { pattern: /(docs\/|\.md$)/i, panelId: "docs-viewer" },
 ];
 const HELIX_DOC_TOPIC_PATH_HINTS: Array<{ pattern: RegExp; path: string }> = [

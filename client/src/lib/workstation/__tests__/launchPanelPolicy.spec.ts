@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isUnfinishedPanel, isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import {
+  isLegacyDebugPanel,
+  isUnfinishedPanel,
+  isUserLaunchPanel,
+} from "@/lib/workstation/launchPanelPolicy";
 
 describe("launchPanelPolicy", () => {
   it("includes workstation notes in the user launch panel list", () => {
@@ -15,6 +19,11 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("workstation-clipboard-history")).toBe(true);
     expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(true);
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);
+  });
+
+  it("keeps Essence Console as a legacy/debug panel outside default launch", () => {
+    expect(isUserLaunchPanel("agi-essence-console")).toBe(false);
+    expect(isLegacyDebugPanel("agi-essence-console")).toBe(true);
   });
 
   it("shows the main Ideology & Zen panel but hides its source/debug variant", () => {

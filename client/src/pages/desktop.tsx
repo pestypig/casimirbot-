@@ -41,6 +41,7 @@ const MAX_LAYOUT_DEPTH = 5;
 const PENDING_PANEL_KEY = "helix:pending-panel";
 const NOISE_GENS_PANEL_ID = "helix-noise-gens";
 const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
+const HELIX_CONVERSATION_TRACE_PANEL_ID = "workstation-workflow-timeline";
 const NOISE_GENS_AUTO_OPEN_SUPPRESS = new Set([ESSENCE_CONSOLE_PANEL_ID]);
 const WORKSTATION_PROCEDURAL_STEP_DELAY_MS = 220;
 
@@ -759,7 +760,7 @@ export default function DesktopPage({
                 maxWidthClassName="max-w-4xl mx-auto"
                 onOpenPanel={openPanelById}
                 onOpenConversation={() => {
-                  openPanelUniversal(ESSENCE_CONSOLE_PANEL_ID);
+                  openPanelUniversal(HELIX_CONVERSATION_TRACE_PANEL_ID);
                 }}
               />
             </div>

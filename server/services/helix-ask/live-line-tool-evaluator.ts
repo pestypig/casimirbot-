@@ -25,10 +25,31 @@ const confidenceDeltaForSupport = (support: HelixLiveLineToolEvaluationSupport):
   return 0;
 };
 
+export function hasLineConfidenceAuthority(input: {
+  tool_receipt_refs?: string[];
+  receipts?: unknown[];
+  state_observation_refs?: string[];
+  user_steering_evidence_refs?: string[];
+  model_review_validation_refs?: string[];
+  model_invoked?: boolean;
+}): boolean {
+  return Boolean(
+    (input.tool_receipt_refs?.length ?? 0) > 0 ||
+    (input.receipts?.length ?? 0) > 0 ||
+    (input.state_observation_refs?.length ?? 0) > 0 ||
+    (input.user_steering_evidence_refs?.length ?? 0) > 0 ||
+    (input.model_review_validation_refs?.length ?? 0) > 0 ||
+    input.model_invoked === true,
+  );
+}
+
 export function evaluateLiveLineToolRequest(input: {
   request: HelixLiveLineToolRequest;
   tool_receipt_refs?: string[];
   receipts?: unknown[];
+  state_observation_refs?: string[];
+  user_steering_evidence_refs?: string[];
+  model_review_validation_refs?: string[];
   supports_line?: HelixLiveLineToolEvaluationSupport;
   next_line_value?: string | null;
   missing_evidence?: string[];
@@ -41,6 +62,7 @@ export function evaluateLiveLineToolRequest(input: {
   const receiptRefs = Array.from(new Set(input.tool_receipt_refs ?? []));
   const support = input.supports_line ?? supportFromReceipts(input.receipts ?? []);
   const now = input.now ?? new Date().toISOString();
+  const canChangeConfidence = hasLineConfidenceAuthority(input);
   const evaluation: HelixLiveLineToolEvaluation = {
     schema: HELIX_LIVE_LINE_TOOL_EVALUATION_SCHEMA,
     evaluation_id: `live_line_tool_evaluation:${hashShort([
@@ -52,17 +74,22 @@ export function evaluateLiveLineToolRequest(input: {
     request_id: input.request.request_id,
     thread_id: input.request.thread_id,
     line_key: input.request.line_key,
-    tool_receipt_refs: receiptRefs,
+    tool_receipt_refs: Array.from(new Set([
+      ...receiptRefs,
+      ...(input.state_observation_refs ?? []),
+      ...(input.user_steering_evidence_refs ?? []),
+      ...(input.model_review_validation_refs ?? []),
+    ])),
     supports_line: support,
-    confidence_delta: receiptRefs.length > 0 || (input.receipts?.length ?? 0) > 0
+    confidence_delta: canChangeConfidence
       ? confidenceDeltaForSupport(support)
       : 0,
     next_line_value: input.next_line_value ?? null,
     missing_evidence: input.missing_evidence ?? [],
     summary: input.summary?.trim() || (
-      receiptRefs.length > 0 || (input.receipts?.length ?? 0) > 0
+      canChangeConfidence
         ? `${input.request.requested_tool} returned ${support} evidence for ${input.request.line_label}.`
-        : `${input.request.requested_tool} has no receipt yet; confidence is unchanged.`
+        : `${input.request.requested_tool} has no receipt, state observation, steering evidence, or model-reviewed validation yet; confidence is unchanged.`
     ),
     deterministic: input.deterministic ?? true,
     model_invoked: input.model_invoked ?? false,

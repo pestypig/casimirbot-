@@ -21,6 +21,14 @@ export type HelixLiveLineExpectedEvidenceKind =
   | "review"
   | "debug_replay";
 
+export type HelixLiveLineToolRequestReason =
+  | "missing_evidence"
+  | "verify_math"
+  | "lookup_semantics"
+  | "query_event_window"
+  | "store_context"
+  | "review_uncertainty";
+
 export type HelixLiveLineToolRequestPriority =
   | "info"
   | "warn"
@@ -47,7 +55,8 @@ export type HelixLiveLineToolRequest = {
   hypothesis_id?: string | null;
   subgoal_id?: string | null;
   requested_tool: HelixLiveLineRequestedTool;
-  reason: string;
+  reason: HelixLiveLineToolRequestReason;
+  reason_summary: string;
   expected_evidence_kind: HelixLiveLineExpectedEvidenceKind;
   priority: HelixLiveLineToolRequestPriority;
   status: HelixLiveLineToolRequestStatus;

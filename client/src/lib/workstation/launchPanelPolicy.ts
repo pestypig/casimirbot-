@@ -5,10 +5,13 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "situation-room-pipelines",
   "workstation-clipboard-history",
   "workstation-workflow-timeline",
-  "agi-essence-console",
   "agi-task-history",
   "scientific-calculator",
   "mission-ethos",
+]);
+
+const LEGACY_DEBUG_PANEL_IDS = new Set<string>([
+  "agi-essence-console",
 ]);
 
 const UNFINISHED_PANEL_IDS = new Set<string>([
@@ -21,6 +24,10 @@ const UNFINISHED_PANEL_IDS = new Set<string>([
 
 export function isUserLaunchPanel(panelId: string): boolean {
   return USER_LAUNCH_PANEL_IDS.has(panelId);
+}
+
+export function isLegacyDebugPanel(panelId: string): boolean {
+  return LEGACY_DEBUG_PANEL_IDS.has(panelId);
 }
 
 export function isUnfinishedPanel(panelId: string): boolean {

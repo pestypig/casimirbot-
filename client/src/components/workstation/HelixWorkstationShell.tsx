@@ -5,7 +5,7 @@ import { WorkstationResizeRail } from "@/components/workstation/WorkstationResiz
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
-const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
+const HELIX_CONVERSATION_TRACE_PANEL_ID = "workstation-workflow-timeline";
 
 export function HelixWorkstationShell({
   onOpenPanel,
@@ -19,7 +19,7 @@ export function HelixWorkstationShell({
 
   const handleOpenConversation = useCallback(
     (_sessionId: string) => {
-      onOpenPanel(ESSENCE_CONSOLE_PANEL_ID);
+      onOpenPanel(HELIX_CONVERSATION_TRACE_PANEL_ID);
     },
     [onOpenPanel],
   );

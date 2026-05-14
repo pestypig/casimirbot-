@@ -207,7 +207,7 @@ export default function MobileStartPage() {
 
   const handleOpenConversation = useCallback(
     (_sessionId: string) => {
-      openPanelUniversal("agi-essence-console");
+      openPanelUniversal("workstation-workflow-timeline");
     },
     [openPanelUniversal]
   );
