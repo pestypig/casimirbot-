@@ -4,6 +4,7 @@ import {
   type HelixInterpretedEvent,
   type HelixInterpretedEventKind,
 } from "@shared/helix-interpreted-event-log";
+import { shouldSuppressInterpretedLogDuplicate } from "./interpreted-log-dedupe";
 
 const eventsByThread = new Map<string, HelixInterpretedEvent[]>();
 const eventIds = new Set<string>();
@@ -47,6 +48,22 @@ export function appendInterpretedEvent(input: {
 }): HelixInterpretedEvent {
   const threadId = normalizeString(input.thread_id);
   if (!threadId) throw new Error("Interpreted event requires thread_id.");
+  const dedupe = shouldSuppressInterpretedLogDuplicate({
+    thread_id: threadId,
+    kind: input.kind,
+    summary: input.summary,
+    evidence_refs: input.evidence_refs ?? [],
+    related_ids: [...(input.related_artifact_ids ?? []), ...(input.related_job_ids ?? [])],
+  });
+  if (dedupe.suppress) {
+    const existing = (eventsByThread.get(threadId) ?? []).find(
+      (event) =>
+        event.kind === input.kind &&
+        event.summary.trim().toLowerCase().replace(/\s+/g, " ") ===
+          input.summary.trim().toLowerCase().replace(/\s+/g, " "),
+    );
+    if (existing) return existing;
+  }
   const eventId = input.event_id ?? makeInterpretedEventId({
     threadId,
     kind: input.kind,
