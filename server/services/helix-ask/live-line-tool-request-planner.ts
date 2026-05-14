@@ -120,6 +120,7 @@ const buildLiveLineToolRequest = (input: {
   artifact_id: input.artifactId ?? null,
   line_key: input.line.key,
   line_label: input.line.label,
+  line_value: input.line.value,
   hypothesis_id: input.hypothesis?.hypothesis_id ?? null,
   subgoal_id: input.subgoalId ?? null,
   requested_tool: input.tool.requested_tool,
@@ -189,5 +190,5 @@ export function planLiveLineToolRequests(input: {
   for (const request of planned) byKey.set(`${request.line_key}:${request.requested_tool}`, request);
   const requests = Array.from(byKey.values());
   if (input.autoRecord === false) return requests;
-  return requests.map((request) => recordLiveLineToolRequest(request));
+  return requests.map((request: HelixLiveLineToolRequest) => recordLiveLineToolRequest(request));
 }

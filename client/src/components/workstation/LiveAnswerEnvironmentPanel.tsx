@@ -22,8 +22,10 @@ import type {
   HelixClarificationQuestionProposal,
 } from "@shared/helix-clarification-dialogue";
 import type { HelixUserSteeringEvidence } from "@shared/helix-user-steering-evidence";
+import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-evaluation";
+import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
 
-type LiveEnvironmentTab = "present_state" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type LiveEnvironmentTab = "present_state" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -35,6 +37,7 @@ type LiveAgenticReviewReadEntry = {
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "present_state", label: "Present State" },
+  { id: "line_checks", label: "Line Checks" },
   { id: "interpreted_log", label: "Interpreted Log" },
   { id: "clarification", label: "Clarification Queue" },
   { id: "overview", label: "Overview" },
@@ -86,6 +89,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [clarificationNeeds, setClarificationNeeds] = useState<HelixClarificationNeed[]>([]);
   const [clarificationProposals, setClarificationProposals] = useState<HelixClarificationQuestionProposal[]>([]);
   const [steeringEvidence, setSteeringEvidence] = useState<HelixUserSteeringEvidence[]>([]);
+  const [lineToolRequests, setLineToolRequests] = useState<HelixLiveLineToolRequest[]>([]);
+  const [lineToolEvaluations, setLineToolEvaluations] = useState<HelixLiveLineToolEvaluation[]>([]);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectActiveLiveAnswerEnvironment(state, threadId),
@@ -123,7 +128,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -132,8 +137,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/present-state-card?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/interpreted-log?thread_id=${encodeURIComponent(threadId)}${roomQuery}&limit=80`),
         fetch(`/api/agi/situation/clarification-dialogue?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-line-tool-requests?thread_id=${encodeURIComponent(threadId)}&limit=80`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -142,6 +148,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         presentStateRes.json(),
         interpretedLogRes.json(),
         clarificationRes.json(),
+        lineToolRes.json(),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -157,6 +164,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setClarificationNeeds(Array.isArray(clarificationBody.needs) ? clarificationBody.needs : []);
       setClarificationProposals(Array.isArray(clarificationBody.proposals) ? clarificationBody.proposals : []);
       setSteeringEvidence(Array.isArray(clarificationBody.steering_evidence) ? clarificationBody.steering_evidence : []);
+      setLineToolRequests(Array.isArray(lineToolBody.requests) ? lineToolBody.requests : []);
+      setLineToolEvaluations(Array.isArray(lineToolBody.evaluations) ? lineToolBody.evaluations : []);
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -197,6 +206,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       environment_id: environment.environment_id,
       question: "Review the latest compact live environment state.",
       trigger: "manual_button",
+    });
+    await refresh();
+  };
+
+  const runLineCheck = async (request: HelixLiveLineToolRequest) => {
+    await postJson("/api/agi/situation/live-line-tool-request/run", {
+      thread_id: request.thread_id,
+      request_id: request.request_id,
+      room_id: environment?.room_id ?? undefined,
+      source_id: environment?.source_ids?.[0] ?? undefined,
     });
     await refresh();
   };
@@ -253,7 +272,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     </span>
                   </div>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {presentStateCard.lines.map((entry) => (
+                    {presentStateCard.lines.map((entry: HelixPresentStateCard["lines"][number]) => (
                       <div key={entry.key} className="rounded border border-white/10 bg-black/20 p-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[10px] uppercase text-emerald-200/80">{entry.label}</p>
@@ -275,6 +294,71 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   </div>
                 </div>
               )}
+            </div>
+          ) : null}
+          {activeTab === "line_checks" ? (
+            <div className="space-y-3">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Executable Line Checks</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Live lines can request workstation checks. Running one creates a receipt and evaluation; it does not create an assistant answer.
+                </p>
+              </div>
+              {lineToolRequests.length === 0 ? (
+                <p className="text-xs text-slate-500">No line tool requests have been proposed yet. Ask Helix about the live situation to generate checks.</p>
+              ) : null}
+              {lineToolRequests.slice(-30).reverse().map((request: HelixLiveLineToolRequest) => {
+                const evaluation = lineToolEvaluations.find((entry: HelixLiveLineToolEvaluation) => entry.request_id === request.request_id);
+                return (
+                  <div key={request.request_id} className="rounded border border-cyan-300/15 bg-slate-950/70 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-cyan-100">{request.line_label}</p>
+                        <p className="mt-1 text-[11px] text-slate-400">{request.requested_tool}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">{request.status}</span>
+                        {request.status !== "evaluated" ? (
+                          <button
+                            type="button"
+                            onClick={() => void runLineCheck(request)}
+                            className="rounded border border-cyan-300/30 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-400/10"
+                          >
+                            Run check
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-300">{request.reason_summary}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                      <span>{request.reason}</span>
+                      <span>{request.expected_evidence_kind}</span>
+                      <span>priority {request.priority}</span>
+                      <span>assistant answer {String(request.assistant_answer)}</span>
+                      <span>raw content {String(request.raw_content_included)}</span>
+                    </div>
+                    {evaluation ? (
+                      <div className="mt-3 rounded border border-emerald-300/15 bg-emerald-950/10 p-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] font-semibold uppercase text-emerald-200">Evaluation</p>
+                          <span className="text-[10px] text-slate-500">
+                            {evaluation.supports_line} / delta {evaluation.confidence_delta.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-200">{evaluation.summary}</p>
+                        {evaluation.missing_evidence.length > 0 ? (
+                          <p className="mt-1 text-[10px] text-amber-200">
+                            Missing: {evaluation.missing_evidence.slice(0, 3).join("; ")}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 truncate text-[10px] text-slate-500">
+                          receipts {evaluation.tool_receipt_refs.slice(0, 3).join(", ") || "none"}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
           {activeTab === "interpreted_log" ? (
@@ -363,7 +447,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               ) : null}
             </div>
           ) : null}
-          {activeTab === "overview" ? (
+          {activeTab === "overview" && environment ? (
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {([
                 ["Environment", environment.environment_id],
@@ -404,7 +488,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               ))}
             </div>
           ) : null}
-          {activeTab === "line_schema" ? (
+          {activeTab === "line_schema" && environment ? (
             <div className="grid gap-2 md:grid-cols-2">
               {environment.lines.map((line: LiveAnswerLineState) => (
                 <div key={line.key} className="rounded border border-white/10 bg-slate-950/70 p-2">
@@ -468,7 +552,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   </div>
                   <div className="rounded border border-white/10 bg-black/20 p-2">
                     <p className="text-[10px] uppercase text-slate-500">Voice mode</p>
-                    <p className="mt-1 text-xs text-slate-200">{commentarySession?.voice_mode ?? environment.mode}</p>
+                    <p className="mt-1 text-xs text-slate-200">{commentarySession?.voice_mode ?? environment?.mode ?? "n/a"}</p>
                   </div>
                   <div className="rounded border border-white/10 bg-black/20 p-2">
                     <p className="text-[10px] uppercase text-slate-500">Last trace</p>

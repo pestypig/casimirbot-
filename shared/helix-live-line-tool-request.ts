@@ -52,6 +52,7 @@ export type HelixLiveLineToolRequest = {
   artifact_id?: string | null;
   line_key: string;
   line_label: string;
+  line_value?: string | null;
   hypothesis_id?: string | null;
   subgoal_id?: string | null;
   requested_tool: HelixLiveLineRequestedTool;
