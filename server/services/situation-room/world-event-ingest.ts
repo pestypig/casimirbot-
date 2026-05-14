@@ -36,6 +36,8 @@ import type {
   HelixMinecraftWorldSenseContext,
   HelixMinecraftWorldSenseEvent,
 } from "@shared/helix-minecraft-world-sense";
+import type { GameSemanticLookupReceipt } from "@shared/helix-game-semantic-dictionary";
+import type { GameUtilityHypothesis } from "@shared/helix-game-utility-hypothesis";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -106,6 +108,11 @@ import {
   reduceMinecraftWorldSense,
   resetMinecraftWorldSenseWindows,
 } from "./minecraft-world-sense-window";
+import {
+  clearGameUtilityHypothesesForTest,
+  reduceMinecraftEntityUtility,
+} from "./minecraft-entity-utility-reducer";
+import { clearGameSemanticLookupReceiptsForTest } from "./game-semantic-reference";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -198,6 +205,8 @@ export type WorldEventIngestResult = {
   minecraft_spatial_episode?: HelixMinecraftSpatialEpisode | null;
   minecraft_world_sense_event?: HelixMinecraftWorldSenseEvent | null;
   minecraft_world_sense_context?: HelixMinecraftWorldSenseContext | null;
+  game_semantic_lookup_receipts?: GameSemanticLookupReceipt[];
+  game_utility_hypotheses?: GameUtilityHypothesis[];
   categorization_events?: HelixCategorizationEvent[];
   synthetic_evidence?: HelixSyntheticEvidence[];
 };
@@ -322,6 +331,8 @@ export const resetWorldEventIngestState = (): void => {
   resetProfileLiveSourcesForTest();
   resetMinecraftSpatialWindows();
   resetMinecraftWorldSenseWindows();
+  clearGameSemanticLookupReceiptsForTest();
+  clearGameUtilityHypothesesForTest();
 };
 
 const getOrCreateState = (
@@ -1116,6 +1127,14 @@ export const ingestWorldEvent = async (
           context: worldSenseResult.world_sense_context,
         })
       : null;
+  const semanticUtilityReduction =
+    shouldPublishWorldSense && resolvedBinding && worldSenseResult.world_sense_context
+      ? reduceMinecraftEntityUtility({
+          threadId: resolvedBinding.thread_id,
+          context: worldSenseResult.world_sense_context,
+          now: signal.ts,
+        })
+      : null;
   const spatialArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId && spatialReduction && spatialResult.spatial_episode
       ? updateLiveSituationArtifact({
@@ -1146,7 +1165,7 @@ export const ingestWorldEvent = async (
         })
       : null;
   const batchReceipt =
-    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction || worldSenseReduction) && resolvedBinding && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction || worldSenseReduction || semanticUtilityReduction) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
           threadId: resolvedBinding.thread_id,
           turnId: standbyTurnId,
@@ -1246,8 +1265,32 @@ export const ingestWorldEvent = async (
                       },
                     ]
                   : []),
+                ...(semanticUtilityReduction?.lookup_receipts ?? []).map((receipt: GameSemanticLookupReceipt) => ({
+                  itemId: `game_semantic_lookup:${hashShort([receipt.lookup_id], 14)}`,
+                  itemType: "toolObservation" as const,
+                  kind: "game_semantic_lookup_receipt",
+                  observationRef: {
+                    ...receipt,
+                    provenance: "semantic_reference_dictionary",
+                    model_invoked: false,
+                    context_role: "reference_not_assistant_answer",
+                    safe_for_future_context: true,
+                  } as Record<string, unknown>,
+                })),
+                ...(semanticUtilityReduction?.utility_hypotheses ?? []).map((hypothesis: GameUtilityHypothesis) => ({
+                  itemId: `game_utility_hypothesis:${hashShort([hypothesis.hypothesis_id], 14)}`,
+                  itemType: "validation" as const,
+                  kind: "game_utility_hypothesis",
+                  observationRef: {
+                    ...hypothesis,
+                    provenance: "deterministic_game_utility_reasoner",
+                    context_role: "evidence_not_assistant_answer",
+                    raw_logs_included: false,
+                    safe_for_future_context: true,
+                  } as Record<string, unknown>,
+                })),
               ]
-            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction
+            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction || semanticUtilityReduction
               ? [
                   ...(spatialReduction && spatialResult.spatial_episode
                     ? [
@@ -1301,6 +1344,30 @@ export const ingestWorldEvent = async (
                         },
                       ]
                     : []),
+                  ...(semanticUtilityReduction?.lookup_receipts ?? []).map((receipt: GameSemanticLookupReceipt) => ({
+                    itemId: `game_semantic_lookup:${hashShort([receipt.lookup_id], 14)}`,
+                    itemType: "toolObservation" as const,
+                    kind: "game_semantic_lookup_receipt",
+                    observationRef: {
+                      ...receipt,
+                      provenance: "semantic_reference_dictionary",
+                      model_invoked: false,
+                      context_role: "reference_not_assistant_answer",
+                      safe_for_future_context: true,
+                    } as Record<string, unknown>,
+                  })),
+                  ...(semanticUtilityReduction?.utility_hypotheses ?? []).map((hypothesis: GameUtilityHypothesis) => ({
+                    itemId: `game_utility_hypothesis:${hashShort([hypothesis.hypothesis_id], 14)}`,
+                    itemType: "validation" as const,
+                    kind: "game_utility_hypothesis",
+                    observationRef: {
+                      ...hypothesis,
+                      provenance: "deterministic_game_utility_reasoner",
+                      context_role: "evidence_not_assistant_answer",
+                      raw_logs_included: false,
+                      safe_for_future_context: true,
+                    } as Record<string, unknown>,
+                  })),
                 ]
               : [],
         })
@@ -1418,6 +1485,8 @@ export const ingestWorldEvent = async (
     minecraft_spatial_episode: spatialResult.spatial_episode,
     minecraft_world_sense_event: worldSenseResult.world_sense_event,
     minecraft_world_sense_context: worldSenseResult.world_sense_context,
+    game_semantic_lookup_receipts: semanticUtilityReduction?.lookup_receipts ?? [],
+    game_utility_hypotheses: semanticUtilityReduction?.utility_hypotheses ?? [],
     categorization_events: [
       ...(spatialReduction?.categorization_events ?? []),
       ...(worldSenseReduction?.categorization_events ?? []),
@@ -1425,6 +1494,7 @@ export const ingestWorldEvent = async (
     synthetic_evidence: [
       ...(spatialReduction?.synthetic_evidence ?? []),
       ...(worldSenseReduction?.synthetic_evidence ?? []),
+      ...(semanticUtilityReduction?.synthetic_evidence ?? []),
     ],
   };
 };

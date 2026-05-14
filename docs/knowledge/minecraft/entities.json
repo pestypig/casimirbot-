@@ -1,0 +1,146 @@
+[
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:entity/chicken",
+    "kind": "entity",
+    "label": "Chicken",
+    "categories": ["passive_mob", "animal", "farmable_entity"],
+    "resources": [
+      {
+        "item_id": "minecraft:egg",
+        "source": "periodic_drop",
+        "uses": ["hatching", "crafting", "collection_loop"]
+      },
+      {
+        "item_id": "minecraft:feather",
+        "source": "kill_drop",
+        "uses": ["arrows", "book_and_quill", "crafting"]
+      },
+      {
+        "item_id": "minecraft:raw_chicken",
+        "source": "kill_drop",
+        "uses": ["food"]
+      }
+    ],
+    "interactions": [
+      {
+        "interaction_id": "breed_with_seeds",
+        "requires": ["minecraft:wheat_seeds"],
+        "produces": ["entity_cluster_growth"],
+        "meaning_hints": ["breeding", "population_management"]
+      },
+      {
+        "interaction_id": "contain_and_collect_eggs",
+        "requires": ["containment", "egg_pickup_or_container_flow"],
+        "produces": ["egg_source"],
+        "meaning_hints": ["farm", "egg_collection"]
+      }
+    ],
+    "affordances": [
+      {
+        "affordance_id": "egg_source_farm",
+        "description": "A contained chicken cluster can function as an egg source when egg pickup or item routing is observed.",
+        "evidence_indicators": [
+          "dense_entity_cluster",
+          "containment_context",
+          "egg_item_flow",
+          "container_or_hopper_context",
+          "repeated_player_return"
+        ],
+        "missing_evidence_questions": [
+          "Is the cluster contained?",
+          "Are eggs being collected?",
+          "Is there a hopper/chest or repeated pickup loop?",
+          "Is the player breeding or feeding chickens?"
+        ]
+      }
+    ],
+    "caution_notes": [
+      "A chicken cluster alone is not enough to call the setup a farm."
+    ]
+  },
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:entity/cow",
+    "kind": "entity",
+    "label": "Cow",
+    "categories": ["passive_mob", "animal", "farmable_entity"],
+    "resources": [
+      {
+        "item_id": "minecraft:leather",
+        "source": "kill_drop",
+        "uses": ["armor", "books", "item_frames", "crafting"]
+      },
+      {
+        "item_id": "minecraft:beef",
+        "source": "kill_drop",
+        "uses": ["food"]
+      },
+      {
+        "item_id": "minecraft:milk_bucket",
+        "source": "interaction",
+        "uses": ["status_effect_removal", "food_crafting"]
+      }
+    ],
+    "interactions": [
+      {
+        "interaction_id": "breed_with_wheat",
+        "requires": ["minecraft:wheat"],
+        "produces": ["entity_cluster_growth"],
+        "meaning_hints": ["breeding", "food_source", "leather_source"]
+      }
+    ],
+    "affordances": [
+      {
+        "affordance_id": "food_leather_breeding_pen",
+        "description": "A contained cow cluster with wheat interaction can support a food/leather breeding pen interpretation.",
+        "evidence_indicators": ["dense_entity_cluster", "containment_context", "wheat_item_flow"],
+        "missing_evidence_questions": [
+          "Is the cow cluster contained?",
+          "Was wheat used near the cows?",
+          "Is there repeated breeding or harvesting behavior?"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:entity/zombie",
+    "kind": "entity",
+    "label": "Zombie",
+    "categories": ["hostile_mob", "mob_drop_source"],
+    "resources": [
+      {
+        "item_id": "minecraft:rotten_flesh",
+        "source": "kill_drop",
+        "uses": ["emergency_food", "cleric_trade", "collection_loop"]
+      }
+    ],
+    "interactions": [
+      {
+        "interaction_id": "kill_and_collect_drops",
+        "requires": ["hostile_cluster", "collection_point"],
+        "produces": ["mob_drops"],
+        "meaning_hints": ["mob_grinder", "drop_collection"]
+      }
+    ],
+    "affordances": [
+      {
+        "affordance_id": "mob_grinder_drop_collection",
+        "description": "A hostile mob cluster with a narrow channel, drop shaft, or collection-point item flow can suggest a mob grinder.",
+        "evidence_indicators": ["hostile_entity_cluster", "containment_context", "drop_item_flow", "container_or_hopper_context"],
+        "missing_evidence_questions": [
+          "Is there a spawner or repeatable spawn source?",
+          "Is there a kill chamber or drop shaft?",
+          "Are mob drops routed into hoppers or chests?"
+        ]
+      }
+    ],
+    "caution_notes": [
+      "A zombie cluster may also be ordinary danger, not a player-built farm."
+    ]
+  }
+]

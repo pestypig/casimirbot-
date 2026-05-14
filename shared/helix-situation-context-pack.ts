@@ -56,6 +56,10 @@ export type SituationContextPack = {
   }>;
   minecraft_spatial_episode?: import("./helix-minecraft-spatial-episode").HelixMinecraftSpatialEpisode | null;
   minecraft_world_sense_context?: import("./helix-minecraft-world-sense").HelixMinecraftWorldSenseContext | null;
+  semantic_reference_hits?: import("./helix-game-semantic-dictionary").GameSemanticLookupReceipt[];
+  utility_hypotheses?: import("./helix-game-utility-hypothesis").GameUtilityHypothesis[];
+  missing_evidence_notes?: string[];
+  semantic_confidence_ladder?: string[];
   objective?: string | null;
   current_goal?: string | null;
   latest_projection?: Record<string, unknown> | null;

@@ -1,0 +1,56 @@
+[
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:item/egg",
+    "kind": "item",
+    "label": "Egg",
+    "categories": ["animal_product", "chicken_resource"],
+    "interactions": [
+      {
+        "interaction_id": "throw_or_collect",
+        "produces": ["possible_chick", "collection_loop"],
+        "meaning_hints": ["egg_source", "chicken_farm_support"]
+      }
+    ],
+    "affordances": [
+      {
+        "affordance_id": "egg_collection_signal",
+        "description": "Egg pickup or routing near chickens is evidence for an egg-source setup.",
+        "evidence_indicators": ["egg_item_flow", "near_chicken_cluster"],
+        "missing_evidence_questions": ["Is the egg flow repeated?", "Is a hopper/chest collecting eggs?"]
+      }
+    ]
+  },
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:item/wheat",
+    "kind": "item",
+    "label": "Wheat",
+    "categories": ["crop", "breeding_item"],
+    "interactions": [
+      {
+        "interaction_id": "breed_cows_or_sheep",
+        "requires": ["cow_or_sheep_nearby"],
+        "produces": ["entity_cluster_growth"],
+        "meaning_hints": ["breeding_pen", "food_source"]
+      }
+    ]
+  },
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:item/rotten_flesh",
+    "kind": "item",
+    "label": "Rotten Flesh",
+    "categories": ["hostile_mob_drop", "zombie_drop"],
+    "interactions": [
+      {
+        "interaction_id": "collect_zombie_drop",
+        "produces": ["mob_drop_collection"],
+        "meaning_hints": ["mob_grinder_support", "combat_drop"]
+      }
+    ]
+  }
+]

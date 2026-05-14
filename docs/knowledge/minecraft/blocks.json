@@ -1,0 +1,40 @@
+[
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:block/hopper",
+    "kind": "block",
+    "label": "Hopper",
+    "categories": ["container_flow", "automation_component"],
+    "interactions": [
+      {
+        "interaction_id": "route_items",
+        "produces": ["container_flow"],
+        "meaning_hints": ["automated_collection", "farm_logistics"]
+      }
+    ],
+    "affordances": [
+      {
+        "affordance_id": "item_collection_routing",
+        "description": "Hoppers near item flow suggest collection or automation.",
+        "evidence_indicators": ["nearby_hopper", "item_flow_context"],
+        "missing_evidence_questions": ["Are items moving into a chest?", "Is the hopper aligned with the entity/item source?"]
+      }
+    ]
+  },
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:block/chest",
+    "kind": "block",
+    "label": "Chest",
+    "categories": ["storage", "container_flow"],
+    "interactions": [
+      {
+        "interaction_id": "store_items",
+        "produces": ["storage_context"],
+        "meaning_hints": ["resource_storage", "collection_endpoint"]
+      }
+    ]
+  }
+]

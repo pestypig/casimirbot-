@@ -1,0 +1,22 @@
+[
+  {
+    "schema": "helix.game_semantic_entry.v1",
+    "game_id": "minecraft",
+    "entry_id": "minecraft:pattern/contained_entity_resource_loop",
+    "kind": "mechanic",
+    "label": "Contained Entity Resource Loop",
+    "categories": ["farm_pattern", "resource_loop"],
+    "affordances": [
+      {
+        "affordance_id": "contained_entity_resource_loop",
+        "description": "A contained resource-producing entity cluster plus repeated item flow can support a farm or resource-loop interpretation.",
+        "evidence_indicators": ["dense_entity_cluster", "containment_context", "resource_item_flow", "container_or_hopper_context"],
+        "missing_evidence_questions": [
+          "Which resource does the entity produce?",
+          "Is the resource being collected repeatedly?",
+          "Is there storage or routing near the cluster?"
+        ]
+      }
+    ]
+  }
+]

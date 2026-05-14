@@ -19,10 +19,13 @@ import {
 import { listWorldSourcesSeen, type WorldSourceSeen } from "./world-source-registry";
 import { getLatestMinecraftSpatialEpisodeForRoom } from "./minecraft-spatial-window";
 import { getLatestMinecraftWorldSenseContextForRoom } from "./minecraft-world-sense-window";
+import { listGameSemanticLookupReceipts } from "./game-semantic-reference";
+import { listGameUtilityHypotheses } from "./minecraft-entity-utility-reducer";
 import type {
   LiveSourceWindowSummary,
   WorkstationLiveSource,
 } from "@shared/helix-workstation-live-source";
+import type { GameUtilityHypothesis } from "@shared/helix-game-utility-hypothesis";
 
 const hashShort = (value: unknown, size = 14): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -98,6 +101,18 @@ export function buildSituationContextPack(args: {
     }));
   const minecraftSpatialEpisode = getLatestMinecraftSpatialEpisodeForRoom(roomId);
   const minecraftWorldSenseContext = getLatestMinecraftWorldSenseContextForRoom(roomId);
+  const semanticReferenceHits = listGameSemanticLookupReceipts(args.threadId).slice(-8);
+  const utilityHypotheses = listGameUtilityHypotheses(args.threadId)
+    .filter((hypothesis: GameUtilityHypothesis) => hypothesis.room_id === roomId)
+    .slice(-8);
+  const missingEvidenceNotes = Array.from(
+    new Set(utilityHypotheses.flatMap((hypothesis: GameUtilityHypothesis) => hypothesis.missing_evidence)),
+  ).slice(0, 12);
+  const semanticConfidenceLadder = utilityHypotheses
+    .map((hypothesis: GameUtilityHypothesis) =>
+      `${hypothesis.subject_ref}: ${hypothesis.utility_label} (${hypothesis.status}, confidence ${hypothesis.confidence.toFixed(2)})`,
+    )
+    .slice(-8);
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -116,6 +131,8 @@ export function buildSituationContextPack(args: {
       missionMemory?.updated_at ?? null,
       minecraftSpatialEpisode?.episode_id ?? null,
       minecraftWorldSenseContext?.context_id ?? null,
+      semanticReferenceHits.at(-1)?.lookup_id ?? null,
+      utilityHypotheses.at(-1)?.hypothesis_id ?? null,
       activities.map((activity: HelixStandbyActivityItem) => activity.activity_id).slice(-12),
     ], 18)}`,
     session_id: sessionId,
@@ -148,6 +165,10 @@ export function buildSituationContextPack(args: {
     world_sources: worldSources,
     minecraft_spatial_episode: minecraftSpatialEpisode,
     minecraft_world_sense_context: minecraftWorldSenseContext,
+    semantic_reference_hits: semanticReferenceHits,
+    utility_hypotheses: utilityHypotheses,
+    missing_evidence_notes: missingEvidenceNotes,
+    semantic_confidence_ladder: semanticConfidenceLadder,
     objective: activeSession?.objective ?? ledger?.objective ?? null,
     current_goal: activeSession?.current_goal ?? ledger?.current_goal ?? null,
     latest_projection: null,
