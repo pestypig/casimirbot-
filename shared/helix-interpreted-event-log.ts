@@ -1,0 +1,50 @@
+export const HELIX_INTERPRETED_EVENT_SCHEMA =
+  "helix.interpreted_event.v1" as const;
+
+export type HelixInterpretedEventKind =
+  | "source_observation"
+  | "categorization"
+  | "synthetic_evidence"
+  | "subgoal_update"
+  | "mission_memory_update"
+  | "live_environment_delta"
+  | "user_steering"
+  | "clarification_question"
+  | "utility_hypothesis"
+  | "pattern_candidate"
+  | "archive_summary"
+  | "agentic_review"
+  | "callout_proposal"
+  | "callout_delivery"
+  | "final_answer_snapshot";
+
+export type HelixInterpretedEvent = {
+  schema: typeof HELIX_INTERPRETED_EVENT_SCHEMA;
+  event_id: string;
+  thread_id: string;
+  room_id?: string | null;
+  source_family?: string | null;
+  kind: HelixInterpretedEventKind;
+  title: string;
+  summary: string;
+  confidence?: number | null;
+  evidence_refs: string[];
+  source_event_ids?: string[];
+  related_artifact_ids?: string[];
+  related_job_ids?: string[];
+  created_at: string;
+  model_invoked: boolean;
+  deterministic: boolean;
+  assistant_answer: false;
+  raw_logs_included: false;
+  context_policy: "compact_context_pack_only";
+};
+
+export type HelixInterpretedLogRead = {
+  schema: "helix.interpreted_log_read.v1";
+  thread_id: string;
+  room_id?: string | null;
+  events: HelixInterpretedEvent[];
+  raw_logs_included: false;
+  deterministic_content_role: "evidence_not_assistant_answer";
+};

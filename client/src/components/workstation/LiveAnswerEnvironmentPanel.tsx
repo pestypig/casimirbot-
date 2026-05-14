@@ -15,8 +15,15 @@ import type {
   LiveCommentarySession,
   LiveCommentaryTraceStep,
 } from "@shared/helix-live-commentary";
+import type { HelixInterpretedEvent } from "@shared/helix-interpreted-event-log";
+import type { HelixPresentStateCard } from "@shared/helix-present-state-card";
+import type {
+  HelixClarificationNeed,
+  HelixClarificationQuestionProposal,
+} from "@shared/helix-clarification-dialogue";
+import type { HelixUserSteeringEvidence } from "@shared/helix-user-steering-evidence";
 
-type LiveEnvironmentTab = "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type LiveEnvironmentTab = "present_state" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -27,6 +34,9 @@ type LiveAgenticReviewReadEntry = {
 };
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
+  { id: "present_state", label: "Present State" },
+  { id: "interpreted_log", label: "Interpreted Log" },
+  { id: "clarification", label: "Clarification Queue" },
   { id: "overview", label: "Overview" },
   { id: "sources", label: "Sources" },
   { id: "line_schema", label: "Line Schema" },
@@ -61,7 +71,7 @@ const formatTime = (value?: string | null): string => {
 };
 
 export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: { threadId?: string }) {
-  const [activeTab, setActiveTab] = useState<LiveEnvironmentTab>("overview");
+  const [activeTab, setActiveTab] = useState<LiveEnvironmentTab>("present_state");
   const [sources, setSources] = useState<WorkstationLiveSource[]>([]);
   const [events, setEvents] = useState<WorkstationLiveSourceEvent[]>([]);
   const [windows, setWindows] = useState<LiveSourceWindowSummary[]>([]);
@@ -71,6 +81,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [commentaryDeliveries, setCommentaryDeliveries] = useState<LiveCommentaryDeliveryReceipt[]>([]);
   const [reviewRequests, setReviewRequests] = useState<LiveAgenticReviewReadEntry[]>([]);
   const [reviewResults, setReviewResults] = useState<LiveAgenticReviewReadEntry[]>([]);
+  const [presentStateCard, setPresentStateCard] = useState<HelixPresentStateCard | null>(null);
+  const [interpretedEvents, setInterpretedEvents] = useState<HelixInterpretedEvent[]>([]);
+  const [clarificationNeeds, setClarificationNeeds] = useState<HelixClarificationNeed[]>([]);
+  const [clarificationProposals, setClarificationProposals] = useState<HelixClarificationQuestionProposal[]>([]);
+  const [steeringEvidence, setSteeringEvidence] = useState<HelixUserSteeringEvidence[]>([]);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectActiveLiveAnswerEnvironment(state, threadId),
@@ -107,19 +122,26 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       const reviewPath = activeEnvironmentId
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes] = await Promise.all([
+      const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
         fetch(commentaryPath),
         fetch(reviewPath),
+        fetch(`/api/agi/situation/present-state-card?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/interpreted-log?thread_id=${encodeURIComponent(threadId)}${roomQuery}&limit=80`),
+        fetch(`/api/agi/situation/clarification-dialogue?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
         commentaryRes.json(),
         reviewRes.json(),
+        presentStateRes.json(),
+        interpretedLogRes.json(),
+        clarificationRes.json(),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -130,6 +152,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setCommentaryDeliveries(Array.isArray(commentaryBody.deliveries) ? commentaryBody.deliveries : []);
       setReviewRequests(Array.isArray(reviewBody.requests) ? reviewBody.requests : []);
       setReviewResults(Array.isArray(reviewBody.results) ? reviewBody.results : []);
+      setPresentStateCard(presentStateBody.card ?? null);
+      setInterpretedEvents(Array.isArray(interpretedLogBody.events) ? interpretedLogBody.events : []);
+      setClarificationNeeds(Array.isArray(clarificationBody.needs) ? clarificationBody.needs : []);
+      setClarificationProposals(Array.isArray(clarificationBody.proposals) ? clarificationBody.proposals : []);
+      setSteeringEvidence(Array.isArray(clarificationBody.steering_evidence) ? clarificationBody.steering_evidence : []);
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -206,10 +233,136 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           </button>
         ))}
       </div>
-      {!environment ? (
+      {!environment && activeTab !== "present_state" && activeTab !== "interpreted_log" ? (
         <p className="mt-3 text-xs text-slate-500">No active live answer environment for {threadId}. Start one from Helix Ask.</p>
       ) : (
         <div className="mt-3">
+          {activeTab === "present_state" ? (
+            <div className="space-y-3">
+              {!presentStateCard ? (
+                <p className="text-xs text-slate-500">No present-state card is available yet.</p>
+              ) : (
+                <div className="rounded border border-emerald-300/20 bg-emerald-950/15 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-emerald-200">{presentStateCard.status}</p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-50">{presentStateCard.title}</p>
+                    </div>
+                    <span className="rounded border border-emerald-300/30 px-2 py-0.5 text-[10px] text-emerald-100">
+                      {formatTime(presentStateCard.updated_at)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {presentStateCard.lines.map((entry) => (
+                      <div key={entry.key} className="rounded border border-white/10 bg-black/20 p-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] uppercase text-emerald-200/80">{entry.label}</p>
+                          {typeof entry.confidence === "number" ? (
+                            <span className="text-[10px] text-slate-500">{Math.round(entry.confidence * 100)}%</span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-100">{entry.value}</p>
+                        <p className="mt-1 truncate text-[10px] text-slate-500">
+                          evidence {entry.evidence_refs.slice(0, 2).join(", ") || "none"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                    <span>log target {presentStateCard.go_to_log_target ?? "none"}</span>
+                    <span>raw logs included false</span>
+                    <span>projection only</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+          {activeTab === "interpreted_log" ? (
+            <div className="space-y-2">
+              {interpretedEvents.length === 0 ? (
+                <p className="text-xs text-slate-500">No interpreted events have been recorded yet.</p>
+              ) : null}
+              {interpretedEvents.slice(-30).reverse().map((event: HelixInterpretedEvent) => (
+                <div key={event.event_id} className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-100">{event.title}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-500">{event.kind}</p>
+                    </div>
+                    <span className="text-[10px] text-slate-500">{formatTime(event.created_at)}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-300">{event.summary}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                    {typeof event.confidence === "number" ? <span>confidence {Math.round(event.confidence * 100)}%</span> : null}
+                    <span>model {String(event.model_invoked)}</span>
+                    <span>deterministic {String(event.deterministic)}</span>
+                    <span>raw logs {String(event.raw_logs_included)}</span>
+                    <span>assistant answer {String(event.assistant_answer)}</span>
+                  </div>
+                  <p className="mt-2 truncate text-[10px] text-slate-600">
+                    evidence {event.evidence_refs.slice(0, 4).join(", ") || "none"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {activeTab === "clarification" ? (
+            <div className="space-y-3">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Clarification Queue</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Questions are proposed only when user input would materially improve the situation model. They are validation artifacts, not assistant answers.
+                </p>
+              </div>
+              {clarificationNeeds.length === 0 && clarificationProposals.length === 0 ? (
+                <p className="text-xs text-slate-500">No clarification needs are pending.</p>
+              ) : null}
+              {clarificationProposals.slice(-12).reverse().map((proposal: HelixClarificationQuestionProposal) => {
+                const need = clarificationNeeds.find((entry: HelixClarificationNeed) => entry.need_id === proposal.need_id);
+                return (
+                  <div key={proposal.proposal_id} className="rounded border border-amber-300/20 bg-amber-950/10 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-amber-100">{proposal.question}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          {proposal.expected_effect} / {proposal.surface_policy} / importance {need?.importance ?? "unknown"}
+                        </p>
+                      </div>
+                      <span className="rounded border border-amber-300/20 px-1.5 py-0.5 text-[10px] text-amber-100">
+                        budget {need?.question_budget ?? 0}
+                      </span>
+                    </div>
+                    {need?.missing_evidence?.length ? (
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        Missing: {need.missing_evidence.slice(0, 3).join("; ")}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-500">
+                      <span>assistant answer {String(proposal.assistant_answer)}</span>
+                      <span>raw content {String(proposal.raw_content_included)}</span>
+                      <span>{formatTime(proposal.created_at)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {steeringEvidence.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">Recent Steering Evidence</p>
+                  {steeringEvidence.slice(-8).reverse().map((entry: HelixUserSteeringEvidence) => (
+                    <div key={entry.steering_id} className="rounded border border-white/10 bg-slate-950/70 p-2">
+                      <p className="text-xs text-slate-200">{entry.user_claim}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        {entry.effect} / delta {entry.confidence_delta ?? "n/a"} / raw content {String(entry.raw_content_included)}
+                      </p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">
+                        next checks {entry.next_checks.join(", ") || "none"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {activeTab === "overview" ? (
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {([

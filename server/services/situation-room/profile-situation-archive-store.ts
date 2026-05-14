@@ -11,6 +11,8 @@ import type { HelixPatternCandidate } from "@shared/helix-pattern-candidate";
 import { listSyntheticEvidence } from "./synthetic-evidence-ledger";
 import { listPatternCandidates } from "./pattern-candidate-ledger";
 import { updateContinuousCategorizationJob } from "./continuous-categorization-job-store";
+import { listInterpretedEvents } from "./interpreted-event-log-store";
+import { listUserSteeringEvidence } from "./user-steering-ingest";
 
 const archivesByProfile = new Map<string, ProfileSituationArchive[]>();
 const ARCHIVE_DIR = path.resolve(process.cwd(), ".cal/profile-archives");
@@ -54,6 +56,12 @@ export function archiveCategorizationSession(input: {
   const endedAt = input.endedAt ?? new Date().toISOString();
   const evidence = listSyntheticEvidence(input.job.thread_id).slice(-24);
   const candidates = listPatternCandidates(input.job.thread_id).slice(-12);
+  const interpretedEvents = listInterpretedEvents({
+    threadId: input.job.thread_id,
+    roomId: input.job.room_id,
+    limit: 40,
+  });
+  const steeringEvidence = listUserSteeringEvidence(input.job.thread_id).slice(-40);
   const archive: ProfileSituationArchive = {
     schema: HELIX_PROFILE_SITUATION_ARCHIVE_SCHEMA,
     archive_id: `profile_archive:${hashShort([profileId, input.job.job_id, endedAt], 18)}`,
@@ -72,6 +80,19 @@ export function archiveCategorizationSession(input: {
       summary: entry.claim,
       confidence: entry.support_status === "supports" ? 0.85 : entry.support_status === "partial" ? 0.55 : 0.35,
       source_refs: entry.source_refs,
+    })),
+    interpreted_event_summaries: interpretedEvents.map((event) => ({
+      event_id: event.event_id,
+      kind: event.kind,
+      summary: event.summary,
+      confidence: event.confidence ?? null,
+    })),
+    user_steering_evidence: steeringEvidence.map((entry) => ({
+      steering_id: entry.steering_id,
+      user_claim: entry.user_claim,
+      effect: entry.effect,
+      next_checks: entry.next_checks,
+      evidence_refs: entry.evidence_refs,
     })),
     subgoals: [],
     learned_pattern_candidates: candidates.map((candidate: HelixPatternCandidate) => candidate.candidate_id),

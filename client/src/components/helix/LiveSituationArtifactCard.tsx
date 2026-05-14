@@ -1,6 +1,6 @@
 import React from "react";
 import { useState } from "react";
-import { ExternalLink, MessageSquare, Mic2, VolumeX } from "lucide-react";
+import { ExternalLink, Mic2, RefreshCw, ScrollText, VolumeX } from "lucide-react";
 import type {
   LiveSituationArtifact,
   LiveSituationArtifactDelta,
@@ -22,6 +22,7 @@ export function LiveSituationArtifactCard({
   speakable = false,
   onAskHelix,
   onOpenSituation,
+  onGoToLog,
   onSpeak,
   onSuppress,
   onDismiss,
@@ -32,6 +33,7 @@ export function LiveSituationArtifactCard({
   speakable?: boolean;
   onAskHelix?: (prompt: string) => void;
   onOpenSituation?: () => void;
+  onGoToLog?: () => void;
   onSpeak?: () => void;
   onSuppress?: () => void;
   onDismiss?: () => void;
@@ -79,11 +81,26 @@ export function LiveSituationArtifactCard({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => onAskHelix?.("What is my current Minecraft situation, and what should I watch next?")}
+          onClick={onGoToLog ?? onOpenSituation}
           className="inline-flex items-center gap-1 rounded border border-emerald-300/25 px-2 py-1 text-[11px] text-emerald-50 hover:bg-emerald-400/10"
         >
-          <MessageSquare className="h-3 w-3" aria-hidden />
-          Ask about this
+          <ScrollText className="h-3 w-3" aria-hidden />
+          Go to log
+        </button>
+        <button
+          type="button"
+          onClick={() => onAskHelix?.("Run an agentic review of the latest interpreted Minecraft situation and update the present-state card.")}
+          className="inline-flex items-center gap-1 rounded border border-emerald-300/25 px-2 py-1 text-[11px] text-emerald-50 hover:bg-emerald-400/10"
+        >
+          <RefreshCw className="h-3 w-3" aria-hidden />
+          Run review
+        </button>
+        <button
+          type="button"
+          onClick={() => onAskHelix?.("Correction for the interpreted situation: ")}
+          className="rounded border border-white/10 px-2 py-1 text-[11px] text-emerald-50 hover:bg-white/10"
+        >
+          Correct this
         </button>
         <button
           type="button"
@@ -107,7 +124,7 @@ export function LiveSituationArtifactCard({
             className="inline-flex items-center gap-1 rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
           >
             <Mic2 className="h-3 w-3" aria-hidden />
-            Speak
+            Speak latest
           </button>
         ) : null}
         <button

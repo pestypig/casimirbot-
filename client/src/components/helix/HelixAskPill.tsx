@@ -285,6 +285,7 @@ function HelixAskLiveSituationProjection({
       speakable={renderedArtifact.mode === "voice_on_confirm"}
       onAskHelix={onAskHelix}
       onOpenSituation={onOpenSituation}
+      onGoToLog={onOpenSituation}
       onSuppress={() => setVoiceError(null)}
       onSpeak={async () => {
         try {

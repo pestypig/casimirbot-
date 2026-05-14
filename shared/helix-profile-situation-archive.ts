@@ -27,6 +27,19 @@ export type ProfileSituationArchive = {
     confidence: number;
     source_refs: string[];
   }>;
+  interpreted_event_summaries?: Array<{
+    event_id: string;
+    kind: string;
+    summary: string;
+    confidence?: number | null;
+  }>;
+  user_steering_evidence?: Array<{
+    steering_id: string;
+    user_claim: string;
+    effect: string;
+    next_checks: string[];
+    evidence_refs: string[];
+  }>;
   subgoals: Array<{
     label: string;
     final_status: "completed" | "blocked" | "active" | "stale" | "unknown";
