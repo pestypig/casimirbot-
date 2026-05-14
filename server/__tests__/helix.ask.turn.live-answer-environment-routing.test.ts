@@ -448,4 +448,48 @@ describe("helix ask live answer environment routing", () => {
     expect(response.body?.final_answer_source).toBe("artifact_synthesis");
     expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Latest prime: 11");
   }, 60000);
+
+  it("exposes line-level workstation tool requests on Minecraft live situation answers", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "Monitor my Minecraft run and keep track of structure, risk, progress, and next checks.",
+        preset: "minecraft_run_monitor",
+        room_id: "room:minecraft-minehut",
+        source_ids: ["source:minecraft-server"],
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is my current Minecraft live situation and what should the workstation check next?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+      })
+      .expect(200);
+
+    expect(response.body?.final_answer_source).toBe("artifact_synthesis");
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(response.body?.line_tool_request_count).toBeGreaterThan(0);
+    expect(response.body?.live_line_tool_requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          schema: "helix.live_line_tool_request.v1",
+          requested_tool: "minecraft.query_event_window",
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
+    expect(response.body?.debug?.line_tool_request_count).toBe(response.body?.line_tool_request_count);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 60000);
 });

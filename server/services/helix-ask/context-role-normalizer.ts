@@ -44,6 +44,9 @@ export function inferHelixArtifactRole(value: unknown, hint?: HelixArtifactRole)
   if (itemType === "validation") return "validation";
   if (schema === "helix.selected_evidence_pack.v1") return "validation";
   if (schema === "helix.synthetic_evidence.v1") return "synthetic_evidence";
+  if (schema === "helix.live_line_tool_request.v1" || schema === "helix.live_line_tool_evaluation.v1") {
+    return "validation";
+  }
   if (schema === "helix.subgoal_evaluation.v1" || schema === "helix.reasoning_subgoal_ledger.v1") {
     return "subgoal_evaluation";
   }
@@ -84,7 +87,9 @@ export function normalizeHelixArtifactRole(value: unknown, hint?: HelixArtifactR
       readString(record?.evidence_id) ??
       readString(record?.archive_id) ??
       readString(record?.question_id) ??
-      readString(record?.steering_id),
+      readString(record?.steering_id) ??
+      readString(record?.request_id) ??
+      readString(record?.evaluation_id),
     schema: readString(record?.schema),
     deterministic: record ? record.deterministic !== false : true,
     assistant_answer: readBoolean(record?.assistant_answer) || role === "assistant_answer",

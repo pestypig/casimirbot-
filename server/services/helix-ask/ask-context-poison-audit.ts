@@ -33,12 +33,27 @@ function collectPayloadArtifacts(payload: Record<string, unknown>): Array<{ arti
   push("subgoal_ledger_snapshot", "subgoal_evaluation");
   push("context_economy_decision", "validation");
   push("tool_choice_decision", "validation");
+  push("live_line_tool_request", "validation");
+  push("live_line_tool_evaluation", "validation");
+
+  for (const key of ["live_line_tool_requests", "live_line_tool_evaluations"]) {
+    const values = payload[key];
+    if (Array.isArray(values)) {
+      for (const artifact of values) artifacts.push({ artifact, role: "validation" });
+    }
+  }
 
   const debug = asRecord(payload.debug);
   if (debug) {
-    for (const key of ["selected_evidence_pack", "situation_context_pack", "interpreted_log_context", "present_state_card"]) {
+    for (const key of ["selected_evidence_pack", "situation_context_pack", "interpreted_log_context", "present_state_card", "live_line_tool_request", "live_line_tool_evaluation"]) {
       const value = debug[key];
       if (value && typeof value === "object") artifacts.push({ artifact: value });
+    }
+    for (const key of ["live_line_tool_requests", "live_line_tool_evaluations"]) {
+      const values = debug[key];
+      if (Array.isArray(values)) {
+        for (const artifact of values) artifacts.push({ artifact, role: "validation" });
+      }
     }
   }
 
