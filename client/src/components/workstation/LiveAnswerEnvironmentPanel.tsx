@@ -60,11 +60,16 @@ const commentaryCadences: LiveCommentaryCadence[] = [
 ];
 
 const postJson = async (path: string, body?: Record<string, unknown>) => {
-  await fetch(path, {
+  const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || `${path} failed with ${response.status}`);
+  }
+  return response.json().catch(() => null);
 };
 
 const formatTime = (value?: string | null): string => {
@@ -92,6 +97,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [lineToolRequests, setLineToolRequests] = useState<HelixLiveLineToolRequest[]>([]);
   const [lineToolEvaluations, setLineToolEvaluations] = useState<HelixLiveLineToolEvaluation[]>([]);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
+  const [lastActionStatus, setLastActionStatus] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
     selectActiveLiveAnswerEnvironment(state, threadId),
   );
@@ -210,6 +216,40 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     await refresh();
   };
 
+  const startMinehutMonitor = async () => {
+    try {
+      const response = await postJson("/api/agi/situation/live-answer-environment/start", {
+        thread_id: threadId,
+        objective: "Minecraft Cortana: monitor active Minehut world, build present-state hypotheses, and expose executable line checks.",
+        room_id: "room:minecraft-minehut",
+        source_ids: ["source:minecraft-server"],
+        world_id: "minecraft:minehut",
+        preset: "minecraft_run_monitor",
+        mode: "active_companion",
+        created_turn_id: `turn:minecraft-cortana-ui:${Date.now()}`,
+      });
+      const environmentId = response?.live_answer_environment?.environment_id ?? "environment";
+      setLastActionStatus(`Started Minehut monitor: ${environmentId}`);
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "start_minehut_monitor_failed");
+    }
+  };
+
+  const planLineChecks = async () => {
+    try {
+      const response = await postJson("/api/agi/situation/live-line-tool-requests/plan", {
+        thread_id: threadId,
+        environment_id: environment?.environment_id,
+      });
+      setLastActionStatus(`Planned ${response?.request_count ?? 0} line checks.`);
+      setActiveTab("line_checks");
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "plan_line_checks_failed");
+    }
+  };
+
   const runLineCheck = async (request: HelixLiveLineToolRequest) => {
     await postJson("/api/agi/situation/live-line-tool-request/run", {
       thread_id: request.thread_id,
@@ -230,6 +270,28 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => void startMinehutMonitor()}
+            className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10"
+          >
+            Start Minehut
+          </button>
+          <button
+            type="button"
+            onClick={() => void planLineChecks()}
+            disabled={!environment}
+            className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Plan checks
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("interpreted_log")}
+            className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10"
+          >
+            Go to log
+          </button>
           {environment ? (
             <>
               <button type="button" onClick={() => void setEnvironmentStatus("pause")} className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10">Pause</button>
@@ -240,6 +302,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <button type="button" onClick={() => void refresh()} className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10">Refresh</button>
         </div>
       </div>
+      {lastActionStatus ? (
+        <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
+          {lastActionStatus}
+        </p>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {tabs.map((tab: { id: LiveEnvironmentTab; label: string }) => (
           <button
@@ -258,6 +325,21 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         <div className="mt-3">
           {activeTab === "present_state" ? (
             <div className="space-y-3">
+              {!environment ? (
+                <div className="rounded border border-amber-300/20 bg-amber-950/10 p-3">
+                  <p className="text-sm font-semibold text-amber-100">No active live answer environment is bound to {threadId}.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">
+                    Start the Minehut monitor to bind room:minecraft-minehut / source:minecraft-server, then this panel will cycle the present state, interpreted log, and executable line checks.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void startMinehutMonitor()}
+                    className="mt-3 rounded border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/10"
+                  >
+                    Start Minehut Monitor
+                  </button>
+                </div>
+              ) : null}
               {!presentStateCard ? (
                 <p className="text-xs text-slate-500">No present-state card is available yet.</p>
               ) : (
@@ -292,6 +374,29 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     <span>raw logs included false</span>
                     <span>projection only</span>
                   </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void planLineChecks()}
+                      className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
+                    >
+                      Plan checks
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("line_checks")}
+                      className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10"
+                    >
+                      Open checks
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("interpreted_log")}
+                      className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10"
+                    >
+                      Go to log
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -305,7 +410,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 </p>
               </div>
               {lineToolRequests.length === 0 ? (
-                <p className="text-xs text-slate-500">No line tool requests have been proposed yet. Ask Helix about the live situation to generate checks.</p>
+                <div className="rounded border border-amber-300/20 bg-amber-950/10 p-3">
+                  <p className="text-xs font-semibold text-amber-100">No line tool requests have been proposed yet.</p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Use Plan checks to turn the current live card lines into receipt-backed workstation checks without creating an assistant answer.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void planLineChecks()}
+                    disabled={!environment}
+                    className="mt-2 rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Plan checks
+                  </button>
+                </div>
               ) : null}
               {lineToolRequests.slice(-30).reverse().map((request: HelixLiveLineToolRequest) => {
                 const evaluation = lineToolEvaluations.find((entry: HelixLiveLineToolEvaluation) => entry.request_id === request.request_id);
@@ -327,6 +445,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                             Run check
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("interpreted_log")}
+                          className="rounded border border-white/15 px-2 py-1 text-[10px] text-slate-200 hover:bg-white/10"
+                        >
+                          Go to log
+                        </button>
                       </div>
                     </div>
                     <p className="mt-2 text-[11px] text-slate-300">{request.reason_summary}</p>

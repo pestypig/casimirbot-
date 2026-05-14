@@ -2617,6 +2617,9 @@ export default function SituationRoomPipelinesPanel() {
               </p>
             ) : null}
           </div>
+          <div className="max-h-[46vh] shrink-0 overflow-y-auto border-b border-white/10 p-3">
+            <LiveAnswerEnvironmentPanel threadId="helix-ask:desktop" />
+          </div>
           <div ref={masterScrollRef} onScroll={handleMasterScroll} className="min-h-0 flex-1 overflow-y-auto p-3">
             {focusedMasterScroll.length === 0 ? (
               <p className="text-xs text-slate-500">No raw or derived events for this job yet.</p>

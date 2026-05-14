@@ -2,6 +2,7 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { planLiveLineToolRequest } from "../services/helix-ask/live-line-tool-request-planner";
+import { createLiveAnswerEnvironment, resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
 import { clearLiveLineToolRequestStoreForTest } from "../services/situation-room/live-line-tool-request-store";
 import { ingestWorldEvent, resetWorldEventIngestState } from "../services/situation-room/world-event-ingest";
 import { __resetHelixThreadLedgerStore } from "../services/helix-thread/ledger";
@@ -20,8 +21,45 @@ describe("live line tool request run route", () => {
   beforeEach(() => {
     __resetHelixThreadLedgerStore();
     resetWorldEventIngestState();
+    resetLiveAnswerEnvironments();
     clearLiveLineToolRequestStoreForTest();
   });
+
+  it("plans executable checks from the active live answer environment", async () => {
+    const app = await createApp();
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "turn:line-check-plan-route",
+      objective: "Minecraft Cortana test monitor",
+      room_id: "room:minecraft-minehut",
+      source_ids: ["source:minecraft-server"],
+      preset: "minecraft_run_monitor",
+      mode: "active_companion",
+    });
+
+    const response = await request(app)
+      .post("/api/agi/situation/live-line-tool-requests/plan")
+      .send({
+        thread_id: threadId,
+        environment_id: environment.environment_id,
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      assistant_answer: false,
+      raw_logs_included: false,
+    });
+    expect(response.body.request_count).toBeGreaterThan(0);
+    expect(response.body.requests[0]).toMatchObject({
+      thread_id: threadId,
+      assistant_answer: false,
+      raw_content_included: false,
+      status: "proposed",
+    });
+  }, 10000);
 
   it("runs a Minecraft event-window check and returns receipt-backed evaluation", async () => {
     const app = await createApp();

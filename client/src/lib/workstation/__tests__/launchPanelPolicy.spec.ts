@@ -15,6 +15,10 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("situation-room-pipelines")).toBe(true);
   });
 
+  it("includes the Live Answer panel for present-state monitoring", () => {
+    expect(isUserLaunchPanel("live-answer-environment")).toBe(true);
+  });
+
   it("includes workstation clipboard and workflow timeline panels", () => {
     expect(isUserLaunchPanel("workstation-clipboard-history")).toBe(true);
     expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(true);

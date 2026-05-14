@@ -22,6 +22,7 @@ export type PanelId =
   | "essence-prompt-panel"
   | "situation-room-sources"
   | "situation-room-pipelines"
+  | "live-answer-environment"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -278,6 +279,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 1120, h: 740 },
     defaultPosition: { x: 280, y: 180 },
     keywords: ["situation", "room", "sources", "pipelines", "jobs", "translation", "summary", "prompt"],
+  },
+  {
+    id: "live-answer-environment",
+    title: "Live Answer",
+    loader: load(() => import("@/components/workstation/LiveAnswerEnvironmentPanel"), "LiveAnswerEnvironmentPanel"),
+    defaultSize: { w: 980, h: 720 },
+    defaultPosition: { x: 260, y: 160 },
+    keywords: ["live", "answer", "cortana", "minecraft", "minehut", "present state", "line checks", "interpreted log"],
   },
   {
     id: "workstation-clipboard-history",

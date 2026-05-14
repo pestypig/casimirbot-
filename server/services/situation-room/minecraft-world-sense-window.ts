@@ -76,7 +76,21 @@ const readBoolean = (...values: unknown[]): boolean | null => {
 const readStringArray = (...values: unknown[]): string[] => {
   for (const value of values) {
     if (Array.isArray(value)) {
-      return value.map((entry: unknown) => String(entry ?? "").trim()).filter(Boolean);
+      return value.map((entry: unknown) => {
+        if (typeof entry === "string") return entry.trim();
+        const record = readRecord(entry);
+        if (record) {
+          const type = readString(record.type, record.entity_type, record.block_type, record.fluid_type, record.id, record.name);
+          const distance = readNumber(record.distance, record.nearest_player_distance);
+          const x = readNumber(record.x, readRecord(record.location)?.x);
+          const y = readNumber(record.y, readRecord(record.location)?.y);
+          const z = readNumber(record.z, readRecord(record.location)?.z);
+          const distancePart = distance !== null ? ` ${distance.toFixed(1)}m` : "";
+          const locationPart = x !== null && y !== null && z !== null ? ` @ ${Math.round(x)},${Math.round(y)},${Math.round(z)}` : "";
+          return `${type ?? "context"}${distancePart}${locationPart}`.trim();
+        }
+        return String(entry ?? "").trim();
+      }).filter(Boolean);
     }
     if (typeof value === "string" && value.trim()) return [value.trim()];
   }
