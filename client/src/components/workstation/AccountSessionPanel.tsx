@@ -1,5 +1,5 @@
 import React from "react";
-import { KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import { Archive, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
 import type { HelixAccountSessionStatus } from "@shared/helix-account-session";
 
 type DiscordSessionView = {
@@ -11,6 +11,21 @@ type DiscordSessionView = {
   live_environment_ids: string[];
   participants: Array<{ discord_user_id: string; display_name: string; role: string; authority: string }>;
   updated_at: string;
+};
+
+type ProfileArchiveView = {
+  archive_id: string;
+  source_family: string;
+  session_title: string;
+  objective: string;
+  started_at: string;
+  ended_at: string;
+  summary: string;
+  evidence_index: Array<{ evidence_id: string; category: string; summary: string; confidence: number }>;
+  subgoals: Array<{ label: string; final_status: string; evidence_ids: string[] }>;
+  learned_pattern_candidates: string[];
+  raw_logs_included: false;
+  assistant_answer: false;
 };
 
 const emptyStatus: HelixAccountSessionStatus = {
@@ -57,6 +72,14 @@ async function fetchDiscordSessions(): Promise<DiscordSessionView[]> {
   return Array.isArray(body.sessions) ? body.sessions : [];
 }
 
+async function fetchProfileArchives(profileId: string): Promise<ProfileArchiveView[]> {
+  if (!profileId.trim()) return [];
+  const response = await fetch(`/api/agi/situation/profile-archives?profile_id=${encodeURIComponent(profileId.trim())}`);
+  if (!response.ok) return [];
+  const body = await response.json();
+  return Array.isArray(body.archives) ? body.archives : [];
+}
+
 export default function AccountSessionPanel() {
   const [status, setStatus] = React.useState<HelixAccountSessionStatus>(emptyStatus);
   const [loading, setLoading] = React.useState(false);
@@ -66,6 +89,7 @@ export default function AccountSessionPanel() {
   const [ingressLabel, setIngressLabel] = React.useState("Profile ingress");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
+  const [profileArchives, setProfileArchives] = React.useState<ProfileArchiveView[]>([]);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -74,12 +98,13 @@ export default function AccountSessionPanel() {
       const [nextStatus, nextDiscordSessions] = await Promise.all([fetchStatus(), fetchDiscordSessions()]);
       setStatus(nextStatus);
       setDiscordSessions(nextDiscordSessions);
+      setProfileArchives(await fetchProfileArchives(nextStatus.session?.profile.profile_id ?? profileId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load account session.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profileId]);
 
   React.useEffect(() => {
     refresh();
@@ -318,6 +343,44 @@ export default function AccountSessionPanel() {
                   </div>
                 );
               })
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <Archive className="h-3.5 w-3.5" />
+            Profile Situation Archives
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Durable session summaries and evidence indexes saved from continuous categorization jobs.
+          </p>
+          <div className="mt-3 space-y-2">
+            {profileArchives.length === 0 ? (
+              <p className="text-xs text-slate-500">No profile situation archives have been saved yet.</p>
+            ) : (
+              profileArchives.slice(-6).reverse().map((archive) => (
+                <div
+                  key={archive.archive_id}
+                  className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[1fr_150px_150px]"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-slate-200">{archive.session_title}</div>
+                    <div className="mt-1 truncate text-slate-500">{archive.archive_id}</div>
+                    <p className="mt-2 line-clamp-2 text-slate-400">{archive.summary}</p>
+                  </div>
+                  <div className="space-y-1 text-slate-300">
+                    <div>source {archive.source_family}</div>
+                    <div>evidence {archive.evidence_index.length}</div>
+                    <div>patterns {archive.learned_pattern_candidates.length}</div>
+                  </div>
+                  <div className="space-y-1 text-slate-400">
+                    <div>raw logs {String(archive.raw_logs_included)}</div>
+                    <div>assistant answer {String(archive.assistant_answer)}</div>
+                    <div>{archive.ended_at}</div>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </section>

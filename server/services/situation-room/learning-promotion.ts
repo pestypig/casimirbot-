@@ -5,6 +5,7 @@ import {
 } from "@shared/helix-learning-promotion";
 import type { HelixPatternCandidate } from "@shared/helix-pattern-candidate";
 import { getMinecraftSemanticDictionaryVersion } from "./semantic-dictionary-versioning";
+import { setPatternCandidateStatus } from "./pattern-candidate-ledger";
 
 const promotionRecordsByThread = new Map<string, HelixLearningPromotionRecord[]>();
 
@@ -15,10 +16,12 @@ export function evaluatePatternCandidatePromotion(input: {
   candidate: HelixPatternCandidate;
   observedReplayCount: number;
   requiredReplayCount?: number;
+  promote?: boolean;
 }): HelixLearningPromotionRecord {
   const requiredReplayCount = input.requiredReplayCount ?? 2;
   const ready = input.candidate.confidence >= 0.76 && input.observedReplayCount >= requiredReplayCount;
   const dictionaryVersion = getMinecraftSemanticDictionaryVersion();
+  const decision = input.promote && ready ? "promoted" : ready ? "ready_for_review" : "not_ready";
   const record: HelixLearningPromotionRecord = {
     schema: HELIX_LEARNING_PROMOTION_RECORD_SCHEMA,
     promotion_id: `learning_promotion:${hashShort([
@@ -28,9 +31,11 @@ export function evaluatePatternCandidatePromotion(input: {
     ])}`,
     thread_id: input.candidate.thread_id,
     candidate_id: input.candidate.candidate_id,
-    decision: ready ? "ready_for_review" : "not_ready",
-    reason: ready
-      ? "Candidate has enough confidence and replay coverage for user review before dictionary promotion."
+    decision,
+    reason: decision === "promoted"
+      ? "Candidate was promoted after confidence and replay coverage checks."
+      : ready
+        ? "Candidate has enough confidence and replay coverage for user review before dictionary promotion."
       : "Candidate remains evidence only until confidence and replay coverage are sufficient.",
     required_replay_count: requiredReplayCount,
     observed_replay_count: input.observedReplayCount,
@@ -43,6 +48,14 @@ export function evaluatePatternCandidatePromotion(input: {
   };
   const existing = promotionRecordsByThread.get(record.thread_id) ?? [];
   promotionRecordsByThread.set(record.thread_id, [...existing, record].slice(-200));
+  if (decision === "promoted") {
+    setPatternCandidateStatus({
+      threadId: input.candidate.thread_id,
+      candidateId: input.candidate.candidate_id,
+      status: "promoted",
+      promotedDictionaryEntryId: dictionaryVersion.version_id,
+    });
+  }
   return record;
 }
 

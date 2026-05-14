@@ -52,6 +52,31 @@ export function listPatternCandidates(threadId: string): HelixPatternCandidate[]
   return [...(candidatesByThread.get(threadId) ?? [])];
 }
 
+export function getPatternCandidate(threadId: string, candidateId: string): HelixPatternCandidate | null {
+  return candidatesByThread.get(threadId)?.find((candidate: HelixPatternCandidate) => candidate.candidate_id === candidateId) ?? null;
+}
+
+export function setPatternCandidateStatus(input: {
+  threadId: string;
+  candidateId: string;
+  status: HelixPatternCandidateStatus;
+  promotedDictionaryEntryId?: string | null;
+}): HelixPatternCandidate | null {
+  const existing = candidatesByThread.get(input.threadId) ?? [];
+  const candidate = existing.find((entry: HelixPatternCandidate) => entry.candidate_id === input.candidateId);
+  if (!candidate) return null;
+  const updated: HelixPatternCandidate = {
+    ...candidate,
+    status: input.status,
+    promoted_dictionary_entry_id: input.promotedDictionaryEntryId ?? candidate.promoted_dictionary_entry_id ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  candidatesByThread.set(input.threadId, existing.map((entry: HelixPatternCandidate) =>
+    entry.candidate_id === input.candidateId ? updated : entry,
+  ));
+  return updated;
+}
+
 export function clearPatternCandidatesForTest(): void {
   candidatesByThread.clear();
 }

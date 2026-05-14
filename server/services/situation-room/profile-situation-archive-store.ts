@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import {
   HELIX_PROFILE_SITUATION_ARCHIVE_SCHEMA,
   type ProfileSituationArchive,
@@ -11,9 +13,36 @@ import { listPatternCandidates } from "./pattern-candidate-ledger";
 import { updateContinuousCategorizationJob } from "./continuous-categorization-job-store";
 
 const archivesByProfile = new Map<string, ProfileSituationArchive[]>();
+const ARCHIVE_DIR = path.resolve(process.cwd(), ".cal/profile-archives");
+const hydratedProfiles = new Set<string>();
 
 const hashShort = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
+
+const safeProfileFileName = (profileId: string): string =>
+  `${profileId.replace(/[^a-zA-Z0-9_.-]/g, "_")}.jsonl`;
+
+const archivePath = (profileId: string): string =>
+  path.join(ARCHIVE_DIR, safeProfileFileName(profileId));
+
+const hydrateProfileArchives = (profileId: string): void => {
+  if (hydratedProfiles.has(profileId)) return;
+  hydratedProfiles.add(profileId);
+  const filePath = archivePath(profileId);
+  if (!fs.existsSync(filePath)) return;
+  const entries = fs
+    .readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .map((line: string) => line.trim())
+    .filter(Boolean)
+    .map((line: string) => JSON.parse(line) as ProfileSituationArchive);
+  archivesByProfile.set(profileId, entries.slice(-200));
+};
+
+const persistArchive = (archive: ProfileSituationArchive): void => {
+  fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
+  fs.appendFileSync(archivePath(archive.profile_id), `${JSON.stringify(archive)}\n`, "utf8");
+};
 
 export function archiveCategorizationSession(input: {
   job: ContinuousCategorizationJob;
@@ -21,6 +50,7 @@ export function archiveCategorizationSession(input: {
   endedAt?: string;
 }): ProfileSituationArchive {
   const profileId = input.profileId ?? input.job.profile_id ?? "local-profile";
+  hydrateProfileArchives(profileId);
   const endedAt = input.endedAt ?? new Date().toISOString();
   const evidence = listSyntheticEvidence(input.job.thread_id).slice(-24);
   const candidates = listPatternCandidates(input.job.thread_id).slice(-12);
@@ -51,6 +81,7 @@ export function archiveCategorizationSession(input: {
   };
   const existing = archivesByProfile.get(profileId) ?? [];
   archivesByProfile.set(profileId, [...existing, archive].slice(-200));
+  persistArchive(archive);
   updateContinuousCategorizationJob({
     jobId: input.job.job_id,
     status: "archived",
@@ -61,9 +92,51 @@ export function archiveCategorizationSession(input: {
 }
 
 export function listProfileSituationArchives(profileId: string): ProfileSituationArchive[] {
+  hydrateProfileArchives(profileId);
   return [...(archivesByProfile.get(profileId) ?? [])];
+}
+
+export function getProfileSituationArchive(profileId: string, archiveId: string): ProfileSituationArchive | null {
+  hydrateProfileArchives(profileId);
+  return archivesByProfile.get(profileId)?.find((archive: ProfileSituationArchive) => archive.archive_id === archiveId) ?? null;
+}
+
+export function compareCurrentSessionToArchive(input: {
+  profileId: string;
+  archiveId: string;
+  threadId: string;
+}): {
+  schema: "helix.profile_archive_comparison.v1";
+  archive_id: string;
+  thread_id: string;
+  overlap_count: number;
+  archive_evidence_count: number;
+  current_pattern_count: number;
+  summary: string;
+  raw_logs_included: false;
+  assistant_answer: false;
+} | null {
+  const archive = getProfileSituationArchive(input.profileId, input.archiveId);
+  if (!archive) return null;
+  const currentPatterns = listPatternCandidates(input.threadId);
+  const archiveCandidateSet = new Set(archive.learned_pattern_candidates);
+  const overlap = currentPatterns.filter((candidate: HelixPatternCandidate) => archiveCandidateSet.has(candidate.candidate_id));
+  return {
+    schema: "helix.profile_archive_comparison.v1",
+    archive_id: archive.archive_id,
+    thread_id: input.threadId,
+    overlap_count: overlap.length,
+    archive_evidence_count: archive.evidence_index.length,
+    current_pattern_count: currentPatterns.length,
+    summary: overlap.length > 0
+      ? `Current session shares ${overlap.length} pattern candidate(s) with the archive.`
+      : "No exact promoted/candidate overlap was found; compare by evidence categories next.",
+    raw_logs_included: false,
+    assistant_answer: false,
+  };
 }
 
 export function clearProfileSituationArchivesForTest(): void {
   archivesByProfile.clear();
+  hydratedProfiles.clear();
 }
