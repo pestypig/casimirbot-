@@ -1,6 +1,7 @@
 import React from "react";
 import { Archive, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
-import type { HelixAccountSessionStatus } from "@shared/helix-account-session";
+import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
+import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
 
 type DiscordSessionView = {
   session_id: string;
@@ -26,6 +27,38 @@ type ProfileArchiveView = {
   learned_pattern_candidates: string[];
   raw_logs_included: false;
   assistant_answer: false;
+};
+
+type CategorizationJobView = {
+  job_id: string;
+  thread_id: string;
+  profile_id?: string | null;
+  room_id?: string | null;
+  source_family: string;
+  source_ids: string[];
+  world_id?: string | null;
+  objective: string;
+  status: string;
+  policy: {
+    mode: string;
+    evidence_budget: string;
+    surface_policy: string;
+    archive_on_stop: boolean;
+    profile_archive_policy: string;
+  };
+  counters: {
+    source_events_seen: number;
+    categorization_events: number;
+    synthetic_evidence: number;
+    utility_hypotheses: number;
+    pattern_candidates: number;
+  };
+  latest_summary?: string | null;
+  last_event_ts?: string | null;
+  archive_id?: string | null;
+  raw_logs_included: false;
+  assistant_answer: false;
+  updated_at: string;
 };
 
 const emptyStatus: HelixAccountSessionStatus = {
@@ -80,6 +113,13 @@ async function fetchProfileArchives(profileId: string): Promise<ProfileArchiveVi
   return Array.isArray(body.archives) ? body.archives : [];
 }
 
+async function fetchCategorizationJobs(): Promise<CategorizationJobView[]> {
+  const response = await fetch("/api/agi/situation/categorization-jobs?thread_id=helix-ask%3Adesktop");
+  if (!response.ok) return [];
+  const body = await response.json();
+  return Array.isArray(body.jobs) ? body.jobs : [];
+}
+
 export default function AccountSessionPanel() {
   const [status, setStatus] = React.useState<HelixAccountSessionStatus>(emptyStatus);
   const [loading, setLoading] = React.useState(false);
@@ -90,14 +130,20 @@ export default function AccountSessionPanel() {
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
   const [profileArchives, setProfileArchives] = React.useState<ProfileArchiveView[]>([]);
+  const [categorizationJobs, setCategorizationJobs] = React.useState<CategorizationJobView[]>([]);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [nextStatus, nextDiscordSessions] = await Promise.all([fetchStatus(), fetchDiscordSessions()]);
+      const [nextStatus, nextDiscordSessions, nextCategorizationJobs] = await Promise.all([
+        fetchStatus(),
+        fetchDiscordSessions(),
+        fetchCategorizationJobs(),
+      ]);
       setStatus(nextStatus);
       setDiscordSessions(nextDiscordSessions);
+      setCategorizationJobs(nextCategorizationJobs);
       setProfileArchives(await fetchProfileArchives(nextStatus.session?.profile.profile_id ?? profileId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load account session.");
@@ -292,7 +338,7 @@ export default function AccountSessionPanel() {
             {status.linked_accounts.length === 0 ? (
               <p className="text-xs text-slate-500">No linked accounts yet.</p>
             ) : (
-              status.linked_accounts.map((account) => (
+              status.linked_accounts.map((account: HelixAccountLinkedAccount) => (
                 <div
                   key={`${account.provider}:${account.external_id}`}
                   className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs md:grid-cols-[120px_1fr_120px_120px]"
@@ -319,9 +365,10 @@ export default function AccountSessionPanel() {
             {discordSessions.length === 0 ? (
               <p className="text-xs text-slate-500">No Discord companion sessions are active.</p>
             ) : (
-              discordSessions.map((discordSession) => {
+              discordSessions.map((discordSession: DiscordSessionView) => {
                 const commander = discordSession.participants.find(
-                  (participant) => participant.discord_user_id === discordSession.commander_discord_user_id,
+                  (participant: DiscordSessionView["participants"][number]) =>
+                    participant.discord_user_id === discordSession.commander_discord_user_id,
                 );
                 return (
                   <div
@@ -359,7 +406,7 @@ export default function AccountSessionPanel() {
             {profileArchives.length === 0 ? (
               <p className="text-xs text-slate-500">No profile situation archives have been saved yet.</p>
             ) : (
-              profileArchives.slice(-6).reverse().map((archive) => (
+              profileArchives.slice(-6).reverse().map((archive: ProfileArchiveView) => (
                 <div
                   key={archive.archive_id}
                   className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[1fr_150px_150px]"
@@ -378,6 +425,49 @@ export default function AccountSessionPanel() {
                     <div>raw logs {String(archive.raw_logs_included)}</div>
                     <div>assistant answer {String(archive.assistant_answer)}</div>
                     <div>{archive.ended_at}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <Archive className="h-3.5 w-3.5" />
+            Active Categorization Jobs
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Background evidence builders attached to Helix threads. These are observations and validations, not assistant answers.
+          </p>
+          <div className="mt-3 space-y-2">
+            {categorizationJobs.length === 0 ? (
+              <p className="text-xs text-slate-500">No categorization jobs are active for helix-ask:desktop.</p>
+            ) : (
+              categorizationJobs.map((job: CategorizationJobView) => (
+                <div
+                  key={job.job_id}
+                  className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs xl:grid-cols-[1fr_180px_180px]"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-slate-200">{job.objective}</div>
+                    <div className="mt-1 truncate text-slate-500">{job.job_id}</div>
+                    <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-300">
+                      <span className="rounded bg-white/5 px-2 py-1">{job.status}</span>
+                      <span className="rounded bg-white/5 px-2 py-1">{job.source_family}</span>
+                      <span className="rounded bg-white/5 px-2 py-1">{job.room_id ?? "no room"}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-slate-300">
+                    <span>events {job.counters.source_events_seen}</span>
+                    <span>categories {job.counters.categorization_events}</span>
+                    <span>evidence {job.counters.synthetic_evidence}</span>
+                    <span>patterns {job.counters.pattern_candidates}</span>
+                  </div>
+                  <div className="space-y-1 text-slate-400">
+                    <div>archive on stop {String(job.policy.archive_on_stop)}</div>
+                    <div>raw logs {String(job.raw_logs_included)}</div>
+                    <div>{job.last_event_ts ?? "waiting for events"}</div>
                   </div>
                 </div>
               ))
@@ -426,7 +516,7 @@ export default function AccountSessionPanel() {
             {status.profile_ingress_tokens.length === 0 ? (
               <p className="text-xs text-slate-500">No profile ingress tokens yet.</p>
             ) : (
-              status.profile_ingress_tokens.map((token) => (
+              status.profile_ingress_tokens.map((token: HelixProfileIngressTokenSummary) => (
                 <div
                   key={token.token_id}
                   className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[160px_1fr_100px_90px]"

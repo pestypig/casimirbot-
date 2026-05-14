@@ -3,6 +3,7 @@ import {
   createLiveSituationArtifact,
   resetLiveSituationArtifacts,
 } from "../services/situation-room/live-situation-artifact-store";
+import { startContinuousCategorizationJob } from "../services/situation-room/continuous-categorization-job-store";
 import { buildSituationContextPack } from "../services/situation-room/situation-context-pack";
 import { resetSituationGoalSessions } from "../services/situation-room/situation-goal-session-store";
 import { resetWorldEventIngestState } from "../services/situation-room/world-event-ingest";
@@ -42,5 +43,30 @@ describe("live situation artifact context pack", () => {
     expect(pack.raw_transcript_included).toBe(false);
     expect(pack.raw_audio_included).toBe(false);
     expect(pack.deterministic_content_role).toBe("observation_not_assistant_answer");
+  });
+
+  it("includes active categorization jobs as compact evidence controls", () => {
+    const { job } = startContinuousCategorizationJob({
+      threadId: "thread:context-pack",
+      profileId: "DatDamPig",
+      roomId: "room:minecraft-minehut",
+      sourceFamily: "minecraft_events",
+      sourceIds: ["source:minecraft-server"],
+      worldId: "minecraft:minehut",
+      objective: "Categorize Minehut world evidence.",
+    });
+
+    const pack = buildSituationContextPack({
+      threadId: "thread:context-pack",
+      roomId: "room:minecraft-minehut",
+    });
+
+    expect(pack.active_categorization_jobs?.[0]).toMatchObject({
+      job_id: job.job_id,
+      source_family: "minecraft_events",
+      status: "active",
+      raw_logs_included: false,
+      assistant_answer: false,
+    });
   });
 });

@@ -21,11 +21,13 @@ import { getLatestMinecraftSpatialEpisodeForRoom } from "./minecraft-spatial-win
 import { getLatestMinecraftWorldSenseContextForRoom } from "./minecraft-world-sense-window";
 import { listGameSemanticLookupReceipts } from "./game-semantic-reference";
 import { listGameUtilityHypotheses } from "./minecraft-entity-utility-reducer";
+import { listContinuousCategorizationJobs } from "./continuous-categorization-job-store";
 import type {
   LiveSourceWindowSummary,
   WorkstationLiveSource,
 } from "@shared/helix-workstation-live-source";
 import type { GameUtilityHypothesis } from "@shared/helix-game-utility-hypothesis";
+import type { ContinuousCategorizationJob } from "@shared/helix-continuous-categorization-job";
 
 const hashShort = (value: unknown, size = 14): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -99,6 +101,32 @@ export function buildSituationContextPack(args: {
       append_reason: source.latest_debug?.append_reason ?? null,
       salience_class: source.latest_debug?.salience_class ?? null,
     }));
+  const activeCategorizationJobs = listContinuousCategorizationJobs({
+    threadId: args.threadId,
+    roomId,
+    status: "any",
+  })
+    .filter((job: ContinuousCategorizationJob) => job.status === "active" || job.status === "paused")
+    .slice(0, 8)
+    .map((job: ContinuousCategorizationJob) => ({
+      job_id: job.job_id,
+      profile_id: job.profile_id ?? null,
+      room_id: job.room_id ?? null,
+      source_family: job.source_family,
+      source_ids: job.source_ids,
+      world_id: job.world_id ?? null,
+      objective: job.objective,
+      status: job.status,
+      policy: job.policy,
+      counters: job.counters,
+      latest_summary: job.latest_summary ?? null,
+      latest_evidence_refs: job.latest_evidence_refs,
+      last_event_ts: job.last_event_ts ?? null,
+      archive_id: job.archive_id ?? null,
+      raw_logs_included: false as const,
+      assistant_answer: false as const,
+      updated_at: job.updated_at,
+    }));
   const minecraftSpatialEpisode = getLatestMinecraftSpatialEpisodeForRoom(roomId);
   const minecraftWorldSenseContext = getLatestMinecraftWorldSenseContextForRoom(roomId);
   const semanticReferenceHits = listGameSemanticLookupReceipts(args.threadId).slice(-8);
@@ -133,6 +161,7 @@ export function buildSituationContextPack(args: {
       minecraftWorldSenseContext?.context_id ?? null,
       semanticReferenceHits.at(-1)?.lookup_id ?? null,
       utilityHypotheses.at(-1)?.hypothesis_id ?? null,
+      activeCategorizationJobs.map((job) => [job.job_id, job.status, job.counters.source_events_seen, job.updated_at]),
       activities.map((activity: HelixStandbyActivityItem) => activity.activity_id).slice(-12),
     ], 18)}`,
     session_id: sessionId,
@@ -163,6 +192,7 @@ export function buildSituationContextPack(args: {
         }
       : null,
     world_sources: worldSources,
+    active_categorization_jobs: activeCategorizationJobs,
     minecraft_spatial_episode: minecraftSpatialEpisode,
     minecraft_world_sense_context: minecraftWorldSenseContext,
     semantic_reference_hits: semanticReferenceHits,

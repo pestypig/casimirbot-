@@ -54,6 +54,25 @@ export type SituationContextPack = {
     append_reason?: string | null;
     salience_class?: string | null;
   }>;
+  active_categorization_jobs?: Array<{
+    job_id: string;
+    profile_id?: string | null;
+    room_id?: string | null;
+    source_family: import("./helix-continuous-categorization-job").ContinuousCategorizationSourceFamily;
+    source_ids: string[];
+    world_id?: string | null;
+    objective: string;
+    status: import("./helix-continuous-categorization-job").ContinuousCategorizationJobStatus;
+    policy: import("./helix-continuous-categorization-job").ContinuousCategorizationJobPolicy;
+    counters: import("./helix-continuous-categorization-job").ContinuousCategorizationJob["counters"];
+    latest_summary?: string | null;
+    latest_evidence_refs: string[];
+    last_event_ts?: string | null;
+    archive_id?: string | null;
+    raw_logs_included: false;
+    assistant_answer: false;
+    updated_at: string;
+  }>;
   minecraft_spatial_episode?: import("./helix-minecraft-spatial-episode").HelixMinecraftSpatialEpisode | null;
   minecraft_world_sense_context?: import("./helix-minecraft-world-sense").HelixMinecraftWorldSenseContext | null;
   semantic_reference_hits?: import("./helix-game-semantic-dictionary").GameSemanticLookupReceipt[];
