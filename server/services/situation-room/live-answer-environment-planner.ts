@@ -9,7 +9,12 @@ const has = (transcript: string, pattern: RegExp): boolean => pattern.test(trans
 export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
-  if (/\blive\s+answer\s+environment\b/.test(normalized)) return true;
+  if (/\blive\s+answer\s+environment\b/.test(normalized)) {
+    if (/\b(?:interpret|explain|summari[sz]e|read|review|status|current|currently|what|why|how)\b/.test(normalized)) {
+      return false;
+    }
+    return /\b(?:create|start|set\s+up|setup|make|open|enable|turn\s+on|use)\b/.test(normalized);
+  }
   if (/\bcreate\s+(?:a\s+)?live\b/.test(normalized) && /\b(?:environment|monitor|tracker|readout|artifact)\b/.test(normalized)) return true;
   if (/\btrack\s+this\s+video\b/.test(normalized)) return true;
   if (/\bfollow\s+this\s+research\s+session\b/.test(normalized)) return true;

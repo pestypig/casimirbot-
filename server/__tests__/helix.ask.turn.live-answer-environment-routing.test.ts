@@ -388,6 +388,48 @@ describe("helix ask live answer environment routing", () => {
     expect(String(response.body?.answer ?? response.body?.text ?? "")).toContain("Latest prime: 7");
   }, 60000);
 
+  it("interprets an active Minecraft live answer environment instead of creating a new one", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+    const { app } = await createApp();
+    await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "Monitor my Minecraft run and keep track of structure, risk, progress, and next checks.",
+        preset: "minecraft_run_monitor",
+        room_id: "room:minecraft-minehut",
+        source_ids: ["source:minecraft-server"],
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Interpret the current Minecraft live environment. What is DatDamPig doing, what risks are present, and what should the workstation check next?",
+        mode: "read",
+        debug: true,
+        context_mode: "attached",
+        sessionId: "helix-ask:desktop",
+        workspace_context_snapshot: {
+          activePanel: "live-answer-environment",
+          hasSituationRoomContext: true,
+        },
+      })
+      .expect(200);
+
+    const answerText = String(response.body?.answer ?? response.body?.text ?? "");
+    expect(response.body?.final_answer_source).toBe("artifact_synthesis");
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(answerText).toContain("Live answer environment is active");
+    expect(answerText).toContain("Goal:");
+    expect(answerText).not.toContain("Created a Live Answer Environment action");
+    expect(actions(response.body).some((entry) => entry?.action_id === "create_live_answer_environment")).toBe(false);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 60000);
+
   it("targets desktop live environments from unrelated UI conversation sessions", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
