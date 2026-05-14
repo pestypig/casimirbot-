@@ -6378,6 +6378,33 @@ const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): str
   const environment = readAgentLoopAuditRecord(pack?.live_answer_environment);
   if (!environment) return null;
   const summary = coerceText(environment.latest_summary).trim();
+  const utilityHypotheses = Array.isArray(pack?.utility_hypotheses) ? pack.utility_hypotheses : [];
+  const utilityLines = utilityHypotheses
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .slice(-3)
+    .map((hypothesis) => {
+      const utilityLabel = coerceText(hypothesis?.utility_label).trim();
+      if (!utilityLabel) return "";
+      const status = coerceText(hypothesis?.status).trim() || "unknown";
+      const confidence = typeof hypothesis?.confidence === "number" && Number.isFinite(hypothesis.confidence)
+        ? `confidence ${hypothesis.confidence.toFixed(2)}`
+        : "confidence unknown";
+      const displayLabel = utilityLabel.replace(new RegExp(`^${status}\\s+`, "i"), "");
+      return `Hypothesis: ${status} ${displayLabel} (${confidence}).`;
+    })
+    .filter(Boolean);
+  const missingEvidence = Array.isArray(pack?.missing_evidence_notes)
+    ? pack.missing_evidence_notes.map((entry) => coerceText(entry).trim()).filter(Boolean).slice(0, 6)
+    : [];
+  const missingEvidenceLines = missingEvidence.length > 0
+    ? [`Missing evidence: ${missingEvidence.join("; ")}.`]
+    : [];
+  const semanticConfidence = Array.isArray(pack?.semantic_confidence_ladder)
+    ? pack.semantic_confidence_ladder.map((entry) => coerceText(entry).trim()).filter(Boolean).slice(-3)
+    : [];
+  const semanticLines = semanticConfidence.length > 0
+    ? [`Semantic confidence: ${semanticConfidence.join("; ")}.`]
+    : [];
   const lines = Array.isArray(environment.lines) ? environment.lines : [];
   const renderedLines = lines
     .map((line) => readAgentLoopAuditRecord(line))
@@ -6388,7 +6415,7 @@ const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): str
       return value ? `${label}: ${value}` : "";
     })
     .filter(Boolean);
-  const text = [summary, ...renderedLines].filter(Boolean).join("\n").trim();
+  const text = [summary, ...utilityLines, ...missingEvidenceLines, ...semanticLines, ...renderedLines].filter(Boolean).join("\n").trim();
   return text || null;
 };
 
@@ -27958,6 +27985,7 @@ export function HelixAskPill({
                 ));
             const shouldRenderLiveAnswerEnvironmentProjection =
               Boolean(liveAnswerEnvironment) ||
+              isLatestReply ||
               visibleDebugActualArtifacts.includes("live_workstation_pipeline_receipt") ||
               visibleDebugActionIds.includes("situation-room-pipelines.create_live_workstation_pipeline") ||
               (isLatestReply &&

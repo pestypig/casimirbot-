@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type {
   LiveAnswerEnvironment,
   LiveAnswerEnvironmentDelta,
   LiveAnswerLineState,
 } from "@shared/helix-live-answer-environment";
+import type { HelixPresentStateCard, HelixPresentStateCardLine } from "@shared/helix-present-state-card";
 import { LiveAnswerEnvironmentTrace } from "@/components/helix/LiveAnswerEnvironmentTrace";
 
 const cleanLine = (line: LiveAnswerLineState): string => {
@@ -65,7 +66,35 @@ export function LiveAnswerEnvironmentCard({
   onDismiss?: () => void;
 }) {
   const [traceOpen, setTraceOpen] = useState(false);
+  const [presentStateCard, setPresentStateCard] = useState<HelixPresentStateCard | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const roomQuery = environment.room_id ? `&room_id=${encodeURIComponent(environment.room_id)}` : "";
+    fetch(`/api/agi/situation/present-state-card?thread_id=${encodeURIComponent(environment.thread_id)}${roomQuery}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((body) => {
+        if (!cancelled) setPresentStateCard(body?.card ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setPresentStateCard(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [environment.environment_id, environment.room_id, environment.thread_id, environment.updated_at]);
   const answerLines = environment.lines.filter((line: LiveAnswerLineState) => line.visibility === "answer_card");
+  const presentLines = presentStateCard?.lines ?? [];
+  const visibleLines = presentLines.length > 0
+    ? presentLines
+    : answerLines.map((entry: LiveAnswerLineState): HelixPresentStateCardLine => ({
+        key: entry.key,
+        label: entry.label,
+        value: cleanLine(entry),
+        evidence_refs: entry.evidence_refs,
+        confidence: null,
+        updated_at: entry.updated_at,
+      }));
+  const pendingQuestion = presentStateCard?.pending_request_input?.question ?? null;
   return (
     <section className="mb-2 w-full rounded-lg border border-cyan-300/20 bg-cyan-950/15 px-3 py-2 text-left text-xs text-cyan-50">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -80,12 +109,21 @@ export function LiveAnswerEnvironmentCard({
         </span>
       </div>
       <div className="mt-2 grid gap-1.5 text-[11px] text-cyan-50/90">
-        {answerLines.map((line: LiveAnswerLineState) => (
+        {visibleLines.map((line: HelixPresentStateCardLine) => (
           <p key={line.key}>
             <span className="text-cyan-200/80">{line.label}: </span>
-            {cleanLine(line)}
+            {String(line.value ?? "").trim()}
+            {typeof line.confidence === "number" ? (
+              <span className="ml-1 text-cyan-200/60">({Math.round(line.confidence * 100)}%)</span>
+            ) : null}
           </p>
         ))}
+        {pendingQuestion ? (
+          <p>
+            <span className="text-cyan-200/80">Question: </span>
+            {pendingQuestion}
+          </p>
+        ) : null}
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button

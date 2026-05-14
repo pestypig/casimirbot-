@@ -1,11 +1,16 @@
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
 import { auditHelixAskContextForPoison } from "../services/helix-ask/ask-context-poison-audit";
 import { quarantineHelixArtifact } from "../services/helix-ask/deterministic-artifact-quarantine";
-import { buildHelixTurnTerminalAuthority } from "../services/helix-ask/turn-terminal-authority";
+import {
+  buildHelixTurnTerminalAuthority,
+  clearHelixTurnTerminalAuthorityForTest,
+  getHelixTurnTerminalAuthority,
+  recordHelixTurnTerminalAuthority,
+} from "../services/helix-ask/turn-terminal-authority";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -15,8 +20,32 @@ const createApp = (): express.Express => {
 };
 
 const answerText = (body: any): string => String(body?.assistant_answer ?? body?.answer ?? body?.text ?? "");
+const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
+  text
+    .split(/\r?\n\r?\n/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split(/\r?\n/);
+      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() ?? "message";
+      const dataRaw = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      let data: any = dataRaw;
+      try {
+        data = JSON.parse(dataRaw);
+      } catch {
+        // Keep raw text for malformed SSE blocks.
+      }
+      return { event, data };
+    });
 
 describe("helix ask E573 deterministic artifact quarantine", () => {
+  beforeEach(() => {
+    clearHelixTurnTerminalAuthorityForTest();
+  });
+
   it("keeps synthetic evidence and UI projections out of assistant-answer authority", () => {
     const synthetic = quarantineHelixArtifact({
       schema: "helix.synthetic_evidence.v1",
@@ -96,13 +125,14 @@ describe("helix ask E573 deterministic artifact quarantine", () => {
 
   it("attaches poison audit and terminal authority to normal Ask turn responses", async () => {
     const app = createApp();
+    const sessionId = `e573-poison-route-${Date.now()}`;
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
         question: "hello",
         mode: "read",
         debug: true,
-        sessionId: `e573-poison-route-${Date.now()}`,
+        sessionId,
       })
       .expect(200);
 
@@ -110,9 +140,58 @@ describe("helix ask E573 deterministic artifact quarantine", () => {
     expect(response.body?.poison_audit?.schema).toBe("helix.turn_poison_audit.v1");
     expect(response.body?.poison_audit?.ok).toBe(true);
     expect(response.body?.terminal_answer_authority?.schema).toBe("helix.turn_terminal_authority.v1");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.terminal_answer_authority?.terminal_kind).toBe("answer");
     expect(response.body?.poison_audit?.terminal_authority?.server_terminal_text_hash).toBe(
       response.body?.terminal_answer_authority?.terminal_text_hash,
     );
     expect(response.body?.debug?.poison_audit?.ok).toBe(true);
+    expect(getHelixTurnTerminalAuthority({ thread_id: sessionId, turn_id: response.body?.turn_id })).toBeTruthy();
+  }, 90000);
+
+  it("records request-input terminal authority without treating the prompt as an answer", () => {
+    const authority = recordHelixTurnTerminalAuthority({
+      thread_id: "helix-ask:desktop",
+      turn_id: "turn:request-input",
+      final_answer_source: "request_user_input",
+      terminal_artifact_kind: "request_user_input",
+      terminal_text: "Is this chicken pit intended as a farm?",
+      route: "/ask",
+    });
+    const requestArtifact = quarantineHelixArtifact({
+      schema: "helix.clarification_question_proposal.v1",
+      proposal_id: "question:1",
+      question: "Is this chicken pit intended as a farm?",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    expect(authority.terminal_kind).toBe("request_user_input");
+    expect(authority.server_authoritative).toBe(true);
+    expect(requestArtifact.role).toBe("request_user_input");
+    expect(requestArtifact.can_be_assistant_answer).toBe(false);
+    expect(requestArtifact.violations).toEqual([]);
+  });
+
+  it("carries terminal authority hashes through the stream final packet", async () => {
+    const app = createApp();
+    const sessionId = `e573-stream-authority-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: "hello",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    const finalPacket = parseSseEvents(response.text).findLast((event) => event.event === "turn_final")?.data;
+    expect(finalPacket).toBeTruthy();
+    expect(finalPacket?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(finalPacket?.server_terminal_hash).toBe(finalPacket?.terminal_answer_authority?.terminal_text_hash);
+    expect(finalPacket?.client_server_terminal_match).toBe(true);
+    expect(finalPacket?.suppressed_stream_terminal_count).toBeGreaterThanOrEqual(1);
+    expect(finalPacket?.poison_audit?.ok).toBe(true);
   }, 90000);
 });

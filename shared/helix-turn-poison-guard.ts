@@ -59,11 +59,20 @@ export type HelixTerminalAuthority = {
   schema: typeof HELIX_TERMINAL_AUTHORITY_SCHEMA;
   thread_id: string;
   turn_id?: string | null;
+  route: "/ask" | "/ask/conversation-turn" | "/ask/turn" | "/ask/turn/stream" | string;
+  terminal_kind:
+    | "answer"
+    | "request_user_input"
+    | "workspace_action_receipt"
+    | "situation_context_pack"
+    | "live_answer_environment"
+    | "tool_evaluation"
+    | "failure";
   final_answer_source: string;
   terminal_artifact_kind: string;
   terminal_text_hash: string;
   terminal_text_preview: string;
-  route?: string | null;
+  server_authoritative: true;
   created_at: string;
 };
 

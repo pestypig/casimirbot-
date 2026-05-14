@@ -8,6 +8,7 @@ import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environme
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
 import { listInterpretedEvents } from "./interpreted-event-log-store";
 import { listClarificationQuestions } from "./clarification-question-store";
+import { listGameUtilityHypotheses } from "./minecraft-entity-utility-reducer";
 
 const hashShort = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -28,25 +29,64 @@ const line = (input: {
   updated_at: input.updatedAt,
 });
 
+const latestUtilityHypothesisLines = (input: {
+  threadId: string;
+  roomId?: string | null;
+}): HelixPresentStateCardLine[] => {
+  const latestHypothesis = listGameUtilityHypotheses(input.threadId)
+    .filter((hypothesis) => !input.roomId || hypothesis.room_id === input.roomId)
+    .at(-1);
+  if (!latestHypothesis) return [];
+  const utilityLabel = latestHypothesis.utility_label.replace(
+    new RegExp(`^${latestHypothesis.status}\\s+`, "i"),
+    "",
+  );
+  return [
+    line({
+      key: "hypothesis",
+      label: "Hypothesis",
+      value: `${latestHypothesis.status} ${utilityLabel}`,
+      evidenceRefs: latestHypothesis.supporting_evidence_refs,
+      confidence: latestHypothesis.confidence,
+      updatedAt: latestHypothesis.ts,
+    }),
+    line({
+      key: "missing_evidence",
+      label: "Missing evidence",
+      value: latestHypothesis.missing_evidence.length > 0
+        ? latestHypothesis.missing_evidence.join("; ")
+        : "No major missing evidence currently flagged.",
+      evidenceRefs: latestHypothesis.supporting_evidence_refs,
+      confidence: latestHypothesis.confidence,
+      updatedAt: latestHypothesis.ts,
+    }),
+  ];
+};
+
 export function projectPresentStateCard(input: {
   threadId: string;
   roomId?: string | null;
 }): HelixPresentStateCard {
   const artifact = getActiveLiveSituationArtifactForThread(input.threadId);
   const environment = getActiveLiveAnswerEnvironmentForThread(input.threadId);
+  const projectedRoomId = input.roomId ?? artifact?.room_id ?? environment?.room_id ?? null;
   const interpretedEvents = listInterpretedEvents({
     threadId: input.threadId,
-    roomId: input.roomId ?? artifact?.room_id ?? environment?.room_id ?? null,
+    roomId: projectedRoomId,
     limit: 20,
   });
   const latestEvent = interpretedEvents.at(-1) ?? null;
   const pendingQuestion = listClarificationQuestions({
     threadId: input.threadId,
-    roomId: input.roomId ?? artifact?.room_id ?? environment?.room_id ?? null,
+    roomId: projectedRoomId,
     status: "pending",
   }).at(-1);
   const pendingRequestInput = pendingQuestion?.proposal?.request_input ?? null;
   const now = new Date().toISOString();
+  const utilityLines = latestUtilityHypothesisLines({
+    threadId: input.threadId,
+    roomId: projectedRoomId,
+  });
   if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
     const lines = artifact.current_state_lines;
     return {
@@ -58,6 +98,7 @@ export function projectPresentStateCard(input: {
       status: artifact.status,
       lines: [
         line({ key: "now", label: "Now", value: lines.now, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+        ...utilityLines,
         line({ key: "goal", label: "Goal", value: lines.goal, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
         line({ key: "risk", label: "Risk", value: lines.risk, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
         line({ key: "progress", label: "Progress", value: lines.progress, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
@@ -78,16 +119,19 @@ export function projectPresentStateCard(input: {
       room_id: environment.room_id ?? null,
       title: environment.objective,
       status: environment.status,
-      lines: environment.lines
-        .filter((entry) => entry.visibility === "answer_card")
-        .map((entry) => line({
-          key: entry.key,
-          label: entry.label,
-          value: String(entry.value ?? ""),
-          evidenceRefs: entry.evidence_refs,
-          confidence: null,
-          updatedAt: entry.updated_at,
-        })),
+      lines: [
+        ...utilityLines,
+        ...environment.lines
+          .filter((entry) => entry.visibility === "answer_card")
+          .map((entry) => line({
+            key: entry.key,
+            label: entry.label,
+            value: String(entry.value ?? ""),
+            evidenceRefs: entry.evidence_refs,
+            confidence: null,
+            updatedAt: entry.updated_at,
+          })),
+      ],
       pending_request_input: pendingRequestInput,
       last_interpreted_event_id: latestEvent?.event_id ?? null,
       go_to_log_target: latestEvent?.event_id ?? null,
@@ -102,6 +146,7 @@ export function projectPresentStateCard(input: {
     title: "Present State",
     status: "paused",
     lines: [
+      ...utilityLines,
       line({
         key: "now",
         label: "Now",
