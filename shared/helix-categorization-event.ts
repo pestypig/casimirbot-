@@ -24,6 +24,13 @@ export type HelixCategorizationCategory =
   | "motive_framework"
   | "minecraft_spatial_pattern"
   | "structure_hypothesis"
+  | "entity_context"
+  | "containment_context"
+  | "item_flow_context"
+  | "dense_entity_cluster"
+  | "contained_entity_cluster"
+  | "repeated_item_flow"
+  | "missing_evidence_note"
   | "hazard_context"
   | "unknown";
 

@@ -24,6 +24,10 @@ The next plugin patch should emit these observe-only event types:
 | `biome_or_light_context` | Add cave/night/darkness context for risk scoring. | Sometimes |
 | `chest_inventory_snapshot` | Explain inventory/resource decisions. | No |
 | `container_item_count` | Explain storage/crafting progress. | No |
+| `entity_cluster_sample` | Report dense neutral entity groups such as many chickens in a small area. | No |
+| `containment_context_sample` | Report neutral enclosure/pit/block context near an entity group. | No |
+| `item_flow_context` | Report neutral item movement/use near a context such as egg pickup or seed use. | No |
+| `environment_context_sample` | Report neutral light/fluid/biome/hostile context around the player or sampled area. | Sometimes |
 
 ## Required Fields
 
@@ -41,7 +45,7 @@ Every event should include:
 
 ## Spatial Fidelity Requirement
 
-Structure hypotheses require exact block geometry. For `block_broken`, `block_placed`, `bucket_empty`, and `bucket_fill`, the plugin must use integer coordinates from the Bukkit/Paper block or target block event, not the player's decimal location.
+Structure hypotheses require exact block geometry. For `block_broken`, `block_placed`, `block_edit`, `bucket_empty`, and `bucket_fill`, the plugin must use integer coordinates from the Bukkit/Paper block or target block event, not the player's decimal location.
 
 Preferred payload shape:
 
@@ -79,6 +83,104 @@ Preferred payload shape:
 
 The Helix reducer now treats decimal player-location samples as movement/projection evidence only. They cannot create `descending_stair`, `parallel_trench`, `lava_lighting_channel`, or other build-structure hypotheses without exact integer block coordinates.
 
+`block_edit` is accepted as a neutral plugin-side vocabulary when it includes `meta.action = "broken" | "placed"` and exact `block_x`, `block_y`, and `block_z`. Situation Room maps that source fact into the existing spatial reducer. The plugin still must not emit meaning labels such as `branch_mine_detected` or `lava_channel_detected`.
+
+## Neutral World-Sense Events
+
+The plugin should emit high-fidelity neutral facts, not interpretations. Do not emit labels such as `chicken_farm_detected`, `lava_channel_detected`, or `survival_strategy_detected`. Those are Helix Ask interpretations over compact evidence.
+
+Example entity cluster payload:
+
+```json
+{
+  "schema": "helix.world_event.v1",
+  "world_id": "minecraft:minehut",
+  "room_id": "room:minecraft-minehut",
+  "source_id": "source:minecraft-server",
+  "event_type": "entity_cluster_sample",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "location": {
+    "dimension": "minecraft:overworld",
+    "x": 282,
+    "y": 63,
+    "z": -408
+  },
+  "meta": {
+    "entity_type": "minecraft:chicken",
+    "count": 18,
+    "density": "high",
+    "nearest_player_distance": 3.1,
+    "bounding_box": {
+      "min": { "x": 282, "y": 63, "z": -408 },
+      "max": { "x": 284, "y": 65, "z": -406 }
+    }
+  },
+  "evidence_refs": ["minecraft:minehut:event:entity-cluster:12345"],
+  "ts": "2026-05-13T22:06:00.000Z"
+}
+```
+
+Example containment context payload:
+
+```json
+{
+  "schema": "helix.world_event.v1",
+  "world_id": "minecraft:minehut",
+  "room_id": "room:minecraft-minehut",
+  "source_id": "source:minecraft-server",
+  "event_type": "containment_context_sample",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "location": {
+    "dimension": "minecraft:overworld",
+    "x": 283,
+    "y": 63,
+    "z": -407
+  },
+  "meta": {
+    "target_entity_type": "minecraft:chicken",
+    "nearby_blocks": ["minecraft:stone", "minecraft:oak_trapdoor"],
+    "possible_escape_routes": "low",
+    "pit_depth": 2,
+    "enclosure_width": 2,
+    "enclosure_depth": 2
+  },
+  "evidence_refs": ["minecraft:minehut:event:containment:12346"],
+  "ts": "2026-05-13T22:06:02.000Z"
+}
+```
+
+Example item-flow payload:
+
+```json
+{
+  "schema": "helix.world_event.v1",
+  "world_id": "minecraft:minehut",
+  "room_id": "room:minecraft-minehut",
+  "source_id": "source:minecraft-server",
+  "event_type": "item_flow_context",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "location": {
+    "dimension": "minecraft:overworld",
+    "x": 283,
+    "y": 63,
+    "z": -407
+  },
+  "meta": {
+    "item_type": "minecraft:egg",
+    "action": "picked_up",
+    "nearby_container": true,
+    "nearby_hopper": false
+  },
+  "evidence_refs": ["minecraft:minehut:event:item-flow:12347"],
+  "ts": "2026-05-13T22:06:05.000Z"
+}
+```
+
+Situation Room may reduce these facts into compact evidence like dense chickens plus containment hints. Helix Ask may then interpret that evidence as a possible or likely farm when the user asks, while preserving missing-evidence caveats.
+
 ## Config Toggles
 
 The observe-only plugin should expose:
@@ -89,8 +191,16 @@ helix:
   emit_bucket_events: true
   emit_light_samples: true
   emit_hostile_precursors: true
+  emit_entity_cluster_samples: true
+  emit_containment_context_samples: true
+  emit_item_flow_context: true
   max_block_events_per_flush: 50
   location_sample_ticks: 600
+  passive_sample_ticks: 80
+  passive_sample_radius: 24
+  passive_cluster_radius: 2
+  passive_cluster_min_count: 6
+  container_context_radius: 3
 ```
 
 Block edit events should be batched through `/api/agi/situation/world-event/batch` when possible. Routine `player_location_sample` events should remain low-frequency and projection-only.

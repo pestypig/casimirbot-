@@ -7,6 +7,7 @@ export type HelixSyntheticEvidenceProducer =
   | "workstation_note"
   | "ideology"
   | "minecraft_spatial_reducer"
+  | "minecraft_world_sense_reducer"
   | "model_review";
 
 export type HelixSyntheticEvidenceSupportStatus =

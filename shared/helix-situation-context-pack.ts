@@ -55,6 +55,7 @@ export type SituationContextPack = {
     salience_class?: string | null;
   }>;
   minecraft_spatial_episode?: import("./helix-minecraft-spatial-episode").HelixMinecraftSpatialEpisode | null;
+  minecraft_world_sense_context?: import("./helix-minecraft-world-sense").HelixMinecraftWorldSenseContext | null;
   objective?: string | null;
   current_goal?: string | null;
   latest_projection?: Record<string, unknown> | null;

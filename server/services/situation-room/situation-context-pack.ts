@@ -16,8 +16,9 @@ import {
   listWorkstationLiveSourceWindows,
   listWorkstationLiveSources,
 } from "./workstation-live-source-ingest";
-import { listWorldSourcesSeen } from "./world-source-registry";
+import { listWorldSourcesSeen, type WorldSourceSeen } from "./world-source-registry";
 import { getLatestMinecraftSpatialEpisodeForRoom } from "./minecraft-spatial-window";
+import { getLatestMinecraftWorldSenseContextForRoom } from "./minecraft-world-sense-window";
 import type {
   LiveSourceWindowSummary,
   WorkstationLiveSource,
@@ -80,9 +81,9 @@ export function buildSituationContextPack(args: {
       to_ts: window.to_ts,
     }));
   const worldSources = listWorldSourcesSeen()
-    .filter((source) => source.room_id === roomId)
+    .filter((source: WorldSourceSeen) => source.room_id === roomId)
     .slice(0, 8)
-    .map((source) => ({
+    .map((source: WorldSourceSeen) => ({
       room_id: source.room_id,
       source_id: source.source_id,
       world_id: source.world_id,
@@ -96,6 +97,7 @@ export function buildSituationContextPack(args: {
       salience_class: source.latest_debug?.salience_class ?? null,
     }));
   const minecraftSpatialEpisode = getLatestMinecraftSpatialEpisodeForRoom(roomId);
+  const minecraftWorldSenseContext = getLatestMinecraftWorldSenseContextForRoom(roomId);
   const episodeActivities = activities
     .filter((activity: HelixStandbyActivityItem) => activity.kind === "episode" || activity.kind === "episode_created")
     .slice(-3);
@@ -113,6 +115,7 @@ export function buildSituationContextPack(args: {
       sessionId,
       missionMemory?.updated_at ?? null,
       minecraftSpatialEpisode?.episode_id ?? null,
+      minecraftWorldSenseContext?.context_id ?? null,
       activities.map((activity: HelixStandbyActivityItem) => activity.activity_id).slice(-12),
     ], 18)}`,
     session_id: sessionId,
@@ -144,6 +147,7 @@ export function buildSituationContextPack(args: {
       : null,
     world_sources: worldSources,
     minecraft_spatial_episode: minecraftSpatialEpisode,
+    minecraft_world_sense_context: minecraftWorldSenseContext,
     objective: activeSession?.objective ?? ledger?.objective ?? null,
     current_goal: activeSession?.current_goal ?? ledger?.current_goal ?? null,
     latest_projection: null,

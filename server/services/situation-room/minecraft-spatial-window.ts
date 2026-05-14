@@ -71,6 +71,7 @@ const readFace = (...values: unknown[]): HelixMinecraftSpatialEvent["block"] ext
 
 const mapEventType = (eventType: string): HelixMinecraftSpatialEventType | null => {
   const normalized = eventType.trim().toLowerCase();
+  if (normalized === "block_edit") return null;
   if (["block_broken", "block_break", "block_mined", "block_dig", "block_dug"].includes(normalized)) return "block_broken";
   if (["block_placed", "block_place"].includes(normalized)) return "block_placed";
   if (["item_used", "player_item_used"].includes(normalized)) return "item_used";
@@ -110,7 +111,12 @@ const hasCompleteExplicitBlockLocation = (
 const normalizeSpatialEvent = (event: HelixWorldEvent): HelixMinecraftSpatialEvent | null => {
   const location = readRecord(event.location);
   const meta = readRecord(event.meta);
-  const spatialType = mapEventType(event.event_type);
+  const blockEditAction = event.event_type === "block_edit" ? readString(meta?.action) : null;
+  const spatialType = blockEditAction === "broken"
+    ? "block_broken"
+    : blockEditAction === "placed"
+      ? "block_placed"
+      : mapEventType(event.event_type);
   if (!location || !spatialType) return null;
   const editType = isEditSpatialType(spatialType);
   const x = editType

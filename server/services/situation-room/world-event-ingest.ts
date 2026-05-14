@@ -32,6 +32,10 @@ import type { HelixCategorizationEvent } from "@shared/helix-categorization-even
 import type { HelixSyntheticEvidence } from "@shared/helix-synthetic-evidence";
 import type { HelixMinecraftSpatialEvent } from "@shared/helix-minecraft-spatial-event";
 import type { HelixMinecraftSpatialEpisode } from "@shared/helix-minecraft-spatial-episode";
+import type {
+  HelixMinecraftWorldSenseContext,
+  HelixMinecraftWorldSenseEvent,
+} from "@shared/helix-minecraft-world-sense";
 import type { StandbyQueueItem } from "@shared/helix-standby-queue";
 import type { SituationNarrationReceipt } from "@shared/helix-situation-narration";
 import type { SituationPrediction } from "@shared/helix-situation-prediction";
@@ -97,6 +101,11 @@ import {
 import {
   reduceMinecraftSpatialIntent,
 } from "./minecraft-intent-hypothesis-reducer";
+import {
+  ingestMinecraftWorldSenseEvent,
+  reduceMinecraftWorldSense,
+  resetMinecraftWorldSenseWindows,
+} from "./minecraft-world-sense-window";
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -187,6 +196,8 @@ export type WorldEventIngestResult = {
   live_answer_environment_delta?: LiveAnswerEnvironmentDelta | null;
   minecraft_spatial_event?: HelixMinecraftSpatialEvent | null;
   minecraft_spatial_episode?: HelixMinecraftSpatialEpisode | null;
+  minecraft_world_sense_event?: HelixMinecraftWorldSenseEvent | null;
+  minecraft_world_sense_context?: HelixMinecraftWorldSenseContext | null;
   categorization_events?: HelixCategorizationEvent[];
   synthetic_evidence?: HelixSyntheticEvidence[];
 };
@@ -310,6 +321,7 @@ export const resetWorldEventIngestState = (): void => {
   resetWorldSourceRegistry();
   resetProfileLiveSourcesForTest();
   resetMinecraftSpatialWindows();
+  resetMinecraftWorldSenseWindows();
 };
 
 const getOrCreateState = (
@@ -793,6 +805,7 @@ export const ingestWorldEvent = async (
   const signalId = buildSignalId(event);
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
   const spatialResult = ingestMinecraftSpatialWorldEvent(event);
+  const worldSenseResult = ingestMinecraftWorldSenseEvent(event);
   state.signals.push(signal);
   state.signals.sort((a: SituationEventSignal, b: SituationEventSignal) =>
     a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id),
@@ -1092,6 +1105,17 @@ export const ingestWorldEvent = async (
           episode: spatialResult.spatial_episode,
         })
       : null;
+  const shouldPublishWorldSense =
+    resolvedBinding && options.appendToThread !== false && worldSenseResult.world_sense_context
+      ? true
+      : false;
+  const worldSenseReduction =
+    shouldPublishWorldSense && resolvedBinding && worldSenseResult.world_sense_context
+      ? reduceMinecraftWorldSense({
+          threadId: resolvedBinding.thread_id,
+          context: worldSenseResult.world_sense_context,
+        })
+      : null;
   const spatialArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId && spatialReduction && spatialResult.spatial_episode
       ? updateLiveSituationArtifact({
@@ -1122,7 +1146,7 @@ export const ingestWorldEvent = async (
         })
       : null;
   const batchReceipt =
-    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction) && resolvedBinding && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction || worldSenseReduction) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
           threadId: resolvedBinding.thread_id,
           turnId: standbyTurnId,
@@ -1204,8 +1228,26 @@ export const ingestWorldEvent = async (
                       },
                     ]
                   : []),
+                ...(worldSenseReduction && worldSenseResult.world_sense_context
+                  ? [
+                      {
+                        itemId: `minecraft_world_sense_context:${hashShort([worldSenseResult.world_sense_context.context_id], 14)}`,
+                        itemType: "validation" as const,
+                        kind: "minecraft_world_sense_context",
+                        observationRef: {
+                          ...worldSenseResult.world_sense_context,
+                          summary: worldSenseReduction.summary,
+                          provenance: "deterministic_world_sense_reduction",
+                          model_invoked: false,
+                          context_role: "observation_not_assistant_answer",
+                          raw_logs_included: false,
+                          safe_for_future_context: true,
+                        } as Record<string, unknown>,
+                      },
+                    ]
+                  : []),
               ]
-            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode)
+            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction
               ? [
                   ...(spatialReduction && spatialResult.spatial_episode
                     ? [
@@ -1240,6 +1282,24 @@ export const ingestWorldEvent = async (
                     } as Record<string, unknown>,
                   },
                     ]
+                    : []),
+                  ...(worldSenseReduction && worldSenseResult.world_sense_context
+                    ? [
+                        {
+                          itemId: `minecraft_world_sense_context:${hashShort([worldSenseResult.world_sense_context.context_id], 14)}`,
+                          itemType: "validation" as const,
+                          kind: "minecraft_world_sense_context",
+                          observationRef: {
+                            ...worldSenseResult.world_sense_context,
+                            summary: worldSenseReduction.summary,
+                            provenance: "deterministic_world_sense_reduction",
+                            model_invoked: false,
+                            context_role: "observation_not_assistant_answer",
+                            raw_logs_included: false,
+                            safe_for_future_context: true,
+                          } as Record<string, unknown>,
+                        },
+                      ]
                     : []),
                 ]
               : [],
@@ -1356,8 +1416,16 @@ export const ingestWorldEvent = async (
     live_answer_environment_delta: liveAnswerEnvironmentUpdate?.delta ?? null,
     minecraft_spatial_event: spatialResult.spatial_event,
     minecraft_spatial_episode: spatialResult.spatial_episode,
-    categorization_events: spatialReduction?.categorization_events ?? [],
-    synthetic_evidence: spatialReduction?.synthetic_evidence ?? [],
+    minecraft_world_sense_event: worldSenseResult.world_sense_event,
+    minecraft_world_sense_context: worldSenseResult.world_sense_context,
+    categorization_events: [
+      ...(spatialReduction?.categorization_events ?? []),
+      ...(worldSenseReduction?.categorization_events ?? []),
+    ],
+    synthetic_evidence: [
+      ...(spatialReduction?.synthetic_evidence ?? []),
+      ...(worldSenseReduction?.synthetic_evidence ?? []),
+    ],
   };
 };
 
