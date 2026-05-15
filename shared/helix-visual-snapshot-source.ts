@@ -19,6 +19,7 @@ export type HelixVisualSourceSurface =
   | "manual_upload";
 
 export type HelixVisualSnapshotSourceStatus =
+  | "permission_required"
   | "active"
   | "paused"
   | "stopped"

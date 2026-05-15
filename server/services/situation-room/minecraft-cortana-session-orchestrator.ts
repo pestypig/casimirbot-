@@ -2,12 +2,19 @@ import type { HelixMinecraftCortanaReadinessItem, HelixMinecraftCortanaSessionRe
 import { HELIX_MINECRAFT_CORTANA_SESSION_RECEIPT_SCHEMA } from "@shared/helix-minecraft-cortana-session";
 import type { ContinuousCategorizationSourceFamily } from "@shared/helix-continuous-categorization-job";
 import type { LiveAnswerLineDefinition } from "@shared/helix-live-answer-environment";
-import { attachMinecraftToDiscordSession, getDiscordVoiceSession } from "./discord-session-store";
-import { upsertCompanionPolicy } from "./companion-policy-engine";
-import { startContinuousCategorizationJob } from "./continuous-categorization-job-store";
-import { startVisualSnapshotSource } from "./visual-snapshot-store";
-import { createLiveAnswerEnvironment, setLiveAnswerEnvironmentLineSchema } from "./live-answer-environment-store";
-import { appendInterpretedEvent } from "./interpreted-event-log-store";
+import { attachMinecraftToDiscordSession, getDiscordVoiceSession, listDiscordVoiceSessions } from "./discord-session-store";
+import { getCompanionPolicy, upsertCompanionPolicy } from "./companion-policy-engine";
+import { listContinuousCategorizationJobs, startContinuousCategorizationJob } from "./continuous-categorization-job-store";
+import { listVisualSnapshotSources, startVisualSnapshotSource } from "./visual-snapshot-store";
+import { createLiveAnswerEnvironment, listLiveAnswerEnvironments, setLiveAnswerEnvironmentLineSchema } from "./live-answer-environment-store";
+import { appendInterpretedEvent, listInterpretedEvents } from "./interpreted-event-log-store";
+
+type MinecraftCortanaNextRequiredAction =
+  | "grant_visual_capture_permission"
+  | "attach_minecraft_source"
+  | "link_discord_profile"
+  | "start_playing_or_wait_for_events"
+  | "ready";
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -215,13 +222,14 @@ export function startMinecraftCortanaCompanionSession(input: {
     source_family: "screen_capture",
     capture_mode: "interval",
     source_surface: "minecraft_client_window",
+    status: "permission_required",
     cadence_ms: typeof input.visualCadenceMs === "number" ? input.visualCadenceMs : 15000,
     raw_image_storage_policy: "ephemeral",
   });
   readinessItems.push(readiness(
     "visual_source",
-    visualReceipt.ok,
-    "Visual source request is registered. The Helix web/desktop client still needs explicit screen/window permission before frames are available.",
+    false,
+    "Visual source request is registered and waiting for explicit Minecraft window/screen capture permission in Helix desktop.",
     visualReceipt.source?.source_id ?? visualSourceId,
     "needs_visual_permission",
   ));
@@ -325,7 +333,7 @@ export function startMinecraftCortanaCompanionSession(input: {
     categorization_job_ids: categorizationJobIds,
     readiness: readinessItems,
     message: ok
-      ? "Minecraft Cortana mode is ready. Visual frames still require explicit local capture permission."
+      ? "Minecraft Cortana mode is ready for Minecraft and voice evidence. Visual frames require explicit local capture permission."
       : "Minecraft Cortana mode is partially staged. Link/attach a Minecraft source to finish setup.",
     error: ok ? null : "minecraft_source_required",
     assistant_answer: false,
@@ -334,5 +342,88 @@ export function startMinecraftCortanaCompanionSession(input: {
     raw_transcript_included: false,
     context_policy: "compact_context_pack_only",
     created_at: interpreted.created_at,
+  };
+}
+
+export function getMinecraftCortanaCompanionStatus(input: {
+  threadId?: string | null;
+  discordSessionId?: string | null;
+}): {
+  ok: boolean;
+  schema: "helix.minecraft_cortana_session_status.v1";
+  preset: "minecraft_cortana_companion";
+  session_id?: string | null;
+  thread_id: string;
+  profile_id?: string | null;
+  discord_session: ReturnType<typeof getDiscordVoiceSession> | null;
+  minecraft_source_id?: string | null;
+  visual_source: ReturnType<typeof listVisualSnapshotSources>[number] | null;
+  categorization_jobs: ReturnType<typeof listContinuousCategorizationJobs>;
+  live_environment: ReturnType<typeof listLiveAnswerEnvironments>[number] | null;
+  latest_interpreted_event: ReturnType<typeof listInterpretedEvents>[number] | null;
+  companion_policy: ReturnType<typeof getCompanionPolicy>;
+  next_required_action: MinecraftCortanaNextRequiredAction;
+  raw_logs_included: false;
+  raw_image_included: false;
+  raw_transcript_included: false;
+  assistant_answer: false;
+  context_policy: "compact_context_pack_only";
+} {
+  const session = normalize(input.discordSessionId)
+    ? getDiscordVoiceSession(normalize(input.discordSessionId))
+    : null;
+  const threadId =
+    normalize(input.threadId) ||
+    normalize(session?.thread_id) ||
+    "helix-ask:desktop";
+  const resolvedSession =
+    session ??
+    listDiscordVoiceSessions().find((entry) => entry.thread_id === threadId) ??
+    null;
+  const profileId = normalize(resolvedSession?.linked_profile_id) || null;
+  const environments = listLiveAnswerEnvironments()
+    .filter((environment) => {
+      if (environment.thread_id !== threadId) return false;
+      if (environment.preset === "minecraft_cortana_companion") return true;
+      if (resolvedSession?.live_environment_ids.includes(environment.environment_id)) return true;
+      return environment.source_ids.some((sourceId) => /minecraft|minehut/i.test(sourceId));
+    })
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const liveEnvironment = environments[0] ?? null;
+  const visualSource =
+    listVisualSnapshotSources({ threadId })
+      .filter((source) => source.source_surface === "minecraft_client_window")
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null;
+  const jobs = listContinuousCategorizationJobs({ threadId, status: "any" });
+  const minecraftJob = jobs.find((job) => job.source_family === "minecraft_events");
+  const minecraftSourceId =
+    liveEnvironment?.source_ids.find((sourceId) => /minecraft|minehut/i.test(sourceId)) ??
+    minecraftJob?.source_ids[0] ??
+    null;
+  let nextRequiredAction: MinecraftCortanaNextRequiredAction = "ready";
+  if (resolvedSession && !profileId) nextRequiredAction = "link_discord_profile";
+  else if (!minecraftSourceId || !liveEnvironment) nextRequiredAction = "attach_minecraft_source";
+  else if (!visualSource || visualSource.status === "permission_required") nextRequiredAction = "grant_visual_capture_permission";
+  else if (jobs.every((job) => job.counters.source_events_seen === 0)) nextRequiredAction = "start_playing_or_wait_for_events";
+  return {
+    ok: Boolean(liveEnvironment && minecraftSourceId),
+    schema: "helix.minecraft_cortana_session_status.v1",
+    preset: "minecraft_cortana_companion",
+    session_id: resolvedSession?.session_id ?? null,
+    thread_id: threadId,
+    profile_id: profileId,
+    discord_session: resolvedSession,
+    minecraft_source_id: minecraftSourceId,
+    visual_source: visualSource,
+    categorization_jobs: jobs,
+    live_environment: liveEnvironment,
+    latest_interpreted_event: listInterpretedEvents({ threadId, roomId: liveEnvironment?.room_id ?? resolvedSession?.room_id ?? null, limit: 1 }).at(-1) ?? null,
+    companion_policy: getCompanionPolicy(threadId),
+    next_required_action: nextRequiredAction,
+    raw_logs_included: false,
+    raw_image_included: false,
+    raw_transcript_included: false,
+    assistant_answer: false,
+    context_policy: "compact_context_pack_only",
   };
 }

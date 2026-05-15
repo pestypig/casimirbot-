@@ -62,7 +62,13 @@ const normalizeStoragePolicy = (value: unknown): HelixRawImageStoragePolicy =>
   value === "debug_retained" || value === "profile_opt_in" ? value : "ephemeral";
 
 const normalizeStatus = (value: unknown): HelixVisualSnapshotSourceStatus | null =>
-  value === "active" || value === "paused" || value === "stopped" || value === "error" ? value : null;
+  value === "permission_required" ||
+  value === "active" ||
+  value === "paused" ||
+  value === "stopped" ||
+  value === "error"
+    ? value
+    : null;
 
 const playerPositionFromInput = (value: unknown): HelixVisualPlayerPosition | null => {
   if (!value || typeof value !== "object") return null;
@@ -105,7 +111,7 @@ export function startVisualSnapshotSource(input: Record<string, unknown>): Helix
     source_family: normalizeSourceFamily(input.source_family),
     capture_mode: normalizeCaptureMode(input.capture_mode),
     source_surface: sourceSurface,
-    status: "active",
+    status: normalizeStatus(input.status) ?? "active",
     cadence_ms: readNumber(input.cadence_ms),
     raw_image_storage_policy: normalizeStoragePolicy(input.raw_image_storage_policy),
     context_policy: "compact_context_pack_only",

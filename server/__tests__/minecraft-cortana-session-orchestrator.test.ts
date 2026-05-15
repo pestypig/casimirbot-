@@ -15,9 +15,9 @@ import {
 import { resetCompanionPolicies } from "../services/situation-room/companion-policy-engine";
 import { clearContinuousCategorizationJobsForTest, listContinuousCategorizationJobs } from "../services/situation-room/continuous-categorization-job-store";
 import { resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
-import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
+import { listVisualSnapshotSources, resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import { clearInterpretedEventLogForTest, listInterpretedEvents } from "../services/situation-room/interpreted-event-log-store";
-import { startMinecraftCortanaCompanionSession } from "../services/situation-room/minecraft-cortana-session-orchestrator";
+import { getMinecraftCortanaCompanionStatus, startMinecraftCortanaCompanionSession } from "../services/situation-room/minecraft-cortana-session-orchestrator";
 
 const createApp = async (): Promise<express.Express> => {
   const { planRouter } = await import("../routes/agi.plan");
@@ -100,7 +100,17 @@ describe("Minecraft Cortana companion session orchestrator", () => {
     expect(receipt.environment_id).toBeTruthy();
     expect(receipt.visual_source_id).toContain("visual_source:minecraft_cortana");
     expect(receipt.categorization_job_ids.length).toBeGreaterThanOrEqual(3);
-    expect(receipt.readiness.every((item) => item.ok)).toBe(true);
+    expect(receipt.readiness).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "visual_source", ok: false, status: "needs_visual_permission" }),
+      expect.objectContaining({ key: "minecraft_source", ok: true }),
+      expect.objectContaining({ key: "live_answer_environment", ok: true }),
+    ]));
+    expect(listVisualSnapshotSources({ threadId: receipt.thread_id }).at(-1)).toMatchObject({
+      source_id: receipt.visual_source_id,
+      status: "permission_required",
+      raw_image_included: false,
+      assistant_answer: false,
+    });
 
     const jobs = listContinuousCategorizationJobs({ threadId: receipt.thread_id, status: "active" });
     expect(jobs.map((job) => job.source_family)).toEqual(
@@ -110,6 +120,18 @@ describe("Minecraft Cortana companion session orchestrator", () => {
 
     const interpreted = listInterpretedEvents({ threadId: receipt.thread_id });
     expect(interpreted.some((event) => event.title === "Minecraft Cortana mode" && event.assistant_answer === false)).toBe(true);
+
+    const status = getMinecraftCortanaCompanionStatus({ threadId: receipt.thread_id });
+    expect(status).toMatchObject({
+      ok: true,
+      preset: "minecraft_cortana_companion",
+      minecraft_source_id: "source:minehut:cortana",
+      next_required_action: "grant_visual_capture_permission",
+      raw_logs_included: false,
+      raw_image_included: false,
+      raw_transcript_included: false,
+      assistant_answer: false,
+    });
   });
 
   it("exposes the start route and reports missing Minecraft source without fabricating one", async () => {
@@ -141,5 +163,37 @@ describe("Minecraft Cortana companion session orchestrator", () => {
         }),
       ]),
     );
+  }, 15000);
+
+  it("returns runtime status through the status endpoint", async () => {
+    const session = createLinkedMinecraftSession();
+    const receipt = startMinecraftCortanaCompanionSession({
+      discordSessionId: session.session_id,
+    });
+    const app = await createApp();
+
+    const response = await request(app)
+      .get(`/api/agi/situation/companion-session/status/${encodeURIComponent(session.session_id)}`)
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      preset: "minecraft_cortana_companion",
+      session_id: session.session_id,
+      thread_id: receipt.thread_id,
+      minecraft_source_id: "source:minehut:cortana",
+      next_required_action: "grant_visual_capture_permission",
+      visual_source: {
+        status: "permission_required",
+        raw_image_included: false,
+      },
+      live_environment: {
+        environment_id: receipt.environment_id,
+        status: "active",
+      },
+      raw_logs_included: false,
+      assistant_answer: false,
+    });
+    expect(response.body.categorization_jobs.length).toBeGreaterThanOrEqual(3);
   }, 15000);
 });

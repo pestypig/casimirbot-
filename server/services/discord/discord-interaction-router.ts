@@ -402,8 +402,8 @@ async function routeQuickCommand(body: Record<string, unknown>): Promise<Discord
               "Minecraft Cortana mode is ready.",
               `Thread: ${cortana.thread_id}`,
               `Live environment: ${cortana.environment_id ?? "none"}`,
-              `Visual source: ${cortana.visual_source_id ?? "permission required"}`,
-              "Screen/window capture still requires explicit permission in Helix desktop.",
+              "Visual source: permission required",
+              "Next: open Casimirbot and grant Minecraft window capture, then ask /helix ask what is my current situation?",
             ].join("\n")
           : [
               "Minecraft Cortana mode is not fully ready yet.",
