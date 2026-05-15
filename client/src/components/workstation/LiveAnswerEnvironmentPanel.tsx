@@ -26,6 +26,7 @@ import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-e
 import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
 import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
+import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
 import { runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
 
 type LiveEnvironmentTab = "present_state" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
@@ -73,6 +74,7 @@ type VisualLatestRead = {
   frame?: { frame_id: string; ts?: string | null } | null;
   evidence?: { evidence_id: string; summary?: string | null; ts?: string | null } | null;
   alignment?: { alignment_id: string; summary?: string | null; confidence?: number | null } | null;
+  visual_evidence_health?: HelixVisualEvidenceHealth | null;
 };
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
@@ -240,6 +242,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     () => sourceHealthEntries.find((entry) => entry.modality === "visual_frame") ?? null,
     [sourceHealthEntries],
   );
+  const visualEvidenceHealth = visualLatest?.visual_evidence_health ?? null;
   const sourceStatusLabel = (capability: HelixSituationSourceCapability): string => {
     if (capability.modality === "visual_frame" && capability.status === "active" && capability.next_required_action === "capture_first_frame") {
       return "active, waiting for first frame";
@@ -692,15 +695,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </p>
           </div>
           <span className={`rounded border px-2 py-0.5 text-[10px] uppercase ${
-            visualLatest?.source?.status === "active"
+            visualEvidenceHealth?.status === "analysis_ready" || visualLatest?.source?.status === "active"
               ? "border-emerald-300/30 text-emerald-100"
-              : visualLatest?.source?.status === "permission_required"
+              : visualEvidenceHealth?.status === "permission_required" || visualEvidenceHealth?.status === "waiting_for_first_frame" || visualLatest?.source?.status === "permission_required"
                 ? "border-amber-300/30 text-amber-100"
-                : visualSourceCapability?.status === "configured_missing"
+                : visualEvidenceHealth?.status === "analysis_failed" || visualSourceCapability?.status === "configured_missing"
                   ? "border-rose-300/30 text-rose-100"
                   : "border-white/10 text-slate-400"
           }`}>
-            {visualLatest?.source?.status ?? visualSourceCapability?.status ?? "not registered"}
+            {visualEvidenceHealth?.status ?? visualLatest?.source?.status ?? visualSourceCapability?.status ?? "not registered"}
           </span>
         </div>
         <div className="mt-2 grid gap-2 md:grid-cols-3">
@@ -713,8 +716,18 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.frame?.frame_id ?? "none"}</p>
           </div>
           <div className="rounded border border-white/10 bg-black/20 p-2">
-            <p className="text-[10px] uppercase text-slate-500">Latest alignment</p>
-            <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.alignment?.summary ?? "none"}</p>
+            <p className="text-[10px] uppercase text-slate-500">Vision provider</p>
+            <p className="mt-1 truncate text-xs text-slate-200">{visualEvidenceHealth?.provider_status ?? "unknown"}</p>
+          </div>
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <div className="rounded border border-white/10 bg-black/20 p-2">
+            <p className="text-[10px] uppercase text-slate-500">Latest evidence</p>
+            <p className="mt-1 truncate text-xs text-slate-200">{visualEvidenceHealth?.latest_evidence_id ?? visualLatest?.evidence?.evidence_id ?? "none"}</p>
+          </div>
+          <div className="rounded border border-white/10 bg-black/20 p-2">
+            <p className="text-[10px] uppercase text-slate-500">Next visual action</p>
+            <p className="mt-1 truncate text-xs text-slate-200">{visualEvidenceHealth?.next_required_action ?? "none"}</p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -744,6 +757,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         {visualLatest?.evidence?.summary ? (
           <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
             {visualLatest.evidence.summary}
+          </p>
+        ) : null}
+        {!visualLatest?.evidence?.summary && visualEvidenceHealth?.latest_summary ? (
+          <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+            {visualEvidenceHealth.latest_summary}
           </p>
         ) : null}
       </div>

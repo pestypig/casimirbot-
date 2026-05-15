@@ -13,6 +13,9 @@ import { buildLiveCardLineStates } from "./live-card-line-state-builder";
 import { buildLiveEnvironmentFidelity } from "./live-environment-fidelity-builder";
 import { synthesizePresentState } from "./present-state-synthesizer";
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
+import { getVisualEvidenceHealth } from "./visual-evidence-health";
+import { listVisualFrameEvidence } from "./visual-snapshot-store";
+import { selectSourceScopedEvidence } from "./source-scoped-evidence-selector";
 import {
   listLiveLineToolEvaluations,
   listLiveLineToolRequests,
@@ -90,6 +93,99 @@ const recordPresentStateSynthesisEvent = (input: {
     created_at: input.synthesis.created_at,
   });
 
+const sourceIsActive = (
+  capabilities: ReturnType<typeof buildSituationSourceCapabilities>,
+  modality: "world_event" | "visual_frame" | "audio_transcript",
+): boolean => capabilities.some((entry) => entry.modality === modality && entry.status === "active");
+
+const visualSeedLines = (input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentPreset?: string | null;
+  environmentObjective?: string | null;
+  updatedAt: string;
+}): HelixPresentStateCardLine[] => {
+  const health = getVisualEvidenceHealth({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    now: input.updatedAt,
+  });
+  const minecraftPreset = input.environmentPreset === "minecraft_run_monitor" ||
+    /\bminecraft|minehut\b/i.test(input.environmentObjective ?? "");
+  const sceneKey = minecraftPreset ? "place" : "scene";
+  const sceneLabel = minecraftPreset ? "Place" : "Scene";
+  if (health.status === "analysis_ready" && health.latest_evidence_id) {
+    const evidence = listVisualFrameEvidence({ threadId: input.threadId, limit: 100 })
+      .find((entry) => entry.evidence_id === health.latest_evidence_id);
+    const evidenceRefs = [health.latest_evidence_id];
+    const objectSummary = evidence?.detected_objects?.length
+      ? evidence.detected_objects.slice(0, 6).join(", ")
+      : "No distinct objects were extracted from the latest frame.";
+    const relationSummary = evidence?.detected_scene_relations?.length
+      ? evidence.detected_scene_relations.slice(0, 4).join("; ")
+      : "No stable structure relation has been confirmed from the latest frame.";
+    return [
+      line({
+        key: sceneKey,
+        label: sceneLabel,
+        value: evidence?.summary ?? health.latest_summary ?? "Latest frame has compact visual evidence.",
+        evidenceRefs,
+        confidence: 0.68,
+        updatedAt: input.updatedAt,
+      }),
+      line({
+        key: minecraftPreset ? "entities" : "objects",
+        label: minecraftPreset ? "Entities" : "Objects",
+        value: objectSummary,
+        evidenceRefs,
+        confidence: evidence?.detected_objects?.length ? 0.58 : 0.34,
+        updatedAt: input.updatedAt,
+      }),
+      line({
+        key: minecraftPreset ? "structure" : "evidence",
+        label: minecraftPreset ? "Structure" : "Evidence",
+        value: relationSummary,
+        evidenceRefs,
+        confidence: evidence?.detected_scene_relations?.length ? 0.56 : 0.34,
+        updatedAt: input.updatedAt,
+      }),
+      ...(evidence?.uncertainty?.length
+        ? [line({
+            key: "missing_evidence",
+            label: "Missing evidence",
+            value: evidence.uncertainty.slice(0, 4).join("; "),
+            evidenceRefs,
+            confidence: null,
+            updatedAt: input.updatedAt,
+          })]
+        : []),
+    ];
+  }
+  if (health.status === "analysis_failed") {
+    return [line({
+      key: sceneKey,
+      label: sceneLabel,
+      value: "Waiting for image recognition; the latest frame was captured but not described.",
+      evidenceRefs: health.latest_evidence_id ? [health.latest_evidence_id] : [],
+      confidence: 0.2,
+      updatedAt: input.updatedAt,
+    })];
+  }
+  if (health.status === "waiting_for_first_frame" || health.status === "frame_captured") {
+    return [line({
+      key: sceneKey,
+      label: sceneLabel,
+      value: health.status === "waiting_for_first_frame"
+        ? "Waiting for the first captured frame from the active visual source."
+        : "Frame captured; waiting for image recognition.",
+      evidenceRefs: health.latest_frame_id ? [health.latest_frame_id] : [],
+      confidence: 0.25,
+      updatedAt: input.updatedAt,
+    })];
+  }
+  return [];
+};
+
 export function projectPresentStateCard(input: {
   threadId: string;
   roomId?: string | null;
@@ -120,6 +216,10 @@ export function projectPresentStateCard(input: {
     threadId: input.threadId,
     roomId: projectedRoomId,
   });
+  const scopedInterpretedEvents = selectSourceScopedEvidence({
+    interpretedEvents,
+    capabilities: sourceCapabilities,
+  });
   if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
     const lines = artifact.current_state_lines;
     const rawLines = [
@@ -149,7 +249,7 @@ export function projectPresentStateCard(input: {
       threadId: artifact.thread_id,
       roomId: artifact.room_id,
       lineStates,
-      interpretedEvents,
+      interpretedEvents: scopedInterpretedEvents,
       fidelityProfile,
       now,
     });
@@ -172,8 +272,17 @@ export function projectPresentStateCard(input: {
     };
   }
   if (environment && (!input.roomId || environment.room_id === input.roomId)) {
+    const worldActive = sourceIsActive(sourceCapabilities, "world_event");
+    const visualLines = visualSeedLines({
+      threadId: environment.thread_id,
+      roomId: environment.room_id ?? null,
+      environmentPreset: environment.preset ?? null,
+      environmentObjective: environment.objective,
+      updatedAt: now,
+    });
     const rawLines = [
-      ...utilityLines,
+      ...(worldActive ? utilityLines : []),
+      ...visualLines,
       ...environment.lines
         .filter((entry) => entry.visibility === "answer_card")
         .map((entry) => line({
@@ -203,7 +312,7 @@ export function projectPresentStateCard(input: {
       threadId: environment.thread_id,
       roomId: environment.room_id ?? null,
       lineStates,
-      interpretedEvents,
+      interpretedEvents: scopedInterpretedEvents,
       fidelityProfile,
       now,
     });

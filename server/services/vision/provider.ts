@@ -3,6 +3,7 @@
  * Ollama is treated as an OpenAI-compatible chat endpoint when OLLAMA_ENDPOINT is set.
  */
 import crypto from "node:crypto";
+import type { HelixVisualProviderHealth } from "@shared/helix-visual-evidence-health";
 
 type CaptionResult = string | undefined;
 
@@ -114,3 +115,27 @@ export const getVisionProvider = (): VisionProvider => {
 
 // Re-export prompt resolver for callers that want to reuse the same env selection.
 export const defaultVisionPrompt = resolvePrompt;
+
+export const getVisionProviderHealth = (): HelixVisualProviderHealth => {
+  const configuredProvider = env("VISION_PROVIDER");
+  const hasOllama = !!env("OLLAMA_ENDPOINT") || configuredProvider === "ollama";
+  const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
+  const openAiBase = env("VISION_HTTP_BASE") || (apiKey ? "https://api.openai.com" : "");
+  const provider = hasOllama ? "ollama" : openAiBase ? "openai" : configuredProvider ? "unknown" : "none";
+  const model = hasOllama
+    ? (env("OLLAMA_VISION_MODEL") || env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "qwen3-vl")
+    : openAiBase
+      ? (env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini")
+      : null;
+  const configured = hasOllama || Boolean(openAiBase);
+  return {
+    schema: "helix.visual_provider_health.v1",
+    configured,
+    provider,
+    model,
+    last_error: null,
+    can_analyze_inline_image: configured && typeof fetch === "function",
+    assistant_answer: false,
+    raw_image_included: false,
+  };
+};

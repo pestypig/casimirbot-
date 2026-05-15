@@ -162,6 +162,122 @@ describe("live environment source fidelity", () => {
     expect(states[0].assistant_answer).toBe(false);
   });
 
+  it("does not copy setup prompts into missing evidence", () => {
+    const setupPrompt = "I have visual capture active. Set up a Minecraft Cortana live environment using the active visual source. I do not have the Minecraft plugin source attached yet, so start visual-only, show missing source fidelity, capture and analyze the first frame, derive the live card from visual evidence, and prepare line checks for Minecraft world events if they become available.";
+    const states = buildLiveCardLineStates({
+      lines: [{
+        key: "missing_evidence",
+        label: "Missing evidence",
+        value: setupPrompt,
+        confidence: null,
+        evidence_refs: ["live_answer_environment:setup"],
+        updated_at: now,
+      }],
+      sourceCapabilities: buildSituationSourceCapabilities({ threadId, now }),
+      now,
+    });
+
+    expect(states[0].missing_evidence.join(" ")).not.toContain("I have visual capture active");
+    expect(states[0].missing_evidence.join(" ")).not.toContain("Set up a Minecraft Cortana");
+  });
+
+  it("does not emit current hostile risk when world events are missing", () => {
+    const states = buildLiveCardLineStates({
+      lines: [{
+        key: "risk",
+        label: "Risk",
+        value: "Nearby hostile context, no damage event in the current compact window.",
+        confidence: 0.7,
+        evidence_refs: ["live_answer_environment:setup"],
+        updated_at: now,
+      }],
+      sourceCapabilities: buildSituationSourceCapabilities({ threadId, now }),
+      now,
+    });
+    const synthesis = synthesizePresentState({
+      threadId,
+      lineStates: states,
+      fidelityProfile: {
+        schema: "helix.live_environment_fidelity.v1",
+        thread_id: threadId,
+        active_modalities: ["visual_frame"],
+        missing_modalities: ["world_event", "audio_transcript"],
+        stale_modalities: [],
+        fidelity_score: 0.4,
+        source_contribution_map: { visual_frame: ["visual_scene"] },
+        per_line_coverage: {},
+        next_actions: ["attach_world_event_source"],
+        capabilities: [],
+        raw_content_included: false,
+        assistant_answer: false,
+        context_policy: "compact_context_pack_only",
+        created_at: now,
+      },
+      now,
+    });
+
+    const risk = synthesis.lines.find((line) => line.key === "risk");
+    expect(risk?.value).toMatch(/not confirmed/i);
+    expect(risk?.value).not.toMatch(/nearby hostile context/i);
+  });
+
+  it("seeds present state from analyzed visual evidence before setup defaults", () => {
+    const states = buildLiveCardLineStates({
+      lines: [{
+        key: "place",
+        label: "Place",
+        value: "The Minecraft screen shows an inventory panel with item stacks and a game HUD.",
+        confidence: 0.68,
+        evidence_refs: ["visual_evidence:inventory"],
+        updated_at: now,
+      }, {
+        key: "activity",
+        label: "Activity",
+        value: "Monitoring current Minecraft activity.",
+        confidence: 0.42,
+        evidence_refs: ["live_answer_environment:setup"],
+        updated_at: now,
+      }],
+      sourceCapabilities: [{
+        schema: "helix.situation_source_capability.v1",
+        source_id: "source:visual-inventory",
+        thread_id: threadId,
+        modality: "visual_frame",
+        status: "active",
+        contribution: "visual_scene",
+        fidelity_score: 1,
+        last_event_ts: now,
+        raw_content_included: false,
+        assistant_answer: false,
+      }],
+      now,
+    });
+    const synthesis = synthesizePresentState({
+      threadId,
+      lineStates: states,
+      fidelityProfile: {
+        schema: "helix.live_environment_fidelity.v1",
+        thread_id: threadId,
+        active_modalities: ["visual_frame"],
+        missing_modalities: ["world_event", "audio_transcript"],
+        stale_modalities: [],
+        fidelity_score: 0.5,
+        source_contribution_map: { visual_frame: ["visual_scene"] },
+        per_line_coverage: {},
+        next_actions: ["attach_world_event_source"],
+        capabilities: [],
+        raw_content_included: false,
+        assistant_answer: false,
+        context_policy: "compact_context_pack_only",
+        created_at: now,
+      },
+      now,
+    });
+
+    expect(synthesis.lines[0].value).toContain("inventory panel");
+    expect(synthesis.lines[0].evidence_refs).toContain("visual_evidence:inventory");
+  });
+
   it("does not synthesize farm/base language for generic visual-only sources", () => {
     const states = buildLiveCardLineStates({
       lines: [{
@@ -279,6 +395,25 @@ describe("live environment source fidelity", () => {
       context_policy: "compact_context_pack_only",
     });
     expect(after.body.fidelity.active_modalities).toContain("visual_frame");
+
+    const latest = await request(app)
+      .get(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}`)
+      .expect(200);
+    expect(latest.body.visual_evidence_health).toMatchObject({
+      schema: "helix.visual_evidence_health.v1",
+      status: "waiting_for_first_frame",
+      assistant_answer: false,
+      raw_image_included: false,
+    });
+
+    const provider = await request(app)
+      .get("/api/agi/situation/visual-provider/health")
+      .expect(200);
+    expect(provider.body).toMatchObject({
+      schema: "helix.visual_provider_health.v1",
+      assistant_answer: false,
+      raw_image_included: false,
+    });
   }, 15000);
 
   it("does not mark visual capture active until the client confirms a stream", async () => {

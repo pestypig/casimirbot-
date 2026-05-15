@@ -7,6 +7,7 @@ import {
   type HelixPresentStateSynthesis,
   type HelixPresentStateSynthesisLine,
 } from "@shared/helix-present-state-synthesis";
+import { sanitizeMissingEvidence } from "./live-card-missing-evidence-sanitizer";
 import { LIVE_COGNITION_TOOL_REGISTRY_VERSION } from "./live-cognition-tool-registry";
 
 const hashShort = (value: unknown, size = 18): string =>
@@ -16,6 +17,16 @@ const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 
 const uniqueStrings = (values: unknown[]): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const hasVisualEvidenceRef = (state: HelixLiveCardLineState): boolean =>
+  state.evidence_refs.some((ref) => /\b(?:visual_evidence|visual_frame|visual_alignment)\b/i.test(ref));
+
+const hasWorldEvidenceRef = (state: HelixLiveCardLineState): boolean =>
+  state.evidence_refs.some((ref) => /\b(?:minecraft|world_event|world-sense|journal|event:|source:minecraft-server)\b/i.test(ref));
+
+const isPlaceholderValue = (value: unknown): boolean =>
+  /\b(?:monitoring current|waiting for|no stable|no strong|not yet active|not confirmed|minecraft scene from the active visual source)\b/i
+    .test(String(value ?? ""));
 
 const avgConfidence = (states: HelixLiveCardLineState[], fallback: number | null = null): number | null => {
   const values = states.map((state) => state.confidence).filter((value): value is number => typeof value === "number");
@@ -39,7 +50,7 @@ const makeLine = (input: {
   value: input.value,
   confidence: input.confidence ?? avgConfidence(input.states),
   evidence_refs: uniqueStrings(input.states.flatMap((state) => state.evidence_refs)),
-  missing_evidence: uniqueStrings(input.missingEvidence ?? input.states.flatMap((state) => state.missing_evidence)).slice(0, 4),
+  missing_evidence: sanitizeMissingEvidence(uniqueStrings(input.missingEvidence ?? input.states.flatMap((state) => state.missing_evidence))).slice(0, 4),
   next_best_tool: input.nextBestTool ?? input.states.find((state) => state.next_best_tool)?.next_best_tool ?? null,
   last_check_result: input.lastCheckResult ?? input.states.find((state) => state.last_check_result)?.last_check_result ?? null,
   source_coverage: input.states.find((state) => state.source_coverage)?.source_coverage,
@@ -59,10 +70,6 @@ export function synthesizePresentState(input: {
 }): HelixPresentStateSynthesis {
   const now = input.now ?? new Date().toISOString();
   const interpreted = input.interpretedEvents ?? [];
-  const allText = lower([
-    ...input.lineStates.map((state) => `${state.label}: ${state.value}`),
-    ...interpreted.slice(-8).map((event) => `${event.kind}: ${event.summary}`),
-  ].join("\n"));
   const visualText = lower(interpreted.filter((event) => event.kind === "visual_observation" || event.kind === "visual_event_alignment").slice(-4).map((event) => event.summary).join("\n"));
   const eventText = lower(interpreted.slice(-12).map((event) => event.summary).join("\n"));
 
@@ -70,14 +77,8 @@ export function synthesizePresentState(input: {
     ...input.lineStates.flatMap((state) => state.evidence_refs),
     ...interpreted.slice(-8).flatMap((event) => event.evidence_refs),
   ]);
-  const missing = uniqueStrings(input.lineStates.flatMap((state) => state.missing_evidence));
+  const missing = sanitizeMissingEvidence(uniqueStrings(input.lineStates.flatMap((state) => state.missing_evidence)));
   const nextTool = input.lineStates.find((state) => state.next_best_tool)?.next_best_tool ?? "minecraft.query_event_window";
-  const minecraftLike = /\b(?:minecraft|minehut|wheat|chicken|farm|slab|block|hostile|creeper|mine|trench|stair)\b/.test(allText);
-  const hasFarmVisual = /\b(?:wheat|chicken|farm|crop|slab|boundary)\b/.test(visualText);
-  const hasThreat = /\b(?:threat|hostile|creeper|danger|risk)\b/.test(allText);
-  const hasDamage = /\b(?:damage|hit|explosion|hurt)\b/.test(eventText);
-  const hasMining = /\b(?:mine|mineshaft|trench|stair|vertical|descending)\b/.test(allText);
-  const hasEditing = /\b(?:block|slab|place|placed|break|broke|edit|decorat|boundary)\b/.test(allText);
   const activeModalities = input.fidelityProfile?.active_modalities ?? [];
   const missingModalities = input.fidelityProfile?.missing_modalities ?? [];
   const staleModalities = input.fidelityProfile?.stale_modalities ?? [];
@@ -90,17 +91,48 @@ export function synthesizePresentState(input: {
   const staleVisual = staleModalities.includes("visual_frame");
   const staleWorld = staleModalities.includes("world_event");
   const staleTranscript = staleModalities.includes("audio_transcript");
+  const visualStates = input.lineStates.filter(hasVisualEvidenceRef);
+  const worldStates = input.lineStates.filter(hasWorldEvidenceRef);
+  const visualReadyText = lower([
+    ...visualStates.map((state) => `${state.label}: ${state.value}`),
+    visualText,
+  ].join("\n"));
+  const worldReadyText = lower([
+    ...worldStates.map((state) => `${state.label}: ${state.value}`),
+    hasWorldEvents && !staleWorld ? eventText : "",
+  ].join("\n"));
+  const visualFailure = /\b(?:no configured vision provider|vision provider|analysis failed|provider returned|waiting for image recognition)\b/.test(visualReadyText);
+  const visualLineFor = (keys: string[]): HelixLiveCardLineState | null =>
+    visualStates.find((state) => keys.includes(state.line_key) && !isPlaceholderValue(state.value)) ?? null;
+  const placeSeed = visualLineFor(["scene", "place"])?.value ?? null;
+  const activitySeed = visualLineFor(["activity"])?.value ?? null;
+  const objectSeed = visualLineFor(["objects", "entities", "evidence"])?.value ?? null;
+  const minecraftPreset = input.lineStates.some((state) => ["place", "structure", "entities", "risk"].includes(state.line_key));
+  const minecraftLike = minecraftPreset || /\b(?:minecraft|minehut|wheat|chicken|farm|slab|block|mine|trench|stair)\b/.test(`${visualReadyText}\n${worldReadyText}`);
+  const hasFarmVisual = /\b(?:wheat|chicken|farm|crop|slab|boundary)\b/.test(visualReadyText);
+  const hasThreat = hasWorldEvents && !staleWorld && /\b(?:threat|hostile|creeper|danger|risk)\b/.test(worldReadyText);
+  const hasDamage = hasWorldEvents && !staleWorld && /\b(?:damage|hit|explosion|hurt)\b/.test(worldReadyText);
+  const hasMining = /\b(?:mine|mineshaft|trench|stair|vertical|descending)\b/.test(`${visualReadyText}\n${worldReadyText}`);
+  const hasEditing = /\b(?:block|slab|place|placed|break|broke|edit|decorat|boundary)\b/.test(`${visualReadyText}\n${worldReadyText}`);
   const hasVisualObservation = /\bvisual|frame|screen|scene|image|window|tab\b/.test(visualText) || hasVisual;
   const genericVisualOnly = hasVisualObservation && !minecraftLike && !hasWorldEvents;
 
-  const place = hasFarmVisual
+  const place = visualFailure
+    ? "Waiting for image recognition; the latest frame was captured but not described."
+    : placeSeed
+      ? String(placeSeed)
+    : hasFarmVisual
     ? "Wheat/chicken farm area."
     : minecraftLike
-      ? (hasVisual ? "Minecraft scene from the active visual source." : "Minecraft monitoring is waiting for visual or world-event evidence.")
+      ? (hasVisual ? "Minecraft visual source is active, but no analyzed scene evidence is ready." : "Minecraft monitoring is waiting for visual or world-event evidence.")
       : genericVisualOnly
         ? "Current visual scene."
         : "Current live source context.";
-  const activity = hasEditing
+  const activity = visualFailure
+    ? "Waiting for the vision provider before interpreting current activity."
+    : activitySeed
+      ? String(activitySeed)
+    : hasEditing
     ? (hasFarmVisual ? "Decorating or editing the farm boundary." : "Editing blocks while the live source tracks nearby context.")
     : minecraftLike
       ? `Monitoring current Minecraft activity${hasWorldEvents ? " from world-event evidence" : ""}${hasTranscript ? " and transcript context" : ""}.`
@@ -114,9 +146,11 @@ export function synthesizePresentState(input: {
       : genericVisualOnly
         ? "No stable scene structure is confirmed yet."
         : "No stable structure purpose has been confirmed yet.";
-  const entities = /\bchicken\b/.test(allText)
+  const entities = objectSeed
+    ? String(objectSeed)
+    : /\bchicken\b/.test(`${visualReadyText}\n${worldReadyText}`)
     ? "Contained chicken cluster or chicken-related evidence nearby."
-    : /\b(?:entity|mob|hostile|creeper|zombie)\b/.test(allText)
+    : /\b(?:entity|mob|hostile|creeper|zombie)\b/.test(`${visualReadyText}\n${worldReadyText}`)
       ? "Entity context is present; exact role still needs confirmation."
       : "No strong entity pattern is confirmed.";
   const risk = hasThreat
@@ -130,7 +164,7 @@ export function synthesizePresentState(input: {
     makeLine({ key: genericVisualOnly ? "scene" : "place", label: genericVisualOnly ? "Scene" : "Place", value: place, states: relevantStates, confidence: hasFarmVisual ? 0.72 : avgConfidence(relevantStates, 0.45), now }),
     makeLine({ key: "activity", label: "Activity", value: activity, states: relevantStates, confidence: hasEditing ? 0.68 : avgConfidence(relevantStates, 0.42), now }),
     makeLine({ key: genericVisualOnly ? "objects" : "structure", label: genericVisualOnly ? "Objects" : "Structure", value: genericVisualOnly ? "Visible objects are tracked from the latest frame evidence." : structure, states: relevantStates, confidence: hasMining || hasFarmVisual ? 0.62 : 0.38, now }),
-    makeLine({ key: genericVisualOnly ? "evidence" : "entities", label: genericVisualOnly ? "Evidence" : "Entities", value: genericVisualOnly ? "Latest compact visual evidence supports the card; no raw image is in Ask context." : entities, states: relevantStates, confidence: /\b(?:chicken|entity|mob|hostile|creeper|zombie)\b/.test(allText) ? 0.64 : 0.35, now }),
+    makeLine({ key: genericVisualOnly ? "evidence" : "entities", label: genericVisualOnly ? "Evidence" : "Entities", value: genericVisualOnly ? "Latest compact visual evidence supports the card; no raw image is in Ask context." : entities, states: relevantStates, confidence: /\b(?:chicken|entity|mob|hostile|creeper|zombie)\b/.test(`${visualReadyText}\n${worldReadyText}`) ? 0.64 : 0.35, now }),
     makeLine({ key: "risk", label: "Risk", value: risk, states: relevantStates, confidence: hasThreat ? 0.7 : 0.45, now }),
     makeLine({
       key: "missing_evidence",
@@ -154,7 +188,9 @@ export function synthesizePresentState(input: {
     makeLine({
       key: "next_check",
       label: "Next check",
-      value: hasFarmVisual
+      value: visualFailure
+        ? "Analyze the latest frame after configuring or recovering the vision provider."
+        : hasFarmVisual
         ? "Align latest visual frame with recent slab/block/entity events."
         : input.fidelityProfile?.next_actions.includes("grant_visual_capture_permission")
           ? "Grant visual capture, then align the latest frame with recent source events."

@@ -9,6 +9,7 @@ import type { HelixSituationSourceCapability, HelixSituationSourceModality } fro
 import type { LiveAnswerLineState } from "@shared/helix-live-answer-environment";
 import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-evaluation";
 import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
+import { sanitizeMissingEvidence } from "./live-card-missing-evidence-sanitizer";
 import { selectLiveCognitionToolForLine } from "./live-cognition-tool-policy";
 
 const lower = (value: unknown): string => String(value ?? "").toLowerCase();
@@ -31,7 +32,7 @@ const inferMissingEvidence = (line: Pick<LiveAnswerLineState, "key" | "label" | 
   if (/\b(?:automation|hopper|container|vertical relation)\b/.test(text)) {
     missing.push("Automation or vertical relation requires event/window or visual alignment evidence.");
   }
-  return uniqueStrings(missing).slice(0, 4);
+  return sanitizeMissingEvidence(uniqueStrings(missing)).slice(0, 4);
 };
 
 const evidenceStatus = (input: {
@@ -81,12 +82,14 @@ const sourceCoverage = (input: {
   capabilities: HelixSituationSourceCapability[];
 }): HelixLiveCardLineSourceCoverage => {
   const needs = lineNeeds(input.line);
-  const text = lower(`${input.line.key} ${input.line.label} ${input.line.value} ${(input.line.evidence_refs ?? []).join(" ")}`);
+  const evidenceRefs = (input.line.evidence_refs ?? []).map((ref) => lower(ref));
   const explicit = {
-    world_event: /\b(?:minecraft|world|source:|journal|event|risk|hostile|damage)\b/.test(text),
-    visual_frame: /\b(?:visual|frame|screenshot|screen|image)\b/.test(text),
-    audio_transcript: /\b(?:voice|transcript|discord|speaker)\b/.test(text),
-    text_chat: /\b(?:chat|message)\b/.test(text),
+    world_event: evidenceRefs.some((ref) =>
+      /\b(?:minecraft|world_event|world-sense|journal|event:|source:minecraft-server)\b/.test(ref),
+    ),
+    visual_frame: evidenceRefs.some((ref) => /\b(?:visual_evidence|visual_frame|visual_alignment)\b/.test(ref)),
+    audio_transcript: evidenceRefs.some((ref) => /\b(?:voice|transcript|audio)\b/.test(ref)),
+    text_chat: evidenceRefs.some((ref) => /\b(?:chat|message)\b/.test(ref)),
   };
   const coverageFor = (
     key: keyof HelixLiveCardLineSourceCoverage,
@@ -118,10 +121,10 @@ export function buildLiveCardLineStates(input: {
     const lastRequest = [...requests].reverse().find((request) => request.line_key === line.key) ?? null;
     const lastEvaluation = [...evaluations].reverse().find((evaluation) => evaluation.line_key === line.key) ?? null;
     const policyTool = selectLiveCognitionToolForLine(line);
-    const missingEvidence = uniqueStrings([
+    const missingEvidence = sanitizeMissingEvidence(uniqueStrings([
       ...inferMissingEvidence(line),
       ...(lastEvaluation?.missing_evidence ?? []),
-    ]);
+    ]));
     return {
       schema: HELIX_LIVE_CARD_LINE_STATE_SCHEMA,
       line_key: line.key,
