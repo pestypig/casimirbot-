@@ -165,6 +165,22 @@ export function setVisualSnapshotSourceStatus(input: {
   };
 }
 
+export function touchVisualSnapshotSource(input: {
+  sourceId: string;
+  status?: HelixVisualSnapshotSourceStatus | null;
+  ts?: string | null;
+}): HelixVisualSnapshotSource | null {
+  const source = sourcesById.get(input.sourceId);
+  if (!source) return null;
+  const updated: HelixVisualSnapshotSource = {
+    ...source,
+    ...(input.status ? { status: input.status } : {}),
+    updated_at: input.ts ?? nowIso(),
+  };
+  sourcesById.set(updated.source_id, updated);
+  return updated;
+}
+
 export function updateVisualSnapshotSource(input: Record<string, unknown>): HelixVisualSnapshotSourceReceipt {
   const sourceId = readString(input.source_id);
   if (!sourceId) {
@@ -229,6 +245,9 @@ export function recordVisualFrame(input: Record<string, unknown>): HelixVisualFr
   };
   const existing = framesByThread.get(threadId) ?? [];
   framesByThread.set(threadId, [...existing.filter((entry) => entry.frame_id !== frame.frame_id), frame].slice(-500));
+  if (source) {
+    touchVisualSnapshotSource({ sourceId: source.source_id, status: "active", ts: frame.ts });
+  }
   return frame;
 }
 
@@ -282,6 +301,7 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
   };
   const existing = evidenceByThread.get(frame.thread_id) ?? [];
   evidenceByThread.set(frame.thread_id, [...existing.filter((entry) => entry.evidence_id !== evidence.evidence_id), evidence].slice(-500));
+  touchVisualSnapshotSource({ sourceId: frame.source_id, status: "active", ts: evidence.ts });
   return evidence;
 }
 

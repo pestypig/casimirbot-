@@ -17,6 +17,7 @@ import {
   resetVisualSnapshotStoreForTest,
   startVisualSnapshotSource,
 } from "../services/situation-room/visual-snapshot-store";
+import { synthesizePresentState } from "../services/situation-room/present-state-synthesizer";
 
 const threadId = "thread:fidelity";
 const now = "2026-05-15T05:00:00.000Z";
@@ -159,6 +160,72 @@ describe("live environment source fidelity", () => {
     expect(states[0].source_coverage.world_event).toBe("supported");
     expect(states[0].source_coverage.visual_frame).toBe("not_applicable");
     expect(states[0].assistant_answer).toBe(false);
+  });
+
+  it("does not synthesize farm/base language for generic visual-only sources", () => {
+    const states = buildLiveCardLineStates({
+      lines: [{
+        key: "scene",
+        label: "Scene",
+        value: "A browser tab with a dashboard is visible.",
+        confidence: 0.7,
+        evidence_refs: ["visual_evidence:dashboard"],
+        updated_at: now,
+      }],
+      sourceCapabilities: [
+        {
+          schema: "helix.situation_source_capability.v1",
+          source_id: "source:visual-dashboard",
+          thread_id: threadId,
+          modality: "visual_frame",
+          status: "active",
+          contribution: "visual_scene",
+          fidelity_score: 0.8,
+          last_event_ts: now,
+          raw_content_included: false,
+          assistant_answer: false,
+        },
+      ],
+      now,
+    });
+    const synthesis = synthesizePresentState({
+      threadId,
+      lineStates: states,
+      interpretedEvents: [{
+        schema: "helix.interpreted_event.v1",
+        event_id: "visual:event:dashboard",
+        thread_id: threadId,
+        kind: "visual_observation",
+        title: "Visual frame analyzed",
+        summary: "A browser tab with a dashboard and controls is visible.",
+        evidence_refs: ["visual_evidence:dashboard"],
+        created_at: now,
+        model_invoked: true,
+        deterministic: false,
+        assistant_answer: false,
+        raw_logs_included: false,
+        context_policy: "compact_context_pack_only",
+      }],
+      fidelityProfile: {
+        schema: "helix.live_environment_fidelity.v1",
+        thread_id: threadId,
+        active_modalities: ["visual_frame"],
+        missing_modalities: ["world_event", "audio_transcript"],
+        stale_modalities: [],
+        fidelity_score: 0.5,
+        source_contribution_map: { visual_frame: ["visual_scene"] },
+        per_line_coverage: {},
+        next_actions: ["attach_world_event_source"],
+        capabilities: [],
+        raw_content_included: false,
+        assistant_answer: false,
+        context_policy: "compact_context_pack_only",
+        created_at: now,
+      },
+      now,
+    });
+    expect(JSON.stringify(synthesis)).not.toContain("Farm/base");
+    expect(synthesis.lines[0]).toMatchObject({ key: "scene", label: "Scene" });
   });
 
   it("marks stale source heartbeat as stale in the fidelity profile", () => {

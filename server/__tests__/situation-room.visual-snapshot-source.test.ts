@@ -3,9 +3,14 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import {
+  buildSituationSourceCapabilities,
+  resetSituationSourceCapabilitiesForTest,
+} from "../services/situation-room/situation-source-capability-store";
+import {
   clearInterpretedEventLogForTest,
   listInterpretedEvents,
 } from "../services/situation-room/interpreted-event-log-store";
+import { resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
 
 const threadId = "helix-ask:desktop";
 
@@ -20,6 +25,8 @@ const createApp = async (): Promise<express.Express> => {
 describe("visual snapshot source routes", () => {
   beforeEach(() => {
     resetVisualSnapshotStoreForTest();
+    resetSituationSourceCapabilitiesForTest();
+    resetLiveAnswerEnvironments();
     clearInterpretedEventLogForTest();
   });
 
@@ -176,6 +183,55 @@ describe("visual snapshot source routes", () => {
     });
   }, 10000);
 
+  it("reports active visual capture as waiting for first frame until a frame is captured", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/visual-source/start")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual:first-frame",
+        source_surface: "desktop_window",
+        status: "permission_required",
+      })
+      .expect(200);
+    await request(app)
+      .post("/api/agi/situation/visual-source/permission-granted")
+      .send({ source_id: "source:visual:first-frame", client_stream_confirmed: true })
+      .expect(200);
+
+    const before = buildSituationSourceCapabilities({ threadId, includeDefaults: false });
+    expect(before).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source_id: "source:visual:first-frame",
+        modality: "visual_frame",
+        status: "active",
+        missing_reason: "Visual capture is active and waiting for the first frame.",
+        next_required_action: "capture_first_frame",
+      }),
+    ]));
+
+    await request(app)
+      .post("/api/agi/situation/visual-source/capture-first-frame")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual:first-frame",
+        image_ref: "ephemeral://frame/first",
+        image_sha256: "c".repeat(64),
+        mime_type: "image/png",
+      })
+      .expect(200);
+    const after = buildSituationSourceCapabilities({ threadId, includeDefaults: false });
+    expect(after).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source_id: "source:visual:first-frame",
+        modality: "visual_frame",
+        status: "active",
+        missing_reason: null,
+        next_required_action: null,
+      }),
+    ]));
+  }, 10000);
+
   it("accepts an inline image for analysis while keeping raw bytes out of the response", async () => {
     const previousVisionBase = process.env.VISION_HTTP_BASE;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
@@ -217,6 +273,95 @@ describe("visual snapshot source routes", () => {
     });
     expect(JSON.stringify(response.body)).not.toContain("iVBORw0KGgo");
     expect(JSON.stringify(response.body)).not.toContain("data:image");
+  }, 10000);
+
+  it("derives a generic visual line schema from first frame evidence", async () => {
+    const app = await createApp();
+    const environmentResponse = await request(app)
+      .post("/api/agi/situation/live-answer-environment/start")
+      .send({
+        thread_id: threadId,
+        objective: "Start a live answer from this screen share.",
+        preset: "custom",
+        source_ids: [],
+      })
+      .expect(200);
+    const environmentId = (environmentResponse.body.environment ?? environmentResponse.body.live_answer_environment).environment_id;
+
+    const analysisResponse = await request(app)
+      .post("/api/agi/situation/visual-frame/analyze")
+      .send({
+        thread_id: threadId,
+        source_id: "source:screen-share",
+        image_base64:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
+        summary: "A browser tab with a dashboard and controls is visible.",
+        detected_objects: ["dashboard", "controls"],
+      })
+      .expect(200);
+
+    const deriveResponse = await request(app)
+      .post(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environmentId)}/derive-line-schema`)
+      .send({
+        visual_evidence_id: analysisResponse.body.evidence.evidence_id,
+      })
+      .expect(200);
+
+    expect(deriveResponse.body.derivation).toMatchObject({
+      schema: "helix.live_line_schema_derivation.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const labels = deriveResponse.body.environment.line_schema.map((line: any) => line.label);
+    expect(labels).toEqual(expect.arrayContaining(["Scene", "Activity", "Objects", "Evidence"]));
+    expect(labels).not.toEqual(expect.arrayContaining(["Place", "Entities"]));
+    expect(deriveResponse.body.environment.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: "scene",
+        value: "A browser tab with a dashboard and controls is visible.",
+        evidence_refs: [analysisResponse.body.evidence.evidence_id],
+      }),
+    ]));
+    expect(JSON.stringify(deriveResponse.body)).not.toContain("Farm/base area");
+  }, 10000);
+
+  it("seeds a new visual live environment from latest visual evidence", async () => {
+    const app = await createApp();
+    const analysisResponse = await request(app)
+      .post("/api/agi/situation/visual-frame/analyze")
+      .send({
+        thread_id: threadId,
+        source_id: "source:minecraft-visual",
+        image_base64:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
+        summary: "The Minecraft screen shows a player looking at a chest inventory with item stacks visible.",
+        detected_objects: ["chest inventory", "item stacks"],
+      })
+      .expect(200);
+
+    const environmentResponse = await request(app)
+      .post("/api/agi/situation/live-answer-environment/start")
+      .send({
+        thread_id: threadId,
+        room_id: "room:minecraft-minehut",
+        objective: "I have visual capture active. Set up a Minecraft Cortana live environment using the active visual source.",
+        preset: "minecraft_run_monitor",
+        source_ids: [],
+      })
+      .expect(200);
+
+    expect(environmentResponse.body.line_schema_derivation).toMatchObject({
+      schema: "helix.live_line_schema_derivation.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(environmentResponse.body.live_answer_environment.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: "place",
+        value: "The Minecraft screen shows a player looking at a chest inventory with item stacks visible.",
+        evidence_refs: [analysisResponse.body.evidence.evidence_id],
+      }),
+    ]));
   }, 10000);
 
   it("creates visual frame evidence and visual-event alignment as non-answer validation", async () => {

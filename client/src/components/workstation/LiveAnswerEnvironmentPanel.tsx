@@ -26,6 +26,7 @@ import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-e
 import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
 import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
+import { runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
 
 type LiveEnvironmentTab = "present_state" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
@@ -239,6 +240,18 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     () => sourceHealthEntries.find((entry) => entry.modality === "visual_frame") ?? null,
     [sourceHealthEntries],
   );
+  const sourceStatusLabel = (capability: HelixSituationSourceCapability): string => {
+    if (capability.modality === "visual_frame" && capability.status === "active" && capability.next_required_action === "capture_first_frame") {
+      return "active, waiting for first frame";
+    }
+    if (capability.modality === "visual_frame" && capability.status === "active" && capability.last_event_ts) {
+      return `active, last frame ${new Date(capability.last_event_ts).toLocaleTimeString()}`;
+    }
+    if (capability.modality === "visual_frame" && capability.status === "stale" && capability.last_event_ts) {
+      return `stale, last frame ${new Date(capability.last_event_ts).toLocaleTimeString()}`;
+    }
+    return capability.status;
+  };
 
   const refresh = async () => {
     try {
@@ -460,12 +473,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     try {
       const source = await ensureVisualSourceRegistered();
       stream = await requestDisplayStream();
-      stream.getTracks().forEach((track) => track.stop());
-      await postJson("/api/agi/situation/visual-source/permission-granted", {
-        source_id: source.source_id,
-        client_stream_confirmed: true,
+      const result = await runVisualFrameProducerOnce({
+        sourceId: source.source_id,
+        threadId,
+        roomId: environment?.room_id ?? null,
+        environmentId: environment?.environment_id ?? null,
+        stream,
+        postJson,
       });
-      setLastActionStatus("Visual capture permission confirmed for this source.");
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+      setLastActionStatus(`Visual capture active; first frame analyzed. ${result.summary}`);
       await refresh();
     } catch (error) {
       stream?.getTracks().forEach((track) => track.stop());
@@ -479,46 +497,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       const source = await ensureVisualSourceRegistered();
       const sourceId = source.source_id;
       stream = await requestDisplayStream();
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      await video.play();
-      await new Promise<void>((resolve) => {
-        if (video.videoWidth > 0 && video.videoHeight > 0) resolve();
-        else video.onloadedmetadata = () => resolve();
+      const result = await runVisualFrameProducerOnce({
+        sourceId,
+        threadId,
+        roomId: environment?.room_id ?? null,
+        environmentId: environment?.environment_id ?? null,
+        stream,
+        postJson,
       });
-      const maxWidth = 1280;
-      const scale = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("screen_capture_canvas_unavailable");
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
-      if (source.status === "permission_required" || visualLatest?.source?.status === "permission_required") {
-        await postJson("/api/agi/situation/visual-source/permission-granted", {
-          source_id: sourceId,
-          client_stream_confirmed: true,
-        });
-      }
-      await postJson("/api/agi/situation/visual-frame/analyze", {
-        thread_id: threadId,
-        room_id: environment?.room_id ?? undefined,
-        source_id: sourceId,
-        image_base64: imageBase64,
-        mime_type: "image/jpeg",
-        prompt: "Summarize this permission-bound live frame as compact evidence for the current live environment. Focus on visible place, activity, entities, UI/game context, and uncertainty.",
-      });
-      await postJson("/api/agi/situation/visual-frame/align-with-events", {
-        thread_id: threadId,
-        room_id: environment?.room_id ?? undefined,
-        limit: 40,
-      });
-      setLastActionStatus("Captured, analyzed, and aligned one visual frame.");
+      setLastActionStatus(`Captured, analyzed, and aligned one visual frame. ${result.summary}`);
       await refresh();
     } catch (error) {
       stream?.getTracks().forEach((track) => track.stop());
@@ -628,7 +617,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               title={capability.missing_reason ?? capability.source_id}
               className={`rounded border px-2 py-1 text-[10px] ${sourceStatusClass(capability.status)}`}
             >
-              {modalityLabel(capability.modality)}: {capability.status}
+              {modalityLabel(capability.modality)}: {sourceStatusLabel(capability)}
             </span>
           ))}
         </div>
@@ -735,14 +724,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             disabled={visualLatest?.source?.status === "active"}
             className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {visualLatest?.source ? "Grant visual capture" : "Register + grant visual"}
+            {visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
           </button>
           <button
             type="button"
             onClick={() => void captureVisualFrameNow()}
             className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Capture now
+            {visualSourceCapability?.next_required_action === "capture_first_frame" ? "Capture first frame" : "Capture now"}
           </button>
           <button
             type="button"

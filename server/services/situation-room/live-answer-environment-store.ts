@@ -101,6 +101,16 @@ const normalizeLineDefinition = (line: LiveAnswerLineDefinition): LiveAnswerLine
   };
 };
 
+const genericVisualLineSchema: LiveAnswerLineDefinition[] = [
+  { key: "scene", label: "Scene", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "activity", label: "Activity", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "objects", label: "Objects", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "evidence", label: "Evidence", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "uncertainty", label: "Uncertainty", update_policy: "projection_only", visibility: "answer_card", priority: "warn" },
+  { key: "next_check", label: "Next check", update_policy: "projection_only", visibility: "answer_card", priority: "action" },
+  { key: "last_update", label: "Last update", update_policy: "projection_only", visibility: "answer_card", priority: "info" },
+];
+
 export function resolveLiveAnswerLineSchema(input: {
   preset?: string | null;
   line_schema?: LiveAnswerLineDefinition[] | null;
@@ -110,7 +120,8 @@ export function resolveLiveAnswerLineSchema(input: {
     : [];
   if (custom.length > 0) return custom.slice(0, 16);
   const preset = normalizePreset(input.preset);
-  return LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS[preset === "custom" ? "minecraft_run_monitor" : preset].map((line: LiveAnswerLineDefinition) => ({ ...line }));
+  if (preset === "custom") return genericVisualLineSchema.map((line: LiveAnswerLineDefinition) => ({ ...line }));
+  return LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS[preset].map((line: LiveAnswerLineDefinition) => ({ ...line }));
 }
 
 const initialValueForLine = (line: LiveAnswerLineDefinition, objective: string): string => {
@@ -496,12 +507,30 @@ export function setLiveAnswerEnvironmentLineSchema(input: {
     .filter((line: LiveAnswerLineDefinition | null): line is LiveAnswerLineDefinition => Boolean(line))
     .slice(0, 16);
   if (normalizedSchema.length === 0) return null;
+  const rawByKey = new Map<string, Record<string, unknown>>();
+  for (const rawLine of input.line_schema as Array<LiveAnswerLineDefinition & Record<string, unknown>>) {
+    const key = normalizeLiveAnswerLineKey(String(rawLine.key ?? ""));
+    if (key) rawByKey.set(key, rawLine);
+  }
   const existingByKey = buildLinesByKey(existing.lines);
-  const nextLines = normalizedSchema.map((line: LiveAnswerLineDefinition) =>
-    existingByKey[line.key]
+  const nextLines = normalizedSchema.map((line: LiveAnswerLineDefinition) => {
+    const raw = rawByKey.get(line.key);
+    const initialValue = normalizeString(typeof raw?.initial_value === "string" ? raw.initial_value : null);
+    const evidenceRefs = uniqueStrings(Array.isArray(raw?.evidence_refs)
+      ? raw.evidence_refs.map((entry) => String(entry ?? ""))
+      : [`live_answer_environment:${existing.environment_id}:line_schema`]);
+    const base = existingByKey[line.key]
       ? { ...existingByKey[line.key], ...line }
-      : makeLineState(line, existing.objective, now, [`live_answer_environment:${existing.environment_id}:line_schema`]),
-  );
+      : makeLineState(line, existing.objective, now, evidenceRefs);
+    return {
+      ...base,
+      ...(initialValue ? { value: initialValue } : {}),
+      evidence_refs: evidenceRefs.length > 0 ? evidenceRefs : base.evidence_refs,
+      updated_at: now,
+      source: initialValue ? "tool_observation" as const : base.source,
+      deterministic: initialValue ? false : base.deterministic,
+    };
+  });
   const next: LiveAnswerEnvironment = {
     ...existing,
     line_schema: normalizedSchema,

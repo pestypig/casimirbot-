@@ -9,7 +9,7 @@ import {
 import type { WorkstationLiveSource, WorkstationLiveSourceKind } from "@shared/helix-workstation-live-source";
 import type { HelixVisualSnapshotSource } from "@shared/helix-visual-snapshot-source";
 import { listWorkstationLiveSources } from "./workstation-live-source-ingest";
-import { listVisualSnapshotSources } from "./visual-snapshot-store";
+import { listVisualFrames, listVisualSnapshotSources } from "./visual-snapshot-store";
 import { isVisualHeartbeatExempt, resolveHeartbeatStatus } from "./source-heartbeat-monitor";
 
 const explicitCapabilities = new Map<string, HelixSituationSourceCapability>();
@@ -131,13 +131,17 @@ const fromWorkstationSource = (source: WorkstationLiveSource, now: string): Heli
 };
 
 const fromVisualSource = (source: HelixVisualSnapshotSource, now: string): HelixSituationSourceCapability => {
+  const latestFrame = listVisualFrames({ threadId: source.thread_id, limit: 100 })
+    .filter((frame) => frame.source_id === source.source_id)
+    .at(-1) ?? null;
   const status = resolveHeartbeatStatus({
     modality: "visual_frame",
     currentStatus: source.status,
-    lastEventTs: source.updated_at,
+    lastEventTs: latestFrame?.ts ?? source.updated_at,
     now,
     heartbeatExempt: isVisualHeartbeatExempt(source),
   });
+  const waitingForFirstFrame = status === "active" && !latestFrame;
   return capability({
     source_id: source.source_id,
     thread_id: source.thread_id,
@@ -147,14 +151,18 @@ const fromVisualSource = (source: HelixVisualSnapshotSource, now: string): Helix
     status,
     contribution: "visual_scene",
     fidelity_score: fidelityForStatus(status),
-    last_event_ts: source.updated_at,
+    last_event_ts: latestFrame?.ts ?? source.updated_at,
     missing_reason: status === "permission_required"
       ? "Browser capture permission has not been granted for this visual source."
+      : waitingForFirstFrame
+        ? "Visual capture is active and waiting for the first frame."
       : status === "stale"
         ? "Visual source has not produced a recent frame or status update."
         : null,
     next_required_action: status === "permission_required"
       ? "grant_visual_capture_permission"
+      : waitingForFirstFrame
+        ? "capture_first_frame"
       : status === "stale"
         ? "capture_frame_now"
         : null,
@@ -288,6 +296,8 @@ export function buildSituationSourceCapabilities(input: {
   const deduped = new Map<string, HelixSituationSourceCapability>();
   for (const entry of inferred) {
     if (input.roomId && entry.room_id && entry.room_id !== input.roomId) continue;
+    const existing = deduped.get(entry.source_id);
+    if (existing?.modality === "visual_frame" && entry.modality === "visual_frame") continue;
     deduped.set(entry.source_id, entry);
   }
   const capabilities = Array.from(deduped.values());

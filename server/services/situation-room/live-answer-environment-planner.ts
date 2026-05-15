@@ -3,6 +3,7 @@ import type {
   LiveAnswerLineDefinition,
 } from "@shared/helix-live-answer-environment";
 import { findLiveAnswerEnvironmentRecipe } from "@shared/helix-live-answer-recipes";
+import { GENERIC_VISUAL_LIVE_LINE_SCHEMA } from "./live-line-schema-deriver";
 
 const has = (transcript: string, pattern: RegExp): boolean => pattern.test(transcript);
 
@@ -16,6 +17,7 @@ export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
     return /\b(?:create|start|set\s+up|setup|make|open|enable|turn\s+on|use)\b/.test(normalized);
   }
   if (/\bcreate\s+(?:a\s+)?live\b/.test(normalized) && /\b(?:environment|monitor|tracker|readout|artifact)\b/.test(normalized)) return true;
+  if (/\b(?:start|watch|monitor|use|set\s+up|setup|create)\b[\s\S]{0,80}\b(?:screen\s*share|screen|window|tab|visual\s+source|visual\s+capture)\b/.test(normalized) && /\b(?:live|source|environment|interpretation|answer|monitor|watch)\b/.test(normalized)) return true;
   if (/\btrack\s+this\s+video\b/.test(normalized)) return true;
   if (/\bfollow\s+this\s+research\s+session\b/.test(normalized)) return true;
   if (/\bwatch\s+my\s+minecraft\s+run\b/.test(normalized)) return true;
@@ -105,6 +107,11 @@ export function inferLiveAnswerEnvironmentSourceArgs(transcript: string): {
   next_required_action?: string;
 } {
   const preset = inferLiveAnswerEnvironmentPreset(transcript);
+  if (preset === "custom" && /\b(?:screen\s*share|screen|window|tab|visual\s+source|visual\s+capture)\b/i.test(transcript)) {
+    return {
+      source_ids: [],
+    };
+  }
   if (preset === "minecraft_run_monitor") {
     if (isWorldEventSourceMissing(transcript)) {
       return {
@@ -144,6 +151,9 @@ export function buildLiveAnswerEnvironmentArgs(args: {
 }): Record<string, unknown> {
   const normalized = args.transcript.trim().toLowerCase();
   const preset = inferLiveAnswerEnvironmentPreset(normalized);
+  const visualGeneric =
+    preset === "custom" &&
+    /\b(?:screen\s*share|screen|window|tab|visual\s+source|visual\s+capture)\b/.test(normalized);
   const mode =
     /\bcritical\s+voice\b/.test(normalized)
       ? "critical_voice"
@@ -158,6 +168,7 @@ export function buildLiveAnswerEnvironmentArgs(args: {
     preset,
     mode,
     ...inferLiveAnswerEnvironmentSourceArgs(args.transcript),
+    ...(visualGeneric ? { line_schema: GENERIC_VISUAL_LIVE_LINE_SCHEMA } : {}),
     ...(preset === "calculator_prime_stream"
       ? {
           source_config: {

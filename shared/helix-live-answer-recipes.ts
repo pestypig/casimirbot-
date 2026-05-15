@@ -25,6 +25,16 @@ const safety = {
   deterministic_content_role: "observation_not_assistant_answer" as const,
 } as const;
 
+const genericVisualLineSchema: LiveAnswerLineDefinition[] = [
+  { key: "scene", label: "Scene", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "activity", label: "Activity", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "objects", label: "Objects", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "evidence", label: "Evidence", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "uncertainty", label: "Uncertainty", update_policy: "projection_only", visibility: "answer_card", priority: "warn" },
+  { key: "next_check", label: "Next check", update_policy: "projection_only", visibility: "answer_card", priority: "action" },
+  { key: "last_update", label: "Last update", update_policy: "projection_only", visibility: "answer_card", priority: "info" },
+];
+
 export const LIVE_ANSWER_ENVIRONMENT_RECIPES: LiveAnswerEnvironmentRecipe[] = [
   {
     recipe_id: "minecraft_run_monitor",
@@ -93,7 +103,7 @@ export const LIVE_ANSWER_ENVIRONMENT_RECIPES: LiveAnswerEnvironmentRecipe[] = [
     recipe_id: "custom_live_answer",
     aliases: ["custom live answer"],
     objective_template: "Create a custom live answer environment.",
-    default_line_schema: LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS.minecraft_run_monitor,
+    default_line_schema: genericVisualLineSchema,
     source_requirements: [],
     default_mode: "text_only",
     safety_policy: safety,

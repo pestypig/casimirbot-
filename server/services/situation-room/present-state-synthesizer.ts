@@ -90,22 +90,30 @@ export function synthesizePresentState(input: {
   const staleVisual = staleModalities.includes("visual_frame");
   const staleWorld = staleModalities.includes("world_event");
   const staleTranscript = staleModalities.includes("audio_transcript");
+  const hasVisualObservation = /\bvisual|frame|screen|scene|image|window|tab\b/.test(visualText) || hasVisual;
+  const genericVisualOnly = hasVisualObservation && !minecraftLike && !hasWorldEvents;
 
   const place = hasFarmVisual
     ? "Wheat/chicken farm area."
     : minecraftLike
-      ? (hasVisual ? "Farm/base area near recent Minecraft activity." : "Farm/base area is possible; visual source is not yet active.")
-      : "Current live source context.";
+      ? (hasVisual ? "Minecraft scene from the active visual source." : "Minecraft monitoring is waiting for visual or world-event evidence.")
+      : genericVisualOnly
+        ? "Current visual scene."
+        : "Current live source context.";
   const activity = hasEditing
     ? (hasFarmVisual ? "Decorating or editing the farm boundary." : "Editing blocks while the live source tracks nearby context.")
     : minecraftLike
       ? `Monitoring current Minecraft activity${hasWorldEvents ? " from world-event evidence" : ""}${hasTranscript ? " and transcript context" : ""}.`
-      : "Monitoring the active live environment.";
+      : genericVisualOnly
+        ? "Monitoring the active visual source."
+        : "Monitoring the active live environment.";
   const structure = hasMining
     ? "Farm/base context is separate from side trench or mineshaft evidence."
     : hasFarmVisual
       ? "Farm complex; automation and vertical relation are not fully proven."
-      : "No stable structure purpose has been confirmed yet.";
+      : genericVisualOnly
+        ? "No stable scene structure is confirmed yet."
+        : "No stable structure purpose has been confirmed yet.";
   const entities = /\bchicken\b/.test(allText)
     ? "Contained chicken cluster or chicken-related evidence nearby."
     : /\b(?:entity|mob|hostile|creeper|zombie)\b/.test(allText)
@@ -119,10 +127,10 @@ export function synthesizePresentState(input: {
 
   const relevantStates = input.lineStates.length > 0 ? input.lineStates : [];
   const lines: HelixPresentStateSynthesisLine[] = [
-    makeLine({ key: "place", label: "Place", value: place, states: relevantStates, confidence: hasFarmVisual ? 0.72 : avgConfidence(relevantStates, 0.45), now }),
+    makeLine({ key: genericVisualOnly ? "scene" : "place", label: genericVisualOnly ? "Scene" : "Place", value: place, states: relevantStates, confidence: hasFarmVisual ? 0.72 : avgConfidence(relevantStates, 0.45), now }),
     makeLine({ key: "activity", label: "Activity", value: activity, states: relevantStates, confidence: hasEditing ? 0.68 : avgConfidence(relevantStates, 0.42), now }),
-    makeLine({ key: "structure", label: "Structure", value: structure, states: relevantStates, confidence: hasMining || hasFarmVisual ? 0.62 : 0.38, now }),
-    makeLine({ key: "entities", label: "Entities", value: entities, states: relevantStates, confidence: /\b(?:chicken|entity|mob|hostile|creeper|zombie)\b/.test(allText) ? 0.64 : 0.35, now }),
+    makeLine({ key: genericVisualOnly ? "objects" : "structure", label: genericVisualOnly ? "Objects" : "Structure", value: genericVisualOnly ? "Visible objects are tracked from the latest frame evidence." : structure, states: relevantStates, confidence: hasMining || hasFarmVisual ? 0.62 : 0.38, now }),
+    makeLine({ key: genericVisualOnly ? "evidence" : "entities", label: genericVisualOnly ? "Evidence" : "Entities", value: genericVisualOnly ? "Latest compact visual evidence supports the card; no raw image is in Ask context." : entities, states: relevantStates, confidence: /\b(?:chicken|entity|mob|hostile|creeper|zombie)\b/.test(allText) ? 0.64 : 0.35, now }),
     makeLine({ key: "risk", label: "Risk", value: risk, states: relevantStates, confidence: hasThreat ? 0.7 : 0.45, now }),
     makeLine({
       key: "missing_evidence",
@@ -160,7 +168,7 @@ export function synthesizePresentState(input: {
     }),
   ];
 
-  const summary = `Present state synthesized as ${lines.find((line) => line.key === "place")?.value ?? "current context"} ${lines.find((line) => line.key === "activity")?.value ?? ""}`.trim();
+  const summary = `Present state synthesized as ${lines.find((line) => line.key === "place" || line.key === "scene")?.value ?? "current context"} ${lines.find((line) => line.key === "activity")?.value ?? ""}`.trim();
 
   return {
     schema: HELIX_PRESENT_STATE_SYNTHESIS_SCHEMA,

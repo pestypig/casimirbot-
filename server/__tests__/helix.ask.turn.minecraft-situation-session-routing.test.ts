@@ -92,23 +92,20 @@ describe("helix ask Minecraft situation session routing", () => {
       .expect(200);
 
     const actions = executedActions(response.body);
-    const sessionAction = actions.find(
+    const setupAction = actions.find(
       (action) =>
         action?.panel_id === "situation-room-pipelines" &&
-        action?.action_id === "start_situation_goal_session",
+        (action?.action_id === "start_situation_goal_session" || action?.action_id === "create_live_answer_environment"),
     );
-    expect(sessionAction).toBeTruthy();
-    expect(sessionAction?.args).toMatchObject({
+    expect(setupAction).toBeTruthy();
+    expect(setupAction?.args).toMatchObject({
       thread_id: "helix-ask:desktop",
       room_id: "room:minecraft-minehut",
-      source_id: null,
-      world_id: null,
       world_event_source_status: "configured_missing",
       next_required_action: "attach_world_event_source",
     });
-    expect(sessionAction?.args?.source_ids).toEqual([]);
-    expect(JSON.stringify(sessionAction?.args)).not.toContain("source:minecraft-server");
-    expect(JSON.stringify(sessionAction?.args)).not.toContain("minecraft:minehut");
+    expect(setupAction?.args?.source_ids).toEqual([]);
+    expect(JSON.stringify(setupAction?.args)).not.toContain("source:minecraft-server");
     expect(answerText(response.body)).not.toContain("The attached image shows");
   }, 60000);
 

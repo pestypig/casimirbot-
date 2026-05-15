@@ -61,6 +61,7 @@ import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
+import { runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
 import {
   createSituationRoomState,
   sourceLabelForSituationSource,
@@ -17858,55 +17859,20 @@ export function HelixAskPill({
     try {
       const sourceId = await ensureHelixAskVisualSource();
       stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      await video.play();
-      await new Promise<void>((resolve) => {
-        if (video.videoWidth > 0 && video.videoHeight > 0) resolve();
-        else video.onloadedmetadata = () => resolve();
+      const result = await runVisualFrameProducerOnce({
+        sourceId,
+        threadId: "helix-ask:desktop",
+        roomId: null,
+        stream,
+        postJson: postSituationJson,
       });
-      const maxWidth = 1280;
-      const scale = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("screen_capture_canvas_unavailable");
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
-      await postSituationJson("/api/agi/situation/visual-source/permission-granted", {
-        source_id: sourceId,
-        client_stream_confirmed: true,
-      });
-      const analysis = await postSituationJson("/api/agi/situation/visual-frame/analyze", {
-        thread_id: "helix-ask:desktop",
-        room_id: null,
-        source_id: sourceId,
-        image_base64: imageBase64,
-        mime_type: "image/jpeg",
-        prompt: "Summarize this permission-bound live frame as compact evidence for the current live environment. Focus on visible place, activity, entities, UI/game context, and uncertainty.",
-      });
-      await postSituationJson("/api/agi/situation/visual-frame/align-with-events", {
-        thread_id: "helix-ask:desktop",
-        room_id: null,
-        limit: 40,
-      });
-      const summary =
-        typeof analysis?.evidence?.summary === "string" && analysis.evidence.summary.trim()
-          ? analysis.evidence.summary.trim()
-          : "Visual frame captured and recorded as compact evidence.";
-      const evidence = analysis?.evidence && typeof analysis.evidence === "object"
-        ? analysis.evidence as Record<string, unknown>
-        : null;
       return {
-        summary,
-        visualEvidence: evidence
+        summary: result.summary,
+        visualEvidence: result.evidence
           ? {
-              evidence,
+              evidence: result.evidence,
               source: {
                 source_id: sourceId,
                 source_family: "visual_snapshot",
