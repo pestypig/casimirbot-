@@ -17,6 +17,7 @@ export type HelixMinecraftCortanaReadinessItem = {
     | "discord_voice"
     | "categorization_jobs"
     | "live_answer_environment"
+    | "worker_lanes"
     | "companion_policy";
   ok: boolean;
   status: HelixMinecraftCortanaReadinessStatus;

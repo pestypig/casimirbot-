@@ -17,8 +17,26 @@ const isAnalysisFailureSummary = (summary: string): boolean =>
 const providerStatus = (): HelixVisualProviderStatus => {
   const health = getVisionProviderHealth();
   if (!health.configured) return "missing";
+  if (health.last_error) return "failed";
   if (!health.can_analyze_inline_image) return "failed";
   return "configured";
+};
+
+const nextActionFor = (input: {
+  status: HelixVisualEvidenceHealth["status"];
+  provider: HelixVisualProviderStatus;
+}): string | null => {
+  if (input.status === "waiting_for_first_frame") return "capture_first_frame";
+  if (input.status === "stale") return "capture_frame_now";
+  if (input.status === "frame_captured") {
+    if (input.provider === "missing" || input.provider === "failed") return "configure_vision_provider";
+    return "capture_frame_now";
+  }
+  if (input.status === "analysis_failed") {
+    if (input.provider === "missing" || input.provider === "failed") return "configure_vision_provider";
+    return "capture_frame_now";
+  }
+  return null;
 };
 
 export function getVisualEvidenceHealth(input: {
@@ -33,6 +51,34 @@ export function getVisualEvidenceHealth(input: {
   const source = sources.at(-1) ?? null;
   const provider = providerStatus();
   if (!source) {
+    const latestFrame = listVisualFrames({ threadId: input.threadId, limit: 100 })
+      .filter((frame) => !input.sourceId || frame.source_id === input.sourceId)
+      .at(-1) ?? null;
+    const latestEvidence = listVisualFrameEvidence({ threadId: input.threadId, limit: 100 })
+      .filter((evidence) => !input.sourceId || evidence.source_id === input.sourceId)
+      .at(-1) ?? null;
+    if (latestFrame || latestEvidence) {
+      const summary = latestEvidence?.summary ?? null;
+      const failed = summary ? isAnalysisFailureSummary(summary) : false;
+      const status: HelixVisualEvidenceHealth["status"] = !latestEvidence
+        ? "frame_captured"
+        : failed
+          ? "analysis_failed"
+          : "analysis_ready";
+      return {
+        schema: HELIX_VISUAL_EVIDENCE_HEALTH_SCHEMA,
+        source_id: latestEvidence?.source_id ?? latestFrame?.source_id ?? input.sourceId ?? null,
+        thread_id: input.threadId,
+        status,
+        latest_frame_id: latestFrame?.frame_id ?? latestEvidence?.frame_id ?? null,
+        latest_evidence_id: latestEvidence?.evidence_id ?? null,
+        latest_summary: summary,
+        provider_status: provider,
+        next_required_action: nextActionFor({ status, provider }),
+        assistant_answer: false,
+        raw_image_included: false,
+      };
+    }
     return {
       schema: HELIX_VISUAL_EVIDENCE_HEALTH_SCHEMA,
       source_id: null,
@@ -94,13 +140,7 @@ export function getVisualEvidenceHealth(input: {
     latest_evidence_id: latestEvidence?.evidence_id ?? null,
     latest_summary: summary,
     provider_status: provider,
-    next_required_action: status === "waiting_for_first_frame"
-      ? "capture_first_frame"
-      : status === "frame_captured" || status === "analysis_failed"
-        ? "analyze_latest_frame"
-        : status === "stale"
-          ? "capture_frame_now"
-          : null,
+    next_required_action: nextActionFor({ status, provider }),
     assistant_answer: false,
     raw_image_included: false,
   };

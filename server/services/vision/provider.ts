@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import type { HelixVisualProviderHealth } from "@shared/helix-visual-evidence-health";
 
 type CaptionResult = string | undefined;
+let lastVisionProviderError: string | null = null;
 
 export interface VisionProvider {
   describeImage(imageBase64: string, mime: string, prompt: string): Promise<CaptionResult>;
@@ -38,7 +39,11 @@ class OpenAiVisionProvider implements VisionProvider {
   async describeImage(imageBase64: string, mime: string, prompt: string): Promise<CaptionResult> {
     const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
     const base = env("VISION_HTTP_BASE") || (apiKey ? "https://api.openai.com" : "");
-    if (!base || typeof fetch !== "function") return undefined;
+    lastVisionProviderError = null;
+    if (!base || typeof fetch !== "function") {
+      lastVisionProviderError = !base ? "vision_provider_base_missing" : "fetch_unavailable";
+      return undefined;
+    }
     const model = env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini";
     const body = {
       model,
@@ -61,19 +66,34 @@ class OpenAiVisionProvider implements VisionProvider {
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
       body: JSON.stringify(body),
-    }, timeoutMs).catch(() => undefined);
-    if (!res) return undefined;
-    if (!res.ok) return undefined;
+    }, timeoutMs).catch((error: unknown) => {
+      lastVisionProviderError = error instanceof Error ? error.message : "vision_provider_request_failed";
+      return undefined;
+    });
+    if (!res) {
+      lastVisionProviderError ??= "vision_provider_request_failed";
+      return undefined;
+    }
+    if (!res.ok) {
+      lastVisionProviderError = `vision_provider_http_${res.status}`;
+      return undefined;
+    }
     const payloadJson = (await res.json()) as any;
     const text = payloadJson?.choices?.[0]?.message?.content;
-    return typeof text === "string" ? text.trim() : undefined;
+    const trimmed = typeof text === "string" ? text.trim() : "";
+    if (!trimmed) lastVisionProviderError = "vision_provider_empty_response";
+    return trimmed || undefined;
   }
 }
 
 class OllamaVisionProvider implements VisionProvider {
   async describeImage(imageBase64: string, mime: string, prompt: string): Promise<CaptionResult> {
     const base = env("OLLAMA_ENDPOINT") || env("VISION_HTTP_BASE");
-    if (!base || typeof fetch !== "function") return undefined;
+    lastVisionProviderError = null;
+    if (!base || typeof fetch !== "function") {
+      lastVisionProviderError = !base ? "vision_provider_base_missing" : "fetch_unavailable";
+      return undefined;
+    }
     const model =
       env("OLLAMA_VISION_MODEL") ||
       env("VISION_HTTP_MODEL") ||
@@ -98,12 +118,23 @@ class OllamaVisionProvider implements VisionProvider {
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
       body: JSON.stringify(body),
-    }, timeoutMs).catch(() => undefined);
-    if (!res) return undefined;
-    if (!res.ok) return undefined;
+    }, timeoutMs).catch((error: unknown) => {
+      lastVisionProviderError = error instanceof Error ? error.message : "vision_provider_request_failed";
+      return undefined;
+    });
+    if (!res) {
+      lastVisionProviderError ??= "vision_provider_request_failed";
+      return undefined;
+    }
+    if (!res.ok) {
+      lastVisionProviderError = `vision_provider_http_${res.status}`;
+      return undefined;
+    }
     const payloadJson = (await res.json()) as any;
     const text = payloadJson?.choices?.[0]?.message?.content;
-    return typeof text === "string" ? text.trim() : undefined;
+    const trimmed = typeof text === "string" ? text.trim() : "";
+    if (!trimmed) lastVisionProviderError = "vision_provider_empty_response";
+    return trimmed || undefined;
   }
 }
 
@@ -118,23 +149,30 @@ export const defaultVisionPrompt = resolvePrompt;
 
 export const getVisionProviderHealth = (): HelixVisualProviderHealth => {
   const configuredProvider = env("VISION_PROVIDER");
-  const hasOllama = !!env("OLLAMA_ENDPOINT") || configuredProvider === "ollama";
+  const hasOllamaEndpoint = !!env("OLLAMA_ENDPOINT");
+  const hasOllama = hasOllamaEndpoint || configuredProvider === "ollama";
   const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
-  const openAiBase = env("VISION_HTTP_BASE") || (apiKey ? "https://api.openai.com" : "");
+  const customBase = env("VISION_HTTP_BASE");
+  const openAiBase = customBase || (apiKey ? "https://api.openai.com" : "");
   const provider = hasOllama ? "ollama" : openAiBase ? "openai" : configuredProvider ? "unknown" : "none";
   const model = hasOllama
     ? (env("OLLAMA_VISION_MODEL") || env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "qwen3-vl")
     : openAiBase
       ? (env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini")
       : null;
-  const configured = hasOllama || Boolean(openAiBase);
+  const configured = hasOllamaEndpoint || Boolean(customBase) || Boolean(apiKey);
+  const missingReason = !configured
+    ? "No vision provider endpoint or API key is configured."
+    : hasOllama && !hasOllamaEndpoint
+      ? "VISION_PROVIDER=ollama is set, but OLLAMA_ENDPOINT is missing."
+      : null;
   return {
     schema: "helix.visual_provider_health.v1",
     configured,
     provider,
     model,
-    last_error: null,
-    can_analyze_inline_image: configured && typeof fetch === "function",
+    last_error: missingReason ?? lastVisionProviderError,
+    can_analyze_inline_image: configured && typeof fetch === "function" && !missingReason,
     assistant_answer: false,
     raw_image_included: false,
   };

@@ -75,7 +75,7 @@ const chooseTools = (input: {
     ];
   }
   if (
-    /\b(?:minecraft|minehut|world|source events?|event window|situation room debug|raw logs?|bucket|lava|water|fluid|block|stair|trench|mine|structure|missing evidence|next check)\b/.test(text)
+    /\b(?:minecraft|minehut|world|source events?|event window|situation room debug|raw logs?|bucket|lava|water|fluid|block|stair|trench|mine|structure|risk|danger|hostile|threat|damage|missing evidence|next check)\b/.test(text)
   ) {
     return [{
       requested_tool: "minecraft.query_event_window",

@@ -27,9 +27,11 @@ import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-requ
 import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
 import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
+import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
+import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
 import { runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
 
-type LiveEnvironmentTab = "present_state" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type LiveEnvironmentTab = "present_state" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -79,6 +81,7 @@ type VisualLatestRead = {
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "present_state", label: "Present State" },
+  { id: "worker_lanes", label: "Worker Lanes" },
   { id: "line_checks", label: "Line Checks" },
   { id: "interpreted_log", label: "Interpreted Log" },
   { id: "clarification", label: "Clarification Queue" },
@@ -181,6 +184,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [steeringEvidence, setSteeringEvidence] = useState<HelixUserSteeringEvidence[]>([]);
   const [lineToolRequests, setLineToolRequests] = useState<HelixLiveLineToolRequest[]>([]);
   const [lineToolEvaluations, setLineToolEvaluations] = useState<HelixLiveLineToolEvaluation[]>([]);
+  const [workerLanes, setWorkerLanes] = useState<HelixLiveWorkerLane[]>([]);
+  const [workerRuns, setWorkerRuns] = useState<HelixLiveWorkerRun[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -268,7 +273,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, visualLatestRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -278,9 +283,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/interpreted-log?thread_id=${encodeURIComponent(threadId)}${roomQuery}&limit=80`),
         fetch(`/api/agi/situation/clarification-dialogue?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-line-tool-requests?thread_id=${encodeURIComponent(threadId)}&limit=80`),
+        fetch(`/api/agi/situation/live-workers?thread_id=${encodeURIComponent(threadId)}&limit=80`),
         fetch(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, visualLatestBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -290,6 +296,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         interpretedLogRes.json(),
         clarificationRes.json(),
         lineToolRes.json(),
+        workerRes.json(),
         visualLatestRes.json(),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
@@ -308,6 +315,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setSteeringEvidence(Array.isArray(clarificationBody.steering_evidence) ? clarificationBody.steering_evidence : []);
       setLineToolRequests(Array.isArray(lineToolBody.requests) ? lineToolBody.requests : []);
       setLineToolEvaluations(Array.isArray(lineToolBody.evaluations) ? lineToolBody.evaluations : []);
+      setWorkerLanes(Array.isArray(workerBody.lanes) ? workerBody.lanes : []);
+      setWorkerRuns(Array.isArray(workerBody.runs) ? workerBody.runs : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -538,6 +547,23 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       request_id: request.request_id,
       room_id: environment?.room_id ?? undefined,
       source_id: environment?.source_ids?.[0] ?? undefined,
+    });
+    await refresh();
+  };
+
+  const runWorkerLane = async (lane: HelixLiveWorkerLane) => {
+    await postJson(`/api/agi/situation/live-workers/${encodeURIComponent(lane.worker_id)}/run`, {
+      trigger_reason: "manual_ui",
+    });
+    await refresh();
+  };
+
+  const runDueWorkers = async () => {
+    await postJson("/api/agi/situation/live-workers/run-due", {
+      thread_id: threadId,
+      environment_id: environment?.environment_id ?? null,
+      trigger_reason: "manual_ui_due",
+      max_runs: 4,
     });
     await refresh();
   };
@@ -913,6 +939,75 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   </div>
                 </div>
               )}
+            </div>
+          ) : null}
+          {activeTab === "worker_lanes" ? (
+            <div className="space-y-3">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-100">Worker Lanes</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Workers create tool observations, validations, and UI projections only. They do not create assistant answers.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void runDueWorkers()}
+                    disabled={!environment}
+                    className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Run due workers
+                  </button>
+                </div>
+              </div>
+              {workerLanes.length === 0 ? (
+                <p className="text-xs text-slate-500">No worker lanes are registered for this thread yet.</p>
+              ) : null}
+              {workerLanes.map((lane: HelixLiveWorkerLane) => {
+                const latestRun = workerRuns.filter((run: HelixLiveWorkerRun) => run.worker_id === lane.worker_id).at(-1) ?? null;
+                return (
+                  <div key={lane.worker_id} className="rounded border border-violet-300/15 bg-slate-950/70 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-violet-100">{lane.lane_key}</p>
+                        <p className="mt-1 text-[11px] text-slate-400">{lane.objective}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">{lane.status}</span>
+                        <button
+                          type="button"
+                          onClick={() => void runWorkerLane(lane)}
+                          className="rounded border border-violet-300/30 px-2 py-1 text-[10px] text-violet-100 hover:bg-violet-400/10"
+                        >
+                          Run
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                      <span>policy {lane.trigger_policy}</span>
+                      <span>next {formatTime(lane.next_run_at)}</span>
+                      <span>assistant answer {String(lane.assistant_answer)}</span>
+                      <span>raw content {String(lane.raw_content_included)}</span>
+                    </div>
+                    <p className="mt-2 truncate text-[10px] text-slate-600">
+                      tools {lane.allowed_tools.slice(0, 4).join(", ") || "none"}
+                    </p>
+                    {latestRun ? (
+                      <div className="mt-3 rounded border border-white/10 bg-black/20 p-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] font-semibold uppercase text-slate-400">Latest run</p>
+                          <span className="text-[10px] text-slate-500">{latestRun.status} / {formatTime(latestRun.completed_at ?? latestRun.started_at)}</span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-300">{latestRun.summary}</p>
+                        <p className="mt-1 truncate text-[10px] text-slate-600">
+                          observations {latestRun.observations.slice(0, 3).join(", ") || "none"} / validations {latestRun.validations.slice(0, 3).join(", ") || "none"}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
           {activeTab === "line_checks" ? (

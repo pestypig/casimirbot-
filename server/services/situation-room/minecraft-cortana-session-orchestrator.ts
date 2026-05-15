@@ -12,6 +12,7 @@ import type { HelixLiveEnvironmentFidelity } from "@shared/helix-live-environmen
 import type { HelixSituationSourceCapability } from "@shared/helix-situation-source-capability";
 import { buildLiveEnvironmentFidelity } from "./live-environment-fidelity-builder";
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
+import { ensureDefaultLiveWorkerLanes } from "./live-worker-lane-store";
 
 type MinecraftCortanaNextRequiredAction =
   | "grant_visual_capture_permission"
@@ -299,6 +300,19 @@ export function startMinecraftCortanaCompanionSession(input: {
     categorizationJobIds.at(0) ?? null,
   ));
 
+  const workerEnvironment = environmentId
+    ? listLiveAnswerEnvironments().find((entry) => entry.environment_id === environmentId) ?? null
+    : null;
+  const workerLanes = workerEnvironment ? ensureDefaultLiveWorkerLanes(workerEnvironment) : [];
+  if (environmentId) {
+    readinessItems.push(readiness(
+      "worker_lanes",
+      workerLanes.length > 0,
+      `Started ${workerLanes.length} live worker lane(s) for source health, visual analysis, and line checks.`,
+      workerLanes.at(0)?.worker_id ?? null,
+    ));
+  }
+
   const interpreted = appendInterpretedEvent({
     thread_id: threadId,
     room_id: roomId,
@@ -314,6 +328,7 @@ export function startMinecraftCortanaCompanionSession(input: {
       `source:${voiceSourceId}`,
       `source:${visualSourceId}`,
       ...categorizationJobIds.map((jobId) => `categorization_job:${jobId}`),
+      ...workerLanes.slice(0, 4).map((lane) => `live_worker:${lane.worker_id}`),
     ].filter((entry): entry is string => Boolean(entry)),
     related_artifact_ids: [environmentId, visualSourceId].filter((entry): entry is string => Boolean(entry)),
     related_job_ids: categorizationJobIds,

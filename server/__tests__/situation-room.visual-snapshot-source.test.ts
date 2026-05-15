@@ -275,6 +275,54 @@ describe("visual snapshot source routes", () => {
     expect(JSON.stringify(response.body)).not.toContain("data:image");
   }, 10000);
 
+  it("reports failed visual evidence as provider recovery or fresh-capture work, not reanalyze-without-payload", async () => {
+    const previousVisionBase = process.env.VISION_HTTP_BASE;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.VISION_HTTP_BASE;
+    delete process.env.OPENAI_API_KEY;
+    const app = await createApp();
+
+    try {
+      await request(app)
+        .post("/api/agi/situation/visual-frame/analyze")
+        .send({
+          thread_id: threadId,
+          source_id: "source:visual:provider-missing",
+          image_base64:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
+          prompt: "Describe the image for a Helix Ask test.",
+        })
+        .expect(200);
+
+      const latest = await request(app)
+        .get(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}`)
+        .expect(200);
+      expect(latest.body.visual_evidence_health).toMatchObject({
+        status: "analysis_failed",
+        provider_status: "missing",
+        next_required_action: "configure_vision_provider",
+        assistant_answer: false,
+        raw_image_included: false,
+      });
+
+      const provider = await request(app)
+        .get("/api/agi/situation/visual-provider/health")
+        .expect(200);
+      expect(provider.body).toMatchObject({
+        configured: false,
+        can_analyze_inline_image: false,
+        assistant_answer: false,
+        raw_image_included: false,
+      });
+      expect(provider.body.last_error).toMatch(/provider|configured|endpoint|api key/i);
+    } finally {
+      if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
+      else process.env.VISION_HTTP_BASE = previousVisionBase;
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+  }, 10000);
+
   it("derives a generic visual line schema from first frame evidence", async () => {
     const app = await createApp();
     const environmentResponse = await request(app)
