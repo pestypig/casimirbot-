@@ -15,6 +15,10 @@ import {
   listLiveWorkerRuns,
   startLiveWorkerRun,
 } from "./live-worker-lane-store";
+import {
+  getLatestLiveSourceChunk,
+  queueLiveSourceAnalysisJob,
+} from "./live-source-chunk-buffer";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -59,14 +63,41 @@ const visualAnalysisWatchdog = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerR
     threadId: lane.thread_id,
     roomId: environment?.room_id ?? null,
   });
+  const latestChunk = getLatestLiveSourceChunk({
+    threadId: lane.thread_id,
+    sourceIds: lane.source_ids,
+    modality: "visual_frame",
+  });
   const provider = getVisionProviderHealth();
-  const observations = [`visual_health:${health.status}`, `visual_provider:${provider.provider}:${provider.configured ? "configured" : "missing"}`];
+  const observations = [
+    `visual_health:${health.status}`,
+    `visual_provider:${provider.provider}:${provider.configured ? "configured" : "missing"}`,
+    latestChunk ? `live_source_chunk:${latestChunk.chunk_id}` : "live_source_chunk:none",
+  ];
   const validations: string[] = [];
+  const toolCalls: HelixLiveWorkerRun["tool_calls"] = [];
   let status: HelixLiveWorkerRun["status"] = "completed";
   let summary = "Visual analysis worker found no repair work.";
   if (health.status === "analysis_ready") {
     validations.push(health.latest_evidence_id ?? "visual_analysis_ready");
     summary = "Latest visual frame already has compact visual evidence.";
+  } else if (latestChunk) {
+    const job = queueLiveSourceAnalysisJob({
+      chunk: latestChunk,
+      workerId: lane.worker_id,
+      analyzerId: "visual_analysis",
+      status: provider.configured ? "queued" : "failed",
+      summary: provider.configured
+        ? "Visual analysis worker queued analysis for the latest visual frame chunk."
+        : "Visual analysis worker consumed the latest visual frame chunk but the vision provider is missing.",
+    });
+    toolCalls.push({
+      tool_id: "visual-frame.analyze",
+      dynamic_tool_call_id: job.job_id,
+      receipt_refs: [latestChunk.chunk_id],
+    });
+    validations.push(job.job_id);
+    summary = job.summary;
   } else if (health.status === "no_source" || health.status === "permission_required" || health.status === "waiting_for_first_frame") {
     status = "suppressed";
     validations.push(health.next_required_action ?? health.status);
@@ -85,6 +116,7 @@ const visualAnalysisWatchdog = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerR
     run,
     status,
     summary,
+    toolCalls,
     observations,
     validations,
     updatedLineKeys: ["scene", "place", "activity", "missing_evidence", "next_check"],

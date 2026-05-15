@@ -15,9 +15,9 @@ export function routeHelixMultimodalIntent(context: HelixMultimodalTurnContext):
     /\b(?:attached|upload(?:ed)?|image|picture|photo|screenshot|visual|frame|what\s+(?:do\s+you\s+)?see|describe)\b/i
       .test(userText);
   const asksForLiveOrchestration =
-    /\b(?:set\s*up|setup|start|create|configure|prepare|enable)\b[\s\S]*\b(?:live\s+environment|minecraft\s+cortana|cortana\s+mode|live\s+source|source\s+fidelity|line\s+checks?)\b/i
+    /\b(?:set\s*up|setup|start|create|configure|prepare|enable)\b[\s\S]*\b(?:live\s+answer|live\s+environment|minecraft\s+cortana|cortana\s+mode|live\s+source|source\s+fidelity|line\s+checks?)\b/i
       .test(userText) ||
-    /\b(?:live\s+environment|minecraft\s+cortana|cortana\s+mode)\b[\s\S]*\b(?:visual(?:\s+capture)?|source|fidelity|line\s+checks?)\b/i
+    /\b(?:live\s+answer|live\s+environment|minecraft\s+cortana|cortana\s+mode)\b[\s\S]*\b(?:visual(?:\s+capture)?|source|fidelity|line\s+checks?|describe)\b/i
       .test(userText);
   const asksForDocumentCompare =
     /\b(?:compare|contrast|check|match|against)\b[\s\S]*\b(?:doc|document|whitepaper|paper|viewer|open file|current file)\b/i

@@ -19,6 +19,7 @@ import {
 } from "../services/situation-room/visual-snapshot-store";
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import { clearLiveLineToolRequestStoreForTest } from "../services/situation-room/live-line-tool-request-store";
+import { resetLiveSourceChunkBufferForTest } from "../services/situation-room/live-source-chunk-buffer";
 
 const threadId = "thread:live-workers";
 
@@ -36,6 +37,7 @@ describe("live source watchdog worker lanes", () => {
     resetLiveWorkerLanesForTest();
     resetVisualSnapshotStoreForTest();
     resetSituationSourceCapabilitiesForTest();
+    resetLiveSourceChunkBufferForTest();
     clearLiveLineToolRequestStoreForTest();
     delete process.env.VISION_HTTP_BASE;
     delete process.env.VISION_HTTP_API_KEY;

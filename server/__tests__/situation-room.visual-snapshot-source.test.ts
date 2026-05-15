@@ -11,6 +11,7 @@ import {
   listInterpretedEvents,
 } from "../services/situation-room/interpreted-event-log-store";
 import { resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
+import { resetLiveSourceChunkBufferForTest } from "../services/situation-room/live-source-chunk-buffer";
 
 const threadId = "helix-ask:desktop";
 
@@ -27,6 +28,7 @@ describe("visual snapshot source routes", () => {
     resetVisualSnapshotStoreForTest();
     resetSituationSourceCapabilitiesForTest();
     resetLiveAnswerEnvironments();
+    resetLiveSourceChunkBufferForTest();
     clearInterpretedEventLogForTest();
   });
 

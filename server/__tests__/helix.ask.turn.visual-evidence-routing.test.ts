@@ -195,6 +195,85 @@ describe("helix ask visual evidence routing", () => {
     expect(response.body.answer).not.toContain("The attached image shows");
   });
 
+  it("blocks attached visual diagnostics from promoting over setup/control intents", async () => {
+    const question =
+      "I attached a visual active for my minecraft tab, can you set up a live answer to describe what is happening?";
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        sessionId: "helix-ask:desktop",
+        debug: true,
+        workspace_context_snapshot: {
+          attached_visual_evidence: {
+            evidence: {
+              evidence_id: "visual_evidence:diagnostic",
+              frame_id: "visual_frame:diagnostic",
+              summary: "Visual frame was recorded, but the configured vision provider did not return an image description.",
+              assistant_answer: false,
+              raw_image_included: false,
+              context_policy: "compact_context_pack_only",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).not.toBe("visual_frame_evidence");
+    expect(response.body.route_reason_code).not.toBe("multimodal_visual_answer");
+    expect(response.body.terminal_artifact_kind).not.toBe("visual_frame_evidence");
+    expect(response.body.answer).not.toContain("The attached image shows");
+    expect(response.body.artifact_promotion_audit).toMatchObject({
+      schema: "helix.artifact_promotion_audit.v1",
+      ok: true,
+      intent_family: "live_environment_setup",
+      deterministic_artifact_answer_blocked: true,
+      source_status_promoted_to_answer: false,
+      worker_output_promoted_to_answer: false,
+    });
+    expect(response.body.artifact_promotion_audit.blocked_artifact_promotions).toEqual([
+      expect.objectContaining({
+        artifact_kind: "visual_frame_evidence",
+        reason: "intent_live_environment_setup_cannot_promote_visual_artifact",
+      }),
+    ]);
+    expect(response.body.poison_audit?.ok).toBe(true);
+    expect(response.body.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 10000);
+
+  it("turns visual provider diagnostic summaries into request-input instead of image descriptions", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Describe this image.",
+        sessionId: "helix-ask:desktop",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: "Describe this image.", source: "user" },
+          {
+            type: "evidence_ref",
+            evidence_id: "visual_evidence:not-ready",
+            evidence_kind: "visual_frame_evidence",
+            compact_summary: "Visual frame was recorded, but no configured vision provider returned an image description.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("visual_evidence_not_ready");
+    expect(response.body.final_answer_source).toBe("request_user_input");
+    expect(response.body.terminal_artifact_kind).toBe("request_user_input");
+    expect(response.body.answer).toContain("can’t describe the image yet");
+    expect(response.body.answer).not.toContain("The attached image shows");
+    expect(response.body.artifact_promotion_audit).toMatchObject({
+      intent_family: "visual_description",
+      deterministic_artifact_answer_blocked: true,
+    });
+    expect(response.body.poison_audit?.ok).toBe(true);
+  });
+
   it("rejects visual evidence grafted into the user prompt in debug/test mode", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
