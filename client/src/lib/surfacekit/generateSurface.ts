@@ -1,7 +1,9 @@
-import type { SurfaceContext, SurfaceLayer, SurfaceRecipe } from "./types";
+import type { LumaMood } from "../luma-moods";
+import type { SurfaceContext, SurfaceLayer, SurfaceOrientation, SurfaceRecipe } from "./types";
 import { SURFACE_GRADIENTS, SURFACE_LAMINATES, SURFACE_MEANDERS, SURFACE_MICRO } from "./slates";
 import { SURFACE_PALETTES, findSurfacePalette } from "./palettes";
 import { createSurfaceRng, pickOne, pickRange, pickRotation } from "./seed";
+import { buildSurfaceWorldMotion, findSurfaceWorldAsset } from "./worlds";
 
 export type SurfaceDensity = "low" | "medium" | "high";
 
@@ -10,6 +12,8 @@ export type GenerateSurfaceOptions = {
   context: SurfaceContext;
   paletteId?: string;
   density?: SurfaceDensity;
+  mood?: LumaMood;
+  orientation?: SurfaceOrientation;
 };
 
 const DEFAULT_SEED = "helix-surface-v1";
@@ -58,6 +62,16 @@ const DENSITY_MULTIPLIER: Record<SurfaceDensity, number> = {
   high: 1.35,
 };
 
+const MOOD_PALETTE: Record<LumaMood, string> = {
+  mad: "ember-copper",
+  upset: "ember-copper",
+  shock: "ember-copper",
+  question: "ion-blue",
+  happy: "verdant",
+  friend: "halo-teal",
+  love: "ember-copper",
+};
+
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
@@ -90,11 +104,16 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
   const seed = (options.seed ?? DEFAULT_SEED).trim() || DEFAULT_SEED;
   const context = options.context;
   const density = options.density ?? "low";
-  const rng = createSurfaceRng(`${seed}:${context}`);
-  const palette = resolvePalette(options.paletteId, rng);
+  const mood = options.mood ?? "question";
+  const orientation = options.orientation ?? (context === "mobile-shell" || context === "mobile-panel" ? "mobile" : "desktop");
+  const rng = createSurfaceRng(`${seed}:${context}:${mood}:${orientation}`);
+  const palette = resolvePalette(options.paletteId ?? MOOD_PALETTE[mood], rng);
   const gradient = pickOne(SURFACE_GRADIENTS, rng);
   const laminate = pickOne(SURFACE_LAMINATES, rng);
   const meander = pickOne(SURFACE_MEANDERS, rng);
+  const world = context === "desktop-wallpaper" || context === "mobile-shell"
+    ? findSurfaceWorldAsset(mood, orientation, rng)
+    : null;
 
   const tuning = CONTEXT_TUNING[context] ?? CONTEXT_TUNING["desktop-wallpaper"];
   const microChance = clamp01(tuning.microChance * DENSITY_MULTIPLIER[density]);
@@ -103,16 +122,37 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
 
   const layers: SurfaceLayer[] = [
     {
-      id: "base",
+      id: "paper-base",
       kind: "base",
       opacity: 1,
-      background: "var(--surface-base)",
+      background: "var(--surface-page-fill)",
     },
+  ];
+
+  if (world) {
+    layers.push({
+      id: world.id,
+      kind: "world",
+      opacity: 0.9,
+      imageUrl: world.src,
+      motion: buildSurfaceWorldMotion(world, rng),
+      mask: world.safeCenter ? "center-safe" : "none",
+    });
+    layers.push({
+      id: `fixed-page-${meander.id}`,
+      kind: "page",
+      opacity: 1,
+      background:
+        "radial-gradient(ellipse at center, var(--surface-page-fill) 0%, var(--surface-page-fill) 43%, rgba(255, 255, 255, 0) 69%)",
+    });
+  }
+
+  layers.push(
     {
       id: gradient.id,
       kind: "gradient",
       opacity: tuning.gradientOpacity,
-      blendMode: "screen",
+      blendMode: world ? "soft-light" : "screen",
       transform: buildTransform(rng, { minScale: 1.02, maxScale: 1.1 }),
       svg: gradient.svg,
     },
@@ -120,19 +160,19 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
       id: laminate.id,
       kind: "laminate",
       opacity: tuning.laminateOpacity,
-      blendMode: "soft-light",
+      blendMode: world ? "overlay" : "soft-light",
       transform: buildTransform(rng, { minScale: 1.01, maxScale: 1.08, maxShift: 3 }),
       svg: laminate.svg,
     },
     {
       id: meander.id,
-      kind: "meander",
+      kind: world ? "page" : "meander",
       opacity: tuning.meanderOpacity,
       blendMode: "normal",
       transform: buildTransform(rng, { minScale: 1, maxScale: 1.05, maxShift: 2 }),
       svg: meander.svg,
     },
-  ];
+  );
 
   if (micro) {
     layers.push({
@@ -147,6 +187,7 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
 
   const vars = {
     "--surface-base": palette.base,
+    "--surface-page-fill": palette.base,
     "--surface-ink": palette.ink,
     "--surface-ink-soft": palette.inkSoft,
     "--surface-laminate": palette.laminate,
@@ -155,7 +196,7 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
   };
 
   return {
-    id: `surface-${context}-${palette.id}-${gradient.id}-${laminate.id}-${meander.id}-${micro?.id ?? "none"}`,
+    id: `surface-${context}-${orientation}-${mood}-${palette.id}-${world?.id ?? "flat"}-${gradient.id}-${laminate.id}-${meander.id}-${micro?.id ?? "none"}`,
     seed,
     context,
     palette,

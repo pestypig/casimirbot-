@@ -18,6 +18,7 @@ import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
+import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import {
@@ -126,14 +127,18 @@ export default function DesktopPage({
   const hashAppliedRef = useRef(false);
   const environmentAppliedRef = useRef(false);
   const autoOpenSuppressRef = useRef<Set<string> | null>(null);
+  const { mood } = useLumaMoodTheme({ randomize: true, listenToBus: true });
+  const orientation = layoutVariant === "mobile" ? "mobile" : "desktop";
   const wallpaperRecipe = useMemo(
     () =>
       generateSurfaceRecipe({
-        seed: "helix-wallpaper-v1",
-        context: "desktop-wallpaper",
+        seed: "helix-workstation-world-v1",
+        context: layoutVariant === "mobile" ? "mobile-shell" : "desktop-wallpaper",
         density: "medium",
+        mood,
+        orientation,
       }),
-    [],
+    [layoutVariant, mood, orientation],
   );
   const allowAutoOpen = false;
   const workstationEnabledFlag =

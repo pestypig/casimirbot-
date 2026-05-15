@@ -107,5 +107,5 @@ export function runDueLiveSourceAnalysisJobs(input: {
     status: "queued",
     limit: Math.min(input.limit ?? maxJobsPerRun, maxJobsPerRun),
   });
-  return due.map((job) => runLiveSourceAnalysisJob(job.job_id));
+  return due.map((job: HelixLiveSourceAnalysisJob) => runLiveSourceAnalysisJob(job.job_id));
 }

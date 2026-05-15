@@ -203,8 +203,97 @@
   transform-origin: center;
 }
 
-.surface-layer[data-kind="base"] {
+.surface-layer[data-kind="base"],
+.surface-layer[data-kind="page"] {
   inset: 0;
+}
+
+.surface-layer[data-kind="world"] {
+  inset: -8%;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.surface-layer[data-motion="wander"] {
+  animation: surface-wander var(--surface-motion-duration, 96000ms) ease-in-out infinite;
+  will-change: transform;
+}
+
+.surface-layer[data-motion="scroll-x"] {
+  animation: surface-scroll-x var(--surface-motion-duration, 160000ms) linear infinite;
+  will-change: background-position;
+}
+
+.surface-layer[data-mask="center-safe"] {
+  -webkit-mask-image: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 42%,
+    black 68%,
+    black 100%
+  );
+  mask-image: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 42%,
+    black 68%,
+    black 100%
+  );
+}
+
+@keyframes surface-wander {
+  0% {
+    transform: translate3d(
+      calc(var(--surface-wander-x, 2%) * -1),
+      calc(var(--surface-wander-y, 1.5%) * -0.5),
+      0
+    ) scale(var(--surface-wander-scale, 1.08));
+  }
+  25% {
+    transform: translate3d(
+      var(--surface-wander-x, 2%),
+      calc(var(--surface-wander-y, 1.5%) * -1),
+      0
+    ) scale(var(--surface-wander-scale-peak, 1.09));
+  }
+  50% {
+    transform: translate3d(
+      calc(var(--surface-wander-x, 2%) * 0.5),
+      var(--surface-wander-y, 1.5%),
+      0
+    ) scale(var(--surface-wander-scale, 1.08));
+  }
+  75% {
+    transform: translate3d(
+      calc(var(--surface-wander-x, 2%) * -1),
+      calc(var(--surface-wander-y, 1.5%) * 0.6),
+      0
+    ) scale(var(--surface-wander-scale-peak, 1.09));
+  }
+  100% {
+    transform: translate3d(
+      calc(var(--surface-wander-x, 2%) * -1),
+      calc(var(--surface-wander-y, 1.5%) * -0.5),
+      0
+    ) scale(var(--surface-wander-scale, 1.08));
+  }
+}
+
+@keyframes surface-scroll-x {
+  from {
+    background-position: 0% center;
+  }
+  to {
+    background-position: var(--surface-scroll-end, -100%) center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-layer[data-motion="wander"],
+  .surface-layer[data-motion="scroll-x"] {
+    animation: none;
+  }
 }
 
 .surface-svg,

@@ -1,8 +1,12 @@
+import type { LumaMood } from "../luma-moods";
+
 export type SurfaceContext =
   | "desktop-wallpaper"
   | "desktop-window"
   | "mobile-shell"
   | "mobile-panel";
+
+export type SurfaceOrientation = "desktop" | "mobile";
 
 export type SurfacePalette = {
   id: string;
@@ -20,7 +24,24 @@ export type SurfaceSlate = {
   svg: string;
 };
 
-export type SurfaceLayerKind = "base" | "gradient" | "laminate" | "meander" | "micro";
+export type SurfaceLayerKind = "base" | "world" | "page" | "gradient" | "laminate" | "meander" | "micro";
+
+export type SurfaceLayerMotion =
+  | {
+      type: "none";
+    }
+  | {
+      type: "wander";
+      durationMs: number;
+      scale: number;
+      xPct: number;
+      yPct: number;
+    }
+  | {
+      type: "scroll-x";
+      durationMs: number;
+      direction: "left" | "right";
+    };
 
 export type SurfaceLayer = {
   id: string;
@@ -30,7 +51,20 @@ export type SurfaceLayer = {
   transform?: string;
   filter?: string;
   svg?: string;
+  imageUrl?: string;
   background?: string;
+  motion?: SurfaceLayerMotion;
+  mask?: "center-safe" | "none";
+};
+
+export type SurfaceWorldAsset = {
+  id: string;
+  mood: LumaMood;
+  orientation: SurfaceOrientation;
+  src: string;
+  mode: "wander" | "scroll-x";
+  repeatX?: boolean;
+  safeCenter?: boolean;
 };
 
 export type SurfaceRecipe = {

@@ -109,7 +109,7 @@ export default function MobileStartPage() {
     () => [...stack].sort((a, b) => b.openedAt - a.openedAt),
     [stack]
   );
-  useLumaMoodTheme({ randomize: true });
+  const { mood } = useLumaMoodTheme({ randomize: true, listenToBus: true });
 
   const navButtonClass =
     "min-h-[44px] items-center gap-1.5 rounded-full border border-primary/35 bg-card/72 px-3 py-1 text-[13px] font-medium text-foreground transition hover:border-primary/55 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-3.5 sm:py-1.5";
@@ -129,11 +129,13 @@ export default function MobileStartPage() {
   const wallpaperRecipe = useMemo(
     () =>
       generateSurfaceRecipe({
-        seed: "helix-wallpaper-v1",
-        context: "desktop-wallpaper",
+        seed: "helix-workstation-world-v1",
+        context: "mobile-shell",
         density: "medium",
+        mood,
+        orientation: "mobile",
       }),
-    []
+    [mood]
   );
 
   const openAppViewer = useCallback(() => {

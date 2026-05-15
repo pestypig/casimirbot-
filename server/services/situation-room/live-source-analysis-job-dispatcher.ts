@@ -24,9 +24,9 @@ const isGenericCaptureSummary = (summary: string | null | undefined): boolean =>
   !summary || genericVisualCaptureSummaries.has(summary.trim().toLowerCase());
 
 const analyzeVisualChunk = (job: HelixLiveSourceAnalysisJob, chunk: HelixLiveSourceChunk): LiveSourceAnalyzerResult => {
-  const existingEvidence = chunk.evidence_refs.find((ref) => ref.startsWith("visual_evidence:")) ??
+  const existingEvidence = chunk.evidence_refs.find((ref: string) => ref.startsWith("visual_evidence:")) ??
     listVisualFrameEvidence({ threadId: chunk.thread_id, limit: 100 })
-      .find((entry) => entry.frame_id === chunk.payload_ref || chunk.evidence_refs.includes(entry.frame_id))
+      .find((entry: { frame_id: string; evidence_id: string }) => entry.frame_id === chunk.payload_ref || chunk.evidence_refs.includes(entry.frame_id))
       ?.evidence_id;
   if (existingEvidence) {
     return {
@@ -38,7 +38,7 @@ const analyzeVisualChunk = (job: HelixLiveSourceAnalysisJob, chunk: HelixLiveSou
   }
   const frameId = typeof chunk.payload_ref === "string" && chunk.payload_ref.startsWith("visual_frame:")
     ? chunk.payload_ref
-    : chunk.evidence_refs.find((ref) => ref.startsWith("visual_frame:")) ?? null;
+    : chunk.evidence_refs.find((ref: string) => ref.startsWith("visual_frame:")) ?? null;
   const frame = frameId ? getVisualFrame({ threadId: chunk.thread_id, frameId }) : null;
   if (!frame) {
     return {

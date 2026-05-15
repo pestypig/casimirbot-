@@ -172,6 +172,17 @@ export function upsertLiveSourceProducer(input: {
   return producer;
 }
 
+export function listLiveSourceProducers(input: {
+  threadId?: string | null;
+  sourceIds?: string[] | null;
+} = {}): HelixLiveSourceProducer[] {
+  const sourceSet = input.sourceIds?.length ? new Set(input.sourceIds) : null;
+  return Array.from(producersBySource.values())
+    .filter((producer: HelixLiveSourceProducer) => !input.threadId || producer.thread_id === input.threadId)
+    .filter((producer: HelixLiveSourceProducer) => !sourceSet || sourceSet.has(producer.source_id))
+    .sort((a: HelixLiveSourceProducer, b: HelixLiveSourceProducer) => a.modality.localeCompare(b.modality) || a.source_id.localeCompare(b.source_id));
+}
+
 export function appendLiveSourceChunk(input: {
   source_id: string;
   thread_id: string;
@@ -213,7 +224,7 @@ export function appendLiveSourceChunk(input: {
     const stats = ensureStats(input.source_id);
     stats.compactedChunkCount += overflow.length;
     stats.compactedSummary = overflow
-      .map((entry) => entry.compact_summary)
+      .map((entry: HelixLiveSourceChunk) => entry.compact_summary)
       .filter(Boolean)
       .slice(-5)
       .join(" | ") || stats.compactedSummary;
@@ -269,9 +280,9 @@ export function listLiveSourceChunks(input: {
     ? [...(chunksBySource.get(input.sourceId) ?? [])]
     : Array.from(chunksBySource.values()).flat();
   return chunks
-    .filter((chunk) => !input.threadId || chunk.thread_id === input.threadId)
-    .filter((chunk) => !input.modality || chunk.modality === input.modality)
-    .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts) || a.sequence_index - b.sequence_index)
+    .filter((chunk: HelixLiveSourceChunk) => !input.threadId || chunk.thread_id === input.threadId)
+    .filter((chunk: HelixLiveSourceChunk) => !input.modality || chunk.modality === input.modality)
+    .sort((a: HelixLiveSourceChunk, b: HelixLiveSourceChunk) => Date.parse(a.ts) - Date.parse(b.ts) || a.sequence_index - b.sequence_index)
     .slice(-(input.limit ?? 100));
 }
 
@@ -282,13 +293,13 @@ export function getLatestLiveSourceChunk(input: {
 }): HelixLiveSourceChunk | null {
   const sourceSet = input.sourceIds?.length ? new Set(input.sourceIds) : null;
   return listLiveSourceChunks({ threadId: input.threadId, modality: input.modality ?? null, limit: 500 })
-    .filter((chunk) => !sourceSet || sourceSet.has(chunk.source_id))
+    .filter((chunk: HelixLiveSourceChunk) => !sourceSet || sourceSet.has(chunk.source_id))
     .at(-1) ?? null;
 }
 
 export function getLiveSourceChunk(chunkId: string): HelixLiveSourceChunk | null {
   for (const chunks of chunksBySource.values()) {
-    const match = chunks.find((chunk) => chunk.chunk_id === chunkId);
+    const match = chunks.find((chunk: HelixLiveSourceChunk) => chunk.chunk_id === chunkId);
     if (match) return match;
   }
   return null;
@@ -326,10 +337,10 @@ const backpressureForSource = (
 export function getLiveSourceBufferStatus(input: { threadId: string }): HelixLiveSourceBufferStatus {
   const producers = Array.from(producersBySource.values()).filter((producer) => producer.thread_id === input.threadId);
   const jobs = listLiveSourceAnalysisJobs({ threadId: input.threadId, limit: 500 });
-  const sources = producers.map((producer) => {
+  const sources = producers.map((producer: HelixLiveSourceProducer) => {
     const chunks = chunksBySource.get(producer.source_id) ?? [];
     const latest = chunks.at(-1);
-    const analysisDepth = jobs.filter((job) => job.source_id === producer.source_id && (job.status === "queued" || job.status === "running")).length;
+    const analysisDepth = jobs.filter((job: HelixLiveSourceAnalysisJob) => job.source_id === producer.source_id && (job.status === "queued" || job.status === "running")).length;
     const stats = ensureStats(producer.source_id);
     return {
       source_id: producer.source_id,
@@ -348,8 +359,8 @@ export function getLiveSourceBufferStatus(input: { threadId: string }): HelixLiv
     schema: HELIX_LIVE_SOURCE_BUFFER_STATUS_SCHEMA,
     thread_id: input.threadId,
     sources,
-    total_chunk_count: sources.reduce((sum, entry) => sum + entry.chunk_count, 0),
-    total_analysis_queue_depth: jobs.filter((job) => job.status === "queued" || job.status === "running").length,
+    total_chunk_count: sources.reduce((sum: number, entry: { chunk_count: number }) => sum + entry.chunk_count, 0),
+    total_analysis_queue_depth: jobs.filter((job: HelixLiveSourceAnalysisJob) => job.status === "queued" || job.status === "running").length,
     assistant_answer: false,
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
@@ -444,7 +455,7 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
   summary: string;
 }): HelixLiveSourceAnalysisJob[] {
   const jobs = analysisJobsByThread.get(input.threadId) ?? [];
-  const updated = jobs.map((job) => job.chunk_id === input.chunkId && (job.status === "queued" || job.status === "running")
+  const updated = jobs.map((job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId && (job.status === "queued" || job.status === "running")
     ? {
         ...job,
         status: input.status,
@@ -453,12 +464,12 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
       }
     : job);
   analysisJobsByThread.set(input.threadId, updated);
-  return updated.filter((job) => job.chunk_id === input.chunkId);
+  return updated.filter((job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId);
 }
 
 export function getLiveSourceAnalysisJob(jobId: string): HelixLiveSourceAnalysisJob | null {
   for (const jobs of analysisJobsByThread.values()) {
-    const match = jobs.find((job) => job.job_id === jobId);
+    const match = jobs.find((job: HelixLiveSourceAnalysisJob) => job.job_id === jobId);
     if (match) return match;
   }
   return null;
@@ -479,7 +490,7 @@ export function updateLiveSourceAnalysisJob(input: {
     output_refs: input.outputRefs ?? existing.output_refs,
     summary: input.summary ?? existing.summary,
   };
-  analysisJobsByThread.set(existing.thread_id, jobs.map((job) => job.job_id === input.jobId ? updatedJob : job));
+  analysisJobsByThread.set(existing.thread_id, jobs.map((job: HelixLiveSourceAnalysisJob) => job.job_id === input.jobId ? updatedJob : job));
   return updatedJob;
 }
 
@@ -494,9 +505,9 @@ export function listLiveSourceAnalysisJobs(input: {
     ? [...(analysisJobsByThread.get(input.threadId) ?? [])]
     : Array.from(analysisJobsByThread.values()).flat();
   return entries
-    .filter((job) => !input.sourceId || job.source_id === input.sourceId)
-    .filter((job) => !input.chunkId || job.chunk_id === input.chunkId)
-    .filter((job) => !input.status || input.status === "any" || job.status === input.status)
+    .filter((job: HelixLiveSourceAnalysisJob) => !input.sourceId || job.source_id === input.sourceId)
+    .filter((job: HelixLiveSourceAnalysisJob) => !input.chunkId || job.chunk_id === input.chunkId)
+    .filter((job: HelixLiveSourceAnalysisJob) => !input.status || input.status === "any" || job.status === input.status)
     .slice(-(input.limit ?? 100));
 }
 

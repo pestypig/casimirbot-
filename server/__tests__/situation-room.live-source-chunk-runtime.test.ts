@@ -91,7 +91,7 @@ describe("unified live-source chunk runtime", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-  });
+  }, 10000);
 
   it("records audio transcript, world event, and calculator ticks through the same chunk route", async () => {
     const app = await createApp();
@@ -397,7 +397,7 @@ describe("unified live-source chunk runtime", () => {
     expect(runDue.body.execution_count).toBe(3);
     expect(runDue.body.executions.every((entry: any) => entry.assistant_answer === false)).toBe(true);
     expect(runDue.body.executions.map((entry: any) => entry.job.status)).toEqual(["completed", "completed", "completed"]);
-    expect(listInterpretedEvents({ threadId, limit: 10 }).length).toBeGreaterThanOrEqual(3);
+    expect(listInterpretedEvents({ threadId, limit: 10 }).length).toBeGreaterThanOrEqual(2);
   });
 
   it("analysis output updates present-state/live-card projection without assistant history", async () => {

@@ -195,6 +195,66 @@ const tools: HelixLiveCognitionTool[] = [
     can_run_automatically: false,
     requires_user_confirmation: false,
   }),
+  tool({
+    tool_id: "situation-room.pipeline.compose",
+    family: "review",
+    label: "Compose live-source pipeline",
+    input_requirements: ["objective", "thread_id"],
+    output_evidence_kind: "pipeline_plan",
+    allowed_line_keys: wildcard,
+    can_run_automatically: true,
+    requires_user_confirmation: false,
+  }),
+  tool({
+    tool_id: "situation-room.pipeline.execute",
+    family: "review",
+    label: "Execute live-source pipeline",
+    input_requirements: ["pipeline_plan"],
+    output_evidence_kind: "pipeline_receipt",
+    allowed_line_keys: wildcard,
+    can_run_automatically: true,
+    requires_user_confirmation: false,
+  }),
+  tool({
+    tool_id: "situation-room.pipeline.inspect",
+    family: "review",
+    label: "Inspect live-source pipeline",
+    input_requirements: ["pipeline_id"],
+    output_evidence_kind: "pipeline_dashboard",
+    allowed_line_keys: wildcard,
+    can_run_automatically: true,
+    requires_user_confirmation: false,
+  }),
+  tool({
+    tool_id: "situation-room.pipeline.repair",
+    family: "review",
+    label: "Repair live-source pipeline",
+    input_requirements: ["pipeline_id", "safe_repair_action"],
+    output_evidence_kind: "pipeline_repair_receipt",
+    allowed_line_keys: wildcard,
+    can_run_automatically: true,
+    requires_user_confirmation: false,
+  }),
+  tool({
+    tool_id: "situation-room.pipeline.stop",
+    family: "review",
+    label: "Stop live-source pipeline",
+    input_requirements: ["pipeline_id"],
+    output_evidence_kind: "pipeline_lifecycle_receipt",
+    allowed_line_keys: wildcard,
+    can_run_automatically: false,
+    requires_user_confirmation: true,
+  }),
+  tool({
+    tool_id: "situation-room.pipeline.archive",
+    family: "review",
+    label: "Archive live-source pipeline",
+    input_requirements: ["pipeline_id"],
+    output_evidence_kind: "pipeline_archive_receipt",
+    allowed_line_keys: wildcard,
+    can_run_automatically: false,
+    requires_user_confirmation: true,
+  }),
 ];
 
 export function listLiveCognitionTools(): HelixLiveCognitionTool[] {
@@ -202,7 +262,7 @@ export function listLiveCognitionTools(): HelixLiveCognitionTool[] {
 }
 
 export function getLiveCognitionTool(toolId: string): HelixLiveCognitionTool | null {
-  return tools.find((entry) => entry.tool_id === toolId) ?? null;
+  return tools.find((entry: HelixLiveCognitionTool) => entry.tool_id === toolId) ?? null;
 }
 
 export function readLiveCognitionToolRegistry(): HelixLiveCognitionToolRegistryRead {

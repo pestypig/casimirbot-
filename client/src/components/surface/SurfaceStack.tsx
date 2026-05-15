@@ -34,6 +34,7 @@ function SurfaceLayerView({ layer }: { layer: SurfaceLayer }) {
   const layerStyle: React.CSSProperties = {
     opacity: layer.opacity,
   };
+  const customStyle = layerStyle as React.CSSProperties & Record<string, string | number>;
 
   if (layer.blendMode) {
     layerStyle.mixBlendMode = layer.blendMode;
@@ -51,8 +52,37 @@ function SurfaceLayerView({ layer }: { layer: SurfaceLayer }) {
     layerStyle.background = layer.background;
   }
 
+  if (layer.imageUrl) {
+    layerStyle.backgroundImage = `url("${layer.imageUrl}")`;
+    layerStyle.backgroundRepeat =
+      layer.motion?.type === "scroll-x" ? "repeat-x" : "no-repeat";
+    layerStyle.backgroundSize =
+      layer.motion?.type === "scroll-x" ? "auto 100%" : "cover";
+    layerStyle.backgroundPosition = "center center";
+  }
+
+  if (layer.motion && layer.motion.type !== "none") {
+    customStyle["--surface-motion-duration"] = `${layer.motion.durationMs}ms`;
+    if (layer.motion.type === "wander") {
+      customStyle["--surface-wander-scale"] = layer.motion.scale;
+      customStyle["--surface-wander-scale-peak"] = Number((layer.motion.scale + 0.01).toFixed(3));
+      customStyle["--surface-wander-x"] = `${layer.motion.xPct}%`;
+      customStyle["--surface-wander-y"] = `${layer.motion.yPct}%`;
+    }
+    if (layer.motion.type === "scroll-x") {
+      customStyle["--surface-scroll-end"] =
+        layer.motion.direction === "right" ? "100%" : "-100%";
+    }
+  }
+
   return (
-    <div className="surface-layer" data-kind={layer.kind} style={layerStyle}>
+    <div
+      className="surface-layer"
+      data-kind={layer.kind}
+      data-motion={layer.motion?.type ?? "none"}
+      data-mask={layer.mask ?? "none"}
+      style={layerStyle}
+    >
       {layer.svg ? (
         <div
           className="surface-svg"
