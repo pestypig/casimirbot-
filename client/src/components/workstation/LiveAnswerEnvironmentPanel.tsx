@@ -24,7 +24,8 @@ import type {
 import type { HelixUserSteeringEvidence } from "@shared/helix-user-steering-evidence";
 import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-evaluation";
 import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
-import type { HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
+import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
+import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
 
 type LiveEnvironmentTab = "present_state" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
@@ -130,6 +131,35 @@ const signalAgeMs = (source?: WorldEventSourceSeen | null): number | null => {
 const isMinecraftWorldSource = (source: WorldEventSourceSeen): boolean =>
   /\bminecraft|minehut|world_event/i.test([source.room_id, source.source_id, source.world_id, source.latest_event_type].join(" "));
 
+const modalityLabel = (modality: HelixSituationSourceModality): string => {
+  if (modality === "world_event") return "World events";
+  if (modality === "visual_frame") return "Visual";
+  if (modality === "audio_transcript") return "Audio transcript";
+  if (modality === "voice_identity") return "Voice identity";
+  if (modality === "text_chat") return "Text chat";
+  if (modality === "calculator_stream") return "Calculator";
+  if (modality === "simulation_stream") return "Simulation";
+  if (modality === "document_context") return "Documents";
+  return "Notes";
+};
+
+const sourceStatusClass = (status: HelixSituationSourceStatus): string => {
+  if (status === "active") return "border-emerald-300/30 text-emerald-100";
+  if (status === "permission_required" || status === "stale" || status === "paused") return "border-amber-300/30 text-amber-100";
+  if (status === "error" || status === "configured_missing") return "border-rose-300/30 text-rose-100";
+  return "border-white/10 text-slate-400";
+};
+
+const sourceCoverageSummary = (coverage?: HelixLiveCardLineSourceCoverage): string[] => {
+  if (!coverage) return [];
+  const entries: string[] = [];
+  if (coverage.world_event !== "not_applicable") entries.push(`world ${coverage.world_event}`);
+  if (coverage.visual_frame !== "not_applicable") entries.push(`visual ${coverage.visual_frame}`);
+  if (coverage.audio_transcript !== "not_applicable") entries.push(`transcript ${coverage.audio_transcript}`);
+  if (coverage.text_chat !== "not_applicable") entries.push(`chat ${coverage.text_chat}`);
+  return entries;
+};
+
 export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: { threadId?: string }) {
   const [activeTab, setActiveTab] = useState<LiveEnvironmentTab>("present_state");
   const [sources, setSources] = useState<WorkstationLiveSource[]>([]);
@@ -192,6 +222,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const entries = presentStateCard?.line_states ?? [];
     return new Map(entries.map((entry: HelixLiveCardLineState) => [entry.line_key, entry]));
   }, [presentStateCard?.line_states]);
+  const sourceHealthEntries = useMemo<HelixSituationSourceCapability[]>(() => {
+    const capabilities = presentStateCard?.fidelity_profile?.capabilities ?? [];
+    const bestByModality = new Map<HelixSituationSourceModality, HelixSituationSourceCapability>();
+    const rank = (status: HelixSituationSourceStatus): number =>
+      status === "active" ? 0 : status === "stale" ? 1 : status === "permission_required" ? 2 : status === "paused" ? 3 : 4;
+    for (const capability of capabilities) {
+      const current = bestByModality.get(capability.modality);
+      if (!current || rank(capability.status) < rank(current.status)) {
+        bestByModality.set(capability.modality, capability);
+      }
+    }
+    return Array.from(bestByModality.values()).slice(0, 8);
+  }, [presentStateCard?.fidelity_profile?.capabilities]);
 
   const refresh = async () => {
     try {
@@ -546,6 +589,38 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         </p>
       ) : null}
       <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold text-slate-100">Source Health</p>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Live environments can run with partial senses. Missing sources become next actions, not failures.
+            </p>
+          </div>
+          <span className="rounded border border-white/10 px-2 py-0.5 text-[10px] uppercase text-slate-400">
+            fidelity {Math.round((presentStateCard?.fidelity_profile?.fidelity_score ?? 0) * 100)}%
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {sourceHealthEntries.length === 0 ? (
+            <span className="rounded border border-white/10 px-2 py-1 text-[10px] text-slate-400">No source capability profile yet</span>
+          ) : null}
+          {sourceHealthEntries.map((capability) => (
+            <span
+              key={capability.source_id}
+              title={capability.missing_reason ?? capability.source_id}
+              className={`rounded border px-2 py-1 text-[10px] ${sourceStatusClass(capability.status)}`}
+            >
+              {modalityLabel(capability.modality)}: {capability.status}
+            </span>
+          ))}
+        </div>
+        {presentStateCard?.fidelity_profile?.next_actions?.length ? (
+          <p className="mt-2 text-[11px] text-amber-100">
+            Next: {presentStateCard.fidelity_profile.next_actions.slice(0, 3).join(", ")}
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold text-slate-100">{sourceLabel}</p>
@@ -748,6 +823,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
                             {lineState.next_best_tool ? <span>next tool {lineState.next_best_tool}</span> : null}
                             {lineState.last_check_result ? <span>last check {lineState.last_check_result}</span> : null}
+                          </div>
+                        ) : null}
+                        {sourceCoverageSummary(lineState?.source_coverage).length ? (
+                          <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
+                            {sourceCoverageSummary(lineState?.source_coverage).map((entry) => (
+                              <span key={entry} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-400">
+                                {entry}
+                              </span>
+                            ))}
                           </div>
                         ) : null}
                         <p className="mt-1 truncate text-[10px] text-slate-500">

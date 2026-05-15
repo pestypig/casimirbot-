@@ -14,6 +14,19 @@ export type HelixLiveCardLineLastCheckResult =
   | "contradicts"
   | "unknown";
 
+export type HelixLiveCardSourceCoverageStatus =
+  | "supported"
+  | "missing"
+  | "stale"
+  | "not_applicable";
+
+export type HelixLiveCardLineSourceCoverage = {
+  world_event: HelixLiveCardSourceCoverageStatus;
+  visual_frame: HelixLiveCardSourceCoverageStatus;
+  audio_transcript: HelixLiveCardSourceCoverageStatus;
+  text_chat: HelixLiveCardSourceCoverageStatus;
+};
+
 export type HelixLiveCardLineState = {
   schema: typeof HELIX_LIVE_CARD_LINE_STATE_SCHEMA;
   line_key: string;
@@ -26,6 +39,7 @@ export type HelixLiveCardLineState = {
   next_best_tool?: string | null;
   last_check_result?: HelixLiveCardLineLastCheckResult | null;
   last_check_refs: string[];
+  source_coverage: HelixLiveCardLineSourceCoverage;
   updated_at: string;
   assistant_answer: false;
   role: "ui_projection";

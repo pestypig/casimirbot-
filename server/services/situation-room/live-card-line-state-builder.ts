@@ -1,8 +1,11 @@
 import {
   HELIX_LIVE_CARD_LINE_STATE_SCHEMA,
   type HelixLiveCardLineEvidenceStatus,
+  type HelixLiveCardLineSourceCoverage,
+  type HelixLiveCardSourceCoverageStatus,
   type HelixLiveCardLineState,
 } from "@shared/helix-live-card-line-state";
+import type { HelixSituationSourceCapability, HelixSituationSourceModality } from "@shared/helix-situation-source-capability";
 import type { LiveAnswerLineState } from "@shared/helix-live-answer-environment";
 import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-evaluation";
 import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
@@ -45,10 +48,67 @@ const evidenceStatus = (input: {
   return input.missingEvidence.length > 0 ? "partial" : "supported";
 };
 
+const modalityStatus = (
+  capabilities: HelixSituationSourceCapability[],
+  modality: HelixSituationSourceModality,
+): HelixLiveCardSourceCoverageStatus => {
+  const entries = capabilities.filter((entry) => entry.modality === modality);
+  if (entries.some((entry) => entry.status === "active")) return "supported";
+  if (entries.some((entry) => entry.status === "stale")) return "stale";
+  return "missing";
+};
+
+const lineNeeds = (line: Pick<LiveAnswerLineState, "key" | "label" | "value">): Set<keyof HelixLiveCardLineSourceCoverage> => {
+  const text = lower(`${line.key} ${line.label} ${line.value}`);
+  const needs = new Set<keyof HelixLiveCardLineSourceCoverage>();
+  if (/\b(?:risk|threat|hostile|damage|world|minecraft|block|entity|mob|farm|wheat|chicken|source event)\b/.test(text)) {
+    needs.add("world_event");
+  }
+  if (/\b(?:place|visual|frame|screen|screenshot|visible|look|scene|farm|wheat|chicken|structure|boundary|decorat)\b/.test(text)) {
+    needs.add("visual_frame");
+  }
+  if (/\b(?:dialogue|voice|transcript|said|call|discord|speaker|conversation)\b/.test(text)) {
+    needs.add("audio_transcript");
+  }
+  if (/\b(?:chat|message|text)\b/.test(text)) {
+    needs.add("text_chat");
+  }
+  return needs;
+};
+
+const sourceCoverage = (input: {
+  line: Pick<LiveAnswerLineState, "key" | "label" | "value" | "evidence_refs">;
+  capabilities: HelixSituationSourceCapability[];
+}): HelixLiveCardLineSourceCoverage => {
+  const needs = lineNeeds(input.line);
+  const text = lower(`${input.line.key} ${input.line.label} ${input.line.value} ${(input.line.evidence_refs ?? []).join(" ")}`);
+  const explicit = {
+    world_event: /\b(?:minecraft|world|source:|journal|event|risk|hostile|damage)\b/.test(text),
+    visual_frame: /\b(?:visual|frame|screenshot|screen|image)\b/.test(text),
+    audio_transcript: /\b(?:voice|transcript|discord|speaker)\b/.test(text),
+    text_chat: /\b(?:chat|message)\b/.test(text),
+  };
+  const coverageFor = (
+    key: keyof HelixLiveCardLineSourceCoverage,
+    modality: HelixSituationSourceModality,
+  ): HelixLiveCardSourceCoverageStatus => {
+    if (explicit[key]) return "supported";
+    if (!needs.has(key)) return "not_applicable";
+    return modalityStatus(input.capabilities, modality);
+  };
+  return {
+    world_event: coverageFor("world_event", "world_event"),
+    visual_frame: coverageFor("visual_frame", "visual_frame"),
+    audio_transcript: coverageFor("audio_transcript", "audio_transcript"),
+    text_chat: coverageFor("text_chat", "text_chat"),
+  };
+};
+
 export function buildLiveCardLineStates(input: {
   lines: Array<Pick<LiveAnswerLineState, "key" | "label" | "value" | "confidence" | "evidence_refs" | "updated_at">>;
   requests?: HelixLiveLineToolRequest[];
   evaluations?: HelixLiveLineToolEvaluation[];
+  sourceCapabilities?: HelixSituationSourceCapability[];
   now?: string;
 }): HelixLiveCardLineState[] {
   const requests = input.requests ?? [];
@@ -74,6 +134,10 @@ export function buildLiveCardLineStates(input: {
       next_best_tool: lastRequest?.requested_tool ?? policyTool?.tool_id ?? null,
       last_check_result: lastEvaluation?.supports_line ?? null,
       last_check_refs: lastEvaluation?.tool_receipt_refs ?? [],
+      source_coverage: sourceCoverage({
+        line,
+        capabilities: input.sourceCapabilities ?? [],
+      }),
       updated_at: line.updated_at ?? now,
       assistant_answer: false,
       role: "ui_projection",

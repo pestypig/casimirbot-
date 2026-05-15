@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { HelixInterpretedEvent } from "@shared/helix-interpreted-event-log";
+import type { HelixLiveEnvironmentFidelity } from "@shared/helix-live-environment-fidelity";
 import type { HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 import {
   HELIX_PRESENT_STATE_SYNTHESIS_SCHEMA,
@@ -41,6 +42,7 @@ const makeLine = (input: {
   missing_evidence: uniqueStrings(input.missingEvidence ?? input.states.flatMap((state) => state.missing_evidence)).slice(0, 4),
   next_best_tool: input.nextBestTool ?? input.states.find((state) => state.next_best_tool)?.next_best_tool ?? null,
   last_check_result: input.lastCheckResult ?? input.states.find((state) => state.last_check_result)?.last_check_result ?? null,
+  source_coverage: input.states.find((state) => state.source_coverage)?.source_coverage,
   updated_at: input.now,
   assistant_answer: false,
   role: "ui_projection",
@@ -51,6 +53,7 @@ export function synthesizePresentState(input: {
   roomId?: string | null;
   lineStates: HelixLiveCardLineState[];
   interpretedEvents?: HelixInterpretedEvent[];
+  fidelityProfile?: HelixLiveEnvironmentFidelity | null;
   mode?: HelixPresentStateSynthesis["mode"];
   now?: string;
 }): HelixPresentStateSynthesis {
@@ -75,16 +78,24 @@ export function synthesizePresentState(input: {
   const hasDamage = /\b(?:damage|hit|explosion|hurt)\b/.test(eventText);
   const hasMining = /\b(?:mine|mineshaft|trench|stair|vertical|descending)\b/.test(allText);
   const hasEditing = /\b(?:block|slab|place|placed|break|broke|edit|decorat|boundary)\b/.test(allText);
+  const activeModalities = input.fidelityProfile?.active_modalities ?? [];
+  const missingModalities = input.fidelityProfile?.missing_modalities ?? [];
+  const hasWorldEvents = activeModalities.includes("world_event");
+  const hasVisual = activeModalities.includes("visual_frame");
+  const hasTranscript = activeModalities.includes("audio_transcript");
+  const missingVisual = missingModalities.includes("visual_frame");
+  const missingWorld = missingModalities.includes("world_event");
+  const missingTranscript = missingModalities.includes("audio_transcript");
 
   const place = hasFarmVisual
     ? "Wheat/chicken farm area."
     : minecraftLike
-      ? "Farm/base area near recent Minecraft activity."
+      ? (hasVisual ? "Farm/base area near recent Minecraft activity." : "Farm/base area is possible; visual source is not yet active.")
       : "Current live source context.";
   const activity = hasEditing
     ? (hasFarmVisual ? "Decorating or editing the farm boundary." : "Editing blocks while the live source tracks nearby context.")
     : minecraftLike
-      ? "Monitoring current Minecraft activity for meaningful progress."
+      ? `Monitoring current Minecraft activity${hasWorldEvents ? " from world-event evidence" : ""}${hasTranscript ? " and transcript context" : ""}.`
       : "Monitoring the active live environment.";
   const structure = hasMining
     ? "Farm/base context is separate from side trench or mineshaft evidence."
@@ -98,7 +109,9 @@ export function synthesizePresentState(input: {
       : "No strong entity pattern is confirmed.";
   const risk = hasThreat
     ? `Nearby hostile context${hasDamage ? " with damage/escalation evidence." : ", no damage event in the current compact window."}`
-    : "No immediate risk is confirmed in the current compact window.";
+    : hasWorldEvents
+      ? "No immediate risk is confirmed in the current world-event window."
+      : "Risk is not confirmed; world-event source is missing or inactive.";
 
   const relevantStates = input.lineStates.length > 0 ? input.lineStates : [];
   const lines: HelixPresentStateSynthesisLine[] = [
@@ -112,7 +125,11 @@ export function synthesizePresentState(input: {
       label: "Missing evidence",
       value: missing.length > 0
         ? missing.slice(0, 2).join("; ")
-        : "No major missing evidence is currently flagged.",
+        : [
+            missingVisual ? "Visual source is missing." : null,
+            missingWorld ? "World-event source is missing." : null,
+            missingTranscript ? "Transcript source is missing." : null,
+          ].filter(Boolean).join(" ") || "No major missing evidence is currently flagged.",
       states: relevantStates,
       confidence: null,
       missingEvidence: missing,
@@ -124,7 +141,11 @@ export function synthesizePresentState(input: {
       label: "Next check",
       value: hasFarmVisual
         ? "Align latest visual frame with recent slab/block/entity events."
-        : "Run event-window and visual-alignment checks before raising confidence.",
+        : input.fidelityProfile?.next_actions.includes("grant_visual_capture_permission")
+          ? "Grant visual capture, then align the latest frame with recent source events."
+          : input.fidelityProfile?.next_actions.includes("attach_world_event_source")
+            ? "Attach a world-event source or run an event-window check before raising confidence."
+            : "Run event-window and visual-alignment checks before raising confidence.",
       states: relevantStates,
       confidence: null,
       nextBestTool: hasFarmVisual ? "visual.align_latest_with_event_window" : nextTool,
@@ -147,6 +168,7 @@ export function synthesizePresentState(input: {
       ...input.lineStates.flatMap((state) => state.last_check_refs),
       ...interpreted.filter((event) => event.kind === "user_steering" || event.kind === "visual_event_alignment" || event.kind === "line_tool_evaluation").map((event) => event.event_id),
     ]),
+    fidelity_profile: input.fidelityProfile ?? null,
     live_cognition_tool_registry_version: LIVE_COGNITION_TOOL_REGISTRY_VERSION,
     model_invoked: input.mode === "model_reviewed",
     deterministic: input.mode !== "model_reviewed",

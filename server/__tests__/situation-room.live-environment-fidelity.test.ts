@@ -1,0 +1,178 @@
+import express from "express";
+import request from "supertest";
+import { beforeEach, describe, expect, it } from "vitest";
+import type { HelixSituationSourceCapability } from "@shared/helix-situation-source-capability";
+import { buildLiveCardLineStates } from "../services/situation-room/live-card-line-state-builder";
+import { buildLiveEnvironmentFidelity } from "../services/situation-room/live-environment-fidelity-builder";
+import {
+  buildSituationSourceCapabilities,
+  recordSituationSourceHeartbeat,
+  resetSituationSourceCapabilitiesForTest,
+} from "../services/situation-room/situation-source-capability-store";
+import {
+  ingestWorkstationLiveSourceEvent,
+  resetWorkstationLiveSources,
+} from "../services/situation-room/workstation-live-source-ingest";
+import {
+  resetVisualSnapshotStoreForTest,
+  startVisualSnapshotSource,
+} from "../services/situation-room/visual-snapshot-store";
+
+const threadId = "thread:fidelity";
+const now = "2026-05-15T05:00:00.000Z";
+
+const createApp = async (): Promise<express.Express> => {
+  const { planRouter } = await import("../routes/agi.plan");
+  const app = express();
+  app.use(express.json({ limit: "2mb" }));
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+describe("live environment source fidelity", () => {
+  beforeEach(() => {
+    resetSituationSourceCapabilitiesForTest();
+    resetVisualSnapshotStoreForTest();
+    resetWorkstationLiveSources();
+  });
+
+  it("starts fidelity with Minecraft world events only and marks visual/transcript as missing", () => {
+    ingestWorkstationLiveSourceEvent({
+      source_id: "source:minecraft-server",
+      kind: "minecraft_world_events",
+      event_type: "hostile_nearby",
+      thread_id: threadId,
+      ts: now,
+      payload: { actor: "DatDamPig" },
+    });
+
+    const capabilities = buildSituationSourceCapabilities({ threadId, now });
+    const fidelity = buildLiveEnvironmentFidelity({ threadId, capabilities, now });
+
+    expect(fidelity.assistant_answer).toBe(false);
+    expect(fidelity.raw_content_included).toBe(false);
+    expect(fidelity.active_modalities).toContain("world_event");
+    expect(fidelity.missing_modalities).toEqual(expect.arrayContaining(["visual_frame", "audio_transcript"]));
+    expect(fidelity.next_actions).toEqual(expect.arrayContaining(["grant_visual_capture_permission"]));
+  });
+
+  it("starts fidelity with a visual source only and does not require world events to exist", () => {
+    startVisualSnapshotSource({
+      thread_id: threadId,
+      source_id: "source:visual-window",
+      source_surface: "minecraft_client_window",
+      status: "active",
+    });
+
+    const fidelity = buildLiveEnvironmentFidelity({
+      threadId,
+      capabilities: buildSituationSourceCapabilities({ threadId, now }),
+      now,
+    });
+
+    expect(fidelity.active_modalities).toContain("visual_frame");
+    expect(fidelity.missing_modalities).toContain("world_event");
+    expect(fidelity.fidelity_score).toBeGreaterThan(0);
+  });
+
+  it("tracks transcript sources independently from visual sources", () => {
+    ingestWorkstationLiveSourceEvent({
+      source_id: "source:tab-transcript",
+      kind: "browser_audio_transcript",
+      event_type: "transcript_summary",
+      thread_id: threadId,
+      ts: now,
+      payload: { text: "I am decorating the farm." },
+    });
+
+    const fidelity = buildLiveEnvironmentFidelity({
+      threadId,
+      capabilities: buildSituationSourceCapabilities({ threadId, now }),
+      now,
+    });
+
+    expect(fidelity.active_modalities).toContain("audio_transcript");
+    expect(fidelity.missing_modalities).toEqual(expect.arrayContaining(["world_event", "visual_frame"]));
+  });
+
+  it("adds source coverage to live card line state", () => {
+    ingestWorkstationLiveSourceEvent({
+      source_id: "source:minecraft-server",
+      kind: "minecraft_world_events",
+      event_type: "hostile_nearby",
+      thread_id: threadId,
+      ts: now,
+      payload: {},
+    });
+    const capabilities = buildSituationSourceCapabilities({ threadId, now });
+    const states = buildLiveCardLineStates({
+      lines: [{
+        key: "risk",
+        label: "Risk",
+        value: "nearby hostile context, no damage event in current window.",
+        confidence: 0.65,
+        evidence_refs: ["event:hostile"],
+        updated_at: now,
+      }],
+      sourceCapabilities: capabilities,
+      now,
+    });
+
+    expect(states[0].source_coverage.world_event).toBe("supported");
+    expect(states[0].source_coverage.visual_frame).toBe("not_applicable");
+    expect(states[0].assistant_answer).toBe(false);
+  });
+
+  it("marks stale source heartbeat as stale in the fidelity profile", () => {
+    recordSituationSourceHeartbeat({
+      source_id: "source:voice",
+      thread_id: threadId,
+      modality: "audio_transcript",
+      status: "active",
+      ts: "2026-05-15T04:30:00.000Z",
+    });
+
+    const fidelity = buildLiveEnvironmentFidelity({
+      threadId,
+      capabilities: buildSituationSourceCapabilities({ threadId, now }),
+      now,
+    });
+
+    expect(fidelity.stale_modalities).toContain("audio_transcript");
+    expect(fidelity.next_actions).toContain("send_source_heartbeat");
+  });
+
+  it("exposes source capability, fidelity, and permission-granted routes", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/visual-source/start")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual-route",
+        source_surface: "minecraft_client_window",
+        status: "permission_required",
+      })
+      .expect(200);
+
+    const before = await request(app)
+      .get(`/api/agi/situation/source-capabilities?thread_id=${encodeURIComponent(threadId)}`)
+      .expect(200);
+    expect((before.body.capabilities as HelixSituationSourceCapability[])
+      .some((entry) => entry.modality === "visual_frame" && entry.status === "permission_required")).toBe(true);
+
+    await request(app)
+      .post("/api/agi/situation/visual-source/permission-granted")
+      .send({ source_id: "source:visual-route" })
+      .expect(200);
+
+    const after = await request(app)
+      .get(`/api/agi/situation/live-environment/fidelity?thread_id=${encodeURIComponent(threadId)}`)
+      .expect(200);
+    expect(after.body.fidelity).toMatchObject({
+      assistant_answer: false,
+      raw_content_included: false,
+      context_policy: "compact_context_pack_only",
+    });
+    expect(after.body.fidelity.active_modalities).toContain("visual_frame");
+  }, 15000);
+});

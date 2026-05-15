@@ -10,7 +10,9 @@ import { appendInterpretedEvent, listInterpretedEvents } from "./interpreted-eve
 import { listClarificationQuestions } from "./clarification-question-store";
 import { listGameUtilityHypotheses } from "./minecraft-entity-utility-reducer";
 import { buildLiveCardLineStates } from "./live-card-line-state-builder";
+import { buildLiveEnvironmentFidelity } from "./live-environment-fidelity-builder";
 import { synthesizePresentState } from "./present-state-synthesizer";
+import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
 import {
   listLiveLineToolEvaluations,
   listLiveLineToolRequests,
@@ -114,6 +116,10 @@ export function projectPresentStateCard(input: {
   });
   const lineRequests = listLiveLineToolRequests({ threadId: input.threadId, limit: 120 });
   const lineEvaluations = listLiveLineToolEvaluations({ threadId: input.threadId, limit: 120 });
+  const sourceCapabilities = buildSituationSourceCapabilities({
+    threadId: input.threadId,
+    roomId: projectedRoomId,
+  });
   if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
     const lines = artifact.current_state_lines;
     const rawLines = [
@@ -129,6 +135,14 @@ export function projectPresentStateCard(input: {
       lines: rawLines,
       requests: lineRequests,
       evaluations: lineEvaluations,
+      sourceCapabilities,
+      now,
+    });
+    const fidelityProfile = buildLiveEnvironmentFidelity({
+      threadId: artifact.thread_id,
+      roomId: artifact.room_id,
+      lineStates,
+      capabilities: sourceCapabilities,
       now,
     });
     const synthesis = synthesizePresentState({
@@ -136,6 +150,7 @@ export function projectPresentStateCard(input: {
       roomId: artifact.room_id,
       lineStates,
       interpretedEvents,
+      fidelityProfile,
       now,
     });
     const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
@@ -149,6 +164,7 @@ export function projectPresentStateCard(input: {
       lines: synthesis.lines,
       line_states: lineStates,
       present_state_synthesis: synthesis,
+      fidelity_profile: fidelityProfile,
       pending_request_input: pendingRequestInput,
       last_interpreted_event_id: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
       go_to_log_target: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
@@ -173,6 +189,14 @@ export function projectPresentStateCard(input: {
       lines: rawLines,
       requests: lineRequests,
       evaluations: lineEvaluations,
+      sourceCapabilities,
+      now,
+    });
+    const fidelityProfile = buildLiveEnvironmentFidelity({
+      threadId: environment.thread_id,
+      roomId: environment.room_id ?? null,
+      lineStates,
+      capabilities: sourceCapabilities,
       now,
     });
     const synthesis = synthesizePresentState({
@@ -180,6 +204,7 @@ export function projectPresentStateCard(input: {
       roomId: environment.room_id ?? null,
       lineStates,
       interpretedEvents,
+      fidelityProfile,
       now,
     });
     const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
@@ -193,12 +218,38 @@ export function projectPresentStateCard(input: {
       lines: synthesis.lines,
       line_states: lineStates,
       present_state_synthesis: synthesis,
+      fidelity_profile: fidelityProfile,
       pending_request_input: pendingRequestInput,
       last_interpreted_event_id: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
       go_to_log_target: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
       updated_at: synthesis.created_at,
     };
   }
+  const fallbackRawLines = [
+    ...utilityLines,
+    line({
+      key: "now",
+      label: "Now",
+      value: latestEvent?.summary ?? "No active interpreted situation is available.",
+      evidenceRefs: latestEvent?.evidence_refs ?? [],
+      confidence: latestEvent?.confidence ?? null,
+      updatedAt: latestEvent?.created_at ?? now,
+    }),
+  ];
+  const fallbackLineStates = buildLiveCardLineStates({
+    lines: fallbackRawLines,
+    requests: lineRequests,
+    evaluations: lineEvaluations,
+    sourceCapabilities,
+    now,
+  });
+  const fallbackFidelity = buildLiveEnvironmentFidelity({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    lineStates: fallbackLineStates,
+    capabilities: sourceCapabilities,
+    now,
+  });
   return {
     schema: HELIX_PRESENT_STATE_CARD_SCHEMA,
     card_id: `present_state:${hashShort([input.threadId, input.roomId ?? null, latestEvent?.event_id ?? "empty"])}`,
@@ -206,17 +257,9 @@ export function projectPresentStateCard(input: {
     room_id: input.roomId ?? null,
     title: "Present State",
     status: "paused",
-    lines: [
-      ...utilityLines,
-      line({
-        key: "now",
-        label: "Now",
-        value: latestEvent?.summary ?? "No active interpreted situation is available.",
-        evidenceRefs: latestEvent?.evidence_refs ?? [],
-        confidence: latestEvent?.confidence ?? null,
-        updatedAt: latestEvent?.created_at ?? now,
-      }),
-    ],
+    lines: fallbackRawLines,
+    line_states: fallbackLineStates,
+    fidelity_profile: fallbackFidelity,
     pending_request_input: pendingRequestInput,
     last_interpreted_event_id: latestEvent?.event_id ?? null,
     go_to_log_target: latestEvent?.event_id ?? null,

@@ -8,6 +8,10 @@ import { listContinuousCategorizationJobs, startContinuousCategorizationJob } fr
 import { listVisualSnapshotSources, startVisualSnapshotSource } from "./visual-snapshot-store";
 import { createLiveAnswerEnvironment, listLiveAnswerEnvironments, setLiveAnswerEnvironmentLineSchema } from "./live-answer-environment-store";
 import { appendInterpretedEvent, listInterpretedEvents } from "./interpreted-event-log-store";
+import type { HelixLiveEnvironmentFidelity } from "@shared/helix-live-environment-fidelity";
+import type { HelixSituationSourceCapability } from "@shared/helix-situation-source-capability";
+import { buildLiveEnvironmentFidelity } from "./live-environment-fidelity-builder";
+import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
 
 type MinecraftCortanaNextRequiredAction =
   | "grant_visual_capture_permission"
@@ -362,6 +366,8 @@ export function getMinecraftCortanaCompanionStatus(input: {
   live_environment: ReturnType<typeof listLiveAnswerEnvironments>[number] | null;
   latest_interpreted_event: ReturnType<typeof listInterpretedEvents>[number] | null;
   companion_policy: ReturnType<typeof getCompanionPolicy>;
+  source_capabilities: HelixSituationSourceCapability[];
+  fidelity_profile: HelixLiveEnvironmentFidelity;
   next_required_action: MinecraftCortanaNextRequiredAction;
   raw_logs_included: false;
   raw_image_included: false;
@@ -400,6 +406,15 @@ export function getMinecraftCortanaCompanionStatus(input: {
     liveEnvironment?.source_ids.find((sourceId) => /minecraft|minehut/i.test(sourceId)) ??
     minecraftJob?.source_ids[0] ??
     null;
+  const sourceCapabilities = buildSituationSourceCapabilities({
+    threadId,
+    roomId: liveEnvironment?.room_id ?? resolvedSession?.room_id ?? null,
+  });
+  const fidelityProfile = buildLiveEnvironmentFidelity({
+    threadId,
+    roomId: liveEnvironment?.room_id ?? resolvedSession?.room_id ?? null,
+    capabilities: sourceCapabilities,
+  });
   let nextRequiredAction: MinecraftCortanaNextRequiredAction = "ready";
   if (resolvedSession && !profileId) nextRequiredAction = "link_discord_profile";
   else if (!minecraftSourceId || !liveEnvironment) nextRequiredAction = "attach_minecraft_source";
@@ -419,6 +434,8 @@ export function getMinecraftCortanaCompanionStatus(input: {
     live_environment: liveEnvironment,
     latest_interpreted_event: listInterpretedEvents({ threadId, roomId: liveEnvironment?.room_id ?? resolvedSession?.room_id ?? null, limit: 1 }).at(-1) ?? null,
     companion_policy: getCompanionPolicy(threadId),
+    source_capabilities: sourceCapabilities,
+    fidelity_profile: fidelityProfile,
     next_required_action: nextRequiredAction,
     raw_logs_included: false,
     raw_image_included: false,

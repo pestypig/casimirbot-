@@ -27,6 +27,7 @@ export type HelixPresentStateCard = {
   pending_request_input?: import("./helix-agentic-request-input").HelixAgenticRequestInput | null;
   line_states?: import("./helix-live-card-line-state").HelixLiveCardLineState[];
   present_state_synthesis?: import("./helix-present-state-synthesis").HelixPresentStateSynthesis | null;
+  fidelity_profile?: import("./helix-live-environment-fidelity").HelixLiveEnvironmentFidelity | null;
   last_interpreted_event_id?: string | null;
   go_to_log_target?: string | null;
   updated_at: string;
