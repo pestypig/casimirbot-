@@ -33,10 +33,29 @@ type DiscordDiagnosticView = {
   raw_transcript_included?: false;
 };
 
+type DiscordInteractionEndpointView = {
+  path?: string;
+  public_key_configured?: boolean;
+  application_id?: string | null;
+  command_registration_script?: string;
+  latest_interaction?: {
+    interaction_id?: string | null;
+    command?: string | null;
+    subcommand?: string | null;
+    terminal_answer_source?: string | null;
+    terminal_hash?: string | null;
+    poison_audit_ok?: boolean | null;
+    deferred?: boolean;
+    answer_created?: boolean;
+    created_at?: string;
+  } | null;
+};
+
 export function DiscordSessionPanel() {
   const [sessions, setSessions] = React.useState<DiscordSessionView[]>([]);
   const [policies, setPolicies] = React.useState<Record<string, DiscordPolicyView>>({});
   const [diagnostics, setDiagnostics] = React.useState<Record<string, DiscordDiagnosticView>>({});
+  const [interactionEndpoint, setInteractionEndpoint] = React.useState<DiscordInteractionEndpointView | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
@@ -47,6 +66,11 @@ export function DiscordSessionPanel() {
       setSessions(Array.isArray(body.sessions) ? body.sessions : []);
       setPolicies(body.policies && typeof body.policies === "object" ? body.policies : {});
       setDiagnostics(body.diagnostics && typeof body.diagnostics === "object" ? body.diagnostics : {});
+      setInteractionEndpoint(
+        body.interaction_endpoint && typeof body.interaction_endpoint === "object"
+          ? body.interaction_endpoint
+          : null,
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load Discord sessions.");
@@ -77,6 +101,28 @@ export function DiscordSessionPanel() {
         </button>
       </div>
       {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
+      {interactionEndpoint ? (
+        <div className="mt-3 grid gap-2 rounded border border-cyan-500/15 bg-cyan-500/5 p-2 text-xs text-slate-300 md:grid-cols-3">
+          <span className="rounded bg-black/20 px-2 py-1">
+            endpoint {interactionEndpoint.path ?? "/api/discord/interactions"}
+          </span>
+          <span className="rounded bg-black/20 px-2 py-1">
+            public key {interactionEndpoint.public_key_configured ? "configured" : "missing"}
+          </span>
+          <span className="rounded bg-black/20 px-2 py-1">
+            latest {interactionEndpoint.latest_interaction?.command ?? "none"}
+            {interactionEndpoint.latest_interaction?.terminal_answer_source
+              ? ` / ${interactionEndpoint.latest_interaction.terminal_answer_source}`
+              : ""}
+          </span>
+          <span className="rounded bg-black/20 px-2 py-1 md:col-span-2">
+            command script {interactionEndpoint.command_registration_script ?? "not configured"}
+          </span>
+          <span className="rounded bg-black/20 px-2 py-1">
+            poison {String(interactionEndpoint.latest_interaction?.poison_audit_ok ?? "n/a")}
+          </span>
+        </div>
+      ) : null}
       <div className="mt-3 space-y-2">
         {sessions.length === 0 ? (
           <p className="rounded border border-dashed border-white/15 px-3 py-4 text-center text-xs text-slate-500">

@@ -31,6 +31,29 @@ type HealthCheckRequest = {
   headers: Record<string, string | string[] | undefined>;
 };
 
+function loadLocalEnvFile(): void {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const equalsAt = trimmed.indexOf("=");
+    if (equalsAt <= 0) continue;
+    const key = trimmed.slice(0, equalsAt).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    let value = trimmed.slice(equalsAt + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadLocalEnvFile();
 patchExpressAsyncHandlers();
 const app = express();
 
@@ -401,7 +424,14 @@ const resolveRootRedirectTarget = (req: Request): string => {
 };
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT ?? "10mb";
-app.use(express.json({ limit: jsonBodyLimit }));
+app.use(express.json({
+  limit: jsonBodyLimit,
+  verify: (req, _res, buf) => {
+    if (req.originalUrl?.startsWith("/api/discord/interactions")) {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: false }));
 registerMetricsEndpoint(app);
 app.use(otelMiddleware);

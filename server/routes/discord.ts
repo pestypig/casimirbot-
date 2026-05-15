@@ -1,5 +1,9 @@
 import { Router } from "express";
 import {
+  handleDiscordInteraction,
+  listDiscordInteractionReceipts,
+} from "../services/discord/discord-interaction-router";
+import {
   attachMinecraftToDiscordSession,
   completeDiscordProfileLink,
   createDiscordLinkCode,
@@ -15,6 +19,10 @@ import {
 import { getCompanionPolicy, upsertCompanionPolicy } from "../services/situation-room/companion-policy-engine";
 
 export const discordRouter = Router();
+
+discordRouter.post("/interactions", (req, res) => {
+  void handleDiscordInteraction(req, res);
+});
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -64,9 +72,17 @@ discordRouter.post("/session/start", (req, res) => {
 
 discordRouter.get("/sessions", (_req, res) => {
   const sessions = listDiscordVoiceSessions();
+  const latestInteraction = listDiscordInteractionReceipts().at(-1) ?? null;
   res.json({
     ok: true,
     sessions,
+    interaction_endpoint: {
+      path: "/api/discord/interactions",
+      public_key_configured: Boolean(process.env.DISCORD_PUBLIC_KEY?.trim()),
+      application_id: process.env.DISCORD_APPLICATION_ID || process.env.DISCORD_CLIENT_ID || null,
+      command_registration_script: "integrations/discord-helix-bot/src/register-commands.ts",
+      latest_interaction: latestInteraction,
+    },
     policies: Object.fromEntries(
       sessions
         .filter((session) => session.thread_id)
