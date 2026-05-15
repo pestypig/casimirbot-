@@ -286,6 +286,14 @@ export function getLatestLiveSourceChunk(input: {
     .at(-1) ?? null;
 }
 
+export function getLiveSourceChunk(chunkId: string): HelixLiveSourceChunk | null {
+  for (const chunks of chunksBySource.values()) {
+    const match = chunks.find((chunk) => chunk.chunk_id === chunkId);
+    if (match) return match;
+  }
+  return null;
+}
+
 const backpressureForSource = (
   sourceId: string,
   producer: HelixLiveSourceProducer,
@@ -448,10 +456,38 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
   return updated.filter((job) => job.chunk_id === input.chunkId);
 }
 
+export function getLiveSourceAnalysisJob(jobId: string): HelixLiveSourceAnalysisJob | null {
+  for (const jobs of analysisJobsByThread.values()) {
+    const match = jobs.find((job) => job.job_id === jobId);
+    if (match) return match;
+  }
+  return null;
+}
+
+export function updateLiveSourceAnalysisJob(input: {
+  jobId: string;
+  status: HelixLiveSourceAnalysisJobStatus;
+  outputRefs?: string[];
+  summary?: string;
+}): HelixLiveSourceAnalysisJob | null {
+  const existing = getLiveSourceAnalysisJob(input.jobId);
+  if (!existing) return null;
+  const jobs = analysisJobsByThread.get(existing.thread_id) ?? [];
+  const updatedJob: HelixLiveSourceAnalysisJob = {
+    ...existing,
+    status: input.status,
+    output_refs: input.outputRefs ?? existing.output_refs,
+    summary: input.summary ?? existing.summary,
+  };
+  analysisJobsByThread.set(existing.thread_id, jobs.map((job) => job.job_id === input.jobId ? updatedJob : job));
+  return updatedJob;
+}
+
 export function listLiveSourceAnalysisJobs(input: {
   threadId?: string | null;
   sourceId?: string | null;
   chunkId?: string | null;
+  status?: HelixLiveSourceAnalysisJobStatus | "any" | null;
   limit?: number;
 } = {}): HelixLiveSourceAnalysisJob[] {
   const entries = input.threadId
@@ -460,6 +496,7 @@ export function listLiveSourceAnalysisJobs(input: {
   return entries
     .filter((job) => !input.sourceId || job.source_id === input.sourceId)
     .filter((job) => !input.chunkId || job.chunk_id === input.chunkId)
+    .filter((job) => !input.status || input.status === "any" || job.status === input.status)
     .slice(-(input.limit ?? 100));
 }
 
