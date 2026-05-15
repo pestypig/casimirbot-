@@ -42,6 +42,7 @@ export function buildHelixTurnTerminalAuthority(input: {
   final_answer_source?: string | null;
   terminal_artifact_kind?: string | null;
   terminal_text: string;
+  terminal_item_id?: string | null;
   route?: HelixTerminalAuthority["route"] | null;
   terminal_kind?: HelixTerminalAuthority["terminal_kind"] | null;
   created_at?: string;
@@ -54,6 +55,7 @@ export function buildHelixTurnTerminalAuthority(input: {
     terminal_kind: input.terminal_kind ?? inferTerminalKind(input),
     final_answer_source: normalizeText(input.final_answer_source) || "unknown",
     terminal_artifact_kind: normalizeText(input.terminal_artifact_kind) || "unknown",
+    terminal_item_id: normalizeText(input.terminal_item_id) || null,
     terminal_text_hash: hashHelixTerminalText(input.terminal_text),
     terminal_text_preview: normalizeText(input.terminal_text).slice(0, 240),
     server_authoritative: true,
@@ -64,7 +66,7 @@ export function buildHelixTurnTerminalAuthority(input: {
 export function recordHelixTurnTerminalAuthority(input: Parameters<typeof buildHelixTurnTerminalAuthority>[0]): HelixTerminalAuthority {
   const authority = buildHelixTurnTerminalAuthority(input);
   const existing = terminalAuthorityByThread.get(authority.thread_id) ?? [];
-  const filtered = existing.filter((entry) => entry.turn_id !== authority.turn_id);
+  const filtered = existing.filter((entry: HelixTerminalAuthority) => entry.turn_id !== authority.turn_id);
   terminalAuthorityByThread.set(authority.thread_id, [...filtered, authority].slice(-500));
   return authority;
 }
@@ -75,7 +77,7 @@ export function getHelixTurnTerminalAuthority(input: {
 }): HelixTerminalAuthority | null {
   const records = terminalAuthorityByThread.get(input.thread_id) ?? [];
   if (input.turn_id) {
-    return records.find((entry) => entry.turn_id === input.turn_id) ?? null;
+    return records.find((entry: HelixTerminalAuthority) => entry.turn_id === input.turn_id) ?? null;
   }
   return records.at(-1) ?? null;
 }

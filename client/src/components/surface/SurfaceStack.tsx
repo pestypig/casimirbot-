@@ -81,6 +81,7 @@ function SurfaceLayerView({ layer }: { layer: SurfaceLayer }) {
       data-kind={layer.kind}
       data-motion={layer.motion?.type ?? "none"}
       data-mask={layer.mask ?? "none"}
+      data-source={layer.source ?? "asset"}
       style={layerStyle}
     >
       {layer.svg ? (

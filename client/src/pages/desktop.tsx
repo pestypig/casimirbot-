@@ -19,6 +19,7 @@ import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference }
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
+import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import {
@@ -31,6 +32,7 @@ import { runWorkstationJob } from "@/lib/workstation/jobExecutor";
 import { emitHelixWorkstationProceduralStep } from "@/lib/workstation/proceduralPlaybackContract";
 import { startWorkstationClipboardCapture } from "@/lib/workstation/workstationClipboard";
 import { startWorkstationTimelineCapture } from "@/lib/workstation/workstationTimelineCapture";
+import { startProcessGraphCapture } from "@/lib/workstation/processGraph/startProcessGraphCapture";
 import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
@@ -215,6 +217,7 @@ export default function DesktopPage({
     if (typeof window === "undefined") return;
     const stopClipboardCapture = startWorkstationClipboardCapture();
     const stopTimelineCapture = startWorkstationTimelineCapture();
+    const stopProcessGraphCapture = startProcessGraphCapture();
     const handleWorkstationAction = (event: Event) => {
       const detail = (event as CustomEvent<unknown>)?.detail;
       const actions = coerceHelixWorkstationActions(detail);
@@ -602,6 +605,7 @@ export default function DesktopPage({
       );
       stopClipboardCapture();
       stopTimelineCapture();
+      stopProcessGraphCapture();
     };
   }, [openPanelUniversal, openSettings, workstationEnabled]);
 
@@ -751,6 +755,7 @@ export default function DesktopPage({
         className="mood-transition-scope relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100"
       >
         <SurfaceStack recipe={wallpaperRecipe} />
+        <ProcessGraphSurfaceLayer mood={mood} orientation={orientation} mode="ambient" />
         {workstationEnabled ? (
           <HelixWorkstationShell
             layoutVariant={layoutVariant}

@@ -303,6 +303,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultPosition: { x: 300, y: 200 },
   },
   {
+    id: "workstation-process-graph",
+    title: "Process Graph",
+    loader: load(() => import("@/components/workstation/WorkstationProcessGraphPanel")),
+    defaultSize: { w: 1120, h: 740 },
+    defaultPosition: { x: 300, y: 180 },
+    keywords: ["process", "graph", "workflow", "tools", "jobs", "artifacts", "timeline"],
+  },
+  {
     id: "casimir-tiles",
     title: "Casimir Tiles",
     loader: load(() => import("@/components/panels/CasimirTilesPanel")),

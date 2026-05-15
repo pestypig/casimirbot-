@@ -17,6 +17,7 @@ import { MobilePanelHost } from "@/components/mobile/MobilePanelHost";
 import { recordPanelActivity } from "@/lib/essence/activityReporter";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
+import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { Dialog } from "@/components/ui/dialog";
@@ -39,6 +40,7 @@ import {
 } from "@/lib/workstation/workstationActionLiveEvents";
 import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import { startProcessGraphCapture } from "@/lib/workstation/processGraph/startProcessGraphCapture";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
@@ -137,6 +139,11 @@ export default function MobileStartPage() {
       }),
     [mood]
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    return startProcessGraphCapture();
+  }, []);
 
   const openAppViewer = useCallback(() => {
     setAppViewerOpen(true);
@@ -429,6 +436,7 @@ export default function MobileStartPage() {
         style={{ minHeight: "max(100dvh, 100vh)" }}
       >
         <SurfaceStack recipe={wallpaperRecipe} />
+        <ProcessGraphSurfaceLayer mood={mood} orientation="mobile" mode="ambient" />
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"

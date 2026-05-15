@@ -296,6 +296,43 @@
   }
 }
 
+.process-graph-surface-layer {
+  position: absolute;
+  inset: -8%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.38;
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 42%,
+    black 68%,
+    black 100%
+  );
+  mask-image: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 42%,
+    black 68%,
+    black 100%
+  );
+  animation: surface-wander 112000ms ease-in-out infinite;
+  will-change: transform;
+}
+
+.process-graph-surface-layer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-graph-surface-layer {
+    animation: none;
+  }
+}
+
 .surface-svg,
 .surface-svg svg {
   width: 100%;

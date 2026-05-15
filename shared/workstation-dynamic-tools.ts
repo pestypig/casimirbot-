@@ -668,6 +668,13 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "callout_policy.set_mode", required_args: ["thread_id", "mode"], optional_args: ["room_id"], risk: "medium", returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "voice_delivery.confirm_speak", required_args: ["thread_id"], optional_args: ["proposal_id", "delivery_id"], risk: "medium", returns_artifact: true },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "workstation-process-graph", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "workstation-process-graph", action_id: "get_snapshot", required_args: [], optional_args: ["scope", "max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
+  { panel_id: "workstation-process-graph", action_id: "query_snapshot", required_args: ["query"], optional_args: ["max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
+  { panel_id: "workstation-process-graph", action_id: "focus_node", required_args: ["node_id"], optional_args: [], returns_artifact: true },
+  { panel_id: "workstation-process-graph", action_id: "filter_view", required_args: [], optional_args: ["filter"], returns_artifact: true },
+  { panel_id: "workstation-process-graph", action_id: "export_svg", required_args: [], optional_args: ["mode", "max_nodes"], returns_artifact: true },
+  { panel_id: "workstation-process-graph", action_id: "clear_historical", required_args: [], optional_args: [], returns_artifact: true },
   { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "scientific-calculator", action_id: "open", required_args: [], optional_args: [] },
@@ -823,6 +830,17 @@ export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
     enabled: true,
   },
   {
+    action_key: "workstation-process-graph.open",
+    family: "timeline",
+    target_id: "workstation-process-graph",
+    action_id: "open",
+    label: "Process Graph",
+    aliases: ["open process graph", "show process graph", "open workstation process graph"],
+    terminal_receipt_required: true,
+    source: "desktop_panel_manifest",
+    enabled: true,
+  },
+  {
     action_key: "agi-essence-console.open",
     family: "console",
     target_id: "agi-essence-console",
@@ -867,6 +885,7 @@ export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
   "situation-room-sources",
   "situation-room-pipelines",
   "workstation-workflow-timeline",
+  "workstation-process-graph",
   "agi-essence-console",
   "agi-task-history",
   "scientific-calculator",
@@ -1031,6 +1050,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "episode_timeline.summarize_window") return "situation_episode_summary";
   if (panelId === "situation-room-pipelines" && actionId === "callout_policy.set_mode") return "standby_callout_policy_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.confirm_speak") return "standby_callout_delivery_receipt";
+  if (panelId === "workstation-process-graph" && actionId !== "open") return actionId === "export_svg" ? "workstation_process_graph_svg" : "workstation_process_graph_snapshot";
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
   if (panelId === "mission-ethos" && actionId === "compare_motive_to_zen") return "ideology_motive_comparison_receipt";
@@ -1082,7 +1102,7 @@ function resolveAffordanceFamily(panelId: string, actionId: string): HelixWorkst
   if (panelId === "docs-viewer") return "documents";
   if (panelId === "mission-ethos") return "ideology";
   if (panelId === "workstation-clipboard-history") return "clipboard";
-  if (panelId === "workstation-workflow-timeline" || panelId === "agi-task-history") return "history";
+  if (panelId === "workstation-workflow-timeline" || panelId === "workstation-process-graph" || panelId === "agi-task-history") return "history";
   if (panelId === "agi-essence-console") return "debug";
   if (panelId === "situation-room-sources") return "live_source";
   if (panelId === "situation-room-pipelines") {

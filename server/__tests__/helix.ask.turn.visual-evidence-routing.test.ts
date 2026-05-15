@@ -47,6 +47,23 @@ describe("helix ask visual evidence routing", () => {
     expect(response.body.route_reason_code).toBe("multimodal_visual_answer");
     expect(response.body.final_answer_source).toBe("artifact_synthesis");
     expect(response.body.terminal_artifact_kind).toBe("visual_frame_evidence");
+    expect(response.body.terminal_item).toEqual(
+      expect.objectContaining({
+        schema: "helix.turn_item.v1",
+        kind: "assistant_answer",
+        assistant_answer: true,
+        text: expect.stringContaining("Minecraft slime"),
+      }),
+    );
+    expect(response.body.turn_item_ledger).toEqual(
+      expect.objectContaining({
+        schema: "helix.turn_item_ledger.v1",
+        terminal_item_id: response.body.terminal_item.item_id,
+        assistant_answer_item_count: 1,
+        worker_output_promoted_to_answer_count: 0,
+      }),
+    );
+    expect(response.body.terminal_answer_authority?.terminal_item_id).toBe(response.body.terminal_item.item_id);
     expect(response.body.answer).toContain("Minecraft slime");
     expect(response.body.prompt_poison_audit?.ok).toBe(true);
     expect(response.body.poison_audit?.ok).toBe(true);
@@ -265,6 +282,22 @@ describe("helix ask visual evidence routing", () => {
     expect(response.body.route_reason_code).toBe("visual_evidence_not_ready");
     expect(response.body.final_answer_source).toBe("request_user_input");
     expect(response.body.terminal_artifact_kind).toBe("request_user_input");
+    expect(response.body.terminal_item).toEqual(
+      expect.objectContaining({
+        schema: "helix.turn_item.v1",
+        kind: "request_user_input",
+        assistant_answer: false,
+      }),
+    );
+    expect(response.body.turn_item_ledger).toEqual(
+      expect.objectContaining({
+        terminal_item_id: response.body.terminal_item.item_id,
+        assistant_answer_item_count: 0,
+        request_user_input_item_count: 1,
+        worker_output_promoted_to_answer_count: 0,
+      }),
+    );
+    expect(response.body.terminal_answer_authority?.terminal_item_id).toBe(response.body.terminal_item.item_id);
     expect(response.body.answer).toContain("can’t describe the image yet");
     expect(response.body.answer).not.toContain("The attached image shows");
     expect(response.body.artifact_promotion_audit).toMatchObject({

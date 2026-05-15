@@ -33,6 +33,8 @@ import {
 } from "@/lib/workstation/situationRoomSetupActions";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
+import { renderWorkstationProcessGraphSvg } from "@/lib/workstation/processGraph/renderProcessGraphSvg";
 import type {
   SituationGraphLane,
   SituationGraphNodeColumn,
@@ -79,6 +81,15 @@ function asBoolean(value: unknown): boolean | null {
     const trimmed = value.trim().toLowerCase();
     if (trimmed === "true" || trimmed === "yes" || trimmed === "y" || trimmed === "1") return true;
     if (trimmed === "false" || trimmed === "no" || trimmed === "n" || trimmed === "0") return false;
+  }
+  return null;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
 }
@@ -611,6 +622,128 @@ export function executeHelixPanelAction(
   if (actionId === "close") {
     context.closePanel(panelId, undefined);
     return { ok: true, panel_id: panelId, action_id: actionId };
+  }
+
+  if (panelId === "workstation-process-graph") {
+    const args = asRecord(request.args) ?? {};
+    const graphStore = useWorkstationProcessGraphStore.getState();
+    const maxNodes = asNumber(args.max_nodes ?? args.maxNodes) ?? undefined;
+    const includeTimeline = asBoolean(args.include_timeline ?? args.includeTimeline) ?? true;
+    const includeArtifacts = asBoolean(args.include_artifacts ?? args.includeArtifacts) ?? true;
+
+    if (actionId === "get_snapshot") {
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: graphStore.getSnapshotArtifact({ maxNodes, includeTimeline, includeArtifacts }) as unknown as Record<string, unknown>,
+        message: "Returned workstation process graph snapshot.",
+      };
+    }
+
+    if (actionId === "query_snapshot") {
+      const query = asNonEmptyString(args.query ?? args.filter);
+      if (!query) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "workstation-process-graph.query_snapshot requires query.",
+        };
+      }
+      const snapshot = graphStore.getSnapshotArtifact({ maxNodes, includeTimeline, includeArtifacts });
+      const needle = query.toLowerCase();
+      const nodes = snapshot.nodes.filter((node) =>
+        [node.id, node.kind, node.label, node.status, node.panelId, node.traceId, node.jobId]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle)),
+      );
+      const nodeIds = new Set(nodes.map((node) => node.id));
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          ...snapshot,
+          query,
+          nodes,
+          edges: snapshot.edges.filter((edge) => nodeIds.has(edge.from) || nodeIds.has(edge.to)),
+          timeline: snapshot.timeline.filter((entry) =>
+            [entry.label, entry.traceId, ...(entry.nodeIds ?? [])]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(needle)),
+          ),
+        },
+        message: `Returned process graph query snapshot for "${query}".`,
+      };
+    }
+
+    if (actionId === "focus_node") {
+      const nodeId = asNonEmptyString(args.node_id ?? args.nodeId);
+      if (!nodeId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "workstation-process-graph.focus_node requires node_id.",
+        };
+      }
+      graphStore.focusNode(nodeId);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { kind: "workstation_process_graph_view_receipt", focused_node_id: nodeId },
+        message: `Focused process graph node ${nodeId}.`,
+      };
+    }
+
+    if (actionId === "filter_view") {
+      const filter = asNonEmptyString(args.filter ?? args.query);
+      graphStore.filterView(filter);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { kind: "workstation_process_graph_view_receipt", filter: filter ?? null },
+        message: filter ? `Filtered process graph by "${filter}".` : "Cleared process graph filter.",
+      };
+    }
+
+    if (actionId === "export_svg") {
+      const mode = asNonEmptyString(args.mode) === "ambient" ? "ambient" : "panel";
+      const graph = graphStore.graph;
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "workstation_process_graph_svg",
+          schemaVersion: "helix.workstation.process_graph.svg/v1",
+          sessionId: graph.sessionId,
+          generatedAt: new Date().toISOString(),
+          mode,
+          svg: renderWorkstationProcessGraphSvg({
+            graph,
+            density: mode,
+            labels: mode === "ambient" ? "minimal" : "full",
+            maxNodes: maxNodes ?? (mode === "ambient" ? 18 : 160),
+          }),
+        },
+        message: "Exported process graph SVG.",
+      };
+    }
+
+    if (actionId === "clear_historical") {
+      graphStore.clearHistorical();
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: { kind: "workstation_process_graph_view_receipt", cleared_historical: true },
+        message: "Pruned historical process graph state.",
+      };
+    }
   }
 
   if (panelId === "docs-viewer" && (actionId === "open_doc" || actionId === "open_doc_by_path")) {

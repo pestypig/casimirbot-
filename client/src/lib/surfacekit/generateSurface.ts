@@ -137,6 +137,7 @@ export function generateSurfaceRecipe(options: GenerateSurfaceOptions): SurfaceR
       imageUrl: world.src,
       motion: buildSurfaceWorldMotion(world, rng),
       mask: world.safeCenter ? "center-safe" : "none",
+      source: "asset",
     });
     layers.push({
       id: `fixed-page-${meander.id}`,

@@ -55,6 +55,7 @@ export type SurfaceLayer = {
   background?: string;
   motion?: SurfaceLayerMotion;
   mask?: "center-safe" | "none";
+  source?: "asset" | "process_graph";
 };
 
 export type SurfaceWorldAsset = {

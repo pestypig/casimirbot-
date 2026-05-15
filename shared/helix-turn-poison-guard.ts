@@ -70,6 +70,7 @@ export type HelixTerminalAuthority = {
     | "failure";
   final_answer_source: string;
   terminal_artifact_kind: string;
+  terminal_item_id?: string | null;
   terminal_text_hash: string;
   terminal_text_preview: string;
   server_authoritative: true;
