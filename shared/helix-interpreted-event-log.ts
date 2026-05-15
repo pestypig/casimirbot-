@@ -3,6 +3,7 @@ export const HELIX_INTERPRETED_EVENT_SCHEMA =
 
 export type HelixInterpretedEventKind =
   | "source_observation"
+  | "visual_observation"
   | "categorization"
   | "synthetic_evidence"
   | "subgoal_update"
@@ -17,6 +18,8 @@ export type HelixInterpretedEventKind =
   | "pattern_candidate"
   | "archive_summary"
   | "agentic_review"
+  | "tool_trace"
+  | "proof_recall"
   | "callout_proposal"
   | "callout_delivery"
   | "final_answer_snapshot";

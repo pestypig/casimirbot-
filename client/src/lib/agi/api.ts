@@ -9,6 +9,7 @@ import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
 import type { LiveSituationArtifact } from "@shared/helix-live-situation-artifact";
 import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
@@ -537,6 +538,7 @@ type RunAskTurnPayload = {
   contextMode?: "attached" | "isolated";
   contextFiles?: string[];
   workspaceContextSnapshot?: Record<string, unknown>;
+  turnInputItems?: HelixTurnInputItem[];
   debug?: boolean;
   capsuleIds?: string[];
   answerContract?: HelixAskAnswerContract;
@@ -1745,6 +1747,9 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
   if (payload.contextMode) body.context_mode = payload.contextMode;
   if (payload.workspaceContextSnapshot && typeof payload.workspaceContextSnapshot === "object") {
     body.workspace_context_snapshot = payload.workspaceContextSnapshot;
+  }
+  if (Array.isArray(payload.turnInputItems) && payload.turnInputItems.length > 0) {
+    body.turn_input_items = payload.turnInputItems;
   }
   if (typeof payload.debug === "boolean") body.debug = payload.debug;
   if (Array.isArray(payload.contextFiles) && payload.contextFiles.length > 0) {

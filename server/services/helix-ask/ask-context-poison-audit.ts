@@ -35,6 +35,13 @@ function collectPayloadArtifacts(payload: Record<string, unknown>): Array<{ arti
   push("tool_choice_decision", "validation");
   push("live_line_tool_request", "validation");
   push("live_line_tool_evaluation", "validation");
+  push("visual_extraction_evidence", "validation");
+  push("derived_equation", "validation");
+  push("doc_equation_extraction", "validation");
+  push("note_write_artifact", "validation");
+  push("workstation_tool_plan", "validation");
+  push("workstation_tool_evaluation", "validation");
+  push("multimodal_subgoal_plan", "validation");
   push("pending_server_request", "request_user_input");
   push("request_user_input", "request_user_input");
 
@@ -47,7 +54,7 @@ function collectPayloadArtifacts(payload: Record<string, unknown>): Array<{ arti
 
   const debug = asRecord(payload.debug);
   if (debug) {
-    for (const key of ["selected_evidence_pack", "situation_context_pack", "interpreted_log_context", "present_state_card", "live_line_tool_request", "live_line_tool_evaluation", "pending_server_request", "request_user_input"]) {
+    for (const key of ["selected_evidence_pack", "situation_context_pack", "interpreted_log_context", "present_state_card", "live_line_tool_request", "live_line_tool_evaluation", "visual_extraction_evidence", "derived_equation", "doc_equation_extraction", "note_write_artifact", "workstation_tool_plan", "workstation_tool_evaluation", "multimodal_subgoal_plan", "pending_server_request", "request_user_input"]) {
       const value = debug[key];
       if (value && typeof value === "object") artifacts.push({ artifact: value });
     }
@@ -87,7 +94,7 @@ export function auditHelixAskContextForPoison(input: {
     ...(input.payload ? collectPayloadArtifacts(input.payload) : []),
   ];
   const quarantined = quarantineHelixArtifacts(artifacts);
-  const violations: HelixPoisonAuditViolation[] = quarantined.flatMap((entry) => entry.violations);
+  const violations: HelixPoisonAuditViolation[] = quarantined.flatMap((entry: (typeof quarantined)[number]) => entry.violations);
   const roleCounts = {
     source_event: 0,
     tool_observation: 0,

@@ -4,6 +4,7 @@ import {
   type HelixWorkstationToolPlanIntent,
   type HelixWorkstationToolPlanStep,
 } from "../../../shared/helix-workstation-tool-plan";
+import type { HelixDerivedEquation } from "../../../shared/helix-derived-equation";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
@@ -68,6 +69,13 @@ function extractQuoted(prompt: string): string | null {
   return stripOuterPunctuation(match?.[1] ?? "") || null;
 }
 
+function extractInlineMathExpression(value: string): string | null {
+  const arithmetic = value.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:\s*[+\-*/^]\s*[-+]?(?:\d+\.?\d*|\.\d+))+/)?.[0];
+  if (arithmetic) return stripOuterPunctuation(arithmetic);
+  const assignment = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
+  return assignment ? stripOuterPunctuation(assignment) : null;
+}
+
 export function extractCalculatorExpression(prompt: string): string | null {
   const normalized = normalizePrompt(prompt);
   const colonTail = normalized.match(/(?:equation|expression|claim|calculator|solve|evaluate|compute|check|verify)[^:]{0,120}:\s*(.+)$/i)?.[1];
@@ -76,9 +84,12 @@ export function extractCalculatorExpression(prompt: string): string | null {
   const quoted = extractQuoted(normalized);
   if (quoted && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(quoted)) return quoted;
 
+  const inlineMath = extractInlineMathExpression(normalized);
+  if (inlineMath) return inlineMath;
+
   const calculatorTail = normalized.match(/\b(?:calculator|calc)\b\s*(.+)$/i)?.[1];
   if (calculatorTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(calculatorTail)) {
-    return stripOuterPunctuation(calculatorTail);
+    return extractInlineMathExpression(calculatorTail) ?? stripOuterPunctuation(calculatorTail);
   }
 
   const solveTail = normalized.match(/\b(?:solve|evaluate|compute|check|verify)\s+(.+?)(?:\s+(?:with|using|in)\s+(?:the\s+)?(?:scientific\s+)?calculator)?$/i)?.[1];
@@ -94,7 +105,11 @@ function extractNoteTitle(prompt: string): string | null {
   const quotedAfterTitle = normalized.match(/\b(?:titled|called|named)\s+["“](.+?)["”]/i)?.[1];
   if (quotedAfterTitle) return stripOuterPunctuation(quotedAfterTitle);
   const afterTitle = normalized.match(/\b(?:titled|called|named)\s+(.+?)(?:\s+(?:with|containing|that says|saying|body|text)\b|$)/i)?.[1];
-  return stripOuterPunctuation(afterTitle ?? "") || null;
+  const explicit = stripOuterPunctuation(afterTitle ?? "");
+  if (explicit) return explicit;
+  if (/\b(?:open|current|active)\s+doc(?:ument)?\b/i.test(normalized)) return "Open document summary";
+  if (/\bdoc(?:ument)?\b/i.test(normalized)) return "Document summary";
+  return null;
 }
 
 function extractNoteBody(prompt: string): string | null {
@@ -412,6 +427,77 @@ export function planWorkstationToolUse(
     scores,
     should_use_tool: false,
     reason: "No workstation affordance is clearly required.",
+    missing_required_args: [],
+  };
+}
+
+export function planWorkstationToolUseFromDerivedEquation(input: {
+  equation: HelixDerivedEquation;
+  threadId: string;
+  turnId: string;
+  wantsSteps?: boolean;
+}): WorkstationToolPlannerResult {
+  const actionId = input.wantsSteps === false ? "solve_expression" : "solve_with_steps";
+  const prompt = `Derived calculator expression: ${input.equation.expression}`;
+  const steps: HelixWorkstationToolPlanStep[] = [
+    makeOpenStep("scientific-calculator"),
+    {
+      step_id: "ingest_expression",
+      kind: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: "ingest_latex",
+      args: { latex: input.equation.expression },
+      depends_on: ["open_scientific_calculator"],
+      expected_receipt_kind: "workspace_action_receipt",
+      expected_state_change: { store: "scientific-calculator", proof_key: "input_latex" },
+      required: true,
+    },
+    {
+      step_id: actionId,
+      kind: "run_panel_action",
+      panel_id: "scientific-calculator",
+      action_id: actionId,
+      args: { latex: input.equation.expression },
+      depends_on: ["ingest_expression"],
+      expected_receipt_kind: "calculator_receipt",
+      expected_state_change: { store: "scientific-calculator", proof_key: "result_text" },
+      required: true,
+    },
+    {
+      step_id: "evaluate_calculator_result",
+      kind: "evaluate_result",
+      depends_on: [actionId],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    },
+  ];
+  const toolPlan = buildToolPlan({
+    prompt,
+    intent: actionId === "solve_with_steps" ? "calculator_verify" : "calculator_solve",
+    missing: [],
+    options: { threadId: input.threadId, turnId: input.turnId },
+    steps,
+  });
+  return {
+    intent: toolPlan.intent,
+    action: {
+      panel_id: "scientific-calculator",
+      action_id: actionId,
+      args: { latex: input.equation.expression },
+    },
+    tool_plan: toolPlan,
+    scores: [
+      {
+        affordance_id: `scientific-calculator.${actionId}`,
+        panel_id: "scientific-calculator",
+        action_id: actionId,
+        score: 0.96,
+        reason: "Derived equation provides a concrete calculator expression without prompt-string grafting.",
+        required_args_missing: [],
+      },
+    ],
+    should_use_tool: true,
+    reason: "Derived equation should be evaluated through the Scientific Calculator tool chain.",
     missing_required_args: [],
   };
 }

@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Mic, Radio, Search, Square } from "lucide-react";
+import { BrainCircuit, Image as ImageIcon, Mic, Plus, Radio, Search, Square, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -88,6 +88,9 @@ import {
   shouldProbeWorkstationIntentClassifier,
 } from "@/lib/workstation/intentClassifier";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
+import { base64FromFile } from "@/utils/files";
+import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
+import type { HelixAttachmentCommitCheck } from "@shared/helix-attachment-commit";
 import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
@@ -5211,6 +5214,8 @@ type RunAskOptions = {
   answerContract?: HelixAskAnswerContract;
   contextMode?: "attached" | "isolated";
   skipContextChooser?: boolean;
+  visualEvidence?: Record<string, unknown>;
+  imageAttachment?: HelixAskImageAttachment;
 };
 
 type AskContextChooserState = {
@@ -5219,6 +5224,70 @@ type AskContextChooserState = {
   capsuleIds?: string[];
   options?: RunAskOptions;
 };
+
+type HelixAskImageAttachment = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  imageBase64?: string | null;
+  imageRef?: string | null;
+  evidenceRef?: string | null;
+  previewUrl: string;
+  status: "ready" | "error";
+  error?: string | null;
+};
+
+const HELIX_ASK_VISUAL_PROMPT_PATTERN =
+  /\b(?:image|screenshot|picture|photo|attached|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
+
+function validateHelixAskImageAttachmentForSubmit(
+  attachment: HelixAskImageAttachment | null | undefined,
+): HelixAttachmentCommitCheck | null {
+  if (!attachment) return null;
+  const hasImageBase64 = typeof attachment.imageBase64 === "string" && attachment.imageBase64.trim().length > 0;
+  const hasImageRef = typeof attachment.imageRef === "string" && attachment.imageRef.trim().length > 0;
+  const hasEvidenceRef = typeof attachment.evidenceRef === "string" && attachment.evidenceRef.trim().length > 0;
+  const mimeType = typeof attachment.mimeType === "string" ? attachment.mimeType : "";
+  const unsupportedType = mimeType.length > 0 && !mimeType.startsWith("image/");
+  const tooLarge = typeof attachment.sizeBytes === "number" && attachment.sizeBytes > 8 * 1024 * 1024;
+  const hasPayload = hasImageBase64 || hasImageRef || hasEvidenceRef;
+  const status: HelixAttachmentCommitCheck["status"] =
+    attachment.status === "error"
+      ? "missing_payload"
+      : unsupportedType
+        ? "unsupported_type"
+        : tooLarge
+          ? "too_large"
+          : hasPayload
+            ? "ready"
+            : "stale_after_restart";
+  const canSubmit = status === "ready";
+  return {
+    schema: "helix.attachment_commit_check.v1",
+    attachment_id: attachment.id,
+    file_name: attachment.fileName,
+    mime_type: attachment.mimeType,
+    status,
+    can_submit: canSubmit,
+    turn_input_item_preview: hasPayload
+      ? {
+          type: hasEvidenceRef && !hasImageBase64 && !hasImageRef ? "evidence_ref" : "image",
+          has_image_base64: hasImageBase64,
+          has_image_ref: hasImageRef,
+          has_evidence_ref: hasEvidenceRef,
+          raw_image_scope: hasImageBase64 ? "turn_input_only" : null,
+        }
+      : null,
+    reason: canSubmit
+      ? null
+      : status === "stale_after_restart"
+        ? "Image attachment is stale. Reattach the image before sending."
+        : attachment.error ?? "Image attachment is not ready to submit.",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
 
 function isMultilangConfidenceGateResponse(response: AskLocalResult): boolean {
   const failReason = String(response.fail_reason ?? "").trim();
@@ -5403,10 +5472,30 @@ export function shouldPreserveAuthoritativeTerminalOverEvidenceGate(args: {
 }): boolean {
   if (!args.evidenceGateBlocked) return false;
   if (!args.hasTerminalText) return false;
+  if (
+    args.finalAnswerSource &&
+    !["unknown", "typed_failure", "legacy_fallback"].includes(args.finalAnswerSource) &&
+    args.terminalArtifactKind &&
+    !["unknown", "typed_failure"].includes(args.terminalArtifactKind)
+  ) {
+    return true;
+  }
   if (args.finalAnswerSource === "artifact_synthesis" && args.terminalArtifactKind === "situation_context_pack") {
     return true;
   }
   if (args.finalAnswerSource === "artifact_synthesis" && args.routeReasonCode === "situation_context_pack") {
+    return true;
+  }
+  if (args.finalAnswerSource === "artifact_synthesis" && args.terminalArtifactKind === "doc_summary") {
+    return true;
+  }
+  if (args.finalAnswerSource === "artifact_synthesis" && args.routeReasonCode?.includes("active_doc_summary")) {
+    return true;
+  }
+  if (args.finalAnswerSource === "workstation_reasoning_trace" && args.routeReasonCode === "proof_recall") {
+    return true;
+  }
+  if (args.finalAnswerSource === "workstation_tool_evaluation" && args.terminalArtifactKind === "workstation_tool_evaluation") {
     return true;
   }
   if (args.hasPendingRequest) return true;
@@ -6422,6 +6511,9 @@ const renderLiveAnswerEnvironmentContextPackAnswer = (contextPack: unknown): str
 export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedTurn {
   const replyRecord = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const terminalAuthorityRecord =
+    readAgentLoopAuditRecord(replyRecord?.terminal_answer_authority) ??
+    readAgentLoopAuditRecord(debugRecord?.terminal_answer_authority);
   const summary = readHelixResolvedTurnSummary(reply);
   const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
   const pendingPresent = Boolean(pendingRequest);
@@ -6443,6 +6535,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
   const finalAnswerSource =
     coerceText(replyRecord?.final_answer_source).trim() ||
     coerceText(debugRecord?.final_answer_source).trim() ||
+    coerceText(terminalAuthorityRecord?.final_answer_source).trim() ||
     (terminalErrorCode ? "typed_failure" : "unknown");
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
@@ -6457,7 +6550,8 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
   const terminalArtifactKind =
     coerceText(summary?.terminal_artifact_kind).trim() ||
     coerceText(replyRecord?.terminal_artifact_kind).trim() ||
-    coerceText(debugRecord?.terminal_artifact_kind).trim();
+    coerceText(debugRecord?.terminal_artifact_kind).trim() ||
+    coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim();
   const situationContextAnswer =
     finalAnswerSource === "artifact_synthesis" && terminalArtifactKind === "situation_context_pack"
       ? (
@@ -10286,6 +10380,20 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     composite_followup_anti_determinism_audit:
       debug?.composite_followup_anti_determinism_audit ?? agentLoop?.composite_followup_anti_determinism_audit ?? payload.composite_followup_anti_determinism_audit,
     pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
+    terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
+    poison_audit: payload.poison_audit ?? debug?.poison_audit ?? agentLoop?.poison_audit,
+    prompt_poison_audit: payload.prompt_poison_audit ?? debug?.prompt_poison_audit ?? agentLoop?.prompt_poison_audit,
+    selected_evidence_pack: payload.selected_evidence_pack ?? debug?.selected_evidence_pack ?? agentLoop?.selected_evidence_pack,
+    turn_input_items: payload.turn_input_items ?? debug?.turn_input_items ?? agentLoop?.turn_input_items,
+    multimodal_turn_context: payload.multimodal_turn_context ?? debug?.multimodal_turn_context ?? agentLoop?.multimodal_turn_context,
+    visual_analysis_turn_items: payload.visual_analysis_turn_items ?? debug?.visual_analysis_turn_items ?? agentLoop?.visual_analysis_turn_items,
+    visual_frame_evidence: payload.visual_frame_evidence ?? debug?.visual_frame_evidence ?? agentLoop?.visual_frame_evidence,
+    turn_item_lifecycle_events: payload.turn_item_lifecycle_events ?? debug?.turn_item_lifecycle_events ?? agentLoop?.turn_item_lifecycle_events,
+    route_reason_code:
+      payload.route_reason_code ??
+      debug?.route_reason_code ??
+      agentLoop?.route_reason_code ??
+      (coerceText(resolvedTurnSummary?.resolved_route_label).trim() || null),
     backend_debug_response_ref:
       readAgentLoopAuditRecord(debug?.debug_export_ref) ??
       readAgentLoopAuditRecord(payload.debug_export_ref) ??
@@ -12647,9 +12755,11 @@ export function HelixAskPill({
   const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
   const helixAskSessionRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const askImageInputRef = useRef<HTMLInputElement | null>(null);
   const [askBusy, setAskBusy] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
+  const [askImageAttachment, setAskImageAttachment] = useState<HelixAskImageAttachment | null>(null);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
@@ -12664,6 +12774,7 @@ export function HelixAskPill({
   const [situationRoomState, setSituationRoomState] = useState<SituationRoomState>(() =>
     createSituationRoomState(situationRoomId),
   );
+  const askImageAttachmentRef = useRef<HelixAskImageAttachment | null>(null);
   const [displayAudioStatus, setDisplayAudioStatus] = useState<
     "idle" | "requesting" | "active" | "transcribing" | "error"
   >("idle");
@@ -12676,6 +12787,67 @@ export function HelixAskPill({
       prev.room_id === situationRoomId ? prev : createSituationRoomState(situationRoomId),
     );
   }, [situationRoomId]);
+  useEffect(() => {
+    return () => {
+      if (askImageAttachment?.previewUrl) {
+        URL.revokeObjectURL(askImageAttachment.previewUrl);
+      }
+    };
+  }, [askImageAttachment?.previewUrl]);
+  useEffect(() => {
+    askImageAttachmentRef.current = askImageAttachment;
+  }, [askImageAttachment]);
+  const clearAskImageAttachment = useCallback(() => {
+    setAskImageAttachment((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return null;
+    });
+    askImageAttachmentRef.current = null;
+    if (askImageInputRef.current) {
+      askImageInputRef.current.value = "";
+    }
+  }, []);
+  const handleAskImageSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0] ?? null;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setAskError("Please attach an image file.");
+      event.currentTarget.value = "";
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setAskError("Image attachments are limited to 8 MB for this Helix Ask path.");
+      event.currentTarget.value = "";
+      return;
+    }
+    try {
+      const imageBase64 = await base64FromFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      const nextAttachment: HelixAskImageAttachment = {
+        id: crypto.randomUUID(),
+        fileName: file.name || "attached image",
+        mimeType: file.type || "image/png",
+        sizeBytes: file.size,
+        imageBase64,
+        previewUrl,
+        status: "ready",
+        error: null,
+      };
+      askImageAttachmentRef.current = nextAttachment;
+      setAskImageAttachment((current) => {
+        if (current?.previewUrl) {
+          URL.revokeObjectURL(current.previewUrl);
+        }
+        return nextAttachment;
+      });
+      setAskError(null);
+    } catch (error) {
+      setAskError(error instanceof Error ? error.message : "Image attachment failed.");
+      event.currentTarget.value = "";
+    }
+  }, []);
   const [pendingWorkstationUserInput, setPendingWorkstationUserInput] =
     useState<PendingWorkstationUserInputRequest | null>(null);
   const pendingWorkstationUserInputRef = useRef<PendingWorkstationUserInputRequest | null>(null);
@@ -24505,6 +24677,93 @@ export function HelixAskPill({
     ) => {
       const trimmed = question.trim();
       if (!trimmed) return;
+      const visualEvidenceForTurn =
+        options?.visualEvidence && typeof options.visualEvidence === "object" ? options.visualEvidence : null;
+      const visualEvidenceRecord =
+        visualEvidenceForTurn?.evidence && typeof visualEvidenceForTurn.evidence === "object"
+          ? (visualEvidenceForTurn.evidence as Record<string, unknown>)
+          : null;
+      const visualEvidenceId =
+        typeof visualEvidenceRecord?.evidence_id === "string" && visualEvidenceRecord.evidence_id.trim()
+          ? visualEvidenceRecord.evidence_id.trim()
+          : null;
+      const visualFrameId =
+        typeof visualEvidenceRecord?.frame_id === "string" && visualEvidenceRecord.frame_id.trim()
+          ? visualEvidenceRecord.frame_id.trim()
+          : null;
+      const visualEvidenceSummary =
+        typeof visualEvidenceRecord?.summary === "string" && visualEvidenceRecord.summary.trim()
+          ? visualEvidenceRecord.summary.trim()
+          : null;
+      const nativeImageAttachment = options?.imageAttachment ?? null;
+      const nativeImageCommitCheck = validateHelixAskImageAttachmentForSubmit(nativeImageAttachment);
+      const nativeImageBase64 =
+        typeof nativeImageAttachment?.imageBase64 === "string" && nativeImageAttachment.imageBase64.trim()
+          ? nativeImageAttachment.imageBase64.trim()
+          : null;
+      const nativeImageRef =
+        typeof nativeImageAttachment?.imageRef === "string" && nativeImageAttachment.imageRef.trim()
+          ? nativeImageAttachment.imageRef.trim()
+          : null;
+      const nativeEvidenceRef =
+        typeof nativeImageAttachment?.evidenceRef === "string" && nativeImageAttachment.evidenceRef.trim()
+          ? nativeImageAttachment.evidenceRef.trim()
+          : null;
+      const turnInputItemsForTurn: HelixTurnInputItem[] = [
+        { type: "text", text: trimmed, source: "user" },
+        ...(nativeImageAttachment && nativeImageCommitCheck?.can_submit && nativeImageBase64
+          ? [{
+              type: "image" as const,
+              image_base64: nativeImageBase64,
+              mime_type: nativeImageAttachment.mimeType,
+              file_name: nativeImageAttachment.fileName,
+              raw_image_included: true,
+              raw_image_scope: "turn_input_only" as const,
+            }]
+          : []),
+        ...(nativeImageAttachment && nativeImageCommitCheck?.can_submit && !nativeImageBase64 && nativeImageRef
+          ? [{
+              type: "image" as const,
+              image_ref: nativeImageRef,
+              mime_type: nativeImageAttachment.mimeType,
+              file_name: nativeImageAttachment.fileName,
+              evidence_id: nativeEvidenceRef,
+              raw_image_included: false,
+            }]
+          : []),
+        ...(nativeImageAttachment && nativeImageCommitCheck?.can_submit && nativeEvidenceRef
+          ? [{
+              type: "evidence_ref" as const,
+              evidence_id: nativeEvidenceRef,
+              evidence_kind: "visual_frame_evidence" as const,
+              compact_summary: null,
+              assistant_answer: false as const,
+              raw_content_included: false as const,
+            }]
+          : []),
+        ...(visualEvidenceId
+          ? [{
+              type: "evidence_ref" as const,
+              evidence_id: visualEvidenceId,
+              evidence_kind: "visual_frame_evidence" as const,
+              compact_summary: visualEvidenceSummary,
+              assistant_answer: false as const,
+              raw_content_included: false as const,
+            }]
+          : []),
+        ...(visualFrameId
+          ? [{
+              type: "image" as const,
+              image_ref: visualFrameId,
+              mime_type:
+                typeof visualEvidenceRecord?.mime_type === "string" && visualEvidenceRecord.mime_type.trim()
+                  ? visualEvidenceRecord.mime_type.trim()
+                  : "image/png",
+              evidence_id: visualEvidenceId,
+              raw_image_included: false as const,
+            }]
+          : []),
+      ];
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const explicitPanelCommand = /^\s*\/open\b/i.test(trimmed);
       const bypassWorkstationDispatch = options?.bypassWorkstationDispatch === true;
@@ -25062,6 +25321,20 @@ export function HelixAskPill({
           const reasoningContextModeForTurn: "attached" | "isolated" =
             options?.contextMode === "isolated" ? "isolated" : "attached";
           const workspaceContextSnapshot = buildAskTurnWorkspaceContextSnapshot(sessionId);
+          const workspaceContextSnapshotForTurn = visualEvidenceForTurn
+            ? {
+                ...workspaceContextSnapshot,
+                attached_visual_evidence: visualEvidenceForTurn,
+                multimodal_evidence_pack: {
+                  schema: "helix.multimodal_evidence_pack.v1",
+                  visual_evidence_refs:
+                    typeof visualEvidenceRecord?.evidence_id === "string" ? [visualEvidenceRecord.evidence_id] : [],
+                  raw_image_included: false,
+                  assistant_answer: false,
+                  context_policy: "compact_context_pack_only",
+                },
+              }
+            : workspaceContextSnapshot;
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
@@ -25078,7 +25351,8 @@ export function HelixAskPill({
               signal: controller.signal,
               mode: askModeForRequest,
               contextMode: reasoningContextModeForTurn,
-              workspaceContextSnapshot,
+              workspaceContextSnapshot: workspaceContextSnapshotForTurn,
+              turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
             };
@@ -25111,7 +25385,8 @@ export function HelixAskPill({
               debug: userSettings.showHelixAskDebug,
               signal: controller.signal,
               mode: askModeForRequest,
-              workspaceContextSnapshot,
+              workspaceContextSnapshot: workspaceContextSnapshotForTurn,
+              turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
             });
@@ -25172,6 +25447,9 @@ export function HelixAskPill({
               ...responseDebugWithClientMode,
               ui_turn_contract_source: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? "ask_turn" : "legacy_local",
               ui_local_fast_path_suppressed: unifiedAskTurnOwnsManualDispatch,
+              ui_visual_attachment_submitted: Boolean(visualEvidenceForTurn || nativeImageAttachment),
+              ui_turn_input_items: turnInputItemsForTurn,
+              ui_turn_input_item_count: turnInputItemsForTurn.length,
               ui_action_envelope_panel_id:
                 typeof firstEnvelopeAction?.panel_id === "string" ? firstEnvelopeAction.panel_id : null,
               ui_action_envelope_action_id:
@@ -26357,6 +26635,10 @@ export function HelixAskPill({
         }
         return;
       }
+      if (askBusy && askImageAttachment) {
+        setAskError("Wait for the current Helix Ask turn before sending an image attachment.");
+        return;
+      }
       if (askInputRef.current) {
         askInputRef.current.value = "";
         resizeTextarea();
@@ -26379,12 +26661,39 @@ export function HelixAskPill({
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
       }
-      void runAsk(first, selectedCapsuleIds);
+      const submittedImageAttachment = askImageAttachmentRef.current ?? askImageAttachment;
+      const submittedImageCommitCheck = validateHelixAskImageAttachmentForSubmit(submittedImageAttachment);
+      const expectsVisualInput = HELIX_ASK_VISUAL_PROMPT_PATTERN.test(first);
+      if (submittedImageAttachment && !submittedImageCommitCheck?.can_submit) {
+        setAskError(submittedImageCommitCheck?.reason ?? "Image attachment is stale. Reattach the image before sending.");
+        setAskStatus(null);
+        if (askInputRef.current) {
+          askInputRef.current.value = first;
+          resizeTextarea();
+        }
+        askDraftRef.current = first;
+        return;
+      }
+      if (!submittedImageAttachment && expectsVisualInput) {
+        setAskError("No image attachment is available for this turn. Attach the image, wait for the preview, then send again.");
+        setAskStatus(null);
+        if (askInputRef.current) {
+          askInputRef.current.value = first;
+          resizeTextarea();
+        }
+        askDraftRef.current = first;
+        return;
+      }
+      if (submittedImageAttachment) {
+        clearAskImageAttachment();
+      }
+      void runAsk(first, selectedCapsuleIds, submittedImageAttachment ? { imageAttachment: submittedImageAttachment } : undefined);
     },
     [
       addMessage,
       cancelMoodHint,
       cancelPendingWorkstationRequestForTurnTransition,
+      clearAskImageAttachment,
       clearMoodTimer,
       getHelixAskSessionId,
       getPanelDef,
@@ -26400,10 +26709,12 @@ export function HelixAskPill({
       updateMoodFromText,
       runAsk,
       askBusy,
+      askImageAttachment,
     ],
   );
 
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
+  const askImageAttachmentCommitCheck = validateHelixAskImageAttachmentForSubmit(askImageAttachment);
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
   const replyListClassNameResolved =
     replyListClassName ??
@@ -27129,6 +27440,29 @@ export function HelixAskPill({
                   )}
                 </div>
               </div>
+            <input
+              ref={askImageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAskImageSelect}
+            />
+            <button
+              type="button"
+              aria-label="Attach image"
+              title="Attach image"
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                askImageAttachmentCommitCheck?.can_submit
+                  ? "border-violet-300/50 bg-violet-400/15 text-violet-100 hover:bg-violet-400/20"
+                  : askImageAttachment
+                    ? "border-amber-300/45 bg-amber-400/12 text-amber-100 hover:bg-amber-400/20"
+                  : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+              }`}
+              onClick={() => askImageInputRef.current?.click()}
+              disabled={askBusy}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
             <button
               type="button"
               aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
@@ -27191,6 +27525,46 @@ export function HelixAskPill({
               {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
             </button>
           </div>
+            {askImageAttachment ? (
+              <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
+                <div
+                  className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
+                    askImageAttachmentCommitCheck?.can_submit
+                      ? "border-violet-300/25 bg-violet-950/20"
+                      : "border-amber-300/30 bg-amber-950/20"
+                  }`}
+                >
+                  <img
+                    src={askImageAttachment.previewUrl}
+                    alt=""
+                    className="h-9 w-9 rounded-md border border-white/10 object-cover"
+                  />
+                  <ImageIcon className="h-3.5 w-3.5 text-violet-200" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11px] text-violet-100">{askImageAttachment.fileName}</div>
+                    <div
+                      className={`text-[10px] ${
+                        askImageAttachmentCommitCheck?.can_submit ? "text-violet-200/70" : "text-amber-100/80"
+                      }`}
+                    >
+                      {askImageAttachment.status === "error"
+                          ? askImageAttachment.error ?? "image analysis failed"
+                          : askImageAttachmentCommitCheck?.can_submit
+                            ? "image ready"
+                            : "image needs reattach"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Remove attached image"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                    onClick={clearAskImageAttachment}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {activeContextCapsulePreview ? (
               <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
                 <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-950/20 px-2 py-1">
@@ -28119,6 +28493,41 @@ export function HelixAskPill({
                       </span>
                     </div>
                     {renderHelixAskFinalAnswerContent(transcriptAnswer)}
+                    {(() => {
+                      const trace = (replyDebugRecord as Record<string, any> | null | undefined)?.workstation_reasoning_trace;
+                      if (!trace || typeof trace !== "object") return null;
+                      const steps = Array.isArray(trace.compact_steps) ? trace.compact_steps : [];
+                      const caveats = Array.isArray(trace.caveats) ? trace.caveats : [];
+                      return (
+                        <details className="mt-3 rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2 text-xs text-amber-50">
+                          <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-amber-200">
+                            Proof trace
+                            {typeof trace.proof_status === "string" ? (
+                              <span className="ml-2 rounded border border-amber-300/30 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em]">
+                                {trace.proof_status}
+                              </span>
+                            ) : null}
+                          </summary>
+                          <div className="mt-2 space-y-1.5">
+                            {steps.slice(0, 6).map((step: any, index: number) => (
+                              <p key={`${String(step?.label ?? "step")}-${index}`} className="leading-relaxed">
+                                <span className="text-amber-200/80">{String(step?.label ?? `Step ${index + 1}`)}: </span>
+                                {clipText(String(step?.summary ?? ""), 260)}
+                              </p>
+                            ))}
+                            {typeof trace.scope_match === "string" ? (
+                              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/70">
+                                Scope: {String(trace.requested_extraction_scope ?? "unknown")}{" -> "}
+                                {String(trace.actual_extraction_scope ?? "unknown")} ({trace.scope_match})
+                              </p>
+                            ) : null}
+                            {caveats.length > 0 ? (
+                              <p className="text-amber-100/80">Caveats: {caveats.slice(0, 3).map(String).join(" | ")}</p>
+                            ) : null}
+                          </div>
+                        </details>
+                      );
+                    })()}
                     {jobReadyLinks.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {jobReadyLinks.slice(0, 6).map((link, index) => {

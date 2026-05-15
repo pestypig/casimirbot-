@@ -43,6 +43,19 @@ export function inferHelixArtifactRole(value: unknown, hint?: HelixArtifactRole)
   }
   if (itemType === "validation") return "validation";
   if (schema === "helix.selected_evidence_pack.v1") return "validation";
+  if (
+    schema === "helix.visual_extraction_evidence.v1" ||
+    schema === "helix.derived_equation.v1" ||
+    schema === "helix.doc_equation_extraction.v1" ||
+    schema === "helix.note_write_artifact.v1" ||
+    schema === "helix.multimodal_subgoal_plan.v1" ||
+    schema === "helix.workstation_tool_plan.v1" ||
+    schema === "helix.workstation_tool_evaluation.v1" ||
+    schema === "helix.context_economy_decision.v1" ||
+    schema === "helix.tool_choice_decision.v1"
+  ) {
+    return "validation";
+  }
   if (schema === "helix.synthetic_evidence.v1") return "synthetic_evidence";
   if (schema === "helix.live_line_tool_request.v1" || schema === "helix.live_line_tool_evaluation.v1") {
     return "validation";
@@ -78,6 +91,7 @@ export function inferHelixArtifactRole(value: unknown, hint?: HelixArtifactRole)
 export function normalizeHelixArtifactRole(value: unknown, hint?: HelixArtifactRole): HelixNormalizedArtifactRole {
   const record = asRecord(value);
   const role = inferHelixArtifactRole(value, hint);
+  const schema = readString(record?.schema);
   return {
     role,
     authority: HELIX_ITEM_ROLE_AUTHORITY[role],
@@ -90,11 +104,31 @@ export function normalizeHelixArtifactRole(value: unknown, hint?: HelixArtifactR
       readString(record?.steering_id) ??
       readString(record?.request_id) ??
       readString(record?.evaluation_id),
-    schema: readString(record?.schema),
+    schema,
     deterministic: record ? record.deterministic !== false : true,
     assistant_answer: readBoolean(record?.assistant_answer) || role === "assistant_answer",
     raw_content_included: readBoolean(record?.raw_content_included),
     raw_logs_included: readBoolean(record?.raw_logs_included),
-    deterministic_content_role: readString(record?.deterministic_content_role) ?? readString(record?.context_role),
+    deterministic_content_role:
+      readString(record?.deterministic_content_role) ??
+      readString(record?.context_role) ??
+      (
+        schema === "helix.selected_evidence_pack.v1" ||
+        schema === "helix.visual_extraction_evidence.v1" ||
+        schema === "helix.derived_equation.v1" ||
+        schema === "helix.doc_equation_extraction.v1" ||
+        schema === "helix.note_write_artifact.v1" ||
+        schema === "helix.multimodal_subgoal_plan.v1" ||
+        schema === "helix.workstation_tool_plan.v1" ||
+        schema === "helix.workstation_tool_evaluation.v1" ||
+        schema === "helix.context_economy_decision.v1" ||
+        schema === "helix.tool_choice_decision.v1" ||
+        schema === "helix.subgoal_evaluation.v1" ||
+        schema === "helix.reasoning_subgoal_ledger.v1" ||
+        schema === "helix.live_line_tool_request.v1" ||
+        schema === "helix.live_line_tool_evaluation.v1"
+          ? "evidence_not_assistant_answer"
+          : null
+      ),
   };
 }

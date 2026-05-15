@@ -40,6 +40,15 @@ export type ProfileSituationArchive = {
     next_checks: string[];
     evidence_refs: string[];
   }>;
+  tool_trace_summaries?: Array<{
+    trace_id: string;
+    user_goal: string;
+    final_answer_snapshot: string;
+    key_evidence_refs: string[];
+    tool_receipt_ids: string[];
+    proof_status?: string;
+    scope_match?: string;
+  }>;
   subgoals: Array<{
     label: string;
     final_status: "completed" | "blocked" | "active" | "stale" | "unknown";

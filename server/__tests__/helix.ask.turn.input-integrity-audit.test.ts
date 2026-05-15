@@ -1,0 +1,97 @@
+import express from "express";
+import request from "supertest";
+import { describe, expect, it } from "vitest";
+import { planRouter } from "../routes/agi.plan";
+import { auditHelixTurnInputIntegrity } from "../services/helix-ask/turn-input-integrity-audit";
+import { normalizeHelixTurnInputItems } from "../services/helix-ask/turn-input-item-normalizer";
+
+const createApp = (): express.Express => {
+  const app = express();
+  app.use(express.json({ limit: "12mb" }));
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+describe("helix ask turn input integrity audit", () => {
+  it("rejects a visual prompt when the committed turn has no image or visual evidence item", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "test:turn-input-integrity:no-image",
+        question: "Describe this image and use the calculator to add my inventory counts.",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("turn_input_integrity_failed");
+    expect(response.body.answer).toContain("Reattach it and resend");
+    expect(response.body.turn_input_integrity_audit).toEqual(
+      expect.objectContaining({
+        ok: false,
+        assistant_answer: false,
+      }),
+    );
+    expect(response.body.turn_input_integrity_audit.violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "visual_prompt_without_visual_input" }),
+      ]),
+    );
+    expect(response.body.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body.poison_audit?.ok).toBe(true);
+  });
+
+  it("rejects an image item with no image bytes, image ref, or evidence ref", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "test:turn-input-integrity:stale-image",
+        question: "describe this image",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: "describe this image", source: "user" },
+          {
+            type: "image",
+            mime_type: "image/png",
+            file_name: "stale.png",
+            raw_image_included: true,
+            raw_image_scope: "turn_input_only",
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("turn_input_integrity_failed");
+    expect(response.body.turn_input_integrity_audit.violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "visual_prompt_without_visual_input" }),
+        expect.objectContaining({ kind: "stale_image_item" }),
+      ]),
+    );
+    expect(JSON.stringify(response.body.turn_input_items)).not.toContain("stale.png");
+  });
+
+  it("allows nonvisual text-only prompts", () => {
+    const requestBody = {
+      question: "What is terminal authority?",
+    };
+    const context = normalizeHelixTurnInputItems({
+      request: requestBody,
+      threadId: "test:turn-input-integrity:text",
+    });
+
+    expect(
+      auditHelixTurnInputIntegrity({
+        userText: requestBody.question,
+        request: requestBody,
+        context,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: true,
+        text_input_count: 1,
+        image_input_count: 0,
+        evidence_ref_count: 0,
+      }),
+    );
+  });
+});

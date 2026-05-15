@@ -13,6 +13,7 @@ import { listPatternCandidates } from "./pattern-candidate-ledger";
 import { updateContinuousCategorizationJob } from "./continuous-categorization-job-store";
 import { listInterpretedEvents } from "./interpreted-event-log-store";
 import { listUserSteeringEvidence } from "./user-steering-ingest";
+import { listWorkstationReasoningTraces } from "../helix-ask/workstation-reasoning-trace-store";
 
 const archivesByProfile = new Map<string, ProfileSituationArchive[]>();
 const ARCHIVE_DIR = path.resolve(process.cwd(), ".cal/profile-archives");
@@ -62,6 +63,10 @@ export function archiveCategorizationSession(input: {
     limit: 40,
   });
   const steeringEvidence = listUserSteeringEvidence(input.job.thread_id).slice(-40);
+  const toolTraces = listWorkstationReasoningTraces({
+    threadId: input.job.thread_id,
+    limit: 30,
+  });
   const archive: ProfileSituationArchive = {
     schema: HELIX_PROFILE_SITUATION_ARCHIVE_SCHEMA,
     archive_id: `profile_archive:${hashShort([profileId, input.job.job_id, endedAt], 18)}`,
@@ -93,6 +98,15 @@ export function archiveCategorizationSession(input: {
       effect: entry.effect,
       next_checks: entry.next_checks,
       evidence_refs: entry.evidence_refs,
+    })),
+    tool_trace_summaries: toolTraces.map((trace) => ({
+      trace_id: trace.trace_id,
+      user_goal: trace.user_goal,
+      final_answer_snapshot: trace.final_answer_snapshot,
+      key_evidence_refs: trace.evidence_refs.slice(0, 12),
+      tool_receipt_ids: trace.tool_receipt_ids,
+      proof_status: trace.proof_status,
+      scope_match: trace.scope_match,
     })),
     subgoals: [],
     learned_pattern_candidates: candidates.map((candidate: HelixPatternCandidate) => candidate.candidate_id),

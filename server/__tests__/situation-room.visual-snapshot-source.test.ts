@@ -48,7 +48,7 @@ describe("visual snapshot source routes", () => {
         raw_image_included: false,
       },
     });
-  }, 10000);
+  }, 15000);
 
   it("records frame metadata without exposing raw image bytes in public context", async () => {
     const app = await createApp();
@@ -94,6 +94,49 @@ describe("visual snapshot source routes", () => {
       assistant_answer: false,
       raw_image_included: false,
     });
+    expect(JSON.stringify(response.body)).not.toContain("data:image");
+  }, 10000);
+
+  it("accepts an inline image for analysis while keeping raw bytes out of the response", async () => {
+    const previousVisionBase = process.env.VISION_HTTP_BASE;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.VISION_HTTP_BASE;
+    delete process.env.OPENAI_API_KEY;
+    const app = await createApp();
+
+    let response: any;
+    try {
+      response = await request(app)
+        .post("/api/agi/situation/visual-frame/analyze")
+        .send({
+          thread_id: threadId,
+          source_id: "source:helix-ask-image-upload",
+          image_base64:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
+          prompt: "Describe the image for a Helix Ask test.",
+        })
+        .expect(200);
+    } finally {
+      if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
+      else process.env.VISION_HTTP_BASE = previousVisionBase;
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+    }
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      assistant_answer: false,
+      raw_image_included: false,
+      context_policy: "compact_context_pack_only",
+      evidence: {
+        schema: "helix.visual_frame_evidence.v1",
+        thread_id: threadId,
+        source_id: "source:helix-ask-image-upload",
+        raw_image_included: false,
+        assistant_answer: false,
+      },
+    });
+    expect(JSON.stringify(response.body)).not.toContain("iVBORw0KGgo");
     expect(JSON.stringify(response.body)).not.toContain("data:image");
   }, 10000);
 

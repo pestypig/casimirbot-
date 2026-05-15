@@ -123,6 +123,52 @@ describe("helix ask E573 deterministic artifact quarantine", () => {
     expect(audit.assistant_history_projection_count).toBe(0);
   });
 
+  it("defaults deterministic validation and subgoal artifacts to evidence-not-answer context roles", () => {
+    const terminal = buildHelixTurnTerminalAuthority({
+      thread_id: "helix-ask:desktop",
+      turn_id: "turn:e573-validation-defaults",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_text: "Calculator verification completed.",
+    });
+    const audit = auditHelixAskContextForPoison({
+      thread_id: "helix-ask:desktop",
+      turn_id: "turn:e573-validation-defaults",
+      terminal_authority: terminal,
+      payload: {
+        turn_id: "turn:e573-validation-defaults",
+        assistant_answer: "Calculator verification completed.",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        selected_evidence_pack: {
+          schema: "helix.selected_evidence_pack.v1",
+          raw_content_included: false,
+          raw_logs_included: false,
+          raw_image_included: false,
+          assistant_answer: false,
+        },
+        workstation_tool_evaluation: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: "workstation-tool-eval:test",
+          deterministic: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        subgoal_ledger_snapshot: {
+          schema: "helix.subgoal_evaluation.v1",
+          evaluation_id: "subgoal-evaluation:test",
+          deterministic: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      assistant_history_items: [],
+    });
+
+    expect(audit.ok).toBe(true);
+    expect(audit.violations).toEqual([]);
+  });
+
   it("attaches poison audit and terminal authority to normal Ask turn responses", async () => {
     const app = createApp();
     const sessionId = `e573-poison-route-${Date.now()}`;

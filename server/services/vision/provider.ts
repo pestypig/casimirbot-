@@ -11,6 +11,21 @@ export interface VisionProvider {
 }
 
 const env = (key: string) => (process.env[key] ?? "").trim();
+const envInt = (key: string, fallback: number) => {
+  const raw = Number.parseInt(env(key), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+};
+
+const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number): Promise<Response> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  timeout.unref?.();
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const resolvePrompt = (prompt?: string) =>
   prompt?.trim() ||
@@ -20,10 +35,10 @@ const resolvePrompt = (prompt?: string) =>
 
 class OpenAiVisionProvider implements VisionProvider {
   async describeImage(imageBase64: string, mime: string, prompt: string): Promise<CaptionResult> {
-    const base = env("VISION_HTTP_BASE");
+    const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
+    const base = env("VISION_HTTP_BASE") || (apiKey ? "https://api.openai.com" : "");
     if (!base || typeof fetch !== "function") return undefined;
     const model = env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini";
-    const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
     const body = {
       model,
       messages: [
@@ -37,14 +52,16 @@ class OpenAiVisionProvider implements VisionProvider {
       ],
       stream: false,
     };
-    const res = await fetch(`${base}/v1/chat/completions`, {
+    const timeoutMs = envInt("VISION_HTTP_TIMEOUT_MS", 30_000);
+    const res = await fetchWithTimeout(`${base.replace(/\/+$/, "")}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
       body: JSON.stringify(body),
-    });
+    }, timeoutMs).catch(() => undefined);
+    if (!res) return undefined;
     if (!res.ok) return undefined;
     const payloadJson = (await res.json()) as any;
     const text = payloadJson?.choices?.[0]?.message?.content;
@@ -72,14 +89,16 @@ class OllamaVisionProvider implements VisionProvider {
       },
     ];
     const body = { model, messages, stream: false };
-    const res = await fetch(`${base.replace(/\/+$/, "")}/v1/chat/completions`, {
+    const timeoutMs = envInt("VISION_HTTP_TIMEOUT_MS", 30_000);
+    const res = await fetchWithTimeout(`${base.replace(/\/+$/, "")}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
       body: JSON.stringify(body),
-    });
+    }, timeoutMs).catch(() => undefined);
+    if (!res) return undefined;
     if (!res.ok) return undefined;
     const payloadJson = (await res.json()) as any;
     const text = payloadJson?.choices?.[0]?.message?.content;
