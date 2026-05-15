@@ -6,9 +6,15 @@ import {
 } from "@shared/helix-present-state-card";
 import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
-import { listInterpretedEvents } from "./interpreted-event-log-store";
+import { appendInterpretedEvent, listInterpretedEvents } from "./interpreted-event-log-store";
 import { listClarificationQuestions } from "./clarification-question-store";
 import { listGameUtilityHypotheses } from "./minecraft-entity-utility-reducer";
+import { buildLiveCardLineStates } from "./live-card-line-state-builder";
+import { synthesizePresentState } from "./present-state-synthesizer";
+import {
+  listLiveLineToolEvaluations,
+  listLiveLineToolRequests,
+} from "./live-line-tool-request-store";
 
 const hashShort = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -63,6 +69,25 @@ const latestUtilityHypothesisLines = (input: {
   ];
 };
 
+const recordPresentStateSynthesisEvent = (input: {
+  synthesis: ReturnType<typeof synthesizePresentState>;
+}): ReturnType<typeof appendInterpretedEvent> =>
+  appendInterpretedEvent({
+    event_id: `interpreted:${input.synthesis.synthesis_id}`,
+    thread_id: input.synthesis.thread_id,
+    room_id: input.synthesis.room_id ?? null,
+    source_family: "live_environment",
+    kind: "present_state_synthesis",
+    title: "Present-state synthesis",
+    summary: input.synthesis.summary,
+    confidence: null,
+    evidence_refs: input.synthesis.evidence_refs,
+    related_artifact_ids: [input.synthesis.synthesis_id],
+    model_invoked: input.synthesis.model_invoked,
+    deterministic: input.synthesis.deterministic,
+    created_at: input.synthesis.created_at,
+  });
+
 export function projectPresentStateCard(input: {
   threadId: string;
   roomId?: string | null;
@@ -87,8 +112,33 @@ export function projectPresentStateCard(input: {
     threadId: input.threadId,
     roomId: projectedRoomId,
   });
+  const lineRequests = listLiveLineToolRequests({ threadId: input.threadId, limit: 120 });
+  const lineEvaluations = listLiveLineToolEvaluations({ threadId: input.threadId, limit: 120 });
   if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
     const lines = artifact.current_state_lines;
+    const rawLines = [
+      line({ key: "now", label: "Now", value: lines.now, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      ...utilityLines,
+      line({ key: "goal", label: "Goal", value: lines.goal, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "risk", label: "Risk", value: lines.risk, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "progress", label: "Progress", value: lines.progress, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "unknowns", label: "Unknowns", value: lines.unknowns, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "next_check", label: "Next check", value: lines.last_decision, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+    ];
+    const lineStates = buildLiveCardLineStates({
+      lines: rawLines,
+      requests: lineRequests,
+      evaluations: lineEvaluations,
+      now,
+    });
+    const synthesis = synthesizePresentState({
+      threadId: artifact.thread_id,
+      roomId: artifact.room_id,
+      lineStates,
+      interpretedEvents,
+      now,
+    });
+    const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
     return {
       schema: HELIX_PRESENT_STATE_CARD_SCHEMA,
       card_id: `present_state:${hashShort([artifact.artifact_id, artifact.updated_at])}`,
@@ -96,22 +146,43 @@ export function projectPresentStateCard(input: {
       room_id: artifact.room_id,
       title: "Minecraft Situation",
       status: artifact.status,
-      lines: [
-        line({ key: "now", label: "Now", value: lines.now, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-        ...utilityLines,
-        line({ key: "goal", label: "Goal", value: lines.goal, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-        line({ key: "risk", label: "Risk", value: lines.risk, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-        line({ key: "progress", label: "Progress", value: lines.progress, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-        line({ key: "unknowns", label: "Unknowns", value: lines.unknowns, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-        line({ key: "next_check", label: "Next check", value: lines.last_decision, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-      ],
+      lines: synthesis.lines,
+      line_states: lineStates,
+      present_state_synthesis: synthesis,
       pending_request_input: pendingRequestInput,
-      last_interpreted_event_id: latestEvent?.event_id ?? null,
-      go_to_log_target: latestEvent?.event_id ?? null,
-      updated_at: artifact.updated_at,
+      last_interpreted_event_id: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
+      go_to_log_target: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
+      updated_at: synthesis.created_at,
     };
   }
   if (environment && (!input.roomId || environment.room_id === input.roomId)) {
+    const rawLines = [
+      ...utilityLines,
+      ...environment.lines
+        .filter((entry) => entry.visibility === "answer_card")
+        .map((entry) => line({
+          key: entry.key,
+          label: entry.label,
+          value: String(entry.value ?? ""),
+          evidenceRefs: entry.evidence_refs,
+          confidence: typeof entry.confidence === "number" ? entry.confidence : null,
+          updatedAt: entry.updated_at,
+        })),
+    ];
+    const lineStates = buildLiveCardLineStates({
+      lines: rawLines,
+      requests: lineRequests,
+      evaluations: lineEvaluations,
+      now,
+    });
+    const synthesis = synthesizePresentState({
+      threadId: environment.thread_id,
+      roomId: environment.room_id ?? null,
+      lineStates,
+      interpretedEvents,
+      now,
+    });
+    const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
     return {
       schema: HELIX_PRESENT_STATE_CARD_SCHEMA,
       card_id: `present_state:${hashShort([environment.environment_id, environment.updated_at])}`,
@@ -119,23 +190,13 @@ export function projectPresentStateCard(input: {
       room_id: environment.room_id ?? null,
       title: environment.objective,
       status: environment.status,
-      lines: [
-        ...utilityLines,
-        ...environment.lines
-          .filter((entry) => entry.visibility === "answer_card")
-          .map((entry) => line({
-            key: entry.key,
-            label: entry.label,
-            value: String(entry.value ?? ""),
-            evidenceRefs: entry.evidence_refs,
-            confidence: null,
-            updatedAt: entry.updated_at,
-          })),
-      ],
+      lines: synthesis.lines,
+      line_states: lineStates,
+      present_state_synthesis: synthesis,
       pending_request_input: pendingRequestInput,
-      last_interpreted_event_id: latestEvent?.event_id ?? null,
-      go_to_log_target: latestEvent?.event_id ?? null,
-      updated_at: environment.updated_at,
+      last_interpreted_event_id: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
+      go_to_log_target: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
+      updated_at: synthesis.created_at,
     };
   }
   return {

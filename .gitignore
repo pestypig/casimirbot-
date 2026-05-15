@@ -128,3 +128,4 @@ external/RayTracingMIS/
 
 # Local Codex app metadata/secrets
 .codex/
+.codex-tools/

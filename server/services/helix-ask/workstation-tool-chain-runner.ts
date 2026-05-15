@@ -10,6 +10,7 @@ import {
   updateLiveLineToolRequestStatus,
 } from "../situation-room/live-line-tool-request-store";
 import { lookupGameSemanticReference } from "../situation-room/game-semantic-reference";
+import { alignVisualFrameWithEvents, getLatestVisualFrame } from "../situation-room/visual-snapshot-store";
 import { getLatestMinecraftWorldSenseContextForRoom } from "../situation-room/minecraft-world-sense-window";
 import { queryEventWindow } from "../situation-room/event-window-query";
 import { evaluateLiveLineToolRequest } from "./live-line-tool-evaluator";
@@ -257,6 +258,65 @@ const runMinecraftSemanticLookup = (input: {
   };
 };
 
+const runVisualEventAlignment = (input: {
+  request: HelixLiveLineToolRequest;
+  roomId?: string | null;
+  sourceId?: string | null;
+  worldId?: string | null;
+  limit?: number;
+}): {
+  receipt: LiveLineToolChainReceipt;
+  supports: HelixLiveLineToolEvaluation["supports_line"];
+  nextLineValue: string | null;
+  missingEvidence: string[];
+} => {
+  const frame = getLatestVisualFrame({ threadId: input.request.thread_id });
+  const result = queryEventWindow({
+    thread_id: null,
+    room_id: input.roomId ?? null,
+    source_id: input.sourceId ?? null,
+    world_id: input.worldId ?? null,
+    limit: input.limit ?? 40,
+    include_raw_events: false,
+  });
+  const eventRefs = result.events.map((event) => event.journal_event_id);
+  const alignment = alignVisualFrameWithEvents({
+    thread_id: input.request.thread_id,
+    frame_ids: frame ? [frame.frame_id] : [],
+    event_refs: eventRefs,
+    summary: frame
+      ? `Aligned latest visual frame with ${eventRefs.length} compact event(s) for ${input.request.line_label}.`
+      : "No latest visual frame is available for visual-event alignment.",
+    confidence: frame && eventRefs.length > 0 ? 0.65 : 0.25,
+    missing_evidence: frame ? [] : ["No visual frame has been captured for this thread yet."],
+  });
+  const supported = frame && eventRefs.length > 0;
+  return {
+    receipt: makeReceipt({
+      request: input.request,
+      ok: true,
+      summary: alignment.summary,
+      evidence_refs: [alignment.alignment_id, ...alignment.frame_ids, ...alignment.event_refs],
+      observation: {
+        schema: alignment.schema,
+        alignment_id: alignment.alignment_id,
+        frame_ids: alignment.frame_ids,
+        event_refs: alignment.event_refs,
+        confidence: alignment.confidence,
+        assistant_answer: alignment.assistant_answer,
+        raw_image_included: alignment.raw_image_included,
+      },
+    }),
+    supports: supported ? "partial" : "unknown",
+    nextLineValue: supported ? `${input.request.line_label} visual check: ${alignment.summary}` : null,
+    missingEvidence: alignment.missing_evidence.length > 0
+      ? alignment.missing_evidence
+      : supported
+        ? []
+        : ["No visual/event pair was available to align."],
+  };
+};
+
 export function runLiveLineToolChainWithReceipt(input: {
   request?: HelixLiveLineToolRequest | null;
   threadId?: string | null;
@@ -292,7 +352,9 @@ export function runLiveLineToolChainWithReceipt(input: {
       ? runMinecraftWorldSenseWindow({ request, roomId })
       : request.requested_tool === "minecraft.lookup_semantics"
         ? runMinecraftSemanticLookup({ request, roomId })
-        : {
+        : request.requested_tool === "visual.align_latest_with_event_window"
+          ? runVisualEventAlignment({ request, roomId, sourceId, worldId, limit: input.limit })
+          : {
             receipt: makeReceipt({
               request,
               ok: false,
@@ -345,7 +407,7 @@ export function runLiveLineToolChainWithReceipt(input: {
     thread_id: request.thread_id,
     room_id: roomId,
     source_family: "minecraft_events",
-    kind: "hypothesis_confidence_changed",
+    kind: "line_tool_evaluation",
     title: `${request.line_label} tool check`,
     summary: evaluation.summary,
     confidence: evaluation.confidence_delta > 0 ? Math.min(1, 0.5 + evaluation.confidence_delta) : null,

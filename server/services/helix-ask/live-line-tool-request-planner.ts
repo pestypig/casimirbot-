@@ -50,6 +50,14 @@ const chooseTools = (input: {
       reason_summary: "Store large context as note references instead of injecting raw text.",
     }];
   }
+  if (/\b(?:visual|image|screenshot|frame|screen|visible|camera|view)\b/.test(text)) {
+    return [{
+      requested_tool: "visual.align_latest_with_event_window",
+      expected_evidence_kind: "verification",
+      reason: "missing_evidence",
+      reason_summary: "Align the latest visual frame with recent event evidence before raising line confidence.",
+    }];
+  }
   if (/\b(?:chicken|cow|zombie|entity|farm|egg|mob|semantic|affordance)\b/.test(text)) {
     return [
       {

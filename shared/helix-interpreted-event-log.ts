@@ -6,6 +6,8 @@ export type HelixInterpretedEventKind =
   | "visual_observation"
   | "visual_event_alignment"
   | "categorization"
+  | "present_state_synthesis"
+  | "line_tool_evaluation"
   | "synthetic_evidence"
   | "subgoal_update"
   | "mission_memory_update"

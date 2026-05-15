@@ -24,6 +24,7 @@ import type {
 import type { HelixUserSteeringEvidence } from "@shared/helix-user-steering-evidence";
 import type { HelixLiveLineToolEvaluation } from "@shared/helix-live-line-tool-evaluation";
 import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-request";
+import type { HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 
 type LiveEnvironmentTab = "present_state" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
@@ -187,6 +188,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     [environment?.environment_id, sourceIds, windows],
   );
   const canStartSourceMonitor = sourceSignal.status === "live" && Boolean(sourceSignal.source);
+  const liveCardLineStateByKey = useMemo(() => {
+    const entries = presentStateCard?.line_states ?? [];
+    return new Map(entries.map((entry: HelixLiveCardLineState) => [entry.line_key, entry]));
+  }, [presentStateCard?.line_states]);
 
   const refresh = async () => {
     try {
@@ -715,20 +720,58 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     </span>
                   </div>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {presentStateCard.lines.map((entry: HelixPresentStateCard["lines"][number]) => (
+                    {presentStateCard.lines.map((entry: HelixPresentStateCard["lines"][number]) => {
+                      const lineState = liveCardLineStateByKey.get(entry.key);
+                      const matchingRequest = lineToolRequests.find((request) => request.line_key === entry.key && request.status !== "evaluated");
+                      return (
                       <div key={entry.key} className="rounded border border-white/10 bg-black/20 p-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[10px] uppercase text-emerald-200/80">{entry.label}</p>
-                          {typeof entry.confidence === "number" ? (
-                            <span className="text-[10px] text-slate-500">{Math.round(entry.confidence * 100)}%</span>
-                          ) : null}
+                          <div className="flex flex-wrap items-center gap-1">
+                            {lineState?.evidence_status ? (
+                              <span className="rounded border border-white/10 px-1.5 py-0.5 text-[9px] uppercase text-slate-400">
+                                {lineState.evidence_status}
+                              </span>
+                            ) : null}
+                            {typeof entry.confidence === "number" ? (
+                              <span className="text-[10px] text-slate-500">{Math.round(entry.confidence * 100)}%</span>
+                            ) : null}
+                          </div>
                         </div>
                         <p className="mt-1 text-xs text-slate-100">{entry.value}</p>
+                        {lineState?.missing_evidence?.length ? (
+                          <p className="mt-1 text-[10px] text-amber-200">
+                            Missing: {lineState.missing_evidence.slice(0, 2).join("; ")}
+                          </p>
+                        ) : null}
+                        {lineState?.next_best_tool || lineState?.last_check_result ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                            {lineState.next_best_tool ? <span>next tool {lineState.next_best_tool}</span> : null}
+                            {lineState.last_check_result ? <span>last check {lineState.last_check_result}</span> : null}
+                          </div>
+                        ) : null}
                         <p className="mt-1 truncate text-[10px] text-slate-500">
                           evidence {entry.evidence_refs.slice(0, 2).join(", ") || "none"}
                         </p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          <button
+                            type="button"
+                            onClick={() => matchingRequest ? void runLineCheck(matchingRequest) : void planLineChecks()}
+                            className="rounded border border-cyan-300/25 px-1.5 py-0.5 text-[10px] text-cyan-100 hover:bg-cyan-400/10"
+                          >
+                            Run check
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("interpreted_log")}
+                            className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-slate-200 hover:bg-white/10"
+                          >
+                            Go to log
+                          </button>
+                        </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
                     <span>log target {presentStateCard.go_to_log_target ?? "none"}</span>
