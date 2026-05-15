@@ -22,7 +22,7 @@ const hasVisualEvidenceRef = (state: HelixLiveCardLineState): boolean =>
   state.evidence_refs.some((ref) => /\b(?:visual_evidence|visual_frame|visual_alignment)\b/i.test(ref));
 
 const hasWorldEvidenceRef = (state: HelixLiveCardLineState): boolean =>
-  state.evidence_refs.some((ref) => /\b(?:minecraft|world_event|world-sense|journal|event:|source:minecraft-server)\b/i.test(ref));
+  state.evidence_refs.some((ref) => /\b(?:world_event|world-sense|journal|event:|minecraft:event|minecraft_event)\b/i.test(ref));
 
 const isPlaceholderValue = (value: unknown): boolean =>
   /\b(?:monitoring current|waiting for|no stable|no strong|not yet active|not confirmed|minecraft scene from the active visual source)\b/i

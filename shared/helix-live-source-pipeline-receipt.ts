@@ -1,4 +1,6 @@
 import type { HelixLiveSourcePipelinePlan } from "./helix-live-source-pipeline-plan";
+import type { HelixLivePipelineLifecycleEvent } from "./helix-live-pipeline-lifecycle";
+import type { HelixLivePipelineReadiness } from "./helix-live-pipeline-readiness";
 
 export const HELIX_LIVE_SOURCE_PIPELINE_RECEIPT_SCHEMA = "helix.live_source_pipeline_receipt.v1" as const;
 
@@ -41,6 +43,8 @@ export type HelixLiveSourcePipelineDashboard = {
   buffer_status: unknown;
   source_capabilities: unknown[];
   live_card: unknown;
+  readiness?: HelixLivePipelineReadiness | null;
+  lifecycle_events?: HelixLivePipelineLifecycleEvent[];
   missing_capabilities: string[];
   next_repair_actions: string[];
   assistant_answer: false;

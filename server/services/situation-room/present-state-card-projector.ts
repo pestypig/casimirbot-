@@ -220,57 +220,6 @@ export function projectPresentStateCard(input: {
     interpretedEvents,
     capabilities: sourceCapabilities,
   });
-  if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
-    const lines = artifact.current_state_lines;
-    const rawLines = [
-      line({ key: "now", label: "Now", value: lines.now, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-      ...utilityLines,
-      line({ key: "goal", label: "Goal", value: lines.goal, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-      line({ key: "risk", label: "Risk", value: lines.risk, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-      line({ key: "progress", label: "Progress", value: lines.progress, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-      line({ key: "unknowns", label: "Unknowns", value: lines.unknowns, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-      line({ key: "next_check", label: "Next check", value: lines.last_decision, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
-    ];
-    const lineStates = buildLiveCardLineStates({
-      lines: rawLines,
-      requests: lineRequests,
-      evaluations: lineEvaluations,
-      sourceCapabilities,
-      now,
-    });
-    const fidelityProfile = buildLiveEnvironmentFidelity({
-      threadId: artifact.thread_id,
-      roomId: artifact.room_id,
-      lineStates,
-      capabilities: sourceCapabilities,
-      now,
-    });
-    const synthesis = synthesizePresentState({
-      threadId: artifact.thread_id,
-      roomId: artifact.room_id,
-      lineStates,
-      interpretedEvents: scopedInterpretedEvents,
-      fidelityProfile,
-      now,
-    });
-    const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
-    return {
-      schema: HELIX_PRESENT_STATE_CARD_SCHEMA,
-      card_id: `present_state:${hashShort([artifact.artifact_id, artifact.updated_at])}`,
-      thread_id: artifact.thread_id,
-      room_id: artifact.room_id,
-      title: "Minecraft Situation",
-      status: artifact.status,
-      lines: synthesis.lines,
-      line_states: lineStates,
-      present_state_synthesis: synthesis,
-      fidelity_profile: fidelityProfile,
-      pending_request_input: pendingRequestInput,
-      last_interpreted_event_id: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
-      go_to_log_target: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
-      updated_at: synthesis.created_at,
-    };
-  }
   if (environment && (!input.roomId || environment.room_id === input.roomId)) {
     const worldActive = sourceIsActive(sourceCapabilities, "world_event");
     const visualLines = visualSeedLines({
@@ -324,6 +273,66 @@ export function projectPresentStateCard(input: {
       room_id: environment.room_id ?? null,
       title: environment.objective,
       status: environment.status,
+      lines: synthesis.lines,
+      line_states: lineStates,
+      present_state_synthesis: synthesis,
+      fidelity_profile: fidelityProfile,
+      pending_request_input: pendingRequestInput,
+      last_interpreted_event_id: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
+      go_to_log_target: synthesisEvent.event_id ?? latestEvent?.event_id ?? null,
+      updated_at: synthesis.created_at,
+    };
+  }
+  if (artifact && (!input.roomId || artifact.room_id === input.roomId)) {
+    const worldActive = sourceIsActive(sourceCapabilities, "world_event");
+    const visualLines = visualSeedLines({
+      threadId: artifact.thread_id,
+      roomId: artifact.room_id ?? null,
+      environmentPreset: "minecraft_run_monitor",
+      environmentObjective: artifact.objective ?? artifact.current_state_lines.goal,
+      updatedAt: now,
+    });
+    const lines = artifact.current_state_lines;
+    const rawLines = [
+      ...visualLines,
+      line({ key: "now", label: "Now", value: lines.now, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      ...(worldActive ? utilityLines : []),
+      line({ key: "goal", label: "Goal", value: lines.goal, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "risk", label: "Risk", value: lines.risk, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "progress", label: "Progress", value: lines.progress, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "unknowns", label: "Unknowns", value: lines.unknowns, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+      line({ key: "next_check", label: "Next check", value: lines.last_decision, evidenceRefs: artifact.evidence_refs, updatedAt: artifact.updated_at }),
+    ];
+    const lineStates = buildLiveCardLineStates({
+      lines: rawLines,
+      requests: lineRequests,
+      evaluations: lineEvaluations,
+      sourceCapabilities,
+      now,
+    });
+    const fidelityProfile = buildLiveEnvironmentFidelity({
+      threadId: artifact.thread_id,
+      roomId: artifact.room_id,
+      lineStates,
+      capabilities: sourceCapabilities,
+      now,
+    });
+    const synthesis = synthesizePresentState({
+      threadId: artifact.thread_id,
+      roomId: artifact.room_id,
+      lineStates,
+      interpretedEvents: scopedInterpretedEvents,
+      fidelityProfile,
+      now,
+    });
+    const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
+    return {
+      schema: HELIX_PRESENT_STATE_CARD_SCHEMA,
+      card_id: `present_state:${hashShort([artifact.artifact_id, artifact.updated_at])}`,
+      thread_id: artifact.thread_id,
+      room_id: artifact.room_id,
+      title: "Minecraft Situation",
+      status: artifact.status,
       lines: synthesis.lines,
       line_states: lineStates,
       present_state_synthesis: synthesis,

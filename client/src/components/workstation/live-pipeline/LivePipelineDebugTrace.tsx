@@ -1,5 +1,9 @@
 import React from "react";
-import type { LiveWorkstationPipeline } from "@shared/helix-live-workstation-pipeline";
+import type {
+  LivePipelineSinkSpec,
+  LivePipelineTransformSpec,
+  LiveWorkstationPipeline,
+} from "@shared/helix-live-workstation-pipeline";
 
 export function LivePipelineDebugTrace({ pipeline }: { pipeline: LiveWorkstationPipeline }) {
   return (
@@ -10,8 +14,8 @@ export function LivePipelineDebugTrace({ pipeline }: { pipeline: LiveWorkstation
           pipeline_id: pipeline.pipeline_id,
           environment_id: pipeline.environment_id ?? null,
           source_ids: pipeline.source_ids,
-          transforms: pipeline.transforms.map((transform) => transform.transform_id),
-          sinks: pipeline.sinks.map((sink) => sink.sink_id),
+          transforms: pipeline.transforms.map((transform: LivePipelineTransformSpec) => transform.transform_id),
+          sinks: pipeline.sinks.map((sink: LivePipelineSinkSpec) => sink.sink_id),
           raw_logs_included: false,
           raw_transcript_included: false,
           deterministic_content_role: pipeline.deterministic_content_role,

@@ -1,5 +1,9 @@
 import React from "react";
-import type { LiveWorkstationPipeline } from "@shared/helix-live-workstation-pipeline";
+import type {
+  LivePipelineSinkSpec,
+  LivePipelineTransformSpec,
+  LiveWorkstationPipeline,
+} from "@shared/helix-live-workstation-pipeline";
 import { LivePipelineTransformCard } from "@/components/workstation/live-pipeline/LivePipelineTransformCard";
 import { LivePipelineSinkCard } from "@/components/workstation/live-pipeline/LivePipelineSinkCard";
 
@@ -19,12 +23,12 @@ export function LivePipelineGraph({ pipeline }: { pipeline: LiveWorkstationPipel
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
         <div className="grid gap-1">
-          {pipeline.transforms.map((transform) => (
+          {pipeline.transforms.map((transform: LivePipelineTransformSpec) => (
             <LivePipelineTransformCard key={transform.transform_id} transform={transform} />
           ))}
         </div>
         <div className="grid gap-1">
-          {pipeline.sinks.map((sink) => (
+          {pipeline.sinks.map((sink: LivePipelineSinkSpec) => (
             <LivePipelineSinkCard key={sink.sink_id} sink={sink} />
           ))}
         </div>

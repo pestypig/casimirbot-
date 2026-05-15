@@ -14,6 +14,7 @@ import { clearSyntheticEvidenceForTest } from "../services/situation-room/synthe
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import { readLiveCognitionToolRegistry } from "../services/situation-room/live-cognition-tool-registry";
+import { resetLivePipelineLifecycleForTest } from "../services/situation-room/live-pipeline-lifecycle-store";
 
 const threadId = "thread:live-source-pipeline";
 
@@ -33,6 +34,7 @@ describe("agentic live-source pipeline composer", () => {
     resetLiveWorkerLanesForTest();
     resetSituationSourceCapabilitiesForTest();
     resetVisualSnapshotStoreForTest();
+    resetLivePipelineLifecycleForTest();
     clearInterpretedEventLogForTest();
     clearSyntheticEvidenceForTest();
     delete process.env.VISION_HTTP_BASE;
@@ -145,6 +147,56 @@ describe("agentic live-source pipeline composer", () => {
       context_policy: "compact_context_pack_only",
     });
     expect(execute.body.dashboard.producers.length).toBeGreaterThan(0);
+    expect(execute.body.dashboard.readiness).toMatchObject({
+      schema: "helix.live_pipeline_readiness.v1",
+      state: "waiting_for_permission",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(execute.body.dashboard.lifecycle_events.map((event: any) => event.kind)).toEqual(expect.arrayContaining([
+      "pipeline_executed",
+      "producer_created",
+      "rate_policy_set",
+    ]));
+  }, 10000);
+
+  it("pipeline readiness and lifecycle routes expose permission and first-chunk states", async () => {
+    const app = await createApp();
+    const execute = await request(app)
+      .post("/api/agi/situation/live-source/pipeline/execute")
+      .send({
+        thread_id: threadId,
+        objective: "Set up Minecraft Cortana from my active screen capture and Minehut source.",
+      })
+      .expect(200);
+    const pipelineId = execute.body.receipt.pipeline_id;
+
+    const waitingPermission = await request(app)
+      .get(`/api/agi/situation/pipelines/${encodeURIComponent(pipelineId)}/readiness`)
+      .expect(200);
+    expect(waitingPermission.body.readiness.state).toBe("waiting_for_permission");
+
+    const visualSource = execute.body.plan.producers.find((producer: any) => producer.modality === "visual_frame").source_id;
+    await request(app)
+      .post("/api/agi/situation/live-source/rate-policy")
+      .send({
+        thread_id: threadId,
+        source_id: visualSource,
+        modality: "visual_frame",
+        status: "active",
+        capture_mode: "manual",
+      })
+      .expect(200);
+
+    const waitingChunk = await request(app)
+      .get(`/api/agi/situation/pipelines/${encodeURIComponent(pipelineId)}/readiness`)
+      .expect(200);
+    expect(waitingChunk.body.readiness.state).toBe("waiting_for_first_chunk");
+
+    const lifecycle = await request(app)
+      .get(`/api/agi/situation/pipelines/${encodeURIComponent(pipelineId)}/lifecycle`)
+      .expect(200);
+    expect(lifecycle.body.events.every((event: any) => event.assistant_answer === false)).toBe(true);
   });
 
   it("pipeline repair proposes provider and capture/world actions rather than failing", () => {
@@ -203,6 +255,41 @@ describe("agentic live-source pipeline composer", () => {
     expect(inspect.body.dashboard.live_card).toBeTruthy();
     expect(listInterpretedEvents({ threadId, limit: 20 }).some((event) => event.kind === "synthetic_evidence")).toBe(true);
     expect(JSON.stringify(inspect.body)).not.toContain("assistant_answer\":true");
+  });
+
+  it("acceptance harness advances chunks, analysis, evidence routing, and readiness", async () => {
+    const app = await createApp();
+    const execute = await request(app)
+      .post("/api/agi/situation/live-source/pipeline/execute")
+      .send({
+        thread_id: threadId,
+        objective: "Set up Minecraft Cortana from my active screen capture and Minehut source.",
+      })
+      .expect(200);
+
+    const acceptance = await request(app)
+      .post(`/api/agi/situation/pipelines/${encodeURIComponent(execute.body.receipt.pipeline_id)}/run-acceptance`)
+      .send({})
+      .expect(200);
+
+    expect(acceptance.body.result).toMatchObject({
+      schema: "helix.live_pipeline_acceptance_result.v1",
+      ok: true,
+      poison_audit_ok: true,
+      terminal_authority_ok: true,
+      assistant_answer_from_pipeline_count: 0,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(acceptance.body.result.scenarios.length).toBeGreaterThan(0);
+    expect(acceptance.body.lifecycle_events.map((event: any) => event.kind)).toEqual(expect.arrayContaining([
+      "chunk_received",
+      "analysis_job_queued",
+      "analysis_job_completed",
+      "evidence_routed",
+      "present_state_updated",
+    ]));
+    expect(["ready", "degraded"]).toContain(acceptance.body.readiness.state);
   });
 
   it("pipeline tools are registered as non-answer actions", () => {

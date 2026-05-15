@@ -85,7 +85,7 @@ const sourceCoverage = (input: {
   const evidenceRefs = (input.line.evidence_refs ?? []).map((ref) => lower(ref));
   const explicit = {
     world_event: evidenceRefs.some((ref) =>
-      /\b(?:minecraft|world_event|world-sense|journal|event:|source:minecraft-server)\b/.test(ref),
+      /\b(?:world_event|world-sense|journal|event:|minecraft:event|minecraft_event)\b/.test(ref),
     ),
     visual_frame: evidenceRefs.some((ref) => /\b(?:visual_evidence|visual_frame|visual_alignment)\b/.test(ref)),
     audio_transcript: evidenceRefs.some((ref) => /\b(?:voice|transcript|audio)\b/.test(ref)),
@@ -95,7 +95,7 @@ const sourceCoverage = (input: {
     key: keyof HelixLiveCardLineSourceCoverage,
     modality: HelixSituationSourceModality,
   ): HelixLiveCardSourceCoverageStatus => {
-    if (explicit[key]) return "supported";
+    if (explicit[key] && modalityStatus(input.capabilities, modality) === "supported") return "supported";
     if (!needs.has(key)) return "not_applicable";
     return modalityStatus(input.capabilities, modality);
   };

@@ -7,9 +7,15 @@ import {
 } from "../services/situation-room/live-cognition-tool-registry";
 import { selectLiveCognitionToolForLine } from "../services/situation-room/live-cognition-tool-policy";
 import { createLiveAnswerEnvironment } from "../services/situation-room/live-answer-environment-store";
+import { createLiveSituationArtifact } from "../services/situation-room/live-situation-artifact-store";
 import { appendInterpretedEvent, listInterpretedEvents } from "../services/situation-room/interpreted-event-log-store";
 import { projectPresentStateCard } from "../services/situation-room/present-state-card-projector";
 import { synthesizePresentState } from "../services/situation-room/present-state-synthesizer";
+import {
+  analyzeVisualFrame,
+  recordVisualFrame,
+  startVisualSnapshotSource,
+} from "../services/situation-room/visual-snapshot-store";
 
 const now = "2026-05-15T00:00:00.000Z";
 
@@ -120,6 +126,24 @@ describe("live cognition tool registry and present-state synthesis", () => {
     expect(states[0].missing_evidence).toContain("No damage event observed.");
   });
 
+  it("does not treat setup source ids as fresh world-event evidence", () => {
+    const states = buildLiveCardLineStates({
+      lines: [{
+        key: "risk",
+        label: "Risk",
+        value: "Risk is not confirmed; world-event source is missing or inactive.",
+        confidence: 0.45,
+        evidence_refs: ["live_situation:setup", "source:source:minecraft-server"],
+        updated_at: now,
+      }],
+      sourceCapabilities: [],
+      now,
+    });
+
+    expect(states[0].source_coverage.world_event).toBe("missing");
+    expect(states[0].evidence_refs).toContain("source:source:minecraft-server");
+  });
+
   it("rewrites reducer-shaped Minecraft lines into Dot-style present-state lines", () => {
     const lineStates = buildLiveCardLineStates({
       lines: [
@@ -200,6 +224,13 @@ describe("live cognition tool registry and present-state synthesis", () => {
       preset: "minecraft_run_monitor",
       now,
     });
+    startVisualSnapshotSource({
+      thread_id: threadId,
+      room_id: "room:minecraft-live-cognition",
+      source_id: "source:visual:farm-card",
+      source_surface: "minecraft_client_window",
+      status: "active",
+    });
     appendInterpretedEvent({
       thread_id: threadId,
       room_id: "room:minecraft-live-cognition",
@@ -226,5 +257,56 @@ describe("live cognition tool registry and present-state synthesis", () => {
     expect(card.lines.some((line) => line.label === "Place" && /wheat\/chicken farm/i.test(line.value))).toBe(true);
     expect(listInterpretedEvents({ threadId, roomId: "room:minecraft-live-cognition", limit: 20 }).some((event) => event.kind === "present_state_synthesis")).toBe(true);
     expect(getLiveCognitionTool(card.line_states?.[0]?.next_best_tool ?? "")?.creates_assistant_answer ?? false).toBe(false);
+  });
+
+  it("prefers the live answer environment over an older live situation artifact when visual evidence exists", () => {
+    const threadId = `thread:project-env-over-artifact:${Date.now()}`;
+    createLiveSituationArtifact({
+      thread_id: threadId,
+      created_turn_id: "turn:artifact",
+      room_id: "room:minecraft-env-priority",
+      source_ids: ["source:minecraft-server"],
+      objective: "Old Minecraft situation artifact",
+      current_goal: "Old setup prompt text",
+      now,
+    });
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "turn:environment",
+      objective: "Process my active Minecraft visual source.",
+      room_id: "room:minecraft-env-priority",
+      preset: "minecraft_run_monitor",
+      source_ids: ["source:visual:minecraft-env-priority"],
+      now,
+    });
+    startVisualSnapshotSource({
+      thread_id: threadId,
+      room_id: "room:minecraft-env-priority",
+      source_id: "source:visual:minecraft-env-priority",
+      source_surface: "minecraft_client_window",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      thread_id: threadId,
+      room_id: "room:minecraft-env-priority",
+      source_id: "source:visual:minecraft-env-priority",
+      image_ref: "ephemeral://frame/env-priority",
+      image_sha256: "d".repeat(64),
+    });
+    const evidence = analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      summary: "The Minecraft screen shows a chest inventory with readable item stacks.",
+      detected_objects: ["chest inventory", "item stacks"],
+    });
+
+    const card = projectPresentStateCard({
+      threadId,
+      roomId: "room:minecraft-env-priority",
+    });
+
+    expect(card.title).toBe("Process my active Minecraft visual source.");
+    expect(card.lines.some((line) => line.label === "Place" && /chest inventory/i.test(line.value))).toBe(true);
+    expect(card.lines.flatMap((line) => line.evidence_refs)).toContain(evidence.evidence_id);
   });
 });
