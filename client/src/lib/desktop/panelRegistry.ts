@@ -286,7 +286,7 @@ const BASE_PANELS: PanelDefinition[] = [
     loader: load(() => import("@/components/workstation/LiveAnswerEnvironmentPanel"), "LiveAnswerEnvironmentPanel"),
     defaultSize: { w: 980, h: 720 },
     defaultPosition: { x: 260, y: 160 },
-    keywords: ["live", "answer", "cortana", "minecraft", "minehut", "present state", "line checks", "interpreted log"],
+    keywords: ["live", "answer", "cortana", "minecraft", "game source", "plugin signal", "present state", "line checks", "interpreted log"],
   },
   {
     id: "workstation-clipboard-history",

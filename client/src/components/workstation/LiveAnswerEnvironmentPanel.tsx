@@ -35,6 +35,43 @@ type LiveAgenticReviewReadEntry = {
   model_invoked?: boolean;
 };
 
+type WorldEventSourceSeen = {
+  room_id: string;
+  source_id: string;
+  world_id: string;
+  latest_event_type: string;
+  latest_ts: string;
+  event_count: number;
+  latest_actor_label?: string | null;
+  latest_actor_id?: string | null;
+};
+
+type SourceSignalStatus = "unchecked" | "live" | "stale" | "missing" | "error";
+
+type SourceSignalCheck = {
+  status: SourceSignalStatus;
+  summary: string;
+  checkedAt?: string | null;
+  source?: WorldEventSourceSeen | null;
+};
+
+type VisualSourceRead = {
+  source_id: string;
+  thread_id: string;
+  status: "permission_required" | "active" | "paused" | "stopped" | "error";
+  source_surface?: string | null;
+  capture_mode?: string | null;
+  updated_at?: string | null;
+};
+
+type VisualLatestRead = {
+  source?: VisualSourceRead | null;
+  active_source?: VisualSourceRead | null;
+  frame?: { frame_id: string; ts?: string | null } | null;
+  evidence?: { evidence_id: string; summary?: string | null; ts?: string | null } | null;
+  alignment?: { alignment_id: string; summary?: string | null; confidence?: number | null } | null;
+};
+
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "present_state", label: "Present State" },
   { id: "line_checks", label: "Line Checks" },
@@ -78,6 +115,20 @@ const formatTime = (value?: string | null): string => {
   return Number.isFinite(ts) ? new Date(ts).toLocaleTimeString() : value;
 };
 
+const defaultWorldEventEndpoint = (): string => {
+  if (typeof window === "undefined") return "/api/agi/situation/world-event";
+  return `${window.location.origin}/api/agi/situation/world-event`;
+};
+
+const signalAgeMs = (source?: WorldEventSourceSeen | null): number | null => {
+  if (!source?.latest_ts) return null;
+  const parsed = Date.parse(source.latest_ts);
+  return Number.isFinite(parsed) ? Date.now() - parsed : null;
+};
+
+const isMinecraftWorldSource = (source: WorldEventSourceSeen): boolean =>
+  /\bminecraft|minehut|world_event/i.test([source.room_id, source.source_id, source.world_id, source.latest_event_type].join(" "));
+
 export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: { threadId?: string }) {
   const [activeTab, setActiveTab] = useState<LiveEnvironmentTab>("present_state");
   const [sources, setSources] = useState<WorkstationLiveSource[]>([]);
@@ -96,6 +147,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [steeringEvidence, setSteeringEvidence] = useState<HelixUserSteeringEvidence[]>([]);
   const [lineToolRequests, setLineToolRequests] = useState<HelixLiveLineToolRequest[]>([]);
   const [lineToolEvaluations, setLineToolEvaluations] = useState<HelixLiveLineToolEvaluation[]>([]);
+  const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
+  const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
+    status: "unchecked",
+    summary: "No source signal has been checked in this panel.",
+    source: null,
+  });
+  const [sourceEndpoint, setSourceEndpoint] = useState<string>(() => {
+    if (typeof window === "undefined") return defaultWorldEventEndpoint();
+    return window.localStorage.getItem("helix.worldEventSourceEndpoint") ?? defaultWorldEventEndpoint();
+  });
+  const [sourceLabel, setSourceLabel] = useState<string>(() => {
+    if (typeof window === "undefined") return "World-event source";
+    return window.localStorage.getItem("helix.worldEventSourceLabel") ?? "World-event source";
+  });
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const [lastActionStatus, setLastActionStatus] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
@@ -121,6 +186,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     () => windows.filter((window: LiveSourceWindowSummary) => sourceIds.size === 0 || sourceIds.has(window.source_id) || window.environment_id === environment?.environment_id),
     [environment?.environment_id, sourceIds, windows],
   );
+  const canStartSourceMonitor = sourceSignal.status === "live" && Boolean(sourceSignal.source);
 
   const refresh = async () => {
     try {
@@ -134,7 +200,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, visualLatestRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -144,8 +210,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/interpreted-log?thread_id=${encodeURIComponent(threadId)}${roomQuery}&limit=80`),
         fetch(`/api/agi/situation/clarification-dialogue?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-line-tool-requests?thread_id=${encodeURIComponent(threadId)}&limit=80`),
+        fetch(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, visualLatestBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -155,6 +222,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         interpretedLogRes.json(),
         clarificationRes.json(),
         lineToolRes.json(),
+        visualLatestRes.json(),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -172,6 +240,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setSteeringEvidence(Array.isArray(clarificationBody.steering_evidence) ? clarificationBody.steering_evidence : []);
       setLineToolRequests(Array.isArray(lineToolBody.requests) ? lineToolBody.requests : []);
       setLineToolEvaluations(Array.isArray(lineToolBody.evaluations) ? lineToolBody.evaluations : []);
+      setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -216,23 +285,178 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     await refresh();
   };
 
-  const startMinehutMonitor = async () => {
+  const checkSourceSignal = async () => {
     try {
+      const response = await fetch("/api/agi/situation/world-event/sources");
+      if (!response.ok) throw new Error(`source_signal_check_failed:${response.status}`);
+      const body = await response.json();
+      const sources = Array.isArray(body.sources)
+        ? body.sources.filter((source: unknown): source is WorldEventSourceSeen => {
+            if (!source || typeof source !== "object") return false;
+            const record = source as Record<string, unknown>;
+            return (
+              typeof record.room_id === "string" &&
+              typeof record.source_id === "string" &&
+              typeof record.world_id === "string" &&
+              typeof record.latest_ts === "string"
+            );
+          })
+        : [];
+      const minecraftSources = sources.filter(isMinecraftWorldSource);
+      const source = minecraftSources[0] ?? null;
+      const age = signalAgeMs(source);
+      const checkedAt = new Date().toISOString();
+      if (!source) {
+        setSourceSignal({
+          status: "missing",
+          checkedAt,
+          source: null,
+          summary: "No matching world-event source has reached Helix since this server started.",
+        });
+        setLastActionStatus("No source signal detected. Check the configured endpoint or paste a regenerated tunnel URL.");
+        return;
+      }
+      if (age !== null && age <= 120_000) {
+        setSourceSignal({
+          status: "live",
+          checkedAt,
+          source,
+          summary: `Live signal from ${source.source_id}; latest ${source.latest_event_type} ${formatTime(source.latest_ts)}.`,
+        });
+        setLastActionStatus(`Source signal live: ${source.source_id}`);
+        return;
+      }
+      setSourceSignal({
+        status: "stale",
+        checkedAt,
+        source,
+        summary: `Last signal from ${source.source_id} is stale; latest ${source.latest_event_type} ${formatTime(source.latest_ts)}.`,
+      });
+      setLastActionStatus("Source signal is stale. If your tunnel changed, paste the new endpoint into the source adapter config.");
+    } catch (error) {
+      setSourceSignal({
+        status: "error",
+        checkedAt: new Date().toISOString(),
+        source: null,
+        summary: error instanceof Error ? error.message : "plugin_signal_check_failed",
+      });
+      setLastActionStatus(error instanceof Error ? error.message : "plugin_signal_check_failed");
+    }
+  };
+
+  const saveSourceConnection = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("helix.worldEventSourceEndpoint", sourceEndpoint.trim());
+      window.localStorage.setItem("helix.worldEventSourceLabel", sourceLabel.trim() || "World-event source");
+    }
+    setSourceLabel(sourceLabel.trim() || "World-event source");
+    setLastActionStatus("Saved source label and endpoint reminder locally. Update the source adapter config with this URL.");
+  };
+
+  const startMinecraftSourceMonitor = async () => {
+    try {
+      const source = sourceSignal.source;
       const response = await postJson("/api/agi/situation/live-answer-environment/start", {
         thread_id: threadId,
-        objective: "Minecraft Cortana: monitor active Minehut world, build present-state hypotheses, and expose executable line checks.",
-        room_id: "room:minecraft-minehut",
-        source_ids: ["source:minecraft-server"],
-        world_id: "minecraft:minehut",
+        objective: `Monitor ${sourceLabel.trim() || "an attached world-event source"}, build present-state hypotheses, and expose executable line checks.`,
+        room_id: source?.room_id ?? "room:minecraft-minehut",
+        source_ids: [source?.source_id ?? "source:minecraft-server"],
+        world_id: source?.world_id ?? "minecraft:world",
         preset: "minecraft_run_monitor",
         mode: "active_companion",
         created_turn_id: `turn:minecraft-cortana-ui:${Date.now()}`,
       });
       const environmentId = response?.live_answer_environment?.environment_id ?? "environment";
-      setLastActionStatus(`Started Minehut monitor: ${environmentId}`);
+      setLastActionStatus(`Started Minecraft source monitor: ${environmentId}`);
       await refresh();
     } catch (error) {
-      setLastActionStatus(error instanceof Error ? error.message : "start_minehut_monitor_failed");
+      setLastActionStatus(error instanceof Error ? error.message : "start_minecraft_source_monitor_failed");
+    }
+  };
+
+  const requestDisplayStream = async (): Promise<MediaStream> => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error("screen_capture_not_available_in_this_browser");
+    }
+    return navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+  };
+
+  const grantVisualCapture = async () => {
+    const sourceId = visualLatest?.source?.source_id;
+    if (!sourceId) {
+      setLastActionStatus("No visual source is registered yet. Start Minecraft Cortana mode first.");
+      return;
+    }
+    let stream: MediaStream | null = null;
+    try {
+      stream = await requestDisplayStream();
+      stream.getTracks().forEach((track) => track.stop());
+      await postJson("/api/agi/situation/visual-source/permission-granted", {
+        source_id: sourceId,
+      });
+      setLastActionStatus("Visual capture permission confirmed for this source.");
+      await refresh();
+    } catch (error) {
+      stream?.getTracks().forEach((track) => track.stop());
+      setLastActionStatus(error instanceof Error ? error.message : "visual_capture_permission_failed");
+    }
+  };
+
+  const captureVisualFrameNow = async () => {
+    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id;
+    if (!sourceId) {
+      setLastActionStatus("No visual source is registered yet. Start Minecraft Cortana mode first.");
+      return;
+    }
+    let stream: MediaStream | null = null;
+    try {
+      stream = await requestDisplayStream();
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      await video.play();
+      await new Promise<void>((resolve) => {
+        if (video.videoWidth > 0 && video.videoHeight > 0) resolve();
+        else video.onloadedmetadata = () => resolve();
+      });
+      const maxWidth = 1280;
+      const scale = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("screen_capture_canvas_unavailable");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+      if (visualLatest?.source?.status === "permission_required") {
+        await postJson("/api/agi/situation/visual-source/permission-granted", {
+          source_id: sourceId,
+        });
+      }
+      await postJson("/api/agi/situation/visual-frame/analyze", {
+        thread_id: threadId,
+        room_id: environment?.room_id ?? undefined,
+        source_id: sourceId,
+        image_base64: imageBase64,
+        mime_type: "image/jpeg",
+        prompt: "Summarize this permission-bound live frame as compact evidence for the current live environment. Focus on visible place, activity, entities, UI/game context, and uncertainty.",
+      });
+      await postJson("/api/agi/situation/visual-frame/align-with-events", {
+        thread_id: threadId,
+        room_id: environment?.room_id ?? undefined,
+        limit: 40,
+      });
+      setLastActionStatus("Captured, analyzed, and aligned one visual frame.");
+      await refresh();
+    } catch (error) {
+      stream?.getTracks().forEach((track) => track.stop());
+      setLastActionStatus(error instanceof Error ? error.message : "visual_capture_failed");
     }
   };
 
@@ -272,10 +496,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
-            onClick={() => void startMinehutMonitor()}
-            className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10"
+            onClick={() => void checkSourceSignal()}
+            className="rounded border border-amber-300/30 px-2 py-1 text-[11px] text-amber-100 hover:bg-amber-400/10"
           >
-            Start Minehut
+            Check source signal
+          </button>
+          <button
+            type="button"
+            onClick={() => void startMinecraftSourceMonitor()}
+            disabled={!canStartSourceMonitor}
+            title={canStartSourceMonitor ? "Start the monitor from the live source signal." : "Check the source signal first; a live source is required."}
+            className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Start source monitor
           </button>
           <button
             type="button"
@@ -307,6 +540,125 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           {lastActionStatus}
         </p>
       ) : null}
+      <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold text-slate-100">{sourceLabel}</p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-400">
+              This checks whether a saved or attached world-event adapter is reaching Helix. The source can be a Minecraft plugin, another game adapter, a browser source, or a future profile-saved live environment.
+            </p>
+          </div>
+          <span className={`rounded border px-2 py-0.5 text-[10px] uppercase ${
+            sourceSignal.status === "live"
+              ? "border-emerald-300/30 text-emerald-100"
+              : sourceSignal.status === "stale"
+                ? "border-amber-300/30 text-amber-100"
+                : sourceSignal.status === "missing" || sourceSignal.status === "error"
+                  ? "border-rose-300/30 text-rose-100"
+                  : "border-white/10 text-slate-400"
+          }`}>
+            {sourceSignal.status}
+          </span>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-300">{sourceSignal.summary}</p>
+        {sourceSignal.source ? (
+          <p className="mt-1 truncate text-[10px] text-slate-500">
+            source {sourceSignal.source.source_id} / room {sourceSignal.source.room_id} / world {sourceSignal.source.world_id} / events {sourceSignal.source.event_count}
+          </p>
+        ) : null}
+        {sourceSignal.status === "missing" || sourceSignal.status === "stale" || sourceSignal.status === "error" ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,0.6fr)_1fr_auto]">
+            <label className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+              Source label
+              <input
+                value={sourceLabel}
+                onChange={(event) => setSourceLabel(event.target.value)}
+                className="mt-1 w-full rounded border border-white/10 bg-black/30 px-2 py-1.5 text-xs normal-case tracking-normal text-slate-100 outline-none focus:border-cyan-300/40"
+                placeholder="My Minecraft world source"
+              />
+            </label>
+            <label className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+              Source endpoint
+              <input
+                value={sourceEndpoint}
+                onChange={(event) => setSourceEndpoint(event.target.value)}
+                className="mt-1 w-full rounded border border-white/10 bg-black/30 px-2 py-1.5 text-xs normal-case tracking-normal text-slate-100 outline-none focus:border-cyan-300/40"
+                placeholder="https://your-cloudflare-tunnel.trycloudflare.com/api/agi/situation/world-event"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={saveSourceConnection}
+              className="self-end rounded border border-cyan-300/30 px-3 py-1.5 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
+            >
+              Save source
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-3 rounded border border-sky-300/15 bg-sky-950/10 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold text-sky-100">Visual capture source</p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-400">
+              Screen/window frames are evidence only. The panel requests browser permission, records compact visual evidence, and aligns it with recent source events.
+            </p>
+          </div>
+          <span className={`rounded border px-2 py-0.5 text-[10px] uppercase ${
+            visualLatest?.source?.status === "active"
+              ? "border-emerald-300/30 text-emerald-100"
+              : visualLatest?.source?.status === "permission_required"
+                ? "border-amber-300/30 text-amber-100"
+                : "border-white/10 text-slate-400"
+          }`}>
+            {visualLatest?.source?.status ?? "not registered"}
+          </span>
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
+          <div className="rounded border border-white/10 bg-black/20 p-2">
+            <p className="text-[10px] uppercase text-slate-500">Source</p>
+            <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.source?.source_id ?? "none"}</p>
+          </div>
+          <div className="rounded border border-white/10 bg-black/20 p-2">
+            <p className="text-[10px] uppercase text-slate-500">Latest frame</p>
+            <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.frame?.frame_id ?? "none"}</p>
+          </div>
+          <div className="rounded border border-white/10 bg-black/20 p-2">
+            <p className="text-[10px] uppercase text-slate-500">Latest alignment</p>
+            <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.alignment?.summary ?? "none"}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => void grantVisualCapture()}
+            disabled={!visualLatest?.source || visualLatest.source.status === "active"}
+            className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Grant visual capture
+          </button>
+          <button
+            type="button"
+            onClick={() => void captureVisualFrameNow()}
+            disabled={!visualLatest?.source}
+            className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Capture now
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("interpreted_log")}
+            className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10"
+          >
+            Go to log
+          </button>
+        </div>
+        {visualLatest?.evidence?.summary ? (
+          <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+            {visualLatest.evidence.summary}
+          </p>
+        ) : null}
+      </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {tabs.map((tab: { id: LiveEnvironmentTab; label: string }) => (
           <button
@@ -329,14 +681,23 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 <div className="rounded border border-amber-300/20 bg-amber-950/10 p-3">
                   <p className="text-sm font-semibold text-amber-100">No active live answer environment is bound to {threadId}.</p>
                   <p className="mt-1 text-xs leading-5 text-slate-300">
-                    Start the Minehut monitor to bind room:minecraft-minehut / source:minecraft-server, then this panel will cycle the present state, interpreted log, and executable line checks.
+                    Check a saved or attached source signal first. If a world-event source is live, start the source monitor to cycle present state, interpreted log, and executable line checks.
                   </p>
                   <button
                     type="button"
-                    onClick={() => void startMinehutMonitor()}
-                    className="mt-3 rounded border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/10"
+                    onClick={() => void checkSourceSignal()}
+                    className="mt-3 rounded border border-amber-300/30 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-400/10"
                   >
-                    Start Minehut Monitor
+                    Check source signal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startMinecraftSourceMonitor()}
+                    disabled={!canStartSourceMonitor}
+                    title={canStartSourceMonitor ? "Start the monitor from the live source signal." : "Check the source signal first; a live source is required."}
+                    className="mt-3 rounded border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Start source monitor
                   </button>
                 </div>
               ) : null}

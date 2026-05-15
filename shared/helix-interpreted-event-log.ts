@@ -4,6 +4,7 @@ export const HELIX_INTERPRETED_EVENT_SCHEMA =
 export type HelixInterpretedEventKind =
   | "source_observation"
   | "visual_observation"
+  | "visual_event_alignment"
   | "categorization"
   | "synthetic_evidence"
   | "subgoal_update"

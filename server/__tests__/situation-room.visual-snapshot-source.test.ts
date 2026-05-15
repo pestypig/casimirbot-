@@ -2,6 +2,10 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
+import {
+  clearInterpretedEventLogForTest,
+  listInterpretedEvents,
+} from "../services/situation-room/interpreted-event-log-store";
 
 const threadId = "helix-ask:desktop";
 
@@ -16,6 +20,7 @@ const createApp = async (): Promise<express.Express> => {
 describe("visual snapshot source routes", () => {
   beforeEach(() => {
     resetVisualSnapshotStoreForTest();
+    clearInterpretedEventLogForTest();
   });
 
   it("starts a permission-bound visual source as a receipt, not an answer", async () => {
@@ -95,6 +100,79 @@ describe("visual snapshot source routes", () => {
       raw_image_included: false,
     });
     expect(JSON.stringify(response.body)).not.toContain("data:image");
+  }, 10000);
+
+  it("activates permission-bound capture only after explicit permission grant", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/visual-source/start")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual:minecraft-window",
+        source_surface: "minecraft_client_window",
+        status: "permission_required",
+      })
+      .expect(200);
+
+    const grantResponse = await request(app)
+      .post("/api/agi/situation/visual-source/permission-granted")
+      .send({
+        source_id: "source:visual:minecraft-window",
+      })
+      .expect(200);
+
+    expect(grantResponse.body).toMatchObject({
+      ok: true,
+      assistant_answer: false,
+      raw_image_included: false,
+      source: {
+        source_id: "source:visual:minecraft-window",
+        status: "active",
+        assistant_answer: false,
+        raw_image_included: false,
+      },
+    });
+  }, 10000);
+
+  it("captures a frame through the visual source handoff route as a tool observation", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/visual-source/start")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual:minecraft-window",
+        source_surface: "minecraft_client_window",
+        status: "permission_required",
+      })
+      .expect(200);
+    await request(app)
+      .post("/api/agi/situation/visual-source/permission-granted")
+      .send({ source_id: "source:visual:minecraft-window" })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/situation/visual-source/capture-frame")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual:minecraft-window",
+        image_ref: "ephemeral://frame/capture-now",
+        image_sha256: "b".repeat(64),
+        mime_type: "image/png",
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "helix.visual_frame_capture_response.v1",
+      source_event: {
+        item_type: "toolObservation",
+        source_family: "visual_snapshot",
+        assistant_answer: false,
+        raw_image_included: false,
+      },
+      assistant_answer: false,
+      raw_image_included: false,
+    });
   }, 10000);
 
   it("accepts an inline image for analysis while keeping raw bytes out of the response", async () => {
@@ -220,5 +298,13 @@ describe("visual snapshot source routes", () => {
       assistant_answer: false,
       raw_image_included: false,
     });
+    expect(alignmentResponse.body.interpreted_event).toMatchObject({
+      kind: "visual_event_alignment",
+      source_family: "visual_snapshot",
+      assistant_answer: false,
+      raw_logs_included: false,
+      context_policy: "compact_context_pack_only",
+    });
+    expect(listInterpretedEvents({ threadId, limit: 10 }).some((event) => event.kind === "visual_event_alignment")).toBe(true);
   }, 10000);
 });
