@@ -118,6 +118,7 @@ describe("visual snapshot source routes", () => {
       .post("/api/agi/situation/visual-source/permission-granted")
       .send({
         source_id: "source:visual:minecraft-window",
+        client_stream_confirmed: true,
       })
       .expect(200);
 
@@ -147,7 +148,7 @@ describe("visual snapshot source routes", () => {
       .expect(200);
     await request(app)
       .post("/api/agi/situation/visual-source/permission-granted")
-      .send({ source_id: "source:visual:minecraft-window" })
+      .send({ source_id: "source:visual:minecraft-window", client_stream_confirmed: true })
       .expect(200);
 
     const response = await request(app)

@@ -1686,15 +1686,22 @@ export function executeHelixPanelAction(
       const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
       const roomId = asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? "room:minecraft-minehut";
       const sourceIdsFromRoom = room ? resolveSituationSourceIds(room, args) : [];
+      const worldEventSourceMissing =
+        args.world_event_source_status === "configured_missing" ||
+        args.no_world_event_source === true ||
+        args.source_id === null ||
+        args.sourceId === null;
       const sourceId =
-        asNonEmptyString(args.source_id ?? args.sourceId) ?? sourceIdsFromRoom[0] ?? "source:minecraft-server";
+        worldEventSourceMissing
+          ? null
+          : asNonEmptyString(args.source_id ?? args.sourceId) ?? sourceIdsFromRoom[0] ?? "source:minecraft-server";
       const sourceIds = Array.from(
         new Set([
           ...asStringArray(args.source_ids ?? args.sourceIds),
-          sourceId,
+          ...(sourceId ? [sourceId] : []),
         ].filter(Boolean)),
       );
-      const worldId = asNonEmptyString(args.world_id ?? args.worldId) ?? "minecraft:minehut";
+      const worldId = worldEventSourceMissing ? null : asNonEmptyString(args.world_id ?? args.worldId) ?? "minecraft:minehut";
       const existingGraphId = asNonEmptyString(args.graph_id ?? args.graphId) ?? graphState.active_graph_id_by_room[roomId];
       const graphReceipt = existingGraphId
         ? null
@@ -1771,7 +1778,9 @@ export function executeHelixPanelAction(
           context_policy: "explicit_attachment_only",
           command_lane_enabled: false,
         },
-        message: `Started a visible situation goal session for ${worldId}.`,
+        message: worldEventSourceMissing
+          ? "Started a visible situation goal session without a world-event source."
+          : `Started a visible situation goal session for ${worldId}.`,
       };
     }
 
@@ -1782,11 +1791,16 @@ export function executeHelixPanelAction(
         asNonEmptyString(args.objective) ??
         "Create a live answer environment for this source.";
       const roomId = asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? undefined;
+      const worldEventSourceMissing =
+        args.world_event_source_status === "configured_missing" ||
+        args.no_world_event_source === true ||
+        args.source_id === null ||
+        args.sourceId === null;
       const sourceIds = Array.from(
         new Set([
           ...asStringArray(args.source_ids ?? args.sourceIds),
-          ...asStringArray(args.source_id ?? args.sourceId),
-          ...(room ? resolveSituationSourceIds(room, args) : []),
+          ...(worldEventSourceMissing ? [] : asStringArray(args.source_id ?? args.sourceId)),
+          ...(worldEventSourceMissing || !room ? [] : resolveSituationSourceIds(room, args)),
         ].filter(Boolean)),
       );
       const request = {

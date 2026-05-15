@@ -67,6 +67,51 @@ describe("helix ask Minecraft situation session routing", () => {
     ).toBe(true);
   }, 60000);
 
+  it("keeps visual-only Minecraft Cortana setup from fabricating a world-event source", async () => {
+    process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
+    process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
+    vi.resetModules();
+
+    const { app } = await createApp();
+    const sessionId = `minecraft-visual-only-${Date.now()}`;
+    const prompt =
+      "I have visual capture active. Set up a Minecraft Cortana live environment using the active visual source. I do not have the Minecraft plugin source attached yet, so start visual-only, show missing source fidelity, and prepare line checks for Minecraft world events if they become available.";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: prompt,
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "situation-room-pipelines",
+          hasSituationRoomContext: true,
+        },
+      })
+      .expect(200);
+
+    const actions = executedActions(response.body);
+    const sessionAction = actions.find(
+      (action) =>
+        action?.panel_id === "situation-room-pipelines" &&
+        action?.action_id === "start_situation_goal_session",
+    );
+    expect(sessionAction).toBeTruthy();
+    expect(sessionAction?.args).toMatchObject({
+      thread_id: "helix-ask:desktop",
+      room_id: "room:minecraft-minehut",
+      source_id: null,
+      world_id: null,
+      world_event_source_status: "configured_missing",
+      next_required_action: "attach_world_event_source",
+    });
+    expect(sessionAction?.args?.source_ids).toEqual([]);
+    expect(JSON.stringify(sessionAction?.args)).not.toContain("source:minecraft-server");
+    expect(JSON.stringify(sessionAction?.args)).not.toContain("minecraft:minehut");
+    expect(answerText(response.body)).not.toContain("The attached image shows");
+  }, 60000);
+
   it("clears stale workspace clarify state when the next prompt is unrelated conversation", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";

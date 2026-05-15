@@ -20,7 +20,10 @@ export type HelixTurnInputIntegrityAudit = {
 };
 
 const VISUAL_PROMPT_PATTERN =
-  /\b(?:image|screenshot|picture|photo|attached|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
+  /\b(?:image|screenshot|picture|photo|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
+
+const ATTACHED_VISUAL_PATTERN =
+  /\battached\b[\s\S]{0,60}\b(?:image|screenshot|picture|photo|frame)\b|\b(?:image|screenshot|picture|photo|frame)\b[\s\S]{0,60}\battached\b/i;
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -28,7 +31,8 @@ const readString = (value: unknown): string | null =>
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
-export const helixTurnInputLooksVisual = (text: string): boolean => VISUAL_PROMPT_PATTERN.test(text);
+export const helixTurnInputLooksVisual = (text: string): boolean =>
+  VISUAL_PROMPT_PATTERN.test(text) || ATTACHED_VISUAL_PATTERN.test(text);
 
 export function auditHelixTurnInputIntegrity(input: {
   userText: string;

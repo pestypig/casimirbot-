@@ -75,6 +75,44 @@ describe("live environment source fidelity", () => {
     expect(fidelity.fidelity_score).toBeGreaterThan(0);
   });
 
+  it("uses room-neutral visual sources for room-scoped live environments", () => {
+    startVisualSnapshotSource({
+      thread_id: threadId,
+      source_id: "source:visual-room-neutral",
+      room_id: null,
+      source_surface: "minecraft_client_window",
+      status: "active",
+    });
+
+    const capabilities = buildSituationSourceCapabilities({
+      threadId,
+      roomId: "room:minecraft-minehut",
+      now,
+    });
+    const fidelity = buildLiveEnvironmentFidelity({
+      threadId,
+      roomId: "room:minecraft-minehut",
+      capabilities,
+      now,
+    });
+
+    expect(capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source_id: "source:visual-room-neutral",
+        modality: "visual_frame",
+        status: "active",
+      }),
+    ]));
+    expect(capabilities).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        modality: "visual_frame",
+        status: "configured_missing",
+      }),
+    ]));
+    expect(fidelity.active_modalities).toContain("visual_frame");
+    expect(fidelity.missing_modalities).not.toContain("visual_frame");
+  });
+
   it("tracks transcript sources independently from visual sources", () => {
     ingestWorkstationLiveSourceEvent({
       source_id: "source:tab-transcript",
@@ -162,7 +200,7 @@ describe("live environment source fidelity", () => {
 
     await request(app)
       .post("/api/agi/situation/visual-source/permission-granted")
-      .send({ source_id: "source:visual-route" })
+      .send({ source_id: "source:visual-route", client_stream_confirmed: true })
       .expect(200);
 
     const after = await request(app)
@@ -174,5 +212,77 @@ describe("live environment source fidelity", () => {
       context_policy: "compact_context_pack_only",
     });
     expect(after.body.fidelity.active_modalities).toContain("visual_frame");
+  }, 15000);
+
+  it("does not mark visual capture active until the client confirms a stream", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/visual-source/start")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual-needs-stream",
+        source_surface: "minecraft_client_window",
+        status: "permission_required",
+      })
+      .expect(200);
+
+    const denied = await request(app)
+      .post("/api/agi/situation/visual-source/permission-granted")
+      .send({ source_id: "source:visual-needs-stream" })
+      .expect(409);
+
+    expect(denied.body).toMatchObject({
+      ok: false,
+      error: "client_stream_not_confirmed",
+      activation_receipt: {
+        schema: "helix.source_activation_receipt.v1",
+        ok: false,
+        requested_status: "active",
+        observed_status: "permission_required",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+  }, 15000);
+
+  it("records audio transcript chunks as source observations without raw transcript promotion", async () => {
+    const app = await createApp();
+    const permission = await request(app)
+      .post("/api/agi/situation/audio-source/permission-granted")
+      .send({
+        thread_id: threadId,
+        source_id: "source:tab-audio",
+      })
+      .expect(200);
+    expect(permission.body.activation_receipt).toMatchObject({
+      schema: "helix.source_activation_receipt.v1",
+      modality: "audio_transcript",
+      observed_status: "active",
+      assistant_answer: false,
+    });
+
+    const chunk = await request(app)
+      .post("/api/agi/situation/audio-source/transcript-chunk")
+      .send({
+        thread_id: threadId,
+        source_id: "source:tab-audio",
+        transcript: "Helix, I am decorating the farm boundary.",
+        transcript_is_final: true,
+        direct_address_classification: "direct_address",
+      })
+      .expect(200);
+
+    expect(chunk.body).toMatchObject({
+      ok: true,
+      assistant_answer: false,
+      raw_transcript_included: false,
+      source_event: {
+        item_type: "toolObservation",
+        source_family: "audio_transcript",
+        assistant_answer: false,
+        raw_transcript_included: false,
+      },
+    });
+    expect(chunk.body.live_source_event.kind).toBe("browser_audio_transcript");
   }, 15000);
 });

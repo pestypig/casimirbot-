@@ -235,6 +235,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
     return Array.from(bestByModality.values()).slice(0, 8);
   }, [presentStateCard?.fidelity_profile?.capabilities]);
+  const visualSourceCapability = useMemo(
+    () => sourceHealthEntries.find((entry) => entry.modality === "visual_frame") ?? null,
+    [sourceHealthEntries],
+  );
 
   const refresh = async () => {
     try {
@@ -432,18 +436,34 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     });
   };
 
-  const grantVisualCapture = async () => {
-    const sourceId = visualLatest?.source?.source_id;
-    if (!sourceId) {
-      setLastActionStatus("No visual source is registered yet. Start Minecraft Cortana mode first.");
-      return;
+  const ensureVisualSourceRegistered = async (): Promise<VisualSourceRead> => {
+    const existing = visualLatest?.active_source ?? visualLatest?.source ?? null;
+    if (existing) return existing;
+    const response = await postJson("/api/agi/situation/visual-source/start", {
+      thread_id: threadId,
+      room_id: environment?.room_id ?? null,
+      capture_mode: "manual",
+      source_surface: "minecraft_client_window",
+      status: "permission_required",
+      raw_image_storage_policy: "ephemeral",
+    });
+    const source = response?.source ?? response?.receipt?.source ?? null;
+    if (!source?.source_id) {
+      throw new Error("visual_source_registration_failed");
     }
+    await refresh();
+    return source as VisualSourceRead;
+  };
+
+  const grantVisualCapture = async () => {
     let stream: MediaStream | null = null;
     try {
+      const source = await ensureVisualSourceRegistered();
       stream = await requestDisplayStream();
       stream.getTracks().forEach((track) => track.stop());
       await postJson("/api/agi/situation/visual-source/permission-granted", {
-        source_id: sourceId,
+        source_id: source.source_id,
+        client_stream_confirmed: true,
       });
       setLastActionStatus("Visual capture permission confirmed for this source.");
       await refresh();
@@ -454,13 +474,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   };
 
   const captureVisualFrameNow = async () => {
-    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id;
-    if (!sourceId) {
-      setLastActionStatus("No visual source is registered yet. Start Minecraft Cortana mode first.");
-      return;
-    }
     let stream: MediaStream | null = null;
     try {
+      const source = await ensureVisualSourceRegistered();
+      const sourceId = source.source_id;
       stream = await requestDisplayStream();
       const video = document.createElement("video");
       video.srcObject = stream;
@@ -482,9 +499,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       const imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
-      if (visualLatest?.source?.status === "permission_required") {
+      if (source.status === "permission_required" || visualLatest?.source?.status === "permission_required") {
         await postJson("/api/agi/situation/visual-source/permission-granted", {
           source_id: sourceId,
+          client_stream_confirmed: true,
         });
       }
       await postJson("/api/agi/situation/visual-frame/analyze", {
@@ -689,9 +707,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               ? "border-emerald-300/30 text-emerald-100"
               : visualLatest?.source?.status === "permission_required"
                 ? "border-amber-300/30 text-amber-100"
-                : "border-white/10 text-slate-400"
+                : visualSourceCapability?.status === "configured_missing"
+                  ? "border-rose-300/30 text-rose-100"
+                  : "border-white/10 text-slate-400"
           }`}>
-            {visualLatest?.source?.status ?? "not registered"}
+            {visualLatest?.source?.status ?? visualSourceCapability?.status ?? "not registered"}
           </span>
         </div>
         <div className="mt-2 grid gap-2 md:grid-cols-3">
@@ -712,15 +732,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <button
             type="button"
             onClick={() => void grantVisualCapture()}
-            disabled={!visualLatest?.source || visualLatest.source.status === "active"}
+            disabled={visualLatest?.source?.status === "active"}
             className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Grant visual capture
+            {visualLatest?.source ? "Grant visual capture" : "Register + grant visual"}
           </button>
           <button
             type="button"
             onClick={() => void captureVisualFrameNow()}
-            disabled={!visualLatest?.source}
             className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
             Capture now

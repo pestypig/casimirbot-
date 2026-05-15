@@ -167,6 +167,34 @@ describe("helix ask visual evidence routing", () => {
     expect(response.body.answer).toContain("47");
   });
 
+  it("does not let visual evidence hijack live environment setup prompts", async () => {
+    const question =
+      "I have visual capture active. Set up a Minecraft Cortana live environment using the active visual source. I do not have the Minecraft plugin source attached yet, so start visual-only, show missing source fidelity, and prepare line checks for Minecraft world events if they become available.";
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        sessionId: "helix-ask:desktop",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: question, source: "user" },
+          {
+            type: "evidence_ref",
+            evidence_id: "visual_evidence:live-source",
+            evidence_kind: "visual_frame_evidence",
+            compact_summary: "Visual frame was recorded, but no configured vision provider returned an image description.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).not.toBe("multimodal_visual_answer");
+    expect(response.body.terminal_artifact_kind).not.toBe("visual_frame_evidence");
+    expect(response.body.answer).not.toContain("The attached image shows");
+  });
+
   it("rejects visual evidence grafted into the user prompt in debug/test mode", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")

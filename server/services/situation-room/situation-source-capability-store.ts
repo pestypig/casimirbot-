@@ -10,6 +10,7 @@ import type { WorkstationLiveSource, WorkstationLiveSourceKind } from "@shared/h
 import type { HelixVisualSnapshotSource } from "@shared/helix-visual-snapshot-source";
 import { listWorkstationLiveSources } from "./workstation-live-source-ingest";
 import { listVisualSnapshotSources } from "./visual-snapshot-store";
+import { isVisualHeartbeatExempt, resolveHeartbeatStatus } from "./source-heartbeat-monitor";
 
 const explicitCapabilities = new Map<string, HelixSituationSourceCapability>();
 
@@ -66,18 +67,14 @@ const normalizeContribution = (value: unknown): HelixSituationSourceContribution
   return "activity";
 };
 
-const isStale = (lastEventTs?: string | null, now: string = nowIso(), staleMs = 120_000): boolean => {
-  if (!lastEventTs) return false;
-  const last = Date.parse(lastEventTs);
-  const current = Date.parse(now);
-  if (!Number.isFinite(last) || !Number.isFinite(current)) return false;
-  return current - last > staleMs;
-};
-
 const statusFromWorkstationSource = (source: WorkstationLiveSource, now: string): HelixSituationSourceStatus => {
   if (source.status === "error" || source.status === "paused" || source.status === "stopped") return source.status;
-  if (isStale(source.last_event_ts, now)) return "stale";
-  return "active";
+  return resolveHeartbeatStatus({
+    modality: modalityForKind(source.kind),
+    currentStatus: "active",
+    lastEventTs: source.last_event_ts,
+    now,
+  });
 };
 
 const modalityForKind = (kind: WorkstationLiveSourceKind): HelixSituationSourceModality => {
@@ -134,9 +131,13 @@ const fromWorkstationSource = (source: WorkstationLiveSource, now: string): Heli
 };
 
 const fromVisualSource = (source: HelixVisualSnapshotSource, now: string): HelixSituationSourceCapability => {
-  const status = source.status === "active" && isStale(source.updated_at, now, 10 * 60_000)
-    ? "stale"
-    : source.status;
+  const status = resolveHeartbeatStatus({
+    modality: "visual_frame",
+    currentStatus: source.status,
+    lastEventTs: source.updated_at,
+    now,
+    heartbeatExempt: isVisualHeartbeatExempt(source),
+  });
   return capability({
     source_id: source.source_id,
     thread_id: source.thread_id,
@@ -266,15 +267,23 @@ export function buildSituationSourceCapabilities(input: {
       .map((source) => fromVisualSource(source, now)),
     ...Array.from(explicitCapabilities.values())
       .filter((entry) => entry.thread_id === input.threadId)
-      .map((entry) => entry.status === "active" && isStale(entry.last_event_ts, now)
-        ? {
-            ...entry,
-            status: "stale" as const,
-            fidelity_score: fidelityForStatus("stale"),
-            missing_reason: entry.missing_reason ?? "Source heartbeat is stale.",
-            next_required_action: entry.next_required_action ?? "send_source_heartbeat",
-          }
-        : entry),
+      .map((entry) => {
+        const status = resolveHeartbeatStatus({
+          modality: entry.modality,
+          currentStatus: entry.status,
+          lastEventTs: entry.last_event_ts,
+          now,
+        });
+        return status === entry.status
+          ? entry
+          : {
+              ...entry,
+              status,
+              fidelity_score: fidelityForStatus(status),
+              missing_reason: entry.missing_reason ?? "Source heartbeat is stale.",
+              next_required_action: entry.next_required_action ?? "send_source_heartbeat",
+            };
+      }),
   ];
   const deduped = new Map<string, HelixSituationSourceCapability>();
   for (const entry of inferred) {

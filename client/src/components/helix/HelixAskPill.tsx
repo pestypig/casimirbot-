@@ -12781,6 +12781,13 @@ export function HelixAskPill({
   const [displayAudioError, setDisplayAudioError] = useState<string | null>(null);
   const [displayAudioCaptureLabel, setDisplayAudioCaptureLabel] = useState<string | null>(null);
   const displayAudioSourceIdRef = useRef<string | null>(null);
+  const [visualSituationSourceStatus, setVisualSituationSourceStatus] = useState<
+    "idle" | "requesting" | "active" | "error"
+  >("idle");
+  const [visualSituationSourceError, setVisualSituationSourceError] = useState<string | null>(null);
+  const [visualSituationSourceLabel, setVisualSituationSourceLabel] = useState<string | null>(null);
+  const [visualSituationEvidenceForTurn, setVisualSituationEvidenceForTurn] = useState<Record<string, unknown> | null>(null);
+  const visualSituationSourceIdRef = useRef<string | null>(null);
   const situationRoomSourcesById = useSituationRoomStore((state) => state.sources);
   useEffect(() => {
     setSituationRoomState((prev) =>
@@ -17806,6 +17813,151 @@ export function HelixAskPill({
     appendSyntheticLiveEvent,
     situationRoomId,
     stopDisplayAudioCapture,
+  ]);
+
+  const postSituationJson = useCallback(async (path: string, body?: Record<string, unknown>) => {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(text || `${path} failed with ${response.status}`);
+    }
+    return response.json().catch(() => null);
+  }, []);
+
+  const ensureHelixAskVisualSource = useCallback(async (): Promise<string> => {
+    if (visualSituationSourceIdRef.current) return visualSituationSourceIdRef.current;
+    const response = await postSituationJson("/api/agi/situation/visual-source/start", {
+      thread_id: "helix-ask:desktop",
+      room_id: null,
+      capture_mode: "manual",
+      source_surface: "minecraft_client_window",
+      status: "permission_required",
+      raw_image_storage_policy: "ephemeral",
+    });
+    const sourceId =
+      typeof response?.source?.source_id === "string"
+        ? response.source.source_id
+        : typeof response?.receipt?.source?.source_id === "string"
+          ? response.receipt.source.source_id
+          : null;
+    if (!sourceId) throw new Error("visual_source_registration_failed");
+    visualSituationSourceIdRef.current = sourceId;
+    setVisualSituationSourceLabel("Visual screen capture");
+    return sourceId;
+  }, [postSituationJson, situationRoomId]);
+
+  const requestHelixAskVisualFrame = useCallback(async (): Promise<{ summary: string; visualEvidence: Record<string, unknown> | null }> => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error("screen_capture_not_available_in_this_browser");
+    }
+    let stream: MediaStream | null = null;
+    try {
+      const sourceId = await ensureHelixAskVisualSource();
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      await video.play();
+      await new Promise<void>((resolve) => {
+        if (video.videoWidth > 0 && video.videoHeight > 0) resolve();
+        else video.onloadedmetadata = () => resolve();
+      });
+      const maxWidth = 1280;
+      const scale = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("screen_capture_canvas_unavailable");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+      await postSituationJson("/api/agi/situation/visual-source/permission-granted", {
+        source_id: sourceId,
+        client_stream_confirmed: true,
+      });
+      const analysis = await postSituationJson("/api/agi/situation/visual-frame/analyze", {
+        thread_id: "helix-ask:desktop",
+        room_id: null,
+        source_id: sourceId,
+        image_base64: imageBase64,
+        mime_type: "image/jpeg",
+        prompt: "Summarize this permission-bound live frame as compact evidence for the current live environment. Focus on visible place, activity, entities, UI/game context, and uncertainty.",
+      });
+      await postSituationJson("/api/agi/situation/visual-frame/align-with-events", {
+        thread_id: "helix-ask:desktop",
+        room_id: null,
+        limit: 40,
+      });
+      const summary =
+        typeof analysis?.evidence?.summary === "string" && analysis.evidence.summary.trim()
+          ? analysis.evidence.summary.trim()
+          : "Visual frame captured and recorded as compact evidence.";
+      const evidence = analysis?.evidence && typeof analysis.evidence === "object"
+        ? analysis.evidence as Record<string, unknown>
+        : null;
+      return {
+        summary,
+        visualEvidence: evidence
+          ? {
+              evidence,
+              source: {
+                source_id: sourceId,
+                source_family: "visual_snapshot",
+                raw_image_included: false,
+                assistant_answer: false,
+                context_policy: "compact_context_pack_only",
+              },
+            }
+          : null,
+      };
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
+    }
+  }, [ensureHelixAskVisualSource, postSituationJson, situationRoomId]);
+
+  const handleVisualSituationSourceCapture = useCallback(() => {
+    if (visualSituationSourceStatus === "requesting") return;
+    onOpenPanel?.("live-answer-environment");
+    setDisplayAudioError(null);
+    setDisplayAudioStatus((current) => (current === "error" ? "idle" : current));
+    setVisualSituationSourceStatus("requesting");
+    setVisualSituationSourceError(null);
+    setVisualSituationSourceLabel("Visual screen capture");
+    void requestHelixAskVisualFrame()
+      .then(({ summary, visualEvidence }) => {
+        setVisualSituationEvidenceForTurn(visualEvidence);
+        setVisualSituationSourceStatus("active");
+        appendSyntheticLiveEvent({
+          id: `situation:visual:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+          tool: "situation_room",
+          ts: new Date().toISOString(),
+          text: summary,
+          meta: {
+            room_id: situationRoomId,
+            source: "visual_screen_capture",
+            event_type: "visual_frame_captured",
+            raw_image_included: false,
+            assistant_answer: false,
+          },
+        });
+      })
+      .catch((error) => {
+        setVisualSituationSourceStatus("error");
+        setVisualSituationSourceError(error instanceof Error ? error.message : String(error));
+      });
+  }, [
+    appendSyntheticLiveEvent,
+    onOpenPanel,
+    requestHelixAskVisualFrame,
+    situationRoomId,
+    visualSituationSourceStatus,
   ]);
 
   useEffect(() => stopDisplayAudioCapture, [stopDisplayAudioCapture]);
@@ -26664,6 +26816,7 @@ export function HelixAskPill({
       const submittedImageAttachment = askImageAttachmentRef.current ?? askImageAttachment;
       const submittedImageCommitCheck = validateHelixAskImageAttachmentForSubmit(submittedImageAttachment);
       const expectsVisualInput = HELIX_ASK_VISUAL_PROMPT_PATTERN.test(first);
+      const submittedVisualEvidence = visualSituationEvidenceForTurn;
       if (submittedImageAttachment && !submittedImageCommitCheck?.can_submit) {
         setAskError(submittedImageCommitCheck?.reason ?? "Image attachment is stale. Reattach the image before sending.");
         setAskStatus(null);
@@ -26674,7 +26827,7 @@ export function HelixAskPill({
         askDraftRef.current = first;
         return;
       }
-      if (!submittedImageAttachment && expectsVisualInput) {
+      if (!submittedImageAttachment && expectsVisualInput && !submittedVisualEvidence) {
         setAskError("No image attachment is available for this turn. Attach the image, wait for the preview, then send again.");
         setAskStatus(null);
         if (askInputRef.current) {
@@ -26687,7 +26840,12 @@ export function HelixAskPill({
       if (submittedImageAttachment) {
         clearAskImageAttachment();
       }
-      void runAsk(first, selectedCapsuleIds, submittedImageAttachment ? { imageAttachment: submittedImageAttachment } : undefined);
+      const runOptions: RunAskOptions | undefined = submittedImageAttachment
+        ? { imageAttachment: submittedImageAttachment }
+        : submittedVisualEvidence
+          ? { visualEvidence: submittedVisualEvidence }
+          : undefined;
+      void runAsk(first, selectedCapsuleIds, runOptions);
     },
     [
       addMessage,
@@ -26710,6 +26868,7 @@ export function HelixAskPill({
       runAsk,
       askBusy,
       askImageAttachment,
+      visualSituationEvidenceForTurn,
     ],
   );
 
@@ -26743,6 +26902,17 @@ export function HelixAskPill({
   const situationSourceCount = displayAudioSourceSnapshot
     ? 1
     : Object.keys(situationRoomState.sources).length;
+  const visualSituationSourceActive = visualSituationSourceStatus === "active";
+  const situationSourceDisplayLabel =
+    visualSituationSourceStatus !== "idle"
+      ? (visualSituationSourceLabel ?? "Visual screen capture")
+      : (displayAudioSourceSnapshot?.label ?? displayAudioCaptureLabel ?? "Display audio");
+  const situationSourceDisplayStatus =
+    visualSituationSourceStatus !== "idle"
+      ? visualSituationSourceStatus
+      : (displayAudioSourceSnapshot?.status ?? displayAudioStatus);
+  const situationSourceDisplayCount =
+    (visualSituationSourceStatus !== "idle" ? 1 : 0) + (displayAudioSourceSnapshot ? 1 : situationSourceCount);
   const displayAudioActive =
     (displayAudioStatus === "active" || displayAudioStatus === "transcribing") &&
     displayAudioSourceSnapshot?.status !== "stopped" &&
@@ -27484,18 +27654,20 @@ export function HelixAskPill({
             </button>
             <button
               type="button"
-              aria-label={displayAudioActive ? "Stop room source capture" : "Attach audio source to room"}
-              aria-pressed={displayAudioActive}
+              aria-label="Capture visual source for Situation Room"
+              aria-pressed={visualSituationSourceStatus === "active"}
               className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                displayAudioActive
+                visualSituationSourceStatus === "active"
                   ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
-                  : displayAudioStatus === "requesting"
+                  : visualSituationSourceStatus === "requesting"
                     ? "border-amber-300/45 bg-amber-400/12 text-amber-100"
+                    : visualSituationSourceStatus === "error"
+                      ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
                     : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
               }`}
-              onClick={handleDisplayAudioCaptureToggle}
+              onClick={handleVisualSituationSourceCapture}
             >
-              <Radio className={`h-4 w-4 ${displayAudioActive ? "animate-pulse" : ""}`} />
+              <ImageIcon className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`} />
             </button>
             <textarea
               aria-label="Ask Helix"
@@ -27618,7 +27790,7 @@ export function HelixAskPill({
                 </div>
               </div>
             ) : null}
-            {(displayAudioStatus !== "idle" || situationRoomState.recentEvents.length > 0) ? (
+            {(visualSituationSourceStatus !== "idle" || displayAudioStatus !== "idle" || situationRoomState.recentEvents.length > 0) ? (
               <div className="-mt-1 px-4 pb-2 text-[11px]">
                 <div className="rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
                   <div className="flex items-center justify-between gap-2">
@@ -27627,17 +27799,24 @@ export function HelixAskPill({
                         Situation Room Source
                       </p>
                       <p className="mt-1 truncate text-[11px] text-cyan-50">
-                        {displayAudioSourceSnapshot?.label ?? displayAudioCaptureLabel ?? "Display audio"} /{" "}
-                        {displayAudioSourceSnapshot?.status ?? displayAudioStatus}
+                        {situationSourceDisplayLabel} / {situationSourceDisplayStatus}
                       </p>
                     </div>
                     <span className="shrink-0 rounded border border-cyan-300/35 bg-black/20 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
-                      {situationSourceCount} source{situationSourceCount === 1 ? "" : "s"}
+                      {situationSourceDisplayCount} source{situationSourceDisplayCount === 1 ? "" : "s"}
                     </span>
                   </div>
-                  {displayAudioError ? (
+                  {visualSituationSourceError ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-rose-100">
+                      {visualSituationSourceError}
+                    </p>
+                  ) : displayAudioError ? (
                     <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-rose-100">
                       {displayAudioError}
+                    </p>
+                  ) : visualSituationSourceActive ? (
+                    <p className="mt-1 text-[10px] text-cyan-100/70">
+                      Visual frame captured as compact evidence. Open Live Answer to capture another frame or inspect source fidelity.
                     </p>
                   ) : situationTranscriptPreview ? (
                     <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-cyan-100/85">

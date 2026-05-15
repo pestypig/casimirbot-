@@ -80,12 +80,16 @@ export function synthesizePresentState(input: {
   const hasEditing = /\b(?:block|slab|place|placed|break|broke|edit|decorat|boundary)\b/.test(allText);
   const activeModalities = input.fidelityProfile?.active_modalities ?? [];
   const missingModalities = input.fidelityProfile?.missing_modalities ?? [];
+  const staleModalities = input.fidelityProfile?.stale_modalities ?? [];
   const hasWorldEvents = activeModalities.includes("world_event");
   const hasVisual = activeModalities.includes("visual_frame");
   const hasTranscript = activeModalities.includes("audio_transcript");
   const missingVisual = missingModalities.includes("visual_frame");
   const missingWorld = missingModalities.includes("world_event");
   const missingTranscript = missingModalities.includes("audio_transcript");
+  const staleVisual = staleModalities.includes("visual_frame");
+  const staleWorld = staleModalities.includes("world_event");
+  const staleTranscript = staleModalities.includes("audio_transcript");
 
   const place = hasFarmVisual
     ? "Wheat/chicken farm area."
@@ -129,6 +133,9 @@ export function synthesizePresentState(input: {
             missingVisual ? "Visual source is missing." : null,
             missingWorld ? "World-event source is missing." : null,
             missingTranscript ? "Transcript source is missing." : null,
+            staleVisual ? "Visual source is stale." : null,
+            staleWorld ? "World-event source is stale." : null,
+            staleTranscript ? "Transcript source is stale." : null,
           ].filter(Boolean).join(" ") || "No major missing evidence is currently flagged.",
       states: relevantStates,
       confidence: null,

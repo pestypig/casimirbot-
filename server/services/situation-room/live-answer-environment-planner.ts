@@ -88,13 +88,32 @@ export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswer
   return "custom";
 }
 
+const isWorldEventSourceMissing = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  return (
+    /\bvisual[-\s]?only\b/.test(normalized) ||
+    /\b(?:do\s+not|don't|without|no)\b[\s\S]{0,80}\b(?:minecraft\s+)?(?:plugin|world[-\s]?event|server\s+log|server\s+source|minecraft\s+source)\b/.test(normalized) ||
+    /\b(?:minecraft\s+)?(?:plugin|world[-\s]?event|server\s+log|server\s+source|minecraft\s+source)\b[\s\S]{0,80}\b(?:not\s+attached|missing|unavailable|inactive)\b/.test(normalized)
+  );
+};
+
 export function inferLiveAnswerEnvironmentSourceArgs(transcript: string): {
   room_id?: string;
   source_ids?: string[];
   graph_id?: string;
+  world_event_source_status?: "configured_missing";
+  next_required_action?: string;
 } {
   const preset = inferLiveAnswerEnvironmentPreset(transcript);
   if (preset === "minecraft_run_monitor") {
+    if (isWorldEventSourceMissing(transcript)) {
+      return {
+        room_id: "room:minecraft-minehut",
+        source_ids: [],
+        world_event_source_status: "configured_missing",
+        next_required_action: "attach_world_event_source",
+      };
+    }
     return {
       room_id: "room:minecraft-minehut",
       source_ids: ["source:minecraft-server"],
