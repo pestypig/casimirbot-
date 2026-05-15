@@ -1,6 +1,7 @@
 /**
  * Simple vision provider abstraction so we can swap OpenAI-style vision and Ollama vision.
- * Ollama is treated as an OpenAI-compatible chat endpoint when OLLAMA_ENDPOINT is set.
+ * Ollama is treated as an OpenAI-compatible chat endpoint when OLLAMA_ENDPOINT is set,
+ * unless VISION_PROVIDER explicitly selects a different vision provider.
  */
 import crypto from "node:crypto";
 import type { HelixVisualProviderHealth } from "@shared/helix-visual-evidence-health";
@@ -16,6 +17,22 @@ const env = (key: string) => (process.env[key] ?? "").trim();
 const envInt = (key: string, fallback: number) => {
   const raw = Number.parseInt(env(key), 10);
   return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+};
+
+const OPENAI_STYLE_MODEL_RE = /^(?:gpt-|o\d|chatgpt-|text-|dall-e)/i;
+const isOfficialOpenAiBase = (base: string) => {
+  try {
+    return /(^|\.)api\.openai\.com$/i.test(new URL(base).hostname);
+  } catch {
+    return false;
+  }
+};
+const resolveOllamaVisionModel = () => {
+  const explicit = env("OLLAMA_VISION_MODEL");
+  if (explicit) return explicit;
+  const sharedVisionModel = env("VISION_HTTP_MODEL");
+  if (sharedVisionModel && !OPENAI_STYLE_MODEL_RE.test(sharedVisionModel)) return sharedVisionModel;
+  return "qwen3-vl:2b";
 };
 
 const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number): Promise<Response> => {
@@ -42,6 +59,10 @@ class OpenAiVisionProvider implements VisionProvider {
     lastVisionProviderError = null;
     if (!base || typeof fetch !== "function") {
       lastVisionProviderError = !base ? "vision_provider_base_missing" : "fetch_unavailable";
+      return undefined;
+    }
+    if (isOfficialOpenAiBase(base) && !apiKey) {
+      lastVisionProviderError = "vision_provider_api_key_missing";
       return undefined;
     }
     const model = env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini";
@@ -94,11 +115,7 @@ class OllamaVisionProvider implements VisionProvider {
       lastVisionProviderError = !base ? "vision_provider_base_missing" : "fetch_unavailable";
       return undefined;
     }
-    const model =
-      env("OLLAMA_VISION_MODEL") ||
-      env("VISION_HTTP_MODEL") ||
-      env("LLM_HTTP_MODEL") ||
-      "qwen3-vl";
+    const model = resolveOllamaVisionModel();
     const apiKey = env("OLLAMA_API_KEY") || env("VISION_HTTP_API_KEY");
     const messages = [
       {
@@ -139,7 +156,10 @@ class OllamaVisionProvider implements VisionProvider {
 }
 
 export const getVisionProvider = (): VisionProvider => {
-  const wantOllama = !!env("OLLAMA_ENDPOINT") || env("VISION_PROVIDER") === "ollama";
+  const configuredProvider = env("VISION_PROVIDER").toLowerCase();
+  if (configuredProvider === "openai") return new OpenAiVisionProvider();
+  if (configuredProvider === "ollama") return new OllamaVisionProvider();
+  const wantOllama = !!env("OLLAMA_ENDPOINT");
   if (wantOllama) return new OllamaVisionProvider();
   return new OpenAiVisionProvider();
 };
@@ -148,21 +168,24 @@ export const getVisionProvider = (): VisionProvider => {
 export const defaultVisionPrompt = resolvePrompt;
 
 export const getVisionProviderHealth = (): HelixVisualProviderHealth => {
-  const configuredProvider = env("VISION_PROVIDER");
+  const configuredProvider = env("VISION_PROVIDER").toLowerCase();
   const hasOllamaEndpoint = !!env("OLLAMA_ENDPOINT");
-  const hasOllama = hasOllamaEndpoint || configuredProvider === "ollama";
+  const hasOllama = configuredProvider === "ollama" || (!configuredProvider && hasOllamaEndpoint);
   const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
   const customBase = env("VISION_HTTP_BASE");
   const openAiBase = customBase || (apiKey ? "https://api.openai.com" : "");
   const provider = hasOllama ? "ollama" : openAiBase ? "openai" : configuredProvider ? "unknown" : "none";
   const model = hasOllama
-    ? (env("OLLAMA_VISION_MODEL") || env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "qwen3-vl")
+    ? resolveOllamaVisionModel()
     : openAiBase
       ? (env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini")
       : null;
-  const configured = hasOllamaEndpoint || Boolean(customBase) || Boolean(apiKey);
+  const openAiNeedsKey = provider === "openai" && Boolean(openAiBase) && isOfficialOpenAiBase(openAiBase) && !apiKey;
+  const configured = !openAiNeedsKey && (hasOllamaEndpoint || Boolean(customBase) || Boolean(apiKey));
   const missingReason = !configured
-    ? "No vision provider endpoint or API key is configured."
+    ? openAiNeedsKey
+      ? "OpenAI vision is selected, but OPENAI_API_KEY or VISION_HTTP_API_KEY is missing."
+      : "No vision provider endpoint or API key is configured."
     : hasOllama && !hasOllamaEndpoint
       ? "VISION_PROVIDER=ollama is set, but OLLAMA_ENDPOINT is missing."
       : null;

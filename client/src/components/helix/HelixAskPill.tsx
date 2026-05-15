@@ -5240,7 +5240,23 @@ type HelixAskImageAttachment = {
 };
 
 const HELIX_ASK_VISUAL_PROMPT_PATTERN =
-  /\b(?:image|screenshot|picture|photo|attached|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
+  /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|live\s+(?:source|answer)|hotbar|inventory|chest|container)\b/i;
+
+const HELIX_VISUAL_DIAGNOSTIC_SUMMARY_PATTERN =
+  /\b(?:visual\s+frame\s+was\s+recorded|no\s+configured\s+vision\s+provider|configured\s+vision\s+provider\s+did\s+not\s+return|did\s+not\s+return\s+an?\s+image\s+description|did\s+not\s+produce\s+usable\s+visual\s+evidence|waiting\s+for\s+image\s+recognition|vision_provider_[a-z_]+|provider\s+(?:missing|failed|unavailable)|analysis_failed|capture\s+(?:and\s+analyze\s+)?(?:a\s+)?fresh\s+frame|recover\s+the\s+vision\s+provider)\b/i;
+
+function readVisualEvidenceSummary(record: Record<string, unknown> | null | undefined): string | null {
+  const evidence = record?.evidence;
+  const evidenceRecord = evidence && typeof evidence === "object" ? (evidence as Record<string, unknown>) : null;
+  const directSummary = typeof record?.summary === "string" ? record.summary.trim() : "";
+  const nestedSummary = typeof evidenceRecord?.summary === "string" ? evidenceRecord.summary.trim() : "";
+  return directSummary || nestedSummary || null;
+}
+
+function isDiagnosticVisualEvidence(record: Record<string, unknown> | null | undefined): boolean {
+  const summary = readVisualEvidenceSummary(record);
+  return Boolean(summary && HELIX_VISUAL_DIAGNOSTIC_SUMMARY_PATTERN.test(summary));
+}
 
 function validateHelixAskImageAttachmentForSubmit(
   attachment: HelixAskImageAttachment | null | undefined,
@@ -26782,7 +26798,7 @@ export function HelixAskPill({
       const submittedImageAttachment = askImageAttachmentRef.current ?? askImageAttachment;
       const submittedImageCommitCheck = validateHelixAskImageAttachmentForSubmit(submittedImageAttachment);
       const expectsVisualInput = HELIX_ASK_VISUAL_PROMPT_PATTERN.test(first);
-      const submittedVisualEvidence = visualSituationEvidenceForTurn;
+      let submittedVisualEvidence = visualSituationEvidenceForTurn;
       if (submittedImageAttachment && !submittedImageCommitCheck?.can_submit) {
         setAskError(submittedImageCommitCheck?.reason ?? "Image attachment is stale. Reattach the image before sending.");
         setAskStatus(null);
@@ -26793,8 +26809,77 @@ export function HelixAskPill({
         askDraftRef.current = first;
         return;
       }
+      if (
+        !submittedImageAttachment &&
+        expectsVisualInput &&
+        (!submittedVisualEvidence || isDiagnosticVisualEvidence(submittedVisualEvidence))
+      ) {
+        setAskStatus("Capturing and analyzing a fresh visual frame...");
+        setVisualSituationSourceStatus("requesting");
+        setVisualSituationSourceError(null);
+        try {
+          const capture = await requestHelixAskVisualFrame();
+          submittedVisualEvidence = capture.visualEvidence;
+          setVisualSituationEvidenceForTurn(capture.visualEvidence);
+          setVisualSituationSourceStatus("active");
+          appendSyntheticLiveEvent({
+            id: `situation:visual:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+            tool: "situation_room",
+            ts: new Date().toISOString(),
+            text: capture.summary,
+            meta: {
+              room_id: situationRoomId,
+              source: "visual_screen_capture",
+              event_type: "visual_frame_captured_for_ask_turn",
+              raw_image_included: false,
+              assistant_answer: false,
+            },
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setVisualSituationSourceStatus("error");
+          setVisualSituationSourceError(message);
+          setAskError(`Visual capture failed: ${message}`);
+          setAskStatus(null);
+          if (askInputRef.current) {
+            askInputRef.current.value = first;
+            resizeTextarea();
+          }
+          askDraftRef.current = first;
+          return;
+        }
+        if (!submittedVisualEvidence || isDiagnosticVisualEvidence(submittedVisualEvidence)) {
+          const summary = readVisualEvidenceSummary(submittedVisualEvidence);
+          const health = await fetch("/api/agi/situation/visual-provider/health")
+            .then((response) => (response.ok ? response.json() : null))
+            .catch(() => null);
+          const lastError =
+            health && typeof health.last_error === "string" && health.last_error.trim()
+              ? health.last_error.trim()
+              : null;
+          const model =
+            health && typeof health.model === "string" && health.model.trim()
+              ? health.model.trim()
+              : null;
+          const provider =
+            health && typeof health.provider === "string" && health.provider.trim()
+              ? health.provider.trim()
+              : null;
+          const detail = lastError
+            ? `Vision provider ${provider ?? "unknown"}${model ? ` / ${model}` : ""} failed: ${lastError}.`
+            : summary ?? "Vision provider did not return an image description.";
+          setAskError(`${detail} The Ask turn was not submitted with diagnostic-only visual evidence.`);
+          setAskStatus(null);
+          if (askInputRef.current) {
+            askInputRef.current.value = first;
+            resizeTextarea();
+          }
+          askDraftRef.current = first;
+          return;
+        }
+      }
       if (!submittedImageAttachment && expectsVisualInput && !submittedVisualEvidence) {
-        setAskError("No image attachment is available for this turn. Attach the image, wait for the preview, then send again.");
+        setAskError("No usable visual evidence is available for this turn. Capture and analyze a frame, then send again.");
         setAskStatus(null);
         if (askInputRef.current) {
           askInputRef.current.value = first;
@@ -26825,11 +26910,14 @@ export function HelixAskPill({
       parseQueuedQuestions,
       parseOpenPanelCommand,
       primeVoiceAudioPlayback,
+      appendSyntheticLiveEvent,
       resolveSelectedContextCapsuleIds,
       resolveWorkstationActionFromPendingInput,
+      requestHelixAskVisualFrame,
       requestMoodHint,
       resizeTextarea,
       setActive,
+      situationRoomId,
       updateMoodFromText,
       runAsk,
       askBusy,
