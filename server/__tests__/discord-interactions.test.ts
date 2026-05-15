@@ -215,4 +215,28 @@ describe("Discord interactions endpoint", () => {
     expect(listDiscordFollowupRecords().at(-1)?.payload.content).toContain("could not return a clean terminal answer");
     expect(listDiscordFollowupRecords().at(-1)?.payload.content).toContain("poison_audit: blocked");
   });
+
+  it("routes /helix cortana minecraft without starting a hidden answer loop", async () => {
+    const app = createApp();
+    const signed = signing.sign(baseInteraction({
+      name: "helix",
+      options: [
+        {
+          type: 2,
+          name: "cortana",
+          options: [{ type: 1, name: "minecraft" }],
+        },
+      ],
+    }));
+    const response = await postSigned(app, signed).expect(200);
+    expect(response.body.type).toBe(4);
+    expect(response.body.data.content).toContain("Start and link a Helix Discord session");
+
+    const sessions = await request(app).get("/api/discord/sessions").expect(200);
+    expect(sessions.body.interaction_endpoint.latest_interaction).toMatchObject({
+      command: "cortana",
+      subcommand: "cortana minecraft",
+      answer_created: false,
+    });
+  });
 });

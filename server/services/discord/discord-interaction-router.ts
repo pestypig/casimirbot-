@@ -11,6 +11,7 @@ import {
   listDiscordVoiceSessions,
 } from "../situation-room/discord-session-store";
 import { getCompanionPolicy, upsertCompanionPolicy } from "../situation-room/companion-policy-engine";
+import { startMinecraftCortanaCompanionSession } from "../situation-room/minecraft-cortana-session-orchestrator";
 import { sendDiscordInteractionFollowup } from "./discord-followup-client";
 import { runDiscordHelixAskTurn } from "./discord-helix-ask-bridge";
 import { verifyDiscordInteractionRequest } from "./discord-interaction-signature";
@@ -87,6 +88,13 @@ function parseHelixCommand(body: Record<string, unknown>): {
     }
   }
   return { command, subcommand, subcommandGroup, values };
+}
+
+function groupedSubcommand(parsed: ReturnType<typeof parseHelixCommand>): string | null {
+  if (parsed.subcommandGroup === "visual" || parsed.subcommandGroup === "cortana") {
+    return `${parsed.subcommandGroup} ${parsed.subcommand ?? ""}`.trim();
+  }
+  return parsed.subcommand;
 }
 
 function findSessionForInteraction(body: Record<string, unknown>) {
@@ -179,7 +187,7 @@ async function routeQuickCommand(body: Record<string, unknown>): Promise<Discord
   const displayName = interactionDisplayName(body);
   const interactionId = normalize(body.id);
   const applicationId = normalize(body.application_id);
-  const subcommand = parsed.subcommandGroup === "visual" ? `visual ${parsed.subcommand ?? ""}`.trim() : parsed.subcommand;
+  const subcommand = groupedSubcommand(parsed);
 
   if (parsed.command !== "helix") {
     return { status: 400, body: response("Unknown Discord command.", true) };
@@ -362,6 +370,64 @@ async function routeQuickCommand(body: Record<string, unknown>): Promise<Discord
     };
   }
 
+  if (subcommand === "cortana minecraft") {
+    const session = findSessionForInteraction(body);
+    if (!session) {
+      return {
+        status: 200,
+        body: response("Start and link a Helix Discord session before starting Minecraft Cortana mode.", true),
+        receipt: buildReceipt({
+          ok: false,
+          interaction_id: interactionId,
+          application_id: applicationId,
+          guild_id: guildId,
+          channel_id: channelId,
+          discord_user_id: userId,
+          command: "cortana",
+          subcommand,
+          error: "missing_discord_session",
+        }),
+      };
+    }
+    const cortana = startMinecraftCortanaCompanionSession({
+      discordSessionId: session.session_id,
+      directAddressNames: ["helix", "cortana", "dottie"],
+    });
+    const missing = cortana.readiness.filter((item) => !item.ok).map((item) => `${item.key}: ${item.summary}`);
+    return {
+      status: cortana.ok ? 200 : 409,
+      body: response(
+        cortana.ok
+          ? [
+              "Minecraft Cortana mode is ready.",
+              `Thread: ${cortana.thread_id}`,
+              `Live environment: ${cortana.environment_id ?? "none"}`,
+              `Visual source: ${cortana.visual_source_id ?? "permission required"}`,
+              "Screen/window capture still requires explicit permission in Helix desktop.",
+            ].join("\n")
+          : [
+              "Minecraft Cortana mode is not fully ready yet.",
+              cortana.message,
+              ...missing.slice(0, 4),
+            ].join("\n"),
+        !cortana.ok,
+      ),
+      receipt: buildReceipt({
+        ok: cortana.ok,
+        interaction_id: interactionId,
+        application_id: applicationId,
+        guild_id: guildId,
+        channel_id: channelId,
+        discord_user_id: userId,
+        command: "cortana",
+        subcommand,
+        session_id: session.session_id,
+        thread_id: cortana.thread_id,
+        error: cortana.error ?? null,
+      }),
+    };
+  }
+
   return { status: 400, body: response("Unsupported /helix subcommand.", true) };
 }
 
@@ -440,7 +506,7 @@ export async function handleDiscordInteraction(req: Request, res: Response): Pro
     return;
   }
   const parsed = parseHelixCommand(body);
-  const subcommand = parsed.subcommandGroup === "visual" ? `visual ${parsed.subcommand ?? ""}`.trim() : parsed.subcommand;
+  const subcommand = groupedSubcommand(parsed);
   if (parsed.command === "helix" && subcommand === "ask") {
     const session = ensureSessionForInteraction(body);
     recordInteractionReceipt(buildReceipt({

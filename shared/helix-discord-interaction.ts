@@ -8,7 +8,8 @@ export type HelixDiscordInteractionCommandName =
   | "attach-minecraft"
   | "companion-mode"
   | "ask"
-  | "visual";
+  | "visual"
+  | "cortana";
 
 export type HelixDiscordInteractionReceipt = {
   schema: typeof HELIX_DISCORD_INTERACTION_RECEIPT_SCHEMA;

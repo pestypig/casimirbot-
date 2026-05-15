@@ -60,6 +60,18 @@ export function buildHelixDiscordCommandDefinition(): HelixDiscordSlashCommandDe
           { type: 1, name: "stop", description: "Stop the visual source." },
         ],
       },
+      {
+        type: 2,
+        name: "cortana",
+        description: "Start companion session presets.",
+        options: [
+          {
+            type: 1,
+            name: "minecraft",
+            description: "Start Minecraft Cortana mode for this linked Discord session.",
+          },
+        ],
+      },
     ],
   };
 }
