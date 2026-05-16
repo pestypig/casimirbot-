@@ -50,6 +50,12 @@ const receipt = (input: {
 }): HelixVisualProducerCadenceReceipt => ({
   schema: "helix.visual_producer_cadence_receipt.v1",
   receipt_id: `visual_producer_cadence_receipt:${hashShort([input.cadence.producer_id, input.cadence.status, Date.now()])}`,
+  action_id: "situation-room.live-source.set_rate",
+  producer_id: input.cadence.producer_id,
+  source_id: input.cadence.source_id,
+  thread_id: input.cadence.thread_id,
+  cadence_ms: input.cadence.cadence_ms ?? null,
+  capture_mode: input.cadence.capture_mode,
   cadence: input.cadence,
   ok: input.ok ?? true,
   summary: input.summary,

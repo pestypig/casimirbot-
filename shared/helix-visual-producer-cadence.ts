@@ -32,6 +32,12 @@ export type HelixVisualProducerCadence = {
 export type HelixVisualProducerCadenceReceipt = {
   schema: "helix.visual_producer_cadence_receipt.v1";
   receipt_id: string;
+  action_id: "situation-room.live-source.set_rate";
+  producer_id: string;
+  source_id: string;
+  thread_id: string;
+  cadence_ms?: number | null;
+  capture_mode: Extract<HelixLiveSourceCaptureMode, "manual" | "interval" | "salience_triggered">;
   cadence: HelixVisualProducerCadence;
   ok: boolean;
   summary: string;

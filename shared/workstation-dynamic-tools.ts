@@ -161,6 +161,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.visual-source.stop",
   "situation-room-pipelines.visual-source.analyze_latest_frame",
   "situation-room-pipelines.visual-source.align_latest_with_event_window",
+  "situation-room-pipelines.live-source.set_rate",
 ]);
 
 export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
@@ -615,6 +616,23 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   },
   {
     panel_id: "situation-room-pipelines",
+    action_id: "live-source.set_rate",
+    title: "Set Live Source Rate",
+    description: "Set the cadence/rate policy for an active live source producer, such as visual screen capture.",
+    aliases: [
+      "set interval on visual capture",
+      "set visual capture interval",
+      "set cadence on screen capture",
+      "keep checking every 10 seconds",
+      "capture every 10 seconds",
+    ],
+    required_args: ["cadence_ms"],
+    optional_args: ["thread_id", "source_id", "producer_id", "modality", "capture_mode", "environment_id", "pipeline_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
     action_id: "pause_live_source",
     required_args: ["source_id"],
     optional_args: ["thread_id"],
@@ -819,6 +837,22 @@ export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
     enabled: true,
   },
   {
+    action_key: "situation-room.live-source.set_rate",
+    family: "situation_room",
+    target_id: "situation-room-pipelines",
+    action_id: "live-source.set_rate",
+    label: "Set Live Source Rate",
+    aliases: [
+      "set interval on visual capture",
+      "set visual capture interval",
+      "set cadence on screen capture",
+      "capture every 10 seconds",
+    ],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
     action_key: "workstation-workflow-timeline.open",
     family: "timeline",
     target_id: "workstation-workflow-timeline",
@@ -993,11 +1027,13 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
   if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
+  if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "calculator_stream", "simulation_stream"] };
+  if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };
   if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
   if (arg === "status") return { enum: ["active", "paused", "stopped"] };
   if (arg === "voice_mode") return { enum: ["text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
   if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
-  if (arg === "tick_rate_ms" || arg === "max_ticks" || arg === "start") return { type: "number" };
+  if (arg === "tick_rate_ms" || arg === "max_ticks" || arg === "start" || arg === "cadence_ms") return { type: "number" };
   return { type: "string" };
 }
 
@@ -1040,6 +1076,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") return "companion_policy_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "live-source.set_rate") return "visual_producer_cadence_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "scientific-calculator" && ["ingest_latex", "solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
   if (panelId === "scientific-calculator" && ["start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)) return "workstation_live_source_receipt";
@@ -1107,7 +1144,7 @@ function resolveAffordanceFamily(panelId: string, actionId: string): HelixWorkst
   if (panelId === "situation-room-sources") return "live_source";
   if (panelId === "situation-room-pipelines") {
     if (actionId.includes("live_answer") || actionId.includes("line_schema")) return "live_answer_environment";
-    if (actionId.includes("live_source") || actionId === "attach_live_source") return "live_source";
+    if (actionId.includes("live_source") || actionId.includes("live-source") || actionId === "attach_live_source") return "live_source";
     return "situation_room";
   }
   return "admin";
@@ -1139,6 +1176,9 @@ function resolveAffordanceBackendEndpoint(panelId: string, actionId: string): st
   }
   if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") {
     return "/api/agi/situation/companion-policy";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "live-source.set_rate") {
+    return "/api/agi/situation/live-source/producer/set-cadence";
   }
   if (panelId === "scientific-calculator" && (actionId.includes("stream") || actionId.includes("live") || actionId.includes("tick"))) {
     return "/api/agi/situation/live-source/event";

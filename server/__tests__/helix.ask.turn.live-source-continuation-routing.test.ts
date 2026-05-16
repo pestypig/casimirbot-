@@ -1,6 +1,10 @@
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
+import {
+  WORKSTATION_DYNAMIC_TOOL_ACTIONS,
+  WORKSPACE_ACTION_REGISTRY,
+} from "@shared/workstation-dynamic-tools";
 import { composeLiveSourcePipelinePlan } from "../services/helix-ask/live-source-pipeline-composer";
 import {
   executeLiveSourcePipelinePlan,
@@ -110,7 +114,11 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.route_reason_code).toBe("live_pipeline_control");
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_pipeline_control");
     expect(response.body?.canonical_goal_frame?.allows_workspace_context).toBe(true);
+    expect(response.body?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.cadence_ms).toBe(10_000);
+    expect(response.body?.workspace_action_receipt?.action_id).toBe("situation-room.live-source.set_rate");
+    expect(response.body?.workspace_action_receipt?.state_observed).toBe(true);
+    expect(response.body?.visual_producer_cadence_receipt?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
@@ -132,11 +140,97 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.schema).toBe("helix.live_answer_environment_control_redirect_response.v1");
     expect(response.body?.redirected_from).toBe("live_answer_environment_create");
     expect(response.body?.action).toBe("situation-room.live-source.set_rate");
+    expect(response.body?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.cadence_ms).toBe(10_000);
+    expect(response.body?.workspace_action_receipt?.action_id).toBe("situation-room.live-source.set_rate");
+    expect(response.body?.workspace_action_receipt?.state_observed).toBe(true);
+    expect(response.body?.visual_producer_cadence_receipt?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
     expect(response.body?.live_answer_environment?.objective).not.toBe("ok set the interval to 10 seconds on the visual capture");
     expect(response.body?.assistant_answer).toBe(false);
+  });
+
+  it("uses the same cadence receipt shape as the direct producer set-cadence endpoint", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/situation/live-source/producer/set-cadence")
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:parity",
+        cadence_ms: 10_000,
+        capture_mode: "interval",
+        client_stream_confirmed: true,
+      })
+      .expect(200);
+
+    expect(response.body?.action_id).toBe("situation-room.live-source.set_rate");
+    expect(response.body?.workspace_action_receipt?.action_id).toBe("situation-room.live-source.set_rate");
+    expect(response.body?.workspace_action_receipt?.state_observed).toBe(true);
+    expect(response.body?.receipt).toMatchObject({
+      schema: "helix.visual_producer_cadence_receipt.v1",
+      action_id: "situation-room.live-source.set_rate",
+      source_id: "visual_source:parity",
+      thread_id: "helix-ask:desktop",
+      cadence_ms: 10_000,
+      capture_mode: "interval",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("normalizes reverse visual interval wording to a 10 second producer cadence", async () => {
+    const app = await createApp();
+    const askResponse = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "Ok set this visual source on 10 seconds interval",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(askResponse.body?.route_reason_code).toBe("live_pipeline_control");
+    expect(askResponse.body?.action_id).toBe("situation-room.live-source.set_rate");
+    expect(askResponse.body?.cadence_ms).toBe(10_000);
+    expect(askResponse.body?.visual_producer_cadence_receipt?.cadence_ms).toBe(10_000);
+    expect(askResponse.body?.live_answer_environment?.objective).not.toBe("Ok set this visual source on 10 seconds interval");
+
+    const createResponse = await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "Ok set this visual source on 10 seconds interval",
+      })
+      .expect(200);
+
+    expect(createResponse.body?.schema).toBe("helix.live_answer_environment_control_redirect_response.v1");
+    expect(createResponse.body?.action_id).toBe("situation-room.live-source.set_rate");
+    expect(createResponse.body?.cadence_ms).toBe(10_000);
+    expect(createResponse.body?.visual_producer_cadence_receipt?.cadence_ms).toBe(10_000);
+    expect(createResponse.body?.live_answer_environment?.objective).not.toBe("Ok set this visual source on 10 seconds interval");
+  }, 20_000);
+
+  it("registers the visual producer rate action as a workstation affordance", () => {
+    expect(WORKSTATION_DYNAMIC_TOOL_ACTIONS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          panel_id: "situation-room-pipelines",
+          action_id: "live-source.set_rate",
+          required_args: ["cadence_ms"],
+        }),
+      ]),
+    );
+    expect(WORKSPACE_ACTION_REGISTRY).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action_key: "situation-room.live-source.set_rate",
+          target_id: "situation-room-pipelines",
+          action_id: "live-source.set_rate",
+          terminal_receipt_required: true,
+        }),
+      ]),
+    );
   });
 
   it("routes producer status questions to pipeline inspection with freshness evidence", async () => {

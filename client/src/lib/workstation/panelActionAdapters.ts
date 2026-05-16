@@ -2217,6 +2217,7 @@ export function executeHelixPanelAction(
     }
 
     if (
+      actionId === "live-source.set_rate" ||
       actionId === "pause_live_source" ||
       actionId === "resume_live_source" ||
       actionId === "stop_live_source" ||
@@ -2229,6 +2230,42 @@ export function executeHelixPanelAction(
           panel_id: panelId,
           action_id: actionId,
           message: `${actionId} requires source_id.`,
+        };
+      }
+      if (actionId === "live-source.set_rate") {
+        const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+        const cadenceMs = typeof args.cadence_ms === "number" ? args.cadence_ms : 15_000;
+        const captureMode = asNonEmptyString(args.capture_mode ?? args.captureMode) ?? "interval";
+        postLiveEnvironmentControl("/api/agi/situation/live-source/producer/set-cadence", {
+          source_id: sourceId,
+          producer_id: asNonEmptyString(args.producer_id ?? args.producerId) ?? undefined,
+          thread_id: threadId,
+          environment_id: asNonEmptyString(args.environment_id ?? args.environmentId) ?? undefined,
+          pipeline_id: asNonEmptyString(args.pipeline_id ?? args.pipelineId) ?? undefined,
+          modality: asNonEmptyString(args.modality) ?? "visual_frame",
+          capture_mode: captureMode,
+          cadence_ms: cadenceMs,
+          client_stream_confirmed: args.client_stream_confirmed === true,
+        });
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            kind: "visual_producer_cadence_receipt",
+            schema: "helix.visual_producer_cadence_receipt.v1",
+            ok: true,
+            action_id: "situation-room.live-source.set_rate",
+            source_id: sourceId,
+            producer_id: asNonEmptyString(args.producer_id ?? args.producerId) ?? null,
+            thread_id: threadId,
+            cadence_ms: cadenceMs,
+            capture_mode: captureMode,
+            raw_content_included: false,
+            assistant_answer: false,
+            context_policy: "compact_context_pack_only",
+          },
+          message: `Queued visual source cadence ${Math.round(cadenceMs / 1000)}s for ${sourceId}.`,
         };
       }
       const actionPath =

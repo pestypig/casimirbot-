@@ -27,7 +27,8 @@ export const readLiveSourceRequestedRateMs = (text: string): number | null => {
   const requestedRate =
     /\bevery\s+(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\b/i.exec(text) ??
     /\b(?:interval|cadence|rate)\s+(?:to\s+|of\s+|at\s+)?(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\b/i.exec(text) ??
-    /\b(?:set|change|update)\b[\s\S]{0,40}\b(?:interval|cadence|rate)\b[\s\S]{0,20}\b(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\b/i.exec(text);
+    /\b(?:set|change|update)\b[\s\S]{0,40}\b(?:interval|cadence|rate)\b[\s\S]{0,20}\b(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\b/i.exec(text) ??
+    /\b(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\s+(?:interval|cadence|rate)\b/i.exec(text);
   if (!requestedRate) return null;
   const count = Number(requestedRate[1]);
   if (!Number.isFinite(count) || count <= 0) return null;
