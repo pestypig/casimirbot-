@@ -96,6 +96,29 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
   }, 20_000);
 
+  it("routes direct visual interval commands to producer cadence control", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "set interval 10 seconds on visual capture",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("live_pipeline_control");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_pipeline_control");
+    expect(response.body?.canonical_goal_frame?.allows_workspace_context).toBe(true);
+    expect(response.body?.cadence_ms).toBe(10_000);
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
+    expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
+    expect(response.body?.live_answer_environment?.objective).not.toBe("set interval 10 seconds on visual capture");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 20_000);
+
   it("routes producer status questions to pipeline inspection with freshness evidence", async () => {
     const app = await createApp();
     const response = await request(app)
