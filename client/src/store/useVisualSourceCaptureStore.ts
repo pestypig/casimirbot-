@@ -3,12 +3,18 @@ import { create } from "zustand";
 export type VisualSourceCaptureState = {
   source_id: string;
   thread_id: string;
+  producer_id?: string | null;
+  environment_id?: string | null;
+  pipeline_id?: string | null;
   stream_active: boolean;
+  interval_active?: boolean;
   track_ready_state: "live" | "ended";
   capture_mode: "manual" | "interval" | "salience_triggered";
   cadence_ms: number | null;
   last_frame_at?: string | null;
   last_heartbeat_at?: string | null;
+  next_capture_due_at?: string | null;
+  pending_analysis_job_id?: string | null;
 };
 
 type VisualSourceCaptureStore = {
@@ -18,17 +24,17 @@ type VisualSourceCaptureStore = {
   removeProducer: (sourceId: string) => void;
 };
 
-export const useVisualSourceCaptureStore = create<VisualSourceCaptureStore>((set) => ({
+export const useVisualSourceCaptureStore = create<VisualSourceCaptureStore>((set: (updater: (current: VisualSourceCaptureStore) => Partial<VisualSourceCaptureStore>) => void) => ({
   producers: {},
-  upsertProducer: (state) =>
-    set((current) => ({
+  upsertProducer: (state: VisualSourceCaptureState) =>
+    set((current: VisualSourceCaptureStore) => ({
       producers: {
         ...current.producers,
         [state.source_id]: state,
       },
     })),
-  patchProducer: (sourceId, patch) =>
-    set((current) => {
+  patchProducer: (sourceId: string, patch: Partial<VisualSourceCaptureState>) =>
+    set((current: VisualSourceCaptureStore) => {
       const existing = current.producers[sourceId];
       if (!existing) return current;
       return {
@@ -41,8 +47,8 @@ export const useVisualSourceCaptureStore = create<VisualSourceCaptureStore>((set
         },
       };
     }),
-  removeProducer: (sourceId) =>
-    set((current) => {
+  removeProducer: (sourceId: string) =>
+    set((current: VisualSourceCaptureStore) => {
       const next = { ...current.producers };
       delete next[sourceId];
       return { producers: next };

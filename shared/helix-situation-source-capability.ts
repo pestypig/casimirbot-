@@ -14,6 +14,7 @@ export type HelixSituationSourceModality =
 
 export type HelixSituationSourceStatus =
   | "active"
+  | "waiting_for_client"
   | "permission_required"
   | "configured_missing"
   | "stale"

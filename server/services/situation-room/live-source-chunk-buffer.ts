@@ -83,6 +83,7 @@ const normalizeCaptureMode = (value: unknown): HelixLiveSourceCaptureMode => {
 const normalizeProducerStatus = (value: unknown): HelixLiveSourceProducerStatus => {
   if (
     value === "permission_required" ||
+    value === "waiting_for_client" ||
     value === "active" ||
     value === "paused" ||
     value === "stale" ||
@@ -181,6 +182,10 @@ export function listLiveSourceProducers(input: {
     .filter((producer: HelixLiveSourceProducer) => !input.threadId || producer.thread_id === input.threadId)
     .filter((producer: HelixLiveSourceProducer) => !sourceSet || sourceSet.has(producer.source_id))
     .sort((a: HelixLiveSourceProducer, b: HelixLiveSourceProducer) => a.modality.localeCompare(b.modality) || a.source_id.localeCompare(b.source_id));
+}
+
+export function getLiveSourceProducer(sourceId: string): HelixLiveSourceProducer | null {
+  return producersBySource.get(sourceId) ?? null;
 }
 
 export function appendLiveSourceChunk(input: {

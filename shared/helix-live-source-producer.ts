@@ -5,6 +5,7 @@ export const HELIX_LIVE_SOURCE_PRODUCER_SCHEMA = "helix.live_source_producer.v1"
 
 export type HelixLiveSourceProducerStatus =
   | "permission_required"
+  | "waiting_for_client"
   | "active"
   | "paused"
   | "stale"

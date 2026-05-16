@@ -12,6 +12,7 @@ import { resetLiveWorkerLanesForTest } from "../services/situation-room/live-wor
 import { resetLivePipelineLifecycleForTest } from "../services/situation-room/live-pipeline-lifecycle-store";
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
+import { resetLiveSourceProducerBindingsForTest } from "../services/situation-room/live-source-producer-binding";
 
 const threadId = "thread:live-source-continuation";
 
@@ -32,6 +33,7 @@ describe("live source continuation Ask routing", () => {
     resetLivePipelineLifecycleForTest();
     resetSituationSourceCapabilitiesForTest();
     resetVisualSnapshotStoreForTest();
+    resetLiveSourceProducerBindingsForTest();
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -54,6 +56,9 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
     expect(response.body?.pipeline_plan_id).toMatch(/^live_source_pipeline_plan:/);
     expect(response.body?.pipeline_receipt_id).toMatch(/^live_source_pipeline_receipt:/);
+    expect(response.body?.visual_producer_id).toMatch(/^live_source_producer:/);
+    expect(response.body?.cadence_ms).toBe(15_000);
+    expect(response.body?.producer_binding_status).toBe("bound");
     expect(response.body?.live_runtime_context?.suggested_action).toBeTruthy();
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
@@ -65,12 +70,33 @@ describe("live source continuation Ask routing", () => {
     expect(debug.body?.payload?.live_runtime_context?.suggested_action).toBeTruthy();
     expect(debug.body?.payload?.pipeline_plan_id).toBe(response.body?.pipeline_plan_id);
     expect(debug.body?.payload?.pipeline_receipt_id).toBe(response.body?.pipeline_receipt_id);
+    expect(debug.body?.payload?.visual_producer_id).toBe(response.body?.visual_producer_id);
+    expect(debug.body?.payload?.cadence_ms).toBe(15_000);
     expect(debug.body?.payload?.terminal_answer_authority?.server_authoritative).toBe(true);
-  }, 10_000);
+  }, 20_000);
+
+  it("sets requested visual cadence for every-N-seconds continuation prompts", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "keep checking my screen as a live answer every 10 seconds",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("live_pipeline_control");
+    expect(response.body?.cadence_ms).toBe(10_000);
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.status).toBe("permission_required");
+    expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
+  }, 20_000);
 
   it("inspects or repairs an existing live pipeline for continuation prompts", async () => {
     const plan = composeLiveSourcePipelinePlan({
-      threadId,
+      threadId: "helix-ask:desktop",
       objective: "Watch this screen as a live answer.",
     });
     const { receipt } = executeLiveSourcePipelinePlan(plan);

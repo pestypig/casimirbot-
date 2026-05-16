@@ -29,7 +29,12 @@ import type { HelixSituationSourceCapability, HelixSituationSourceModality, Heli
 import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
 import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
-import { runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
+import {
+  runVisualFrameProducerOnce,
+  startVisualFrameProducerInterval,
+  stopVisualFrameProducerInterval,
+} from "@/lib/helix/visualFrameProducer";
+import { useVisualSourceCaptureStore, type VisualSourceCaptureState } from "@/store/useVisualSourceCaptureStore";
 
 type LiveEnvironmentTab = "present_state" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type LiveAgenticReviewReadEntry = {
@@ -64,7 +69,7 @@ type SourceSignalCheck = {
 type VisualSourceRead = {
   source_id: string;
   thread_id: string;
-  status: "permission_required" | "active" | "paused" | "stopped" | "error";
+  status: "permission_required" | "waiting_for_client" | "active" | "paused" | "stopped" | "error";
   source_surface?: string | null;
   capture_mode?: string | null;
   updated_at?: string | null;
@@ -244,10 +249,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     return Array.from(bestByModality.values()).slice(0, 8);
   }, [presentStateCard?.fidelity_profile?.capabilities]);
   const visualSourceCapability = useMemo(
-    () => sourceHealthEntries.find((entry) => entry.modality === "visual_frame") ?? null,
+    () => sourceHealthEntries.find((entry: HelixSituationSourceCapability) => entry.modality === "visual_frame") ?? null,
     [sourceHealthEntries],
   );
   const visualEvidenceHealth = visualLatest?.visual_evidence_health ?? null;
+  const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
+    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+    return sourceId ? state.producers[sourceId] ?? null : null;
+  });
   const sourceStatusLabel = (capability: HelixSituationSourceCapability): string => {
     if (capability.modality === "visual_frame" && capability.status === "active" && capability.next_required_action === "capture_first_frame") {
       return "active, waiting for first frame";
@@ -485,22 +494,91 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     try {
       const source = await ensureVisualSourceRegistered();
       stream = await requestDisplayStream();
-      const result = await runVisualFrameProducerOnce({
+      const scheduledCadenceMs = await readScheduledVisualCadenceMs(source.source_id);
+      if (scheduledCadenceMs) {
+        const result = await startVisualFrameProducerInterval({
+          sourceId: source.source_id,
+          threadId,
+          roomId: environment?.room_id ?? null,
+          environmentId: environment?.environment_id ?? null,
+          cadenceMs: scheduledCadenceMs,
+          stream,
+          postJson,
+        });
+        stream = null;
+        setLastActionStatus(`Visual interval active every ${Math.round(scheduledCadenceMs / 1000)}s. ${result.summary}`);
+      } else {
+        const result = await runVisualFrameProducerOnce({
+          sourceId: source.source_id,
+          threadId,
+          roomId: environment?.room_id ?? null,
+          environmentId: environment?.environment_id ?? null,
+          stream,
+          postJson,
+        });
+        stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        stream = null;
+        setLastActionStatus(`Visual capture active; first frame analyzed. ${result.summary}`);
+      }
+      await refresh();
+    } catch (error) {
+      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      setLastActionStatus(error instanceof Error ? error.message : "visual_capture_permission_failed");
+    }
+  };
+
+  const readScheduledVisualCadenceMs = async (sourceId: string): Promise<number | null> => {
+    const response = await fetch(`/api/agi/situation/live-source/producers?thread_id=${encodeURIComponent(threadId)}`);
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => null);
+    const producer = Array.isArray(body?.producers)
+      ? body.producers.find((entry: any) => entry?.source_id === sourceId && entry?.modality === "visual_frame")
+      : null;
+    return producer?.capture_mode === "interval" && typeof producer?.cadence_ms === "number"
+      ? producer.cadence_ms
+      : null;
+  };
+
+  const startVisualInterval = async (cadenceMs: number) => {
+    let stream: MediaStream | null = null;
+    try {
+      const source = await ensureVisualSourceRegistered();
+      stream = await requestDisplayStream();
+      const result = await startVisualFrameProducerInterval({
         sourceId: source.source_id,
         threadId,
         roomId: environment?.room_id ?? null,
         environmentId: environment?.environment_id ?? null,
+        cadenceMs,
         stream,
         postJson,
       });
-      stream.getTracks().forEach((track) => track.stop());
       stream = null;
-      setLastActionStatus(`Visual capture active; first frame analyzed. ${result.summary}`);
+      setLastActionStatus(`Visual interval active every ${Math.round(cadenceMs / 1000)}s. ${result.summary}`);
       await refresh();
     } catch (error) {
-      stream?.getTracks().forEach((track) => track.stop());
-      setLastActionStatus(error instanceof Error ? error.message : "visual_capture_permission_failed");
+      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      setLastActionStatus(error instanceof Error ? error.message : "visual_interval_start_failed");
     }
+  };
+
+  const pauseVisualInterval = async () => {
+    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+    if (!sourceId) {
+      setLastActionStatus("No visual source is registered.");
+      return;
+    }
+    stopVisualFrameProducerInterval(sourceId);
+    await postJson("/api/agi/situation/live-source/producer/heartbeat", {
+      source_id: sourceId,
+      thread_id: threadId,
+      environment_id: environment?.environment_id ?? null,
+      client_stream_confirmed: false,
+      status: "paused",
+      ts: new Date().toISOString(),
+    }).catch(() => null);
+    setLastActionStatus("Paused visual interval capture.");
+    await refresh();
   };
 
   const captureVisualFrameNow = async () => {
@@ -517,12 +595,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         stream,
         postJson,
       });
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       stream = null;
       setLastActionStatus(`Captured, analyzed, and aligned one visual frame. ${result.summary}`);
       await refresh();
     } catch (error) {
-      stream?.getTracks().forEach((track) => track.stop());
+      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       setLastActionStatus(error instanceof Error ? error.message : "visual_capture_failed");
     }
   };
@@ -640,7 +718,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           {sourceHealthEntries.length === 0 ? (
             <span className="rounded border border-white/10 px-2 py-1 text-[10px] text-slate-400">No source capability profile yet</span>
           ) : null}
-          {sourceHealthEntries.map((capability) => (
+          {sourceHealthEntries.map((capability: HelixSituationSourceCapability) => (
             <span
               key={capability.source_id}
               title={capability.missing_reason ?? capability.source_id}
@@ -760,7 +838,6 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <button
             type="button"
             onClick={() => void grantVisualCapture()}
-            disabled={visualLatest?.source?.status === "active"}
             className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
@@ -771,6 +848,28 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {visualSourceCapability?.next_required_action === "capture_first_frame" ? "Capture first frame" : "Capture now"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void startVisualInterval(10_000)}
+            className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
+          >
+            Set interval 10s
+          </button>
+          <button
+            type="button"
+            onClick={() => void startVisualInterval(30_000)}
+            className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
+          >
+            Set interval 30s
+          </button>
+          <button
+            type="button"
+            onClick={() => void pauseVisualInterval()}
+            disabled={!visualProducerState?.interval_active}
+            className="rounded border border-amber-300/30 px-2 py-1 text-[11px] text-amber-100 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Pause interval
           </button>
           <button
             type="button"
@@ -788,6 +887,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         {!visualLatest?.evidence?.summary && visualEvidenceHealth?.latest_summary ? (
           <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
             {visualEvidenceHealth.latest_summary}
+          </p>
+        ) : null}
+        {visualProducerState?.capture_mode === "interval" ? (
+          <p className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
+            Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; last frame {formatTime(visualProducerState.last_frame_at)}.
           </p>
         ) : null}
       </div>
@@ -849,7 +953,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {presentStateCard.lines.map((entry: HelixPresentStateCard["lines"][number]) => {
                       const lineState = liveCardLineStateByKey.get(entry.key);
-                      const matchingRequest = lineToolRequests.find((request) => request.line_key === entry.key && request.status !== "evaluated");
+                      const matchingRequest = lineToolRequests.find((request: HelixLiveLineToolRequest) => request.line_key === entry.key && request.status !== "evaluated");
                       return (
                       <div key={entry.key} className="rounded border border-white/10 bg-black/20 p-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -879,7 +983,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                         ) : null}
                         {sourceCoverageSummary(lineState?.source_coverage).length ? (
                           <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
-                            {sourceCoverageSummary(lineState?.source_coverage).map((entry) => (
+                            {sourceCoverageSummary(lineState?.source_coverage).map((entry: string) => (
                               <span key={entry} className="rounded border border-white/10 px-1.5 py-0.5 text-slate-400">
                                 {entry}
                               </span>

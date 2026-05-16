@@ -171,6 +171,16 @@ export function bindActiveVisualSourceToPipelinePlan(input: {
           }
         : producer,
     ),
+    analyzers: input.plan.analyzers.map((analyzer: HelixLiveSourcePipelinePlan["analyzers"][number]) =>
+      input.plan.producers.some((producer: HelixLiveSourcePipelinePlan["producers"][number]) =>
+        producer.modality === "visual_frame" && producer.source_id === analyzer.source_id
+      )
+        ? {
+            ...analyzer,
+            source_id: input.runtime.active_visual_source_id!,
+          }
+        : analyzer,
+    ),
     missing_capabilities: visualNeedsPermission
       ? input.plan.missing_capabilities
       : input.plan.missing_capabilities.filter((entry: string) => entry !== "grant_visual_capture_permission"),

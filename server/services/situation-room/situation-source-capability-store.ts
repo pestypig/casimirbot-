@@ -42,6 +42,7 @@ const normalizeModality = (value: unknown): HelixSituationSourceModality => {
 const normalizeStatus = (value: unknown): HelixSituationSourceStatus => {
   if (
     value === "active" ||
+    value === "waiting_for_client" ||
     value === "permission_required" ||
     value === "configured_missing" ||
     value === "stale" ||
@@ -99,6 +100,7 @@ const contributionForModality = (modality: HelixSituationSourceModality): HelixS
 
 const fidelityForStatus = (status: HelixSituationSourceStatus): number => {
   if (status === "active") return 1;
+  if (status === "waiting_for_client") return 0.3;
   if (status === "stale") return 0.35;
   if (status === "permission_required" || status === "paused") return 0.2;
   return 0;
@@ -132,7 +134,7 @@ const fromWorkstationSource = (source: WorkstationLiveSource, now: string): Heli
 
 const fromVisualSource = (source: HelixVisualSnapshotSource, now: string): HelixSituationSourceCapability => {
   const latestFrame = listVisualFrames({ threadId: source.thread_id, limit: 100 })
-    .filter((frame) => frame.source_id === source.source_id)
+    .filter((frame: { source_id?: string }) => frame.source_id === source.source_id)
     .at(-1) ?? null;
   const status = resolveHeartbeatStatus({
     modality: "visual_frame",
@@ -267,15 +269,15 @@ export function buildSituationSourceCapabilities(input: {
   now?: string;
 }): HelixSituationSourceCapability[] {
   const now = input.now ?? nowIso();
-  const inferred = [
+  const inferred: HelixSituationSourceCapability[] = [
     ...listWorkstationLiveSources()
-      .filter((source) => !source.thread_id || source.thread_id === input.threadId)
-      .map((source) => fromWorkstationSource(source, now)),
+      .filter((source: WorkstationLiveSource) => !source.thread_id || source.thread_id === input.threadId)
+      .map((source: WorkstationLiveSource) => fromWorkstationSource(source, now)),
     ...listVisualSnapshotSources({ threadId: input.threadId })
-      .map((source) => fromVisualSource(source, now)),
+      .map((source: HelixVisualSnapshotSource) => fromVisualSource(source, now)),
     ...Array.from(explicitCapabilities.values())
-      .filter((entry) => entry.thread_id === input.threadId)
-      .map((entry) => {
+      .filter((entry: HelixSituationSourceCapability) => entry.thread_id === input.threadId)
+      .map((entry: HelixSituationSourceCapability) => {
         const status = resolveHeartbeatStatus({
           modality: entry.modality,
           currentStatus: entry.status,
@@ -302,7 +304,7 @@ export function buildSituationSourceCapabilities(input: {
   }
   const capabilities = Array.from(deduped.values());
   if (input.includeDefaults !== false) {
-    const modalities = new Set(capabilities.map((entry) => entry.modality));
+    const modalities = new Set(capabilities.map((entry: HelixSituationSourceCapability) => entry.modality));
     if (!modalities.has("world_event")) {
       capabilities.push(missingCapability({
         threadId: input.threadId,
@@ -331,8 +333,8 @@ export function buildSituationSourceCapabilities(input: {
       }));
     }
   }
-  return capabilities.sort((a, b) => {
-    const statusRank = (status: HelixSituationSourceStatus) => status === "active" ? 0 : status === "stale" ? 1 : status === "permission_required" ? 2 : 3;
+  return capabilities.sort((a: HelixSituationSourceCapability, b: HelixSituationSourceCapability) => {
+    const statusRank = (status: HelixSituationSourceStatus) => status === "active" ? 0 : status === "stale" ? 1 : status === "waiting_for_client" ? 2 : status === "permission_required" ? 3 : 4;
     return statusRank(a.status) - statusRank(b.status) || a.modality.localeCompare(b.modality) || a.source_id.localeCompare(b.source_id);
   });
 }
