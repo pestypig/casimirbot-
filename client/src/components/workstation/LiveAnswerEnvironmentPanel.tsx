@@ -891,7 +891,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ) : null}
         {visualProducerState?.capture_mode === "interval" ? (
           <p className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
-            Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; last frame {formatTime(visualProducerState.last_frame_at)}.
+            Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
           </p>
         ) : null}
       </div>

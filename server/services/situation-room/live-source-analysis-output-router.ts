@@ -8,6 +8,8 @@ import {
   updateLiveAnswerEnvironment,
 } from "./live-answer-environment-store";
 import { projectPresentStateCard } from "./present-state-card-projector";
+import { getLiveSourceProducer } from "./live-source-chunk-buffer";
+import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -129,6 +131,19 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
   const presentStateCard = projectPresentStateCard({
     threadId: input.chunk.thread_id,
   });
+  const producer = getLiveSourceProducer(input.chunk.source_id);
+  if (producer && delta?.delta) {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: producer.source_id,
+      threadId: producer.thread_id,
+      environmentId: delta.environment.environment_id,
+      kind: "card_updated",
+      status: "ok",
+      summary: "Live card updated from live-source analysis output.",
+      relatedIds: [input.job.job_id, input.chunk.chunk_id, delta.delta.delta_id, syntheticEvidence.evidence_id],
+    });
+  }
   return {
     synthetic_evidence: syntheticEvidence,
     interpreted_event: interpretedEvent,

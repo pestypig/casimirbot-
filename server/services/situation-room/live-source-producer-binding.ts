@@ -12,6 +12,7 @@ import {
   setLiveSourceRatePolicy,
   upsertLiveSourceProducer,
 } from "./live-source-chunk-buffer";
+import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 import { recordSituationSourceHeartbeat } from "./situation-source-capability-store";
 
 export type HelixLiveSourceProducerBinding = {
@@ -88,6 +89,17 @@ export function bindLiveSourceProducer(input: {
     raw_content_included: false,
   };
   bindingsBySourceId.set(input.sourceId, binding);
+  recordLiveSourceProducerLifecycleEvent({
+    producerId: producer.producer_id,
+    sourceId: input.sourceId,
+    threadId: input.threadId,
+    environmentId: binding.environment_id ?? null,
+    pipelineId: binding.pipeline_id ?? null,
+    kind: "producer_bound",
+    status: binding.status === "bound" ? "ok" : "waiting",
+    summary: `Visual producer binding is ${binding.status}.`,
+    relatedIds: [binding.binding_id, binding.environment_id, binding.pipeline_id].filter(Boolean) as string[],
+  });
   return binding;
 }
 
@@ -123,6 +135,32 @@ export function setVisualProducerCadence(input: {
     cadence_ms: captureMode === "manual" ? null : cadenceMs,
     status,
   }).producer;
+  recordLiveSourceProducerLifecycleEvent({
+    producerId: producer.producer_id,
+    sourceId: input.sourceId,
+    threadId: input.threadId,
+    environmentId: input.environmentId ?? null,
+    pipelineId: input.pipelineId ?? null,
+    kind: "cadence_set",
+    status: input.clientStreamConfirmed ? "ok" : status === "permission_required" ? "blocked" : "waiting",
+    summary: captureMode === "interval"
+      ? `Visual producer cadence set to ${cadenceMs}ms.`
+      : "Visual producer set to manual capture.",
+    relatedIds: [producer.producer_id],
+  });
+  if (input.clientStreamConfirmed) {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: input.sourceId,
+      threadId: input.threadId,
+      environmentId: input.environmentId ?? null,
+      pipelineId: input.pipelineId ?? null,
+      kind: "interval_started",
+      status: "ok",
+      summary: "Client stream confirmed and interval producer started.",
+      relatedIds: [producer.producer_id],
+    });
+  }
   const binding = bindLiveSourceProducer({
     threadId: input.threadId,
     sourceId: input.sourceId,
@@ -192,6 +230,18 @@ export function markVisualProducerHeartbeat(input: {
     status: producer.status,
     ts,
   });
+  recordLiveSourceProducerLifecycleEvent({
+    producerId: producer.producer_id,
+    sourceId: input.sourceId,
+    threadId: input.threadId,
+    environmentId: input.environmentId ?? existing?.environment_id ?? null,
+    pipelineId: input.pipelineId ?? existing?.pipeline_id ?? null,
+    kind: input.status === "paused" ? "interval_paused" : input.clientStreamConfirmed ? "client_stream_confirmed" : "producer_stale",
+    status: input.status === "paused" ? "ok" : input.clientStreamConfirmed ? "ok" : "waiting",
+    summary: input.clientStreamConfirmed ? "Client stream heartbeat confirmed." : `Producer heartbeat recorded with status ${producer.status}.`,
+    relatedIds: [producer.producer_id],
+    createdAt: ts,
+  });
   const binding = bindLiveSourceProducer({
     threadId: input.threadId,
     sourceId: input.sourceId,
@@ -249,6 +299,19 @@ export function readVisualProducerTickDue(input: {
   const nowMs = Date.parse(input.now ?? nowIso());
   const dueMs = producer?.next_chunk_due_at ? Date.parse(producer.next_chunk_due_at) : Number.POSITIVE_INFINITY;
   const due = producer?.status === "active" && producer.capture_mode === "interval" && Number.isFinite(dueMs) && nowMs >= dueMs;
+  if (producer) {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: producer.source_id,
+      threadId: producer.thread_id,
+      environmentId: binding?.environment_id ?? null,
+      pipelineId: binding?.pipeline_id ?? null,
+      kind: "capture_due",
+      status: due ? "ok" : "waiting",
+      summary: due ? "Producer interval reports capture due." : "Producer interval reports capture not due yet.",
+      relatedIds: [producer.producer_id],
+    });
+  }
   return {
     due,
     producer,

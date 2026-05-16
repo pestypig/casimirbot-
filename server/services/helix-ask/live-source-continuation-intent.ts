@@ -45,8 +45,8 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const rate =
     /\b(?:every\s+\d+|cadence|interval|rate|10 seconds|30 seconds)\b/.test(text);
   const inspect =
-    /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness)\b/.test(text) &&
-    /\b(?:pipeline|visual source|screen|live answer|analysis|frame)\b/.test(text);
+    /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
+    /\b(?:pipeline|visual source|screen|live answer|analysis|frame|minecraft events|world events|minehut|world event)\b/.test(text);
   const repair =
     /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame)\b/.test(text) &&
     /\b(?:pipeline|visual|frame|source|analysis|live answer)\b/.test(text);

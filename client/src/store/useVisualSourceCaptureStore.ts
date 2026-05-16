@@ -15,6 +15,11 @@ export type VisualSourceCaptureState = {
   last_heartbeat_at?: string | null;
   next_capture_due_at?: string | null;
   pending_analysis_job_id?: string | null;
+  capture_count?: number;
+  post_count?: number;
+  last_frame_hash?: string | null;
+  last_chunk_id?: string | null;
+  last_error?: string | null;
 };
 
 type VisualSourceCaptureStore = {

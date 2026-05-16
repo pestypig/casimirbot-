@@ -31,6 +31,7 @@ import {
   type HelixLiveSourceRatePolicy,
 } from "@shared/helix-live-source-rate-policy";
 import { recordSituationSourceHeartbeat } from "./situation-source-capability-store";
+import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 
 const chunksBySource = new Map<string, HelixLiveSourceChunk[]>();
 const producersBySource = new Map<string, HelixLiveSourceProducer>();
@@ -163,6 +164,18 @@ export function upsertLiveSourceProducer(input: {
     assistant_answer: false,
   };
   producersBySource.set(input.sourceId, producer);
+  if (!existing) {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: producer.source_id,
+      threadId: producer.thread_id,
+      kind: "producer_created",
+      status: "ok",
+      summary: `${producer.modality} producer created with ${producer.capture_mode} capture mode.`,
+      relatedIds: [producer.producer_id],
+      createdAt: now,
+    });
+  }
   recordSituationSourceHeartbeat({
     source_id: input.sourceId,
     thread_id: input.threadId,
@@ -247,6 +260,32 @@ export function appendLiveSourceChunk(input: {
     rawContentPolicy: input.raw_content_policy,
     now: ts,
   });
+  recordLiveSourceProducerLifecycleEvent({
+    producerId: producer.producer_id,
+    sourceId: input.source_id,
+    threadId: input.thread_id,
+    environmentId: input.environment_id ?? null,
+    kind: input.modality === "visual_frame" ? "frame_captured" : "chunk_posted",
+    status: "ok",
+    summary: input.modality === "visual_frame"
+      ? "Visual frame captured and posted as live-source chunk."
+      : `${input.modality} chunk posted.`,
+    relatedIds: [chunk.chunk_id, chunk.payload_ref].filter(Boolean) as string[],
+    createdAt: ts,
+  });
+  if (input.modality === "visual_frame") {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: input.source_id,
+      threadId: input.thread_id,
+      environmentId: input.environment_id ?? null,
+      kind: "chunk_posted",
+      status: "ok",
+      summary: "Visual live-source chunk posted to backend.",
+      relatedIds: [chunk.chunk_id],
+      createdAt: ts,
+    });
+  }
   return {
     chunk,
     producer,
@@ -340,7 +379,7 @@ const backpressureForSource = (
 };
 
 export function getLiveSourceBufferStatus(input: { threadId: string }): HelixLiveSourceBufferStatus {
-  const producers = Array.from(producersBySource.values()).filter((producer) => producer.thread_id === input.threadId);
+  const producers = Array.from(producersBySource.values()).filter((producer: HelixLiveSourceProducer) => producer.thread_id === input.threadId);
   const jobs = listLiveSourceAnalysisJobs({ threadId: input.threadId, limit: 500 });
   const sources = producers.map((producer: HelixLiveSourceProducer) => {
     const chunks = chunksBySource.get(producer.source_id) ?? [];
@@ -449,6 +488,19 @@ export function queueLiveSourceAnalysisJob(input: {
   };
   const existing = analysisJobsByThread.get(job.thread_id) ?? [];
   analysisJobsByThread.set(job.thread_id, [...existing, job].slice(-500));
+  const producer = getLiveSourceProducer(input.chunk.source_id);
+  if (producer) {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: input.chunk.source_id,
+      threadId: input.chunk.thread_id,
+      environmentId: input.chunk.environment_id ?? null,
+      kind: "analysis_queued",
+      status: "ok",
+      summary: `${job.analyzer_id} analysis job queued for live-source chunk.`,
+      relatedIds: [job.job_id, input.chunk.chunk_id],
+    });
+  }
   return job;
 }
 
@@ -469,7 +521,24 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
       }
     : job);
   analysisJobsByThread.set(input.threadId, updated);
-  return updated.filter((job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId);
+  const completed = updated.filter((job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId);
+  const chunk = getLiveSourceChunk(input.chunkId);
+  const producer = chunk ? getLiveSourceProducer(chunk.source_id) : null;
+  if (producer) {
+    for (const job of completed) {
+      recordLiveSourceProducerLifecycleEvent({
+        producerId: producer.producer_id,
+        sourceId: producer.source_id,
+        threadId: producer.thread_id,
+        environmentId: chunk?.environment_id ?? null,
+        kind: input.status === "completed" ? "analysis_completed" : "producer_error",
+        status: input.status === "completed" ? "ok" : "failed",
+        summary: input.summary,
+        relatedIds: [job.job_id, input.chunkId, ...(input.outputRefs ?? [])],
+      });
+    }
+  }
+  return completed;
 }
 
 export function getLiveSourceAnalysisJob(jobId: string): HelixLiveSourceAnalysisJob | null {
@@ -496,6 +565,20 @@ export function updateLiveSourceAnalysisJob(input: {
     summary: input.summary ?? existing.summary,
   };
   analysisJobsByThread.set(existing.thread_id, jobs.map((job: HelixLiveSourceAnalysisJob) => job.job_id === input.jobId ? updatedJob : job));
+  const chunk = getLiveSourceChunk(existing.chunk_id);
+  const producer = chunk ? getLiveSourceProducer(chunk.source_id) : null;
+  if (producer && (input.status === "completed" || input.status === "failed" || input.status === "suppressed")) {
+    recordLiveSourceProducerLifecycleEvent({
+      producerId: producer.producer_id,
+      sourceId: producer.source_id,
+      threadId: producer.thread_id,
+      environmentId: chunk?.environment_id ?? null,
+      kind: input.status === "completed" ? "analysis_completed" : "producer_error",
+      status: input.status === "completed" ? "ok" : input.status === "suppressed" ? "blocked" : "failed",
+      summary: input.summary ?? existing.summary,
+      relatedIds: [updatedJob.job_id, existing.chunk_id, ...updatedJob.output_refs],
+    });
+  }
   return updatedJob;
 }
 

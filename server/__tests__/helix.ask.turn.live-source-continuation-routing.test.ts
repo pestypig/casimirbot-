@@ -13,6 +13,7 @@ import { resetLivePipelineLifecycleForTest } from "../services/situation-room/li
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import { resetLiveSourceProducerBindingsForTest } from "../services/situation-room/live-source-producer-binding";
+import { resetLiveSourceProducerLifecycleForTest } from "../services/situation-room/live-source-producer-lifecycle-store";
 
 const threadId = "thread:live-source-continuation";
 
@@ -34,6 +35,7 @@ describe("live source continuation Ask routing", () => {
     resetSituationSourceCapabilitiesForTest();
     resetVisualSnapshotStoreForTest();
     resetLiveSourceProducerBindingsForTest();
+    resetLiveSourceProducerLifecycleForTest();
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -92,6 +94,40 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.status).toBe("permission_required");
     expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
+  }, 20_000);
+
+  it("routes producer status questions to pipeline inspection with freshness evidence", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "is my screen live source still updating?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("live_pipeline_inspect");
+    expect(response.body?.producer_freshness?.next_required_action).toBeTruthy();
+    expect(response.body?.visual_cadence_acceptance?.assistant_answer).toBe(false);
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 20_000);
+
+  it("routes Minecraft event attachment questions to world binding diagnostics", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "are Minecraft events attached to this thread?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("live_pipeline_inspect");
+    expect(response.body?.world_event_thread_binding_check?.schema).toBe("helix.world_event_thread_binding_check.v1");
+    expect(response.body?.world_event_thread_binding_check?.assistant_answer).toBe(false);
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 20_000);
 
   it("inspects or repairs an existing live pipeline for continuation prompts", async () => {

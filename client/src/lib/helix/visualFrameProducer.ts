@@ -31,6 +31,12 @@ const activeCaptureLocks = new Set<string>();
 const clampVisualCadenceMs = (value?: number | null): number =>
   Math.max(5_000, Math.min(120_000, Math.round(value ?? 15_000)));
 
+const hashFramePreview = async (dataUrl: string): Promise<string> => {
+  const bytes = new TextEncoder().encode(dataUrl.slice(0, 4096));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
 const waitForVideoReady = async (video: HTMLVideoElement): Promise<void> => {
   if (video.videoWidth > 0 && video.videoHeight > 0) return;
   await new Promise<void>((resolve: () => void) => {
@@ -86,6 +92,7 @@ export async function runVisualFrameProducerOnce(input: {
     cadence_ms: captureMode === "manual" ? null : clampVisualCadenceMs(input.cadenceMs),
     last_frame_at: null,
     last_heartbeat_at: now,
+    last_error: null,
   });
   firstTrack?.addEventListener("ended", () => {
     useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
@@ -109,11 +116,18 @@ export async function runVisualFrameProducerOnce(input: {
   });
 
   const imageBase64 = await captureFrameDataUrlFromStream(input.stream);
+  const frameHash = await hashFramePreview(imageBase64);
+  const existingState = useVisualSourceCaptureStore.getState().producers[input.sourceId];
+  useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
+    capture_count: (existingState?.capture_count ?? 0) + 1,
+    last_frame_hash: frameHash,
+  });
   const analysis = await input.postJson("/api/agi/situation/visual-frame/analyze", {
     thread_id: input.threadId,
     room_id: input.roomId ?? null,
     source_id: input.sourceId,
     environment_id: input.environmentId ?? null,
+    capture_mode: captureMode,
     image_base64: imageBase64,
     mime_type: "image/jpeg",
     prompt: input.prompt ??
@@ -134,6 +148,7 @@ export async function runVisualFrameProducerOnce(input: {
 
   const frameId = typeof analysis?.evidence?.frame_id === "string" ? analysis.evidence.frame_id : null;
   const evidenceId = typeof analysis?.evidence?.evidence_id === "string" ? analysis.evidence.evidence_id : null;
+  const chunkId = typeof analysis?.live_source_chunk?.chunk_id === "string" ? analysis.live_source_chunk.chunk_id : null;
   const summary = typeof analysis?.evidence?.summary === "string" && analysis.evidence.summary.trim()
     ? analysis.evidence.summary.trim()
     : "Visual frame captured and recorded as compact evidence.";
@@ -141,6 +156,12 @@ export async function runVisualFrameProducerOnce(input: {
   useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
     last_frame_at: frameAt,
     last_heartbeat_at: frameAt,
+    post_count: (useVisualSourceCaptureStore.getState().producers[input.sourceId]?.post_count ?? 0) + 1,
+    last_chunk_id: chunkId,
+    pending_analysis_job_id: Array.isArray(analysis?.live_source_analysis_jobs) && typeof analysis.live_source_analysis_jobs.at(-1)?.job_id === "string"
+      ? analysis.live_source_analysis_jobs.at(-1).job_id
+      : null,
+    last_error: null,
     next_capture_due_at: captureMode === "interval" && input.cadenceMs
       ? new Date(Date.parse(frameAt) + clampVisualCadenceMs(input.cadenceMs)).toISOString()
       : null,
@@ -262,6 +283,11 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
         source_id: input.sourceId,
       }).catch(() => null);
       return result;
+    } catch (error) {
+      useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
+        last_error: error instanceof Error ? error.message : "visual_interval_capture_failed",
+      });
+      throw error;
     } finally {
       activeCaptureLocks.delete(input.sourceId);
     }
@@ -269,7 +295,7 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
 
   const firstResult = await capture(true);
   const interval = window.setInterval(() => {
-    void capture(false);
+    void capture(false).catch(() => null);
   }, cadenceMs);
   activeIntervals.set(input.sourceId, interval);
   return firstResult ?? {
