@@ -15,12 +15,54 @@ import {
 } from "../services/situation-room/live-source-producer-lifecycle-store";
 import { readLiveSourceProducerFreshness } from "../services/situation-room/live-source-producer-freshness";
 import { runVisualCadenceAcceptance } from "../services/situation-room/visual-cadence-acceptance-runner";
+import {
+  recordVisualProducerSchedulerAdoption,
+  resetVisualProducerSchedulerAdoptionsForTest,
+} from "../services/situation-room/visual-producer-scheduler-adoption-store";
 
 describe("visual producer cadence acceptance", () => {
   beforeEach(() => {
     resetLiveSourceChunkBufferForTest();
     resetLiveSourceProducerBindingsForTest();
     resetLiveSourceProducerLifecycleForTest();
+    resetVisualProducerSchedulerAdoptionsForTest();
+  });
+
+  it("moves waiting client freshness forward after scheduler adoption", () => {
+    const cadence = setVisualProducerCadence({
+      threadId: "helix-ask:desktop",
+      sourceId: "visual_source:adopt",
+      environmentId: "live_answer:adopt",
+      cadenceMs: 10_000,
+      captureMode: "interval",
+      clientStreamConfirmed: false,
+      status: "waiting_for_client",
+    });
+
+    const before = readLiveSourceProducerFreshness({
+      producerId: cadence.producer.producer_id,
+    });
+    expect(before?.stale_reason).toBe("waiting_for_client_stream");
+    expect(before?.next_required_action).toBe("client_adopt_visual_producer");
+
+    const adoption = recordVisualProducerSchedulerAdoption({
+      producer_id: cadence.producer.producer_id,
+      source_id: "visual_source:adopt",
+      thread_id: "helix-ask:desktop",
+      environment_id: "live_answer:adopt",
+      cadence_ms: 10_000,
+      capture_mode: "interval",
+      client_stream_confirmed: true,
+      interval_active: true,
+      status: "adopted",
+    });
+
+    expect(adoption.status).toBe("adopted");
+    const after = readLiveSourceProducerFreshness({
+      producerId: cadence.producer.producer_id,
+    });
+    expect(after?.stale_reason).toBe("no_chunk_after_two_cadence_windows");
+    expect(after?.next_required_action).toBe("capture_frame_now");
   });
 
   it("records cadence lifecycle and reports stale when no chunks arrive", () => {

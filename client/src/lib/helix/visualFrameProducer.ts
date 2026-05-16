@@ -22,14 +22,53 @@ type VisualProducerIntervalOptions = {
   environmentId?: string | null;
   pipelineId?: string | null;
   cadenceMs?: number | null;
+  preserveExistingStream?: boolean;
 };
 
 const activeIntervals = new Map<string, number>();
 const activeStreams = new Map<string, MediaStream>();
 const activeCaptureLocks = new Set<string>();
 
+type ServerVisualProducer = {
+  producer_id?: string;
+  source_id?: string;
+  thread_id?: string;
+  modality?: string;
+  environment_id?: string | null;
+  pipeline_id?: string | null;
+  capture_mode?: string;
+  cadence_ms?: number | null;
+  status?: string;
+};
+
 const clampVisualCadenceMs = (value?: number | null): number =>
   Math.max(5_000, Math.min(120_000, Math.round(value ?? 15_000)));
+
+const getLiveTrack = (stream?: MediaStream | null): MediaStreamTrack | null => {
+  const track = stream?.getVideoTracks()[0] ?? stream?.getTracks()[0] ?? null;
+  return track && track.readyState !== "ended" ? track : null;
+};
+
+export function getActiveVisualFrameStream(sourceId?: string | null): MediaStream | null {
+  if (!sourceId) return null;
+  const stream = activeStreams.get(sourceId) ?? null;
+  return getLiveTrack(stream) ? stream : null;
+}
+
+export function getLatestActiveVisualFrameStream(threadId?: string | null): { sourceId: string; stream: MediaStream } | null {
+  const states = useVisualSourceCaptureStore.getState().producers;
+  const candidates = Object.values(states)
+    .filter((state) => (!threadId || state.thread_id === threadId) && state.stream_active && state.track_ready_state !== "ended")
+    .sort((a, b) => Date.parse(b.last_heartbeat_at ?? b.last_frame_at ?? "0") - Date.parse(a.last_heartbeat_at ?? a.last_frame_at ?? "0"));
+  for (const candidate of candidates) {
+    const stream = getActiveVisualFrameStream(candidate.source_id);
+    if (stream) return { sourceId: candidate.source_id, stream };
+  }
+  for (const [sourceId, stream] of activeStreams.entries()) {
+    if (getLiveTrack(stream)) return { sourceId, stream };
+  }
+  return null;
+}
 
 const hashFramePreview = async (dataUrl: string): Promise<string> => {
   const bytes = new TextEncoder().encode(dataUrl.slice(0, 4096));
@@ -79,6 +118,7 @@ export async function runVisualFrameProducerOnce(input: {
   const now = new Date().toISOString();
   const firstTrack = input.stream.getVideoTracks()[0] ?? input.stream.getTracks()[0] ?? null;
   const captureMode = input.captureMode ?? "manual";
+  activeStreams.set(input.sourceId, input.stream);
   useVisualSourceCaptureStore.getState().upsertProducer({
     source_id: input.sourceId,
     thread_id: input.threadId,
@@ -95,6 +135,7 @@ export async function runVisualFrameProducerOnce(input: {
     last_error: null,
   });
   firstTrack?.addEventListener("ended", () => {
+    activeStreams.delete(input.sourceId);
     useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
       stream_active: false,
       interval_active: false,
@@ -194,9 +235,49 @@ export function stopVisualFrameProducerInterval(sourceId: string, options: { sto
   });
 }
 
+const postSchedulerAdoption = async (input: {
+  postJson: PostJson;
+  producerId?: string | null;
+  sourceId: string;
+  threadId: string;
+  environmentId?: string | null;
+  pipelineId?: string | null;
+  cadenceMs?: number | null;
+  captureMode?: VisualCaptureMode;
+  clientStreamConfirmed: boolean;
+  intervalActive: boolean;
+  status?: "adopted" | "waiting_for_stream" | "waiting_for_environment" | "paused" | "stopped" | "error";
+  lastCaptureAt?: string | null;
+  lastChunkId?: string | null;
+}): Promise<void> => {
+  const nextCaptureDueAt = input.intervalActive && input.cadenceMs
+    ? new Date(Date.now() + clampVisualCadenceMs(input.cadenceMs)).toISOString()
+    : null;
+  const response = await input.postJson("/api/agi/situation/live-source/producer/adopt", {
+    producer_id: input.producerId ?? undefined,
+    source_id: input.sourceId,
+    thread_id: input.threadId,
+    environment_id: input.environmentId ?? null,
+    pipeline_id: input.pipelineId ?? null,
+    cadence_ms: input.cadenceMs ?? null,
+    capture_mode: input.captureMode ?? "interval",
+    client_stream_confirmed: input.clientStreamConfirmed,
+    interval_active: input.intervalActive,
+    next_capture_due_at: nextCaptureDueAt,
+    last_capture_at: input.lastCaptureAt ?? null,
+    last_chunk_id: input.lastChunkId ?? null,
+    status: input.status ?? (input.clientStreamConfirmed && input.intervalActive ? "adopted" : "waiting_for_stream"),
+  }).catch(() => null);
+  const adoption = response?.adoption && typeof response.adoption === "object" ? response.adoption : null;
+  useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
+    scheduler_adoption_id: typeof adoption?.adoption_id === "string" ? adoption.adoption_id : null,
+    scheduler_adoption_status: typeof adoption?.status === "string" ? adoption.status : input.status ?? null,
+  });
+};
+
 export async function startVisualFrameProducerInterval(input: VisualProducerIntervalOptions): Promise<VisualFrameProducerResult> {
   const cadenceMs = clampVisualCadenceMs(input.cadenceMs);
-  stopVisualFrameProducerInterval(input.sourceId, { stopStream: true });
+  stopVisualFrameProducerInterval(input.sourceId, { stopStream: input.preserveExistingStream ? false : true });
   activeStreams.set(input.sourceId, input.stream);
 
   const firstTrack = input.stream.getVideoTracks()[0] ?? input.stream.getTracks()[0] ?? null;
@@ -243,12 +324,25 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
     last_heartbeat_at: new Date().toISOString(),
     next_capture_due_at: new Date(Date.now() + cadenceMs).toISOString(),
   });
+  await postSchedulerAdoption({
+    postJson: input.postJson,
+    producerId,
+    sourceId: input.sourceId,
+    threadId: input.threadId,
+    environmentId: input.environmentId ?? null,
+    pipelineId: input.pipelineId ?? null,
+    cadenceMs,
+    captureMode: "interval",
+    clientStreamConfirmed: true,
+    intervalActive: true,
+    status: "adopted",
+  });
 
   const capture = async (force: boolean): Promise<VisualFrameProducerResult | null> => {
     if (activeCaptureLocks.has(input.sourceId)) return null;
     const stream = activeStreams.get(input.sourceId);
     const track = stream?.getVideoTracks()[0] ?? stream?.getTracks()[0] ?? null;
-    if (!stream || track?.readyState === "ended") {
+    if (!stream || !track) {
       stopVisualFrameProducerInterval(input.sourceId, { stopStream: false });
       return null;
     }
@@ -282,6 +376,22 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
         thread_id: input.threadId,
         source_id: input.sourceId,
       }).catch(() => null);
+      const latestState = useVisualSourceCaptureStore.getState().producers[input.sourceId];
+      await postSchedulerAdoption({
+        postJson: input.postJson,
+        producerId,
+        sourceId: input.sourceId,
+        threadId: input.threadId,
+        environmentId: input.environmentId ?? null,
+        pipelineId: input.pipelineId ?? null,
+        cadenceMs,
+        captureMode: "interval",
+        clientStreamConfirmed: true,
+        intervalActive: true,
+        status: "adopted",
+        lastCaptureAt: latestState?.last_frame_at ?? null,
+        lastChunkId: latestState?.last_chunk_id ?? null,
+      });
       return result;
     } catch (error) {
       useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
@@ -305,4 +415,110 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
     summary: "Visual producer interval started; first frame capture is pending.",
     evidence: null,
   };
+}
+
+export async function adoptServerVisualProducerPolicies(input: {
+  threadId: string;
+  postJson: PostJson;
+  fetchJson?: (path: string) => Promise<any>;
+  roomId?: string | null;
+  environmentId?: string | null;
+}): Promise<number> {
+  const fetchJson = input.fetchJson ?? (async (path: string) => {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`${path} failed with ${response.status}`);
+    return response.json();
+  });
+  const body = await fetchJson(`/api/agi/situation/live-source/producers?thread_id=${encodeURIComponent(input.threadId)}`);
+  const producers: ServerVisualProducer[] = Array.isArray(body?.producers) ? body.producers : [];
+  let adopted = 0;
+  for (const producer of producers) {
+    if (producer.modality && producer.modality !== "visual_frame") continue;
+    if (producer.capture_mode !== "interval" || typeof producer.cadence_ms !== "number") continue;
+    const sourceId = typeof producer.source_id === "string" ? producer.source_id : null;
+    if (!sourceId) continue;
+    let stream = activeStreams.get(sourceId);
+    let track = getLiveTrack(stream);
+    if (!stream || !track) {
+      const fallback = getLatestActiveVisualFrameStream(input.threadId);
+      if (fallback?.stream) {
+        stream = fallback.stream;
+        track = getLiveTrack(stream);
+        activeStreams.set(sourceId, stream);
+        const fallbackState = useVisualSourceCaptureStore.getState().producers[fallback.sourceId];
+        useVisualSourceCaptureStore.getState().upsertProducer({
+          source_id: sourceId,
+          thread_id: input.threadId,
+          producer_id: producer.producer_id ?? null,
+          environment_id: producer.environment_id ?? input.environmentId ?? fallbackState?.environment_id ?? null,
+          pipeline_id: producer.pipeline_id ?? fallbackState?.pipeline_id ?? null,
+          stream_active: true,
+          interval_active: false,
+          track_ready_state: "live",
+          capture_mode: "interval",
+          cadence_ms: producer.cadence_ms,
+          last_frame_at: fallbackState?.last_frame_at ?? null,
+          last_heartbeat_at: new Date().toISOString(),
+          last_chunk_id: fallbackState?.last_chunk_id ?? null,
+          capture_count: fallbackState?.capture_count ?? 0,
+          post_count: fallbackState?.post_count ?? 0,
+          last_frame_hash: fallbackState?.last_frame_hash ?? null,
+          last_error: null,
+        });
+      }
+    }
+    if (!stream || track?.readyState === "ended") {
+      await postSchedulerAdoption({
+        postJson: input.postJson,
+        producerId: producer.producer_id ?? null,
+        sourceId,
+        threadId: input.threadId,
+        environmentId: producer.environment_id ?? input.environmentId ?? null,
+        pipelineId: producer.pipeline_id ?? null,
+        cadenceMs: producer.cadence_ms,
+        captureMode: "interval",
+        clientStreamConfirmed: false,
+        intervalActive: false,
+        status: "waiting_for_stream",
+      });
+      continue;
+    }
+    const current = useVisualSourceCaptureStore.getState().producers[sourceId];
+    if (
+      current?.interval_active &&
+      current.cadence_ms === producer.cadence_ms &&
+      current.producer_id === producer.producer_id
+    ) {
+      await postSchedulerAdoption({
+        postJson: input.postJson,
+        producerId: producer.producer_id ?? null,
+        sourceId,
+        threadId: input.threadId,
+        environmentId: producer.environment_id ?? input.environmentId ?? null,
+        pipelineId: producer.pipeline_id ?? null,
+        cadenceMs: producer.cadence_ms,
+        captureMode: "interval",
+        clientStreamConfirmed: true,
+        intervalActive: true,
+        status: "adopted",
+        lastCaptureAt: current.last_frame_at ?? null,
+        lastChunkId: current.last_chunk_id ?? null,
+      });
+      adopted += 1;
+      continue;
+    }
+    await startVisualFrameProducerInterval({
+      sourceId,
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: producer.environment_id ?? input.environmentId ?? null,
+      pipelineId: producer.pipeline_id ?? null,
+      cadenceMs: producer.cadence_ms,
+      stream,
+      postJson: input.postJson,
+      preserveExistingStream: true,
+    });
+    adopted += 1;
+  }
+  return adopted;
 }

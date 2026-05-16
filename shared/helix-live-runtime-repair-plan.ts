@@ -14,6 +14,7 @@ export type HelixLiveRuntimeRepairProblemKind =
   | "missing_permission";
 
 export type HelixLiveRuntimeRepairActionId =
+  | "client_adopt_visual_producer"
   | "grant_visual_capture_permission"
   | "capture_frame_now"
   | "run_due_analysis"

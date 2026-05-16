@@ -15,6 +15,8 @@ export type VisualSourceCaptureState = {
   last_heartbeat_at?: string | null;
   next_capture_due_at?: string | null;
   pending_analysis_job_id?: string | null;
+  scheduler_adoption_id?: string | null;
+  scheduler_adoption_status?: "adopted" | "waiting_for_stream" | "waiting_for_environment" | "paused" | "stopped" | "error" | null;
   capture_count?: number;
   post_count?: number;
   last_frame_hash?: string | null;

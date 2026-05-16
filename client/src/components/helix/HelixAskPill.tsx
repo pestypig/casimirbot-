@@ -61,7 +61,7 @@ import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
-import { runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
+import { adoptServerVisualProducerPolicies, runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
 import {
   createSituationRoomState,
   sourceLabelForSituationSource,
@@ -17882,7 +17882,6 @@ export function HelixAskPill({
         stream,
         postJson: postSituationJson,
       });
-      stream.getTracks().forEach((track) => track.stop());
       stream = null;
       return {
         summary: result.summary,
@@ -17941,6 +17940,28 @@ export function HelixAskPill({
     situationRoomId,
     visualSituationSourceStatus,
   ]);
+
+  useEffect(() => {
+    if (visualSituationSourceStatus !== "active") return;
+    let cancelled = false;
+    const adopt = async () => {
+      try {
+        await adoptServerVisualProducerPolicies({
+          threadId: "helix-ask:desktop",
+          roomId: null,
+          postJson: postSituationJson,
+        });
+      } catch {
+        if (cancelled) return;
+      }
+    };
+    void adopt();
+    const interval = window.setInterval(() => void adopt(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [postSituationJson, visualSituationSourceStatus]);
 
   useEffect(() => stopDisplayAudioCapture, [stopDisplayAudioCapture]);
 

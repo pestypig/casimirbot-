@@ -30,6 +30,9 @@ import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-he
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
 import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
 import {
+  adoptServerVisualProducerPolicies,
+  getActiveVisualFrameStream,
+  getLatestActiveVisualFrameStream,
   runVisualFrameProducerOnce,
   startVisualFrameProducerInterval,
   stopVisualFrameProducerInterval,
@@ -339,6 +342,31 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     return () => window.clearInterval(interval);
   }, [threadId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const adopt = async () => {
+      try {
+        const adopted = await adoptServerVisualProducerPolicies({
+          threadId,
+          roomId: environment?.room_id ?? null,
+          environmentId: environment?.environment_id ?? null,
+          postJson,
+        });
+        if (!cancelled && adopted > 0) {
+          setLastActionStatus(`Visual scheduler adopted ${adopted} producer${adopted === 1 ? "" : "s"}.`);
+        }
+      } catch {
+        // Adoption is opportunistic; source health shows concrete repair actions.
+      }
+    };
+    void adopt();
+    const interval = window.setInterval(() => void adopt(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [environment?.environment_id, environment?.room_id, threadId]);
+
   const setEnvironmentStatus = async (action: "pause" | "resume" | "stop") => {
     if (!environment) return;
     await postJson(`/api/agi/situation/live-answer-environment/${encodeURIComponent(environment.environment_id)}/${action}`);
@@ -491,9 +519,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
 
   const grantVisualCapture = async () => {
     let stream: MediaStream | null = null;
+    let ownsStream = false;
     try {
       const source = await ensureVisualSourceRegistered();
-      stream = await requestDisplayStream();
+      stream = getActiveVisualFrameStream(source.source_id) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+      if (!stream) {
+        stream = await requestDisplayStream();
+        ownsStream = true;
+      }
       const scheduledCadenceMs = await readScheduledVisualCadenceMs(source.source_id);
       if (scheduledCadenceMs) {
         const result = await startVisualFrameProducerInterval({
@@ -504,6 +537,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           cadenceMs: scheduledCadenceMs,
           stream,
           postJson,
+          preserveExistingStream: !ownsStream,
         });
         stream = null;
         setLastActionStatus(`Visual interval active every ${Math.round(scheduledCadenceMs / 1000)}s. ${result.summary}`);
@@ -516,13 +550,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           stream,
           postJson,
         });
-        stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        if (ownsStream) stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
         stream = null;
         setLastActionStatus(`Visual capture active; first frame analyzed. ${result.summary}`);
       }
       await refresh();
     } catch (error) {
-      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       setLastActionStatus(error instanceof Error ? error.message : "visual_capture_permission_failed");
     }
   };
@@ -541,9 +575,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
 
   const startVisualInterval = async (cadenceMs: number) => {
     let stream: MediaStream | null = null;
+    let ownsStream = false;
     try {
       const source = await ensureVisualSourceRegistered();
-      stream = await requestDisplayStream();
+      stream = getActiveVisualFrameStream(source.source_id) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+      if (!stream) {
+        stream = await requestDisplayStream();
+        ownsStream = true;
+      }
       const result = await startVisualFrameProducerInterval({
         sourceId: source.source_id,
         threadId,
@@ -552,12 +591,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         cadenceMs,
         stream,
         postJson,
+        preserveExistingStream: !ownsStream,
       });
       stream = null;
       setLastActionStatus(`Visual interval active every ${Math.round(cadenceMs / 1000)}s. ${result.summary}`);
       await refresh();
     } catch (error) {
-      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       setLastActionStatus(error instanceof Error ? error.message : "visual_interval_start_failed");
     }
   };
@@ -891,7 +931,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ) : null}
         {visualProducerState?.capture_mode === "interval" ? (
           <p className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
-            Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
+            Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; scheduler {visualProducerState.scheduler_adoption_status ?? "not adopted"}; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
           </p>
         ) : null}
       </div>

@@ -10,6 +10,7 @@ import {
   listLiveSourceProducers,
 } from "./live-source-chunk-buffer";
 import { getLiveSourceProducerBinding } from "./live-source-producer-binding";
+import { getVisualProducerSchedulerAdoption } from "./visual-producer-scheduler-adoption-store";
 import { listLiveAnswerEnvironmentDeltas } from "./live-answer-environment-store";
 
 const latest = <T>(items: T[]): T | null => items.at(-1) ?? null;
@@ -40,6 +41,8 @@ export function readLiveSourceProducerFreshness(input: {
   });
   const latestJob = latest(jobs) as HelixLiveSourceAnalysisJob | null;
   const binding = getLiveSourceProducerBinding(actualProducer.source_id);
+  const adoption = getVisualProducerSchedulerAdoption(actualProducer.producer_id) ??
+    getVisualProducerSchedulerAdoption(actualProducer.source_id);
   const deltas = binding?.environment_id
     ? listLiveAnswerEnvironmentDeltas(binding.environment_id).slice(-20)
     : [];
@@ -53,9 +56,9 @@ export function readLiveSourceProducerFreshness(input: {
   if (actualProducer.status === "permission_required") {
     staleReason = "visual_capture_permission_required";
     nextRequiredAction = "grant_visual_capture_permission";
-  } else if (actualProducer.status === "waiting_for_client") {
+  } else if (actualProducer.status === "waiting_for_client" && adoption?.status !== "adopted") {
     staleReason = "waiting_for_client_stream";
-    nextRequiredAction = "client_stream_heartbeat_or_permission";
+    nextRequiredAction = adoption ? "client_stream_heartbeat_or_permission" : "client_adopt_visual_producer";
   } else if (actualProducer.capture_mode === "interval" && (!latestChunk || (lastChunkMs !== null && nowMs - lastChunkMs > staleWindowMs))) {
     staleReason = "no_chunk_after_two_cadence_windows";
     nextRequiredAction = "capture_frame_now";

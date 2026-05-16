@@ -18,6 +18,7 @@ import { resetSituationSourceCapabilitiesForTest } from "../services/situation-r
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import { resetLiveSourceProducerBindingsForTest } from "../services/situation-room/live-source-producer-binding";
 import { resetLiveSourceProducerLifecycleForTest } from "../services/situation-room/live-source-producer-lifecycle-store";
+import { resetVisualProducerSchedulerAdoptionsForTest } from "../services/situation-room/visual-producer-scheduler-adoption-store";
 
 const threadId = "thread:live-source-continuation";
 
@@ -40,6 +41,7 @@ describe("live source continuation Ask routing", () => {
     resetVisualSnapshotStoreForTest();
     resetLiveSourceProducerBindingsForTest();
     resetLiveSourceProducerLifecycleForTest();
+    resetVisualProducerSchedulerAdoptionsForTest();
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -177,6 +179,51 @@ describe("live source continuation Ask routing", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("records scheduler adoption through the producer adoption endpoint", async () => {
+    const app = await createApp();
+    const cadence = await request(app)
+      .post("/api/agi/situation/live-source/producer/set-cadence")
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:adoption-route",
+        cadence_ms: 10_000,
+        capture_mode: "interval",
+      })
+      .expect(200);
+
+    const adoption = await request(app)
+      .post("/api/agi/situation/live-source/producer/adopt")
+      .send({
+        producer_id: cadence.body?.producer?.producer_id,
+        source_id: "visual_source:adoption-route",
+        thread_id: "helix-ask:desktop",
+        cadence_ms: 10_000,
+        capture_mode: "interval",
+        client_stream_confirmed: true,
+        interval_active: true,
+      })
+      .expect(200);
+
+    expect(adoption.body?.adoption).toMatchObject({
+      schema: "helix.visual_producer_scheduler_adoption.v1",
+      producer_id: cadence.body?.producer?.producer_id,
+      source_id: "visual_source:adoption-route",
+      thread_id: "helix-ask:desktop",
+      cadence_ms: 10_000,
+      capture_mode: "interval",
+      client_stream_confirmed: true,
+      interval_active: true,
+      status: "adopted",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const list = await request(app)
+      .get("/api/agi/situation/live-source/producer/adoptions?thread_id=helix-ask%3Adesktop")
+      .expect(200);
+    expect(list.body?.adoptions?.map((entry: any) => entry.adoption_id)).toContain(adoption.body.adoption.adoption_id);
   });
 
   it("normalizes reverse visual interval wording to a 10 second producer cadence", async () => {
