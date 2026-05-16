@@ -130,7 +130,25 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 20_000);
 
-  it("inspects or repairs an existing live pipeline for continuation prompts", async () => {
+  it("routes explicit live repair prompts to live runtime repair", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "fix the live screen source",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("live_runtime_repair");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_runtime_repair");
+    expect(response.body?.live_runtime_repair_plan?.schema).toBe("helix.live_runtime_repair_plan.v1");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 20_000);
+
+  it("repairs an existing live pipeline for not-updating prompts", async () => {
     const plan = composeLiveSourcePipelinePlan({
       threadId: "helix-ask:desktop",
       objective: "Watch this screen as a live answer.",
@@ -147,10 +165,11 @@ describe("live source continuation Ask routing", () => {
       })
       .expect(200);
 
-    expect(response.body?.route_reason_code).toBe("live_pipeline_inspect");
-    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_pipeline_inspect");
+    expect(response.body?.route_reason_code).toBe("live_runtime_repair");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_runtime_repair");
     expect(response.body?.live_runtime_context?.active_pipeline_id).toBe(receipt.pipeline_id);
     expect(response.body?.pipeline_dashboard?.pipeline_id).toBe(receipt.pipeline_id);
+    expect(response.body?.live_runtime_repair_plan?.assistant_answer).toBe(false);
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
     expect(response.body?.poison_audit?.assistant_history_projection_count).toBe(0);
   });

@@ -3,6 +3,7 @@ export type HelixLiveSourceContinuationIntentKind =
   | "live_pipeline_control"
   | "live_pipeline_inspect"
   | "live_pipeline_repair"
+  | "live_runtime_repair"
   | "live_answer_environment_setup";
 
 export type HelixLiveSourceContinuationIntent = {
@@ -48,13 +49,13 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
     /\b(?:pipeline|visual source|screen|live answer|analysis|frame|minecraft events|world events|minehut|world event)\b/.test(text);
   const repair =
-    /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame)\b/.test(text) &&
-    /\b(?:pipeline|visual|frame|source|analysis|live answer)\b/.test(text);
+    /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame|not updating|stale|attach)\b/.test(text) &&
+    /\b(?:pipeline|visual|frame|source|analysis|live answer|minecraft events|world events|minehut)\b/.test(text);
 
   if (repair) {
     return {
       schema: "helix.live_source_continuation_intent.v1",
-      kind: "live_pipeline_repair",
+      kind: "live_runtime_repair",
       confidence: "high",
       reason: "Prompt requests repair or due analysis for live source pipeline.",
       requested_rate_ms: readRequestedRateMs(prompt),
