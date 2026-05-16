@@ -23,7 +23,7 @@ const normalize = (value: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-const readRequestedRateMs = (text: string): number | null => {
+export const readLiveSourceRequestedRateMs = (text: string): number | null => {
   const requestedRate =
     /\bevery\s+(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\b/i.exec(text) ??
     /\b(?:interval|cadence|rate)\s+(?:to\s+|of\s+|at\s+)?(\d{1,3})\s*(second|seconds|sec|secs|s|minute|minutes|min|mins|m)\b/i.exec(text) ??
@@ -61,7 +61,7 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
       kind: "live_runtime_repair",
       confidence: "high",
       reason: "Prompt requests repair or due analysis for live source pipeline.",
-      requested_rate_ms: readRequestedRateMs(prompt),
+      requested_rate_ms: readLiveSourceRequestedRateMs(prompt),
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -72,7 +72,7 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
       kind: "live_pipeline_inspect",
       confidence: "high",
       reason: "Prompt asks for live source or pipeline status.",
-      requested_rate_ms: readRequestedRateMs(prompt),
+      requested_rate_ms: readLiveSourceRequestedRateMs(prompt),
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -83,7 +83,7 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
       kind: "live_answer_environment_setup",
       confidence: "high",
       reason: "Prompt asks to set up a live answer/source workflow.",
-      requested_rate_ms: readRequestedRateMs(prompt),
+      requested_rate_ms: readLiveSourceRequestedRateMs(prompt),
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -94,7 +94,7 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
       kind: rate ? "live_pipeline_control" : "live_source_continuation",
       confidence: "high",
       reason: "Prompt asks to keep using an active live source instead of answering model-only.",
-      requested_rate_ms: readRequestedRateMs(prompt),
+      requested_rate_ms: readLiveSourceRequestedRateMs(prompt),
       assistant_answer: false,
       raw_content_included: false,
     };

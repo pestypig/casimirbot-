@@ -102,7 +102,7 @@ describe("live source continuation Ask routing", () => {
       .post("/api/agi/ask/turn")
       .send({
         sessionId: threadId,
-        question: "set interval 10 seconds on visual capture",
+        question: "ok set the interval to 10 seconds on the visual capture",
         debug: true,
       })
       .expect(200);
@@ -114,10 +114,30 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
-    expect(response.body?.live_answer_environment?.objective).not.toBe("set interval 10 seconds on visual capture");
+    expect(response.body?.live_answer_environment?.objective).not.toBe("ok set the interval to 10 seconds on the visual capture");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 20_000);
+
+  it("redirects direct live-answer create cadence commands to producer control", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/situation/live-answer-environment/create")
+      .send({
+        thread_id: "helix-ask:desktop",
+        objective: "ok set the interval to 10 seconds on the visual capture",
+      })
+      .expect(200);
+
+    expect(response.body?.schema).toBe("helix.live_answer_environment_control_redirect_response.v1");
+    expect(response.body?.redirected_from).toBe("live_answer_environment_create");
+    expect(response.body?.action).toBe("situation-room.live-source.set_rate");
+    expect(response.body?.cadence_ms).toBe(10_000);
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
+    expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
+    expect(response.body?.live_answer_environment?.objective).not.toBe("ok set the interval to 10 seconds on the visual capture");
+    expect(response.body?.assistant_answer).toBe(false);
+  });
 
   it("routes producer status questions to pipeline inspection with freshness evidence", async () => {
     const app = await createApp();
