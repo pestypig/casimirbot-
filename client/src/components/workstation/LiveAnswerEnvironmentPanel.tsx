@@ -40,6 +40,20 @@ import {
 import { useVisualSourceCaptureStore, type VisualSourceCaptureState } from "@/store/useVisualSourceCaptureStore";
 
 type LiveEnvironmentTab = "present_state" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type ClientCapabilityActionRead = {
+  action_request_id: string;
+  capability: string;
+  action: string;
+  status: string;
+  args?: Record<string, unknown>;
+};
+type ClientCapabilityAdoptionRead = {
+  adoption_id: string;
+  capability: string;
+  action: string;
+  ok: boolean;
+  observed_state?: Record<string, unknown>;
+};
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -194,6 +208,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [lineToolEvaluations, setLineToolEvaluations] = useState<HelixLiveLineToolEvaluation[]>([]);
   const [workerLanes, setWorkerLanes] = useState<HelixLiveWorkerLane[]>([]);
   const [workerRuns, setWorkerRuns] = useState<HelixLiveWorkerRun[]>([]);
+  const [clientActions, setClientActions] = useState<ClientCapabilityActionRead[]>([]);
+  const [clientAdoptions, setClientAdoptions] = useState<ClientCapabilityAdoptionRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -285,7 +301,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -297,8 +313,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/live-line-tool-requests?thread_id=${encodeURIComponent(threadId)}&limit=80`),
         fetch(`/api/agi/situation/live-workers?thread_id=${encodeURIComponent(threadId)}&limit=80`),
         fetch(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}`),
+        fetch(`/api/agi/client-action/pending?thread_id=${encodeURIComponent(threadId)}`),
+        fetch(`/api/agi/client-action/adoptions?thread_id=${encodeURIComponent(threadId)}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -310,6 +328,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         lineToolRes.json(),
         workerRes.json(),
         visualLatestRes.json(),
+        clientActionRes.json().catch(() => ({})),
+        clientAdoptionRes.json().catch(() => ({})),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -329,6 +349,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setLineToolEvaluations(Array.isArray(lineToolBody.evaluations) ? lineToolBody.evaluations : []);
       setWorkerLanes(Array.isArray(workerBody.lanes) ? workerBody.lanes : []);
       setWorkerRuns(Array.isArray(workerBody.runs) ? workerBody.runs : []);
+      setClientActions(Array.isArray(clientActionBody.actions) ? clientActionBody.actions : []);
+      setClientAdoptions(Array.isArray(clientAdoptionBody.adoptions) ? clientAdoptionBody.adoptions.slice(-12) : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -932,6 +954,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         {visualProducerState?.capture_mode === "interval" ? (
           <p className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
             Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; scheduler {visualProducerState.scheduler_adoption_status ?? "not adopted"}; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
+          </p>
+        ) : null}
+        {(clientActions.length > 0 || clientAdoptions.length > 0) ? (
+          <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+            Client actions: {clientActions.length} pending; latest adoption {clientAdoptions.at(-1)?.ok ? "ok" : clientAdoptions.at(-1) ? "failed" : "none"}.
           </p>
         ) : null}
       </div>

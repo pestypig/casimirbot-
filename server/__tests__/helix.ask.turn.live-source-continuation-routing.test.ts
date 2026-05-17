@@ -19,6 +19,8 @@ import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visu
 import { resetLiveSourceProducerBindingsForTest } from "../services/situation-room/live-source-producer-binding";
 import { resetLiveSourceProducerLifecycleForTest } from "../services/situation-room/live-source-producer-lifecycle-store";
 import { resetVisualProducerSchedulerAdoptionsForTest } from "../services/situation-room/visual-producer-scheduler-adoption-store";
+import { resetClientCapabilityActionsForTest } from "../services/client-capabilities/client-action-queue";
+import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabilities/client-adoption-store";
 
 const threadId = "thread:live-source-continuation";
 
@@ -42,6 +44,8 @@ describe("live source continuation Ask routing", () => {
     resetLiveSourceProducerBindingsForTest();
     resetLiveSourceProducerLifecycleForTest();
     resetVisualProducerSchedulerAdoptionsForTest();
+    resetClientCapabilityActionsForTest();
+    resetClientCapabilityAdoptionsForTest();
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -123,6 +127,10 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.visual_producer_cadence_receipt?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
+    expect(response.body?.client_action_request?.schema).toBe("helix.client_capability_action.v1");
+    expect(response.body?.client_action_request?.capability).toBe("visual_capture");
+    expect(response.body?.client_action_request?.action).toBe("request_permission");
+    expect(response.body?.client_action_request_ids).toContain(response.body?.client_action_request?.action_request_id);
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
     expect(response.body?.live_answer_environment?.objective).not.toBe("ok set the interval to 10 seconds on the visual capture");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
@@ -169,6 +177,11 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.workspace_action_receipt?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.workspace_action_receipt?.state_observed).toBe(true);
+    expect(response.body?.client_action_request?.schema).toBe("helix.client_capability_action.v1");
+    expect(response.body?.client_action_request?.capability).toBe("visual_capture");
+    expect(response.body?.client_action_request?.args?.source_id).toBe("visual_source:parity");
+    expect(response.body?.client_action_request?.args?.cadence_ms).toBe(10_000);
+    expect(response.body?.client_action_request_ids).toContain(response.body.client_action_request.action_request_id);
     expect(response.body?.receipt).toMatchObject({
       schema: "helix.visual_producer_cadence_receipt.v1",
       action_id: "situation-room.live-source.set_rate",
@@ -179,6 +192,60 @@ describe("live source continuation Ask routing", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("records generic client capability adoption for visual producer requests", async () => {
+    const app = await createApp();
+    const cadence = await request(app)
+      .post("/api/agi/situation/live-source/producer/set-cadence")
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:client-action",
+        cadence_ms: 10_000,
+        capture_mode: "interval",
+        client_stream_confirmed: true,
+      })
+      .expect(200);
+
+    const pending = await request(app)
+      .get("/api/agi/client-action/pending?thread_id=helix-ask%3Adesktop")
+      .expect(200);
+    expect(pending.body?.actions?.map((entry: any) => entry.action_request_id)).toContain(
+      cadence.body.client_action_request.action_request_id,
+    );
+
+    const adoption = await request(app)
+      .post(`/api/agi/client-action/${encodeURIComponent(cadence.body.client_action_request.action_request_id)}/adopt`)
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:client-action",
+        producer_id: cadence.body.producer.producer_id,
+        client_id: "current_browser",
+        ok: true,
+        observed_state: {
+          client_stream_confirmed: true,
+          interval_active: true,
+          cadence_ms: 10_000,
+        },
+      })
+      .expect(200);
+
+    expect(adoption.body?.adoption).toMatchObject({
+      schema: "helix.client_capability_adoption.v1",
+      action_request_id: cadence.body.client_action_request.action_request_id,
+      thread_id: "helix-ask:desktop",
+      capability: "visual_capture",
+      action: "adopt_producer",
+      source_id: "visual_source:client-action",
+      producer_id: cadence.body.producer.producer_id,
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const adoptions = await request(app)
+      .get("/api/agi/client-action/adoptions?thread_id=helix-ask%3Adesktop")
+      .expect(200);
+    expect(adoptions.body?.adoptions?.map((entry: any) => entry.adoption_id)).toContain(adoption.body.adoption.adoption_id);
   });
 
   it("records scheduler adoption through the producer adoption endpoint", async () => {

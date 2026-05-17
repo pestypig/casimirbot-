@@ -39,6 +39,7 @@ type ServerVisualProducer = {
   capture_mode?: string;
   cadence_ms?: number | null;
   status?: string;
+  action_request_id?: string | null;
 };
 
 const clampVisualCadenceMs = (value?: number | null): number =>
@@ -275,6 +276,30 @@ const postSchedulerAdoption = async (input: {
   });
 };
 
+const postClientCapabilityAdoption = async (input: {
+  postJson: PostJson;
+  actionRequestId?: string | null;
+  threadId: string;
+  sourceId?: string | null;
+  producerId?: string | null;
+  ok: boolean;
+  observedState: Record<string, unknown>;
+  nextRequiredAction?: string | null;
+  error?: string | null;
+}): Promise<void> => {
+  if (!input.actionRequestId) return;
+  await input.postJson(`/api/agi/client-action/${encodeURIComponent(input.actionRequestId)}/adopt`, {
+    thread_id: input.threadId,
+    source_id: input.sourceId ?? null,
+    producer_id: input.producerId ?? null,
+    client_id: "current_browser",
+    ok: input.ok,
+    observed_state: input.observedState,
+    next_required_action: input.nextRequiredAction ?? null,
+    error: input.error ?? null,
+  }).catch(() => null);
+};
+
 export async function startVisualFrameProducerInterval(input: VisualProducerIntervalOptions): Promise<VisualFrameProducerResult> {
   const cadenceMs = clampVisualCadenceMs(input.cadenceMs);
   stopVisualFrameProducerInterval(input.sourceId, { stopStream: input.preserveExistingStream ? false : true });
@@ -430,9 +455,35 @@ export async function adoptServerVisualProducerPolicies(input: {
     return response.json();
   });
   const body = await fetchJson(`/api/agi/situation/live-source/producers?thread_id=${encodeURIComponent(input.threadId)}`);
+  const pendingBody = await fetchJson(`/api/agi/client-action/pending?thread_id=${encodeURIComponent(input.threadId)}`).catch(() => null);
   const producers: ServerVisualProducer[] = Array.isArray(body?.producers) ? body.producers : [];
+  const pendingProducers: ServerVisualProducer[] = Array.isArray(pendingBody?.actions)
+    ? pendingBody.actions
+        .filter((action: any) =>
+          action?.capability === "visual_capture" &&
+          ["adopt_producer", "set_rate", "start_interval"].includes(action?.action) &&
+          action?.args &&
+          typeof action.args === "object"
+        )
+        .map((action: any) => ({
+          producer_id: typeof action.args.producer_id === "string" ? action.args.producer_id : undefined,
+          source_id: typeof action.args.source_id === "string" ? action.args.source_id : undefined,
+          thread_id: typeof action.thread_id === "string" ? action.thread_id : input.threadId,
+          modality: "visual_frame",
+          environment_id: typeof action.environment_id === "string" ? action.environment_id : null,
+          pipeline_id: typeof action.pipeline_id === "string" ? action.pipeline_id : null,
+          capture_mode: typeof action.args.capture_mode === "string" ? action.args.capture_mode : "interval",
+          cadence_ms: typeof action.args.cadence_ms === "number" ? action.args.cadence_ms : null,
+          action_request_id: typeof action.action_request_id === "string" ? action.action_request_id : null,
+        }))
+    : [];
+  const producerByKey = new Map<string, ServerVisualProducer>();
+  for (const producer of [...producers, ...pendingProducers]) {
+    const key = producer.producer_id ?? producer.source_id ?? `${producer.action_request_id}`;
+    if (key) producerByKey.set(key, { ...producerByKey.get(key), ...producer });
+  }
   let adopted = 0;
-  for (const producer of producers) {
+  for (const producer of producerByKey.values()) {
     if (producer.modality && producer.modality !== "visual_frame") continue;
     if (producer.capture_mode !== "interval" || typeof producer.cadence_ms !== "number") continue;
     const sourceId = typeof producer.source_id === "string" ? producer.source_id : null;
@@ -481,6 +532,22 @@ export async function adoptServerVisualProducerPolicies(input: {
         intervalActive: false,
         status: "waiting_for_stream",
       });
+      await postClientCapabilityAdoption({
+        postJson: input.postJson,
+        actionRequestId: producer.action_request_id ?? null,
+        threadId: input.threadId,
+        sourceId,
+        producerId: producer.producer_id ?? null,
+        ok: false,
+        observedState: {
+          source_id: sourceId,
+          producer_id: producer.producer_id ?? null,
+          client_stream_confirmed: false,
+          interval_active: false,
+          status: "waiting_for_stream",
+        },
+        nextRequiredAction: "grant_visual_capture_permission",
+      });
       continue;
     }
     const current = useVisualSourceCaptureStore.getState().producers[sourceId];
@@ -504,6 +571,23 @@ export async function adoptServerVisualProducerPolicies(input: {
         lastCaptureAt: current.last_frame_at ?? null,
         lastChunkId: current.last_chunk_id ?? null,
       });
+      await postClientCapabilityAdoption({
+        postJson: input.postJson,
+        actionRequestId: producer.action_request_id ?? null,
+        threadId: input.threadId,
+        sourceId,
+        producerId: producer.producer_id ?? null,
+        ok: true,
+        observedState: {
+          source_id: sourceId,
+          producer_id: producer.producer_id ?? null,
+          client_stream_confirmed: true,
+          interval_active: true,
+          cadence_ms: producer.cadence_ms,
+          latest_chunk_id: current.last_chunk_id ?? null,
+          scheduler_adoption_status: "adopted",
+        },
+      });
       adopted += 1;
       continue;
     }
@@ -517,6 +601,24 @@ export async function adoptServerVisualProducerPolicies(input: {
       stream,
       postJson: input.postJson,
       preserveExistingStream: true,
+    });
+    const updated = useVisualSourceCaptureStore.getState().producers[sourceId];
+    await postClientCapabilityAdoption({
+      postJson: input.postJson,
+      actionRequestId: producer.action_request_id ?? null,
+      threadId: input.threadId,
+      sourceId,
+      producerId: producer.producer_id ?? updated?.producer_id ?? null,
+      ok: true,
+      observedState: {
+        source_id: sourceId,
+        producer_id: producer.producer_id ?? updated?.producer_id ?? null,
+        client_stream_confirmed: true,
+        interval_active: true,
+        cadence_ms: producer.cadence_ms,
+        latest_chunk_id: updated?.last_chunk_id ?? null,
+        scheduler_adoption_status: "adopted",
+      },
     });
     adopted += 1;
   }
