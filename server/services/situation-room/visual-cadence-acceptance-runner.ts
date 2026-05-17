@@ -12,6 +12,7 @@ import {
 } from "./live-source-chunk-buffer";
 import { getLiveSourceProducerBinding } from "./live-source-producer-binding";
 import { readLiveSourceProducerFreshness } from "./live-source-producer-freshness";
+import { findLatestClientCapabilityAdoption } from "../client-capabilities/client-adoption-store";
 
 const check = (input: HelixVisualCadenceAcceptanceCheck): HelixVisualCadenceAcceptanceCheck => input;
 
@@ -36,6 +37,14 @@ export function runVisualCadenceAcceptance(input: {
   const latestChunk = chunks.at(-1) as HelixLiveSourceChunk | null;
   const latestJob = jobs.at(-1) as HelixLiveSourceAnalysisJob | null;
   const freshness = readLiveSourceProducerFreshness({ producerId: producer.producer_id });
+  const clientAdoption = findLatestClientCapabilityAdoption({
+    threadId: producer.thread_id,
+    sourceId: producer.source_id,
+    producerId: producer.producer_id,
+  }) ?? findLatestClientCapabilityAdoption({
+    threadId: producer.thread_id,
+    sourceId: producer.source_id,
+  });
   const chunkSequencesIncrease =
     chunks.length >= 2 &&
     chunks.at(-2)!.sequence_index < chunks.at(-1)!.sequence_index;
@@ -61,6 +70,16 @@ export function runVisualCadenceAcceptance(input: {
       ok: producer.status === "active" || producer.status === "permission_required" || producer.status === "waiting_for_client",
       summary: `Producer status is ${producer.status}.`,
       related_ids: [producer.producer_id],
+    }),
+    check({
+      name: "client_adoption_proven",
+      ok: Boolean(clientAdoption?.ok || freshness?.client_adoption_ok),
+      summary: clientAdoption
+        ? `Client adoption ${clientAdoption.ok ? "succeeded" : "failed"}.`
+        : freshness?.client_adoption_status
+          ? `Client adoption status is ${freshness.client_adoption_status}.`
+          : "No client adoption receipt exists for this producer.",
+      related_ids: [clientAdoption?.adoption_id, freshness?.client_adoption_id].filter(Boolean) as string[],
     }),
     check({
       name: "two_increasing_chunks",
@@ -110,6 +129,8 @@ export function runVisualCadenceAcceptance(input: {
       ? null
       : firstFailed?.name === "two_increasing_chunks"
         ? "wait_for_next_interval_or_capture_now"
+        : firstFailed?.name === "client_adoption_proven"
+          ? "client_adopt_visual_producer"
         : firstFailed?.name === "latest_chunk_has_analysis_job"
           ? "run_due_analysis"
           : freshness?.next_required_action ?? "inspect_pipeline",

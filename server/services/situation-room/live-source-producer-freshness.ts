@@ -12,6 +12,8 @@ import {
 import { getLiveSourceProducerBinding } from "./live-source-producer-binding";
 import { getVisualProducerSchedulerAdoption } from "./visual-producer-scheduler-adoption-store";
 import { listLiveAnswerEnvironmentDeltas } from "./live-answer-environment-store";
+import { findLatestClientCapabilityAction } from "../client-capabilities/client-action-queue";
+import { findLatestClientCapabilityAdoption } from "../client-capabilities/client-adoption-store";
 
 const latest = <T>(items: T[]): T | null => items.at(-1) ?? null;
 
@@ -43,6 +45,37 @@ export function readLiveSourceProducerFreshness(input: {
   const binding = getLiveSourceProducerBinding(actualProducer.source_id);
   const adoption = getVisualProducerSchedulerAdoption(actualProducer.producer_id) ??
     getVisualProducerSchedulerAdoption(actualProducer.source_id);
+  const clientAction = findLatestClientCapabilityAction({
+    threadId: actualProducer.thread_id,
+    sourceId: actualProducer.source_id,
+    producerId: actualProducer.producer_id,
+    capability: "visual_capture",
+  }) ?? findLatestClientCapabilityAction({
+    threadId: actualProducer.thread_id,
+    sourceId: actualProducer.source_id,
+    capability: "visual_capture",
+  });
+  const clientAdoption = findLatestClientCapabilityAdoption({
+    threadId: actualProducer.thread_id,
+    sourceId: actualProducer.source_id,
+    producerId: actualProducer.producer_id,
+    actionRequestId: clientAction?.action_request_id ?? null,
+  }) ?? findLatestClientCapabilityAdoption({
+    threadId: actualProducer.thread_id,
+    sourceId: actualProducer.source_id,
+    producerId: actualProducer.producer_id,
+  }) ?? findLatestClientCapabilityAdoption({
+    threadId: actualProducer.thread_id,
+    sourceId: actualProducer.source_id,
+  });
+  const observedState = clientAdoption?.observed_state ?? null;
+  const streamEnded =
+    observedState?.track_ready_state === "ended" ||
+    observedState?.status === "stopped" ||
+    observedState?.status === "waiting_for_stream";
+  const clientAdopted =
+    clientAdoption?.ok === true ||
+    adoption?.status === "adopted";
   const deltas = binding?.environment_id
     ? listLiveAnswerEnvironmentDeltas(binding.environment_id).slice(-20)
     : [];
@@ -53,40 +86,66 @@ export function readLiveSourceProducerFreshness(input: {
   const staleWindowMs = cadenceMs ? cadenceMs * 2 : 60_000;
   let staleReason: string | null = null;
   let nextRequiredAction: string | null = null;
+  let readinessState: HelixLiveSourceProducerFreshness["readiness_state"] = null;
   if (actualProducer.status === "permission_required") {
     staleReason = "visual_capture_permission_required";
     nextRequiredAction = "grant_visual_capture_permission";
-  } else if (actualProducer.status === "waiting_for_client" && adoption?.status !== "adopted") {
-    staleReason = "waiting_for_client_stream";
-    nextRequiredAction = adoption ? "client_stream_heartbeat_or_permission" : "client_adopt_visual_producer";
+    readinessState = "waiting_for_permission";
+  } else if (clientAdoption?.ok === false) {
+    staleReason = streamEnded ? "client_stream_ended" : "client_action_failed";
+    nextRequiredAction = clientAdoption.next_required_action ?? (streamEnded ? "grant_visual_capture_permission" : "client_adopt_visual_producer");
+    readinessState = streamEnded ? "client_stream_ended" : "client_action_failed";
+  } else if (actualProducer.status === "waiting_for_client" && !clientAdopted) {
+    staleReason = "waiting_for_client_adoption";
+    nextRequiredAction = "client_adopt_visual_producer";
+    readinessState = "waiting_for_client_adoption";
+  } else if (clientAdopted && actualProducer.capture_mode === "interval" && !latestChunk) {
+    staleReason = "client_adopted_waiting_for_chunk";
+    nextRequiredAction = "capture_frame_now";
+    readinessState = "client_adopted_waiting_for_chunk";
   } else if (actualProducer.capture_mode === "interval" && (!latestChunk || (lastChunkMs !== null && nowMs - lastChunkMs > staleWindowMs))) {
     staleReason = "no_chunk_after_two_cadence_windows";
     nextRequiredAction = "capture_frame_now";
+    readinessState = clientAdopted ? "stale" : "waiting_for_client_adoption";
   } else if (latestChunk && !latestJob) {
     staleReason = "analysis_pending_or_failed";
     nextRequiredAction = "run_due_analysis";
+    readinessState = "analysis_blocked";
   } else if (latestJob && latestJob.status === "queued") {
     staleReason = "analysis_pending_or_failed";
     nextRequiredAction = "run_due_analysis";
+    readinessState = "analysis_blocked";
   } else if (latestJob && latestJob.status === "failed") {
     staleReason = "analysis_pending_or_failed";
     nextRequiredAction = "repair_pipeline";
+    readinessState = "analysis_blocked";
   } else if (latestJob && latestJob.status === "completed" && binding?.environment_id && !latestDelta) {
     staleReason = "routing_gap";
     nextRequiredAction = "inspect_pipeline";
+    readinessState = "producer_active_chunks_flowing";
   }
   const isFresh = staleReason === null;
+  if (isFresh) {
+    readinessState = latestChunk ? "ready" : "producer_active_chunks_flowing";
+  }
   return {
     schema: HELIX_LIVE_SOURCE_PRODUCER_FRESHNESS_SCHEMA,
     producer_id: actualProducer.producer_id,
     source_id: actualProducer.source_id,
     thread_id: actualProducer.thread_id,
+    readiness_state: readinessState,
     cadence_ms: cadenceMs,
     last_capture_at: latestChunk?.ts ?? null,
     last_chunk_id: latestChunk?.chunk_id ?? actualProducer.latest_chunk_id ?? null,
     last_analysis_job_id: latestJob?.job_id ?? null,
     last_visual_evidence_id: outputEvidenceRef(latestJob),
     last_card_delta_at: latestDelta?.ts ?? null,
+    client_action_request_id: clientAction?.action_request_id ?? null,
+    client_action_status: clientAction?.status ?? null,
+    client_adoption_id: clientAdoption?.adoption_id ?? adoption?.adoption_id ?? null,
+    client_adoption_ok: clientAdoption?.ok ?? (adoption?.status === "adopted" ? true : null),
+    client_adoption_status: clientAdoption ? (clientAdoption.ok ? "adopted" : "failed") : adoption?.status ?? null,
+    client_observed_state: observedState,
     is_fresh: isFresh,
     stale_reason: staleReason,
     next_required_action: nextRequiredAction,

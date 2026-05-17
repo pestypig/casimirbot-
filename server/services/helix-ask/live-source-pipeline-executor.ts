@@ -26,6 +26,7 @@ import { getVisionProviderHealth } from "../vision/provider";
 import { pipelineLinesToLiveAnswerSchema } from "./live-source-pipeline-composer";
 import { recordLivePipelineLifecycleEvent, listLivePipelineLifecycleEvents } from "../situation-room/live-pipeline-lifecycle-store";
 import { calculateLivePipelineReadiness } from "../situation-room/live-pipeline-readiness";
+import { readLiveSourceProducerFreshness } from "../situation-room/live-source-producer-freshness";
 
 const plansById = new Map<string, HelixLiveSourcePipelinePlan>();
 const receiptsByPipelineId = new Map<string, HelixLiveSourcePipelineReceipt>();
@@ -332,6 +333,22 @@ export function buildLiveSourcePipelineRepairActions(plan: HelixLiveSourcePipeli
     if (producer.modality === "audio_transcript" && (!capability || capability.status === "configured_missing")) actions.add("attach_audio_or_transcript_source");
   }
   const buffer = getLiveSourceBufferStatus({ threadId: plan.thread_id });
+  const producers = listLiveSourceProducers({
+    threadId: plan.thread_id,
+    sourceIds: plan.producers.map((producer) => producer.source_id),
+  });
+  for (const producer of producers) {
+    if (producer.modality !== "visual_frame") continue;
+    const freshness = readLiveSourceProducerFreshness({ producerId: producer.producer_id });
+    if (!freshness || freshness.is_fresh) continue;
+    if (freshness.stale_reason === "waiting_for_client_adoption") actions.add("client_adopt_visual_producer");
+    if (freshness.stale_reason === "client_action_failed") actions.add("client_adopt_visual_producer");
+    if (freshness.stale_reason === "client_stream_ended") actions.add("grant_visual_capture_permission");
+    if (freshness.stale_reason === "client_adopted_waiting_for_chunk") actions.add("capture_frame_now");
+    if (freshness.stale_reason === "no_chunk_after_two_cadence_windows") actions.add("capture_frame_now");
+    if (freshness.stale_reason === "analysis_pending_or_failed") actions.add("run_due_analysis");
+    if (freshness.stale_reason === "routing_gap") actions.add("run_due_analysis");
+  }
   if (buffer.total_analysis_queue_depth > 0) actions.add("run_due_analysis");
   if (buffer.sources.some((source: any) => source.backpressure.status === "retry_later" || source.backpressure.status === "compacting")) {
     actions.add("wait_or_reduce_rate");

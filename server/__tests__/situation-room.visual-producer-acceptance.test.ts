@@ -19,6 +19,13 @@ import {
   recordVisualProducerSchedulerAdoption,
   resetVisualProducerSchedulerAdoptionsForTest,
 } from "../services/situation-room/visual-producer-scheduler-adoption-store";
+import {
+  resetClientCapabilityActionsForTest,
+} from "../services/client-capabilities/client-action-queue";
+import {
+  recordClientCapabilityAdoption,
+  resetClientCapabilityAdoptionsForTest,
+} from "../services/client-capabilities/client-adoption-store";
 
 describe("visual producer cadence acceptance", () => {
   beforeEach(() => {
@@ -26,6 +33,8 @@ describe("visual producer cadence acceptance", () => {
     resetLiveSourceProducerBindingsForTest();
     resetLiveSourceProducerLifecycleForTest();
     resetVisualProducerSchedulerAdoptionsForTest();
+    resetClientCapabilityActionsForTest();
+    resetClientCapabilityAdoptionsForTest();
   });
 
   it("moves waiting client freshness forward after scheduler adoption", () => {
@@ -42,7 +51,7 @@ describe("visual producer cadence acceptance", () => {
     const before = readLiveSourceProducerFreshness({
       producerId: cadence.producer.producer_id,
     });
-    expect(before?.stale_reason).toBe("waiting_for_client_stream");
+    expect(before?.stale_reason).toBe("waiting_for_client_adoption");
     expect(before?.next_required_action).toBe("client_adopt_visual_producer");
 
     const adoption = recordVisualProducerSchedulerAdoption({
@@ -61,7 +70,7 @@ describe("visual producer cadence acceptance", () => {
     const after = readLiveSourceProducerFreshness({
       producerId: cadence.producer.producer_id,
     });
-    expect(after?.stale_reason).toBe("no_chunk_after_two_cadence_windows");
+    expect(after?.stale_reason).toBe("client_adopted_waiting_for_chunk");
     expect(after?.next_required_action).toBe("capture_frame_now");
   });
 
@@ -75,6 +84,18 @@ describe("visual producer cadence acceptance", () => {
       clientStreamConfirmed: true,
       status: "active",
     });
+    recordClientCapabilityAdoption({
+      action_request_id: "client_action:test",
+      thread_id: "helix-ask:desktop",
+      source_id: "visual_source:test",
+      producer_id: cadence.producer.producer_id,
+      ok: true,
+      observed_state: {
+        client_stream_confirmed: true,
+        interval_active: true,
+        track_ready_state: "live",
+      },
+    });
 
     const events = listLiveSourceProducerLifecycleEvents({
       producerId: cadence.producer.producer_id,
@@ -87,7 +108,7 @@ describe("visual producer cadence acceptance", () => {
       now: new Date(Date.now() + 25_000).toISOString(),
     });
     expect(freshness?.is_fresh).toBe(false);
-    expect(freshness?.stale_reason).toBe("no_chunk_after_two_cadence_windows");
+    expect(freshness?.stale_reason).toBe("client_adopted_waiting_for_chunk");
     expect(freshness?.next_required_action).toBe("capture_frame_now");
   });
 
@@ -100,6 +121,18 @@ describe("visual producer cadence acceptance", () => {
       captureMode: "interval",
       clientStreamConfirmed: true,
       status: "active",
+    });
+    recordClientCapabilityAdoption({
+      action_request_id: "client_action:test-pass",
+      thread_id: "helix-ask:desktop",
+      source_id: "visual_source:test",
+      producer_id: cadence.producer.producer_id,
+      ok: true,
+      observed_state: {
+        client_stream_confirmed: true,
+        interval_active: true,
+        track_ready_state: "live",
+      },
     });
     const first = appendLiveSourceChunk({
       source_id: "visual_source:test",

@@ -51,7 +51,19 @@ export function listClientCapabilityAdoptions(input: { threadId?: string | null 
     .filter((adoption) => !input.threadId || adoption.thread_id === input.threadId);
 }
 
+export function findLatestClientCapabilityAdoption(input: {
+  threadId?: string | null;
+  sourceId?: string | null;
+  producerId?: string | null;
+  actionRequestId?: string | null;
+}): HelixClientCapabilityAdoption | null {
+  return listClientCapabilityAdoptions({ threadId: input.threadId })
+    .filter((adoption) => !input.actionRequestId || adoption.action_request_id === input.actionRequestId)
+    .filter((adoption) => !input.sourceId || adoption.source_id === input.sourceId)
+    .filter((adoption) => !input.producerId || adoption.producer_id === input.producerId)
+    .at(-1) ?? null;
+}
+
 export function resetClientCapabilityAdoptionsForTest(): void {
   adoptionsById.clear();
 }
-

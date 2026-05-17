@@ -32,6 +32,10 @@ const action = (input: {
 const problemFromFreshness = (freshness?: HelixLiveSourceProducerFreshness | null): HelixLiveRuntimeRepairProblemKind | null => {
   if (!freshness || freshness.is_fresh) return null;
   if (freshness.stale_reason === "visual_capture_permission_required") return "missing_permission";
+  if (freshness.stale_reason === "waiting_for_client_adoption") return "visual_no_chunks";
+  if (freshness.stale_reason === "client_adopted_waiting_for_chunk") return "visual_no_chunks";
+  if (freshness.stale_reason === "client_action_failed") return "visual_no_chunks";
+  if (freshness.stale_reason === "client_stream_ended") return "missing_permission";
   if (freshness.stale_reason === "waiting_for_client_stream") return freshness.next_required_action === "client_adopt_visual_producer" ? "visual_no_chunks" : "missing_permission";
   if (freshness.stale_reason === "no_chunk_after_two_cadence_windows") return freshness.last_chunk_id ? "visual_stale" : "visual_no_chunks";
   if (freshness.stale_reason === "analysis_pending_or_failed") return "visual_analysis_pending";
@@ -63,6 +67,12 @@ const actionsForProblem = (problem: HelixLiveRuntimeRepairProblemKind): HelixLiv
         requires_user_permission: true,
         can_run_automatically: false,
         summary: "Capture a fresh frame from the active browser stream.",
+      }),
+      action({
+        action_id: "restart_visual_producer",
+        requires_user_permission: false,
+        can_run_automatically: true,
+        summary: "Restart the interval loop if the client has adopted the producer but chunks are not flowing.",
       }),
       action({
         action_id: "resume_visual_producer",

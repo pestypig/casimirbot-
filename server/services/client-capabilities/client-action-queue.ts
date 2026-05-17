@@ -119,6 +119,23 @@ export function listClientCapabilityActions(input: { threadId?: string | null } 
     .filter((request) => !input.threadId || request.thread_id === input.threadId);
 }
 
+export function findLatestClientCapabilityAction(input: {
+  threadId?: string | null;
+  sourceId?: string | null;
+  producerId?: string | null;
+  capability?: HelixClientCapability | null;
+  action?: HelixClientCapabilityActionKind | null;
+}): HelixClientCapabilityAction | null {
+  const sourceId = input.sourceId ?? null;
+  const producerId = input.producerId ?? null;
+  return listClientCapabilityActions({ threadId: input.threadId })
+    .filter((request) => !input.capability || request.capability === input.capability)
+    .filter((request) => !input.action || request.action === input.action)
+    .filter((request) => !sourceId || request.args.source_id === sourceId || request.args.sourceId === sourceId)
+    .filter((request) => !producerId || request.args.producer_id === producerId || request.args.producerId === producerId)
+    .at(-1) ?? null;
+}
+
 export function getClientCapabilityAction(actionRequestId: string | null | undefined): HelixClientCapabilityAction | null {
   return actionRequestId ? requestsById.get(actionRequestId) ?? null : null;
 }
@@ -137,4 +154,3 @@ export function updateClientCapabilityActionStatus(
 export function resetClientCapabilityActionsForTest(): void {
   requestsById.clear();
 }
-

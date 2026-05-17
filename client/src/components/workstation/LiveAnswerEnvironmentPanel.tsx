@@ -276,6 +276,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     return sourceId ? state.producers[sourceId] ?? null : null;
   });
+  const latestClientAction = useMemo(() => clientActions.at(-1) ?? null, [clientActions]);
+  const latestClientAdoption = useMemo(() => clientAdoptions.at(-1) ?? null, [clientAdoptions]);
+  const latestClientObserved = latestClientAdoption?.observed_state ?? {};
   const sourceStatusLabel = (capability: HelixSituationSourceCapability): string => {
     if (capability.modality === "visual_frame" && capability.status === "active" && capability.next_required_action === "capture_first_frame") {
       return "active, waiting for first frame";
@@ -958,7 +961,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ) : null}
         {(clientActions.length > 0 || clientAdoptions.length > 0) ? (
           <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
-            Client actions: {clientActions.length} pending; latest adoption {clientAdoptions.at(-1)?.ok ? "ok" : clientAdoptions.at(-1) ? "failed" : "none"}.
+            Client actions: {clientActions.length} pending; latest action {latestClientAction?.action ?? "none"}; latest adoption {latestClientAdoption?.ok ? "adopted" : latestClientAdoption ? "failed" : "none"}; stream {latestClientObserved.client_stream_confirmed === true ? "active" : latestClientObserved.client_stream_confirmed === false ? "missing" : "unknown"}; interval {latestClientObserved.interval_active === true ? "active" : latestClientObserved.interval_active === false ? "inactive" : "unknown"}; chunk {typeof latestClientObserved.latest_chunk_id === "string" ? latestClientObserved.latest_chunk_id : "none"}.
           </p>
         ) : null}
       </div>
