@@ -16,6 +16,7 @@ import { synthesizePresentState } from "./present-state-synthesizer";
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
 import { buildLiveCardLineProjection } from "./live-card-line-projection-builder";
 import { LIVE_COGNITION_TOOL_REGISTRY_VERSION } from "./live-cognition-tool-registry";
+import { perturbLiveSituationRunFromPrompt } from "./live-situation-prompt-perturbation-router";
 import { getVisualEvidenceHealth } from "./visual-evidence-health";
 import { listVisualFrameEvidence } from "./visual-snapshot-store";
 import { selectSourceScopedEvidence } from "./source-scoped-evidence-selector";
@@ -273,6 +274,7 @@ export function projectPresentStateCard(input: {
     capabilities: sourceCapabilities,
   });
   if (environment && (!input.roomId || environment.room_id === input.roomId)) {
+    perturbLiveSituationRunFromPrompt({ environment, now });
     const projection = buildLiveCardLineProjection({ environment, now });
     const projectionLines = projection.lines.map((entry) => projectionLineToPresentLine(entry, now));
     const lineStates = projectionLineStates(projection, now);

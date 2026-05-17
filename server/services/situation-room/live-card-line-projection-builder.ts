@@ -13,6 +13,7 @@ import { reasonLiveCardLinesForEnvironment } from "./live-card-line-reasoner";
 import { listInterpretedEvents } from "./interpreted-event-log-store";
 import { getVisualEvidenceHealth } from "./visual-evidence-health";
 import { listVisualFrameEvidence } from "./visual-snapshot-store";
+import { latestLiveFieldEvaluationsByField } from "./live-field-evaluation-store";
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
 import {
   liveSchemaSelectionToLineDefinitions,
@@ -186,12 +187,17 @@ export function buildLiveCardLineProjection(input: {
     lineSchema: selectedSchema,
   });
   const reasoningsByKey = new Map(reasoned.reasonings.map((entry) => [entry.line_key, entry]));
+  const fieldEvaluationsByKey = latestLiveFieldEvaluationsByField({
+    threadId: input.environment.thread_id,
+    environmentId: input.environment.environment_id,
+  });
   const analyzerVisualObservation = latestAnalyzerVisualObservation({
     environment: input.environment,
     now,
   });
   let staleFallbackUsed = false;
   const lines: HelixLiveCardLineProjectionLine[] = selectedSchema.map((line) => {
+    const fieldEvaluation = fieldEvaluationsByKey.get(line.key) ?? null;
     const reasoning = reasoningsByKey.get(line.key) ?? null;
     const visualValue = visualFallbackValue({
       line,
@@ -200,26 +206,29 @@ export function buildLiveCardLineProjection(input: {
     });
     const useReasoning = Boolean(reasoning && (reasoning.evidence_refs.length > 0 || !visualValue));
     const activeReasoning = useReasoning ? reasoning : null;
-    if (!activeReasoning && !visualValue) staleFallbackUsed = true;
-    const missing = safeMissingEvidence(activeReasoning?.missing_evidence ?? [], genericVisual);
+    if (!fieldEvaluation && !activeReasoning && !visualValue) staleFallbackUsed = true;
+    const missing = safeMissingEvidence(fieldEvaluation?.missing_evidence ?? activeReasoning?.missing_evidence ?? [], genericVisual);
     const nextTool = genericVisual && (activeReasoning?.next_best_tool === "minecraft.query_event_window" || activeReasoning?.next_best_tool === "visual.align_latest_with_event_window")
       ? line.key === "next_check" ? "visual.compare_recent_frames" : "live-cognition.synthesize_line_from_observations"
       : activeReasoning?.next_best_tool ?? null;
     return {
       key: line.key,
       label: line.label,
-      value: activeReasoning?.value ?? visualValue ?? fallbackValueFor(line, genericVisual),
-      confidence: typeof activeReasoning?.confidence === "number" ? activeReasoning.confidence : null,
+      value: fieldEvaluation?.value ?? activeReasoning?.value ?? visualValue ?? fallbackValueFor(line, genericVisual),
+      confidence: typeof fieldEvaluation?.confidence === "number"
+        ? fieldEvaluation.confidence
+        : typeof activeReasoning?.confidence === "number" ? activeReasoning.confidence : null,
       evidence_refs: uniqueStrings([
+        ...(fieldEvaluation?.evidence_refs ?? []),
         ...(activeReasoning?.evidence_refs ?? []),
-        ...(activeReasoning ? [] : analyzerVisualObservation?.evidence_refs ?? []),
+        ...(fieldEvaluation || activeReasoning ? [] : analyzerVisualObservation?.evidence_refs ?? []),
       ]).slice(-12),
       missing_evidence: missing,
-      next_best_tool: nextTool,
-      last_check_result: null,
+      next_best_tool: fieldEvaluation?.next_check && line.key === "next_check" ? "visual.compare_recent_frames" : nextTool,
+      last_check_result: fieldEvaluation?.status ?? null,
       source_coverage: sourceCoverageFor(line, capabilities, genericVisual),
-      reasoner_id: activeReasoning?.reasoning_id ?? null,
-      source: activeReasoning ? projectionSourceFor(line, genericVisual) : visualValue ? "visual_observation" : "fallback",
+      reasoner_id: fieldEvaluation?.evaluation_id ?? activeReasoning?.reasoning_id ?? null,
+      source: fieldEvaluation ? "line_reasoner" : activeReasoning ? projectionSourceFor(line, genericVisual) : visualValue ? "visual_observation" : "fallback",
       assistant_answer: false,
       role: "ui_projection",
     };

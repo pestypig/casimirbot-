@@ -20,6 +20,7 @@ import {
 } from "./live-schema-selection-engine";
 import { inspectLiveSchemaCompatibility } from "./live-schema-compatibility-guard";
 import { buildLiveCardLineProjection } from "./live-card-line-projection-builder";
+import { runLiveFieldWorkersForObservation } from "./live-field-worker-runner";
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -154,6 +155,12 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       })
     : null;
   const scopedEnvironment = schemaRepair?.environment ?? environment;
+  const fieldWorkerRun = scopedEnvironment
+    ? runLiveFieldWorkersForObservation({
+        environment: scopedEnvironment,
+        observation: liveCognitionPromotion.observation ?? null,
+      })
+    : null;
   const lineProjection = scopedEnvironment
     ? buildLiveCardLineProjection({ environment: scopedEnvironment })
     : null;
@@ -229,6 +236,10 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     schema_repair_delta: schemaRepair?.delta ?? null,
     live_card_line_projection: lineProjection,
     live_card_line_reasoning: lineReasoning,
+    live_situation_run: fieldWorkerRun?.run ?? null,
+    live_field_workers: fieldWorkerRun?.workers ?? [],
+    live_field_evaluations: fieldWorkerRun?.evaluations ?? [],
+    live_handoff_arbitration: fieldWorkerRun?.arbitration ?? null,
     assistant_answer: false as const,
     raw_content_included: false as const,
     context_policy: "compact_context_pack_only" as const,

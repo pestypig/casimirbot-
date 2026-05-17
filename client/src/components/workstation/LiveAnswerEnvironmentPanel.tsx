@@ -84,6 +84,39 @@ type LiveCognitionHandoffRead = {
   selected_evidence_refs?: string[];
   created_at: string;
 };
+type LiveSituationRunRead = {
+  situation_run_id: string;
+  modality_scope: string;
+  status: string;
+  active_fields?: string[];
+  reasoning_budget: string;
+  updated_at: string;
+};
+type LiveFieldWorkerRead = {
+  worker_id: string;
+  field_key: string;
+  field_label: string;
+  worker_role: string;
+  status: string;
+  may_execute_tool: boolean;
+};
+type LiveFieldEvaluationRead = {
+  evaluation_id: string;
+  worker_id: string;
+  field_key: string;
+  value: string;
+  status: string;
+  confidence: number;
+  missing_evidence?: string[];
+  expires_at: string;
+};
+type LiveTangentEvaluationRead = {
+  tangent_id: string;
+  tangent_type: string;
+  claim: string;
+  confidence: number;
+  recommended_handoff?: { type: string; reason: string };
+};
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -245,6 +278,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [cognitionInterpretations, setCognitionInterpretations] = useState<LiveCognitionInterpretationRead[]>([]);
   const [cognitionGoals, setCognitionGoals] = useState<LiveCognitionGoalRead[]>([]);
   const [cognitionHandoffs, setCognitionHandoffs] = useState<LiveCognitionHandoffRead[]>([]);
+  const [situationRuns, setSituationRuns] = useState<LiveSituationRunRead[]>([]);
+  const [fieldWorkers, setFieldWorkers] = useState<LiveFieldWorkerRead[]>([]);
+  const [fieldEvaluations, setFieldEvaluations] = useState<LiveFieldEvaluationRead[]>([]);
+  const [tangentEvaluations, setTangentEvaluations] = useState<LiveTangentEvaluationRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -351,7 +388,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldEvaluationRes, tangentRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -369,8 +406,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/live-cognition/interpretations?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/goals?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/handoffs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/situation-runs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/field-workers?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/field-evaluations?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/tangents?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldEvaluationBody, tangentBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -388,6 +429,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         cognitionInterpretationRes.json().catch(() => ({})),
         cognitionGoalRes.json().catch(() => ({})),
         cognitionHandoffRes.json().catch(() => ({})),
+        situationRunRes.json().catch(() => ({})),
+        fieldWorkerRes.json().catch(() => ({})),
+        fieldEvaluationRes.json().catch(() => ({})),
+        tangentRes.json().catch(() => ({})),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -413,6 +458,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setCognitionInterpretations(Array.isArray(cognitionInterpretationBody.interpretations) ? cognitionInterpretationBody.interpretations : []);
       setCognitionGoals(Array.isArray(cognitionGoalBody.goals) ? cognitionGoalBody.goals : []);
       setCognitionHandoffs(Array.isArray(cognitionHandoffBody.handoffs) ? cognitionHandoffBody.handoffs : []);
+      setSituationRuns(Array.isArray(situationRunBody.runs) ? situationRunBody.runs : []);
+      setFieldWorkers(Array.isArray(fieldWorkerBody.workers) ? fieldWorkerBody.workers : []);
+      setFieldEvaluations(Array.isArray(fieldEvaluationBody.evaluations) ? fieldEvaluationBody.evaluations : []);
+      setTangentEvaluations(Array.isArray(tangentBody.tangents) ? tangentBody.tangents : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -1435,6 +1484,69 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           ) : null}
           {activeTab === "live_cognition" ? (
             <div className="grid gap-3 xl:grid-cols-2">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Situation Runs</p>
+                <p className="mt-1 text-[11px] text-slate-500">Prompt-perturbed procedures that receive live observations.</p>
+                <div className="mt-3 space-y-2">
+                  {situationRuns.length === 0 ? <p className="text-xs text-slate-500">No situation runs yet.</p> : null}
+                  {situationRuns.slice(-6).reverse().map((run: LiveSituationRunRead) => (
+                    <div key={run.situation_run_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-slate-100">{run.modality_scope}</p>
+                        <span className="text-[10px] text-slate-500">{run.status} / {run.reasoning_budget}</span>
+                      </div>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">fields {(run.active_fields ?? []).join(", ") || "none"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Field Workers</p>
+                <p className="mt-1 text-[11px] text-slate-500">Workers evaluate fields; they cannot execute tools or answer users.</p>
+                <div className="mt-3 space-y-2">
+                  {fieldWorkers.length === 0 ? <p className="text-xs text-slate-500">No field workers yet.</p> : null}
+                  {fieldWorkers.slice(-8).reverse().map((worker: LiveFieldWorkerRead) => (
+                    <div key={worker.worker_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs font-semibold text-slate-100">{worker.field_label}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">{worker.worker_role} / {worker.status} / may execute {String(worker.may_execute_tool)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Field Evaluations</p>
+                <p className="mt-1 text-[11px] text-slate-500">Latest scoped field judgments feeding the canonical card projection.</p>
+                <div className="mt-3 space-y-2">
+                  {fieldEvaluations.length === 0 ? <p className="text-xs text-slate-500">No field evaluations yet.</p> : null}
+                  {fieldEvaluations.slice(-8).reverse().map((evaluation: LiveFieldEvaluationRead) => (
+                    <div key={evaluation.evaluation_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase text-slate-500">{evaluation.field_key}</p>
+                        <span className="text-[10px] text-slate-600">{evaluation.status} / {Math.round(evaluation.confidence * 100)}%</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-200">{evaluation.value}</p>
+                      {(evaluation.missing_evidence ?? []).length ? (
+                        <p className="mt-1 text-[10px] text-amber-200">Missing: {(evaluation.missing_evidence ?? []).slice(0, 2).join("; ")}</p>
+                      ) : null}
+                      <p className="mt-1 text-[10px] text-slate-600">expires {formatTime(evaluation.expires_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Tangents / Arbiter</p>
+                <p className="mt-1 text-[11px] text-slate-500">Side evaluations may recommend handoffs, but do not act.</p>
+                <div className="mt-3 space-y-2">
+                  {tangentEvaluations.length === 0 ? <p className="text-xs text-slate-500">No tangent evaluations yet.</p> : null}
+                  {tangentEvaluations.slice(-6).reverse().map((tangent: LiveTangentEvaluationRead) => (
+                    <div key={tangent.tangent_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-[10px] uppercase text-slate-500">{tangent.tangent_type}</p>
+                      <p className="mt-1 text-xs text-slate-200">{tangent.claim}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">handoff {tangent.recommended_handoff?.type ?? "none"} / {Math.round(tangent.confidence * 100)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="rounded border border-white/10 bg-slate-950/70 p-3">
                 <p className="text-xs font-semibold text-slate-100">Observation Journal</p>
                 <p className="mt-1 text-[11px] text-slate-500">Chronological observations only. Model perception is allowed only as evidence, not answer text.</p>
