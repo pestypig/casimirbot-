@@ -5,6 +5,7 @@ import { recordSyntheticEvidence } from "./synthetic-evidence-ledger";
 import {
   getActiveLiveAnswerEnvironmentForSource,
   getActiveLiveAnswerEnvironmentForThread,
+  setLiveAnswerEnvironmentLineSchema,
   updateLiveAnswerEnvironment,
 } from "./live-answer-environment-store";
 import { projectPresentStateCard } from "./present-state-card-projector";
@@ -12,6 +13,12 @@ import { getLiveSourceProducer } from "./live-source-chunk-buffer";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 import { promoteLiveSourceAnalysisOutput } from "./live-cognition-promotion-router";
 import { reasonLiveCardLinesForEnvironment } from "./live-card-line-reasoner";
+import { upsertLiveSourceDescriptor } from "./live-source-descriptor-builder";
+import {
+  liveSchemaSelectionToLineDefinitions,
+  selectLiveSchemaForEnvironment,
+} from "./live-schema-selection-engine";
+import { inspectLiveSchemaCompatibility } from "./live-schema-compatibility-guard";
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -115,18 +122,46 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     evidenceRefs: [syntheticEvidence.evidence_id, interpretedEvent.event_id],
     modelInvoked: input.modelInvoked,
   });
+  if (input.chunk.modality === "visual_frame") {
+    upsertLiveSourceDescriptor({
+      source_id: input.chunk.source_id,
+      thread_id: input.chunk.thread_id,
+      environment_id: input.chunk.environment_id ?? null,
+      modality: "visual_frame",
+      source_origin: "browser_getDisplayMedia",
+      surface: "screen",
+      app_hint: input.summary,
+      window_title_hint: input.summary,
+      current_state: "active",
+      latest_observation_refs: liveCognitionPromotion.observation ? [liveCognitionPromotion.observation.observation_id] : [],
+      capabilities: ["capture_frame", "interval_capture", "client_adoption"],
+    });
+  }
   const environment =
     getActiveLiveAnswerEnvironmentForSource(input.chunk.source_id) ??
     getActiveLiveAnswerEnvironmentForThread(input.chunk.thread_id);
-  const lineReasoning = environment
-    ? reasonLiveCardLinesForEnvironment({ environment })
+  const schemaSelection = environment
+    ? selectLiveSchemaForEnvironment({ environment })
+    : null;
+  const schemaCompatibility = environment && schemaSelection
+    ? inspectLiveSchemaCompatibility({ environment, selection: schemaSelection })
+    : null;
+  const schemaRepair = environment && schemaSelection && schemaCompatibility && !schemaCompatibility.ok && schemaCompatibility.recommended_schema
+    ? setLiveAnswerEnvironmentLineSchema({
+        environment_id: environment.environment_id,
+        line_schema: liveSchemaSelectionToLineDefinitions(schemaSelection),
+      })
+    : null;
+  const scopedEnvironment = schemaRepair?.environment ?? environment;
+  const lineReasoning = scopedEnvironment
+    ? reasonLiveCardLinesForEnvironment({ environment: scopedEnvironment })
     : null;
   const lineValues = Object.keys(lineReasoning?.line_values ?? {}).length > 0
     ? lineReasoning?.line_values ?? {}
     : input.lineValues ?? defaultLineValues(input);
-  const delta = environment
+  const delta = scopedEnvironment
     ? updateLiveAnswerEnvironment({
-        environment_id: environment.environment_id,
+        environment_id: scopedEnvironment.environment_id,
         reason: "subgoal_update",
         line_values: Object.fromEntries(Object.entries(lineValues).map(([key, value]) => [
           key,
@@ -169,6 +204,9 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     present_state_card: presentStateCard,
     live_cognition_promotion: liveCognitionPromotion,
     live_cognition_promotion_audit: liveCognitionPromotion.audit,
+    schema_selection: schemaSelection,
+    schema_compatibility: schemaCompatibility,
+    schema_repair_delta: schemaRepair?.delta ?? null,
     live_card_line_reasoning: lineReasoning,
     assistant_answer: false as const,
     raw_content_included: false as const,

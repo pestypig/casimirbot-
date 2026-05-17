@@ -10,6 +10,9 @@ export type LiveAnswerEnvironmentReadResponse = {
   schema?: "helix.live_answer_environment_read.v1";
   environment?: LiveAnswerEnvironment | null;
   deltas?: LiveAnswerEnvironmentDelta[];
+  source_descriptors?: Array<Record<string, unknown>>;
+  schema_selection?: Record<string, unknown> | null;
+  schema_compatibility?: Record<string, unknown> | null;
   debug?: {
     thread_id?: string | null;
     environment_id?: string | null;
@@ -33,6 +36,7 @@ export type LiveAnswerEnvironmentState = {
   environmentByThread: Record<string, LiveAnswerEnvironment | null>;
   environmentById: Record<string, LiveAnswerEnvironment | null>;
   deltasByEnvironment: Record<string, LiveAnswerEnvironmentDelta[]>;
+  latestReadByThread: Record<string, LiveAnswerEnvironmentReadResponse | null>;
   diagnosticsByThread: Record<string, LiveAnswerEnvironmentDiagnostics>;
   upsertReadResponse: (threadId: string, response: LiveAnswerEnvironmentReadResponse) => void;
   loadLiveAnswerEnvironment: (threadId: string, limit?: number) => Promise<void>;
@@ -66,6 +70,7 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
       environmentByThread: {},
       environmentById: {},
       deltasByEnvironment: {},
+      latestReadByThread: {},
       diagnosticsByThread: {},
       upsertReadResponse: (threadId, response) => {
         const environment = response.environment ?? null;
@@ -89,6 +94,10 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
                 }
               : state.environmentById,
             deltasByEnvironment,
+            latestReadByThread: {
+              ...state.latestReadByThread,
+              [threadId]: response,
+            },
             diagnosticsByThread: {
               ...state.diagnosticsByThread,
               [threadId]: {
@@ -164,10 +173,23 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
     }),
     {
       name: "helix-live-answer-environment-v1",
+      version: 2,
+      migrate: (persisted) => {
+        const state = persisted && typeof persisted === "object"
+          ? persisted as Partial<LiveAnswerEnvironmentState>
+          : {};
+        return {
+          environmentByThread: state.environmentByThread ?? {},
+          environmentById: state.environmentById ?? {},
+          deltasByEnvironment: {},
+          latestReadByThread: {},
+          diagnosticsByThread: state.diagnosticsByThread ?? {},
+        } as LiveAnswerEnvironmentState;
+      },
       partialize: (state) => ({
         environmentByThread: state.environmentByThread,
         environmentById: state.environmentById,
-        deltasByEnvironment: state.deltasByEnvironment,
+        deltasByEnvironment: {},
         diagnosticsByThread: state.diagnosticsByThread,
       }),
     },

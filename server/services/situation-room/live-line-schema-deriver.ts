@@ -6,20 +6,13 @@ import {
   type HelixLiveLineSchemaDerivation,
 } from "@shared/helix-live-line-schema-derivation";
 import type { HelixSituationSourceModality } from "@shared/helix-situation-source-capability";
+import {
+  liveSchemaSelectionToLineDefinitions,
+  selectLiveSchemaForEnvironment,
+} from "./live-schema-selection-engine";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
-
-const lower = (value: unknown): string => String(value ?? "").toLowerCase();
-
-const isExplicitGenericNonMinecraftVisual = (value: unknown): boolean => {
-  const text = lower(value);
-  return (
-    /\b(?:generic\s+workstation|generic\s+visual|workstation\s+live\s+answer|document|folder|file explorer|app screen)\b/.test(text) ||
-    /\b(?:do\s+not|don't|not|without|exclude|avoid)\b[\s\S]{0,80}\b(?:minecraft|minehut|game[-\s]?specific|game)\b/.test(text) ||
-    /\b(?:minecraft|minehut|game[-\s]?specific|game)\b[\s\S]{0,80}\b(?:do\s+not|don't|not|without|exclude|avoid|assumptions?)\b/.test(text)
-  );
-};
 
 const line = (
   key: string,
@@ -55,13 +48,6 @@ export const GENERIC_VISUAL_LIVE_LINE_SCHEMA: LiveAnswerLineDefinition[] = [
   { key: "last_update", label: "Last update", update_policy: "projection_only", visibility: "answer_card", priority: "info" },
 ];
 
-const isMinecraftObjective = (environment: Pick<LiveAnswerEnvironment, "objective" | "preset">): boolean =>
-  !isExplicitGenericNonMinecraftVisual(environment.objective) &&
-  (
-    environment.preset === "minecraft_run_monitor" ||
-    /\b(?:minecraft|minehut|hotbar|inventory|creeper|wheat|chicken|farm|block|slab)\b/i.test(environment.objective)
-  );
-
 export function deriveLiveLineSchema(input: {
   environment: LiveAnswerEnvironment;
   visualEvidence?: HelixVisualFrameEvidence | null;
@@ -82,8 +68,33 @@ export function deriveLiveLineSchema(input: {
     ...(input.activeModalities?.includes("audio_transcript") ? [] : ["audio transcript source is not attached"]),
     ...(input.activeModalities?.includes("world_event") ? [] : ["world-event source is not attached"]),
   ];
+  const schemaSelection = selectLiveSchemaForEnvironment({
+    environment: input.environment,
+    activeModalities: input.activeModalities,
+    observations: evidence
+      ? [{
+          schema: "helix.observation_journal_entry.v1",
+          observation_id: `observation:visual-evidence:${evidence.evidence_id}`,
+          thread_id: input.environment.thread_id,
+          room_id: input.environment.room_id ?? null,
+          source_id: evidence.source_id ?? null,
+          modality: "visual_frame",
+          role: "model_perception_observation",
+          text: summary,
+          summary,
+          evidence_refs: [evidence.evidence_id],
+          model_invoked: true,
+          confidence: null,
+          raw_content_included: false,
+          assistant_answer: false,
+          context_policy: "compact_context_pack_only",
+          created_at: evidence.ts ?? now,
+        }]
+      : null,
+  });
+  const selectedKeys = new Set(liveSchemaSelectionToLineDefinitions(schemaSelection).map((entry) => entry.key));
 
-  const schema = isMinecraftObjective(input.environment)
+  const schema = selectedKeys.has("place") || schemaSelection.preset_hint === "minecraft_cortana"
     ? [
         line("place", "Place", "Current Minecraft place or scene.", "visual_frame", summary || "Waiting for visual or world evidence.", evidenceRefs, missing, "visual.align_latest_with_event_window"),
         line("activity", "Activity", "Current player activity.", "mixed", "Waiting for supported activity evidence.", evidenceRefs, missing, "visual.align_latest_with_event_window"),

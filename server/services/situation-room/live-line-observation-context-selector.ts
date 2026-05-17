@@ -4,6 +4,8 @@ import { listGoalCards } from "./goal-finder-store";
 import { listInterpretationCards } from "./interpretation-card-store";
 import { listObservationJournalEntries } from "./observation-journal-store";
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
+import { listLiveSourceDescriptors } from "./live-source-descriptor-builder";
+import { selectLiveSchemaForEnvironment } from "./live-schema-selection-engine";
 
 const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 
@@ -20,6 +22,18 @@ export function inferLineReasoningModalityScope(input: {
   environment: LiveAnswerEnvironment;
   hasFreshWorld?: boolean;
 }): HelixLiveCardLineReasoningModalityScope {
+  const descriptors = listLiveSourceDescriptors({
+    threadId: input.environment.thread_id,
+    environmentId: input.environment.environment_id,
+    limit: 20,
+  });
+  const descriptorText = lower(descriptors.map((descriptor) =>
+    `${descriptor.modality} ${descriptor.serving_context.surface} ${descriptor.serving_context.app_hint ?? ""} ${descriptor.serving_context.window_title_hint ?? ""} ${descriptor.user_label ?? ""}`,
+  ).join("\n"));
+  if (/\b(?:file_manager|document|browser_tab|screen|window)\b/.test(descriptorText)) return "generic_visual";
+  if (/\b(?:game|minehut_plugin)\b/.test(descriptorText) && !isExplicitGenericNonMinecraftVisual(input.environment.objective)) {
+    return input.hasFreshWorld ? "minecraft_world" : "minecraft_visual";
+  }
   const text = lower(`${input.environment.preset ?? ""} ${input.environment.objective} ${input.environment.line_schema.map((line) => `${line.key} ${line.label}`).join(" ")}`);
   if (isExplicitGenericNonMinecraftVisual(input.environment.objective)) return "generic_visual";
   if (/\b(?:calculator|equation|residual|prime|simulation)\b/.test(text)) return "calculator_stream";
@@ -62,6 +76,16 @@ export function selectLiveLineObservationContext(input: {
     environment: input.environment,
     hasFreshWorld,
   });
+  const descriptors = listLiveSourceDescriptors({
+    threadId: input.environment.thread_id,
+    environmentId: input.environment.environment_id,
+    limit: 40,
+  });
+  const schemaSelection = selectLiveSchemaForEnvironment({
+    environment: input.environment,
+    descriptors,
+    observations,
+  });
   return {
     thread_id: input.environment.thread_id,
     environment_id: input.environment.environment_id,
@@ -71,6 +95,8 @@ export function selectLiveLineObservationContext(input: {
     interpretations,
     goals,
     capabilities,
+    source_descriptors: descriptors,
+    schema_selection: schemaSelection,
     latest_observation_refs: observations.slice(-8).map((entry) => entry.observation_id),
     latest_interpretation_refs: interpretations.slice(-8).map((entry) => entry.interpretation_id),
     latest_goal_refs: goals.slice(-8).map((entry) => entry.goal_id),

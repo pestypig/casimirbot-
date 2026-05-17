@@ -270,6 +270,18 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const diagnostics = useLiveAnswerEnvironmentStore(
     (state: LiveAnswerEnvironmentState) => state.diagnosticsByThread[threadId] ?? null,
   );
+  const latestReadResponse = useLiveAnswerEnvironmentStore(
+    (state: LiveAnswerEnvironmentState) => state.latestReadByThread[threadId] ?? null,
+  );
+  const sourceDescriptors = Array.isArray(latestReadResponse?.source_descriptors)
+    ? latestReadResponse.source_descriptors
+    : [];
+  const schemaSelection = latestReadResponse?.schema_selection && typeof latestReadResponse.schema_selection === "object"
+    ? latestReadResponse.schema_selection
+    : null;
+  const schemaCompatibility = latestReadResponse?.schema_compatibility && typeof latestReadResponse.schema_compatibility === "object"
+    ? latestReadResponse.schema_compatibility
+    : null;
   const loadEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment);
   const sourceIds = useMemo(() => new Set(environment?.source_ids ?? []), [environment?.source_ids]);
   const relevantSources = useMemo(
@@ -1506,17 +1518,50 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
           ) : null}
           {activeTab === "line_schema" && environment ? (
-            <div className="grid gap-2 md:grid-cols-2">
-              {environment.lines.map((line: LiveAnswerLineState) => (
-                <div key={line.key} className="rounded border border-white/10 bg-slate-950/70 p-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-100">{line.label}</p>
-                    <span className="rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-400">{line.update_policy} / {line.visibility}</span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">{line.key} / changed {formatTime(line.updated_at)}</p>
-                  <p className="mt-1 text-xs text-slate-200">{line.value}</p>
+            <div className="space-y-3">
+              <div className="grid gap-2 lg:grid-cols-2">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Source descriptor</p>
+                  {sourceDescriptors.length === 0 ? (
+                    <p className="mt-2 text-xs text-slate-400">No source descriptor has been recorded yet.</p>
+                  ) : sourceDescriptors.slice(-3).map((descriptor: Record<string, unknown>) => {
+                    const serving = descriptor.serving_context && typeof descriptor.serving_context === "object"
+                      ? descriptor.serving_context as Record<string, unknown>
+                      : {};
+                    return (
+                      <div key={String(descriptor.descriptor_id)} className="mt-2 rounded border border-white/10 bg-black/20 p-2">
+                        <p className="break-words text-xs text-slate-100">{String(descriptor.source_id ?? "source")}</p>
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {String(descriptor.modality ?? "unknown")} / {String(serving.surface ?? "unknown")} / {String(descriptor.current_state ?? "unknown")}
+                        </p>
+                        <p className="mt-1 break-words text-[10px] text-slate-500">
+                          app {String(serving.app_hint ?? "none")} / window {String(serving.window_title_hint ?? "none")}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Schema selection</p>
+                  <p className="mt-2 text-xs text-slate-200">{String(schemaSelection?.preset_hint ?? "none")}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    authority {String(schemaSelection?.preset_authority ?? "none")} / compatibility {String(schemaCompatibility?.ok ?? "unknown")}
+                  </p>
+                  <p className="mt-2 text-[11px] text-slate-300">{String(schemaSelection?.rationale ?? "No schema selection has been recorded yet.")}</p>
+                </div>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {environment.lines.map((line: LiveAnswerLineState) => (
+                  <div key={line.key} className="rounded border border-white/10 bg-slate-950/70 p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-slate-100">{line.label}</p>
+                      <span className="rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-400">{line.update_policy} / {line.visibility}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-500">{line.key} / changed {formatTime(line.updated_at)}</p>
+                    <p className="mt-1 text-xs text-slate-200">{line.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           {activeTab === "deltas" ? (

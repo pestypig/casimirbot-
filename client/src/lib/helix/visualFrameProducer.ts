@@ -1,4 +1,5 @@
 import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
+import { postVisualLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
 
 type PostJson = (path: string, body?: Record<string, unknown>) => Promise<any>;
 
@@ -147,6 +148,16 @@ export async function runVisualFrameProducerOnce(input: {
   await input.postJson("/api/agi/situation/visual-source/permission-granted", {
     source_id: input.sourceId,
     client_stream_confirmed: true,
+  });
+  await postVisualLiveSourceDescriptor({
+    postJson: input.postJson,
+    sourceId: input.sourceId,
+    threadId: input.threadId,
+    environmentId: input.environmentId ?? null,
+    pipelineId: input.pipelineId ?? null,
+    currentState: captureMode === "interval" ? "active_interval" : "active",
+    cadenceMs: captureMode === "interval" ? input.cadenceMs ?? null : null,
+    stream: input.stream,
   });
   await input.postJson("/api/agi/situation/source/heartbeat", {
     source_id: input.sourceId,
@@ -362,6 +373,16 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
     intervalActive: true,
     status: "adopted",
   });
+  await postVisualLiveSourceDescriptor({
+    postJson: input.postJson,
+    sourceId: input.sourceId,
+    threadId: input.threadId,
+    environmentId: input.environmentId ?? null,
+    pipelineId: input.pipelineId ?? null,
+    currentState: "active_interval",
+    cadenceMs,
+    stream: input.stream,
+  });
 
   const capture = async (force: boolean): Promise<VisualFrameProducerResult | null> => {
     if (activeCaptureLocks.has(input.sourceId)) return null;
@@ -416,6 +437,16 @@ export async function startVisualFrameProducerInterval(input: VisualProducerInte
         status: "adopted",
         lastCaptureAt: latestState?.last_frame_at ?? null,
         lastChunkId: latestState?.last_chunk_id ?? null,
+      });
+      await postVisualLiveSourceDescriptor({
+        postJson: input.postJson,
+        sourceId: input.sourceId,
+        threadId: input.threadId,
+        environmentId: input.environmentId ?? null,
+        pipelineId: input.pipelineId ?? null,
+        currentState: "active_interval",
+        cadenceMs,
+        stream,
       });
       return result;
     } catch (error) {
@@ -571,6 +602,16 @@ export async function adoptServerVisualProducerPolicies(input: {
         status: "adopted",
         lastCaptureAt: current.last_frame_at ?? null,
         lastChunkId: current.last_chunk_id ?? null,
+      });
+      await postVisualLiveSourceDescriptor({
+        postJson: input.postJson,
+        sourceId,
+        threadId: input.threadId,
+        environmentId: producer.environment_id ?? input.environmentId ?? null,
+        pipelineId: producer.pipeline_id ?? null,
+        currentState: "active_interval",
+        cadenceMs: producer.cadence_ms,
+        stream,
       });
       await postClientCapabilityAdoption({
         postJson: input.postJson,
