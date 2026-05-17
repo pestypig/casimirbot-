@@ -74,6 +74,16 @@ export const SOURCE_DESCRIBED_GENERIC_VISUAL_SCHEMA: LiveAnswerLineDefinition[] 
   { key: "last_update", label: "Last update", update_policy: "projection_only", visibility: "answer_card", priority: "info" },
 ];
 
+export const SOURCE_DESCRIBED_MINECRAFT_VISUAL_SCHEMA: LiveAnswerLineDefinition[] = [
+  { key: "place", label: "Place", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "activity", label: "Activity", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "structure", label: "Structure", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "entities", label: "Entities", update_policy: "episode_based", visibility: "answer_card", priority: "info" },
+  { key: "risk", label: "Risk", update_policy: "salience_only", visibility: "answer_card", priority: "warn" },
+  { key: "missing_evidence", label: "Missing evidence", update_policy: "projection_only", visibility: "answer_card", priority: "warn" },
+  { key: "next_check", label: "Next check", update_policy: "projection_only", visibility: "answer_card", priority: "action" },
+];
+
 export function excludedLiveSchemaDomains(objectiveText: string): string[] {
   const text = lower(objectiveText);
   const domains: string[] = [];
@@ -154,13 +164,18 @@ export function selectLiveSchemaForEnvironment(input: {
   const gameSource = sourceLooksGame(looseDescriptors, observations);
   const wantsGeneric = objectiveAsksGenericVisual(objectiveText) || excludedDomains.includes("game");
   const wantsGame = objectiveAsksGameMonitoring(objectiveText);
-  const explicitMinecraft = explicitPreset === "minecraft_run_monitor";
+  const environmentMinecraftPreset =
+    input.environment.preset === "minecraft_run_monitor" &&
+    wantsGame &&
+    !wantsGeneric &&
+    !excludedDomains.includes("game");
+  const explicitMinecraft = explicitPreset === "minecraft_run_monitor" || environmentMinecraftPreset;
   const useMinecraft = explicitMinecraft || (!excludedDomains.includes("game") && gameSource && wantsGame && !genericSource && !wantsGeneric);
   const selectedPreset: "generic_visual" | "minecraft_cortana" = useMinecraft ? "minecraft_cortana" : "generic_visual";
   const sourceDescriptorRefs = looseDescriptors.map((descriptor) => descriptor.descriptor_id);
   const observationRefs = observations.slice(-12).map((entry) => entry.observation_id);
   const baseSchema = selectedPreset === "minecraft_cortana"
-    ? LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS.minecraft_run_monitor
+    ? SOURCE_DESCRIBED_MINECRAFT_VISUAL_SCHEMA
     : SOURCE_DESCRIBED_GENERIC_VISUAL_SCHEMA;
   const selectedSchema = baseSchema.map((line) => toSelectionLine(line, selectedPreset));
   const rationale = useMinecraft

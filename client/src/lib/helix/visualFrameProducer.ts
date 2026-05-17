@@ -194,8 +194,9 @@ export async function runVisualFrameProducerOnce(input: {
     });
   }
   if (input.environmentId && analysis?.evidence?.evidence_id) {
-    await input.postJson(`/api/agi/situation/live-answer-environment/${encodeURIComponent(input.environmentId)}/derive-line-schema`, {
-      visual_evidence_id: analysis.evidence.evidence_id,
+    await input.postJson("/api/agi/situation/live-schema/repair", {
+      environment_id: input.environmentId,
+      thread_id: input.threadId,
     }).catch(() => null);
   }
 

@@ -4,6 +4,7 @@ import {
   type HelixPresentStateCard,
   type HelixPresentStateCardLine,
 } from "@shared/helix-present-state-card";
+import { HELIX_PRESENT_STATE_SYNTHESIS_SCHEMA } from "@shared/helix-present-state-synthesis";
 import { getActiveLiveAnswerEnvironmentForThread } from "./live-answer-environment-store";
 import { getActiveLiveSituationArtifactForThread } from "./live-situation-artifact-store";
 import { appendInterpretedEvent, listInterpretedEvents } from "./interpreted-event-log-store";
@@ -13,6 +14,8 @@ import { buildLiveCardLineStates } from "./live-card-line-state-builder";
 import { buildLiveEnvironmentFidelity } from "./live-environment-fidelity-builder";
 import { synthesizePresentState } from "./present-state-synthesizer";
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
+import { buildLiveCardLineProjection } from "./live-card-line-projection-builder";
+import { LIVE_COGNITION_TOOL_REGISTRY_VERSION } from "./live-cognition-tool-registry";
 import { getVisualEvidenceHealth } from "./visual-evidence-health";
 import { listVisualFrameEvidence } from "./visual-snapshot-store";
 import { selectSourceScopedEvidence } from "./source-scoped-evidence-selector";
@@ -39,6 +42,45 @@ const line = (input: {
   evidence_refs: input.evidenceRefs ?? [],
   updated_at: input.updatedAt,
 });
+
+const projectionLineToPresentLine = (
+  input: NonNullable<ReturnType<typeof buildLiveCardLineProjection>["lines"]>[number],
+  updatedAt: string,
+): HelixPresentStateCardLine => ({
+  key: input.key,
+  label: input.label,
+  value: input.value,
+  confidence: input.confidence,
+  evidence_refs: input.evidence_refs,
+  missing_evidence: input.missing_evidence,
+  next_best_tool: input.next_best_tool ?? null,
+  last_check_result: input.last_check_result ?? null,
+  source_coverage: input.source_coverage,
+  reasoner_id: input.reasoner_id ?? null,
+  source: input.source,
+  updated_at: updatedAt,
+});
+
+const projectionLineStates = (
+  projection: ReturnType<typeof buildLiveCardLineProjection>,
+  updatedAt: string,
+) => projection.lines.map((entry) => ({
+  schema: "helix.live_card_line_state.v1" as const,
+  line_key: entry.key,
+  label: entry.label,
+  value: entry.value,
+  confidence: entry.confidence,
+  evidence_status: entry.evidence_refs.length > 0 ? "supported" as const : entry.missing_evidence.length > 0 ? "partial" as const : "none" as const,
+  evidence_refs: entry.evidence_refs,
+  missing_evidence: entry.missing_evidence,
+  next_best_tool: entry.next_best_tool ?? null,
+  last_check_result: entry.last_check_result ?? null,
+  last_check_refs: [],
+  source_coverage: entry.source_coverage,
+  updated_at: updatedAt,
+  assistant_answer: false as const,
+  role: "ui_projection" as const,
+}));
 
 const latestUtilityHypothesisLines = (input: {
   threadId: string;
@@ -231,35 +273,9 @@ export function projectPresentStateCard(input: {
     capabilities: sourceCapabilities,
   });
   if (environment && (!input.roomId || environment.room_id === input.roomId)) {
-    const worldActive = sourceIsActive(sourceCapabilities, "world_event");
-    const visualLines = visualSeedLines({
-      threadId: environment.thread_id,
-      roomId: environment.room_id ?? null,
-      environmentPreset: environment.preset ?? null,
-      environmentObjective: environment.objective,
-      updatedAt: now,
-    });
-    const rawLines = [
-      ...(worldActive ? utilityLines : []),
-      ...visualLines,
-      ...environment.lines
-        .filter((entry) => entry.visibility === "answer_card")
-        .map((entry) => line({
-          key: entry.key,
-          label: entry.label,
-          value: String(entry.value ?? ""),
-          evidenceRefs: entry.evidence_refs,
-          confidence: typeof entry.confidence === "number" ? entry.confidence : null,
-          updatedAt: entry.updated_at,
-        })),
-    ];
-    const lineStates = buildLiveCardLineStates({
-      lines: rawLines,
-      requests: lineRequests,
-      evaluations: lineEvaluations,
-      sourceCapabilities,
-      now,
-    });
+    const projection = buildLiveCardLineProjection({ environment, now });
+    const projectionLines = projection.lines.map((entry) => projectionLineToPresentLine(entry, now));
+    const lineStates = projectionLineStates(projection, now);
     const fidelityProfile = buildLiveEnvironmentFidelity({
       threadId: environment.thread_id,
       roomId: environment.room_id ?? null,
@@ -267,24 +283,48 @@ export function projectPresentStateCard(input: {
       capabilities: sourceCapabilities,
       now,
     });
-    const synthesis = synthesizePresentState({
-      threadId: environment.thread_id,
-      roomId: environment.room_id ?? null,
-      lineStates,
-      interpretedEvents: scopedInterpretedEvents,
-      fidelityProfile,
-      now,
-    });
+    const synthesis = {
+      schema: HELIX_PRESENT_STATE_SYNTHESIS_SCHEMA,
+      synthesis_id: `present_state_synthesis:${hashShort([projection.projection_id, now])}`,
+      thread_id: environment.thread_id,
+      room_id: environment.room_id ?? null,
+      mode: "deterministic_rewrite" as const,
+      summary: projectionLines.map((entry) => `${entry.label}: ${entry.value}`).slice(0, 2).join(" "),
+      lines: projection.lines.map((entry) => ({
+        key: entry.key,
+        label: entry.label,
+        value: entry.value,
+        confidence: entry.confidence,
+        evidence_refs: entry.evidence_refs,
+        missing_evidence: entry.missing_evidence,
+        next_best_tool: entry.next_best_tool ?? null,
+        last_check_result: entry.last_check_result ?? null,
+        source_coverage: entry.source_coverage,
+        updated_at: now,
+        assistant_answer: false as const,
+        role: "ui_projection" as const,
+      })),
+      evidence_refs: Array.from(new Set(projection.lines.flatMap((entry) => entry.evidence_refs))),
+      confidence_change_sources: [],
+      fidelity_profile: fidelityProfile,
+      live_cognition_tool_registry_version: LIVE_COGNITION_TOOL_REGISTRY_VERSION,
+      model_invoked: projection.lines.some((entry) => entry.source === "line_reasoner" || entry.source === "visual_observation"),
+      deterministic: !projection.lines.some((entry) => entry.source === "line_reasoner" || entry.source === "visual_observation"),
+      assistant_answer: false as const,
+      role: "ui_projection" as const,
+      created_at: now,
+    };
     const synthesisEvent = recordPresentStateSynthesisEvent({ synthesis });
     return {
       schema: HELIX_PRESENT_STATE_CARD_SCHEMA,
-      card_id: `present_state:${hashShort([environment.environment_id, environment.updated_at])}`,
+      card_id: `present_state:${hashShort([environment.environment_id, projection.projection_id])}`,
       thread_id: environment.thread_id,
       room_id: environment.room_id ?? null,
       title: environment.objective,
       status: environment.status,
-      lines: synthesis.lines,
+      lines: projectionLines,
       line_states: lineStates,
+      live_card_line_projection: projection,
       present_state_synthesis: synthesis,
       fidelity_profile: fidelityProfile,
       pending_request_input: pendingRequestInput,

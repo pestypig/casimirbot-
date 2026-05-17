@@ -19,6 +19,7 @@ import {
   selectLiveSchemaForEnvironment,
 } from "./live-schema-selection-engine";
 import { inspectLiveSchemaCompatibility } from "./live-schema-compatibility-guard";
+import { buildLiveCardLineProjection } from "./live-card-line-projection-builder";
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -153,16 +154,35 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       })
     : null;
   const scopedEnvironment = schemaRepair?.environment ?? environment;
+  const lineProjection = scopedEnvironment
+    ? buildLiveCardLineProjection({ environment: scopedEnvironment })
+    : null;
+  const projectionLineValues = lineProjection
+    ? Object.fromEntries(lineProjection.lines.map((entry) => [
+        entry.key,
+        {
+          value: entry.value,
+          confidence: entry.confidence,
+          evidence_refs: entry.evidence_refs,
+          source_event_ids: [input.chunk.chunk_id],
+          source: "model_review" as const,
+          model_invoked: input.modelInvoked === true,
+          deterministic: input.modelInvoked !== true,
+        },
+      ]))
+    : null;
   const lineReasoning = scopedEnvironment
     ? reasonLiveCardLinesForEnvironment({ environment: scopedEnvironment })
     : null;
-  const lineValues = Object.keys(lineReasoning?.line_values ?? {}).length > 0
+  const lineValues = projectionLineValues && Object.keys(projectionLineValues).length > 0
+    ? projectionLineValues
+    : Object.keys(lineReasoning?.line_values ?? {}).length > 0
     ? lineReasoning?.line_values ?? {}
     : input.lineValues ?? defaultLineValues(input);
   const delta = scopedEnvironment
     ? updateLiveAnswerEnvironment({
         environment_id: scopedEnvironment.environment_id,
-        reason: "subgoal_update",
+        reason: "line_reasoning_update",
         line_values: Object.fromEntries(Object.entries(lineValues).map(([key, value]) => [
           key,
           {
@@ -207,6 +227,7 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     schema_selection: schemaSelection,
     schema_compatibility: schemaCompatibility,
     schema_repair_delta: schemaRepair?.delta ?? null,
+    live_card_line_projection: lineProjection,
     live_card_line_reasoning: lineReasoning,
     assistant_answer: false as const,
     raw_content_included: false as const,

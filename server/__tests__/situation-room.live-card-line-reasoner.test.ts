@@ -4,6 +4,7 @@ import type { HelixLiveSourceChunk } from "@shared/helix-live-source-chunk";
 import {
   createLiveAnswerEnvironment,
   getLiveAnswerEnvironment,
+  listLiveAnswerEnvironmentDeltas,
   resetLiveAnswerEnvironments,
 } from "../services/situation-room/live-answer-environment-store";
 import { resetAskHandoffsForTest } from "../services/helix-ask/ask-handoff-router";
@@ -88,6 +89,8 @@ describe("observation-scoped live card line reasoner", () => {
     expect(byKey.next_check?.value).not.toMatch(/Minecraft|event-window/i);
     expect(byKey.activity?.assistant_answer).toBeUndefined();
     expect(byKey.activity?.model_invoked).toBe(true);
+    expect(routed.live_environment_delta?.reason).toBe("line_reasoning_update");
+    expect(listLiveAnswerEnvironmentDeltas(environment.environment_id).at(-1)?.reason).toBe("line_reasoning_update");
   });
 
   it("projects generic visual present state without requiring a visual event pair", () => {
@@ -114,8 +117,11 @@ describe("observation-scoped live card line reasoner", () => {
     expect(byKey.activity?.value).toMatch(/browsing|organizing|folder/i);
     expect(byKey.objects?.value).toMatch(/audio|file explorer|folder/i);
     expect(byKey.next_check?.next_best_tool).toBe("visual.compare_recent_frames");
+    expect(card.live_card_line_projection?.stale_fallback_used).toBe(false);
+    expect(card.live_card_line_projection?.lines.find((line) => line.key === "next_check")?.source).toBe("line_reasoner");
     expect(JSON.stringify(card)).not.toContain("visual.align_latest_with_event_window");
     expect(JSON.stringify(card)).not.toContain("minecraft.query_event_window");
+    expect(JSON.stringify(card)).not.toContain("No visual/event pair was available to align");
   });
 
   it("keeps Minecraft visual-only risk from using unattached world-event evidence", () => {
