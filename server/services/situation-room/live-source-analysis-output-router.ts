@@ -10,6 +10,7 @@ import {
 import { projectPresentStateCard } from "./present-state-card-projector";
 import { getLiveSourceProducer } from "./live-source-chunk-buffer";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
+import { promoteLiveSourceAnalysisOutput } from "./live-cognition-promotion-router";
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -104,6 +105,15 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     deterministic: input.modelInvoked !== true,
     created_at: new Date().toISOString(),
   });
+  const liveCognitionPromotion = promoteLiveSourceAnalysisOutput({
+    job: input.job,
+    chunk: input.chunk,
+    status: input.status,
+    summary: input.summary,
+    outputRefs: input.outputRefs,
+    evidenceRefs: [syntheticEvidence.evidence_id, interpretedEvent.event_id],
+    modelInvoked: input.modelInvoked,
+  });
   const environment =
     getActiveLiveAnswerEnvironmentForSource(input.chunk.source_id) ??
     getActiveLiveAnswerEnvironmentForThread(input.chunk.thread_id);
@@ -150,6 +160,8 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     live_environment_delta: delta?.delta ?? null,
     live_answer_environment: delta?.environment ?? environment ?? null,
     present_state_card: presentStateCard,
+    live_cognition_promotion: liveCognitionPromotion,
+    live_cognition_promotion_audit: liveCognitionPromotion.audit,
     assistant_answer: false as const,
     raw_content_included: false as const,
     context_policy: "compact_context_pack_only" as const,

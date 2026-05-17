@@ -21,7 +21,9 @@ const normalizeRole = (value: unknown): HelixObservationJournalRole => {
     value === "raw_source_event" ||
     value === "model_perception_observation" ||
     value === "tool_observation" ||
-    value === "client_capability_observation"
+    value === "client_capability_observation" ||
+    value === "transcript_observation" ||
+    value === "reference_observation"
   ) return value;
   throw new Error("observation_journal_invalid_role");
 };

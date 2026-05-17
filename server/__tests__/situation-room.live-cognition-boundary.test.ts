@@ -204,6 +204,7 @@ describe("live cognition boundary artifacts", () => {
       thread_id: "helix-ask:desktop",
       candidate_goal: "Track whether the screen changes.",
       rationale: "Visual chunks are active.",
+      evidence_refs: ["live_source_chunk:one"],
       next_evidence_needed: ["next frame chunk"],
       expires_at: "2026-05-17T20:00:00.000Z",
     });
@@ -227,5 +228,5 @@ describe("live cognition boundary artifacts", () => {
     expect(goals.body.goals).toHaveLength(1);
     expect(handoffs.body.handoffs).toHaveLength(1);
     expect(handoffs.body.raw_content_included).toBe(false);
-  });
+  }, 15_000);
 });

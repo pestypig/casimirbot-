@@ -5,7 +5,9 @@ export type HelixObservationJournalRole =
   | "raw_source_event"
   | "model_perception_observation"
   | "tool_observation"
-  | "client_capability_observation";
+  | "client_capability_observation"
+  | "transcript_observation"
+  | "reference_observation";
 
 export type HelixObservationJournalEntry = {
   schema: typeof HELIX_OBSERVATION_JOURNAL_ENTRY_SCHEMA;
