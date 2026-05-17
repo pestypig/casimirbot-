@@ -7,6 +7,15 @@ import { GENERIC_VISUAL_LIVE_LINE_SCHEMA } from "./live-line-schema-deriver";
 
 const has = (transcript: string, pattern: RegExp): boolean => pattern.test(transcript);
 
+export function requestsGenericNonMinecraftVisual(transcript: string): boolean {
+  const normalized = transcript.trim().toLowerCase();
+  return (
+    /\b(?:generic\s+workstation|generic\s+visual|workstation\s+live\s+answer|document|folder|file explorer|app screen)\b/.test(normalized) ||
+    /\b(?:do\s+not|don't|not|without|exclude|avoid)\b[\s\S]{0,80}\b(?:minecraft|minehut|game[-\s]?specific|game)\b/.test(normalized) ||
+    /\b(?:minecraft|minehut|game[-\s]?specific|game)\b[\s\S]{0,80}\b(?:do\s+not|don't|not|without|exclude|avoid|assumptions?)\b/.test(normalized)
+  );
+}
+
 export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
@@ -81,6 +90,7 @@ export function buildLiveCommentaryPolicyArgs(args: {
 
 export function inferLiveAnswerEnvironmentPreset(transcript: string): LiveAnswerEnvironmentPreset {
   const normalized = transcript.trim().toLowerCase();
+  if (requestsGenericNonMinecraftVisual(normalized)) return "custom";
   const recipe = findLiveAnswerEnvironmentRecipe(normalized);
   if (recipe) {
     if (recipe.recipe_id === "research_session_tracker") return "research_session";
@@ -160,7 +170,8 @@ export function buildLiveAnswerEnvironmentArgs(args: {
   const preset = inferLiveAnswerEnvironmentPreset(normalized);
   const visualGeneric =
     preset === "custom" &&
-    /\b(?:screen\s*share|screen|window|tab|visual\s+source|visual\s+capture)\b/.test(normalized);
+    (requestsGenericNonMinecraftVisual(normalized) ||
+      /\b(?:screen\s*share|screen|window|tab|visual\s+source|visual\s+capture|visual\s+observation)\b/.test(normalized));
   const mode =
     /\bcritical\s+voice\b/.test(normalized)
       ? "critical_voice"

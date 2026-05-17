@@ -98,6 +98,15 @@ const sourceIsActive = (
   modality: "world_event" | "visual_frame" | "audio_transcript",
 ): boolean => capabilities.some((entry) => entry.modality === modality && entry.status === "active");
 
+const isExplicitGenericNonMinecraftVisual = (value: unknown): boolean => {
+  const text = String(value ?? "").toLowerCase();
+  return (
+    /\b(?:generic\s+workstation|generic\s+visual|workstation\s+live\s+answer|document|folder|file explorer|app screen)\b/.test(text) ||
+    /\b(?:do\s+not|don't|not|without|exclude|avoid)\b[\s\S]{0,80}\b(?:minecraft|minehut|game[-\s]?specific|game)\b/.test(text) ||
+    /\b(?:minecraft|minehut|game[-\s]?specific|game)\b[\s\S]{0,80}\b(?:do\s+not|don't|not|without|exclude|avoid|assumptions?)\b/.test(text)
+  );
+};
+
 const visualSeedLines = (input: {
   threadId: string;
   roomId?: string | null;
@@ -110,8 +119,9 @@ const visualSeedLines = (input: {
     roomId: input.roomId ?? null,
     now: input.updatedAt,
   });
-  const minecraftPreset = input.environmentPreset === "minecraft_run_monitor" ||
-    /\bminecraft|minehut\b/i.test(input.environmentObjective ?? "");
+  const minecraftPreset = !isExplicitGenericNonMinecraftVisual(input.environmentObjective) &&
+    (input.environmentPreset === "minecraft_run_monitor" ||
+      /\bminecraft|minehut\b/i.test(input.environmentObjective ?? ""));
   const sceneKey = minecraftPreset ? "place" : "scene";
   const sceneLabel = minecraftPreset ? "Place" : "Scene";
   if (health.status === "analysis_ready" && health.latest_evidence_id) {

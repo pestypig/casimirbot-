@@ -7,11 +7,21 @@ import { buildSituationSourceCapabilities } from "./situation-source-capability-
 
 const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 
+const isExplicitGenericNonMinecraftVisual = (value: unknown): boolean => {
+  const text = lower(value);
+  return (
+    /\b(?:generic\s+workstation|generic\s+visual|workstation\s+live\s+answer|document|folder|file explorer|app screen)\b/.test(text) ||
+    /\b(?:do\s+not|don't|not|without|exclude|avoid)\b[\s\S]{0,80}\b(?:minecraft|minehut|game[-\s]?specific|game)\b/.test(text) ||
+    /\b(?:minecraft|minehut|game[-\s]?specific|game)\b[\s\S]{0,80}\b(?:do\s+not|don't|not|without|exclude|avoid|assumptions?)\b/.test(text)
+  );
+};
+
 export function inferLineReasoningModalityScope(input: {
   environment: LiveAnswerEnvironment;
   hasFreshWorld?: boolean;
 }): HelixLiveCardLineReasoningModalityScope {
   const text = lower(`${input.environment.preset ?? ""} ${input.environment.objective} ${input.environment.line_schema.map((line) => `${line.key} ${line.label}`).join(" ")}`);
+  if (isExplicitGenericNonMinecraftVisual(input.environment.objective)) return "generic_visual";
   if (/\b(?:calculator|equation|residual|prime|simulation)\b/.test(text)) return "calculator_stream";
   if (/\b(?:audio|transcript|dialogue|speaker|voice)\b/.test(text)) return "audio_transcript";
   if (/\b(?:document|folder|file|pdf|reference|docs?)\b/.test(text)) return "generic_visual";

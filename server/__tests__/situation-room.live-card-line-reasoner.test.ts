@@ -12,6 +12,8 @@ import { resetInterpretationCardsForTest } from "../services/situation-room/inte
 import { resetObservationJournalForTest } from "../services/situation-room/observation-journal-store";
 import { projectPresentStateCard } from "../services/situation-room/present-state-card-projector";
 import { routeLiveSourceAnalysisOutput } from "../services/situation-room/live-source-analysis-output-router";
+import { buildLiveAnswerEnvironmentArgs, inferLiveAnswerEnvironmentPreset } from "../services/situation-room/live-answer-environment-planner";
+import { deriveLiveLineSchema } from "../services/situation-room/live-line-schema-deriver";
 
 const threadId = "helix-ask:desktop";
 
@@ -143,5 +145,43 @@ describe("observation-scoped live card line reasoner", () => {
     expect(updated?.lines_by_key?.risk?.value).toMatch(/world-event risk source is missing|no current risk is confirmed/i);
     const card = projectPresentStateCard({ threadId });
     expect(JSON.stringify(card)).not.toContain("Nearby hostile context");
+  });
+
+  it("treats negative Minecraft wording as generic workstation visual intent", () => {
+    const prompt = "Using the latest visual observation, describe my current screen as a generic workstation live answer. Do not use Minecraft or game-specific assumptions.";
+    expect(inferLiveAnswerEnvironmentPreset(prompt)).toBe("custom");
+    const args = buildLiveAnswerEnvironmentArgs({ transcript: prompt });
+    expect(args).toMatchObject({ preset: "custom" });
+    expect((args.line_schema as any[]).map((line) => line.key)).toEqual([
+      "scene",
+      "activity",
+      "objects",
+      "evidence",
+      "uncertainty",
+      "next_check",
+      "last_update",
+    ]);
+
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:generic-negative",
+      objective: prompt,
+      preset: args.preset as string,
+      line_schema: args.line_schema as any,
+      source_ids: ["source:documents"],
+    });
+    const derivation = deriveLiveLineSchema({
+      environment,
+      activeModalities: ["visual_frame"],
+    });
+    expect(derivation.line_schema.map((line) => line.key)).toEqual([
+      "scene",
+      "activity",
+      "objects",
+      "evidence",
+      "uncertainty",
+      "next_check",
+      "last_update",
+    ]);
   });
 });

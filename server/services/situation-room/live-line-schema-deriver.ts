@@ -12,6 +12,15 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 
+const isExplicitGenericNonMinecraftVisual = (value: unknown): boolean => {
+  const text = lower(value);
+  return (
+    /\b(?:generic\s+workstation|generic\s+visual|workstation\s+live\s+answer|document|folder|file explorer|app screen)\b/.test(text) ||
+    /\b(?:do\s+not|don't|not|without|exclude|avoid)\b[\s\S]{0,80}\b(?:minecraft|minehut|game[-\s]?specific|game)\b/.test(text) ||
+    /\b(?:minecraft|minehut|game[-\s]?specific|game)\b[\s\S]{0,80}\b(?:do\s+not|don't|not|without|exclude|avoid|assumptions?)\b/.test(text)
+  );
+};
+
 const line = (
   key: string,
   label: string,
@@ -47,8 +56,11 @@ export const GENERIC_VISUAL_LIVE_LINE_SCHEMA: LiveAnswerLineDefinition[] = [
 ];
 
 const isMinecraftObjective = (environment: Pick<LiveAnswerEnvironment, "objective" | "preset">): boolean =>
-  environment.preset === "minecraft_run_monitor" ||
-  /\b(?:minecraft|minehut|hotbar|inventory|creeper|wheat|chicken|farm|block|slab)\b/i.test(environment.objective);
+  !isExplicitGenericNonMinecraftVisual(environment.objective) &&
+  (
+    environment.preset === "minecraft_run_monitor" ||
+    /\b(?:minecraft|minehut|hotbar|inventory|creeper|wheat|chicken|farm|block|slab)\b/i.test(environment.objective)
+  );
 
 export function deriveLiveLineSchema(input: {
   environment: LiveAnswerEnvironment;

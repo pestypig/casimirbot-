@@ -108,7 +108,8 @@ export function synthesizePresentState(input: {
   const activitySeed = visualLineFor(["activity"])?.value ?? null;
   const objectSeed = visualLineFor(["objects", "entities", "evidence"])?.value ?? null;
   const minecraftPreset = input.lineStates.some((state) => ["place", "structure", "entities", "risk"].includes(state.line_key));
-  const minecraftLike = minecraftPreset || /\b(?:minecraft|minehut|wheat|chicken|farm|slab|block|mine|trench|stair)\b/.test(`${visualReadyText}\n${worldReadyText}`);
+  const genericVisualContent = /\b(?:file explorer|folder|directory|document|pdf|browser tab|app screen|workstation|audio export|\.wav|\.asd|image files?)\b/.test(`${visualReadyText}\n${worldReadyText}`);
+  const minecraftLike = (!genericVisualContent && minecraftPreset) || /\b(?:minecraft|minehut|wheat|chicken|farm|slab|block|mine|trench|stair)\b/.test(`${visualReadyText}\n${worldReadyText}`);
   const hasFarmVisual = /\b(?:wheat|chicken|farm|crop|slab|boundary)\b/.test(visualReadyText);
   const hasThreat = hasWorldEvents && !staleWorld && /\b(?:threat|hostile|creeper|danger|risk)\b/.test(worldReadyText);
   const hasDamage = hasWorldEvents && !staleWorld && /\b(?:damage|hit|explosion|hurt)\b/.test(worldReadyText);
