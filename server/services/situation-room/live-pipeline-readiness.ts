@@ -69,6 +69,10 @@ export function calculateLivePipelineReadiness(input: {
   const hasClientActionFailed = producerFreshness.some((freshness) => freshness?.readiness_state === "client_action_failed");
   const hasAnalysisBlocked = producerFreshness.some((freshness) => freshness?.readiness_state === "analysis_blocked");
   const hasChunksFlowing = producerFreshness.some((freshness) => freshness?.readiness_state === "producer_active_chunks_flowing" || freshness?.readiness_state === "ready");
+  const hasStaleRequiredProducer = producerFreshness.some((freshness) =>
+    freshness?.readiness_state === "stale" ||
+    freshness?.stale_reason === "no_chunk_after_two_cadence_windows"
+  );
   const environment = input.receipt.environment_id ? getLiveAnswerEnvironment(input.receipt.environment_id) : null;
   const hasCardUpdate = Boolean(environment?.evidence_refs?.some((ref: string) =>
     /\b(?:synthetic_evidence|visual_evidence|live_source_analysis_job|live_source_chunk)\b/i.test(ref)
@@ -82,6 +86,7 @@ export function calculateLivePipelineReadiness(input: {
   else if (hasClientAdoptedWaitingForChunk) state = "client_adopted_waiting_for_chunk";
   else if (!hasAnyChunk) state = "waiting_for_first_chunk";
   else if (hasAnalysisBlocked) state = "analysis_blocked";
+  else if (hasStaleRequiredProducer) state = "stale";
   else if (hasQueuedOrRunning) state = "analyzing";
   else if (hasCompleted && hasCardUpdate) state = input.missingCapabilities.length > 0 ? "degraded" : "ready";
   else if (hasCompleted) state = "ready";
@@ -98,6 +103,7 @@ export function calculateLivePipelineReadiness(input: {
     (hasCardUpdate ? 0.2 : 0) -
     (state === "blocked" ? 0.35 : 0) -
     (state === "waiting_for_client_adoption" || state === "client_action_failed" || state === "client_stream_ended" ? 0.25 : 0) -
+    (state === "stale" ? 0.2 : 0) -
     (input.missingCapabilities.length > 0 ? 0.1 : 0),
   );
   return {
@@ -126,9 +132,11 @@ export function calculateLivePipelineReadiness(input: {
                 ? "Browser client action failed before source traffic could be proven."
               : state === "waiting_for_first_chunk"
                 ? "Pipeline is active and waiting for the first source chunk."
-                : state === "analysis_blocked"
-                  ? "Source chunks exist, but analysis is pending or blocked."
-                  : state === "producer_active_chunks_flowing"
+              : state === "analysis_blocked"
+                ? "Source chunks exist, but analysis is pending or blocked."
+                : state === "stale"
+                  ? "A required source producer is adopted but stale; fresh chunks must arrive before the pipeline is ready."
+                : state === "producer_active_chunks_flowing"
                     ? "Source chunks are flowing; the pipeline is waiting for completed analysis or card projection."
                 : state === "analyzing"
                   ? "Pipeline has source chunks and queued/running analysis."

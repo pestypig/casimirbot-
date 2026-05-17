@@ -39,7 +39,7 @@ import {
 } from "@/lib/helix/visualFrameProducer";
 import { useVisualSourceCaptureStore, type VisualSourceCaptureState } from "@/store/useVisualSourceCaptureStore";
 
-type LiveEnvironmentTab = "present_state" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type LiveEnvironmentTab = "present_state" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type ClientCapabilityActionRead = {
   action_request_id: string;
   capability: string;
@@ -53,6 +53,36 @@ type ClientCapabilityAdoptionRead = {
   action: string;
   ok: boolean;
   observed_state?: Record<string, unknown>;
+};
+type LiveCognitionObservationRead = {
+  observation_id: string;
+  role: string;
+  text: string;
+  model_invoked: boolean;
+  evidence_refs?: string[];
+  created_at: string;
+};
+type LiveCognitionInterpretationRead = {
+  interpretation_id: string;
+  title: string;
+  summary: string;
+  evidence_refs?: string[];
+  expires_at: string;
+  confidence?: number;
+};
+type LiveCognitionGoalRead = {
+  goal_id: string;
+  candidate_goal: string;
+  status: string;
+  next_evidence_needed?: string[];
+  expires_at: string;
+};
+type LiveCognitionHandoffRead = {
+  handoff_id: string;
+  objective: string;
+  reasoning_budget: string;
+  selected_evidence_refs?: string[];
+  created_at: string;
 };
 type LiveAgenticReviewReadEntry = {
   review_id: string;
@@ -107,6 +137,7 @@ const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "line_checks", label: "Line Checks" },
   { id: "interpreted_log", label: "Interpreted Log" },
   { id: "clarification", label: "Clarification Queue" },
+  { id: "live_cognition", label: "Live Cognition" },
   { id: "overview", label: "Overview" },
   { id: "sources", label: "Sources" },
   { id: "line_schema", label: "Line Schema" },
@@ -210,6 +241,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [workerRuns, setWorkerRuns] = useState<HelixLiveWorkerRun[]>([]);
   const [clientActions, setClientActions] = useState<ClientCapabilityActionRead[]>([]);
   const [clientAdoptions, setClientAdoptions] = useState<ClientCapabilityAdoptionRead[]>([]);
+  const [cognitionObservations, setCognitionObservations] = useState<LiveCognitionObservationRead[]>([]);
+  const [cognitionInterpretations, setCognitionInterpretations] = useState<LiveCognitionInterpretationRead[]>([]);
+  const [cognitionGoals, setCognitionGoals] = useState<LiveCognitionGoalRead[]>([]);
+  const [cognitionHandoffs, setCognitionHandoffs] = useState<LiveCognitionHandoffRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -304,7 +339,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -318,8 +353,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}`),
         fetch(`/api/agi/client-action/pending?thread_id=${encodeURIComponent(threadId)}`),
         fetch(`/api/agi/client-action/adoptions?thread_id=${encodeURIComponent(threadId)}`),
+        fetch(`/api/agi/situation/live-cognition/plain-log?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/interpretations?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/goals?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/handoffs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -333,6 +372,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         visualLatestRes.json(),
         clientActionRes.json().catch(() => ({})),
         clientAdoptionRes.json().catch(() => ({})),
+        cognitionPlainRes.json().catch(() => ({})),
+        cognitionInterpretationRes.json().catch(() => ({})),
+        cognitionGoalRes.json().catch(() => ({})),
+        cognitionHandoffRes.json().catch(() => ({})),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -354,6 +397,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setWorkerRuns(Array.isArray(workerBody.runs) ? workerBody.runs : []);
       setClientActions(Array.isArray(clientActionBody.actions) ? clientActionBody.actions : []);
       setClientAdoptions(Array.isArray(clientAdoptionBody.adoptions) ? clientAdoptionBody.adoptions.slice(-12) : []);
+      setCognitionObservations(Array.isArray(cognitionPlainBody.observations) ? cognitionPlainBody.observations : []);
+      setCognitionInterpretations(Array.isArray(cognitionInterpretationBody.interpretations) ? cognitionInterpretationBody.interpretations : []);
+      setCognitionGoals(Array.isArray(cognitionGoalBody.goals) ? cognitionGoalBody.goals : []);
+      setCognitionHandoffs(Array.isArray(cognitionHandoffBody.handoffs) ? cognitionHandoffBody.handoffs : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -1372,6 +1419,68 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   <p className="mt-1 break-words text-xs text-slate-200">{value}</p>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {activeTab === "live_cognition" ? (
+            <div className="grid gap-3 xl:grid-cols-2">
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Observation Journal</p>
+                <p className="mt-1 text-[11px] text-slate-500">Chronological observations only. Model perception is allowed only as evidence, not answer text.</p>
+                <div className="mt-3 space-y-2">
+                  {cognitionObservations.length === 0 ? <p className="text-xs text-slate-500">No observation journal entries yet.</p> : null}
+                  {cognitionObservations.slice(-8).reverse().map((entry: LiveCognitionObservationRead) => (
+                    <div key={entry.observation_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase text-slate-500">{entry.role}</p>
+                        <span className="text-[10px] text-slate-600">model {String(entry.model_invoked)}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-200">{entry.text}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">evidence {(entry.evidence_refs ?? []).join(", ") || "none"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Interpretations</p>
+                <p className="mt-1 text-[11px] text-slate-500">Meaning cards require evidence refs and expiry.</p>
+                <div className="mt-3 space-y-2">
+                  {cognitionInterpretations.length === 0 ? <p className="text-xs text-slate-500">No interpretation cards yet.</p> : null}
+                  {cognitionInterpretations.slice(-8).reverse().map((card: LiveCognitionInterpretationRead) => (
+                    <div key={card.interpretation_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs font-semibold text-slate-100">{card.title}</p>
+                      <p className="mt-1 text-xs text-slate-300">{card.summary}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">confidence {Math.round((card.confidence ?? 0) * 100)}% / expires {formatTime(card.expires_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Candidate Goals</p>
+                <p className="mt-1 text-[11px] text-slate-500">Goal cards cannot execute tools; they only name next evidence needed.</p>
+                <div className="mt-3 space-y-2">
+                  {cognitionGoals.length === 0 ? <p className="text-xs text-slate-500">No candidate goals yet.</p> : null}
+                  {cognitionGoals.slice(-8).reverse().map((goal: LiveCognitionGoalRead) => (
+                    <div key={goal.goal_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs font-semibold text-slate-100">{goal.candidate_goal}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">{goal.status} / expires {formatTime(goal.expires_at)}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">next {(goal.next_evidence_needed ?? []).join(", ") || "none"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Ask / Action Handoffs</p>
+                <p className="mt-1 text-[11px] text-slate-500">Handoffs carry selected evidence and a reasoning budget; they are not assistant answers.</p>
+                <div className="mt-3 space-y-2">
+                  {cognitionHandoffs.length === 0 ? <p className="text-xs text-slate-500">No Ask handoffs yet.</p> : null}
+                  {cognitionHandoffs.slice(-8).reverse().map((handoff: LiveCognitionHandoffRead) => (
+                    <div key={handoff.handoff_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{handoff.objective}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">budget {handoff.reasoning_budget} / evidence {(handoff.selected_evidence_refs ?? []).length}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
           {activeTab === "sources" ? (
