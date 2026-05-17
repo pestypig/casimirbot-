@@ -114,7 +114,9 @@ export function synthesizePresentState(input: {
   const hasDamage = hasWorldEvents && !staleWorld && /\b(?:damage|hit|explosion|hurt)\b/.test(worldReadyText);
   const hasMining = /\b(?:mine|mineshaft|trench|stair|vertical|descending)\b/.test(`${visualReadyText}\n${worldReadyText}`);
   const hasEditing = /\b(?:block|slab|place|placed|break|broke|edit|decorat|boundary)\b/.test(`${visualReadyText}\n${worldReadyText}`);
-  const hasVisualObservation = /\bvisual|frame|screen|scene|image|window|tab\b/.test(visualText) || hasVisual;
+  const hasGenericVisualLineSchema = input.lineStates.some((state) => state.line_key === "scene") &&
+    input.lineStates.some((state) => state.line_key === "objects" || state.line_key === "evidence");
+  const hasVisualObservation = /\bvisual|frame|screen|scene|image|window|tab\b/.test(visualText) || hasVisual || hasGenericVisualLineSchema || visualStates.length > 0;
   const genericVisualOnly = hasVisualObservation && !minecraftLike && !hasWorldEvents;
 
   const place = visualFailure
@@ -160,7 +162,44 @@ export function synthesizePresentState(input: {
       : "Risk is not confirmed; world-event source is missing or inactive.";
 
   const relevantStates = input.lineStates.length > 0 ? input.lineStates : [];
-  const lines: HelixPresentStateSynthesisLine[] = [
+  const genericVisualLines: HelixPresentStateSynthesisLine[] = [
+    makeLine({ key: "scene", label: "Scene", value: place, states: relevantStates, confidence: avgConfidence(relevantStates, 0.58), now }),
+    makeLine({ key: "activity", label: "Activity", value: activity, states: relevantStates, confidence: avgConfidence(relevantStates, 0.52), now }),
+    makeLine({ key: "objects", label: "Objects", value: objectSeed ?? "Visible UI elements and screen contents are tracked from the latest visual observation.", states: relevantStates, confidence: objectSeed ? 0.58 : 0.42, now }),
+    makeLine({ key: "evidence", label: "Evidence", value: "Latest compact visual observation and interpretation evidence support this card.", states: relevantStates, confidence: avgConfidence(relevantStates, 0.55), now }),
+    makeLine({
+      key: "uncertainty",
+      label: "Uncertainty",
+      value: missing.length > 0
+        ? missing.slice(0, 2).join("; ")
+        : "User intent is unknown unless stated; no transcript or external source is attached for corroboration.",
+      states: relevantStates,
+      confidence: null,
+      missingEvidence: missing,
+      nextBestTool: "interpretation_card.missing_evidence",
+      now,
+    }),
+    makeLine({
+      key: "next_check",
+      label: "Next check",
+      value: visualFailure
+        ? "Analyze the latest frame after configuring or recovering the vision provider."
+        : "Compare the next captured frame for selection, window, or content changes.",
+      states: relevantStates,
+      confidence: null,
+      nextBestTool: "visual.compare_recent_frames",
+      now,
+    }),
+    makeLine({
+      key: "last_update",
+      label: "Last update",
+      value: `Latest synthesis updated at ${now}.`,
+      states: relevantStates,
+      confidence: null,
+      now,
+    }),
+  ];
+  const lines: HelixPresentStateSynthesisLine[] = genericVisualOnly ? genericVisualLines : [
     makeLine({ key: genericVisualOnly ? "scene" : "place", label: genericVisualOnly ? "Scene" : "Place", value: place, states: relevantStates, confidence: hasFarmVisual ? 0.72 : avgConfidence(relevantStates, 0.45), now }),
     makeLine({ key: "activity", label: "Activity", value: activity, states: relevantStates, confidence: hasEditing ? 0.68 : avgConfidence(relevantStates, 0.42), now }),
     makeLine({ key: genericVisualOnly ? "objects" : "structure", label: genericVisualOnly ? "Objects" : "Structure", value: genericVisualOnly ? "Visible objects are tracked from the latest frame evidence." : structure, states: relevantStates, confidence: hasMining || hasFarmVisual ? 0.62 : 0.38, now }),

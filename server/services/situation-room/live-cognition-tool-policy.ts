@@ -10,6 +10,14 @@ export function selectLiveCognitionToolForLine(
   line: Pick<LiveAnswerLineState, "key" | "label" | "value">,
 ): HelixLiveCognitionTool | null {
   const text = lower(`${line.key} ${line.label} ${line.value}`);
+  if (/\b(?:file explorer|folder|directory|document|browser tab|current screen|latest visual observation|visual observation|visible ui|screen contents|compare the next captured frame|content changes)\b/.test(text) &&
+    !/\b(?:minecraft|minehut|creeper|zombie|wheat|farm|mob|world-event)\b/.test(text)) {
+    if (/\b(?:objects?|scene|visible)\b/.test(text)) return byId("visual.latest_observation");
+    if (/\b(?:evidence)\b/.test(text)) return byId("observation_journal.latest");
+    if (/\b(?:uncertain|unknown|missing)\b/.test(text)) return byId("interpretation_card.missing_evidence");
+    if (/\b(?:next|compare|change)\b/.test(text)) return byId("visual.compare_recent_frames");
+    return byId("live-cognition.synthesize_line_from_observations");
+  }
   if (/\b(?:equation|calculate|calculator|solve|numeric|residual|function|total|sum)\b/.test(text)) {
     return byId("scientific-calculator.solve_with_steps");
   }

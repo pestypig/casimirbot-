@@ -11,6 +11,7 @@ import { projectPresentStateCard } from "./present-state-card-projector";
 import { getLiveSourceProducer } from "./live-source-chunk-buffer";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 import { promoteLiveSourceAnalysisOutput } from "./live-cognition-promotion-router";
+import { reasonLiveCardLinesForEnvironment } from "./live-card-line-reasoner";
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -117,20 +118,26 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
   const environment =
     getActiveLiveAnswerEnvironmentForSource(input.chunk.source_id) ??
     getActiveLiveAnswerEnvironmentForThread(input.chunk.thread_id);
+  const lineReasoning = environment
+    ? reasonLiveCardLinesForEnvironment({ environment })
+    : null;
+  const lineValues = Object.keys(lineReasoning?.line_values ?? {}).length > 0
+    ? lineReasoning?.line_values ?? {}
+    : input.lineValues ?? defaultLineValues(input);
   const delta = environment
     ? updateLiveAnswerEnvironment({
         environment_id: environment.environment_id,
         reason: "subgoal_update",
-        line_values: Object.fromEntries(Object.entries(input.lineValues ?? defaultLineValues(input)).map(([key, value]) => [
+        line_values: Object.fromEntries(Object.entries(lineValues).map(([key, value]) => [
           key,
           {
             value: value.value,
             confidence: value.confidence ?? null,
-            evidence_refs: [...refs, syntheticEvidence.evidence_id],
-            source_event_ids: [input.chunk.chunk_id],
-            source: "deterministic_reducer",
-            model_invoked: input.modelInvoked === true,
-            deterministic: input.modelInvoked !== true,
+            evidence_refs: [...refs, syntheticEvidence.evidence_id, ...(value.evidence_refs ?? [])],
+            source_event_ids: [input.chunk.chunk_id, ...(value.source_event_ids ?? [])],
+            source: value.source ?? "deterministic_reducer",
+            model_invoked: value.model_invoked ?? input.modelInvoked === true,
+            deterministic: value.deterministic ?? input.modelInvoked !== true,
           },
         ])),
         latest_summary: input.summary,
@@ -162,6 +169,7 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     present_state_card: presentStateCard,
     live_cognition_promotion: liveCognitionPromotion,
     live_cognition_promotion_audit: liveCognitionPromotion.audit,
+    live_card_line_reasoning: lineReasoning,
     assistant_answer: false as const,
     raw_content_included: false as const,
     context_policy: "compact_context_pack_only" as const,
