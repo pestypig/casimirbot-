@@ -7,9 +7,13 @@ export type HelixLiveTangentEvaluation = {
   situation_run_id: string;
   thread_id: string;
   tangent_type: string;
+  trigger_observation_refs: string[];
   claim: string;
   confidence: number;
   evidence_refs: string[];
+  missing_evidence: string[];
+  supports: string[];
+  contradicts: string[];
   recommended_handoff?: {
     type: "none" | "ask_handoff" | "plan_contract" | "request_user_input";
     reason: string;
@@ -17,4 +21,5 @@ export type HelixLiveTangentEvaluation = {
   assistant_answer: false;
   raw_content_included: false;
   role: "validation";
+  expires_at: string;
 };

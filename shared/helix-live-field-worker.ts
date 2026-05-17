@@ -29,7 +29,7 @@ export type HelixLiveFieldWorker = {
   };
   output_type: "field_evaluation";
   may_execute_tool: false;
-  status: "active" | "paused" | "stale" | "stopped";
+  status: "registered" | "active" | "paused" | "stale" | "disabled" | "stopped";
   assistant_answer: false;
   raw_content_included: false;
 };

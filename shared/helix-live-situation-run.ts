@@ -17,9 +17,11 @@ export type HelixLiveSituationRun = {
   environment_id: string;
   pipeline_id?: string | null;
   source_ids: string[];
+  source_binding_id: string;
   objective_text: string;
   modality_scope: HelixLiveSituationRunModalityScope;
   active_fields: string[];
+  current_epoch: number;
   corroboration_policy: {
     audio_required: boolean;
     user_steering_required: boolean;
@@ -27,7 +29,12 @@ export type HelixLiveSituationRun = {
     missing_corroboration_effect: "lower_confidence_not_block" | "block" | "request_input";
   };
   reasoning_budget: "cheap" | "normal" | "deep";
-  status: "active" | "paused" | "stale" | "completed" | "stopped";
+  terminal_policy: {
+    worker_outputs_are_terminal: false;
+    tangent_outputs_are_terminal: false;
+    terminal_authority_required: true;
+  };
+  status: "created" | "active" | "paused" | "stale" | "completed" | "cancelled" | "stopped";
   created_at: string;
   updated_at: string;
   assistant_answer: false;

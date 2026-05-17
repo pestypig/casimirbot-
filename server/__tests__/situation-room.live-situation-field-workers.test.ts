@@ -9,6 +9,7 @@ import { resetAskHandoffsForTest } from "../services/helix-ask/ask-handoff-route
 import { resetGoalCardsForTest } from "../services/situation-room/goal-finder-store";
 import { resetInterpretationCardsForTest } from "../services/situation-room/interpretation-card-store";
 import { resetLiveFieldEvaluationsForTest } from "../services/situation-room/live-field-evaluation-store";
+import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live-field-worker-run-store";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
 import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
 import { resetLiveTangentEvaluationsForTest } from "../services/situation-room/live-tangent-evaluation-store";
@@ -59,6 +60,7 @@ describe("live situation field workers", () => {
     resetAskHandoffsForTest();
     resetLiveSituationRunsForTest();
     resetLiveFieldWorkersForTest();
+    resetLiveFieldWorkerRunsForTest();
     resetLiveFieldEvaluationsForTest();
     resetLiveTangentEvaluationsForTest();
   });
@@ -85,6 +87,13 @@ describe("live situation field workers", () => {
       modality_scope: "generic_visual",
       status: "active",
       assistant_answer: false,
+      source_binding_id: expect.stringMatching(/^source_binding:/),
+      current_epoch: 1,
+    });
+    expect(routed.live_situation_run?.terminal_policy).toMatchObject({
+      worker_outputs_are_terminal: false,
+      tangent_outputs_are_terminal: false,
+      terminal_authority_required: true,
     });
     expect(routed.live_situation_run?.corroboration_policy).toMatchObject({
       audio_required: false,
@@ -93,15 +102,20 @@ describe("live situation field workers", () => {
     });
     expect(routed.live_field_workers.length).toBeGreaterThanOrEqual(6);
     expect(routed.live_field_workers.every((worker) => worker.may_execute_tool === false && worker.assistant_answer === false)).toBe(true);
+    expect(routed.live_field_worker_runs.length).toBe(routed.live_field_workers.length);
+    expect(routed.live_field_worker_runs.every((run) => run.status === "completed" && run.assistant_answer === false)).toBe(true);
     const activity = routed.live_field_evaluations.find((entry) => entry.field_key === "activity");
     expect(activity).toMatchObject({
       status: "tentative",
       assistant_answer: false,
       raw_content_included: false,
+      worker_run_id: expect.stringMatching(/^live_field_worker_run:/),
     });
     expect(activity?.value).toMatch(/browsing|reviewing|organizing/i);
     expect(activity?.missing_evidence.join(" ")).toMatch(/audio\/user steering/i);
     expect(activity?.corroboration_state.audio_transcript).toBe("missing_not_required");
+    expect(routed.live_handoff_arbitration?.arbitration.decision).toBe("silent_update");
+    expect(routed.live_handoff_arbitration?.arbitration.candidate?.type).toBe("none");
   });
 
   it("uses field evaluations before fallback in canonical projection", () => {
@@ -127,5 +141,32 @@ describe("live situation field workers", () => {
     expect(activityProjection?.value).toMatch(/browsing|reviewing|organizing/i);
     expect(JSON.stringify(card)).not.toContain("Waiting for visual activity evidence");
     expect(JSON.stringify(card)).not.toContain("No visual/event pair was available to align");
+  });
+
+  it("does not attach field evaluations from an unbound source", () => {
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:field-workers",
+      objective: "Using the latest visual observation, describe my current screen as a generic workstation live answer.",
+      preset: "custom",
+      source_ids: ["source:documents"],
+    });
+    const chunk = {
+      ...visualChunk(),
+      chunk_id: "live_source_chunk:unbound",
+      source_id: "source:other-window",
+    };
+    const routed = routeLiveSourceAnalysisOutput({
+      job: jobFor(chunk),
+      chunk,
+      status: "completed",
+      summary: chunk.compact_summary,
+      outputRefs: ["visual_evidence:unbound"],
+      modelInvoked: true,
+    });
+    expect(routed.live_situation_run?.source_binding_id).toMatch(/^source_binding:/);
+    expect(routed.live_field_workers).toEqual([]);
+    expect(routed.live_field_worker_runs).toEqual([]);
+    expect(routed.live_field_evaluations).toEqual([]);
   });
 });

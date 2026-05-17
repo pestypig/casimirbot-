@@ -36,6 +36,11 @@ export function ensureLiveSituationRunForEnvironment(input: {
   const modalityScope = scopeFor(input.environment);
   const activeFields = input.environment.line_schema.map((line) => line.key);
   const genericVisual = modalityScope === "generic_visual";
+  const sourceBindingId = `source_binding:${hashShort([
+    input.environment.thread_id,
+    input.environment.environment_id,
+    input.environment.source_ids,
+  ])}`;
   const run: HelixLiveSituationRun = {
     schema: HELIX_LIVE_SITUATION_RUN_SCHEMA,
     situation_run_id: existing?.situation_run_id ?? `live_situation_run:${hashShort([
@@ -47,9 +52,11 @@ export function ensureLiveSituationRunForEnvironment(input: {
     environment_id: input.environment.environment_id,
     pipeline_id: input.pipelineId ?? existing?.pipeline_id ?? null,
     source_ids: input.environment.source_ids,
+    source_binding_id: sourceBindingId,
     objective_text: input.environment.objective,
     modality_scope: modalityScope,
     active_fields: activeFields,
+    current_epoch: existing?.current_epoch ?? 1,
     corroboration_policy: {
       audio_required: false,
       user_steering_required: false,
@@ -57,6 +64,11 @@ export function ensureLiveSituationRunForEnvironment(input: {
       missing_corroboration_effect: genericVisual ? "lower_confidence_not_block" : "lower_confidence_not_block",
     },
     reasoning_budget: reasoningBudgetFor(input.environment.objective),
+    terminal_policy: {
+      worker_outputs_are_terminal: false,
+      tangent_outputs_are_terminal: false,
+      terminal_authority_required: true,
+    },
     status: existing?.status === "paused" ? "paused" : "active",
     created_at: existing?.created_at ?? now,
     updated_at: now,

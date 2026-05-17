@@ -100,6 +100,14 @@ type LiveFieldWorkerRead = {
   status: string;
   may_execute_tool: boolean;
 };
+type LiveFieldWorkerRunRead = {
+  worker_run_id: string;
+  worker_id: string;
+  field_key: string;
+  status: string;
+  output_evaluation_id?: string | null;
+  completed_at?: string | null;
+};
 type LiveFieldEvaluationRead = {
   evaluation_id: string;
   worker_id: string;
@@ -280,6 +288,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [cognitionHandoffs, setCognitionHandoffs] = useState<LiveCognitionHandoffRead[]>([]);
   const [situationRuns, setSituationRuns] = useState<LiveSituationRunRead[]>([]);
   const [fieldWorkers, setFieldWorkers] = useState<LiveFieldWorkerRead[]>([]);
+  const [fieldWorkerRuns, setFieldWorkerRuns] = useState<LiveFieldWorkerRunRead[]>([]);
   const [fieldEvaluations, setFieldEvaluations] = useState<LiveFieldEvaluationRead[]>([]);
   const [tangentEvaluations, setTangentEvaluations] = useState<LiveTangentEvaluationRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
@@ -388,7 +397,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldEvaluationRes, tangentRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -408,10 +417,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/live-cognition/handoffs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/situation-runs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/field-workers?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/field-worker-runs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/field-evaluations?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/tangents?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldEvaluationBody, tangentBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -431,6 +441,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         cognitionHandoffRes.json().catch(() => ({})),
         situationRunRes.json().catch(() => ({})),
         fieldWorkerRes.json().catch(() => ({})),
+        fieldWorkerRunRes.json().catch(() => ({})),
         fieldEvaluationRes.json().catch(() => ({})),
         tangentRes.json().catch(() => ({})),
       ]);
@@ -460,6 +471,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setCognitionHandoffs(Array.isArray(cognitionHandoffBody.handoffs) ? cognitionHandoffBody.handoffs : []);
       setSituationRuns(Array.isArray(situationRunBody.runs) ? situationRunBody.runs : []);
       setFieldWorkers(Array.isArray(fieldWorkerBody.workers) ? fieldWorkerBody.workers : []);
+      setFieldWorkerRuns(Array.isArray(fieldWorkerRunBody.worker_runs) ? fieldWorkerRunBody.worker_runs : []);
       setFieldEvaluations(Array.isArray(fieldEvaluationBody.evaluations) ? fieldEvaluationBody.evaluations : []);
       setTangentEvaluations(Array.isArray(tangentBody.tangents) ? tangentBody.tangents : []);
       setVisualLatest(visualLatestBody ?? null);
@@ -1509,6 +1521,22 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     <div key={worker.worker_id} className="rounded border border-white/10 bg-black/20 p-2">
                       <p className="text-xs font-semibold text-slate-100">{worker.field_label}</p>
                       <p className="mt-1 text-[10px] text-slate-500">{worker.worker_role} / {worker.status} / may execute {String(worker.may_execute_tool)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Field Worker Runs</p>
+                <p className="mt-1 text-[11px] text-slate-500">Started/completed lifecycle items for each field worker.</p>
+                <div className="mt-3 space-y-2">
+                  {fieldWorkerRuns.length === 0 ? <p className="text-xs text-slate-500">No field worker runs yet.</p> : null}
+                  {fieldWorkerRuns.slice(-8).reverse().map((run: LiveFieldWorkerRunRead) => (
+                    <div key={`${run.worker_run_id}:${run.status}`} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase text-slate-500">{run.field_key}</p>
+                        <span className="text-[10px] text-slate-600">{run.status}</span>
+                      </div>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">output {run.output_evaluation_id ?? "pending"} / {formatTime(run.completed_at)}</p>
                     </div>
                   ))}
                 </div>

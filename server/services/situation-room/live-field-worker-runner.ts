@@ -3,11 +3,16 @@ import {
   HELIX_LIVE_FIELD_EVALUATION_SCHEMA,
   type HelixLiveFieldEvaluation,
 } from "@shared/helix-live-field-evaluation";
+import {
+  HELIX_LIVE_FIELD_WORKER_RUN_SCHEMA,
+  type HelixLiveFieldWorkerRun,
+} from "@shared/helix-live-field-worker-run";
 import type { HelixObservationJournalEntry } from "@shared/helix-observation-journal";
 import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
 import { ensureLiveSituationRunForEnvironment } from "./live-situation-run-store";
 import { registerFieldWorkersForSituationRun } from "./live-field-worker-registry";
 import { recordLiveFieldEvaluation } from "./live-field-evaluation-store";
+import { recordLiveFieldWorkerRun } from "./live-field-worker-run-store";
 import { arbitrateLiveSituationHandoffs } from "./live-handoff-arbiter";
 
 const hashShort = (value: unknown, size = 18): string =>
@@ -54,6 +59,7 @@ const corroborationState = (input: {
 const evaluateField = (input: {
   environment: LiveAnswerEnvironment;
   runId: string;
+  workerRunId: string;
   workerId: string;
   fieldKey: string;
   observation: HelixObservationJournalEntry;
@@ -120,11 +126,13 @@ const evaluateField = (input: {
     schema: HELIX_LIVE_FIELD_EVALUATION_SCHEMA,
     evaluation_id: `live_field_eval:${hashShort([
       input.runId,
+      input.workerRunId,
       input.workerId,
       fieldKey,
       value,
       input.observation.observation_id,
     ])}`,
+    worker_run_id: input.workerRunId,
     worker_id: input.workerId,
     situation_run_id: input.runId,
     thread_id: input.environment.thread_id,
@@ -138,6 +146,7 @@ const evaluateField = (input: {
     corroboration_state: corroborationState({ genericVisual: input.genericVisual, fieldKey }),
     next_check: nextCheck,
     expires_at: expiresAt,
+    created_at: input.now,
     role: "ui_projection",
     assistant_answer: false,
     raw_content_included: false,
@@ -153,6 +162,7 @@ export function runLiveFieldWorkersForObservation(input: {
     return {
       run: null,
       workers: [],
+      worker_runs: [],
       evaluations: [],
       arbitration: null,
       assistant_answer: false as const,
@@ -164,26 +174,90 @@ export function runLiveFieldWorkersForObservation(input: {
     environment: input.environment,
     now,
   });
+  if (
+    input.environment.source_ids.length > 0 &&
+    input.observation.source_id &&
+    !input.environment.source_ids.includes(input.observation.source_id)
+  ) {
+    return {
+      run,
+      workers: [],
+      worker_runs: [],
+      evaluations: [],
+      arbitration: null,
+      assistant_answer: false as const,
+      raw_content_included: false as const,
+    };
+  }
   const workers = registerFieldWorkersForSituationRun({
     run,
     environment: input.environment,
   });
   const genericVisual = run.modality_scope === "generic_visual";
+  const workerRuns: HelixLiveFieldWorkerRun[] = [];
   const evaluations = workers
     .filter((worker) => worker.status === "active")
-    .map((worker) => recordLiveFieldEvaluation(evaluateField({
-      environment: input.environment,
-      runId: run.situation_run_id,
-      workerId: worker.worker_id,
-      fieldKey: worker.field_key,
-      observation: input.observation as HelixObservationJournalEntry,
-      genericVisual,
-      now,
-    })));
+    .map((worker) => {
+      const workerRunId = `live_field_worker_run:${hashShort([
+        run.situation_run_id,
+        worker.worker_id,
+        input.observation?.observation_id,
+        now,
+      ])}`;
+      recordLiveFieldWorkerRun({
+        schema: HELIX_LIVE_FIELD_WORKER_RUN_SCHEMA,
+        worker_run_id: workerRunId,
+        worker_id: worker.worker_id,
+        situation_run_id: run.situation_run_id,
+        thread_id: run.thread_id,
+        environment_id: run.environment_id,
+        field_key: worker.field_key,
+        status: "started",
+        trigger_observation_refs: [input.observation?.observation_id ?? ""].filter(Boolean),
+        started_at: now,
+        completed_at: null,
+        output_evaluation_id: null,
+        error: null,
+        assistant_answer: false,
+        raw_content_included: false,
+        role: "validation",
+      });
+      const evaluation = recordLiveFieldEvaluation(evaluateField({
+        environment: input.environment,
+        runId: run.situation_run_id,
+        workerRunId,
+        workerId: worker.worker_id,
+        fieldKey: worker.field_key,
+        observation: input.observation as HelixObservationJournalEntry,
+        genericVisual,
+        now,
+      }));
+      const completed = recordLiveFieldWorkerRun({
+        schema: HELIX_LIVE_FIELD_WORKER_RUN_SCHEMA,
+        worker_run_id: workerRunId,
+        worker_id: worker.worker_id,
+        situation_run_id: run.situation_run_id,
+        thread_id: run.thread_id,
+        environment_id: run.environment_id,
+        field_key: worker.field_key,
+        status: "completed",
+        trigger_observation_refs: [input.observation?.observation_id ?? ""].filter(Boolean),
+        started_at: now,
+        completed_at: now,
+        output_evaluation_id: evaluation.evaluation_id,
+        error: null,
+        assistant_answer: false,
+        raw_content_included: false,
+        role: "validation",
+      });
+      workerRuns.push(completed);
+      return evaluation;
+    });
   const arbitration = arbitrateLiveSituationHandoffs({ run, evaluations });
   return {
     run,
     workers,
+    worker_runs: workerRuns,
     evaluations,
     arbitration,
     assistant_answer: false as const,

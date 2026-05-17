@@ -238,6 +238,7 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     live_card_line_reasoning: lineReasoning,
     live_situation_run: fieldWorkerRun?.run ?? null,
     live_field_workers: fieldWorkerRun?.workers ?? [],
+    live_field_worker_runs: fieldWorkerRun?.worker_runs ?? [],
     live_field_evaluations: fieldWorkerRun?.evaluations ?? [],
     live_handoff_arbitration: fieldWorkerRun?.arbitration ?? null,
     assistant_answer: false as const,
