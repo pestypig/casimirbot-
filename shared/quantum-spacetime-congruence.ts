@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  QST_PROXY_TO_ADM_METRIC_BOUNDARY,
+  type Nhm2RepresentationBoundaryId,
+  type Nhm2RepresentationSpaceBoundary,
+} from "./nhm2-representation-space-navigation";
 
 export const PLANCK_LENGTH_M = 1.616255e-35;
 export const QST_MAX_MATERIALIZED_LOG_LAMBDA = Math.log(Number.MAX_VALUE);
@@ -113,9 +118,11 @@ export type QuantumSpacetimeCongruence = ParsedQuantumSpacetimeCongruenceInput &
     spacetimeCL: "proxy_only";
     mayPromoteToCL4: false;
     blockedCausalLinks: QstUnsupportedCausalLink[];
+    representationBoundaryId: Nhm2RepresentationBoundaryId;
     allowedVacuumChannels: Array<z.infer<typeof qstVacuumModeSchema>>;
     overclaimWarnings: QstOverclaimWarning[];
   };
+  representationNavigation: Nhm2RepresentationSpaceBoundary;
   evidence: {
     qcl: QuantumCongruenceLevel;
     stage: "QST_PROXY";
@@ -228,9 +235,11 @@ export function buildQuantumSpacetimeCongruence(
       spacetimeCL: "proxy_only",
       mayPromoteToCL4: false,
       blockedCausalLinks: unsupportedCausalLinks,
+      representationBoundaryId: QST_PROXY_TO_ADM_METRIC_BOUNDARY.boundaryId,
       allowedVacuumChannels,
       overclaimWarnings,
     },
+    representationNavigation: QST_PROXY_TO_ADM_METRIC_BOUNDARY,
     evidence: {
       qcl: parsed.congruenceGate.quantumCL,
       stage: "QST_PROXY",

@@ -139,13 +139,9 @@ export const buildHelixEvidenceObservationId = (input: {
   source_id?: string | null;
 }): string => {
   const filePath = normalizeRef(input.filePath ?? input.source_id);
-  const lineStart = normalizeLineNumber(input.lineStart) ?? 1;
-  const lineEnd = normalizeLineNumber(input.lineEnd) ?? lineStart;
   const key = [
     input.lane ?? "repo_search",
     filePath,
-    lineStart,
-    lineEnd,
     normalizeRef(input.term),
     normalizeRef(input.snippet),
   ].join(":");

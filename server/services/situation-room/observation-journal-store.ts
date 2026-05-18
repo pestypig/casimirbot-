@@ -55,6 +55,13 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
     evidence_refs: cleanStrings(input.evidence_refs ?? input.evidenceRefs),
     model_invoked: input.model_invoked === true,
     confidence: typeof input.confidence === "number" ? Math.max(0, Math.min(1, input.confidence)) : null,
+    replay_status:
+      input.replay_status === "replayed"
+        ? "replayed"
+        : input.replay_status === "live"
+          ? "live"
+          : null,
+    source_binding_id: cleanString(input.source_binding_id ?? input.sourceBindingId),
     raw_image_ref: cleanString(input.raw_image_ref ?? input.rawImageRef),
     raw_content_included: false,
     assistant_answer: false,

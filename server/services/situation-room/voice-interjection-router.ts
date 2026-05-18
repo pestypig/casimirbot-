@@ -68,6 +68,7 @@ export function ingestVoiceLaneEvent(input: {
   source_id?: string | null;
   room_id?: string | null;
   speaker_id?: string | null;
+  diarization_speaker_id?: string | null;
   source_surface?: HelixVoiceLaneEvent["source_surface"];
   speaker_role?: HelixVoiceLaneEvent["speaker_role"];
   speaker_confidence?: number | null;
@@ -116,6 +117,7 @@ export function ingestVoiceLaneEvent(input: {
     source_surface: input.source_surface ?? null,
     room_id: input.room_id ?? null,
     speaker_id: input.speaker_id ?? null,
+    diarization_speaker_id: input.diarization_speaker_id ?? null,
     speaker_role: input.speaker_role ?? null,
     speaker_confidence: input.speaker_confidence ?? null,
     overlap: input.overlap ?? null,

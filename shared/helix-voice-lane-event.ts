@@ -29,6 +29,7 @@ export type HelixVoiceLaneEvent = {
   source_surface?: HelixVoiceSourceSurface | null;
   room_id?: string | null;
   speaker_id?: string | null;
+  diarization_speaker_id?: string | null;
   speaker_role?: HelixSpeakerRole | null;
   speaker_confidence?: number | null;
   overlap?: boolean | null;
@@ -76,6 +77,7 @@ export type HelixVoiceSourceObservation = {
   source_surface: HelixVoiceSourceSurface;
   room_id?: string | null;
   speaker_id?: string | null;
+  diarization_speaker_id?: string | null;
   speaker_role?: HelixSpeakerRole | null;
   speaker_authority: HelixConversationModeClassification["speaker_authority"];
   transcript_kind: HelixConversationModeClassification["transcript_kind"];

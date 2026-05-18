@@ -215,6 +215,8 @@ discordRouter.post("/source-event", (req, res) => {
       typeof req.body?.discord_user_id === "string" ? req.body.discord_user_id : null,
     display_name: typeof req.body?.display_name === "string" ? req.body.display_name : null,
     text: typeof req.body?.text === "string" ? req.body.text : null,
+    diarization_speaker_id:
+      typeof req.body?.diarization_speaker_id === "string" ? req.body.diarization_speaker_id : null,
     evidence_refs: Array.isArray(req.body?.evidence_refs) ? req.body.evidence_refs : null,
     ts: typeof req.body?.ts === "string" ? req.body.ts : null,
   });

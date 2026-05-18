@@ -25,6 +25,19 @@ describe("quantum spacetime congruence proxy lane", () => {
     expect(qst.congruenceGate.mayPromoteToCL4).toBe(false);
   });
 
+  it("navigates QST proxy claims through representation-space boundaries", () => {
+    const qst = buildQuantumSpacetimeCongruence({
+      entropyStretch: { deltaS_nats: Math.log(2) },
+    });
+
+    expect(qst.representationNavigation.boundaryId).toBe("qst_proxy_to_adm_metric_boundary");
+    expect(qst.representationNavigation.sourceCategory).toBe("quantum_spacetime_proxy_space");
+    expect(qst.representationNavigation.targetCategory).toBe("adm_dimensional_metric_space");
+    expect(qst.representationNavigation.targetInvariant).toBe("same_chart_tensor_equivalence");
+    expect(qst.representationNavigation.blockedOverclaims).toContain("qst_proxy_as_metric_equivalence");
+    expect(qst.guards.representationBoundaryId).toBe(qst.representationNavigation.boundaryId);
+  });
+
   it("uses log-space entropy bookkeeping before lambda overflows", () => {
     const qst = buildQuantumSpacetimeCongruence({
       entropyStretch: { deltaS_nats: QST_MAX_MATERIALIZED_LOG_LAMBDA + 10 },

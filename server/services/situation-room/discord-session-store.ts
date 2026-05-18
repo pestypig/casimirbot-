@@ -533,6 +533,7 @@ export function ingestDiscordSourceEvent(input: {
   discord_user_id?: string | null;
   display_name?: string | null;
   text?: string | null;
+  diarization_speaker_id?: string | null;
   evidence_refs?: string[] | null;
   ts?: string | null;
 }): {
@@ -580,6 +581,7 @@ export function ingestDiscordSourceEvent(input: {
     event_type: input.event_type,
     participant,
     text: normalize(input.text) || null,
+    diarization_speaker_id: normalize(input.diarization_speaker_id) || null,
     evidence_refs:
       input.evidence_refs?.length
         ? input.evidence_refs
@@ -620,6 +622,7 @@ export function ingestDiscordSourceEvent(input: {
       source_surface: "discord_user_stream",
       room_id: session.room_id ?? null,
       speaker_id: participant?.speaker_id ?? participant?.discord_user_id ?? null,
+      diarization_speaker_id: event.diarization_speaker_id ?? null,
       speaker_role:
         participant?.role === "commander"
           ? "owner"

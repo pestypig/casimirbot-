@@ -78,6 +78,9 @@ export type HelixTranslationObservation = {
   speaker_id: string;
   source_language: string;
   target_language: string;
+  speaker_role: HelixTranslationSpeakerRole;
+  speaker_authority: HelixTranslationSpeakerAuthority;
+  consent_state: HelixTranslationConsentState;
   source_text: string;
   translated_text: string;
   transcript_confidence: number;
@@ -89,6 +92,22 @@ export type HelixTranslationObservation = {
   evidence_refs: string[];
   content_role: "observation_not_assistant_answer";
   context_policy: "compact_context_pack_only";
+  assistant_answer: false;
+  raw_audio_included: false;
+  raw_transcript_included: false;
+};
+
+export type HelixTranslationVoiceRelayGate = {
+  schema: "helix.translation_voice_relay_gate.v1";
+  procedure_id: string;
+  observation_id: string;
+  allowed: boolean;
+  reason:
+    | "allowed"
+    | "procedure_voice_disabled"
+    | "voice_output_not_speakable"
+    | "translation_blocked"
+    | "speaker_not_authorized";
   assistant_answer: false;
   raw_audio_included: false;
   raw_transcript_included: false;

@@ -72,6 +72,7 @@ export function buildHelixVoiceSourceObservation(input: {
     source_surface: sourceSurface,
     room_id: event.room_id ?? null,
     speaker_id: event.speaker_id ?? null,
+    diarization_speaker_id: event.diarization_speaker_id ?? null,
     speaker_role: event.speaker_role ?? null,
     speaker_authority: classification.speaker_authority,
     transcript_kind: classification.transcript_kind,

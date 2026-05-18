@@ -307,6 +307,73 @@ export function getActiveLiveAnswerEnvironmentForSource(sourceId: string): LiveA
     .at(0) ?? null;
 }
 
+export function addLiveAnswerEnvironmentSourceIds(input: {
+  environment_id: string;
+  source_ids: string[];
+  now?: string;
+}): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
+  const existing = environments.get(input.environment_id);
+  if (!existing) return null;
+  const now = input.now ?? new Date().toISOString();
+  const nextSourceIds = uniqueStrings([...(existing.source_ids ?? []), ...input.source_ids]);
+  if (nextSourceIds.length === existing.source_ids.length) {
+    return {
+      environment: existing,
+      delta: {
+        schema: HELIX_LIVE_ANSWER_ENVIRONMENT_DELTA_SCHEMA,
+        delta_id: `live_answer_delta:${hashShort([existing.environment_id, "source_ids_noop", now], 18)}`,
+        environment_id: existing.environment_id,
+        thread_id: existing.thread_id,
+        reason: "manual_refresh",
+        changed_line_keys: [],
+        changed_fields: [],
+        previous_hash: hashLiveAnswerEnvironment(existing),
+        next_hash: hashLiveAnswerEnvironment(existing),
+        environment_snapshot: existing,
+        evidence_refs: [],
+        source_event_count: null,
+        window_id: null,
+        window_count: null,
+        model_invoked: false,
+        context_policy: "compact_context_pack_only",
+        raw_logs_included: false,
+        ts: now,
+      },
+    };
+  }
+  const previousHash = hashLiveAnswerEnvironment(existing);
+  const evidenceRefs = uniqueStrings(nextSourceIds.map((sourceId: string) => `source:${sourceId}`));
+  const next: LiveAnswerEnvironment = {
+    ...existing,
+    source_ids: nextSourceIds,
+    evidence_refs: uniqueStrings([...(existing.evidence_refs ?? []), ...evidenceRefs]).slice(-48),
+    updated_at: now,
+  };
+  environments.set(next.environment_id, next);
+  const delta: LiveAnswerEnvironmentDelta = {
+    schema: HELIX_LIVE_ANSWER_ENVIRONMENT_DELTA_SCHEMA,
+    delta_id: `live_answer_delta:${hashShort([next.environment_id, "source_ids_attached", nextSourceIds, now], 18)}`,
+    environment_id: next.environment_id,
+    thread_id: next.thread_id,
+    reason: "manual_refresh",
+    changed_line_keys: [],
+    changed_fields: ["source_ids"],
+    previous_hash: previousHash,
+    next_hash: hashLiveAnswerEnvironment(next),
+    environment_snapshot: next,
+    evidence_refs: evidenceRefs,
+    source_event_count: null,
+    window_id: null,
+    window_count: null,
+    model_invoked: false,
+    context_policy: "compact_context_pack_only",
+    raw_logs_included: false,
+    ts: now,
+  };
+  deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
+  return { environment: next, delta };
+}
+
 export function listLiveAnswerEnvironments(): LiveAnswerEnvironment[] {
   return Array.from(environments.values()).sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
     b.updated_at.localeCompare(a.updated_at) ||
@@ -517,7 +584,7 @@ export function setLiveAnswerEnvironmentLineSchema(input: {
     const raw = rawByKey.get(line.key);
     const initialValue = normalizeString(typeof raw?.initial_value === "string" ? raw.initial_value : null);
     const evidenceRefs = uniqueStrings(Array.isArray(raw?.evidence_refs)
-      ? raw.evidence_refs.map((entry) => String(entry ?? ""))
+      ? raw.evidence_refs.map((entry: unknown) => String(entry ?? ""))
       : [`live_answer_environment:${existing.environment_id}:line_schema`]);
     const base = existingByKey[line.key]
       ? { ...existingByKey[line.key], ...line }

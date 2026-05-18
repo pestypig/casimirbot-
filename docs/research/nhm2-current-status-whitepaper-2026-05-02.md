@@ -10,6 +10,8 @@ The May 8 validation-hardening update adds the next piece of that map: source-si
 
 The same update also adds a quantum-spacetime proxy lane for entropy stretch, cosmological expansion context, ER=EPR / holographic-area analogies, and vacuum-channel separation. This lane is diagnostic only. It does not change Planck's constant, count wormholes per hull area, turn Hubble expansion into a local photon source, or promote any NHM2 row through CL0-CL4. Its purpose is narrower: preserve useful quantum-spacetime bookkeeping while making unsupported causal links machine-detectable.
 
+The representation-space boundary patch adds a navigation layer for the broader category distinction behind this paper: projective quantum prediction space is not ADM dimensional metric space, but both teach the same discipline about representatives versus physical claims. The new category map treats the projective/Born-rule insight as a navigation analogy and routes NHM2 claims through same-chart tensor, source-independence, proxy-non-promotion, and bounded-contract invariants. This is a rhyme in the machinery room, not a derivation bridge.
+
 ## Executive scientific claim boundary
 
 NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or lower-alpha profile promotion. Repository artifacts define which NHM2 rows are pass-level under a named contract, review-level, diagnostic, runtime-blocked, or unsupported.
@@ -24,6 +26,8 @@ The current source-side full-tensor producer should be read in that frame. It pe
 
 The new quantum-spacetime congruence contract should be read even more conservatively. It creates `QST_PROXY` as a Stage 0 diagnostic helper and forces `spacetimeCL = "proxy_only"` with `mayPromoteToCL4 = false`. ER=EPR, Ryu-Takayanagi-style area estimates, and entropy-stretch ratios can appear as context or toy-model diagnostics, but they do not satisfy the same-chart metric, ADM, derived-geometry, stress-energy, or guardrail-congruence ladder.
 
+The new representation-space navigation contract should be read as a map, not a gate promotion. It records four boundaries: projective quantum state space to ADM dimensional metric space, QST proxy to ADM metric lane, source mechanism to metric-required stress-energy, and bounded output to route/speed claim. All four boundaries keep `promotionAllowed = false`, `physicalMechanismClaimAllowed = false`, and `validationClaimAllowed = false`.
+
 ## 1. Motivation and problem statement
 
 The scientific problem addressed here is narrower than a flight-ready warp-drive claim. NHM2 asks whether a bounded lapse-shift profile can be represented, evaluated, and audited in one declared chart with enough mathematical discipline that observer quantities, energy-condition surfaces, and centerline proper-time targets are not confused with coordinate artifacts or mechanism-side assumptions.
@@ -37,6 +41,8 @@ The follow-up source-side full-tensor work adds a fifth failure mode: a tile-sid
 The quantum-spacetime proxy lane adds a sixth failure mode: a suggestive quantum-spacetime analogy can be mistaken for a local force law. The current contract rejects that move. Big Bang expansion and horizon-scale entropy can inform cosmological context; they cannot by themselves drive local dynamic Casimir photon production. ER=EPR and holographic-area relations can motivate `erDensityProxy`; they cannot be reported as a physical wormhole inventory for the hull. Entropy stretch can demote quantum-visibility claims; it cannot alter the physical value of `hbar`.
 
 The implementation records calculations through repository artifacts. Those artifacts are not the theory itself; they are the evidence surfaces used to determine which NHM2 rows are admitted, review-level, diagnostic, runtime-blocked, or unsupported.
+
+The representation-space navigation patch adds a seventh failure mode: a useful cross-domain analogy can be mistaken for a derivation. The projective quantum state-space lesson is that physical prediction is not identical to a chosen vector representative. NHM2's dimensional counterpart is that metric, source, proxy, and contract claims are not identical to their convenient data representatives. The patch gives this distinction names so code and paper can point at the same boundary.
 
 ## 2. Accepted mathematical background
 
@@ -173,6 +179,32 @@ NHM2's observer audit is therefore not merely asking whether a single coordinate
 ### 2.6 Warp-drive context and known limitations
 
 Alcubierre and Natario provide warp-metric context. Natario's zero-expansion framing is especially relevant because it separates low-expansion morphology from stronger optical or global-causal safety statements. Pfenning-Ford, Fewster-Roman, and Santiago-Schuster-Visser provide the cautionary context: warp-like geometries and negative-energy constructions are constrained by energy-condition and quantum-inequality issues. Those papers are not evidence that NHM2 works; they define why NHM2 must be conservative about what is tested and what is not.
+
+### 2.7 Representation-space boundary: projective quantum vs ADM dimensional metrics
+
+The projective quantum-state-space perspective supplies a useful category boundary. In ordinary quantum notation, a normalized vector is not the physical state by itself; the physical state is a ray together with the prediction rule that survives allowed representative changes. Born-rule preservation is the invariant that prevents arbitrary Hilbert-vector bookkeeping from being mistaken for a different physics.
+
+NHM2 does not import that structure as a quantum-to-spacetime derivation. The dimensional metric lane is ADM / 3+1: lapse, shift, spatial metric, same-chart tensors, observer projections, and Einstein-tensor evaluation. Its invariant is not Born-rule preservation. Its invariant is same-chart tensor and observer equivalence under declared foliation semantics.
+
+The analogy is therefore navigational:
+
+```text
+projective quantum prediction space:
+  representative -> ray / Born-rule predictions
+
+ADM dimensional metric space:
+  coordinate components -> same-chart tensor / observer predictions
+```
+
+The two lanes rhyme because both refuse to treat a convenient representative as physical reality. They do not collapse into one another. A nonlinear Hilbert representative that preserves quantum predictions does not validate an NHM2 metric, and a same-chart ADM tensor pass does not solve quantum state-space ontology.
+
+The code-level navigation surface is:
+
+```text
+shared/nhm2-representation-space-navigation.ts
+```
+
+It records `projective_quantum_to_adm_dimensional_boundary`, `qst_proxy_to_adm_metric_boundary`, `source_mechanism_to_metric_required_boundary`, and `bounded_output_to_route_claim_boundary`. These boundaries exist to make conceptual handoffs searchable and machine-readable while remaining non-promoting.
 
 ## 3. NHM2 construction
 
@@ -417,6 +449,8 @@ holographic_entropy_proxy
 The congruence policy treats it as proxy-only. It never satisfies CL0-CL4 by itself, and it cannot bypass source-to-geometry closure, observer closure, QEI/QFT, Ford-Roman, conservation, causality, or reproducibility gates.
 
 ### 4.10 Quantum-spacetime sidecar: ER_EPR_STAGE1 solver status
+
+The QST lane is now also tagged by the representation-space boundary `qst_proxy_to_adm_metric_boundary`. That tag preserves the machinery-room rhyme with projective quantum state space while blocking `QST_PROXY` from becoming a metric-equivalence lane, stress-energy source, wormhole inventory, or local photon-production model.
 
 `ER_EPR_STAGE1` is a sidecar quantum-spacetime simulation lane. It is not part of the NHM2 source mechanism, not part of the tile-effective stress-energy closure path, and not a propulsion validation layer. Its purpose is to test whether controlled toy-dual models can produce model-internal ER=EPR-like observables under strict null controls.
 
@@ -747,6 +781,7 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | tile counterpart conservation artifact | implemented as `nhm2_tile_counterpart_conservation/v1` | diagnostic conservation surface; missing/failing conservation remains a blocker |
 | quantum-spacetime proxy contract | implemented as `QST_PROXY` / `shared/quantum-spacetime-congruence.ts` | Stage 0 diagnostic only; `spacetimeCL = proxy_only`, `mayPromoteToCL4 = false` |
 | holographic entropy graph edge | `edgeType = holographic_entropy_proxy` | treated as proxy-only by strict graph walks; no CL0-CL4 promotion |
+| representation-space navigation | implemented as `shared/nhm2-representation-space-navigation.ts` | navigation only; projective quantum analogy and NHM2 dimensional metric claims remain separate |
 | Hubble-only photon-production link | blocked as `H0_to_local_virtual_photon_production_rate` | cosmological context only, not local dynamic Casimir drive |
 | 0p7000 | `runtime_blocked` due to `selected_transport_timeout` | runtime-blocked, not physics-failed |
 | 0p5000 | exploratory expected target | not promoted |
@@ -794,6 +829,8 @@ build and render blocker ledger
 
 This chain may end in `fail` or `review`. That is acceptable when the ledger identifies the first remaining blocker precisely.
 
+The representation-space navigation patch adds no run-free validation command. It is a static claim-boundary map. The relevant review action is to verify that code paths using `QST_PROXY`, tile-effective source tensors, and bounded contracts expose the correct boundary id and do not treat the boundary id as a promotion token.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -811,6 +848,8 @@ This chain may end in `fail` or `review`. That is acceptable when the ledger ide
 | `A_info = 4 l_P^2 S_ent` and `erDensityProxy = A_info / A_R` | holographic area proxy | ER=EPR / RT-inspired comparison lane | not wormhole inventory |
 | `H0_to_local_virtual_photon_production_rate` | unsupported causal-link marker | blocks Hubble-only dynamic Casimir photon-production claims | Hubble rate is context, not local drive |
 | WEC/NEC/SEC/DEC | energy-condition tests | observer audit | passing audit is not physical viability |
+| `projective_quantum_to_adm_dimensional_boundary` | representation-space navigation | maps ray / Born-rule representative discipline to ADM same-chart tensor discipline | analogy only; no derivation or promotion |
+| `qst_proxy_to_adm_metric_boundary` | proxy-to-metric navigation | tags QST entropy / holography / vacuum bookkeeping as proxy-only before same-chart stress-energy gates | diagnostic only |
 | `tau=alpha T` | frozen centerline clocking target | lapse sweep expectation | lower-alpha rows remain targets until artifacts pass |
 | `E/A=-pi^2 hbar c/(720a^3)` | mechanism-side source model | tile energy baseline | not GR-coupled physical source proof |
 | `d_eff=d_burst d_cycle (N_concurrent/N_sector)` | duty averaging | sector strobing source strength | not a certified thrust law |
@@ -835,10 +874,11 @@ This chain may end in `fail` or `review`. That is acceptable when the ledger ide
 | Maldacena, Real observers solving imaginary problems: https://arxiv.org/abs/2412.14014 | observer-inclusion caution; v3 leaves an overall minus-sign caveat | does not validate the NHM2 observer audit |
 | Maldacena, Milekhin, Popov, Traversable wormholes in four dimensions: https://arxiv.org/abs/1807.04726 | negative Casimir-like energy and ambient-causality context | does not validate warp drive or NHM2 tile source |
 | Guevara, Lupsasca, Skinner, Strominger, Weil, Single-minus gluon tree amplitudes are nonzero: https://arxiv.org/abs/2602.12176 | unrelated scattering-amplitudes context | does not support NHM2 source closure |
+| Assumptions of Physics, Is quantum mechanics inherently linear?: https://assumptionsofphysics.org/essays/2026-05-15-is-quantum-linear | projective quantum state-space and representation/ontology context | navigation analogy only; does not derive NHM2 metric, source closure, or transport |
 | CasimirBot repository artifacts | implementation/evidence state | only source for NHM2 row status |
 
 ## Final conclusion
 
 NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a metric-required tensor, observer projections define energy-condition gates, and the centerline-lapse law computes expected timing targets.
 
-The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, attach a QEI/QFT dossier, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.
+The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, attach a QEI/QFT dossier, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. The representation-space navigation patch is the naming layer for the broader perspective: projective quantum rays and ADM metric tensors both warn us not to mistake representatives for physics, while keeping the lanes separate. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.

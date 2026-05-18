@@ -75,12 +75,18 @@ export function listSituationSourceBindings(input: {
 } = {}): HelixSituationSourceBinding[] {
   const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
   return Array.from(bindings.values())
-    .filter((binding) => !input.threadId || binding.thread_id === input.threadId)
-    .filter((binding) => !input.situationRunId || binding.situation_run_id === input.situationRunId)
-    .filter((binding) => !input.sourceId || binding.source_id === input.sourceId)
-    .filter((binding) => !input.modality || binding.modality === input.modality)
-    .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
+    .filter((binding: HelixSituationSourceBinding) => !input.threadId || binding.thread_id === input.threadId)
+    .filter((binding: HelixSituationSourceBinding) => !input.situationRunId || binding.situation_run_id === input.situationRunId)
+    .filter((binding: HelixSituationSourceBinding) => !input.sourceId || binding.source_id === input.sourceId)
+    .filter((binding: HelixSituationSourceBinding) => !input.modality || binding.modality === input.modality)
+    .sort((a: HelixSituationSourceBinding, b: HelixSituationSourceBinding) => a.updated_at.localeCompare(b.updated_at))
     .slice(-limit);
+}
+
+export function getSituationSourceBinding(
+  bindingId: string,
+): HelixSituationSourceBinding | null {
+  return bindings.get(bindingId) ?? null;
 }
 
 export function getSituationSourceBindingForSource(input: {

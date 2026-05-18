@@ -5,8 +5,10 @@ import {
   type HelixLiveTranslationProcedure,
   type HelixLiveTranslationSourceBinding,
   type HelixTranslationObservation,
+  type HelixTranslationVoiceRelayGate,
 } from "@shared/helix-live-translation-procedure";
 import { buildHelixEvidenceObservation } from "@shared/helix-evidence-observation";
+import type { HelixVoiceOutputDecision } from "@shared/helix-voice-output-decision";
 
 const procedures = new Map<string, HelixLiveTranslationProcedure>();
 const observations: HelixTranslationObservation[] = [];
@@ -100,6 +102,10 @@ export function recordTranslationObservation(input: {
     input.translated_text,
     now,
   ], 18)}`;
+  const sourceBinding =
+    procedure.source_bindings.find((binding: HelixLiveTranslationSourceBinding) =>
+      binding.source_id === input.source_id && binding.speaker_id === input.speaker_id
+    ) ?? null;
   const observation: HelixTranslationObservation = {
     schema: HELIX_TRANSLATION_OBSERVATION_SCHEMA,
     observation_id: observationId,
@@ -109,6 +115,9 @@ export function recordTranslationObservation(input: {
     speaker_id: input.speaker_id,
     source_language: input.source_language,
     target_language: input.target_language,
+    speaker_role: sourceBinding?.role ?? "unknown",
+    speaker_authority: sourceBinding?.authority ?? "transcribe_only",
+    consent_state: sourceBinding?.consent_state ?? "requested",
     source_text: input.source_text,
     translated_text: input.translated_text,
     transcript_confidence: clampConfidence(input.transcript_confidence),
@@ -126,7 +135,7 @@ export function recordTranslationObservation(input: {
       confidence: clampConfidence(input.translation_confidence),
       refs: evidenceRefs,
       content_role: "observation_not_assistant_answer",
-      consent_state: "granted",
+      consent_state: sourceBinding?.consent_state ?? "requested",
       term: input.source_language,
       query: input.target_language,
     }),
@@ -159,6 +168,33 @@ export function listTranslationObservations(
     (observation: HelixTranslationObservation) =>
       !procedureId || observation.procedure_id === procedureId,
   );
+}
+
+export function evaluateTranslationVoiceRelayGate(input: {
+  procedure: HelixLiveTranslationProcedure;
+  observation: HelixTranslationObservation;
+  outputDecision: HelixVoiceOutputDecision;
+}): HelixTranslationVoiceRelayGate {
+  const reason: HelixTranslationVoiceRelayGate["reason"] =
+    !input.procedure.output_policy.speak_translation
+      ? "procedure_voice_disabled"
+      : !input.outputDecision.speakable
+        ? "voice_output_not_speakable"
+        : input.observation.dispatch_state === "blocked"
+          ? "translation_blocked"
+          : input.observation.speaker_authority === "ignored"
+            ? "speaker_not_authorized"
+            : "allowed";
+  return {
+    schema: "helix.translation_voice_relay_gate.v1",
+    procedure_id: input.procedure.procedure_id,
+    observation_id: input.observation.observation_id,
+    allowed: reason === "allowed",
+    reason,
+    assistant_answer: false,
+    raw_audio_included: false,
+    raw_transcript_included: false,
+  };
 }
 
 export function resetLiveTranslationProcedures(): void {

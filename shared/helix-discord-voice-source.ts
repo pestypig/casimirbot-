@@ -23,6 +23,7 @@ export type HelixDiscordSourceEvent = {
   event_type: HelixDiscordSourceEventType;
   participant?: HelixDiscordParticipant | null;
   text?: string | null;
+  diarization_speaker_id?: string | null;
   evidence_refs: string[];
   ts: string;
   raw_audio_included: false;

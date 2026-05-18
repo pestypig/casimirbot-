@@ -98,6 +98,14 @@ the legacy `Repo search hits:` block.
 Retrieval context attempts must merge and carry observations forward; debug
 payloads are only a visibility surface, not the source of proof authority.
 
+Final repo-grounded answers then pass through a repo-claim observation gate.
+The gate is controlled by `HELIX_ASK_REPO_CLAIM_OBSERVATION_GATE` with
+`off`, `shadow`, `repair`, and `fail` modes. In `shadow` mode it records
+unsupported implementation claims without mutating the answer. In `repair`
+mode unsupported implementation claims are downgraded into `Next evidence
+needed`. In `fail` mode unsupported repo implementation claims fail closed with
+`REPO_CLAIM_OBSERVATION_SUPPORT_MISSING`.
+
 The loop can rank evidence, but it cannot promote one lane to answer authority
 without passing the same proof/coverage gates. A live source is equal in
 identity to repo grep or telemetry: useful evidence, not final truth.
