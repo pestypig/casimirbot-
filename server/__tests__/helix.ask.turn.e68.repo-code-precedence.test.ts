@@ -1,0 +1,113 @@
+import express from "express";
+import request from "supertest";
+import { describe, expect, it } from "vitest";
+
+import { planRouter } from "../routes/agi.plan";
+import { detectDeicticReference } from "../services/helix-ask/deictic-reference-detector";
+import { detectRepoCodeEvidenceIntent } from "../services/helix-ask/repo-code-intent-detector";
+
+const createApp = (): express.Express => {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+describe("helix ask repo/code intent precedence", () => {
+  it("detects hard repo/code evidence prompts", () => {
+    const intent = detectRepoCodeEvidenceIntent(
+      "Using repo/code evidence only, what lanes does StarSim support, and where is that enforced in code? Cite exact file paths and line-backed sources from the repository.",
+    );
+
+    expect(intent.repoEvidenceRequested).toBe(true);
+    expect(intent.strength).toBe("hard");
+    expect(intent.reasons).toEqual(
+      expect.arrayContaining([
+        "repo_code_evidence_only",
+        "line_backed_sources",
+        "implementation_enforcement_location",
+      ]),
+    );
+    expect(intent.requestedOutputs).toEqual(
+      expect.arrayContaining(["repo_code", "file_path", "line_backed_source", "implementation_location"]),
+    );
+  });
+
+  it("does not treat repo file-path requests as selected visible file references", () => {
+    const ref = detectDeicticReference({
+      threadId: "test",
+      promptText: "Cite exact file paths and line-backed sources from the repository.",
+      inputModality: "typed",
+    });
+
+    expect(ref.candidate_signal).toBe(false);
+    expect(ref.reference_type).toBe("unknown");
+  });
+
+  it("still treats selected visible file prompts as Situation Room references", () => {
+    const ref = detectDeicticReference({
+      threadId: "test",
+      promptText: "Can you see the file I'm clicking on right now?",
+      inputModality: "typed",
+    });
+
+    expect(ref.candidate_signal).toBe(true);
+    expect(ref.reference_type).toBe("selected_visible_file");
+  });
+
+  it("routes explicit repo/code evidence prompts away from Situation Room and direct answer paths", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Using repo/code evidence only, what lanes does StarSim support, and where is that enforced in code? Cite exact file paths and line-backed sources from the repository.",
+        mode: "read",
+        debug: true,
+        sessionId: `repo-code-starsim-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).not.toBe("situation_context_question");
+    expect(response.body?.final_answer_source).not.toBe("artifact_synthesis");
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_code_evidence_question");
+    expect(response.body?.retrieval_required_signal?.required).toBe(true);
+    expect(response.body?.retrieval_required_signal?.strength).toBe("hard");
+    expect(response.body?.repo_claim_observation_gate).toBeTruthy();
+    expect(response.body?.repo_claim_support).toBeTruthy();
+  }, 90000);
+
+  it("routes project-local entity definition prompts to repo evidence", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is StarSim?",
+        mode: "read",
+        debug: true,
+        sessionId: `repo-entity-starsim-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_entity_definition");
+    expect(response.body?.retrieval_required_signal?.required).toBe(true);
+  }, 90000);
+
+  it("keeps explicit background-only prompts direct", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Background only: what is a generic stellar simulation?",
+        mode: "read",
+        debug: true,
+        sessionId: `background-only-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.retrieval_required_signal?.required).toBe(false);
+    expect(response.body?.dispatch_policy).toBe("direct_answer_only");
+  }, 60000);
+});

@@ -273,6 +273,77 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
 
+  it("routes explicit visual capture content questions through SituationRun evidence", async () => {
+    const { app } = await createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Explain, what is in the visual capture?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+        workspace_context_snapshot: {
+          sessionId: "helix-ask:desktop",
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      })
+      .expect(200);
+
+    const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      precedence_reason: "explicit_visual_source_target",
+    });
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(response.body?.deictic_reference).toMatchObject({
+      reference_type: "current_screen",
+      candidate_signal: true,
+      resolution_status: "resolved",
+    });
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(finalAnswer).toMatch(/browsing|reviewing|organizing|File Explorer/i);
+    expect(finalAnswer).not.toContain("McGurk");
+    expect(finalAnswer).not.toContain("phenomenon where visual information");
+    expect(finalAnswer).not.toContain("Explained the active document");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 60000);
+
+  it("fail-closes explicit visual capture prompts without model-only concept answers when no visual evidence is bound", async () => {
+    const { app } = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Explain, what is in the visual capture?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+      })
+      .expect(200);
+
+    const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      precedence_reason: "explicit_visual_source_target",
+    });
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.deictic_reference).toMatchObject({
+      reference_type: "current_screen",
+      candidate_signal: true,
+    });
+    expect(response.body?.situation_evidence_selection?.answerable).toBe(false);
+    expect(finalAnswer).toMatch(/active visual SituationRun|no server-bound active SituationRun evidence/i);
+    expect(finalAnswer).not.toContain("McGurk");
+    expect(finalAnswer).not.toContain("phenomenon where visual information");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 60000);
+
   it("keeps generic looking-at prompts on the visual terminal presentation when an active doc is present", async () => {
     const { app } = await createApp();
     seedVisualSituationRun();

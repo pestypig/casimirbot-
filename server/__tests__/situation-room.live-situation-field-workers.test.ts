@@ -11,6 +11,11 @@ import { resetInterpretationCardsForTest } from "../services/situation-room/inte
 import { resetLiveFieldEvaluationsForTest } from "../services/situation-room/live-field-evaluation-store";
 import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live-field-worker-run-store";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
+import { resetLiveInterpretationGraphsForTest } from "../services/situation-room/live-interpretation-graph-store";
+import { resetLiveInterpretationHypothesesForTest } from "../services/situation-room/live-interpretation-hypothesis-store";
+import { resetLiveInterpretationRunsForTest } from "../services/situation-room/live-interpretation-run-store";
+import { resetLiveInterpretationWorkerRunsForTest } from "../services/situation-room/live-interpretation-worker-run-store";
+import { resetLiveInterpretationWorkersForTest } from "../services/situation-room/live-interpretation-worker-registry";
 import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
 import { resetLiveTangentEvaluationsForTest } from "../services/situation-room/live-tangent-evaluation-store";
 import { resetObservationJournalForTest } from "../services/situation-room/observation-journal-store";
@@ -62,6 +67,11 @@ describe("live situation field workers", () => {
     resetLiveFieldWorkersForTest();
     resetLiveFieldWorkerRunsForTest();
     resetLiveFieldEvaluationsForTest();
+    resetLiveInterpretationRunsForTest();
+    resetLiveInterpretationWorkersForTest();
+    resetLiveInterpretationWorkerRunsForTest();
+    resetLiveInterpretationHypothesesForTest();
+    resetLiveInterpretationGraphsForTest();
     resetLiveTangentEvaluationsForTest();
   });
 
@@ -168,5 +178,121 @@ describe("live situation field workers", () => {
     expect(routed.live_field_workers).toEqual([]);
     expect(routed.live_field_worker_runs).toEqual([]);
     expect(routed.live_field_evaluations).toEqual([]);
+    expect(routed.live_interpretation_run).toBeNull();
+    expect(routed.live_interpretation_workers).toEqual([]);
+    expect(routed.live_interpretation_worker_runs).toEqual([]);
+    expect(routed.live_interpretation_hypotheses).toEqual([]);
+  });
+
+  it("seeds durable interpretation workers from the first bound visual summary", () => {
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:interpretation-workers",
+      objective: "Using the latest visual observation, describe what document or folder view I am looking at.",
+      preset: "custom",
+      source_ids: ["source:documents"],
+    });
+    const chunk = visualChunk();
+    const routed = routeLiveSourceAnalysisOutput({
+      job: jobFor(chunk),
+      chunk,
+      status: "completed",
+      summary: chunk.compact_summary,
+      outputRefs: ["visual_evidence:field-workers"],
+      modelInvoked: true,
+    });
+
+    expect(routed.live_interpretation_run).toMatchObject({
+      situation_run_id: routed.live_situation_run?.situation_run_id,
+      source_id: "source:documents",
+      modality_scope: "generic_visual",
+      objective_text: "Using the latest visual observation, describe what document or folder view I am looking at.",
+      status: "active",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(routed.live_interpretation_run?.active_lenses).toEqual(expect.arrayContaining([
+      "scene_neutral",
+      "activity",
+      "objects",
+      "uncertainty",
+      "verifier_lane",
+      "workstation_affordance_lane",
+      "user_notice_lane",
+    ]));
+    expect(routed.live_interpretation_workers.length).toBe(routed.live_interpretation_run?.active_lenses.length);
+    expect(routed.live_interpretation_workers.every((worker) =>
+      worker.may_execute_tool === false &&
+      worker.may_emit_assistant_answer === false &&
+      worker.assistant_answer === false
+    )).toBe(true);
+    expect(routed.live_interpretation_worker_runs.length).toBe(routed.live_interpretation_workers.length);
+    expect(routed.live_interpretation_worker_runs.every((run) =>
+      run.status === "completed" &&
+      run.assistant_answer === false &&
+      run.raw_content_included === false
+    )).toBe(true);
+    expect(routed.live_interpretation_hypotheses.length).toBe(routed.live_interpretation_workers.length);
+    expect(routed.live_interpretation_hypotheses.every((hypothesis) =>
+      hypothesis.assistant_answer === false &&
+      hypothesis.raw_content_included === false &&
+      hypothesis.role === "validation" &&
+      hypothesis.evidence_refs.some((ref) => ref.startsWith("observation:")) &&
+      !hypothesis.evidence_refs.includes("Using the latest visual observation, describe what document or folder view I am looking at.")
+    )).toBe(true);
+    const activity = routed.live_interpretation_hypotheses.find((hypothesis) => hypothesis.lens === "activity");
+    expect(activity?.missing_evidence.join(" ")).toMatch(/audio\/user steering/i);
+    expect(activity?.confidence).toBeLessThan(0.7);
+    expect(routed.live_interpretation_graph?.nodes).toEqual(
+      expect.arrayContaining(routed.live_interpretation_hypotheses.map((hypothesis) => hypothesis.hypothesis_id)),
+    );
+  });
+
+  it("records interpretation contradictions as validation tangents without action authority", () => {
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:interpretation-contradiction",
+      objective: "Track what is visible on the current screen.",
+      preset: "custom",
+      source_ids: ["source:documents"],
+    });
+    const first = visualChunk();
+    routeLiveSourceAnalysisOutput({
+      job: jobFor(first),
+      chunk: first,
+      status: "completed",
+      summary: first.compact_summary,
+      outputRefs: ["visual_evidence:first"],
+      modelInvoked: true,
+    });
+    const second: HelixLiveSourceChunk = {
+      ...visualChunk(),
+      chunk_id: "live_source_chunk:browser-contradiction",
+      sequence_index: 2,
+      ts: "2026-05-17T21:30:10.000Z",
+      payload_ref: "visual_frame:browser-contradiction",
+      compact_summary: "A browser tab is visible with a web page and site navigation controls.",
+    };
+    const routed = routeLiveSourceAnalysisOutput({
+      job: jobFor(second),
+      chunk: second,
+      status: "completed",
+      summary: second.compact_summary,
+      outputRefs: ["visual_evidence:second"],
+      modelInvoked: true,
+    });
+
+    expect(routed.live_interpretation_hypotheses.some((hypothesis) =>
+      hypothesis.status === "contradicted" &&
+      (hypothesis.contradicts ?? []).length > 0
+    )).toBe(true);
+    expect(routed.live_interpretation_graph?.edges.some((edge) => edge.relation === "contradicts")).toBe(true);
+    expect(routed.live_interpretation_tangents.length).toBeGreaterThan(0);
+    expect(routed.live_interpretation_tangents.every((tangent) =>
+      tangent.tangent_type === "contradiction_tangent" &&
+      tangent.assistant_answer === false &&
+      tangent.raw_content_included === false &&
+      tangent.recommended_handoff.type === "none"
+    )).toBe(true);
   });
 });

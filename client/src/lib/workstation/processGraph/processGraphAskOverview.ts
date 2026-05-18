@@ -3,8 +3,12 @@ import type { ProcessGraphContextPack } from "./buildProcessGraphContextPack";
 const OVERVIEW_PROMPT_PATTERN =
   /\b(?:what(?:'s| is)\s+(?:happening|going on)|what\s+are\s+you\s+doing|what\s+tools\s+are\s+active|current\s+workspace|active\s+(?:jobs?|tools?|panels?|pipeline)|why\s+did\s+that\s+fail|what\s+changed|latest\s+(?:artifact|result|job))\b/i;
 
+const PROCEDURE_MEMORY_PROMPT_PATTERN =
+  /\b(?:last\s+(?:situation\s+)?epoch|situation\s+epoch|procedure\s+epoch|what\s+changed\s+in\s+the\s+last\s+(?:situation\s+)?epoch|show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|replay\s+(?:that|the\s+last))\b/i;
+
 export function shouldUseProcessGraphContextPack(prompt: string): boolean {
-  return OVERVIEW_PROMPT_PATTERN.test(prompt.trim());
+  const trimmed = prompt.trim();
+  return OVERVIEW_PROMPT_PATTERN.test(trimmed) && !PROCEDURE_MEMORY_PROMPT_PATTERN.test(trimmed);
 }
 
 function formatList(

@@ -151,6 +151,38 @@ drops are runtime failures. Do not classify them as retrieval, observation, or
 repo-claim gate failures unless the terminal debug payload proves that the
 retrieval/gate stage actually ran.
 
+## Repo/Code Intent Precedence
+
+Explicit repo/code evidence requests have precedence over live Situation Room
+and model-only routes.
+
+If the prompt asks for repo/code evidence, source files, file paths,
+line-backed sources, implementation location, contracts, schemas, routes,
+modules, or where behavior is enforced in code, Helix Ask must route the turn as
+a repo evidence question before evaluating deictic screen context.
+
+Words such as `file` and `path` are ambiguous. They are Situation Room cues only
+when paired with current-screen language such as `clicking`, `selected`,
+`looking at right now`, `my screen`, or `current window`. They are repo evidence
+cues when paired with `repo`, `repository`, `code`, `source`, `implementation`,
+`line-backed`, `contract`, `module`, `route`, or `where enforced`.
+
+A hard repo/code evidence turn may not terminate as:
+
+- `situation_context_question`
+- `artifact_synthesis`
+- `no_tool_direct`
+
+It must either:
+
+1. produce evidence observations,
+2. answer through the repo-claim observation gate, or
+3. fail closed with a typed repo evidence reason.
+
+Project-local entity definition prompts such as `What is StarSim?`, `What is
+NHM2?`, or `What is Helix Ask?` should use repo evidence unless the user
+explicitly asks for background-only or general-concept-only reasoning.
+
 Use these stable labels when a UI turn cannot be reconciled:
 
 ```txt

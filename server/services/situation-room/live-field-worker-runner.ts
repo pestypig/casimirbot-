@@ -22,6 +22,7 @@ import { recordLiveProcedureEpoch } from "./live-procedure-epoch-store";
 import { HELIX_LIVE_PROCEDURE_EPOCH_SCHEMA } from "@shared/helix-live-procedure-epoch";
 import { appendProcedureEpochLedgerItem } from "./procedure-epoch-ledger-store";
 import { recordProcedureEpochClosure } from "./procedure-epoch-closure";
+import { runLiveInterpretationWorkersForObservation } from "./live-interpretation-worker-runner";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -29,6 +30,15 @@ const hashShort = (value: unknown, size = 18): string =>
 const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+
+const emptyInterpretationWorkerRun = () => ({
+  interpretation_run: null,
+  interpretation_workers: [],
+  interpretation_worker_runs: [],
+  interpretation_hypotheses: [],
+  interpretation_graph: null,
+  interpretation_tangents: [],
+});
 
 const genericActivity = (text: string): string => {
   const normalized = lower(text);
@@ -173,6 +183,7 @@ export function runLiveFieldWorkersForObservation(input: {
       worker_runs: [],
       evaluations: [],
       arbitration: null,
+      ...emptyInterpretationWorkerRun(),
       assistant_answer: false as const,
       raw_content_included: false as const,
     };
@@ -194,10 +205,16 @@ export function runLiveFieldWorkersForObservation(input: {
       worker_runs: [],
       evaluations: [],
       arbitration: null,
+      ...emptyInterpretationWorkerRun(),
       assistant_answer: false as const,
       raw_content_included: false as const,
     };
   }
+  const interpretationWorkerRun = runLiveInterpretationWorkersForObservation({
+    run,
+    observation: input.observation,
+    now,
+  });
   const workers = registerFieldWorkersForSituationRun({
     run,
     environment: input.environment,
@@ -437,6 +454,7 @@ export function runLiveFieldWorkersForObservation(input: {
     confidence_updates: probeFeedback.confidence_updates,
     procedure_epoch: procedureEpoch,
     procedure_epoch_closure: epochClosure,
+    ...interpretationWorkerRun,
     assistant_answer: false as const,
     raw_content_included: false as const,
   };

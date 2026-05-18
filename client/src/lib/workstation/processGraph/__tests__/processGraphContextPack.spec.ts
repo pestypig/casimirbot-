@@ -82,4 +82,10 @@ describe("workstation process graph context pack", () => {
     expect(shouldUseProcessGraphContextPack("continue that active pipeline")).toBe(true);
     expect(shouldUseProcessGraphContextPack("summarize quantum vacuum pressure")).toBe(false);
   });
+
+  it("does not capture procedure-memory prompts as workstation overview prompts", () => {
+    expect(shouldUseProcessGraphContextPack("What changed in the last situation epoch?")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Show the evidence for that.")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Why did you say that?")).toBe(false);
+  });
 });
