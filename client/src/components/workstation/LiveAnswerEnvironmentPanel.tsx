@@ -152,6 +152,47 @@ type LiveSituationRunAcceptanceRead = {
   checks?: Array<{ check: string; passed: boolean; evidence: string }>;
   created_at: string;
 };
+type LiveSituationPredictionRead = {
+  prediction_id: string;
+  field_key: string;
+  claim: string;
+  status: string;
+  source_epoch: number;
+  expected_observation_signals?: string[];
+  expires_at: string;
+};
+type LiveObservationProbeRead = {
+  probe_id: string;
+  prediction_id: string;
+  probe_type: string;
+  status: string;
+  source_epoch: number;
+  expected_observation_signals?: string[];
+};
+type LiveProbeResultRead = {
+  probe_result_id: string;
+  prediction_id: string;
+  status: string;
+  tested_at_epoch: number;
+  observed_signals?: string[];
+  confidence_delta: number;
+};
+type LiveConfidenceUpdateRead = {
+  confidence_update_id: string;
+  field_key?: string | null;
+  confidence_delta: number;
+  updated_confidence?: number | null;
+  reason: string;
+};
+type LiveProcedureEpochRead = {
+  epoch_id: string;
+  epoch: number;
+  observation_refs?: string[];
+  field_evaluation_refs?: string[];
+  prediction_refs?: string[];
+  probe_result_refs?: string[];
+  created_at: string;
+};
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -321,6 +362,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [arbitrationCandidates, setArbitrationCandidates] = useState<LiveArbitrationCandidateRead[]>([]);
   const [planContracts, setPlanContracts] = useState<LivePlanContractRead[]>([]);
   const [acceptanceRuns, setAcceptanceRuns] = useState<LiveSituationRunAcceptanceRead[]>([]);
+  const [situationPredictions, setSituationPredictions] = useState<LiveSituationPredictionRead[]>([]);
+  const [observationProbes, setObservationProbes] = useState<LiveObservationProbeRead[]>([]);
+  const [probeResults, setProbeResults] = useState<LiveProbeResultRead[]>([]);
+  const [confidenceUpdates, setConfidenceUpdates] = useState<LiveConfidenceUpdateRead[]>([]);
+  const [procedureEpochs, setProcedureEpochs] = useState<LiveProcedureEpochRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -427,7 +473,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes, arbitrationCandidateRes, planContractRes, acceptanceRunRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes, arbitrationCandidateRes, planContractRes, acceptanceRunRes, predictionRes, probeRes, probeResultRes, confidenceUpdateRes, procedureEpochRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -453,8 +499,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/live-cognition/arbitration-candidates?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/plan-contracts?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/acceptance-runs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/predictions?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/probes?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/probe-results?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/confidence-updates?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/procedure-epochs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody, arbitrationCandidateBody, planContractBody, acceptanceRunBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody, arbitrationCandidateBody, planContractBody, acceptanceRunBody, predictionBody, probeBody, probeResultBody, confidenceUpdateBody, procedureEpochBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -480,6 +531,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         arbitrationCandidateRes.json().catch(() => ({})),
         planContractRes.json().catch(() => ({})),
         acceptanceRunRes.json().catch(() => ({})),
+        predictionRes.json().catch(() => ({})),
+        probeRes.json().catch(() => ({})),
+        probeResultRes.json().catch(() => ({})),
+        confidenceUpdateRes.json().catch(() => ({})),
+        procedureEpochRes.json().catch(() => ({})),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -513,6 +569,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setArbitrationCandidates(Array.isArray(arbitrationCandidateBody.candidates) ? arbitrationCandidateBody.candidates : []);
       setPlanContracts(Array.isArray(planContractBody.plan_contracts) ? planContractBody.plan_contracts : []);
       setAcceptanceRuns(Array.isArray(acceptanceRunBody.acceptance_runs) ? acceptanceRunBody.acceptance_runs : []);
+      setSituationPredictions(Array.isArray(predictionBody.predictions) ? predictionBody.predictions : []);
+      setObservationProbes(Array.isArray(probeBody.probes) ? probeBody.probes : []);
+      setProbeResults(Array.isArray(probeResultBody.probe_results) ? probeResultBody.probe_results : []);
+      setConfidenceUpdates(Array.isArray(confidenceUpdateBody.confidence_updates) ? confidenceUpdateBody.confidence_updates : []);
+      setProcedureEpochs(Array.isArray(procedureEpochBody.procedure_epochs) ? procedureEpochBody.procedure_epochs : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -1685,6 +1746,54 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                       <p className="text-xs text-slate-200">{acceptance.scenario}: {acceptance.ok ? "passed" : "failed"}</p>
                       <p className="mt-1 text-[10px] text-slate-500">{acceptance.summary}</p>
                       <p className="mt-1 text-[10px] text-slate-600">{(acceptance.checks ?? []).filter((entry) => entry.passed).length}/{(acceptance.checks ?? []).length} checks / {formatTime(acceptance.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Predictions / Probes</p>
+                <p className="mt-1 text-[11px] text-slate-500">Next checks become testable predictions, then passive probes wait for fresh observations.</p>
+                <div className="mt-3 space-y-2">
+                  {situationPredictions.length === 0 && observationProbes.length === 0 ? <p className="text-xs text-slate-500">No predictions or probes yet.</p> : null}
+                  {situationPredictions.slice(-5).reverse().map((prediction: LiveSituationPredictionRead) => (
+                    <div key={prediction.prediction_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase text-slate-500">{prediction.field_key}</p>
+                        <span className="text-[10px] text-slate-600">epoch {prediction.source_epoch} / {prediction.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-200">{prediction.claim}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">expects {(prediction.expected_observation_signals ?? []).join(", ") || "none"} / expires {formatTime(prediction.expires_at)}</p>
+                    </div>
+                  ))}
+                  {observationProbes.slice(-5).reverse().map((probe: LiveObservationProbeRead) => (
+                    <div key={probe.probe_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{probe.probe_type}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">epoch {probe.source_epoch} / {probe.status} / signals {(probe.expected_observation_signals ?? []).join(", ") || "none"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Probe Results / Confidence</p>
+                <p className="mt-1 text-[11px] text-slate-500">New observations satisfy, contradict, or leave prior predictions inconclusive.</p>
+                <div className="mt-3 space-y-2">
+                  {probeResults.length === 0 && confidenceUpdates.length === 0 ? <p className="text-xs text-slate-500">No probe results yet.</p> : null}
+                  {probeResults.slice(-5).reverse().map((result: LiveProbeResultRead) => (
+                    <div key={result.probe_result_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{result.status} at epoch {result.tested_at_epoch}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">signals {(result.observed_signals ?? []).join(", ") || "none"} / delta {Math.round(result.confidence_delta * 100)}%</p>
+                    </div>
+                  ))}
+                  {confidenceUpdates.slice(-5).reverse().map((update: LiveConfidenceUpdateRead) => (
+                    <div key={update.confidence_update_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{update.field_key ?? "field"} confidence {Math.round(update.confidence_delta * 100)}%</p>
+                      <p className="mt-1 text-[10px] text-slate-600">{update.reason} / updated {typeof update.updated_confidence === "number" ? `${Math.round(update.updated_confidence * 100)}%` : "n/a"}</p>
+                    </div>
+                  ))}
+                  {procedureEpochs.slice(-3).reverse().map((epoch: LiveProcedureEpochRead) => (
+                    <div key={epoch.epoch_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">Procedure epoch {epoch.epoch}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">obs {(epoch.observation_refs ?? []).length} / evals {(epoch.field_evaluation_refs ?? []).length} / preds {(epoch.prediction_refs ?? []).length} / results {(epoch.probe_result_refs ?? []).length}</p>
                     </div>
                   ))}
                 </div>

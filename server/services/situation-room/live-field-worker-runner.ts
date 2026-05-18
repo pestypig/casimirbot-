@@ -14,6 +14,12 @@ import { registerFieldWorkersForSituationRun } from "./live-field-worker-registr
 import { recordLiveFieldEvaluation } from "./live-field-evaluation-store";
 import { recordLiveFieldWorkerRun } from "./live-field-worker-run-store";
 import { arbitrateLiveSituationHandoffs } from "./live-handoff-arbiter";
+import {
+  createPredictionsForFieldEvaluations,
+  runObservationProbesForObservation,
+} from "./live-observation-probe-runner";
+import { recordLiveProcedureEpoch } from "./live-procedure-epoch-store";
+import { HELIX_LIVE_PROCEDURE_EPOCH_SCHEMA } from "@shared/helix-live-procedure-epoch";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -173,6 +179,7 @@ export function runLiveFieldWorkersForObservation(input: {
   const run = ensureLiveSituationRunForEnvironment({
     environment: input.environment,
     now,
+    advanceEpoch: true,
   });
   if (
     input.environment.source_ids.length > 0 &&
@@ -192,6 +199,11 @@ export function runLiveFieldWorkersForObservation(input: {
   const workers = registerFieldWorkersForSituationRun({
     run,
     environment: input.environment,
+  });
+  const probeFeedback = runObservationProbesForObservation({
+    run,
+    observation: input.observation,
+    now,
   });
   const genericVisual = run.modality_scope === "generic_visual";
   const workerRuns: HelixLiveFieldWorkerRun[] = [];
@@ -253,13 +265,40 @@ export function runLiveFieldWorkersForObservation(input: {
       workerRuns.push(completed);
       return evaluation;
     });
+  const predictionFeedback = createPredictionsForFieldEvaluations({
+    run,
+    evaluations,
+    now,
+  });
   const arbitration = arbitrateLiveSituationHandoffs({ run, evaluations });
+  const procedureEpoch = recordLiveProcedureEpoch({
+    schema: HELIX_LIVE_PROCEDURE_EPOCH_SCHEMA,
+    epoch_id: `live_procedure_epoch:${hashShort([run.situation_run_id, run.current_epoch, input.observation.observation_id])}`,
+    situation_run_id: run.situation_run_id,
+    thread_id: run.thread_id,
+    environment_id: run.environment_id,
+    source_binding_id: run.source_binding_id,
+    epoch: run.current_epoch,
+    observation_refs: [input.observation.observation_id],
+    field_evaluation_refs: evaluations.map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id),
+    prediction_refs: predictionFeedback.predictions.map((entry) => entry.prediction_id),
+    probe_result_refs: probeFeedback.probe_results.map((entry) => entry.probe_result_id),
+    assistant_answer: false,
+    raw_content_included: false,
+    role: "validation",
+    created_at: now,
+  });
   return {
     run,
     workers,
     worker_runs: workerRuns,
     evaluations,
     arbitration,
+    predictions: predictionFeedback.predictions,
+    probes: predictionFeedback.probes,
+    probe_results: probeFeedback.probe_results,
+    confidence_updates: probeFeedback.confidence_updates,
+    procedure_epoch: procedureEpoch,
     assistant_answer: false as const,
     raw_content_included: false as const,
   };

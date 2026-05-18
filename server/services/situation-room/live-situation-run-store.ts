@@ -29,6 +29,7 @@ const scopeFor = (environment: LiveAnswerEnvironment): HelixLiveSituationRunModa
 export function ensureLiveSituationRunForEnvironment(input: {
   environment: LiveAnswerEnvironment;
   pipelineId?: string | null;
+  advanceEpoch?: boolean;
   now?: string;
 }): HelixLiveSituationRun {
   const now = input.now ?? new Date().toISOString();
@@ -56,7 +57,7 @@ export function ensureLiveSituationRunForEnvironment(input: {
     objective_text: input.environment.objective,
     modality_scope: modalityScope,
     active_fields: activeFields,
-    current_epoch: existing?.current_epoch ?? 1,
+    current_epoch: existing ? existing.current_epoch + (input.advanceEpoch ? 1 : 0) : 1,
     corroboration_policy: {
       audio_required: false,
       user_steering_required: false,
