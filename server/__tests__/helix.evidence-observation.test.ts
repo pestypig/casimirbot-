@@ -4,6 +4,7 @@ import {
   assertHelixEvidenceObservationRole,
   buildHelixEvidenceObservation,
   inferHelixEvidenceSourceKindFromRef,
+  mergeHelixEvidenceObservations,
 } from "../../shared/helix-evidence-observation";
 import { formatRepoSearchEvidence } from "../services/helix-ask/repo-search";
 
@@ -22,6 +23,7 @@ describe("helix evidence observations", () => {
 
     expect(observation).toMatchObject({
       source_kind: "repo_code",
+      lane: "repo_search",
       source_id: "server/modules/starsim/contract.ts:12",
       observed_at: "2026-05-18T12:00:00.000Z",
       provenance: "retrieved",
@@ -31,6 +33,42 @@ describe("helix evidence observations", () => {
       consent_state: "not_required",
     });
     expect(() => assertHelixEvidenceObservationRole(observation)).not.toThrow();
+  });
+
+  it("builds stable IDs and dedupes duplicate observations", () => {
+    const first = buildHelixEvidenceObservation({
+      lane: "git_tracked",
+      source_kind: "repo_code",
+      source_id: "server/modules/starsim/contract.ts:42",
+      observed_at: "2026-05-18T12:00:00.000Z",
+      provenance: "retrieved",
+      confidence: 0.85,
+      refs: ["server/modules/starsim/contract.ts:42"],
+      content_role: "evidence_not_assistant_answer",
+      filePath: "server/modules/starsim/contract.ts",
+      lineStart: 42,
+      lineEnd: 42,
+      snippet: "requestedLanes: StarSimLane[]",
+      term: "requestedLanes",
+    });
+    const second = buildHelixEvidenceObservation({
+      lane: "git_tracked",
+      source_kind: "repo_code",
+      source_id: "server/modules/starsim/contract.ts:42",
+      observed_at: "2026-05-18T12:05:00.000Z",
+      provenance: "retrieved",
+      confidence: 0.7,
+      refs: ["server/modules/starsim/contract.ts:42"],
+      content_role: "evidence_not_assistant_answer",
+      filePath: "server/modules/starsim/contract.ts",
+      lineStart: 42,
+      lineEnd: 42,
+      snippet: "requestedLanes: StarSimLane[]",
+      term: "requestedLanes",
+    });
+
+    expect(first.id).toBe(second.id);
+    expect(mergeHelixEvidenceObservations([first], [second])).toEqual([first]);
   });
 
   it("classifies repo paths by source kind", () => {
@@ -69,12 +107,19 @@ describe("helix evidence observations", () => {
     ]);
     expect(formatted.observations).toHaveLength(2);
     expect(formatted.observations[0]).toMatchObject({
+      lane: "repo_search",
       source_kind: "repo_code",
       source_id: "server/modules/starsim/contract.ts:42",
       refs: ["server/modules/starsim/contract.ts:42"],
       provenance: "retrieved",
       content_role: "evidence_not_assistant_answer",
+      filePath: "server/modules/starsim/contract.ts",
+      lineStart: 42,
+      lineEnd: 42,
+      snippet: "requestedLanes: StarSimLane[]",
+      term: "requestedLanes",
     });
+    expect(formatted.observations[0]?.id).toMatch(/^obs_[a-f0-9]{8}$/);
     expect(formatted.observations[1]?.source_kind).toBe("repo_doc");
   });
 });

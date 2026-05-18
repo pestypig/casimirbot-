@@ -14,6 +14,7 @@ export type HelixVoiceOutputDecision = {
   reason:
     | "voice_output_disabled"
     | "ambient_context"
+    | "speaker_not_authorized"
     | "direct_address"
     | "command_candidate"
     | "critical_commentary"

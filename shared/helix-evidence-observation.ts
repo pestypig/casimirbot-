@@ -5,8 +5,14 @@ export type HelixEvidenceSourceKind =
   | "telemetry"
   | "live_screen"
   | "live_audio"
+  | "live_voice_speaker"
+  | "live_translation"
+  | "world_event"
+  | "minecraft_event"
+  | "discord_call"
   | "browser"
-  | "operator_text";
+  | "operator_text"
+  | "situation_goal_session";
 
 export type HelixEvidenceObservationProvenance =
   | "measured"
@@ -24,7 +30,25 @@ export type HelixEvidenceObservationConsentState =
   | "granted"
   | "revoked";
 
+export type HelixEvidenceObservationLane =
+  | "repo_search"
+  | "git_tracked"
+  | "stage0"
+  | "atlas"
+  | "manual_contract"
+  | "live_source"
+  | "voice_lane"
+  | "translation_procedure";
+
+export type HelixEvidenceObservationSourceStage =
+  | "preflight"
+  | "fallback_repo_search"
+  | "stage0_code_floor"
+  | "objective_recovery";
+
 export type HelixEvidenceObservation = {
+  id: string;
+  lane: HelixEvidenceObservationLane;
   source_kind: HelixEvidenceSourceKind;
   source_id: string;
   observed_at: string;
@@ -34,12 +58,22 @@ export type HelixEvidenceObservation = {
   refs: string[];
   content_role: HelixEvidenceObservationContentRole;
   consent_state?: HelixEvidenceObservationConsentState;
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
+  snippet?: string;
+  term?: string;
+  query?: string;
+  score?: number;
+  sourceStage?: HelixEvidenceObservationSourceStage;
 };
 
 export type HelixEvidenceObservationInput = Omit<
   HelixEvidenceObservation,
-  "observed_at" | "confidence" | "refs" | "source_id"
+  "id" | "lane" | "observed_at" | "confidence" | "refs" | "source_id"
 > & {
+  id?: string | null;
+  lane?: HelixEvidenceObservationLane | null;
   source_id?: string | null;
   observed_at?: string | Date | null;
   confidence?: number | null;
@@ -81,6 +115,43 @@ const clampConfidence = (value: number | null | undefined): number => {
   return Math.max(0, Math.min(1, Number(value)));
 };
 
+const normalizeLineNumber = (value: number | null | undefined): number | undefined => {
+  if (!Number.isFinite(value)) return undefined;
+  return Math.max(1, Math.trunc(Number(value)));
+};
+
+const stableObservationHash = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
+
+export const buildHelixEvidenceObservationId = (input: {
+  lane?: HelixEvidenceObservationLane | null;
+  filePath?: string | null;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  term?: string | null;
+  snippet?: string | null;
+  source_id?: string | null;
+}): string => {
+  const filePath = normalizeRef(input.filePath ?? input.source_id);
+  const lineStart = normalizeLineNumber(input.lineStart) ?? 1;
+  const lineEnd = normalizeLineNumber(input.lineEnd) ?? lineStart;
+  const key = [
+    input.lane ?? "repo_search",
+    filePath,
+    lineStart,
+    lineEnd,
+    normalizeRef(input.term),
+    normalizeRef(input.snippet),
+  ].join(":");
+  return `obs_${stableObservationHash(key)}`;
+};
+
 export const inferHelixEvidenceSourceKindFromRef = (ref: string): HelixEvidenceSourceKind => {
   const normalized = normalizeRef(ref).toLowerCase();
   if (/^(?:server|client|shared|modules|scripts|tools)\//.test(normalized)) {
@@ -99,8 +170,28 @@ export const buildHelixEvidenceObservation = (
   input: HelixEvidenceObservationInput,
 ): HelixEvidenceObservation => {
   const refs = uniqueRefs(input.refs);
-  const sourceId = normalizeRef(input.source_id) || refs[0] || input.source_kind;
+  const filePath = normalizeRef(input.filePath);
+  const lineStart = normalizeLineNumber(input.lineStart);
+  const lineEnd = normalizeLineNumber(input.lineEnd) ?? lineStart;
+  const sourceId = normalizeRef(input.source_id) || refs[0] || filePath || input.source_kind;
+  const lane = input.lane ?? "repo_search";
+  const snippet = normalizeRef(input.snippet);
+  const term = normalizeRef(input.term);
+  const query = normalizeRef(input.query);
+  const id =
+    normalizeRef(input.id) ||
+    buildHelixEvidenceObservationId({
+      lane,
+      filePath,
+      lineStart,
+      lineEnd,
+      term,
+      snippet,
+      source_id: sourceId,
+    });
   return {
+    id,
+    lane,
     source_kind: input.source_kind,
     source_id: sourceId,
     observed_at: normalizeObservedAt(input.observed_at),
@@ -112,6 +203,14 @@ export const buildHelixEvidenceObservation = (
     refs,
     content_role: input.content_role,
     ...(input.consent_state ? { consent_state: input.consent_state } : {}),
+    ...(filePath ? { filePath } : {}),
+    ...(lineStart ? { lineStart } : {}),
+    ...(lineEnd ? { lineEnd } : {}),
+    ...(snippet ? { snippet } : {}),
+    ...(term ? { term } : {}),
+    ...(query ? { query } : {}),
+    ...(Number.isFinite(input.score) ? { score: Number(input.score) } : {}),
+    ...(input.sourceStage ? { sourceStage: input.sourceStage } : {}),
   };
 };
 
@@ -124,4 +223,31 @@ export const assertHelixEvidenceObservationRole = (
   ) {
     throw new Error("helix_evidence_observation_invalid_content_role");
   }
+};
+
+export const mergeHelixEvidenceObservations = (
+  ...groups: Array<Array<HelixEvidenceObservation | null | undefined> | null | undefined>
+): HelixEvidenceObservation[] => {
+  const seen = new Set<string>();
+  const out: HelixEvidenceObservation[] = [];
+  for (const group of groups) {
+    for (const observation of group ?? []) {
+      if (!observation) continue;
+      const key =
+        normalizeRef(observation.id) ||
+        buildHelixEvidenceObservationId({
+          lane: observation.lane,
+          filePath: observation.filePath,
+          lineStart: observation.lineStart,
+          lineEnd: observation.lineEnd,
+          term: observation.term,
+          snippet: observation.snippet,
+          source_id: observation.source_id,
+        });
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(observation.id ? observation : { ...observation, id: key });
+    }
+  }
+  return out;
 };

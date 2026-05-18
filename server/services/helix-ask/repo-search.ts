@@ -7,6 +7,8 @@ import {
   buildHelixEvidenceObservation,
   inferHelixEvidenceSourceKindFromRef,
   type HelixEvidenceObservation,
+  type HelixEvidenceObservationLane,
+  type HelixEvidenceObservationSourceStage,
 } from "../../../shared/helix-evidence-observation";
 import type { HelixAskConceptMatch } from "./concepts";
 import type { HelixAskTopicProfile, HelixAskTopicTag } from "./topic";
@@ -1473,7 +1475,14 @@ export async function runGitTrackedStage0CandidateLane(input: {
   };
 }
 
-export function formatRepoSearchEvidence(result: RepoSearchResult): {
+export function formatRepoSearchEvidence(
+  result: RepoSearchResult,
+  options?: {
+    lane?: HelixEvidenceObservationLane;
+    query?: string;
+    sourceStage?: HelixEvidenceObservationSourceStage;
+  },
+): {
   evidenceText: string;
   filePaths: string[];
   observations: HelixEvidenceObservation[];
@@ -1488,7 +1497,9 @@ export function formatRepoSearchEvidence(result: RepoSearchResult): {
   const filePaths = Array.from(new Set(result.hits.map((hit) => hit.filePath)));
   const observations = result.hits.map((hit) => {
     const ref = `${hit.filePath}:${hit.line}`;
+    const line = Math.max(1, Math.trunc(Number(hit.line) || 1));
     return buildHelixEvidenceObservation({
+      lane: options?.lane ?? "repo_search",
       source_kind: inferHelixEvidenceSourceKindFromRef(hit.filePath),
       source_id: ref,
       refs: [ref],
@@ -1496,6 +1507,13 @@ export function formatRepoSearchEvidence(result: RepoSearchResult): {
       confidence: 0.85,
       content_role: "evidence_not_assistant_answer",
       consent_state: "not_required",
+      filePath: hit.filePath,
+      lineStart: line,
+      lineEnd: line,
+      snippet: hit.text,
+      term: hit.term,
+      query: options?.query,
+      sourceStage: options?.sourceStage,
     });
   });
   return { evidenceText, filePaths, observations };

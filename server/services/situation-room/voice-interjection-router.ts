@@ -11,6 +11,7 @@ import { classifyVoiceLaneEvent } from "./voice-lane-mode-classifier";
 import { buildLiveAgenticReviewRequest } from "../helix-ask/live-agentic-review-planner";
 import { recordLiveAgenticReviewRequest } from "./live-agentic-review-runner";
 import { decideVoiceOutputAction } from "./voice-lane-decision-center";
+import { buildHelixVoiceSourceObservation } from "./voice-source-observation-builder";
 
 const hashShort = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -20,6 +21,7 @@ function appendVoiceObservation(input: {
   classification: HelixVoiceLaneIngestReceipt["classification"];
   decision: HelixVoiceLaneIngestReceipt["decision"];
   outputDecision: HelixVoiceLaneIngestReceipt["output_decision"];
+  sourceObservation: HelixVoiceLaneIngestReceipt["source_observation"];
 }): string {
   const itemId = `voice_lane:${hashShort([input.event.voice_event_id, input.decision], 18)}`;
   appendHelixThreadEvent({
@@ -41,6 +43,7 @@ function appendVoiceObservation(input: {
       classification: input.classification,
       decision: input.decision,
       output_decision: input.outputDecision,
+      source_observation: input.sourceObservation,
       model_invoked: false,
       deterministic: true,
       context_role: "observation_not_assistant_answer",
@@ -65,6 +68,12 @@ export function ingestVoiceLaneEvent(input: {
   source_id?: string | null;
   room_id?: string | null;
   speaker_id?: string | null;
+  source_surface?: HelixVoiceLaneEvent["source_surface"];
+  speaker_role?: HelixVoiceLaneEvent["speaker_role"];
+  speaker_confidence?: number | null;
+  overlap?: boolean | null;
+  language?: string | null;
+  consent_state?: HelixVoiceLaneEvent["consent_state"];
   transcript: string;
   transcript_is_final?: boolean;
   confidence?: number | null;
@@ -104,8 +113,14 @@ export function ingestVoiceLaneEvent(input: {
     voice_event_id: `voice_event:${hashShort([threadId, input.source_id, transcript, now], 18)}`,
     thread_id: threadId,
     source_id: input.source_id?.trim() || "voice:mic",
+    source_surface: input.source_surface ?? null,
     room_id: input.room_id ?? null,
     speaker_id: input.speaker_id ?? null,
+    speaker_role: input.speaker_role ?? null,
+    speaker_confidence: input.speaker_confidence ?? null,
+    overlap: input.overlap ?? null,
+    language: input.language ?? null,
+    consent_state: input.consent_state ?? null,
     transcript,
     transcript_is_final: input.transcript_is_final ?? true,
     confidence: input.confidence ?? null,
@@ -128,7 +143,17 @@ export function ingestVoiceLaneEvent(input: {
     commentary: null,
     cooldownOk: true,
   });
-  const itemIds = [appendVoiceObservation({ event, classification, decision, outputDecision })];
+  const sourceObservation = buildHelixVoiceSourceObservation({
+    event,
+    classification,
+  });
+  const itemIds = [appendVoiceObservation({
+    event,
+    classification,
+    decision,
+    outputDecision,
+    sourceObservation,
+  })];
   let reviewId: string | null = null;
   if (decision === "request_agentic_review") {
     if (environment) {
@@ -149,6 +174,7 @@ export function ingestVoiceLaneEvent(input: {
     classification,
     decision,
     output_decision: outputDecision,
+    source_observation: sourceObservation,
     review_id: reviewId,
     thread_item_ids: itemIds,
     message:

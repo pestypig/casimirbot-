@@ -1,7 +1,9 @@
 import { shouldOverrideHelixAskRetrievalRetryPolicy } from "../policy/execution-policy";
+import type { HelixEvidenceObservation } from "../../../../shared/helix-evidence-observation";
 
 type RetrievalBuildResult = {
   files: string[];
+  observations?: HelixEvidenceObservation[];
 };
 
 type RetrievalAttemptOutcome = {

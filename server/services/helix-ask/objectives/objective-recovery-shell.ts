@@ -15,6 +15,7 @@ import {
   scoreHelixAskObjectiveRecoveryVariantResult,
   shouldBypassHelixAskObjectiveScopedRetrievalAgentGate,
 } from "../retrieval/objective-scoped-recovery";
+import type { HelixEvidenceObservation } from "../../../../shared/helix-evidence-observation";
 
 type ObjectiveContractShape = {
   label?: string;
@@ -36,6 +37,7 @@ type ObjectiveRecoveryBuildResult = {
   topScore?: number;
   scoreGap?: number;
   topicMustIncludeOk?: boolean;
+  observations?: HelixEvidenceObservation[];
 };
 
 type ObjectiveRecoveryOutcome = {
@@ -142,6 +144,7 @@ export type HelixAskObjectiveScopedRecoveryShellArgs = {
     objectiveId: string;
     queries: string[];
     files: string[];
+    observations?: HelixEvidenceObservation[];
     before: number;
     after: number;
     passIndex?: number;
@@ -735,6 +738,7 @@ export const runHelixAskObjectiveScopedRecoveryShell = async (
           objectiveId: currentState.objective_id,
           queries: objectiveQueries,
           files: objectiveResult.files,
+          observations: objectiveResult.observations,
           before: objectiveBefore,
           after: objectiveAfter,
           passIndex: objectivePassIndex,

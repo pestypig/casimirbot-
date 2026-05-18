@@ -617,8 +617,19 @@ export function ingestDiscordSourceEvent(input: {
     voiceLaneReceipt = ingestVoiceLaneEvent({
       thread_id: threadId,
       source_id: `discord:${session.session_id}:voice`,
+      source_surface: "discord_user_stream",
       room_id: session.room_id ?? null,
       speaker_id: participant?.speaker_id ?? participant?.discord_user_id ?? null,
+      speaker_role:
+        participant?.role === "commander"
+          ? "owner"
+          : participant?.role === "trusted_participant"
+            ? "trusted_guest"
+            : participant?.role === "guest"
+              ? "guest"
+              : "unknown",
+      speaker_confidence: participant ? 1 : 0.5,
+      consent_state: "granted",
       transcript: event.text,
       transcript_is_final: true,
       speaker_authority: participantCanCommand(participant) ? "authorized_user" : "untrusted_speaker",

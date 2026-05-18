@@ -18,6 +18,11 @@ import {
   getHelixThreadLedgerEvents,
 } from "../services/helix-thread/ledger";
 import { planRouter } from "../routes/agi.plan";
+import {
+  createLiveTranslationProcedure,
+  recordTranslationObservation,
+  resetLiveTranslationProcedures,
+} from "../services/situation-room/live-translation-procedure-store";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -32,6 +37,7 @@ describe("voice-aware companion mode", () => {
     resetCompanionPolicies();
     resetLiveAgenticReviews();
     __resetHelixThreadLedgerStore();
+    resetLiveTranslationProcedures();
   });
 
   it("records ambient mic context without creating answer items", async () => {
@@ -47,6 +53,9 @@ describe("voice-aware companion mode", () => {
       .send({
         thread_id: "helix-ask:voice",
         source_id: "voice:mic",
+        source_surface: "room_mic",
+        speaker_role: "unknown",
+        consent_state: "not_required",
         transcript: "I probably need more wood before night.",
         evidence_refs: ["voice:test:ambient"],
       })
@@ -68,6 +77,21 @@ describe("voice-aware companion mode", () => {
         requires_confirmation: false,
         raw_audio_included: false,
         raw_transcript_included: false,
+      },
+      source_observation: {
+        schema: "helix.voice_source_observation.v1",
+        source_id: "voice:mic",
+        source_surface: "room_mic",
+        speaker_authority: "ambient",
+        content_role: "observation_not_assistant_answer",
+        assistant_answer: false,
+        raw_audio_included: false,
+        raw_transcript_included: false,
+        evidence_observation: {
+          lane: "voice_lane",
+          source_kind: "live_voice_speaker",
+          content_role: "observation_not_assistant_answer",
+        },
       },
       raw_audio_included: false,
       raw_transcript_included: false,
@@ -185,6 +209,55 @@ describe("voice-aware companion mode", () => {
     });
   });
 
+  it("keeps untrusted direct address non-speakable even when voice output is enabled", async () => {
+    const app = createApp();
+    upsertCompanionPolicy({
+      thread_id: "helix-ask:voice-untrusted",
+      voice_input_active: true,
+      voice_output_enabled: true,
+      companion_mode: "active_companion",
+      direct_address_names: ["dottie", "helix"],
+    });
+
+    const response = await request(app)
+      .post("/api/agi/situation/voice-lane/event")
+      .send({
+        thread_id: "helix-ask:voice-untrusted",
+        source_id: "voice:room",
+        source_surface: "room_mic",
+        speaker_id: "speaker:guest",
+        speaker_role: "guest",
+        speaker_authority: "untrusted_speaker",
+        speaker_confidence: 0.82,
+        transcript: "Dottie, open the calculator",
+        evidence_refs: ["voice:test:untrusted"],
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      classification: {
+        direct_addressed: true,
+        command_candidate: true,
+        speaker_authority: "untrusted_speaker",
+      },
+      decision: "record_context",
+      output_decision: {
+        action: "journal_only",
+        reason: "speaker_not_authorized",
+        speakable: false,
+      },
+      source_observation: {
+        speaker_id: "speaker:guest",
+        speaker_role: "guest",
+        speaker_authority: "untrusted_speaker",
+        speaker_confidence: 0.82,
+      },
+    });
+    const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:voice-untrusted" });
+    expect(events.some((event) => event.item_type === "answer")).toBe(false);
+  });
+
   it("keeps empty transcript and silence events silent", async () => {
     const app = createApp();
     upsertCompanionPolicy({
@@ -215,6 +288,72 @@ describe("voice-aware companion mode", () => {
       },
       raw_audio_included: false,
       raw_transcript_included: false,
+    });
+  });
+
+  it("records translation procedures and observations as evidence, not assistant answers", () => {
+    const procedure = createLiveTranslationProcedure({
+      thread_id: "helix-ask:translation",
+      room_id: "room:translation",
+      source_bindings: [
+        {
+          source_id: "discord:session-1:voice",
+          source_surface: "discord_user_stream",
+          speaker_id: "discord:user-1",
+          display_name: "Alex",
+          role: "trusted_guest",
+          authority: "transcribe_only",
+          input_language: "es",
+          output_language: "en",
+          consent_state: "granted",
+        },
+      ],
+      speak_translation: false,
+    });
+
+    expect(procedure).toMatchObject({
+      schema: "helix.live_translation_procedure.v1",
+      status: "active",
+      output_policy: {
+        render_text: true,
+        speak_translation: false,
+      },
+      assistant_answer: false,
+      raw_audio_included: false,
+      raw_transcript_included: false,
+    });
+
+    const observation = recordTranslationObservation({
+      procedure_id: procedure.procedure_id,
+      source_id: "discord:session-1:voice",
+      speaker_id: "discord:user-1",
+      source_language: "es",
+      target_language: "en",
+      source_text: "Necesito ayuda.",
+      translated_text: "I need help.",
+      transcript_confidence: 0.91,
+      language_confidence: 0.94,
+      speaker_confidence: 1,
+      translation_confidence: 0.88,
+      dispatch_state: "confirm",
+      evidence_refs: ["translation:test:1"],
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.translation_observation.v1",
+      procedure_id: procedure.procedure_id,
+      source_id: "discord:session-1:voice",
+      speaker_id: "discord:user-1",
+      dispatch_state: "confirm",
+      content_role: "observation_not_assistant_answer",
+      assistant_answer: false,
+      raw_audio_included: false,
+      raw_transcript_included: false,
+      evidence_observation: {
+        lane: "translation_procedure",
+        source_kind: "live_translation",
+        content_role: "observation_not_assistant_answer",
+      },
     });
   });
 });

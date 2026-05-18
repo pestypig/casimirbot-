@@ -308,6 +308,19 @@ describe("Discord session bridge", () => {
         classification: {
           speaker_authority: "untrusted_speaker",
         },
+        output_decision: {
+          action: "journal_only",
+          reason: "voice_output_disabled",
+          speakable: false,
+        },
+        source_observation: {
+          source_surface: "discord_user_stream",
+          speaker_id: "discord:guest-user",
+          speaker_role: "unknown",
+          speaker_authority: "untrusted_speaker",
+          raw_audio_included: false,
+          raw_transcript_included: false,
+        },
       },
       ask_turn_bridge: {
         decision: "not_requested",

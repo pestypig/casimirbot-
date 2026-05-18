@@ -50,6 +50,13 @@ export function decideVoiceOutputAction(input: {
     return buildDecision("journal_only", "ambient_context");
   }
 
+  if (
+    classification?.direct_addressed &&
+    classification.speaker_authority !== "authorized_user"
+  ) {
+    return buildDecision("journal_only", "speaker_not_authorized");
+  }
+
   if (classification?.command_candidate && classification.direct_addressed) {
     return buildDecision("voice_now", "command_candidate");
   }

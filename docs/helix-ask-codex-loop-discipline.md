@@ -61,6 +61,8 @@ same envelope shape:
 
 ```ts
 type HelixEvidenceObservation = {
+  id: string;
+  lane: "repo_search" | "git_tracked" | "stage0" | "atlas" | "manual_contract";
   source_kind:
     | "repo_code"
     | "repo_doc"
@@ -78,6 +80,14 @@ type HelixEvidenceObservation = {
   refs: string[];
   content_role: "evidence_not_assistant_answer" | "observation_not_assistant_answer";
   consent_state?: "not_required" | "requested" | "granted" | "revoked";
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
+  snippet?: string;
+  term?: string;
+  query?: string;
+  score?: number;
+  sourceStage?: "preflight" | "fallback_repo_search" | "stage0_code_floor" | "objective_recovery";
 };
 ```
 
@@ -85,6 +95,8 @@ The shared TypeScript contract lives in `shared/helix-evidence-observation.ts`.
 Repo-search formatting must emit these observations alongside text snippets so
 debug traces preserve source identity even when the answer composer still reads
 the legacy `Repo search hits:` block.
+Retrieval context attempts must merge and carry observations forward; debug
+payloads are only a visibility surface, not the source of proof authority.
 
 The loop can rank evidence, but it cannot promote one lane to answer authority
 without passing the same proof/coverage gates. A live source is equal in
