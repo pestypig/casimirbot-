@@ -22,6 +22,8 @@ import {
   type LiveCommentaryTraceStepKind,
 } from "@shared/helix-live-commentary";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
+import { getCompanionPolicy } from "./companion-policy-engine";
+import { decideVoiceOutputAction } from "./voice-lane-decision-center";
 
 const sessionsByEnvironment = new Map<string, LiveCommentarySession>();
 const candidatesByEnvironment = new Map<string, LiveCommentaryCandidate[]>();
@@ -207,20 +209,34 @@ export function listLiveCommentaryDeliveries(environmentId?: string | null): Liv
 }
 
 const buildDeliveryReceipt = (proposal: LiveCommentaryProposal): LiveCommentaryDeliveryReceipt => {
-  const isVoiceConfirm = proposal.decision === "voice_on_confirm";
-  const isText = proposal.decision === "show_text";
+  const session = sessionsByEnvironment.get(proposal.environment_id) ?? null;
+  const outputDecision = decideVoiceOutputAction({
+    policy: getCompanionPolicy(proposal.thread_id),
+    classification: null,
+    environment: null,
+    environmentMode: session?.voice_mode ?? null,
+    commentary: proposal,
+    cooldownOk: true,
+  });
+  const isVoiceConfirm = outputDecision.action === "voice_on_confirm";
+  const isText = outputDecision.action === "show_text" || proposal.decision === "show_text";
+  const isVoiceNow = outputDecision.action === "voice_now";
   return {
     schema: HELIX_LIVE_COMMENTARY_DELIVERY_RECEIPT_SCHEMA,
     delivery_id: `live_commentary_delivery:${hashShort([proposal.proposal_id, proposal.decision, proposal.ts], 18)}`,
     proposal_id: proposal.proposal_id,
     thread_id: proposal.thread_id,
     environment_id: proposal.environment_id,
-    delivered: isText,
-    channel: isText ? "ui_text" : isVoiceConfirm ? "voice_on_confirm" : "none",
+    delivered: isText || isVoiceNow,
+    channel: isVoiceNow ? "voice" : isText ? "ui_text" : isVoiceConfirm ? "voice_on_confirm" : "none",
     reason: isText
       ? "delivered"
+      : isVoiceNow
+        ? "delivered"
       : isVoiceConfirm
         ? "awaiting_confirmation"
+        : outputDecision.reason === "voice_output_disabled"
+          ? "voice_not_enabled"
         : "silent_keep_in_context",
     evidence_refs: proposal.evidence_refs,
     audio_event_id: null,

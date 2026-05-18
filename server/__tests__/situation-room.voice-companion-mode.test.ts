@@ -61,6 +61,14 @@ describe("voice-aware companion mode", () => {
         deterministic: true,
       },
       decision: "record_context",
+      output_decision: {
+        action: "journal_only",
+        reason: "voice_output_disabled",
+        speakable: false,
+        requires_confirmation: false,
+        raw_audio_included: false,
+        raw_transcript_included: false,
+      },
       raw_audio_included: false,
       raw_transcript_included: false,
     });
@@ -96,6 +104,11 @@ describe("voice-aware companion mode", () => {
         direct_addressed: true,
       },
       decision: "start_user_turn",
+      output_decision: {
+        action: "journal_only",
+        reason: "voice_output_disabled",
+        speakable: false,
+      },
     });
     const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:voice-direct" });
     expect(events.some((event) => event.item_type === "answer")).toBe(false);
@@ -139,5 +152,69 @@ describe("voice-aware companion mode", () => {
     expect(listLiveAgenticReviewRequests()).toHaveLength(1);
     const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:voice-review" });
     expect(events.some((event) => event.item_type === "answer")).toBe(false);
+  });
+
+  it("allows direct-address speech only when voice output is enabled", async () => {
+    const app = createApp();
+    upsertCompanionPolicy({
+      thread_id: "helix-ask:voice-output",
+      voice_input_active: true,
+      voice_output_enabled: true,
+      companion_mode: "active_companion",
+      direct_address_names: ["dottie", "helix"],
+    });
+
+    const response = await request(app)
+      .post("/api/agi/situation/voice-lane/event")
+      .send({
+        thread_id: "helix-ask:voice-output",
+        transcript: "Dottie, what is happening?",
+        evidence_refs: ["voice:test:direct-speak"],
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      decision: "start_user_turn",
+      output_decision: {
+        action: "voice_now",
+        reason: "direct_address",
+        speakable: true,
+        requires_confirmation: false,
+      },
+    });
+  });
+
+  it("keeps empty transcript and silence events silent", async () => {
+    const app = createApp();
+    upsertCompanionPolicy({
+      thread_id: "helix-ask:voice-silence",
+      voice_input_active: true,
+      voice_output_enabled: true,
+      companion_mode: "active_companion",
+    });
+
+    const response = await request(app)
+      .post("/api/agi/situation/voice-lane/event")
+      .send({
+        thread_id: "helix-ask:voice-silence",
+        transcript: "   ",
+        evidence_refs: ["voice:test:silence"],
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      event: null,
+      classification: null,
+      decision: "silent_keep_in_context",
+      output_decision: {
+        action: "remain_silent",
+        reason: "silent_policy",
+        speakable: false,
+      },
+      raw_audio_included: false,
+      raw_transcript_included: false,
+    });
   });
 });

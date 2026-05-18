@@ -18,12 +18,17 @@ import {
   __resetHelixThreadLedgerStore,
   getHelixThreadLedgerEvents,
 } from "../services/helix-thread/ledger";
+import {
+  resetCompanionPolicies,
+  upsertCompanionPolicy,
+} from "../services/situation-room/companion-policy-engine";
 
 describe("live commentary for live answer environments", () => {
   beforeEach(() => {
     resetLiveAnswerEnvironments();
     resetWorkstationLiveSources();
     resetLiveCommentary();
+    resetCompanionPolicies();
     __resetHelixThreadLedgerStore();
   });
 
@@ -210,6 +215,11 @@ describe("live commentary for live answer environments", () => {
       now: "2026-05-12T12:00:00.000Z",
     });
     upsertLiveCommentarySession({ environment, cadence: "milestones_only", status: "active" });
+    upsertCompanionPolicy({
+      thread_id: "helix-ask:commentary-voice",
+      voice_output_enabled: true,
+      companion_mode: "active_companion",
+    });
 
     const result = ingestWorkstationLiveSourceEvent({
       source_id: "source:calculator-prime-stream",
@@ -233,6 +243,48 @@ describe("live commentary for live answer environments", () => {
       delivered: false,
       channel: "voice_on_confirm",
       reason: "awaiting_confirmation",
+    });
+  });
+
+  it("downgrades voice confirmation commentary to text when voice output is disabled", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:commentary-voice-off",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      mode: "voice_on_confirm",
+      now: "2026-05-12T12:00:00.000Z",
+    });
+    upsertLiveCommentarySession({ environment, cadence: "milestones_only", status: "active" });
+    upsertCompanionPolicy({
+      thread_id: "helix-ask:commentary-voice-off",
+      voice_output_enabled: false,
+      companion_mode: "active_companion",
+    });
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-prime-stream",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "prime_found",
+      seq: 17,
+      ts: "2026-05-12T12:00:17.000Z",
+      payload: {
+        candidate: 17,
+        is_prime: true,
+        latest_prime: 17,
+        prime_count: 7,
+        gap: 4,
+      },
+      evidence_refs: ["calculator:prime:17"],
+    });
+
+    expect(result.live_commentary?.proposal.decision).toBe("voice_on_confirm");
+    expect(result.live_commentary?.delivery).toMatchObject({
+      delivered: true,
+      channel: "ui_text",
+      reason: "delivered",
     });
   });
 });

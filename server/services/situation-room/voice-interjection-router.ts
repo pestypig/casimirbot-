@@ -10,6 +10,7 @@ import {
 import { classifyVoiceLaneEvent } from "./voice-lane-mode-classifier";
 import { buildLiveAgenticReviewRequest } from "../helix-ask/live-agentic-review-planner";
 import { recordLiveAgenticReviewRequest } from "./live-agentic-review-runner";
+import { decideVoiceOutputAction } from "./voice-lane-decision-center";
 
 const hashShort = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -18,6 +19,7 @@ function appendVoiceObservation(input: {
   event: HelixVoiceLaneEvent;
   classification: HelixVoiceLaneIngestReceipt["classification"];
   decision: HelixVoiceLaneIngestReceipt["decision"];
+  outputDecision: HelixVoiceLaneIngestReceipt["output_decision"];
 }): string {
   const itemId = `voice_lane:${hashShort([input.event.voice_event_id, input.decision], 18)}`;
   appendHelixThreadEvent({
@@ -38,6 +40,7 @@ function appendVoiceObservation(input: {
       },
       classification: input.classification,
       decision: input.decision,
+      output_decision: input.outputDecision,
       model_invoked: false,
       deterministic: true,
       context_role: "observation_not_assistant_answer",
@@ -70,6 +73,8 @@ export function ingestVoiceLaneEvent(input: {
   ts?: string;
 }): HelixVoiceLaneIngestReceipt {
   const transcript = input.transcript.trim();
+  const threadId = input.thread_id?.trim() || "helix-ask:desktop";
+  const policy = getCompanionPolicy(threadId);
   if (!transcript) {
     return {
       schema: "helix.voice_lane_ingest_receipt.v1",
@@ -77,6 +82,13 @@ export function ingestVoiceLaneEvent(input: {
       event: null,
       classification: null,
       decision: "silent_keep_in_context",
+      output_decision: decideVoiceOutputAction({
+        policy,
+        classification: null,
+        environment: getActiveLiveAnswerEnvironmentForThread(threadId),
+        commentary: null,
+        cooldownOk: true,
+      }),
       review_id: null,
       thread_item_ids: [],
       message: "Voice lane ingest requires transcript text.",
@@ -87,7 +99,6 @@ export function ingestVoiceLaneEvent(input: {
     };
   }
   const now = input.ts ?? new Date().toISOString();
-  const threadId = input.thread_id?.trim() || "helix-ask:desktop";
   const event: HelixVoiceLaneEvent = {
     schema: "helix.voice_lane_event.v1",
     voice_event_id: `voice_event:${hashShort([threadId, input.source_id, transcript, now], 18)}`,
@@ -103,17 +114,23 @@ export function ingestVoiceLaneEvent(input: {
     raw_audio_included: false,
     context_policy: "compact_context_pack_only",
   };
-  const policy = getCompanionPolicy(threadId);
   const classification = classifyVoiceLaneEvent({
     event,
     policy,
     speaker_authority: input.speaker_authority,
   });
   const decision = decideVoiceLaneAction({ policy, classification });
-  const itemIds = [appendVoiceObservation({ event, classification, decision })];
+  const environment = getActiveLiveAnswerEnvironmentForThread(threadId);
+  const outputDecision = decideVoiceOutputAction({
+    policy,
+    classification,
+    environment,
+    commentary: null,
+    cooldownOk: true,
+  });
+  const itemIds = [appendVoiceObservation({ event, classification, decision, outputDecision })];
   let reviewId: string | null = null;
   if (decision === "request_agentic_review") {
-    const environment = getActiveLiveAnswerEnvironmentForThread(threadId);
     if (environment) {
       const request = buildLiveAgenticReviewRequest({
         environment,
@@ -131,6 +148,7 @@ export function ingestVoiceLaneEvent(input: {
     event,
     classification,
     decision,
+    output_decision: outputDecision,
     review_id: reviewId,
     thread_item_ids: itemIds,
     message:

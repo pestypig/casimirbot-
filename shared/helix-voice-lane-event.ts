@@ -1,4 +1,5 @@
 import type { HelixConversationModeClassification } from "./helix-conversation-mode";
+import type { HelixVoiceOutputDecision } from "./helix-voice-output-decision";
 
 export const HELIX_VOICE_LANE_EVENT_SCHEMA = "helix.voice_lane_event.v1" as const;
 export const HELIX_VOICE_LANE_INGEST_RECEIPT_SCHEMA =
@@ -34,6 +35,7 @@ export type HelixVoiceLaneIngestReceipt = {
   event: HelixVoiceLaneEvent | null;
   classification: HelixConversationModeClassification | null;
   decision: HelixVoiceLaneIngestDecision;
+  output_decision: HelixVoiceOutputDecision;
   review_id?: string | null;
   thread_item_ids: string[];
   message: string;
