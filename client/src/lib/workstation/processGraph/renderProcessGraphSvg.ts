@@ -5,6 +5,7 @@ import type {
   WorkstationProcessNode,
   WorkstationProcessNodeKind,
 } from "./processGraphTypes";
+import { escapeSvgText } from "./svgEscape";
 
 type RenderProcessGraphSvgOptions = {
   graph: WorkstationProcessGraphState;
@@ -51,14 +52,6 @@ function hash(value: string): number {
   return Math.abs(result);
 }
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function statusStroke(status: string, accent: string): string {
   switch (status) {
     case "failed":
@@ -101,8 +94,8 @@ export function renderWorkstationProcessGraphSvg(options: RenderProcessGraphSvgO
   const height = options.height ?? 900;
   const density = options.density ?? "ambient";
   const labels = options.labels ?? (density === "ambient" ? "minimal" : "full");
-  const maxNodes = options.maxNodes ?? (density === "ambient" ? 18 : 220);
-  const maxEdges = options.maxEdges ?? (density === "ambient" ? 28 : 420);
+  const maxNodes = Math.min(options.maxNodes ?? (density === "ambient" ? 18 : 220), density === "ambient" ? 18 : 240);
+  const maxEdges = Math.min(options.maxEdges ?? (density === "ambient" ? 28 : 420), density === "ambient" ? 28 : 420);
   const mood = options.mood ?? "question";
   const accent = MOOD_ACCENT[mood] ?? MOOD_ACCENT.question;
 
@@ -155,7 +148,7 @@ export function renderWorkstationProcessGraphSvg(options: RenderProcessGraphSvgO
       const label =
         labels === "hidden"
           ? ""
-          : `<text x="${x.toFixed(1)}" y="${(y + r + 14).toFixed(1)}" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui" font-size="${density === "ambient" ? 11 : 13}" fill="${accent.primary}" fill-opacity="${density === "ambient" ? 0.42 : 0.9}">${escapeXml(labels === "minimal" ? node.kind.replace("_", " ") : node.label.slice(0, 34))}</text>`;
+          : `<text x="${x.toFixed(1)}" y="${(y + r + 14).toFixed(1)}" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui" font-size="${density === "ambient" ? 11 : 13}" fill="${accent.primary}" fill-opacity="${density === "ambient" ? 0.42 : 0.9}">${escapeSvgText(labels === "minimal" ? node.kind.replace("_", " ") : node.label.slice(0, 34))}</text>`;
       const statusMark = node.status === "failed"
         ? `<path d="M ${(x + r * 0.6).toFixed(1)} ${(y - r * 0.65).toFixed(1)} l 9 0 l -4.5 8 z" fill="#fb7185" opacity="0.9"/>`
         : node.status === "completed" || node.status === "verified"

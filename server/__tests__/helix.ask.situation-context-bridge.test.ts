@@ -223,6 +223,38 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 60000);
 
+  it("does not let active-doc identity override an explicit visual screen-capture target", async () => {
+    const { app } = await createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Actually, what file am I looking at in the visual screen capture?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+        workspace_context_snapshot: {
+          sessionId: "helix-ask:desktop",
+          activePanel: "live-answer-environment",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(response.body?.deictic_reference?.candidate_signal).toBe(true);
+    expect(response.body?.situation_evidence_selection?.answerable).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toContain("Active doc:");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toContain("nhm2-current-status-whitepaper");
+    expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 60000);
+
   it("ask turn keeps missing live context inside the situation bridge instead of model-only fallback", async () => {
     const { app } = await createApp();
     const response = await request(app)

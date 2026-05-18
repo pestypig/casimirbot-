@@ -4,6 +4,12 @@ This document defines the minimal controller mapping from gate outcomes to the n
 best action in the Helix Ask agent loop. The policy is intentionally conservative:
 no repo-attributed claim is emitted without proof pointers.
 
+For the boundary between Helix Ask and Codex-owned agent mechanics, follow
+`docs/helix-ask-codex-loop-discipline.md`. Helix Ask owns evidence retrieval,
+live-source provenance, objective coverage, and proof gates; Codex owns generic
+session, turn, tool, sandbox, approval, patch, compaction, and subagent runtime
+mechanics.
+
 ## Action selection (gate outcome -> next action)
 
 | Gate outcome / signal | Next action | Notes |

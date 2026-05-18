@@ -145,6 +145,8 @@ export default function DesktopPage({
   const allowAutoOpen = false;
   const workstationEnabledFlag =
     String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_SHELL ?? "1") !== "0";
+  const processGraphSurfaceEnabled =
+    String((import.meta as any)?.env?.VITE_HELIX_PROCESS_GRAPH_SURFACE ?? "1") !== "0";
   const workstationEnabled =
     workstationEnabledFlag && (workstationMode === "workstation" || layoutVariant === "mobile");
 
@@ -755,7 +757,7 @@ export default function DesktopPage({
         className="mood-transition-scope relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-100"
       >
         <SurfaceStack recipe={wallpaperRecipe} />
-        <ProcessGraphSurfaceLayer mood={mood} orientation={orientation} mode="ambient" />
+        {processGraphSurfaceEnabled ? <ProcessGraphSurfaceLayer mood={mood} orientation={orientation} mode="ambient" /> : null}
         {workstationEnabled ? (
           <HelixWorkstationShell
             layoutVariant={layoutVariant}

@@ -60,6 +60,8 @@ export default function MobileStartPage() {
   } = useHelixSettingsDialog("preferences");
   const mobileWorkstationEnabled =
     String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_MOBILE_SHELL ?? "1") !== "0";
+  const processGraphSurfaceEnabled =
+    String((import.meta as any)?.env?.VITE_HELIX_PROCESS_GRAPH_SURFACE ?? "1") !== "0";
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [appViewerOpen, setAppViewerOpen] = useState(mobileWorkstationEnabled);
   const pressTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -436,7 +438,7 @@ export default function MobileStartPage() {
         style={{ minHeight: "max(100dvh, 100vh)" }}
       >
         <SurfaceStack recipe={wallpaperRecipe} />
-        <ProcessGraphSurfaceLayer mood={mood} orientation="mobile" mode="ambient" />
+        {processGraphSurfaceEnabled ? <ProcessGraphSurfaceLayer mood={mood} orientation="mobile" mode="ambient" /> : null}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"

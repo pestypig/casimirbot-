@@ -10,11 +10,14 @@ import type {
   WorkstationProcessStatus,
 } from "./processGraphTypes";
 
-const MAX_NODES = 220;
+const MAX_NODES = 240;
 const MAX_EDGES = 420;
-const MAX_TIMELINE = 360;
+const MAX_TIMELINE = 500;
+const MAX_ARTIFACT_PREVIEW_CHARS = 240;
 const WORKSPACE_NODE_ID = "workspace:current";
 const HELIX_NODE_ID = "helix:ask";
+const SENSITIVE_FIELD_PATTERN =
+  /chain[_-]?of[_-]?thought|hidden[_-]?reasoning|scratchpad|private[_-]?scratch|reasoning[_-]?trace/i;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -29,7 +32,8 @@ function newSessionId(): string {
 }
 
 function cleanId(value: string): string {
-  return value.trim().replace(/\s+/g, "-").replace(/[^\w:./-]+/g, "").slice(0, 120);
+  const safe = SENSITIVE_FIELD_PATTERN.test(value) ? "private-graph-detail" : value;
+  return safe.trim().replace(/\s+/g, "-").replace(/[^\w:./-]+/g, "").slice(0, 120);
 }
 
 function nodeId(kind: WorkstationProcessNodeKind, value: string): string {
@@ -45,9 +49,35 @@ function artifactKindFrom(value: Record<string, unknown> | null | undefined): st
   return typeof kind === "string" && kind.trim() ? kind.trim() : "artifact";
 }
 
+function sanitizeVisibleText(value: unknown, fallback: string, maxChars = 160): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return fallback;
+  if (SENSITIVE_FIELD_PATTERN.test(text)) return "[private graph detail]";
+  return text.slice(0, maxChars);
+}
+
 function artifactLabel(value: Record<string, unknown> | null | undefined, fallback: string): string {
   const label = value?.label ?? value?.title ?? value?.path ?? value?.note_title ?? value?.message;
-  return typeof label === "string" && label.trim() ? label.trim().slice(0, 96) : fallback;
+  return sanitizeVisibleText(label, fallback, 96);
+}
+
+function sanitizeGraphMeta(value: unknown, depth = 0): unknown {
+  if (depth > 2) return undefined;
+  if (typeof value === "string") {
+    return sanitizeVisibleText(value, "[private graph detail]", MAX_ARTIFACT_PREVIEW_CHARS);
+  }
+  if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 12).map((entry) => sanitizeGraphMeta(entry, depth + 1));
+  }
+  if (!value || typeof value !== "object") return undefined;
+  const output: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (SENSITIVE_FIELD_PATTERN.test(key)) continue;
+    const sanitized = sanitizeGraphMeta(entry, depth + 1);
+    if (sanitized !== undefined) output[key] = sanitized;
+  }
+  return output;
 }
 
 function statusFromEvent(type: string): WorkstationProcessStatus {
@@ -106,11 +136,18 @@ function upsertNode(
   patch: Omit<Partial<WorkstationProcessNode>, "id"> & Pick<WorkstationProcessNode, "id" | "kind" | "label" | "status">,
 ): void {
   const existing = state.nodes[patch.id];
+  const label = sanitizeVisibleText(patch.label, existing?.label ?? patch.id);
+  const duplicate =
+    existing &&
+    existing.updatedAt === ts &&
+    existing.kind === patch.kind &&
+    existing.label === label &&
+    existing.status === patch.status;
   state.nodes[patch.id] = {
     ...existing,
     id: patch.id,
     kind: patch.kind,
-    label: patch.label,
+    label,
     status: patch.status,
     createdAt: existing?.createdAt ?? ts,
     updatedAt: ts,
@@ -118,8 +155,8 @@ function upsertNode(
     traceId: patch.traceId ?? existing?.traceId,
     jobId: patch.jobId ?? existing?.jobId,
     artifactKind: patch.artifactKind ?? existing?.artifactKind,
-    weight: Math.min(3, (existing?.weight ?? 0.2) + (patch.weight ?? 0.18)),
-    meta: { ...(existing?.meta ?? {}), ...(patch.meta ?? {}) },
+    weight: duplicate ? existing.weight : Math.min(3, (existing?.weight ?? 0.2) + (patch.weight ?? 0.18)),
+    meta: sanitizeGraphMeta({ ...(existing?.meta ?? {}), ...(patch.meta ?? {}) }) as Record<string, unknown>,
   };
 }
 
@@ -144,8 +181,10 @@ function addTimeline(
   state: WorkstationProcessGraphState,
   entry: Omit<WorkstationProcessGraphTimelineEntry, "id"> & { id?: string },
 ): void {
-  const id = entry.id ?? `graph-entry:${Date.parse(entry.ts) || Date.now()}:${state.revision + 1}`;
-  state.timelineEntries[id] = { ...entry, id };
+  const label = sanitizeVisibleText(entry.label, "graph event", 180);
+  const signature = `${entry.ts}:${label}:${entry.traceId ?? ""}:${(entry.nodeIds ?? []).join("|")}`;
+  const id = entry.id ?? `graph-entry:${cleanId(signature) || `${Date.parse(entry.ts) || Date.now()}`}`;
+  state.timelineEntries[id] = { ...entry, label, id };
   state.timeline = [id, ...state.timeline.filter((current) => current !== id)].slice(0, MAX_TIMELINE);
   const keep = new Set(state.timeline);
   for (const key of Object.keys(state.timelineEntries)) {
@@ -156,13 +195,34 @@ function addTimeline(
 function trimGraph(state: WorkstationProcessGraphState): void {
   const activePanelNodeId = state.activePanelId ? nodeId("panel", state.activePanelId) : undefined;
   const fixed = new Set([WORKSPACE_NODE_ID, HELIX_NODE_ID, activePanelNodeId].filter(Boolean));
-  const nodeIds = Object.values(state.nodes)
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .map((node) => node.id);
-  const keepNodeIds = new Set([
-    ...nodeIds.filter((id) => fixed.has(id)).slice(0, MAX_NODES),
-    ...nodeIds.filter((id) => !fixed.has(id)).slice(0, MAX_NODES),
-  ]);
+  const activeTraceIds = new Set(state.activeTraceIds);
+  const degree = new Map<string, number>();
+  for (const edge of Object.values(state.edges)) {
+    degree.set(edge.from, (degree.get(edge.from) ?? 0) + 1);
+    degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
+  }
+  const now = Date.parse(state.updatedAt) || Date.now();
+  const priority = (node: WorkstationProcessNode): number => {
+    const ageMs = Math.max(0, now - (Date.parse(node.updatedAt) || now));
+    if (fixed.has(node.id)) return 1000;
+    if (node.status === "active" || node.status === "running" || node.status === "pending" || node.status === "failed") return 900;
+    if (node.traceId && activeTraceIds.has(node.traceId)) return 800;
+    if (node.kind === "artifact" && ageMs <= 60 * 60 * 1000) return 700;
+    if ((degree.get(node.id) ?? 0) > 0) return 500;
+    return 100;
+  };
+  const keepNodeIds = new Set(
+    Object.values(state.nodes)
+      .sort((a, b) => {
+        const priorityDelta = priority(b) - priority(a);
+        if (priorityDelta !== 0) return priorityDelta;
+        const degreeDelta = (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0);
+        if (degreeDelta !== 0) return degreeDelta;
+        return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      })
+      .slice(0, MAX_NODES)
+      .map((node) => node.id),
+  );
   for (const id of Object.keys(state.nodes)) {
     if (!keepNodeIds.has(id)) delete state.nodes[id];
   }
@@ -373,7 +433,7 @@ export function buildWorkstationProcessGraphSnapshot(
     sessionId: state.sessionId,
     generatedAt: nowIso(),
     summary: {
-      activePanelId: state.activePanelId,
+      activePanelId: state.activePanelId ? sanitizeVisibleText(state.activePanelId, "panel") : undefined,
       activeJobs: nodes.filter((node) => node.kind === "job" && (node.status === "running" || node.status === "active")).length,
       runningOperations: nodes.filter((node) => node.kind === "operation" && node.status === "running").length,
       failedNodes: nodes.filter((node) => node.status === "failed").length,
@@ -383,11 +443,11 @@ export function buildWorkstationProcessGraphSnapshot(
     nodes: nodes.map((node) => ({
       id: node.id,
       kind: node.kind,
-      label: node.label,
+      label: sanitizeVisibleText(node.label, node.kind),
       status: node.status,
-      panelId: node.panelId,
-      traceId: node.traceId,
-      jobId: node.jobId,
+      panelId: node.panelId ? sanitizeVisibleText(node.panelId, "panel") : undefined,
+      traceId: node.traceId ? sanitizeVisibleText(node.traceId, "trace") : undefined,
+      jobId: node.jobId ? sanitizeVisibleText(node.jobId, "job") : undefined,
     })),
     edges: edges.map((edge) => ({
       from: edge.from,
@@ -397,9 +457,9 @@ export function buildWorkstationProcessGraphSnapshot(
     })),
     timeline: timeline.map((entry) => ({
       ts: entry.ts,
-      label: entry.label,
+      label: sanitizeVisibleText(entry.label, "graph event"),
       nodeIds: entry.nodeIds,
-      traceId: entry.traceId,
+      traceId: entry.traceId ? sanitizeVisibleText(entry.traceId, "trace") : undefined,
     })),
   };
 }

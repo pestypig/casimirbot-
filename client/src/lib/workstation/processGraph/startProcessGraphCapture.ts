@@ -16,6 +16,8 @@ import {
   isWorkstationProcessGraphEvent,
 } from "./processGraphEvents";
 
+const SELF_PANEL_ID = "workstation-process-graph";
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -119,6 +121,16 @@ export function startProcessGraphCapture(): () => void {
       const panelId = asString(action?.panel_id);
       const actionId = asString(action?.action_id) ?? asString(action?.action);
       const tool = panelId && actionId ? `${panelId}.${actionId}` : payload.entry.tool ?? "workstation.action";
+      if (panelId === SELF_PANEL_ID) {
+        recordWorkstationProcessGraphEvent({
+          type: "panel.focused",
+          panelId,
+          label: panelLabel(panelId),
+          traceId,
+          ts,
+        });
+        return;
+      }
       if (panelId && (action?.action === "open_panel" || actionId === "open")) {
         recordWorkstationProcessGraphEvent({
           type: "panel.opened",

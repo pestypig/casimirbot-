@@ -3,6 +3,11 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { promisify } from "node:util";
+import {
+  buildHelixEvidenceObservation,
+  inferHelixEvidenceSourceKindFromRef,
+  type HelixEvidenceObservation,
+} from "../../../shared/helix-evidence-observation";
 import type { HelixAskConceptMatch } from "./concepts";
 import type { HelixAskTopicProfile, HelixAskTopicTag } from "./topic";
 import { filterSignalTokens, tokenizeAskQuery } from "./query";
@@ -1471,14 +1476,27 @@ export async function runGitTrackedStage0CandidateLane(input: {
 export function formatRepoSearchEvidence(result: RepoSearchResult): {
   evidenceText: string;
   filePaths: string[];
+  observations: HelixEvidenceObservation[];
 } {
   if (!result.hits.length) {
-    return { evidenceText: "", filePaths: [] };
+    return { evidenceText: "", filePaths: [], observations: [] };
   }
   const lines = result.hits.map(
     (hit) => `- ${hit.filePath}:${hit.line}: ${hit.text}`,
   );
   const evidenceText = ["Repo search hits:", ...lines].join("\n");
   const filePaths = Array.from(new Set(result.hits.map((hit) => hit.filePath)));
-  return { evidenceText, filePaths };
+  const observations = result.hits.map((hit) => {
+    const ref = `${hit.filePath}:${hit.line}`;
+    return buildHelixEvidenceObservation({
+      source_kind: inferHelixEvidenceSourceKindFromRef(hit.filePath),
+      source_id: ref,
+      refs: [ref],
+      provenance: "retrieved",
+      confidence: 0.85,
+      content_role: "evidence_not_assistant_answer",
+      consent_state: "not_required",
+    });
+  });
+  return { evidenceText, filePaths, observations };
 }
