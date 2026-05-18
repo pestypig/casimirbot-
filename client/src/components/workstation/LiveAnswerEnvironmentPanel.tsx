@@ -125,6 +125,33 @@ type LiveTangentEvaluationRead = {
   confidence: number;
   recommended_handoff?: { type: string; reason: string };
 };
+type LiveArbitrationCandidateRead = {
+  candidate_id: string;
+  candidate_type: string;
+  priority: string;
+  status: string;
+  reason: string;
+  evidence_refs?: string[];
+  field_evaluation_refs?: string[];
+  tangent_refs?: string[];
+  epoch: number;
+  source_binding_id: string;
+};
+type LivePlanContractRead = {
+  plan_id: string;
+  action_id: string;
+  client_adoption_required: boolean;
+  can_execute_itself: boolean;
+  created_at: string;
+};
+type LiveSituationRunAcceptanceRead = {
+  acceptance_id: string;
+  scenario: string;
+  ok: boolean;
+  summary: string;
+  checks?: Array<{ check: string; passed: boolean; evidence: string }>;
+  created_at: string;
+};
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -291,6 +318,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [fieldWorkerRuns, setFieldWorkerRuns] = useState<LiveFieldWorkerRunRead[]>([]);
   const [fieldEvaluations, setFieldEvaluations] = useState<LiveFieldEvaluationRead[]>([]);
   const [tangentEvaluations, setTangentEvaluations] = useState<LiveTangentEvaluationRead[]>([]);
+  const [arbitrationCandidates, setArbitrationCandidates] = useState<LiveArbitrationCandidateRead[]>([]);
+  const [planContracts, setPlanContracts] = useState<LivePlanContractRead[]>([]);
+  const [acceptanceRuns, setAcceptanceRuns] = useState<LiveSituationRunAcceptanceRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -397,7 +427,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes, arbitrationCandidateRes, planContractRes, acceptanceRunRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -420,8 +450,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/live-cognition/field-worker-runs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/field-evaluations?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/tangents?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/arbitration-candidates?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/plan-contracts?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/acceptance-runs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody, arbitrationCandidateBody, planContractBody, acceptanceRunBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -444,6 +477,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fieldWorkerRunRes.json().catch(() => ({})),
         fieldEvaluationRes.json().catch(() => ({})),
         tangentRes.json().catch(() => ({})),
+        arbitrationCandidateRes.json().catch(() => ({})),
+        planContractRes.json().catch(() => ({})),
+        acceptanceRunRes.json().catch(() => ({})),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -474,6 +510,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setFieldWorkerRuns(Array.isArray(fieldWorkerRunBody.worker_runs) ? fieldWorkerRunBody.worker_runs : []);
       setFieldEvaluations(Array.isArray(fieldEvaluationBody.evaluations) ? fieldEvaluationBody.evaluations : []);
       setTangentEvaluations(Array.isArray(tangentBody.tangents) ? tangentBody.tangents : []);
+      setArbitrationCandidates(Array.isArray(arbitrationCandidateBody.candidates) ? arbitrationCandidateBody.candidates : []);
+      setPlanContracts(Array.isArray(planContractBody.plan_contracts) ? planContractBody.plan_contracts : []);
+      setAcceptanceRuns(Array.isArray(acceptanceRunBody.acceptance_runs) ? acceptanceRunBody.acceptance_runs : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -540,6 +579,22 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       environment_id: environment.environment_id,
       question: "Review the latest compact live environment state.",
       trigger: "manual_button",
+    });
+    await refresh();
+  };
+
+  const runSituationAcceptance = async () => {
+    await postJson("/api/agi/situation/live-cognition/run-acceptance", {
+      thread_id: threadId,
+      scenario: "generic_visual_folder",
+      situation_run_id: situationRuns.at(-1)?.situation_run_id ?? null,
+    });
+    await refresh();
+  };
+
+  const consumeArbitrationCandidate = async (candidateId: string) => {
+    await postJson(`/api/agi/situation/live-cognition/arbitration-candidates/${encodeURIComponent(candidateId)}/consume`, {
+      mode: "auto",
     });
     await refresh();
   };
@@ -1571,6 +1626,65 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                       <p className="text-[10px] uppercase text-slate-500">{tangent.tangent_type}</p>
                       <p className="mt-1 text-xs text-slate-200">{tangent.claim}</p>
                       <p className="mt-1 text-[10px] text-slate-600">handoff {tangent.recommended_handoff?.type ?? "none"} / {Math.round(tangent.confidence * 100)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-100">Arbitration Candidates</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Candidates must be consumed before becoming handoffs, plans, or requests.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void runSituationAcceptance()}
+                    className="rounded border border-cyan-300/30 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-400/10"
+                  >
+                    Run acceptance
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {arbitrationCandidates.length === 0 ? <p className="text-xs text-slate-500">No arbitration candidates yet.</p> : null}
+                  {arbitrationCandidates.slice(-8).reverse().map((candidate: LiveArbitrationCandidateRead) => (
+                    <div key={candidate.candidate_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase text-slate-500">{candidate.candidate_type}</p>
+                        <span className="text-[10px] text-slate-600">{candidate.priority} / {candidate.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-200">{candidate.reason}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">
+                        epoch {candidate.epoch} / fields {(candidate.field_evaluation_refs ?? []).length} / tangents {(candidate.tangent_refs ?? []).length}
+                      </p>
+                      {candidate.status === "pending" ? (
+                        <button
+                          type="button"
+                          onClick={() => void consumeArbitrationCandidate(candidate.candidate_id)}
+                          className="mt-2 rounded border border-cyan-300/25 px-1.5 py-0.5 text-[10px] text-cyan-100 hover:bg-cyan-400/10"
+                        >
+                          Consume
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Plan Contracts / Acceptance Runs</p>
+                <p className="mt-1 text-[11px] text-slate-500">Plans are action requests only; acceptance runs prove the SituationRun lifecycle.</p>
+                <div className="mt-3 space-y-2">
+                  {planContracts.length === 0 && acceptanceRuns.length === 0 ? <p className="text-xs text-slate-500">No plan contracts or acceptance runs yet.</p> : null}
+                  {planContracts.slice(-4).reverse().map((contract: LivePlanContractRead) => (
+                    <div key={contract.plan_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{contract.action_id}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">client adoption {String(contract.client_adoption_required)} / self execute {String(contract.can_execute_itself)} / {formatTime(contract.created_at)}</p>
+                    </div>
+                  ))}
+                  {acceptanceRuns.slice(-4).reverse().map((acceptance: LiveSituationRunAcceptanceRead) => (
+                    <div key={acceptance.acceptance_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{acceptance.scenario}: {acceptance.ok ? "passed" : "failed"}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">{acceptance.summary}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">{(acceptance.checks ?? []).filter((entry) => entry.passed).length}/{(acceptance.checks ?? []).length} checks / {formatTime(acceptance.created_at)}</p>
                     </div>
                   ))}
                 </div>

@@ -9,7 +9,10 @@ import {
 } from "@shared/helix-live-tangent-evaluation";
 import type { HelixLiveSituationRun } from "@shared/helix-live-situation-run";
 import type { HelixLiveFieldEvaluation } from "@shared/helix-live-field-evaluation";
+import type { HelixLiveArbitrationCandidate } from "@shared/helix-live-arbitration-candidate";
 import { recordLiveTangentEvaluation } from "./live-tangent-evaluation-store";
+import { buildLiveArbitrationCandidate } from "./live-arbitration-policy";
+import { recordLiveArbitrationCandidate } from "./live-arbitration-candidate-store";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -20,12 +23,13 @@ export function arbitrateLiveSituationHandoffs(input: {
 }): {
   tangent: HelixLiveTangentEvaluation | null;
   arbitration: HelixLiveHandoffArbitration;
+  arbitration_candidate: HelixLiveArbitrationCandidate;
   assistant_answer: false;
   raw_content_included: false;
 } {
   const now = new Date().toISOString();
-  const evidenceRefs = Array.from(new Set(input.evaluations.flatMap((entry) => entry.evidence_refs))).slice(-12);
-  const uncertainty = input.evaluations.find((entry) => entry.field_key === "uncertainty" || entry.field_key === "missing_evidence");
+  const evidenceRefs = Array.from(new Set(input.evaluations.flatMap((entry: HelixLiveFieldEvaluation) => entry.evidence_refs))).slice(-12);
+  const uncertainty = input.evaluations.find((entry: HelixLiveFieldEvaluation) => entry.field_key === "uncertainty" || entry.field_key === "missing_evidence");
   const tangent: HelixLiveTangentEvaluation | null = uncertainty && uncertainty.missing_evidence.length > 0
     ? recordLiveTangentEvaluation({
         schema: HELIX_LIVE_TANGENT_EVALUATION_SCHEMA,
@@ -54,7 +58,7 @@ export function arbitrateLiveSituationHandoffs(input: {
         expires_at: new Date(Date.parse(now) + 45_000).toISOString(),
       })
     : null;
-  const userNotice = input.evaluations.find((entry) =>
+  const userNotice = input.evaluations.find((entry: HelixLiveFieldEvaluation) =>
     entry.field_key === "user_notice" &&
     entry.confidence > 0.8 &&
     entry.status === "supported"
@@ -88,9 +92,17 @@ export function arbitrateLiveSituationHandoffs(input: {
     role: "validation",
     created_at: now,
   };
+  const arbitrationCandidate = recordLiveArbitrationCandidate(buildLiveArbitrationCandidate({
+    run: input.run,
+    arbitration,
+    evaluations: input.evaluations,
+    tangent,
+    now,
+  }));
   return {
     tangent,
     arbitration,
+    arbitration_candidate: arbitrationCandidate,
     assistant_answer: false as const,
     raw_content_included: false as const,
   };
