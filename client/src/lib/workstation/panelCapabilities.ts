@@ -1076,6 +1076,14 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "get_context_pack",
+        title: "Get Process Graph Context Pack",
+        description: "Return a compact read-only workstation overview for Helix Ask or agent preflight context.",
+        risk: "low",
+        optional_args: ["max_nodes", "max_artifacts", "max_timeline", "include_timeline"],
+        returns_artifact: true,
+      },
+      {
         id: "query_snapshot",
         title: "Query Process Graph Snapshot",
         description: "Return a filtered read-only snapshot of workstation graph nodes, edges, and timeline.",

@@ -93,6 +93,11 @@ import {
   reconcileWorkstationIntentDecisionWithPrompt,
   shouldProbeWorkstationIntentClassifier,
 } from "@/lib/workstation/intentClassifier";
+import {
+  buildProcessGraphOverviewText,
+  shouldUseProcessGraphContextPack,
+} from "@/lib/workstation/processGraph/processGraphAskOverview";
+import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { base64FromFile } from "@/utils/files";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
@@ -24938,6 +24943,61 @@ export function HelixAskPill({
           reason: "manual_turn_superseded",
         });
       }
+      if (!bypassWorkstationDispatch && shouldUseProcessGraphContextPack(trimmed)) {
+        const sessionId = getHelixAskSessionId();
+        const processGraphContextPack = useWorkstationProcessGraphStore.getState().getContextPack();
+        const overviewText = buildProcessGraphOverviewText(processGraphContextPack);
+        setAskStatus(null);
+        setAskError(null);
+        setAskLiveEvents([]);
+        askLiveEventsRef.current = [];
+        setAskLiveDraft("");
+        askLiveDraftRef.current = "";
+        askLiveDraftBufferRef.current = "";
+        clearLiveDraftFlush();
+        setAskActiveQuestion(null);
+        if (askInputRef.current) {
+          askInputRef.current.value = "";
+          resizeTextarea();
+        }
+        askDraftRef.current = "";
+        if (sessionId) {
+          setActive(sessionId);
+          addMessage(sessionId, { role: "user", content: trimmed });
+          addMessage(sessionId, { role: "assistant", content: overviewText });
+        }
+        addHelixTimelineEntry({
+          type: "conversation_brief",
+          source: "manual",
+          status: "done",
+          text: "Returned workstation process graph overview.",
+          detail: "process_graph_context_pack | overview_only",
+          mode: "observe",
+          traceId: runAskTurnId,
+          meta: {
+            kind: "workstation_process_graph_context_pack",
+            context_pack: processGraphContextPack,
+            execution_authority: "none",
+            note: processGraphContextPack.observer_note,
+          },
+        });
+        setAskReplies((prev) =>
+          [
+            {
+              id: crypto.randomUUID(),
+              content: overviewText,
+              question: trimmed,
+              mode: "observe",
+              debug: {
+                process_graph_context_pack: processGraphContextPack,
+                process_graph_execution_authority: "none",
+              } as unknown as HelixAskReply["debug"],
+            },
+            ...prev,
+          ].slice(0, 3),
+        );
+        return;
+      }
       const normalizedWorkstationQuestion = normalizeWorkstationCommandText(trimmed);
       let parsedWorkstationFollowupActions: HelixWorkstationAction[] = [];
       let parsedWorkstationCommand: HelixWorkstationAction | null = null;
@@ -25484,9 +25544,16 @@ export function HelixAskPill({
           const reasoningContextModeForTurn: "attached" | "isolated" =
             options?.contextMode === "isolated" ? "isolated" : "attached";
           const workspaceContextSnapshot = buildAskTurnWorkspaceContextSnapshot(sessionId);
+          const processGraphContextPackForTurn =
+            manualDispatchHint || backgroundWorkspaceReasoningLane || preliminaryDispatchPlan.should_dispatch_reasoning
+              ? useWorkstationProcessGraphStore.getState().getContextPack()
+              : null;
           const workspaceContextSnapshotForTurn = visualEvidenceForTurn
             ? {
                 ...workspaceContextSnapshot,
+                ...(processGraphContextPackForTurn
+                  ? { process_graph_context_pack: processGraphContextPackForTurn }
+                  : {}),
                 attached_visual_evidence: visualEvidenceForTurn,
                 multimodal_evidence_pack: {
                   schema: "helix.multimodal_evidence_pack.v1",
@@ -25497,7 +25564,12 @@ export function HelixAskPill({
                   context_policy: "compact_context_pack_only",
                 },
               }
-            : workspaceContextSnapshot;
+            : processGraphContextPackForTurn
+              ? {
+                  ...workspaceContextSnapshot,
+                  process_graph_context_pack: processGraphContextPackForTurn,
+                }
+              : workspaceContextSnapshot;
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {

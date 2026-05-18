@@ -222,6 +222,15 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("RF_EMPTY_TERMINAL");
   });
 
+  it("routes workstation overview prompts through the read-only process graph context pack", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("shouldUseProcessGraphContextPack(trimmed)");
+    expect(source).toContain("getContextPack()");
+    expect(source).toContain("process_graph_context_pack | overview_only");
+    expect(source).toContain('process_graph_execution_authority: "none"');
+    expect(source).toContain("workspaceContextSnapshotForTurn");
+  });
+
   it("routes voice lite prompts through normal-turn lane without queued reasoning", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("voice normal turn lane (no queued reasoning)");

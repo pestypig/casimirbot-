@@ -16,6 +16,7 @@ export function buildAskTurnPreflightContext(input: {
   inputModality?: HelixAskTurnInputModality | null;
   retrievalRequiredSignal: unknown;
   routeCandidates?: HelixRouteCandidate[];
+  sourceTargetIntent?: unknown | null;
   liveSourceContinuationIntent?: unknown | null;
   liveEnvironmentIntent?: unknown | null;
   deicticReference?: unknown | null;
@@ -42,6 +43,7 @@ export function buildAskTurnPreflightContext(input: {
     created_at: createdAt,
     retrieval_required_signal: input.retrievalRequiredSignal,
     route_candidates: input.routeCandidates ?? [],
+    source_target_intent: input.sourceTargetIntent ?? null,
     live_source_continuation_intent: input.liveSourceContinuationIntent ?? null,
     live_environment_intent: input.liveEnvironmentIntent ?? null,
     deictic_reference: input.deicticReference ?? null,

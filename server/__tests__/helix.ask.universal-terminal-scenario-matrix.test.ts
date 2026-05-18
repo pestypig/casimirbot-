@@ -24,6 +24,7 @@ import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabi
 import { resetWorldEventIngestState } from "../services/situation-room/world-event-ingest";
 import { resetSituationThreadBindings } from "../services/situation-room/thread-binding-store";
 import { resetSourceBindingStatusLedgerForTest } from "../services/situation-room/source-binding-status-ledger";
+import { resetSituationSourceBindingsForTest } from "../services/situation-room/situation-source-binding-store";
 
 const createApp = async (): Promise<express.Express> => {
   const { planRouter } = await import("../routes/agi.plan");
@@ -35,6 +36,8 @@ const createApp = async (): Promise<express.Express> => {
 
 const expectTurnCeremony = (body: any) => {
   expect(body?.ask_turn_preflight_context?.schema).toBe("helix.ask_turn_preflight_context.v1");
+  expect(body?.source_target_intent?.schema).toBe("helix.ask_source_target_intent.v1");
+  expect(body?.ask_turn_preflight_context?.source_target_intent?.schema).toBe("helix.ask_source_target_intent.v1");
   expect(body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
   expect(body?.terminal_answer_authority?.schema).toBe("helix.turn_terminal_authority.v1");
   expect(body?.terminal_answer_authority?.server_authoritative).toBe(true);
@@ -168,7 +171,66 @@ describe("Helix Ask universal terminal scenario matrix", () => {
     resetWorldEventIngestState();
     resetSituationThreadBindings();
     resetSourceBindingStatusLedgerForTest();
+    resetSituationSourceBindingsForTest();
   });
+
+  it("preflights source-target intent before visual/doc/world route selection", async () => {
+    const app = await createApp();
+    seedVisualSituationRun();
+    const visual = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "Actually, what file am I looking at in the visual screen capture?",
+        debug: true,
+        workspace_context_snapshot: {
+          sessionId: "helix-ask:desktop",
+          activePanel: "live-answer-environment",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+    expectTurnCeremony(visual.body);
+    expect(visual.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      precedence_reason: "explicit_visual_source_target",
+    });
+    expect(visual.body?.source_target_route_rejections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ route: "active_doc_identity", reason: "explicit_visual_source_target" }),
+      ]),
+    );
+    expect(visual.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(String(visual.body?.selected_final_answer ?? "")).not.toContain("Active doc:");
+
+    const doc = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "doc-target-thread",
+        question: "What paper am I viewing?",
+        debug: true,
+        workspace_context_snapshot: {
+          sessionId: "doc-target-thread",
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+    expectTurnCeremony(doc.body);
+    expect(doc.body?.source_target_intent?.target_source).toBe("active_doc");
+    expect(doc.body?.canonical_goal_frame?.goal_kind).toBe("active_doc_identity");
+
+    const world = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({ sessionId: "helix-ask:desktop", question: "Are Minehut world events attached to this thread?", debug: true })
+      .expect(200);
+    expectTurnCeremony(world.body);
+    expect(world.body?.source_target_intent?.target_source).toBe("world_event");
+  }, 90_000);
 
   it("keeps visual situation answers on the active SituationRun path and quarantines legacy projection context", async () => {
     const app = await createApp();
@@ -234,6 +296,7 @@ describe("Helix Ask universal terminal scenario matrix", () => {
 
   it("records observed-unbound Minecraft sources, excludes them, then records explicit repair acceptance for future events", async () => {
     const app = await createApp();
+    const { run } = seedVisualSituationRun();
     const first = await request(app)
       .post("/api/agi/situation/world-event")
       .send(worldEvent("unbound"))
@@ -256,14 +319,25 @@ describe("Helix Ask universal terminal scenario matrix", () => {
     });
 
     const attach = await request(app)
-      .post("/api/agi/situation/world-event/attach-source-to-thread")
+      .post("/api/agi/situation/source-binding/attach-source-to-active-run")
       .send({
         thread_id: "helix-ask:desktop",
+        situation_run_id: run.situation_run_id,
+        environment_id: run.environment_id,
         room_id: "room:minecraft-minehut",
         source_id: "source:minecraft-server",
         world_id: "minecraft:minehut",
+        modality: "world_event",
       })
       .expect(200);
+    expect(attach.body?.action_id).toBe("situation-room.attach_source_to_active_run");
+    expect(attach.body?.situation_source_binding).toMatchObject({
+      schema: "helix.situation_source_binding.v1",
+      source_id: "source:minecraft-server",
+      modality: "world_event",
+      status: "bound",
+      replay_policy: "future_only",
+    });
     expect(attach.body?.repair_transition).toMatchObject({ to: "repair_accepted" });
 
     const second = await request(app)

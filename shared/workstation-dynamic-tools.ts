@@ -688,6 +688,7 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "get_snapshot", required_args: [], optional_args: ["scope", "max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
+  { panel_id: "workstation-process-graph", action_id: "get_context_pack", required_args: [], optional_args: ["max_nodes", "max_artifacts", "max_timeline", "include_timeline"], returns_artifact: true },
   { panel_id: "workstation-process-graph", action_id: "query_snapshot", required_args: ["query"], optional_args: ["max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
   { panel_id: "workstation-process-graph", action_id: "focus_node", required_args: ["node_id"], optional_args: [], returns_artifact: true },
   { panel_id: "workstation-process-graph", action_id: "filter_view", required_args: [], optional_args: ["filter"], returns_artifact: true },
@@ -1014,7 +1015,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "confirmed" || arg === "derived_outputs_auto_attach" || arg === "command_lane_enabled") {
     return { type: "boolean" };
   }
-  if (arg === "limit") return { type: "number" };
+  if (arg === "limit" || arg === "max_nodes" || arg === "max_artifacts" || arg === "max_timeline") return { type: "number" };
   if (arg === "kind") return { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] };
   if (arg === "intent") return { enum: ["translate_conversation", "monitor_conversation", "summarize_conversation"] };
   if (arg === "capture_preference") return { enum: ["existing_source", "browser_tab_audio", "display_audio", "mic", "unknown"] };
@@ -1087,7 +1088,11 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "episode_timeline.summarize_window") return "situation_episode_summary";
   if (panelId === "situation-room-pipelines" && actionId === "callout_policy.set_mode") return "standby_callout_policy_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.confirm_speak") return "standby_callout_delivery_receipt";
-  if (panelId === "workstation-process-graph" && actionId !== "open") return actionId === "export_svg" ? "workstation_process_graph_svg" : "workstation_process_graph_snapshot";
+  if (panelId === "workstation-process-graph" && actionId !== "open") {
+    if (actionId === "export_svg") return "workstation_process_graph_svg";
+    if (actionId === "get_context_pack") return "workstation_process_graph_context_pack";
+    return "workstation_process_graph_snapshot";
+  }
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
   if (panelId === "mission-ethos" && actionId === "compare_motive_to_zen") return "ideology_motive_comparison_receipt";

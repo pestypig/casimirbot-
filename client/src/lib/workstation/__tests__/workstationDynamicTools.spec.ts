@@ -151,4 +151,26 @@ describe("workstation dynamic tools", () => {
       },
     });
   });
+
+  it("exposes process graph context pack as read-only situational awareness", () => {
+    const tools = getWorkstationDynamicTools();
+    const contextPack = tools.find((tool) => tool.name === "workstation_process_graph.get_context_pack");
+
+    expect(contextPack).toMatchObject({
+      namespace: "workstation",
+      panel_id: "workstation-process-graph",
+      action_id: "get_context_pack",
+      risk: "low",
+      returns_artifact: true,
+      terminal_artifact_kind: "workstation_process_graph_context_pack",
+    });
+    expect(contextPack?.inputSchema).toMatchObject({
+      required: [],
+      properties: {
+        max_nodes: { type: "number" },
+        max_artifacts: { type: "number" },
+        max_timeline: { type: "number" },
+      },
+    });
+  });
 });

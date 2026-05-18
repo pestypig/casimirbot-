@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyWorkstationProcessGraphEvent,
+  createInitialWorkstationProcessGraphState,
+} from "../processGraphReducer";
+import { buildProcessGraphContextPack } from "../buildProcessGraphContextPack";
+import {
+  buildProcessGraphOverviewText,
+  shouldUseProcessGraphContextPack,
+} from "../processGraphAskOverview";
+
+describe("workstation process graph context pack", () => {
+  it("prioritizes active state, recent artifacts, warnings, and hard max counts", () => {
+    let state = createInitialWorkstationProcessGraphState("session:test");
+    state = applyWorkstationProcessGraphEvent(state, {
+      type: "job.started",
+      jobId: "job-active",
+      label: "Active translation",
+      traceId: "trace-active",
+      panelId: "situation-room-pipelines",
+      ts: "2026-05-15T10:00:00.000Z",
+    });
+    state = applyWorkstationProcessGraphEvent(state, {
+      type: "tool.failed",
+      tool: "docs-viewer.search_docs",
+      traceId: "trace-failed",
+      panelId: "docs-viewer",
+      label: "Docs search failed",
+      ts: "2026-05-15T10:01:00.000Z",
+    });
+    state = applyWorkstationProcessGraphEvent(state, {
+      type: "tool.completed",
+      tool: "workstation-notes.list_notes",
+      traceId: "trace-notes",
+      panelId: "workstation-notes",
+      artifact: { kind: "notes_list", title: "Notes list" },
+      ts: "2026-05-15T10:02:00.000Z",
+    });
+
+    const pack = buildProcessGraphContextPack(state, {
+      maxActive: 2,
+      maxArtifacts: 1,
+      maxTimeline: 2,
+    });
+
+    expect(pack.kind).toBe("workstation_process_graph_context_pack");
+    expect(pack.active).toHaveLength(2);
+    expect(pack.active.some((node) => node.status === "failed")).toBe(true);
+    expect(pack.recentArtifacts).toHaveLength(1);
+    expect(pack.recentArtifacts[0]?.artifactKind).toBe("notes_list");
+    expect(pack.recentTimeline).toHaveLength(2);
+    expect(pack.warnings.some((warning) => warning.includes("failed"))).toBe(true);
+  });
+
+  it("drops hidden/scratch fields from compact context and overview text", () => {
+    const state = applyWorkstationProcessGraphEvent(createInitialWorkstationProcessGraphState("session:test"), {
+      type: "tool.completed",
+      tool: "docs-viewer.inspect",
+      traceId: "trace-hidden_reasoning",
+      panelId: "docs-viewer",
+      label: "chain_of_thought should not surface",
+      artifact: {
+        kind: "doc_context",
+        title: "scratchpad should not surface",
+        hidden_reasoning: "private",
+      },
+      ts: "2026-05-15T10:00:00.000Z",
+    });
+    const pack = buildProcessGraphContextPack(state);
+    const serialized = JSON.stringify(pack);
+    const overview = buildProcessGraphOverviewText(pack);
+
+    expect(serialized).not.toContain("hidden_reasoning");
+    expect(serialized).not.toContain("chain_of_thought");
+    expect(serialized).not.toContain("scratchpad");
+    expect(overview).not.toContain("chain_of_thought");
+    expect(overview).toContain("observational");
+  });
+
+  it("detects workstation overview prompts without making them executable", () => {
+    expect(shouldUseProcessGraphContextPack("what is happening in the workstation?")).toBe(true);
+    expect(shouldUseProcessGraphContextPack("continue that active pipeline")).toBe(true);
+    expect(shouldUseProcessGraphContextPack("summarize quantum vacuum pressure")).toBe(false);
+  });
+});

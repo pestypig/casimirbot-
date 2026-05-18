@@ -628,16 +628,44 @@ export function executeHelixPanelAction(
     const args = asRecord(request.args) ?? {};
     const graphStore = useWorkstationProcessGraphStore.getState();
     const maxNodes = asNumber(args.max_nodes ?? args.maxNodes) ?? undefined;
+    const scope = asNonEmptyString(args.scope)?.toLowerCase();
     const includeTimeline = asBoolean(args.include_timeline ?? args.includeTimeline) ?? true;
     const includeArtifacts = asBoolean(args.include_artifacts ?? args.includeArtifacts) ?? true;
 
     if (actionId === "get_snapshot") {
+      if (scope === "compact" || scope === "context_pack") {
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: graphStore.getContextPack({
+            maxActive: maxNodes,
+            maxArtifacts: asNumber(args.max_artifacts ?? args.maxArtifacts) ?? undefined,
+            maxTimeline: includeTimeline ? asNumber(args.max_timeline ?? args.maxTimeline) ?? undefined : 0,
+          }) as unknown as Record<string, unknown>,
+          message: "Returned compact workstation process graph context pack.",
+        };
+      }
       return {
         ok: true,
         panel_id: panelId,
         action_id: actionId,
         artifact: graphStore.getSnapshotArtifact({ maxNodes, includeTimeline, includeArtifacts }) as unknown as Record<string, unknown>,
         message: "Returned workstation process graph snapshot.",
+      };
+    }
+
+    if (actionId === "get_context_pack") {
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: graphStore.getContextPack({
+          maxActive: maxNodes,
+          maxArtifacts: asNumber(args.max_artifacts ?? args.maxArtifacts) ?? undefined,
+          maxTimeline: includeTimeline ? asNumber(args.max_timeline ?? args.maxTimeline) ?? undefined : 0,
+        }) as unknown as Record<string, unknown>,
+        message: "Returned compact workstation process graph context pack.",
       };
     }
 

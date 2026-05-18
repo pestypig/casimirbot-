@@ -8,6 +8,7 @@ import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
@@ -47,6 +48,7 @@ describe("panelActionAdapters", () => {
     useSituationRoomStore.getState().reset();
     useSituationRoomJobStore.getState().reset();
     useSituationRoomGraphStore.getState().reset();
+    useWorkstationProcessGraphStore.getState().reset();
   });
 
   it("opens/focuses docs panel before applying read intent", () => {
@@ -283,6 +285,79 @@ describe("panelActionAdapters", () => {
     );
     expect(copySelectionToNote.ok).toBe(true);
     expect(copySelectionToNote.artifact?.source).toBe("clipboard_receipt");
+  });
+
+  it("returns process graph context packs and escaped SVG without executing other panel actions", () => {
+    const processGraphStore = useWorkstationProcessGraphStore.getState();
+    processGraphStore.dispatch({
+      type: "panel.opened",
+      panelId: "docs-viewer",
+      label: `<script>alert("x")</script>`,
+      ts: "2026-05-15T10:00:00.000Z",
+    });
+    processGraphStore.dispatch({
+      type: "tool.completed",
+      tool: "docs-viewer.search_docs",
+      traceId: "trace-1",
+      panelId: "docs-viewer",
+      artifact: { kind: "doc_context", title: "Docs result" },
+      ts: "2026-05-15T10:01:00.000Z",
+    });
+    processGraphStore.dispatch({
+      type: "panel.opened",
+      panelId: "unsafe-panel",
+      label: `<script>alert("x")</script>`,
+      ts: "2026-05-15T10:02:00.000Z",
+    });
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: vi.fn(),
+      openSettings: vi.fn(),
+    };
+
+    const contextPack = executeHelixPanelAction(
+      {
+        panel_id: "workstation-process-graph",
+        action_id: "get_context_pack",
+      },
+      context,
+    );
+    expect(contextPack.ok).toBe(true);
+    expect(contextPack.artifact?.kind).toBe("workstation_process_graph_context_pack");
+    expect(context.openPanel).not.toHaveBeenCalled();
+    expect(context.focusPanel).not.toHaveBeenCalled();
+
+    const compactSnapshot = executeHelixPanelAction(
+      {
+        panel_id: "workstation-process-graph",
+        action_id: "get_snapshot",
+        args: { scope: "compact" },
+      },
+      context,
+    );
+    expect(compactSnapshot.artifact?.kind).toBe("workstation_process_graph_context_pack");
+
+    const focus = executeHelixPanelAction(
+      {
+        panel_id: "workstation-process-graph",
+        action_id: "focus_node",
+        args: { node_id: "panel:docs-viewer" },
+      },
+      context,
+    );
+    expect(focus.ok).toBe(true);
+    expect(useWorkstationProcessGraphStore.getState().graph.view.focusedNodeId).toBe("panel:docs-viewer");
+
+    const svg = executeHelixPanelAction(
+      {
+        panel_id: "workstation-process-graph",
+        action_id: "export_svg",
+      },
+      context,
+    );
+    expect(String(svg.artifact?.svg ?? "")).not.toContain("<script>");
+    expect(String(svg.artifact?.svg ?? "")).toContain("&lt;script&gt;");
   });
 
   it("supports scientific calculator ingest and solve actions", () => {

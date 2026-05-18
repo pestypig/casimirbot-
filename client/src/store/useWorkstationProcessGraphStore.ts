@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
+  buildProcessGraphContextPack,
+  type ProcessGraphContextPack,
+} from "@/lib/workstation/processGraph/buildProcessGraphContextPack";
+import {
   applyWorkstationProcessGraphEvent,
   buildWorkstationProcessGraphSnapshot,
   createInitialWorkstationProcessGraphState,
@@ -27,6 +31,11 @@ type WorkstationProcessGraphStore = {
     includeTimeline?: boolean;
     includeArtifacts?: boolean;
   }) => WorkstationProcessGraphSnapshotArtifact;
+  getContextPack: (options?: {
+    maxActive?: number;
+    maxArtifacts?: number;
+    maxTimeline?: number;
+  }) => ProcessGraphContextPack;
 };
 
 export const useWorkstationProcessGraphStore = create<WorkstationProcessGraphStore>()(
@@ -84,6 +93,7 @@ export const useWorkstationProcessGraphStore = create<WorkstationProcessGraphSto
         }),
       reset: () => set({ graph: createInitialWorkstationProcessGraphState() }),
       getSnapshotArtifact: (options) => buildWorkstationProcessGraphSnapshot(get().graph, options),
+      getContextPack: (options) => buildProcessGraphContextPack(get().graph, options),
     }),
     {
       name: STORAGE_KEY,

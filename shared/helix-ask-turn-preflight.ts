@@ -20,6 +20,7 @@ export type HelixAskTurnPreflightContext = {
   created_at: string;
   retrieval_required_signal: unknown;
   route_candidates: HelixRouteCandidate[];
+  source_target_intent?: unknown | null;
   live_source_continuation_intent?: unknown | null;
   live_environment_intent?: unknown | null;
   deictic_reference?: unknown | null;
