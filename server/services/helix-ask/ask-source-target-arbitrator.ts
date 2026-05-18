@@ -119,9 +119,24 @@ const rules: CueRule[] = [
     cues: [
       { label: "show_evidence", pattern: /\bshow\s+(?:the\s+)?evidence\b/i },
       { label: "why_answer", pattern: /\bwhy\s+did\s+you\s+say\b/i },
-      { label: "replay", pattern: /\breplay\s+(?:that|the\s+last)\b/i },
-      { label: "last_epoch", pattern: /\blast\s+(?:situation\s+)?epoch\b/i },
+      { label: "replay", pattern: /\breplay\s+(?:that|the\s+last|the\s+procedure|procedure\s+memory)\b/i },
+      { label: "procedure_memory", pattern: /\bprocedure\s+memory\b/i },
+      { label: "last_epoch", pattern: /\blast\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch\b/i },
+      { label: "scene_epoch", pattern: /\bscene\s+epoch\b/i },
+      { label: "visual_epoch", pattern: /\bvisual\s+epoch\b/i },
+      { label: "screen_epoch", pattern: /\bscreen\s+epoch\b/i },
+      { label: "live_epoch", pattern: /\blive\s+epoch\b/i },
       { label: "what_changed", pattern: /\bwhat\s+changed\b/i },
+      { label: "changed_since", pattern: /\bchanged\s+since\b/i },
+      { label: "since_last_seen", pattern: /\bsince\s+(?:the\s+)?last\s+seen\b/i },
+      { label: "since_last_visual", pattern: /\bsince\s+(?:the\s+)?last\s+visual\b/i },
+      { label: "since_last_capture", pattern: /\bsince\s+(?:the\s+)?last\s+capture\b/i },
+      { label: "previous_frame", pattern: /\bprevious\s+frame\b/i },
+      { label: "previous_visual", pattern: /\bprevious\s+visual\b/i },
+      { label: "compare_to_last", pattern: /\bcompare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)\b/i },
+      { label: "compare_current_scene", pattern: /\bcompare\s+current\s+scene\b/i },
+      { label: "difference_from_last_scene", pattern: /\b(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)\b/i },
+      { label: "last_scene_current_scene", pattern: /\blast\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))\b/i },
       { label: "confidence_change", pattern: /\bconfidence\s+change\b/i },
     ],
   },
@@ -238,6 +253,16 @@ const mapRepoRequestedOutputs = (
     return ["repo_code" as const];
   });
 
+const isSituationEpochCue = (cue: string): boolean =>
+  /epoch|changed|since|previous|compare|different|difference|visual|scene|frame|capture/i.test(cue);
+
+const PROCEDURE_EPOCH_REQUESTED_OUTPUTS: HelixAskSourceTargetRequestedOutput[] = [
+  "procedure_epoch_replay",
+  "field_evaluation_refs",
+  "interpretation_refs",
+  "current_visual_state",
+];
+
 export function arbitrateAskSourceTarget(input: {
   turnId: string;
   threadId: string;
@@ -294,13 +319,38 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  const procedureMemoryRule = rules.find((rule) => rule.target === "procedure_memory");
+  if (procedureMemoryRule) {
+    const explicitCues = matches(prompt, procedureMemoryRule.cues);
+    if (explicitCues.some(isSituationEpochCue)) {
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target: procedureMemoryRule.target,
+        targetKind: "situation_epoch",
+        strength: procedureMemoryRule.strength,
+        explicitCues,
+        reasons: [procedureMemoryRule.reason, ...explicitCues],
+        requestedOutputs: PROCEDURE_EPOCH_REQUESTED_OUTPUTS,
+        suppressedRoutes: procedureMemoryRule.suppressedRoutes,
+        precedenceReason: procedureMemoryRule.reason,
+        confidence: procedureMemoryRule.confidence,
+        allowClientShortcut: procedureMemoryRule.allowClientShortcut,
+        allowNoToolDirect: procedureMemoryRule.allowNoToolDirect,
+      });
+    }
+  }
   for (const rule of rules) {
     const explicitCues = matches(prompt, rule.cues);
     if (explicitCues.length === 0) continue;
     const targetKind =
-      rule.target === "procedure_memory" && explicitCues.some((cue) => /epoch|changed/i.test(cue))
+      rule.target === "procedure_memory" && explicitCues.some(isSituationEpochCue)
         ? "situation_epoch"
         : rule.targetKind;
+    const requestedOutputs =
+      rule.target === "procedure_memory" && targetKind === "situation_epoch"
+        ? PROCEDURE_EPOCH_REQUESTED_OUTPUTS
+        : rule.requestedOutputs;
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -309,7 +359,7 @@ export function arbitrateAskSourceTarget(input: {
       strength: rule.strength,
       explicitCues,
       reasons: [rule.reason, ...explicitCues],
-      requestedOutputs: rule.requestedOutputs,
+      requestedOutputs,
       suppressedRoutes: rule.suppressedRoutes,
       precedenceReason: rule.reason,
       confidence: rule.confidence,

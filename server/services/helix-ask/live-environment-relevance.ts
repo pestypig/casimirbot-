@@ -89,6 +89,20 @@ const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
       /\banomaly\b/,
     ];
   }
+  if (/\b(?:visual|screen|capture|frame|scene|file explorer|window)\b/.test(objective)) {
+    return [
+      /\bvisual\b/,
+      /\bscreen\b/,
+      /\bscene\b/,
+      /\bframe\b/,
+      /\bcapture\b/,
+      /\blooking\s+at\b/,
+      /\bwhat\s+(?:changed|is\s+different)\b/,
+      /\bdifference\b/,
+      /\blast\s+(?:scene|frame|visual|screen|capture)\b/,
+      /\bcurrent\s+(?:scene|frame|visual|screen)\b/,
+    ];
+  }
   if (preset === "minecraft_run_monitor") {
     return [
       /\bminecraft\b/,
@@ -121,6 +135,7 @@ const environmentPromptScore = (environment: LiveAnswerEnvironment, text: string
   if (/\blive\s+output\b/.test(text) && /\blive\s+output\b/.test(objective)) score += 4;
   if (/\bprime\b/.test(text) && (environment.preset === "calculator_prime_stream" || /\bprime\b/.test(objective))) score += 2;
   if (/\bequation|result|variables?|interpret|big\s+picture\b/.test(text) && environment.preset === "calculator_equation_interpreter") score += 4;
+  if (/\bvisual|screen|scene|frame|capture|looking\s+at|what\s+changed|difference|last\s+(?:scene|frame|visual|screen|capture)\b/.test(text) && /\b(?:visual|screen|capture|frame|scene|file explorer|window)\b/.test(objective)) score += 5;
   if (/\bstatus|current|latest|right\s+now|what\s+.*on\b/.test(text)) score += 1;
   return score;
 };
@@ -130,7 +145,7 @@ const isGeneralConceptQuestion = (text: string): boolean =>
   !/\b(?:we|current|currently|latest|so\s+far|right\s+now|on\s+the\s+stream|live\s+card|environment|tracker|status|progress|changed|found|checked)\b/.test(text);
 
 const hasCurrentStateCue = (text: string): boolean =>
-  /\b(?:current|currently|right\s+now|latest|status|progress|changed|so\s+far|what\s+changed|where\s+are\s+we|are\s+we\s+on|what\s+.*\s+on|found|checked|count|next\s+check|live\s+card|environment|tracker|stream)\b/.test(text);
+  /\b(?:current|currently|right\s+now|latest|status|progress|changed|so\s+far|what\s+changed|difference|different|last\s+(?:scene|frame|visual|screen|capture)|where\s+are\s+we|are\s+we\s+on|what\s+.*\s+on|found|checked|count|next\s+check|live\s+card|environment|tracker|stream)\b/.test(text);
 
 export function evaluateLiveEnvironmentTurnRelevance(args: {
   threadId: string;

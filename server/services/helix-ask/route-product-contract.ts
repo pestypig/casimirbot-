@@ -43,8 +43,19 @@ const PROCEDURE_ALLOWED_TERMINAL_PRODUCTS = [
   "procedure_epoch_replay",
   "procedure_memory_recall",
   "situation_context_pack",
+  "situation_context_pack_with_epoch_evidence",
   "request_user_input",
   "typed_failure",
+  "procedure_memory_unavailable",
+  "procedure_epoch_previous_unavailable",
+];
+
+const PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS = [
+  "process_graph_overview",
+  "workspace_action_receipt",
+  "live_pipeline_receipt",
+  "no_tool_direct",
+  "model_only_concept",
 ];
 
 const REPO_CODE_ALLOWED_TERMINAL_PRODUCTS = [
@@ -172,14 +183,14 @@ export function buildRouteProductContract(input: {
     };
   }
 
-  if (sourceTarget === "procedure_memory") {
+  if (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") {
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,
-      source_target: "procedure_memory",
+      source_target: sourceTarget,
       allowed_terminal_artifact_kinds: PROCEDURE_ALLOWED_TERMINAL_PRODUCTS,
-      forbidden_terminal_artifact_kinds: [],
-      precedence_reason: "procedure_memory_source_target_allows_recall_terminal_products",
+      forbidden_terminal_artifact_kinds: PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS,
+      precedence_reason: "procedure_memory_source_target_allows_only_epoch_recall_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
     };

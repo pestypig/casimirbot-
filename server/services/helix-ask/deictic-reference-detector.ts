@@ -29,14 +29,16 @@ export function detectDeicticReference(input: {
   const prompt = input.promptText.trim();
   const text = normalize(prompt);
   const repoCodeContextWithoutScreen = repoCodeContextRe.test(prompt) && !explicitScreenContextRe.test(prompt);
+  const epochChangeRe =
+    /\b(?:what\s+changed|changed|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+step|card\s+update|confidence\s+change|why\s+did|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen)))\b/;
   const referenceType: HelixDeicticReferenceType =
     repoCodeContextWithoutScreen
       ? "unknown"
+      : epochChangeRe.test(text)
+      ? "latest_epoch_change"
       : /\b(?:compare|comparison|next\s+(?:one|file|image|picture|screen)|about\s+to\s+show|first\s+(?:picture|image|file))\b/.test(text)
       ? "comparison_target"
-      : /\b(?:what\s+changed|changed|last\s+(?:epoch|step)|card\s+update|confidence\s+change|why\s+did)\b/.test(text)
-        ? "latest_epoch_change"
-        : /\b(?:clicking|clicked|selected|selection|highlighted|file\s+i(?:'m| am)?\s+(?:clicking|selecting|looking\s+at)|selected\s+(?:file|item))\b/.test(text)
+      : /\b(?:clicking|clicked|selected|selection|highlighted|file\s+i(?:'m| am)?\s+(?:clicking|selecting|looking\s+at)|selected\s+(?:file|item))\b/.test(text)
           ? "selected_visible_file"
           : /\b(?:what\s+am\s+i\s+doing|doing\s+right\s+now|current\s+activity)\b/.test(text)
             ? "current_activity"

@@ -210,6 +210,10 @@ such as:
 
 ```txt
 What changed in the last situation epoch?
+What changed since last seen epoch?
+What changed since the previous visual?
+Compare current scene to last capture.
+What is the difference between the last scene and what I am looking at now?
 Show the evidence.
 Why did you say that?
 Replay that.
@@ -222,6 +226,12 @@ Procedure-memory prompts must terminate as `procedure_epoch_replay`,
 `procedure_memory_recall`, `situation_context_pack` with selected epoch
 evidence, or a typed procedure-memory failure. A process-graph overview is not
 a valid terminal product for those turns.
+
+The process graph can answer explicit workstation questions such as "what
+panels are open" or "what changed in the process graph." It cannot answer
+scene, epoch, visual-delta, live-source, evidence, or procedure-memory prompts.
+Those prompts must enter backend Ask and produce an `ask:` turn, canonical goal,
+artifact ledger, route reason, and terminal authority.
 
 ## Live Capture Is Not Live Cognition
 

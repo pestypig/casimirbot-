@@ -21,6 +21,7 @@ import {
   upsertLiveSourceProducer,
 } from "../services/situation-room/live-source-chunk-buffer";
 import { routeSituationContextTurn } from "../services/helix-ask/situation-context-turn-router";
+import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 
 const createApp = async (): Promise<{ app: express.Express }> => {
   const agi = await import("../routes/agi.plan");
@@ -946,5 +947,48 @@ describe("thread-bound situation context bridge", () => {
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
       "Raw images, audio, and logs were not injected into Ask context.",
     );
+  });
+
+  it.each([
+    "Okay, what changed since last seen epoch?",
+    "What changed since the previous visual?",
+    "Compare current scene to last capture.",
+    "What changed in the visual epoch?",
+    "Okay, so what is the difference between the last scene in the scene I'm looking at now",
+  ])("routes %s through procedure epoch replay", (promptText) => {
+    seedVisualSituationRun();
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:scene-delta-admission",
+      threadId: "helix-ask:desktop",
+      promptText,
+    });
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText,
+      inputModality: "typed",
+      turnId: "ask:scene-delta-admission",
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "procedure_memory",
+      target_kind: "situation_epoch",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.requested_outputs).toEqual(
+      expect.arrayContaining([
+        "procedure_epoch_replay",
+        "field_evaluation_refs",
+        "interpretation_refs",
+        "current_visual_state",
+      ]),
+    );
+    expect(route.route).toBe("procedure_epoch_replay_question");
+    expect(route.deictic_reference.reference_type).toBe("latest_epoch_change");
+    expect(route.procedure_memory_recall?.recall_type).toBe("epoch_replay");
+    expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
+    expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Current observation:");
   });
 });

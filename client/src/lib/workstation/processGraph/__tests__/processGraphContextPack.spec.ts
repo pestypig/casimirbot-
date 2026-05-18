@@ -80,6 +80,8 @@ describe("workstation process graph context pack", () => {
   it("detects workstation overview prompts without making them executable", () => {
     expect(shouldUseProcessGraphContextPack("what is happening in the workstation?")).toBe(true);
     expect(shouldUseProcessGraphContextPack("continue that active pipeline")).toBe(true);
+    expect(shouldUseProcessGraphContextPack("What changed in the process graph?")).toBe(true);
+    expect(shouldUseProcessGraphContextPack("What artifacts are active in the workstation overview?")).toBe(true);
     expect(shouldUseProcessGraphContextPack("summarize quantum vacuum pressure")).toBe(false);
   });
 
@@ -93,5 +95,11 @@ describe("workstation process graph context pack", () => {
     expect(shouldUseProcessGraphContextPack("Okay, can you describe what changed since last scene?")).toBe(false);
     expect(shouldUseProcessGraphContextPack("What changed since the previous scene?")).toBe(false);
     expect(shouldUseProcessGraphContextPack("Compare this scene to the last scene.")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Okay, what changed since last seen epoch?")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("What changed since the previous visual?")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Compare current scene to last capture.")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("What changed in the visual epoch?")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Replay the procedure memory.")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Okay, so what is the difference between the last scene in the scene I'm looking at now")).toBe(false);
   });
 });

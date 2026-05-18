@@ -77,7 +77,7 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
 const isProcedureReplayPrompt = (prompt: string): boolean =>
-  /\b(?:why\s+did|what\s+changed|last\s+(?:situation\s+)?epoch|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last)\b/i.test(prompt);
+  /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
 
 const isComparisonPrompt = (prompt: string): boolean =>
   /\b(?:compare\s+this|compare\s+(?:this|the)\s+(?:file|image|picture|screen)|next\s+(?:one|file|image|picture|screen)|remember\s+this\s+as\s+the\s+first)\b/i.test(prompt);
@@ -475,6 +475,19 @@ const buildReplayAnswer = (input: {
     epoch,
     limit: 20,
   });
+  const runLedger = listProcedureEpochLedger({
+    threadId: context.thread_id,
+    environmentId: context.environment_id ?? null,
+    situationRunId: context.situation_run_id,
+    limit: 200,
+  });
+  const previousEpoch = Array.from(new Set(runLedger.map((entry) => entry.epoch)))
+    .filter((candidate) => candidate < epoch)
+    .sort((a, b) => a - b)
+    .at(-1) ?? null;
+  const previousEpochLedger = previousEpoch === null
+    ? []
+    : runLedger.filter((entry) => entry.epoch === previousEpoch);
   const probes = listLiveProbeResults({
     threadId: context.thread_id,
     environmentId: context.environment_id ?? null,
@@ -489,16 +502,25 @@ const buildReplayAnswer = (input: {
         limit: 80,
       }).filter((entry) => selectedObservationSet.has(entry.observation_id))
     : [];
-  const previousObservation = ledger.find((entry) => entry.item_kind === "observation")?.summary ?? null;
   const selectedObservationSummary = selectedObservations
     .map((entry) => entry.text.trim())
     .filter(Boolean)
     .slice(-2)
     .join(" Then ");
+  const selectedPreviousObservation = selectedObservations.at(-2) ?? null;
+  const selectedCurrentObservation = selectedObservations.at(-1) ?? null;
+  const currentObservationLedger = ledger.filter((entry) => entry.item_kind === "observation").at(-1) ?? null;
+  const previousObservationLedger = previousEpochLedger.filter((entry) => entry.item_kind === "observation").at(-1) ?? null;
+  const currentObservation = currentObservationLedger?.summary ?? selectedCurrentObservation?.text.trim() ?? selectedObservationSummary;
+  const previousObservation = previousObservationLedger?.summary ?? selectedPreviousObservation?.text.trim() ?? null;
+  const currentObservationRef = currentObservationLedger?.item_ref ?? selectedCurrentObservation?.observation_id ?? null;
+  const previousObservationRef = previousObservationLedger?.item_ref ?? selectedPreviousObservation?.observation_id ?? null;
   const latestProbe = probes.at(-1) ?? null;
   return [
     `Epoch ${epoch} closed as ${closure?.status ?? "unknown"}.`,
-    line("Observation", previousObservation ?? selectedObservationSummary),
+    previousEpoch !== null ? `Compared against epoch ${previousEpoch}.` : "Previous epoch: no earlier bound epoch was selected.",
+    line("Previous observation", previousObservation),
+    line("Current observation", currentObservation),
     line("Scene", scene?.value),
     line("Activity", activity?.value),
     line("Objects", objects?.value),
@@ -506,10 +528,12 @@ const buildReplayAnswer = (input: {
     closure?.confidence_changes.length ? `Confidence changes: ${closure.confidence_changes.join(", ")}.` : "",
     closure?.pending_actions.length ? `Pending actions: ${closure.pending_actions.join(", ")}.` : "Arbitration did not require an action from this epoch.",
     `Evidence refs: ${[
+      previousObservationRef,
+      currentObservationRef,
       ...input.selection.selected_probe_result_refs,
       ...input.selection.selected_epoch_closure_refs,
       ...input.selection.selected_field_evaluation_refs,
-    ].slice(0, 8).join(", ") || "none selected"}.`,
+    ].filter(Boolean).slice(0, 8).join(", ") || "none selected"}.`,
     "Raw images, audio, and logs were not injected into Ask context.",
   ].filter(Boolean).join("\n");
 };

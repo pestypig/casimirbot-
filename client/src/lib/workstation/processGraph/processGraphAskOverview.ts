@@ -1,14 +1,21 @@
 import type { ProcessGraphContextPack } from "./buildProcessGraphContextPack";
 
 const OVERVIEW_PROMPT_PATTERN =
-  /\b(?:what(?:'s| is)\s+(?:happening|going on)|what\s+are\s+you\s+doing|what\s+tools\s+are\s+active|current\s+workspace|active\s+(?:jobs?|tools?|panels?|pipeline)|why\s+did\s+that\s+fail|what\s+changed|latest\s+(?:artifact|result|job))\b/i;
+  /\b(?:what(?:'s| is)\s+(?:happening|going on)|what\s+are\s+you\s+doing|what\s+(?:tools|artifacts)\s+are\s+active|current\s+workspace|active\s+(?:jobs?|tools?|panels?|pipeline|artifacts)|why\s+did\s+that\s+fail|what\s+changed|latest\s+(?:artifact|result|job))\b/i;
+
+const EXPLICIT_PROCESS_GRAPH_PROMPT_PATTERN =
+  /\b(?:workstation\s+overview|workstation\s+state|process\s+graph|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|what\s+artifacts\s+are\s+active|active\s+(?:artifacts|jobs?|tools?|panels?)|current\s+workspace)\b/i;
 
 const PROCEDURE_MEMORY_PROMPT_PATTERN =
-  /\b(?:last\s+(?:situation\s+)?epoch|situation\s+epoch|procedure\s+epoch|what\s+changed\s+in\s+the\s+last\s+(?:situation\s+)?epoch|show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|replay\s+(?:that|the\s+last)|visual\s+capture|live\s+source|current\s+screen|screen\s+capture|what\s+(?:am\s+i|are\s+we)\s+looking\s+at|(?:what\s+changed|describe\s+what\s+changed|compare\b.*)\s+since\s+(?:the\s+)?(?:last|previous)\s+(?:scene|frame|visual|screen)|(?:last|previous)\s+(?:scene|frame|visual)|scene\s+change|frame\s+change)\b/i;
+  /\b(?:last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|situation\s+epoch|procedure\s+epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|what\s+changed\s+in\s+the\s+last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+)?epoch|show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|replay\s+(?:that|the\s+last|the\s+procedure|procedure\s+memory)|procedure\s+memory|visual\s+capture|live\s+source|current\s+screen|screen\s+capture|what\s+(?:am\s+i|are\s+we)\s+looking\s+at|(?:what\s+changed|changed\s+since|describe\s+what\s+changed|compare\b.*)\s+(?:since\s+)?(?:the\s+)?(?:last|previous)\s+(?:seen\s+)?(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|since\s+last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|compare\s+(?:to\s+)?(?:the\s+)?last\s+(?:scene|frame|visual|screen|capture|epoch)|compare\s+current\s+scene|previous\s+(?:scene|frame|visual|screen|capture)|scene\s+change|frame\s+change|visual\s+delta|screen\s+delta)\b/i;
 
 export function shouldUseProcessGraphContextPack(prompt: string): boolean {
   const trimmed = prompt.trim();
-  return OVERVIEW_PROMPT_PATTERN.test(trimmed) && !PROCEDURE_MEMORY_PROMPT_PATTERN.test(trimmed);
+  const asksOverview = OVERVIEW_PROMPT_PATTERN.test(trimmed);
+  if (!asksOverview) return false;
+  const asksProcedureMemory = PROCEDURE_MEMORY_PROMPT_PATTERN.test(trimmed);
+  if (!asksProcedureMemory) return true;
+  return EXPLICIT_PROCESS_GRAPH_PROMPT_PATTERN.test(trimmed);
 }
 
 function formatList(
