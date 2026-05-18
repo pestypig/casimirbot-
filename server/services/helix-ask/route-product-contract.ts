@@ -47,6 +47,27 @@ const PROCEDURE_ALLOWED_TERMINAL_PRODUCTS = [
   "typed_failure",
 ];
 
+const REPO_CODE_ALLOWED_TERMINAL_PRODUCTS = [
+  "direct_answer_text",
+  "repo_code_evidence_answer",
+  "repo_entity_definition",
+  "tool_evaluation",
+  "workstation_tool_evaluation",
+  "request_user_input",
+  "typed_failure",
+];
+
+const REPO_CODE_FORBIDDEN_TERMINAL_PRODUCTS = [
+  "situation_context_pack",
+  "visual_context_pack",
+  "visual_frame_evidence",
+  "live_card_projection",
+  "active_doc_identity",
+  "doc_summary",
+  "doc_location_matches",
+  "doc_evidence_location",
+];
+
 const WORLD_ALLOWED_TERMINAL_PRODUCTS = [
   "situation_context_pack",
   "source_binding_status",
@@ -84,6 +105,11 @@ const normalizeSourceTarget = (
     sourceTarget === "active_doc" ||
     sourceTarget === "docs_viewer" ||
     sourceTarget === "active_note" ||
+    sourceTarget === "repo_code" ||
+    sourceTarget === "situation_epoch" ||
+    sourceTarget === "process_graph" ||
+    sourceTarget === "workstation_state" ||
+    sourceTarget === "general_background" ||
     sourceTarget === "procedure_memory" ||
     sourceTarget === "world_event" ||
     sourceTarget === "workspace_action" ||
@@ -154,6 +180,19 @@ export function buildRouteProductContract(input: {
       allowed_terminal_artifact_kinds: PROCEDURE_ALLOWED_TERMINAL_PRODUCTS,
       forbidden_terminal_artifact_kinds: [],
       precedence_reason: "procedure_memory_source_target_allows_recall_terminal_products",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (sourceTarget === "repo_code") {
+    return {
+      schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
+      turn_id: input.turnId,
+      source_target: "repo_code",
+      allowed_terminal_artifact_kinds: REPO_CODE_ALLOWED_TERMINAL_PRODUCTS,
+      forbidden_terminal_artifact_kinds: REPO_CODE_FORBIDDEN_TERMINAL_PRODUCTS,
+      precedence_reason: "repo_code_source_target_allows_only_repo_evidence_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
     };

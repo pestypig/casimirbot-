@@ -43,7 +43,10 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const mentionsLiveSurface =
     /\b(?:screen|screenshare|screen share|tab|window|visual|camera|frame|frames|source|live answer|live source|pipeline|share)\b/.test(text);
   const continuation =
-    /\b(?:keep|continue|watch|checking|check|monitor|track|look at|observe|process|analyze|analyse|describe|use)\b/.test(text);
+    /\b(?:keep|continue|watch|checking|check|monitor|track|look at|observe|process|analyze|analyse|use)\b/.test(text);
+  const contentQuestion =
+    /\b(?:describe|explain|summari[sz]e|what)\b[\s\S]{0,80}\b(?:see|seeing|visuals?|screen|capture|frame|image|picture|window)\b/.test(text) &&
+    !/\b(?:keep|continue|watch|checking|check|monitor|track|every\s+\d+|cadence|interval|rate|set\s+up|setup|start|create|turn on|enable|pipeline|live answer)\b/.test(text);
   const setup =
     /\b(?:start|setup|set up|create|make|turn on|enable)\b/.test(text) &&
     /\b(?:live answer|live source|pipeline|visual source|screen|tab|window)\b/.test(text);
@@ -89,7 +92,7 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
       raw_content_included: false,
     };
   }
-  if (mentionsLiveSurface && (continuation || rate)) {
+  if (!contentQuestion && mentionsLiveSurface && (continuation || rate)) {
     return {
       schema: "helix.live_source_continuation_intent.v1",
       kind: rate ? "live_pipeline_control" : "live_source_continuation",

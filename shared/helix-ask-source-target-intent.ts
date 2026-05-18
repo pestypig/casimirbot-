@@ -7,19 +7,44 @@ export type HelixAskSourceTarget =
   | "docs_viewer"
   | "active_doc"
   | "active_note"
+  | "repo_code"
+  | "situation_epoch"
+  | "process_graph"
+  | "workstation_state"
+  | "general_background"
   | "workspace_panel"
   | "procedure_memory"
   | "model_only"
   | "unknown";
+
+export type HelixAskSourceTargetStrength = "none" | "soft" | "hard";
+
+export type HelixAskSourceTargetRequestedOutput =
+  | "current_visual_state"
+  | "field_evaluation_refs"
+  | "interpretation_refs"
+  | "procedure_epoch_replay"
+  | "repo_code"
+  | "file_path"
+  | "line_backed_source"
+  | "implementation_location"
+  | "process_overview";
 
 export type HelixAskSourceTargetIntent = {
   schema: typeof HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA;
   turn_id: string;
   thread_id: string;
   target_source: HelixAskSourceTarget;
+  target_kind: HelixAskSourceTarget;
+  strength: HelixAskSourceTargetStrength;
   explicit_cues: string[];
+  reasons: string[];
+  requested_outputs: HelixAskSourceTargetRequestedOutput[];
   suppressed_routes: string[];
   precedence_reason: string;
+  must_enter_backend_ask: boolean;
+  allow_client_shortcut: boolean;
+  allow_no_tool_direct: boolean;
   confidence: number;
   assistant_answer: false;
   raw_content_included: false;

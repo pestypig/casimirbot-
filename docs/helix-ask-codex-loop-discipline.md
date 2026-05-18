@@ -183,6 +183,46 @@ Project-local entity definition prompts such as `What is StarSim?`, `What is
 NHM2?`, or `What is Helix Ask?` should use repo evidence unless the user
 explicitly asks for background-only or general-concept-only reasoning.
 
+## Source Target Admission
+
+Every source-targeted turn must bind a `helix.ask_source_target_intent.v1`
+record before route execution. The record is admission control, not answer
+content. It must state the target source, target kind, strength, requested
+outputs, and whether the turn must enter backend Ask.
+
+Hard source-targeted prompts must set:
+
+```txt
+must_enter_backend_ask = true
+allow_client_shortcut = false
+allow_no_tool_direct = false
+```
+
+This applies to visual capture/current screen prompts, procedure memory and
+situation-epoch prompts, docs-viewer evidence prompts, world-event prompts, and
+hard repo/code evidence prompts. These prompts may not be answered by a client
+process-graph shortcut, legacy projection, no-tool direct answer, or ambient
+workspace context.
+
+Client process-graph overview is allowed only for explicit workstation/process
+overview prompts. It must decline procedure-memory and source-target prompts
+such as:
+
+```txt
+What changed in the last situation epoch?
+Show the evidence.
+Why did you say that?
+Replay that.
+Explain what is in the visual capture.
+What is happening in the live source?
+What is on the current screen?
+```
+
+Procedure-memory prompts must terminate as `procedure_epoch_replay`,
+`procedure_memory_recall`, `situation_context_pack` with selected epoch
+evidence, or a typed procedure-memory failure. A process-graph overview is not
+a valid terminal product for those turns.
+
 Use these stable labels when a UI turn cannot be reconciled:
 
 ```txt

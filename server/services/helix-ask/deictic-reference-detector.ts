@@ -17,7 +17,7 @@ const repoCodeContextRe =
   /\b(?:repo|repository|code|source|implementation|module|contract|schema|route|endpoint|line-backed|line backed|file paths?|where is .* enforced)\b/i;
 
 const explicitScreenContextRe =
-  /\b(?:my screen|current screen|current window|current tab|visual capture|screen capture|visual source|visual frame|visual screen|looking at right now|clicking|clicked|selected|selected visible file|visible selected file|window i am viewing|screen i am viewing)\b/i;
+  /\b(?:my screen|current screen|current window|current tab|visual capture|screen capture|visual source|visual frame|visual screen|visuals|looking at right now|clicking|clicked|selected|selected visible file|visible selected file|window i am viewing|screen i am viewing)\b/i;
 
 export function detectDeicticReference(input: {
   threadId: string;
@@ -40,7 +40,7 @@ export function detectDeicticReference(input: {
           ? "selected_visible_file"
           : /\b(?:what\s+am\s+i\s+doing|doing\s+right\s+now|current\s+activity)\b/.test(text)
             ? "current_activity"
-            : /\b(?:what\s+am\s+i\s+looking\s+at|what\s+is\s+(?:in|inside)\s+(?:the\s+)?(?:visual\s+capture|screen\s+capture|visual\s+source|visual\s+frame)|what\s+is\s+on\s+(?:my|the)\s+screen|current\s+(?:screen|window|tab|folder|file|document|image|picture|photo)|latest\s+(?:visual|screen|frame|observation)|visual\s+capture|screen\s+capture|visual\s+source|visual\s+frame|screen|window|tab|folder|file|document|image|picture|photo|looking\s+at|viewing|can\s+you\s+see\s+(?:the\s+)?(?:screen|window|folder|file|document|image|picture|photo)|do\s+you\s+see\s+(?:the\s+)?(?:screen|window|folder|file|document|image|picture|photo))\b/.test(text)
+            : /\b(?:what\s+am\s+i\s+looking\s+at|what\s+is\s+(?:in|inside)\s+(?:the\s+)?(?:visual\s+capture|screen\s+capture|visual\s+source|visual\s+frame|visuals)|(?:describe|explain|summari[sz]e)\s+(?:what\s+)?(?:the\s+)?visuals\s+(?:are|show|contain|depict)|what\s+is\s+on\s+(?:my|the)\s+screen|current\s+(?:screen|window|tab|folder|file|document|image|picture|photo)|latest\s+(?:visual|screen|frame|observation)|visual\s+capture|screen\s+capture|visual\s+source|visual\s+frame|visuals|screen|window|tab|folder|file|document|image|picture|photo|looking\s+at|viewing|can\s+you\s+see\s+(?:the\s+)?(?:screen|window|folder|file|document|image|picture|photo)|do\s+you\s+see\s+(?:the\s+)?(?:screen|window|folder|file|document|image|picture|photo))\b/.test(text)
               ? "current_screen"
               : "unknown";
   const candidateSignal = referenceType !== "unknown";

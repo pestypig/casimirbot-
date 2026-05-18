@@ -297,7 +297,19 @@ describe("thread-bound situation context bridge", () => {
     const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
     expect(response.body?.source_target_intent).toMatchObject({
       target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
       precedence_reason: "explicit_visual_source_target",
+    });
+    expect(response.body?.ask_turn_preflight_context?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      must_enter_backend_ask: true,
+    });
+    expect(response.body?.route_product_contract).toMatchObject({
+      source_target: "visual_capture",
     });
     expect(response.body?.route_reason_code).toBe("situation_context_question");
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
@@ -315,6 +327,72 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
 
+  it("routes plural visuals description prompts through SituationRun evidence", async () => {
+    const { app } = await createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, can you describe what the visuals are?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+      })
+      .expect(200);
+
+    const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.ask_turn_preflight_context?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      must_enter_backend_ask: true,
+    });
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(response.body?.deictic_reference).toMatchObject({
+      reference_type: "current_screen",
+      candidate_signal: true,
+      resolution_status: "resolved",
+    });
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(finalAnswer).not.toContain("Visuals refer to images");
+    expect(finalAnswer).not.toContain("charts, graphs, and videos");
+    expect(finalAnswer).toMatch(/File Explorer|browsing|reviewing|organizing/i);
+  }, 60000);
+
+  it("does not treat visual screen content questions as live pipeline continuation", async () => {
+    const { app } = await createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Can you describe what we can see now in the visual screen capture?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+      })
+      .expect(200);
+
+    const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+    expect(finalAnswer).not.toContain("Visual capture is running every");
+    expect(finalAnswer).toMatch(/File Explorer|browsing|reviewing|organizing/i);
+  }, 60000);
+
   it("fail-closes explicit visual capture prompts without model-only concept answers when no visual evidence is bound", async () => {
     const { app } = await createApp();
     const response = await request(app)
@@ -330,7 +408,16 @@ describe("thread-bound situation context bridge", () => {
     const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
     expect(response.body?.source_target_intent).toMatchObject({
       target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
       precedence_reason: "explicit_visual_source_target",
+    });
+    expect(response.body?.ask_turn_preflight_context?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      must_enter_backend_ask: true,
     });
     expect(response.body?.route_reason_code).toBe("situation_context_question");
     expect(response.body?.deictic_reference).toMatchObject({
@@ -370,7 +457,16 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
     expect(response.body?.source_target_intent).toMatchObject({
       target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
       precedence_reason: "explicit_visual_source_target",
+    });
+    expect(response.body?.ask_turn_preflight_context?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      must_enter_backend_ask: true,
     });
     expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
     expect(response.body?.terminal_presentation?.concise_text).toBe(finalAnswer);
@@ -412,6 +508,11 @@ describe("thread-bound situation context bridge", () => {
     const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
     expect(response.body?.source_target_intent).toMatchObject({
       target_source: "docs_viewer",
+      target_kind: "docs_viewer",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
       precedence_reason: "explicit_docs_viewer_source_target",
     });
     expect(response.body?.route_product_contract).toMatchObject({
@@ -819,5 +920,31 @@ describe("thread-bound situation context bridge", () => {
     expect(recall.procedure_memory_recall?.snapshot_refs).toContain(first.reasoning_snapshot?.snapshot_id);
     expect(recall.answer_distillation?.assistant_answer).toBe(false);
     expect(recall.reasoning_snapshot?.assistant_answer).toBe(false);
+  });
+
+  it("routes scene-delta prompts through procedure replay", () => {
+    seedVisualSituationRun();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Okay, can you describe what changed since last scene?",
+      inputModality: "typed",
+      turnId: "ask:scene-delta",
+    });
+
+    expect(route.route).toBe("procedure_epoch_replay_question");
+    expect(route.deictic_reference.reference_type).toBe("latest_epoch_change");
+    expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
+      "Activity: Likely browsing, reviewing, or organizing visible workstation files.",
+    );
+    expect(route.procedure_memory_recall).toMatchObject({
+      schema: "helix.procedure_memory_recall.v1",
+      recall_type: "epoch_replay",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
+      "Raw images, audio, and logs were not injected into Ask context.",
+    );
   });
 });

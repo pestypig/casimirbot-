@@ -4,7 +4,7 @@ const OVERVIEW_PROMPT_PATTERN =
   /\b(?:what(?:'s| is)\s+(?:happening|going on)|what\s+are\s+you\s+doing|what\s+tools\s+are\s+active|current\s+workspace|active\s+(?:jobs?|tools?|panels?|pipeline)|why\s+did\s+that\s+fail|what\s+changed|latest\s+(?:artifact|result|job))\b/i;
 
 const PROCEDURE_MEMORY_PROMPT_PATTERN =
-  /\b(?:last\s+(?:situation\s+)?epoch|situation\s+epoch|procedure\s+epoch|what\s+changed\s+in\s+the\s+last\s+(?:situation\s+)?epoch|show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|replay\s+(?:that|the\s+last))\b/i;
+  /\b(?:last\s+(?:situation\s+)?epoch|situation\s+epoch|procedure\s+epoch|what\s+changed\s+in\s+the\s+last\s+(?:situation\s+)?epoch|show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|replay\s+(?:that|the\s+last)|visual\s+capture|live\s+source|current\s+screen|screen\s+capture|what\s+(?:am\s+i|are\s+we)\s+looking\s+at|(?:what\s+changed|describe\s+what\s+changed|compare\b.*)\s+since\s+(?:the\s+)?(?:last|previous)\s+(?:scene|frame|visual|screen)|(?:last|previous)\s+(?:scene|frame|visual)|scene\s+change|frame\s+change)\b/i;
 
 export function shouldUseProcessGraphContextPack(prompt: string): boolean {
   const trimmed = prompt.trim();

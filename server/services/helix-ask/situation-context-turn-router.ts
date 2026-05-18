@@ -27,6 +27,7 @@ import { detectDeicticReference } from "./deictic-reference-detector";
 import { selectSituationEvidence } from "./situation-evidence-selector";
 import { resolveActiveSituationContext } from "../situation-room/active-situation-context-resolver";
 import { repairUnboundVisualSituationContext } from "../situation-room/live-situation-context-binding-repair";
+import { listObservationJournalEntries } from "../situation-room/observation-journal-store";
 import { listLiveFieldEvaluations } from "../situation-room/live-field-evaluation-store";
 import { buildLiveContextWindowBinding } from "../situation-room/live-context-window-binding-builder";
 import { listProcedureEpochLedger } from "../situation-room/procedure-epoch-ledger-store";
@@ -71,6 +72,9 @@ const line = (label: string, value: string | null | undefined): string =>
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
+
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
 const isProcedureReplayPrompt = (prompt: string): boolean =>
   /\b(?:why\s+did|what\s+changed|last\s+(?:situation\s+)?epoch|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last)\b/i.test(prompt);
@@ -477,11 +481,27 @@ const buildReplayAnswer = (input: {
     situationRunId: context.situation_run_id,
     limit: 5,
   });
+  const { scene, activity, objects } = getSituationFields(context);
+  const selectedObservationSet = new Set(input.selection.selected_observation_refs);
+  const selectedObservations = selectedObservationSet.size > 0
+    ? listObservationJournalEntries({
+        threadId: context.thread_id,
+        limit: 80,
+      }).filter((entry) => selectedObservationSet.has(entry.observation_id))
+    : [];
   const previousObservation = ledger.find((entry) => entry.item_kind === "observation")?.summary ?? null;
+  const selectedObservationSummary = selectedObservations
+    .map((entry) => entry.text.trim())
+    .filter(Boolean)
+    .slice(-2)
+    .join(" Then ");
   const latestProbe = probes.at(-1) ?? null;
   return [
     `Epoch ${epoch} closed as ${closure?.status ?? "unknown"}.`,
-    line("Observation", previousObservation),
+    line("Observation", previousObservation ?? selectedObservationSummary),
+    line("Scene", scene?.value),
+    line("Activity", activity?.value),
+    line("Objects", objects?.value),
     latestProbe ? `Probe result: ${latestProbe.status}; signals: ${latestProbe.observed_signals.join(", ") || "none"}.` : "Probe result: no probe result was selected for this epoch.",
     closure?.confidence_changes.length ? `Confidence changes: ${closure.confidence_changes.join(", ")}.` : "",
     closure?.pending_actions.length ? `Pending actions: ${closure.pending_actions.join(", ")}.` : "Arbitration did not require an action from this epoch.",
@@ -595,12 +615,24 @@ export function routeSituationContextTurn(input: {
     activeContext,
     promptText: input.promptText,
   });
-  const resolvedActiveContext = bindingRepair?.status === "applied"
+  const baseResolvedActiveContext = bindingRepair?.status === "applied"
     ? resolveActiveSituationContext({
         threadId: bindingRepair.thread_id,
         environmentId: bindingRepair.environment_id,
       })
     : activeContext;
+  const resolvedActiveContext = bindingRepair?.status === "applied"
+    ? {
+        ...baseResolvedActiveContext,
+        latest_field_evaluation_refs: uniqueStrings([
+          ...baseResolvedActiveContext.latest_field_evaluation_refs,
+          ...bindingRepair.field_evaluation_refs,
+        ]),
+        status: baseResolvedActiveContext.status === "no_fresh_evidence"
+          ? "active" as const
+          : baseResolvedActiveContext.status,
+      }
+    : baseResolvedActiveContext;
   const answerStartedAt = input.answerStartedAt ?? new Date().toISOString();
   const liveContextWindowBinding = buildLiveContextWindowBinding({
     threadId: resolvedActiveContext.thread_id || input.threadId,

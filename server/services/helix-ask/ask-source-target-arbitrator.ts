@@ -2,12 +2,20 @@ import {
   HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA,
   type HelixAskSourceTarget,
   type HelixAskSourceTargetIntent,
+  type HelixAskSourceTargetRequestedOutput,
+  type HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
+import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 
 type CueRule = {
   target: HelixAskSourceTarget;
   reason: string;
   confidence: number;
+  strength: HelixAskSourceTargetStrength;
+  requestedOutputs: HelixAskSourceTargetRequestedOutput[];
+  targetKind?: HelixAskSourceTarget;
+  allowClientShortcut?: boolean;
+  allowNoToolDirect?: boolean;
   cues: Array<{ label: string; pattern: RegExp }>;
   suppressedRoutes: string[];
 };
@@ -17,11 +25,29 @@ const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
     .filter((cue) => cue.pattern.test(prompt))
     .map((cue) => cue.label);
 
+const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
+  const docsViewerCue =
+    /\bcurrent\s+docs?\s+viewer\s+context\b/i.test(prompt) ||
+    /\bdocs?\s+viewer\b/i.test(prompt);
+  const structuredPathCue = /^\s*Document\s+path\s*:/im.test(prompt);
+  const locateQueryCue = /^\s*Locate\s+query\s*:/im.test(prompt);
+  const locationsListCue =
+    /\bReturn\s+a\s+short\s+"?Locations:"?\s+list\b/i.test(prompt) ||
+    /\banchors?\/sections?\b/i.test(prompt) ||
+    /\bevidence\s+snippets?\b/i.test(prompt);
+  return (docsViewerCue && (structuredPathCue || locateQueryCue || locationsListCue)) ||
+    (structuredPathCue && locateQueryCue && locationsListCue);
+};
+
 const rules: CueRule[] = [
   {
     target: "docs_viewer",
     reason: "explicit_docs_viewer_source_target",
     confidence: 0.96,
+    strength: "hard",
+    requestedOutputs: ["file_path"],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
     suppressedRoutes: [
       "situation_context_question",
       "visual_deictic",
@@ -43,11 +69,17 @@ const rules: CueRule[] = [
     target: "visual_capture",
     reason: "explicit_visual_source_target",
     confidence: 0.94,
+    strength: "hard",
+    requestedOutputs: ["current_visual_state", "field_evaluation_refs", "interpretation_refs"],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
     suppressedRoutes: ["active_doc_identity", "active_doc_summary", "active_note", "doc_open_best"],
     cues: [
       { label: "visual_capture", pattern: /\bvisual\s+(?:screen\s+)?capture\b/i },
       { label: "screen_capture", pattern: /\bscreen\s+capture\b/i },
       { label: "visual_source", pattern: /\bvisual\s+(?:source|frame|screen)\b/i },
+      { label: "visuals_plural", pattern: /\b(?:the\s+)?visuals\b/i },
+      { label: "describe_visuals", pattern: /\b(?:describe|explain|summari[sz]e)\s+(?:what\s+)?(?:the\s+)?visuals\s+(?:are|show|contain|depict)\b/i },
       { label: "screen_share", pattern: /\bscreen\s+share\b/i },
       { label: "current_screen", pattern: /\b(?:current|latest)\s+(?:screen|visual|frame)\b/i },
       { label: "on_screen", pattern: /\bon\s+(?:my|the)\s+screen\b/i },
@@ -62,6 +94,10 @@ const rules: CueRule[] = [
     target: "world_event",
     reason: "explicit_world_event_source_target",
     confidence: 0.94,
+    strength: "hard",
+    requestedOutputs: ["procedure_epoch_replay"],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
     suppressedRoutes: ["active_doc_identity", "active_doc_summary", "situation_context_question"],
     cues: [
       { label: "minecraft", pattern: /\b(?:minecraft|minehut)\b/i },
@@ -74,6 +110,11 @@ const rules: CueRule[] = [
     target: "procedure_memory",
     reason: "explicit_procedure_memory_recall",
     confidence: 0.9,
+    strength: "hard",
+    requestedOutputs: ["procedure_epoch_replay"],
+    targetKind: "procedure_memory",
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
     suppressedRoutes: ["active_doc_identity", "active_doc_summary"],
     cues: [
       { label: "show_evidence", pattern: /\bshow\s+(?:the\s+)?evidence\b/i },
@@ -88,6 +129,10 @@ const rules: CueRule[] = [
     target: "active_doc",
     reason: "explicit_active_document_target",
     confidence: 0.88,
+    strength: "hard",
+    requestedOutputs: ["file_path"],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
     suppressedRoutes: ["situation_context_question"],
     cues: [
       { label: "active_doc", pattern: /\b(?:active|current|open)\s+(?:doc|document|paper)\b/i },
@@ -100,6 +145,10 @@ const rules: CueRule[] = [
     target: "active_note",
     reason: "explicit_active_note_target",
     confidence: 0.86,
+    strength: "hard",
+    requestedOutputs: [],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
     suppressedRoutes: ["active_doc_identity", "situation_context_question"],
     cues: [
       { label: "active_note", pattern: /\b(?:active|current|open)\s+note\b/i },
@@ -110,6 +159,11 @@ const rules: CueRule[] = [
     target: "workspace_panel",
     reason: "explicit_workspace_panel_target",
     confidence: 0.78,
+    strength: "soft",
+    requestedOutputs: ["process_overview"],
+    targetKind: "workstation_state",
+    allowClientShortcut: true,
+    allowNoToolDirect: false,
     suppressedRoutes: [],
     cues: [
       { label: "workspace_panel", pattern: /\b(?:panel|workspace|workstation|tab|dock)\b/i },
@@ -120,6 +174,11 @@ const rules: CueRule[] = [
     target: "model_only",
     reason: "explicit_model_only_target",
     confidence: 0.76,
+    strength: "hard",
+    requestedOutputs: [],
+    targetKind: "general_background",
+    allowClientShortcut: false,
+    allowNoToolDirect: true,
     suppressedRoutes: ["active_doc_identity", "active_doc_summary", "situation_context_question"],
     cues: [
       { label: "no_workspace", pattern: /\b(?:don't|do\s+not)\s+(?:use|look\s+at|check)\s+(?:workspace|docs|screen|visual|sources?)\b/i },
@@ -128,40 +187,150 @@ const rules: CueRule[] = [
   },
 ];
 
+const toSourceTargetIntent = (input: {
+  turnId: string;
+  threadId: string;
+  target: HelixAskSourceTarget;
+  targetKind?: HelixAskSourceTarget;
+  strength: HelixAskSourceTargetStrength;
+  explicitCues: string[];
+  reasons: string[];
+  requestedOutputs: HelixAskSourceTargetRequestedOutput[];
+  suppressedRoutes: string[];
+  precedenceReason: string;
+  confidence: number;
+  allowClientShortcut?: boolean;
+  allowNoToolDirect?: boolean;
+}): HelixAskSourceTargetIntent => {
+  const mustEnterBackendAsk =
+    input.target !== "unknown" &&
+    input.target !== "model_only" &&
+    input.allowNoToolDirect !== true;
+  return {
+    schema: HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    target_source: input.target,
+    target_kind: input.targetKind ?? input.target,
+    strength: input.strength,
+    explicit_cues: input.explicitCues,
+    reasons: input.reasons,
+    requested_outputs: Array.from(new Set(input.requestedOutputs)),
+    suppressed_routes: input.suppressedRoutes,
+    precedence_reason: input.precedenceReason,
+    must_enter_backend_ask: mustEnterBackendAsk,
+    allow_client_shortcut: input.allowClientShortcut ?? !mustEnterBackendAsk,
+    allow_no_tool_direct: input.allowNoToolDirect ?? !mustEnterBackendAsk,
+    confidence: input.confidence,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const mapRepoRequestedOutputs = (
+  outputs: ReturnType<typeof detectRepoCodeEvidenceIntent>["requestedOutputs"],
+): HelixAskSourceTargetRequestedOutput[] =>
+  outputs.flatMap((output) => {
+    if (output === "repo_code") return ["repo_code" as const];
+    if (output === "file_path") return ["file_path" as const];
+    if (output === "line_backed_source") return ["line_backed_source" as const];
+    if (output === "implementation_location") return ["implementation_location" as const];
+    return ["repo_code" as const];
+  });
+
 export function arbitrateAskSourceTarget(input: {
   turnId: string;
   threadId: string;
   promptText: string;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isStructuredDocsViewerPrompt(prompt)) {
+    const docsRule = rules.find((rule) => rule.target === "docs_viewer");
+    if (docsRule) {
+      const explicitCues = matches(prompt, docsRule.cues);
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target: docsRule.target,
+        targetKind: docsRule.targetKind,
+        strength: docsRule.strength,
+        explicitCues,
+        reasons: [docsRule.reason, ...explicitCues],
+        requestedOutputs: docsRule.requestedOutputs,
+        suppressedRoutes: docsRule.suppressedRoutes,
+        precedenceReason: docsRule.reason,
+        confidence: docsRule.confidence,
+        allowClientShortcut: docsRule.allowClientShortcut,
+        allowNoToolDirect: docsRule.allowNoToolDirect,
+      });
+    }
+  }
+  const repoIntent = detectRepoCodeEvidenceIntent(prompt);
+  if (repoIntent.repoEvidenceRequested) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "repo_code",
+      targetKind: "repo_code",
+      strength: repoIntent.strength,
+      explicitCues: repoIntent.reasons,
+      reasons: repoIntent.reasons,
+      requestedOutputs: mapRepoRequestedOutputs(repoIntent.requestedOutputs),
+      suppressedRoutes: [
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "active_doc_summary",
+        "active_note",
+        "doc_open_best",
+      ],
+      precedenceReason:
+        repoIntent.strength === "hard"
+          ? "explicit_repo_code_source_target"
+          : "project_local_entity_source_target",
+      confidence: repoIntent.strength === "hard" ? 0.97 : 0.82,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   for (const rule of rules) {
     const explicitCues = matches(prompt, rule.cues);
     if (explicitCues.length === 0) continue;
-    return {
-      schema: HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA,
-      turn_id: input.turnId,
-      thread_id: input.threadId,
-      target_source: rule.target,
-      explicit_cues: explicitCues,
-      suppressed_routes: rule.suppressedRoutes,
-      precedence_reason: rule.reason,
+    const targetKind =
+      rule.target === "procedure_memory" && explicitCues.some((cue) => /epoch|changed/i.test(cue))
+        ? "situation_epoch"
+        : rule.targetKind;
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: rule.target,
+      targetKind,
+      strength: rule.strength,
+      explicitCues,
+      reasons: [rule.reason, ...explicitCues],
+      requestedOutputs: rule.requestedOutputs,
+      suppressedRoutes: rule.suppressedRoutes,
+      precedenceReason: rule.reason,
       confidence: rule.confidence,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
+      allowClientShortcut: rule.allowClientShortcut,
+      allowNoToolDirect: rule.allowNoToolDirect,
+    });
   }
-  return {
-    schema: HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA,
-    turn_id: input.turnId,
-    thread_id: input.threadId,
-    target_source: "unknown",
-    explicit_cues: [],
-    suppressed_routes: [],
-    precedence_reason: "no_explicit_source_target",
+  return toSourceTargetIntent({
+    turnId: input.turnId,
+    threadId: input.threadId,
+    target: "unknown",
+    strength: "none",
+    explicitCues: [],
+    reasons: ["no_explicit_source_target"],
+    requestedOutputs: [],
+    suppressedRoutes: [],
+    precedenceReason: "no_explicit_source_target",
     confidence: 0.2,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
+    allowClientShortcut: true,
+    allowNoToolDirect: true,
+  });
 }
 
 export const sourceTargetSuppressesRoute = (

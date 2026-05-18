@@ -72,6 +72,19 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.final_answer_source).not.toBe("artifact_synthesis");
     expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_code_evidence_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      precedence_reason: "explicit_repo_code_source_target",
+    });
+    expect(response.body?.route_product_contract).toMatchObject({
+      source_target: "repo_code",
+    });
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("situation_context_pack");
     expect(response.body?.retrieval_required_signal?.required).toBe(true);
     expect(response.body?.retrieval_required_signal?.strength).toBe("hard");
     expect(response.body?.repo_claim_observation_gate).toBeTruthy();
@@ -92,6 +105,15 @@ describe("helix ask repo/code intent precedence", () => {
 
     expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_entity_definition");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      strength: "soft",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      precedence_reason: "project_local_entity_source_target",
+    });
     expect(response.body?.retrieval_required_signal?.required).toBe(true);
   }, 90000);
 
