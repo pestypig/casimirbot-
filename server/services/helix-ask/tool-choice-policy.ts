@@ -14,15 +14,6 @@ export type DecideHelixToolChoiceInput = {
   missing_requirements?: string[];
 };
 
-const hasLiveVisualDeicticCue = (prompt: string): boolean => {
-  const text = prompt.trim().toLowerCase();
-  if (!text) return false;
-  return (
-    /\b(?:right\s+now|currently|current|latest|this|that|these|those|here|on\s+(?:my|the)\s+screen|screen|window|tab|folder|file|document|image|picture|photo|selected|selection|clicking|clicked|looking\s+at|viewing|showing|show\s+you|about\s+to\s+show|can\s+you\s+see|do\s+you\s+see|what\s+am\s+i\s+(?:looking\s+at|doing)|what\s+is\s+(?:this|that))\b/.test(text) &&
-    /\b(?:see|show|screen|window|tab|folder|file|document|image|picture|photo|selected|selection|clicking|clicked|looking|viewing|compare|open|current|latest|right\s+now|doing)\b/.test(text)
-  );
-};
-
 export function decideHelixToolChoice(input: DecideHelixToolChoiceInput): HelixToolChoiceDecision {
   if (input.missing_requirements && input.missing_requirements.length > 0) {
     return {
@@ -40,27 +31,19 @@ export function decideHelixToolChoice(input: DecideHelixToolChoiceInput): HelixT
       turn_id: input.turn_id,
       decision: "workstation_tool_plan",
       selected_affordance_ids: input.workstation_tool_plan.steps
-        .filter((step) => step.panel_id && step.action_id)
-        .map((step) => `${step.panel_id}.${step.action_id}`),
+        .filter((step: HelixWorkstationToolPlan["steps"][number]) => step.panel_id && step.action_id)
+        .map((step: HelixWorkstationToolPlan["steps"][number]) => `${step.panel_id}.${step.action_id}`),
       reason: "Prompt maps to a receipt-backed workstation affordance before final answer.",
       confidence: 0.88,
     };
   }
-  if (
-    (input.active_live_environment_ids ?? []).length > 0 &&
-    (
-      /\b(?:current|latest|what.*happen|what.*changed|what.*prime|situation)\b/i.test(input.prompt) ||
-      hasLiveVisualDeicticCue(input.prompt)
-    )
-  ) {
+  if ((input.active_live_environment_ids ?? []).length > 0 && /\b(?:current|latest|what.*happen|what.*changed|what.*prime|situation)\b/i.test(input.prompt)) {
     return {
       schema: HELIX_TOOL_CHOICE_DECISION_SCHEMA,
       turn_id: input.turn_id,
       decision: "live_environment_synthesis",
       selected_affordance_ids: [],
-      reason: hasLiveVisualDeicticCue(input.prompt)
-        ? "Prompt refers to the active visual/workstation live environment."
-        : "Prompt is relevant to an active live environment.",
+      reason: "Prompt is relevant to an active live environment.",
       confidence: 0.72,
     };
   }
