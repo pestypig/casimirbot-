@@ -9,6 +9,7 @@ import {
   type HelixProcedureReasoningSnapshot,
 } from "@shared/helix-procedure-reasoning-snapshot";
 import type { HelixActiveSituationContext } from "@shared/helix-active-situation-context";
+import type { HelixLiveContextWindowBinding } from "@shared/helix-live-context-window-binding";
 import type {
   HelixDeicticInputModality,
   HelixDeicticReference,
@@ -27,6 +28,7 @@ import { selectSituationEvidence } from "./situation-evidence-selector";
 import { resolveActiveSituationContext } from "../situation-room/active-situation-context-resolver";
 import { repairUnboundVisualSituationContext } from "../situation-room/live-situation-context-binding-repair";
 import { listLiveFieldEvaluations } from "../situation-room/live-field-evaluation-store";
+import { buildLiveContextWindowBinding } from "../situation-room/live-context-window-binding-builder";
 import { listProcedureEpochLedger } from "../situation-room/procedure-epoch-ledger-store";
 import { listProcedureEpochClosures } from "../situation-room/procedure-epoch-closure";
 import { listLiveProbeResults } from "../situation-room/live-probe-result-store";
@@ -58,6 +60,7 @@ export type SituationContextTurnRoute = {
   reasoning_snapshot?: HelixProcedureReasoningSnapshot | null;
   answer_distillation?: HelixConversationalAnswerDistillation | null;
   procedure_memory_recall?: HelixProcedureMemoryRecall | null;
+  live_context_window_binding?: HelixLiveContextWindowBinding | null;
   comparison_session?: HelixVisualComparisonSession | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
   binding_repair?: ReturnType<typeof repairUnboundVisualSituationContext> | null;
@@ -149,14 +152,64 @@ const getSituationFields = (context: HelixActiveSituationContext) => {
         limit: 20,
       })
     : [];
-  const byField = new Map(evaluations.map((entry) => [entry.field_key, entry]));
+  const allowedEvaluationRefs = new Set(context.latest_field_evaluation_refs);
+  const scopedEvaluations = allowedEvaluationRefs.size > 0
+    ? evaluations.filter((entry) => allowedEvaluationRefs.has(entry.evaluation_id))
+    : evaluations;
+  const byField = new Map(scopedEvaluations.map((entry) => [entry.field_key, entry]));
   return {
-    evaluations,
+    evaluations: scopedEvaluations,
     scene: byField.get("scene") ?? byField.get("place") ?? null,
     activity: byField.get("activity") ?? null,
     objects: byField.get("objects") ?? byField.get("entities") ?? null,
     uncertainty: byField.get("uncertainty") ?? byField.get("missing_evidence") ?? null,
     nextCheck: byField.get("next_check") ?? null,
+  };
+};
+
+const filterActiveSituationContextByWindow = (
+  context: HelixActiveSituationContext,
+  binding: HelixLiveContextWindowBinding | null,
+  answerStartedAt: string,
+): HelixActiveSituationContext => {
+  if (!binding || !context.situation_run_id) return context;
+  const includedObservationRefs = new Set(binding.included_observation_refs);
+  const windowToMs = Date.parse(binding.window.to_ts);
+  const answerStartedMs = Date.parse(answerStartedAt);
+  const latestObservationRefs = context.latest_observation_refs.filter((ref) => includedObservationRefs.has(ref));
+  const evaluations = listLiveFieldEvaluations({
+    threadId: context.thread_id,
+    environmentId: context.environment_id ?? null,
+    situationRunId: context.situation_run_id,
+    limit: 100,
+  });
+  const latestFieldEvaluationRefs = context.latest_field_evaluation_refs.filter((ref) => {
+    const evaluation = evaluations.find((entry) => entry.evaluation_id === ref);
+    if (!evaluation) return false;
+    const createdMs = Date.parse(evaluation.created_at);
+    const createdBeforeAnchor = Number.isFinite(createdMs) && createdMs <= windowToMs;
+    const availableBeforeAnswer = Number.isFinite(createdMs) && createdMs <= answerStartedMs;
+    const refsIncluded = evaluation.evidence_refs.some((evidenceRef) => includedObservationRefs.has(evidenceRef));
+    return availableBeforeAnswer && (refsIncluded || createdBeforeAnchor);
+  });
+  const latestClosureRefs = context.latest_closure_refs.filter((ref) => {
+    if (latestObservationRefs.length > 0 || latestFieldEvaluationRefs.length > 0) return true;
+    return !binding.excluded_observation_refs.some((entry) => entry.reason === "after_anchor");
+  });
+  const status =
+    context.status === "active" && latestObservationRefs.length === 0 && latestFieldEvaluationRefs.length === 0
+      ? "no_fresh_evidence"
+      : context.status;
+  return {
+    ...context,
+    latest_observation_refs: latestObservationRefs,
+    latest_field_evaluation_refs: latestFieldEvaluationRefs,
+    latest_closure_refs: latestClosureRefs,
+    status,
+    freshness_summary:
+      status === "no_fresh_evidence"
+        ? "Active SituationRun exists, but no observations were inside the turn's live context window."
+        : context.freshness_summary,
   };
 };
 
@@ -446,6 +499,13 @@ export function routeSituationContextTurn(input: {
   promptText: string;
   inputModality?: HelixDeicticInputModality;
   turnId?: string | null;
+  submittedAt?: string | null;
+  speechStartAt?: string | null;
+  speechEndAt?: string | null;
+  serverReceivedAt?: string | null;
+  answerStartedAt?: string | null;
+  lookbackMs?: number;
+  liveTailPolicy?: "strict_past" | "live_tail_explicit" | "procedure_continuation";
 }): SituationContextTurnRoute {
   const turnId = input.turnId ?? `situation_context_turn:${hashShort([
     input.threadId,
@@ -504,6 +564,7 @@ export function routeSituationContextTurn(input: {
         snapshot: latestSnapshot,
         distillation: latestDistillation,
       }),
+      live_context_window_binding: null,
       comparison_session: null,
       voice_live_handoff: null,
       binding_repair: null,
@@ -524,6 +585,7 @@ export function routeSituationContextTurn(input: {
       reasoning_snapshot: null,
       answer_distillation: null,
       procedure_memory_recall: null,
+      live_context_window_binding: null,
       comparison_session: null,
       voice_live_handoff: null,
       binding_repair: null,
@@ -539,11 +601,31 @@ export function routeSituationContextTurn(input: {
         environmentId: bindingRepair.environment_id,
       })
     : activeContext;
-  const resolutionStatus: HelixDeicticResolutionStatus = resolvedActiveContext.status === "active"
+  const answerStartedAt = input.answerStartedAt ?? new Date().toISOString();
+  const liveContextWindowBinding = buildLiveContextWindowBinding({
+    threadId: resolvedActiveContext.thread_id || input.threadId,
+    turnId,
+    questionText: input.promptText,
+    anchorKind: input.inputModality === "voice" ? "voice_direct_address" : "typed_user_prompt",
+    anchorSourceId: input.inputModality === "voice" ? "voice_input" : "typed_prompt",
+    speechStartAt: input.speechStartAt ?? null,
+    speechEndAt: input.speechEndAt ?? null,
+    submittedAt: input.submittedAt ?? answerStartedAt,
+    serverReceivedAt: input.serverReceivedAt ?? answerStartedAt,
+    answerStartedAt,
+    lookbackMs: input.lookbackMs ?? (/\bwhat\s+just\s+happened\b/i.test(input.promptText) ? 90_000 : 60_000),
+    tailPolicy: input.liveTailPolicy ?? "strict_past",
+  });
+  const temporalActiveContext = filterActiveSituationContextByWindow(
+    resolvedActiveContext,
+    liveContextWindowBinding,
+    answerStartedAt,
+  );
+  const resolutionStatus: HelixDeicticResolutionStatus = temporalActiveContext.status === "active"
       ? "resolved"
-    : resolvedActiveContext.status === "stale"
+    : temporalActiveContext.status === "stale"
       ? "stale"
-      : resolvedActiveContext.status === "unbound"
+      : temporalActiveContext.status === "unbound"
         ? "unbound_source"
         : "missing_context";
   const deicticReference = {
@@ -551,16 +633,16 @@ export function routeSituationContextTurn(input: {
     resolved_context_refs: [
       resolvedActiveContext.context_id,
       resolvedActiveContext.situation_run_id ?? "",
-      ...resolvedActiveContext.latest_observation_refs,
-      ...resolvedActiveContext.latest_field_evaluation_refs,
-      ...resolvedActiveContext.latest_probe_result_refs,
-      ...resolvedActiveContext.latest_closure_refs,
+      ...temporalActiveContext.latest_observation_refs,
+      ...temporalActiveContext.latest_field_evaluation_refs,
+      ...temporalActiveContext.latest_probe_result_refs,
+      ...temporalActiveContext.latest_closure_refs,
     ].filter(Boolean),
     resolution_status: resolutionStatus,
   };
   const selection = selectSituationEvidence({
     threadId: input.threadId,
-    activeContext: resolvedActiveContext,
+    activeContext: temporalActiveContext,
     deicticReference,
     askingHistory: isProcedureReplayPrompt(input.promptText),
   });
@@ -576,34 +658,35 @@ export function routeSituationContextTurn(input: {
     return {
       route: "situation_context_question",
       deictic_reference: deicticReference,
-      active_situation_context: activeContext,
+      active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
       answer_text: [
         "I resolved this as a live situation-context question, but there is no server-bound active SituationRun evidence to answer from yet.",
         bindingRepair?.status === "failed"
           ? "I attempted to bind the live visual source into a SituationRun, but the repair failed."
           : selection.answerability_reason,
-        `Next required action: ${activeContext.next_required_action ?? "start or bind a live source"}.`,
+        `Next required action: ${temporalActiveContext.next_required_action ?? "start or bind a live source"}.`,
       ].join(" "),
       reasoning_snapshot: null,
       answer_distillation: null,
       procedure_memory_recall: null,
+      live_context_window_binding: liveContextWindowBinding,
       comparison_session: null,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
     };
   }
-  if (isComparisonPrompt(input.promptText) && resolvedActiveContext.situation_run_id && resolvedActiveContext.latest_observation_refs[0]) {
+  if (isComparisonPrompt(input.promptText) && temporalActiveContext.situation_run_id && temporalActiveContext.latest_observation_refs[0]) {
     const comparisonSession = createVisualComparisonSession({
       threadId: input.threadId,
-      situationRunId: resolvedActiveContext.situation_run_id,
-      baselineEpoch: resolvedActiveContext.latest_epoch ?? 0,
-      baselineObservationRef: resolvedActiveContext.latest_observation_refs.at(-1) ?? resolvedActiveContext.latest_observation_refs[0],
+      situationRunId: temporalActiveContext.situation_run_id,
+      baselineEpoch: temporalActiveContext.latest_epoch ?? 0,
+      baselineObservationRef: temporalActiveContext.latest_observation_refs.at(-1) ?? temporalActiveContext.latest_observation_refs[0],
     });
     return {
       route: "visual_comparison_setup",
       deictic_reference: deicticReference,
-      active_situation_context: resolvedActiveContext,
+      active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
       answer_text: [
         "I saved the current visual SituationRun observation as the comparison baseline.",
@@ -613,18 +696,19 @@ export function routeSituationContextTurn(input: {
       reasoning_snapshot: null,
       answer_distillation: null,
       procedure_memory_recall: null,
+      live_context_window_binding: liveContextWindowBinding,
       comparison_session: comparisonSession,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
     };
   }
   if (isProcedureReplayPrompt(input.promptText) || deicticReference.reference_type === "latest_epoch_change") {
-    const fullReasoning = buildReplayAnswer({ activeContext: resolvedActiveContext, selection });
+    const fullReasoning = buildReplayAnswer({ activeContext: temporalActiveContext, selection });
     const distillationBundle = recordReasoningAndDistillation({
       turnId,
       threadId: input.threadId,
       prompt: input.promptText,
-      activeContext: resolvedActiveContext,
+      activeContext: temporalActiveContext,
       selection,
       sourceAnswerKind: "procedure_epoch_replay",
       fullReasoningSummary: fullReasoning,
@@ -638,7 +722,7 @@ export function routeSituationContextTurn(input: {
     return {
       route: "procedure_epoch_replay_question",
       deictic_reference: deicticReference,
-      active_situation_context: resolvedActiveContext,
+      active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
       answer_text: distillationBundle.terminalText,
       reasoning_snapshot: distillationBundle.snapshot,
@@ -647,11 +731,12 @@ export function routeSituationContextTurn(input: {
         threadId: input.threadId,
         turnId,
         prompt: input.promptText,
-        activeContext: resolvedActiveContext,
+        activeContext: temporalActiveContext,
         selection,
         snapshot: distillationBundle.snapshot,
         distillation: distillationBundle.distillation,
       }),
+      live_context_window_binding: liveContextWindowBinding,
       comparison_session: null,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
@@ -663,19 +748,19 @@ export function routeSituationContextTurn(input: {
   });
   const fullReasoning = buildSituationFullReasoning({
     prompt: input.promptText,
-    activeContext: resolvedActiveContext,
+    activeContext: temporalActiveContext,
     selection,
   });
   const concise = buildConciseSituationAnswer({
     prompt: input.promptText,
-    activeContext: resolvedActiveContext,
+    activeContext: temporalActiveContext,
     style,
   });
   const distillationBundle = recordReasoningAndDistillation({
     turnId,
     threadId: input.threadId,
     prompt: input.promptText,
-    activeContext: resolvedActiveContext,
+    activeContext: temporalActiveContext,
     selection,
     sourceAnswerKind: "situation_context_question",
     fullReasoningSummary: fullReasoning,
@@ -686,12 +771,13 @@ export function routeSituationContextTurn(input: {
   return {
     route: "situation_context_question",
     deictic_reference: deicticReference,
-    active_situation_context: resolvedActiveContext,
+    active_situation_context: temporalActiveContext,
     situation_evidence_selection: selection,
     answer_text: distillationBundle.terminalText,
     reasoning_snapshot: distillationBundle.snapshot,
     answer_distillation: distillationBundle.distillation,
     procedure_memory_recall: null,
+    live_context_window_binding: liveContextWindowBinding,
     comparison_session: null,
     voice_live_handoff: voiceLiveHandoff,
     binding_repair: bindingRepair,

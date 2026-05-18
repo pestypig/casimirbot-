@@ -16,6 +16,13 @@ const cleanString = (value: unknown): string | null =>
 const cleanStrings = (values: unknown): string[] =>
   Array.isArray(values) ? Array.from(new Set(values.map(cleanString).filter(Boolean) as string[])) : [];
 
+const normalizeTimestamp = (value: unknown, fallback: string): string => {
+  const raw = cleanString(value);
+  if (!raw) return fallback;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
+};
+
 const normalizeRole = (value: unknown): HelixObservationJournalRole => {
   if (
     value === "raw_source_event" ||
@@ -42,7 +49,10 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
   if (role === "raw_source_event" && forbiddenObservationTerms.test(text)) {
     throw new Error("plain_log_rejects_inferred_intent");
   }
-  const now = cleanString(input.created_at ?? input.createdAt) ?? new Date().toISOString();
+  const now = normalizeTimestamp(input.created_at ?? input.createdAt, new Date().toISOString());
+  const observedAt = normalizeTimestamp(input.observed_at ?? input.observedAt ?? input.event_ts ?? input.eventTs, now);
+  const ingestedAt = normalizeTimestamp(input.ingested_at ?? input.ingestedAt, now);
+  const availableAt = normalizeTimestamp(input.available_at ?? input.availableAt ?? input.finalized_at ?? input.finalizedAt, ingestedAt);
   const entry: HelixObservationJournalEntry = {
     schema: HELIX_OBSERVATION_JOURNAL_ENTRY_SCHEMA,
     observation_id: cleanString(input.observation_id ?? input.observationId) ?? `observation:${hashShort([threadId, role, text, now])}`,
@@ -55,6 +65,14 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
     evidence_refs: cleanStrings(input.evidence_refs ?? input.evidenceRefs),
     model_invoked: input.model_invoked === true,
     confidence: typeof input.confidence === "number" ? Math.max(0, Math.min(1, input.confidence)) : null,
+    observed_at: observedAt,
+    ingested_at: ingestedAt,
+    available_at: availableAt,
+    source_seq: typeof input.source_seq === "number" && Number.isFinite(input.source_seq)
+      ? Math.trunc(input.source_seq)
+      : typeof input.sourceSeq === "number" && Number.isFinite(input.sourceSeq)
+        ? Math.trunc(input.sourceSeq)
+        : null,
     replay_status:
       input.replay_status === "replayed"
         ? "replayed"

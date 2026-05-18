@@ -114,6 +114,48 @@ The loop can rank evidence, but it cannot promote one lane to answer authority
 without passing the same proof/coverage gates. A live source is equal in
 identity to repo grep or telemetry: useful evidence, not final truth.
 
+## UI Turn Discipline
+
+Live UI tests are source-identity tests, not demos. Treat the browser-visible
+turn, streaming transport, non-streamed backend route, debug export, and evidence
+observations as equal live sources that must reconcile to the same terminal
+turn.
+
+A Helix Ask UI turn has not passed until all of these are true:
+
+1. The UI emits exactly one terminal visible result: final answer, typed failure,
+   or fail-closed result.
+2. The terminal visible result matches the backend terminal payload for the same
+   turn.
+3. The stream closes after the terminal event; it must not leave the user in an
+   indefinite `Thinking` state.
+4. The visible turn id or trace id can retrieve the debug/export payload.
+5. Repo-grounded turns include `repo_claim_observation_gate`,
+   `repo_claim_support`, and observation-backed sources when implementation
+   claims are present.
+
+Streaming and non-streamed routes are two presentations of the same turn
+contract. `/api/agi/ask/turn/stream` may expose progress events, but only the
+gated terminal payload is answer authority. `/api/agi/ask/turn` must return an
+equivalent terminal payload for the same request class and must not crash or
+drop the dev server when the streamed route would emit a typed failure.
+
+Model timeouts, missing terminal events, lost debug exports, and connection
+drops are runtime failures. Do not classify them as retrieval, observation, or
+repo-claim gate failures unless the terminal debug payload proves that the
+retrieval/gate stage actually ran.
+
+Use these stable labels when a UI turn cannot be reconciled:
+
+```txt
+turn_terminal_event_missing
+turn_stream_backend_mismatch
+turn_debug_export_missing
+turn_non_streamed_route_dropped
+turn_model_direct_answer_timeout
+repo_claim_gate_trace_missing
+```
+
 ## Non-Redundancy Test
 
 Before adding Helix Ask backend logic, answer these questions:

@@ -19,6 +19,27 @@ const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
 
 const rules: CueRule[] = [
   {
+    target: "docs_viewer",
+    reason: "explicit_docs_viewer_source_target",
+    confidence: 0.96,
+    suppressedRoutes: [
+      "situation_context_question",
+      "visual_deictic",
+      "visual_frame_evidence",
+      "active_doc_identity",
+      "active_doc_summary",
+    ],
+    cues: [
+      { label: "current_docs_viewer_context", pattern: /\bcurrent\s+docs?\s+viewer\s+context\b/i },
+      { label: "docs_viewer", pattern: /\bdocs?\s+viewer\b/i },
+      { label: "document_path_field", pattern: /^\s*Document\s+path\s*:/im },
+      { label: "locate_query_field", pattern: /^\s*Locate\s+query\s*:/im },
+      { label: "locations_list", pattern: /\bReturn\s+a\s+short\s+"?Locations:"?\s+list\b/i },
+      { label: "anchors_sections", pattern: /\banchors?\/sections?\b/i },
+      { label: "evidence_snippets", pattern: /\bevidence\s+snippets?\b/i },
+    ],
+  },
+  {
     target: "visual_capture",
     reason: "explicit_visual_source_target",
     confidence: 0.94,

@@ -4,6 +4,7 @@ export const HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA =
 export type HelixAskSourceTarget =
   | "visual_capture"
   | "world_event"
+  | "docs_viewer"
   | "active_doc"
   | "active_note"
   | "workspace_panel"

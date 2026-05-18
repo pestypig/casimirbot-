@@ -21,6 +21,10 @@ export type HelixObservationJournalEntry = {
   evidence_refs: string[];
   model_invoked: boolean;
   confidence?: number | null;
+  observed_at: string;
+  ingested_at: string;
+  available_at: string;
+  source_seq?: number | null;
   replay_status?: "live" | "replayed" | null;
   source_binding_id?: string | null;
   raw_image_ref?: string | null;

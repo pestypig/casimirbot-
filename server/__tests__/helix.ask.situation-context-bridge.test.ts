@@ -115,6 +115,24 @@ const seedVisualSituationRun = () => {
   return { environment, run, observation };
 };
 
+const seedTemporalVisualSituationRun = () => {
+  const now = "2026-05-18T12:00:00.000Z";
+  const { environment } = createLiveAnswerEnvironment({
+    thread_id: "helix-ask:desktop",
+    created_turn_id: "ask:temporal-seed",
+    objective: "Use time-windowed visual observations.",
+    preset: "custom",
+    source_ids: ["visual_source:temporal"],
+    now,
+  });
+  const run = ensureLiveSituationRunForEnvironment({
+    environment,
+    advanceEpoch: false,
+    now,
+  });
+  return { environment, run };
+};
+
 describe("thread-bound situation context bridge", () => {
   beforeEach(() => {
     resetLiveAnswerEnvironments();
@@ -293,6 +311,61 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
 
+  it("does not let visual SituationRun hijack structured docs-viewer locate prompts", async () => {
+    const { app } = await createApp();
+    seedVisualSituationRun();
+    const question = [
+      "Find where this topic is addressed in the current docs viewer context.",
+      "Return a short \"Locations:\" list with anchors/sections and one-line evidence snippets.",
+      "Document path: docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      "Locate query: \"Okay, can you open up Docs and read me the latest NHM2 white paper?\"",
+    ].join("\n");
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+        workspace_context_snapshot: {
+          sessionId: "helix-ask:desktop",
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      })
+      .expect(200);
+
+    const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "docs_viewer",
+      precedence_reason: "explicit_docs_viewer_source_target",
+    });
+    expect(response.body?.route_product_contract).toMatchObject({
+      schema: "helix.route_product_contract.v1",
+      source_target: "docs_viewer",
+    });
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("situation_context_pack");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_location_result");
+    expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
+    expect(finalAnswer).toContain("Locations:");
+    expect(finalAnswer).not.toContain("File Explorer");
+    expect(finalAnswer).not.toContain("visible workstation files");
+    expect(response.body?.route_history_debug?.rejected_route_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route: "situation_context_question",
+          target_source: "docs_viewer",
+        }),
+      ]),
+    );
+    expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 60000);
+
   it("ask turn keeps missing live context inside the situation bridge instead of model-only fallback", async () => {
     const { app } = await createApp();
     const response = await request(app)
@@ -344,6 +417,178 @@ describe("thread-bound situation context bridge", () => {
     });
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
+
+  it("freezes live visual context at the ask timestamp and excludes post-anchor observations", () => {
+    const { run } = seedTemporalVisualSituationRun();
+    const inventoryObservation = appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: "observation:inventory-open",
+      kind: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: "visual_source:temporal",
+      text: "The player has the inventory open.",
+      evidence_refs: ["visual_frame:inventory"],
+      model_invoked: true,
+      confidence: 0.84,
+      observed_at: "2026-05-18T12:00:08.000Z",
+      created_at: "2026-05-18T12:00:08.500Z",
+      available_at: "2026-05-18T12:00:09.000Z",
+    });
+    appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: "observation:cave-entered",
+      kind: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: "visual_source:temporal",
+      text: "The player has entered a cave.",
+      evidence_refs: ["visual_frame:cave"],
+      model_invoked: true,
+      confidence: 0.82,
+      observed_at: "2026-05-18T12:00:12.000Z",
+      created_at: "2026-05-18T12:00:12.500Z",
+      available_at: "2026-05-18T12:00:13.000Z",
+    });
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:scene:inventory",
+      worker_run_id: "field_worker_run:scene:inventory",
+      worker_id: "field_worker:scene",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: "The visible screen shows an open inventory.",
+      status: "supported",
+      confidence: 0.8,
+      evidence_refs: [inventoryObservation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Watch for inventory changes.",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: "2026-05-18T12:00:09.000Z",
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:scene:cave",
+      worker_run_id: "field_worker_run:scene:cave",
+      worker_id: "field_worker:scene",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: "The visible screen shows the player entering a cave.",
+      status: "supported",
+      confidence: 0.8,
+      evidence_refs: ["observation:cave-entered"],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Watch for hostile mobs.",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: "2026-05-18T12:00:13.000Z",
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Dottie, what am I doing?",
+      inputModality: "voice",
+      speechEndAt: "2026-05-18T12:00:10.000Z",
+      serverReceivedAt: "2026-05-18T12:00:14.000Z",
+      answerStartedAt: "2026-05-18T12:00:14.000Z",
+    });
+
+    expect(route.route).toBe("situation_context_question");
+    expect(route.live_context_window_binding?.window.to_ts).toBe("2026-05-18T12:00:10.000Z");
+    expect(route.live_context_window_binding?.included_observation_refs).toContain("observation:inventory-open");
+    expect(route.live_context_window_binding?.excluded_observation_refs).toEqual(
+      expect.arrayContaining([
+        { ref: "observation:cave-entered", reason: "after_anchor" },
+      ]),
+    );
+    expect(route.situation_evidence_selection.selected_observation_refs).toContain("observation:inventory-open");
+    expect(route.situation_evidence_selection.selected_observation_refs).not.toContain("observation:cave-entered");
+    expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:scene:inventory");
+    expect(route.situation_evidence_selection.selected_field_evaluation_refs).not.toContain("field_eval:scene:cave");
+    expect(String(route.answer_text ?? "")).toContain("inventory");
+    expect(String(route.answer_text ?? "")).not.toContain("cave");
+  });
+
+  it("allows late-arriving pre-anchor observations only when available before answer start", () => {
+    const { run } = seedTemporalVisualSituationRun();
+    appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: "observation:late-frame",
+      kind: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: "visual_source:temporal",
+      text: "A frame captured before the question shows the player opening a chest.",
+      evidence_refs: ["visual_frame:late"],
+      model_invoked: true,
+      confidence: 0.84,
+      observed_at: "2026-05-18T12:00:08.000Z",
+      created_at: "2026-05-18T12:00:10.500Z",
+      available_at: "2026-05-18T12:00:10.500Z",
+    });
+    appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: "observation:late-translation",
+      kind: "transcript_observation",
+      modality: "audio_transcript",
+      source_id: "translation:guest",
+      text: "A translation became available after the answer started.",
+      evidence_refs: ["translation:late"],
+      model_invoked: false,
+      confidence: 0.8,
+      observed_at: "2026-05-18T12:00:07.000Z",
+      created_at: "2026-05-18T12:00:12.000Z",
+      available_at: "2026-05-18T12:00:12.000Z",
+    });
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:scene:late-frame",
+      worker_run_id: "field_worker_run:scene:late-frame",
+      worker_id: "field_worker:scene",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: "The visible screen shows a chest being opened.",
+      status: "supported",
+      confidence: 0.8,
+      evidence_refs: ["observation:late-frame"],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Watch for item transfer.",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: "2026-05-18T12:00:10.500Z",
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "What am I looking at?",
+      inputModality: "typed",
+      submittedAt: "2026-05-18T12:00:11.000Z",
+      answerStartedAt: "2026-05-18T12:00:11.000Z",
+    });
+
+    expect(route.live_context_window_binding?.included_observation_refs).toContain("observation:late-frame");
+    expect(route.live_context_window_binding?.excluded_observation_refs).toEqual(
+      expect.arrayContaining([
+        { ref: "observation:late-translation", reason: "not_available_before_answer" },
+      ]),
+    );
+    expect(route.situation_evidence_selection.selected_observation_refs).toContain("observation:late-frame");
+    expect(String(route.answer_text ?? "")).toContain("chest");
+    expect(String(route.answer_text ?? "")).not.toContain("translation");
+  });
 
   it("distills visible folder evidence into a grammatical file answer", () => {
     const { run, observation } = seedVisualSituationRun();
