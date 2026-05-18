@@ -131,6 +131,69 @@ const summarizeVisibleContext = (value: string | null | undefined): string => {
   return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trim()}...` : firstSentence;
 };
 
+const stripSceneLeadIn = (value: string): string => {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  return cleaned
+    .replace(/^(?:the\s+)?(?:visible\s+scene|current\s+live\s+frame|live\s+frame|current\s+frame|image|screen)\s+(?:showcases|shows|depicts|displays|features|contains)\s+/i, "")
+    .replace(/^(?:the\s+)?(?:active\s+context|ui)\s+(?:appears\s+to\s+be|suggests)\s+/i, "")
+    .trim();
+};
+
+const extractLabeledContainer = (value: string): { kind: string; label: string } | null => {
+  const text = value.replace(/\s+/g, " ").trim();
+  const match = text.match(/\b(file\s+directory|directory|folder|interface|window)\s+(?:labeled|named|titled)\s+"([^"]+)"/i);
+  if (!match?.[1] || !match[2]) return null;
+  const rawKind = match[1].toLowerCase();
+  const kind = rawKind === "file directory" ? "folder" : rawKind;
+  return { kind, label: match[2].replace(/[.,;\s]+$/, "") };
+};
+
+const inferVisibleContentPhrase = (input: {
+  scene: string | null | undefined;
+  objects: string | null | undefined;
+}): string => {
+  const text = `${input.scene ?? ""} ${input.objects ?? ""}`.toLowerCase();
+  const content: string[] = [];
+  if (/\bsolar|sdo|sun|flare|magnetic|dynamics|observator/.test(text)) {
+    content.push("solar-observation");
+  }
+  if (/\bvideo|\.mp4|\.mov\b/.test(text)) {
+    content.push("video");
+  }
+  if (/\bimage|\.png|\.jpg|diagram|graph|chart/.test(text)) {
+    content.push("image");
+  }
+  if (/\bpdf|document/.test(text)) {
+    content.push("document");
+  }
+  if (content.length === 0) return "visible file entries";
+  const unique = Array.from(new Set(content));
+  if (unique.length === 1) return `${unique[0]} files`;
+  if (unique[0] === "solar-observation") {
+    return `solar-observation ${unique.slice(1).join(" and ")} files`;
+  }
+  return `${unique.join(" and ")} files`;
+};
+
+const summarizeVisibleWorkspace = (input: {
+  prompt: string;
+  scene: string | null | undefined;
+  objects: string | null | undefined;
+}): string => {
+  const source = input.scene ?? input.objects ?? null;
+  const sceneSummary = summarizeVisibleContext(source);
+  const stripped = stripSceneLeadIn(sceneSummary);
+  const labeled = extractLabeledContainer(source ?? "");
+  const contentPhrase = inferVisibleContentPhrase({ scene: input.scene, objects: input.objects });
+  if (labeled) {
+    return `a ${labeled.kind} labeled "${labeled.label}" with ${contentPhrase}`;
+  }
+  if (!stripped || stripped === "the active visual workspace") {
+    return "the active visual workspace";
+  }
+  return stripped.replace(/\.$/, "");
+};
+
 const buildConciseSituationAnswer = (input: {
   prompt: string;
   activeContext: HelixActiveSituationContext;
@@ -138,10 +201,15 @@ const buildConciseSituationAnswer = (input: {
 }): { concise: string; caveat: string | null } => {
   const { scene, activity, objects, uncertainty } = getSituationFields(input.activeContext);
   const prompt = input.prompt;
+  const visible = summarizeVisibleWorkspace({
+    prompt,
+    scene: scene?.value,
+    objects: objects?.value,
+  });
+  const asksAboutSpecificFile = /\b(?:what|which|describe|see)\b[\s\S]{0,80}\bfile\b|\bfile\s+(?:i'm|i am|am i|that i'm|that i am)\s+(?:looking|clicking|viewing)\b/i.test(prompt);
   if (/\b(?:equation|formula)\b/i.test(prompt)) {
-    const visible = summarizeVisibleContext(scene?.value ?? objects?.value);
     return {
-      concise: `You're looking at ${visible}, but I can't identify a specific equation until a readable formula or opened file is visible.`,
+      concise: `You're viewing ${visible}, but I can't identify a specific equation until a readable formula or opened file is visible.`,
       caveat: null,
     };
   }
@@ -151,11 +219,16 @@ const buildConciseSituationAnswer = (input: {
       caveat: null,
     };
   }
+  if (asksAboutSpecificFile) {
+    return {
+      concise: `You're viewing ${visible}, but I can't confirm a specific selected file from the current evidence.`,
+      caveat: null,
+    };
+  }
   if (/\b(?:file|folder|looking at|screen|this|now)\b/i.test(prompt)) {
-    const visible = summarizeVisibleContext(scene?.value ?? objects?.value);
     const action = activity?.value ? ` ${activity.value}` : "";
     return {
-      concise: `You're looking at ${visible}.${action ? ` ${action}` : ""}`,
+      concise: `You're viewing ${visible}.${action ? ` ${action}` : ""}`,
       caveat: uncertainty?.value ? `Caveat: ${uncertainty.value}` : null,
     };
   }

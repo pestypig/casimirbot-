@@ -21,6 +21,7 @@ import { resetLiveSourceProducerLifecycleForTest } from "../services/situation-r
 import { resetVisualProducerSchedulerAdoptionsForTest } from "../services/situation-room/visual-producer-scheduler-adoption-store";
 import { resetClientCapabilityActionsForTest } from "../services/client-capabilities/client-action-queue";
 import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabilities/client-adoption-store";
+import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
 
 const threadId = "thread:live-source-continuation";
 
@@ -46,6 +47,7 @@ describe("live source continuation Ask routing", () => {
     resetVisualProducerSchedulerAdoptionsForTest();
     resetClientCapabilityActionsForTest();
     resetClientCapabilityAdoptionsForTest();
+    resetReceiptPresentationSnapshotsForTest();
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -132,6 +134,20 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.client_action_request?.action).toBe("request_permission");
     expect(response.body?.client_action_request_ids).toContain(response.body?.client_action_request?.action_request_id);
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
+    expect(response.body?.answer).toMatch(/Requested visual capture every 10 seconds|Visual capture is running every 10 seconds/);
+    expect(response.body?.answer).not.toContain("Producer freshness:");
+    expect(response.body?.answer).not.toContain("Pipeline:");
+    expect(response.body?.ask_turn_preflight_context?.schema).toBe("helix.ask_turn_preflight_context.v1");
+    expect(response.body?.ask_turn_preflight_context?.retrieval_required_signal).toBeTruthy();
+    expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
+    expect(response.body?.terminal_presentation?.concise_text).toBe(response.body?.answer);
+    expect(response.body?.receipt_presentation_snapshot?.schema).toBe("helix.receipt_presentation_snapshot.v1");
+    expect(response.body?.receipt_presentation_snapshot?.full_summary).toContain("Producer freshness:");
+    expect(
+      response.body?.current_turn_artifact_ledger?.some(
+        (entry: any) => entry?.payload?.schema === "helix.live_pipeline_turn_receipt.v1",
+      ),
+    ).toBe(true);
     expect(response.body?.live_answer_environment?.objective).not.toBe("ok set the interval to 10 seconds on the visual capture");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);

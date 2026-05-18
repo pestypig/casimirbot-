@@ -240,7 +240,8 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.deictic_reference?.reference_type).toBe("selected_visible_file");
     expect(response.body?.active_situation_context?.status).toBe("missing");
     expect(response.body?.situation_evidence_selection?.answerable).toBe(false);
-    expect(String(response.body?.answer ?? "")).toContain("no server-bound active SituationRun evidence");
+    expect(String(response.body?.answer ?? "")).toContain("active visual SituationRun");
+    expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
     expect(String(response.body?.answer ?? "")).not.toContain("model_only");
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
@@ -261,7 +262,74 @@ describe("thread-bound situation context bridge", () => {
     expect(String(response.body?.answer ?? "")).not.toContain("retrievalRequiredSignal");
     expect(response.body?.final_answer_source).toBe("artifact_synthesis");
     expect(response.body?.deictic_reference?.candidate_signal).toBe(true);
+    expect(response.body?.ask_turn_preflight_context?.schema).toBe("helix.ask_turn_preflight_context.v1");
+    expect(response.body?.ask_turn_preflight_context?.retrieval_required_signal).toBeTruthy();
+    expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
+    expect(response.body?.terminal_presentation?.concise_text).toBe(response.body?.answer);
     expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 60000);
+
+  it("distills visible folder evidence into a grammatical file answer", () => {
+    const { run, observation } = seedVisualSituationRun();
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:scene:sdo",
+      worker_run_id: "field_worker_run:scene",
+      worker_id: "field_worker:scene",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: "The visible scene showcases a file directory labeled \"SDO-Solar Dynamics Observatory,\" containing various folders and files related to solar observation and data analysis.",
+      status: "supported",
+      confidence: 0.7,
+      evidence_refs: [observation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Watch for a selected file or opened document.",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString(),
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Okay, can you describe what file I'm looking at now?",
+      inputModality: "typed",
+    });
+
+    expect(route.route).toBe("situation_context_question");
+    expect(route.answer_distillation?.concise_answer).toContain("You're viewing a folder labeled \"SDO-Solar Dynamics Observatory\"");
+    expect(route.answer_distillation?.concise_answer).toContain("can't confirm a specific selected file");
+    expect(String(route.answer_text ?? "")).not.toContain("You're looking at The visible scene");
+    expect(String(route.answer_text ?? "")).not.toContain("Observatory.\" with");
+    expect(String(route.answer_text ?? "")).not.toContain("..");
+    expect(String(route.answer_text ?? "")).not.toContain("Evidence refs:");
+  });
+
+  it("streaming ask turn handles explicit UUID deictic prompts without retrieval initialization errors", async () => {
+    const { app } = await createApp();
+    const turnId = "3450f3b2-9bb3-4ed1-9be4-d50273209029";
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: "Okay, what file am I looking at now?",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+        traceId: turnId,
+        turnId,
+      })
+      .expect(200);
+
+    expect(response.text).toContain("event: turn_final");
+    expect(response.text).toContain('"route_reason_code":"situation_context_question"');
+    expect(response.text).toContain('"schema":"helix.ask_turn_preflight_context.v1"');
+    expect(response.text).toContain('"schema":"helix.terminal_presentation.v1"');
+    expect(response.text).not.toContain("retrievalRequiredSignal");
+    expect(response.text).not.toContain("Cannot access");
   }, 60000);
 
   it("reports an unbound live visual producer instead of claiming no live source exists", () => {
