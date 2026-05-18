@@ -34,6 +34,7 @@ const rules: CueRule[] = [
       { label: "visible_workspace", pattern: /\bvisible\s+(?:screen|window|folder|file)\b/i },
       { label: "looking_at_file", pattern: /\b(?:what|which|describe)?\s*(?:file|window|folder)\s+(?:am\s+i|i(?:'m| am)|are\s+we)\s+(?:looking\s+at|viewing|seeing|clicking|selecting)\b/i },
       { label: "looking_at_now", pattern: /\bwhat\s+(?:am\s+i|are\s+we)\s+looking\s+at(?:\s+(?:now|right\s+now))?\b/i },
+      { label: "explain_looking_at_now", pattern: /\b(?:explain|describe|summari[sz]e)\s+what\s+(?:i(?:'m| am)|we(?:'re| are))\s+looking\s+at(?:\s+(?:now|right\s+now))?\b/i },
     ],
   },
   {

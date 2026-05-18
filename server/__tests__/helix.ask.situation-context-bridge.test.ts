@@ -255,6 +255,44 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
 
+  it("keeps generic looking-at prompts on the visual terminal presentation when an active doc is present", async () => {
+    const { app } = await createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, explain what I'm looking at right now.",
+        mode: "read",
+        debug: true,
+        sessionId: "helix-ask:desktop",
+        workspace_context_snapshot: {
+          sessionId: "helix-ask:desktop",
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+      })
+      .expect(200);
+
+    const finalAnswer = String(response.body?.selected_final_answer ?? "");
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      precedence_reason: "explicit_visual_source_target",
+    });
+    expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(response.body?.terminal_presentation?.concise_text).toBe(finalAnswer);
+    expect(finalAnswer).toContain("File Explorer");
+    expect(finalAnswer).not.toContain("Explained the active document");
+    expect(finalAnswer).not.toContain("Key claim: The current document context");
+    expect(finalAnswer).not.toContain("nhm2-current-status-whitepaper");
+    expect(response.body?.terminal_answer_authority?.terminal_text_preview).toBe(finalAnswer);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 60000);
+
   it("ask turn keeps missing live context inside the situation bridge instead of model-only fallback", async () => {
     const { app } = await createApp();
     const response = await request(app)
