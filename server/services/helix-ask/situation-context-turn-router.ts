@@ -1,3 +1,13 @@
+import crypto from "node:crypto";
+import {
+  HELIX_CONVERSATIONAL_ANSWER_DISTILLATION_SCHEMA,
+  type HelixConversationalAnswerDistillation,
+  type HelixConversationalAnswerStyle,
+} from "@shared/helix-conversational-answer-distillation";
+import {
+  HELIX_PROCEDURE_REASONING_SNAPSHOT_SCHEMA,
+  type HelixProcedureReasoningSnapshot,
+} from "@shared/helix-procedure-reasoning-snapshot";
 import type { HelixActiveSituationContext } from "@shared/helix-active-situation-context";
 import type {
   HelixDeicticInputModality,
@@ -16,6 +26,15 @@ import { listProcedureEpochClosures } from "../situation-room/procedure-epoch-cl
 import { listLiveProbeResults } from "../situation-room/live-probe-result-store";
 import { createVisualComparisonSession } from "../situation-room/visual-comparison-session-store";
 import { createVoiceLiveHandoff } from "../situation-room/voice-live-handoff-router";
+import {
+  listProcedureReasoningSnapshots,
+  recordProcedureReasoningSnapshot,
+} from "../situation-room/procedure-reasoning-snapshot-store";
+import {
+  listConversationalAnswerDistillations,
+  recordConversationalAnswerDistillation,
+} from "./conversational-answer-distillation-store";
+import { chooseLiveAnswerStyle, formatDistilledAnswer } from "./live-answer-style-policy";
 
 export type SituationContextTurnRouteKind =
   | "none"
@@ -30,6 +49,8 @@ export type SituationContextTurnRoute = {
   active_situation_context: HelixActiveSituationContext;
   situation_evidence_selection: HelixSituationEvidenceSelection;
   answer_text: string | null;
+  reasoning_snapshot?: HelixProcedureReasoningSnapshot | null;
+  answer_distillation?: HelixConversationalAnswerDistillation | null;
   comparison_session?: HelixVisualComparisonSession | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
   binding_repair?: ReturnType<typeof repairUnboundVisualSituationContext> | null;
@@ -38,18 +59,28 @@ export type SituationContextTurnRoute = {
 const line = (label: string, value: string | null | undefined): string =>
   value && value.trim() ? `${label}: ${value.trim()}` : "";
 
+const hashShort = (value: unknown, size = 18): string =>
+  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
+
 const isProcedureReplayPrompt = (prompt: string): boolean =>
   /\b(?:why\s+did|what\s+changed|last\s+(?:situation\s+)?epoch|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last)\b/i.test(prompt);
 
 const isComparisonPrompt = (prompt: string): boolean =>
   /\b(?:compare\s+this|compare\s+(?:this|the)\s+(?:file|image|picture|screen)|next\s+(?:one|file|image|picture|screen)|remember\s+this\s+as\s+the\s+first)\b/i.test(prompt);
 
-const buildSituationAnswer = (input: {
-  prompt: string;
-  activeContext: HelixActiveSituationContext;
-  selection: HelixSituationEvidenceSelection;
-}): string => {
-  const context = input.activeContext;
+const isEvidenceExpansionPrompt = (prompt: string): boolean =>
+  /\b(?:show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|why\s+that|go\s+to\s+log|replay\s+that|show\s+refs?|what\s+evidence)\b/i.test(prompt);
+
+const selectedEvidenceRefs = (selection: HelixSituationEvidenceSelection): string[] =>
+  Array.from(new Set([
+    ...selection.selected_observation_refs,
+    ...selection.selected_field_evaluation_refs,
+    ...selection.selected_probe_result_refs,
+    ...selection.selected_epoch_closure_refs,
+    ...selection.selected_source_descriptor_refs,
+  ])).slice(0, 24);
+
+const getSituationFields = (context: HelixActiveSituationContext) => {
   const evaluations = context.situation_run_id
     ? listLiveFieldEvaluations({
         threadId: context.thread_id,
@@ -59,11 +90,23 @@ const buildSituationAnswer = (input: {
       })
     : [];
   const byField = new Map(evaluations.map((entry) => [entry.field_key, entry]));
-  const scene = byField.get("scene") ?? byField.get("place") ?? null;
-  const activity = byField.get("activity") ?? null;
-  const objects = byField.get("objects") ?? byField.get("entities") ?? null;
-  const uncertainty = byField.get("uncertainty") ?? byField.get("missing_evidence") ?? null;
-  const nextCheck = byField.get("next_check") ?? null;
+  return {
+    evaluations,
+    scene: byField.get("scene") ?? byField.get("place") ?? null,
+    activity: byField.get("activity") ?? null,
+    objects: byField.get("objects") ?? byField.get("entities") ?? null,
+    uncertainty: byField.get("uncertainty") ?? byField.get("missing_evidence") ?? null,
+    nextCheck: byField.get("next_check") ?? null,
+  };
+};
+
+const buildSituationFullReasoning = (input: {
+  prompt: string;
+  activeContext: HelixActiveSituationContext;
+  selection: HelixSituationEvidenceSelection;
+}): string => {
+  const context = input.activeContext;
+  const { scene, activity, objects, uncertainty, nextCheck } = getSituationFields(context);
   const asksSelection = /\b(?:clicking|clicked|selected|selection|highlighted)\b/i.test(input.prompt);
   const selectionCaveat = asksSelection
     ? "I can use the active visual SituationRun, but I can only confirm the clicked/selected file if the selected state is visible in the latest frame or captured in the next epoch."
@@ -75,13 +118,146 @@ const buildSituationAnswer = (input: {
     line("Visible objects", objects?.value),
     line("Uncertainty", uncertainty?.value),
     line("Next check", nextCheck?.next_check || nextCheck?.value),
-    `Evidence refs: ${[
-      ...input.selection.selected_observation_refs,
-      ...input.selection.selected_field_evaluation_refs,
-      ...input.selection.selected_probe_result_refs,
-      ...input.selection.selected_epoch_closure_refs,
-    ].slice(0, 8).join(", ") || "none selected"}.`,
+    `Evidence refs: ${selectedEvidenceRefs(input.selection).slice(0, 8).join(", ") || "none selected"}.`,
     context.status === "stale" ? "Freshness caveat: selected evidence is stale." : "",
+    "Raw images, audio, and logs were not injected into Ask context.",
+  ].filter(Boolean).join("\n");
+};
+
+const summarizeVisibleContext = (value: string | null | undefined): string => {
+  const trimmed = value?.replace(/\s+/g, " ").trim() ?? "";
+  if (!trimmed) return "the active visual workspace";
+  const firstSentence = trimmed.split(/(?<=[.!?])\s+/)[0] ?? trimmed;
+  return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trim()}...` : firstSentence;
+};
+
+const buildConciseSituationAnswer = (input: {
+  prompt: string;
+  activeContext: HelixActiveSituationContext;
+  style: HelixConversationalAnswerStyle;
+}): { concise: string; caveat: string | null } => {
+  const { scene, activity, objects, uncertainty } = getSituationFields(input.activeContext);
+  const prompt = input.prompt;
+  if (/\b(?:equation|formula)\b/i.test(prompt)) {
+    const visible = summarizeVisibleContext(scene?.value ?? objects?.value);
+    return {
+      concise: `You're looking at ${visible}, but I can't identify a specific equation until a readable formula or opened file is visible.`,
+      caveat: null,
+    };
+  }
+  if (/\b(?:clicking|clicked|selected|selection|highlighted)\b/i.test(prompt)) {
+    return {
+      concise: "I can see the active folder or screen view, but I can't confirm the clicked file unless the selection is visible or the next frame captures the change.",
+      caveat: null,
+    };
+  }
+  if (/\b(?:file|folder|looking at|screen|this|now)\b/i.test(prompt)) {
+    const visible = summarizeVisibleContext(scene?.value ?? objects?.value);
+    const action = activity?.value ? ` ${activity.value}` : "";
+    return {
+      concise: `You're looking at ${visible}.${action ? ` ${action}` : ""}`,
+      caveat: uncertainty?.value ? `Caveat: ${uncertainty.value}` : null,
+    };
+  }
+  return {
+    concise: summarizeVisibleContext(scene?.value ?? activity?.value ?? objects?.value),
+    caveat: uncertainty?.value ? `Caveat: ${uncertainty.value}` : null,
+  };
+};
+
+const recordReasoningAndDistillation = (input: {
+  turnId: string;
+  threadId: string;
+  prompt: string;
+  activeContext: HelixActiveSituationContext;
+  selection: HelixSituationEvidenceSelection;
+  sourceAnswerKind: "situation_context_question" | "procedure_epoch_replay";
+  fullReasoningSummary: string;
+  conciseAnswer: string;
+  caveat?: string | null;
+  style: HelixConversationalAnswerStyle;
+}): {
+  snapshot: HelixProcedureReasoningSnapshot;
+  distillation: HelixConversationalAnswerDistillation;
+  terminalText: string;
+} => {
+  const evidenceRefs = selectedEvidenceRefs(input.selection);
+  const snapshot: HelixProcedureReasoningSnapshot = recordProcedureReasoningSnapshot({
+    schema: HELIX_PROCEDURE_REASONING_SNAPSHOT_SCHEMA,
+    snapshot_id: `procedure_reasoning_snapshot:${hashShort([
+      input.turnId,
+      input.activeContext.situation_run_id,
+      input.selection.selection_id,
+      input.fullReasoningSummary,
+    ])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    situation_run_id: input.activeContext.situation_run_id ?? null,
+    epoch: input.activeContext.latest_epoch ?? null,
+    user_question: input.prompt,
+    full_reasoning_summary: input.fullReasoningSummary,
+    observation_refs: input.selection.selected_observation_refs,
+    field_evaluation_refs: input.selection.selected_field_evaluation_refs,
+    prediction_refs: [],
+    probe_result_refs: input.selection.selected_probe_result_refs,
+    confidence_update_refs: [],
+    epoch_closure_refs: input.selection.selected_epoch_closure_refs,
+    selected_evidence_pack_ref: input.selection.selection_id,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  const distillation: HelixConversationalAnswerDistillation = recordConversationalAnswerDistillation({
+    schema: HELIX_CONVERSATIONAL_ANSWER_DISTILLATION_SCHEMA,
+    distillation_id: `conversational_answer_distillation:${hashShort([
+      input.turnId,
+      snapshot.snapshot_id,
+      input.conciseAnswer,
+      input.style,
+    ])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    situation_run_id: input.activeContext.situation_run_id ?? null,
+    source_answer_kind: input.sourceAnswerKind,
+    full_reasoning_refs: [snapshot.snapshot_id, input.selection.selection_id],
+    selected_evidence_refs: evidenceRefs,
+    concise_answer: input.conciseAnswer,
+    caveat: input.caveat ?? null,
+    expansion_available: true,
+    expansion_ref: snapshot.snapshot_id,
+    style: input.style,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  return {
+    snapshot,
+    distillation,
+    terminalText: formatDistilledAnswer({
+      conciseAnswer: distillation.concise_answer,
+      caveat: distillation.caveat,
+      style: distillation.style,
+      expansionAvailable: distillation.expansion_available,
+    }),
+  };
+};
+
+const buildSnapshotExpansionAnswer = (input: {
+  snapshot: HelixProcedureReasoningSnapshot | null;
+  distillation: HelixConversationalAnswerDistillation | null;
+}): string => {
+  if (!input.snapshot && !input.distillation) {
+    return "I do not have a saved situation reasoning snapshot to expand yet.";
+  }
+  const snapshot = input.snapshot;
+  const distillation = input.distillation;
+  return [
+    distillation?.concise_answer ? `Short answer: ${distillation.concise_answer}` : "",
+    snapshot?.full_reasoning_summary ? `Reasoning snapshot: ${snapshot.full_reasoning_summary}` : "",
+    snapshot ? `Evidence refs: ${[
+      ...snapshot.observation_refs,
+      ...snapshot.field_evaluation_refs,
+      ...snapshot.probe_result_refs,
+      ...snapshot.epoch_closure_refs,
+    ].slice(0, 12).join(", ") || "none"}.` : "",
     "Raw images, audio, and logs were not injected into Ask context.",
   ].filter(Boolean).join("\n");
 };
@@ -136,13 +312,61 @@ export function routeSituationContextTurn(input: {
   threadId: string;
   promptText: string;
   inputModality?: HelixDeicticInputModality;
+  turnId?: string | null;
 }): SituationContextTurnRoute {
+  const turnId = input.turnId ?? `situation_context_turn:${hashShort([
+    input.threadId,
+    input.promptText,
+    input.inputModality ?? "typed",
+    Date.now(),
+  ])}`;
   const activeContext = resolveActiveSituationContext({ threadId: input.threadId });
   const initialReference = detectDeicticReference({
     threadId: input.threadId,
     promptText: input.promptText,
     inputModality: input.inputModality ?? "typed",
   });
+  if (!initialReference.candidate_signal && isEvidenceExpansionPrompt(input.promptText)) {
+    const latestDistillation = listConversationalAnswerDistillations({
+      threadId: input.threadId,
+      limit: 1,
+    }).at(-1) ?? null;
+    const latestSnapshot = latestDistillation?.expansion_ref
+      ? (listProcedureReasoningSnapshots({ threadId: input.threadId, limit: 20 })
+          .find((entry) => entry.snapshot_id === latestDistillation.expansion_ref) ?? null)
+      : (listProcedureReasoningSnapshots({ threadId: input.threadId, limit: 1 }).at(-1) ?? null);
+    const selection = selectSituationEvidence({
+      threadId: input.threadId,
+      activeContext,
+      deicticReference: initialReference,
+      askingHistory: true,
+    });
+    return {
+      route: "procedure_epoch_replay_question",
+      deictic_reference: {
+        ...initialReference,
+        reference_type: "latest_epoch_change",
+        candidate_signal: true,
+        resolution_status: latestSnapshot || latestDistillation ? "resolved" : "missing_context",
+        resolved_context_refs: [
+          activeContext.context_id,
+          latestSnapshot?.snapshot_id ?? "",
+          latestDistillation?.distillation_id ?? "",
+        ].filter(Boolean),
+      },
+      active_situation_context: activeContext,
+      situation_evidence_selection: selection,
+      answer_text: buildSnapshotExpansionAnswer({
+        snapshot: latestSnapshot,
+        distillation: latestDistillation,
+      }),
+      reasoning_snapshot: latestSnapshot,
+      answer_distillation: latestDistillation,
+      comparison_session: null,
+      voice_live_handoff: null,
+      binding_repair: null,
+    };
+  }
   if (!initialReference.candidate_signal) {
     const selection = selectSituationEvidence({
       threadId: input.threadId,
@@ -155,6 +379,8 @@ export function routeSituationContextTurn(input: {
       active_situation_context: activeContext,
       situation_evidence_selection: selection,
       answer_text: null,
+      reasoning_snapshot: null,
+      answer_distillation: null,
       comparison_session: null,
       voice_live_handoff: null,
       binding_repair: null,
@@ -216,6 +442,8 @@ export function routeSituationContextTurn(input: {
           : selection.answerability_reason,
         `Next required action: ${activeContext.next_required_action ?? "start or bind a live source"}.`,
       ].join(" "),
+      reasoning_snapshot: null,
+      answer_distillation: null,
       comparison_session: null,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
@@ -238,33 +466,77 @@ export function routeSituationContextTurn(input: {
         `Baseline: ${comparisonSession.baseline_observation_ref} at epoch ${comparisonSession.baseline_epoch}.`,
         "Show the next file/image and let the next visual epoch arrive; comparison will be grounded in the procedure evidence, not raw image injection.",
       ].join("\n"),
+      reasoning_snapshot: null,
+      answer_distillation: null,
       comparison_session: comparisonSession,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
     };
   }
   if (isProcedureReplayPrompt(input.promptText) || deicticReference.reference_type === "latest_epoch_change") {
+    const fullReasoning = buildReplayAnswer({ activeContext: resolvedActiveContext, selection });
+    const distillationBundle = recordReasoningAndDistillation({
+      turnId,
+      threadId: input.threadId,
+      prompt: input.promptText,
+      activeContext: resolvedActiveContext,
+      selection,
+      sourceAnswerKind: "procedure_epoch_replay",
+      fullReasoningSummary: fullReasoning,
+      conciseAnswer: fullReasoning.split("\n").slice(0, 3).join(" "),
+      caveat: null,
+      style: chooseLiveAnswerStyle({
+        promptText: input.promptText,
+        inputModality: input.inputModality,
+      }),
+    });
     return {
       route: "procedure_epoch_replay_question",
       deictic_reference: deicticReference,
       active_situation_context: resolvedActiveContext,
       situation_evidence_selection: selection,
-      answer_text: buildReplayAnswer({ activeContext: resolvedActiveContext, selection }),
+      answer_text: distillationBundle.terminalText,
+      reasoning_snapshot: distillationBundle.snapshot,
+      answer_distillation: distillationBundle.distillation,
       comparison_session: null,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
     };
   }
+  const style = chooseLiveAnswerStyle({
+    promptText: input.promptText,
+    inputModality: input.inputModality,
+  });
+  const fullReasoning = buildSituationFullReasoning({
+    prompt: input.promptText,
+    activeContext: resolvedActiveContext,
+    selection,
+  });
+  const concise = buildConciseSituationAnswer({
+    prompt: input.promptText,
+    activeContext: resolvedActiveContext,
+    style,
+  });
+  const distillationBundle = recordReasoningAndDistillation({
+    turnId,
+    threadId: input.threadId,
+    prompt: input.promptText,
+    activeContext: resolvedActiveContext,
+    selection,
+    sourceAnswerKind: "situation_context_question",
+    fullReasoningSummary: fullReasoning,
+    conciseAnswer: concise.concise,
+    caveat: concise.caveat,
+    style,
+  });
   return {
     route: "situation_context_question",
     deictic_reference: deicticReference,
     active_situation_context: resolvedActiveContext,
     situation_evidence_selection: selection,
-    answer_text: buildSituationAnswer({
-      prompt: input.promptText,
-      activeContext: resolvedActiveContext,
-      selection,
-    }),
+    answer_text: distillationBundle.terminalText,
+    reasoning_snapshot: distillationBundle.snapshot,
+    answer_distillation: distillationBundle.distillation,
     comparison_session: null,
     voice_live_handoff: voiceLiveHandoff,
     binding_repair: bindingRepair,

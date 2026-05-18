@@ -14,6 +14,8 @@ import { resetVisualComparisonSessionsForTest } from "../services/situation-room
 import { resetVoiceLiveHandoffsForTest } from "../services/situation-room/voice-live-handoff-router";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
 import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live-field-worker-run-store";
+import { resetProcedureReasoningSnapshotsForTest } from "../services/situation-room/procedure-reasoning-snapshot-store";
+import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
@@ -126,6 +128,8 @@ describe("thread-bound situation context bridge", () => {
     resetLiveSourceChunkBufferForTest();
     resetLiveFieldWorkersForTest();
     resetLiveFieldWorkerRunsForTest();
+    resetProcedureReasoningSnapshotsForTest();
+    resetConversationalAnswerDistillationsForTest();
   });
   it("resolves a typed selected-file prompt through active SituationRun evidence", () => {
     seedVisualSituationRun();
@@ -145,7 +149,10 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.answerable).toBe(true);
     expect(route.situation_evidence_selection.selected_observation_refs).toContain("observation:folder-view");
     expect(route.situation_evidence_selection.raw_content_included).toBe(false);
-    expect(route.answer_text).toContain("only confirm the clicked/selected file");
+    expect(route.answer_text).toContain("can't confirm the clicked file");
+    expect(route.answer_text).not.toContain("Evidence refs:");
+    expect(route.reasoning_snapshot?.assistant_answer).toBe(false);
+    expect(route.answer_distillation?.assistant_answer).toBe(false);
   });
 
   it("creates a voice live handoff instead of quick-response authority", () => {
@@ -208,7 +215,10 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.route_reason_code).toBe("situation_context_question");
     expect(response.body?.deictic_reference?.reference_type).toBe("selected_visible_file");
     expect(response.body?.situation_evidence_selection?.selected_observation_refs).toContain("observation:folder-view");
-    expect(String(response.body?.answer ?? "")).toContain("active visual SituationRun");
+    expect(String(response.body?.answer ?? "")).toContain("can't confirm the clicked file");
+    expect(String(response.body?.answer ?? "")).not.toContain("Evidence refs:");
+    expect(response.body?.procedure_reasoning_snapshot?.assistant_answer).toBe(false);
+    expect(response.body?.answer_distillation?.assistant_answer).toBe(false);
     expect(String(response.body?.answer ?? "")).not.toContain("I cannot access any files");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 60000);
@@ -315,6 +325,32 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.answerable).toBe(true);
     expect(route.situation_evidence_selection.selected_observation_refs).toContain("observation:barrier-formula-screen");
     expect(route.situation_evidence_selection.selected_field_evaluation_refs.length).toBeGreaterThan(0);
-    expect(String(route.answer_text ?? "")).toContain("active visual SituationRun");
+    expect(String(route.answer_text ?? "")).toContain("Details are saved in the procedure log");
+    expect(String(route.answer_text ?? "")).not.toContain("Evidence refs:");
+  });
+
+  it("recalls saved evidence through a snapshot expansion prompt", () => {
+    seedVisualSituationRun();
+    const first = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "What am I looking at now?",
+      inputModality: "typed",
+      turnId: "ask:first",
+    });
+    expect(first.answer_distillation?.expansion_available).toBe(true);
+
+    const recall = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Show the evidence.",
+      inputModality: "typed",
+      turnId: "ask:recall",
+    });
+
+    expect(recall.route).toBe("procedure_epoch_replay_question");
+    expect(recall.answer_text).toContain("Reasoning snapshot:");
+    expect(recall.answer_text).toContain("Evidence refs:");
+    expect(recall.answer_text).toContain("observation:folder-view");
+    expect(recall.answer_distillation?.assistant_answer).toBe(false);
+    expect(recall.reasoning_snapshot?.assistant_answer).toBe(false);
   });
 });
