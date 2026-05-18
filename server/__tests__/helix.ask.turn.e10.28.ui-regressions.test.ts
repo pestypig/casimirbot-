@@ -13,6 +13,21 @@ const createApp = (): express.Express => {
 
 const answerText = (body: any): string => String(body?.assistant_answer ?? body?.answer ?? body?.text ?? "");
 
+const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
+  text
+    .split(/\r?\n\r?\n/)
+    .map((block) => {
+      const lines = block.split(/\r?\n/);
+      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+      const data = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!event || !data) return null;
+      return { event, data: JSON.parse(data) };
+    })
+    .filter(Boolean) as Array<{ event: string; data: any }>;
+
 describe("helix ask turn e10.28 ui regressions", () => {
   it("streams turn transcript events and a final ask turn payload", async () => {
     const app = createApp();
@@ -46,6 +61,36 @@ describe("helix ask turn e10.28 ui regressions", () => {
     expect(text).toContain("\"async_executor_used\":true");
     expect(text).toContain("\"async_step_durations\"");
     expect(text.indexOf("event: turn_transcript_event")).toBeLessThan(text.indexOf("event: turn_final"));
+  });
+
+  it("terminalizes stream errors as a final typed-failure turn payload", async () => {
+    const app = createApp();
+    const sessionId = `e1028-stream-error-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: "[[TEST_FORCE_STREAM_ERROR]] what does the UI do when the stream path throws?",
+        mode: "read",
+        sessionId,
+        traceId: "ask:e1028-stream-error",
+        turnId: "ask:e1028-stream-error",
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const eventNames = events.map((event) => event.event);
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+
+    expect(eventNames).toContain("turn_error");
+    expect(eventNames).toContain("turn_final");
+    expect(eventNames.indexOf("turn_error")).toBeLessThan(eventNames.lastIndexOf("turn_final"));
+    expect(finalPacket?.ok).toBe(false);
+    expect(finalPacket?.terminal_error_code).toBe("ask_turn_stream_failed");
+    expect(finalPacket?.final_answer_source).toBe("typed_failure");
+    expect(finalPacket?.terminal_artifact_kind).toBe("typed_failure");
+    expect(finalPacket?.client_server_terminal_match).toBe(true);
+    expect(finalPacket?.debug?.stream_error_terminalized).toBe(true);
+    expect(String(finalPacket?.selected_final_answer ?? "")).toContain("Terminal: final_failure");
   });
 
   it("maps conversational notes navigation variants to the notes panel", async () => {
