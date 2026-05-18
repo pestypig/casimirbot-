@@ -5234,6 +5234,8 @@ type AskContextChooserState = {
   question: string;
   capsuleIds?: string[];
   options?: RunAskOptions;
+  autoContextMode?: "attached" | "isolated";
+  autoContextReason?: string;
 };
 
 type HelixAskImageAttachment = {
@@ -5251,6 +5253,32 @@ type HelixAskImageAttachment = {
 
 const HELIX_ASK_VISUAL_PROMPT_PATTERN =
   /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|live\s+(?:source|answer)|hotbar|inventory|chest|container)\b/i;
+
+const HELIX_ASK_REPO_CODE_EVIDENCE_PROMPT_PATTERN =
+  /\b(?:repo(?:sitory)?|code|source\s+(?:file|path|tree)|file\s+paths?|line-backed|line\s+(?:number|numbers|source|sources)|cite\s+(?:exact\s+)?(?:file|path|source)|where\s+is\s+(?:that\s+)?(?:enforced|defined|declared|implemented|wired)|contract|schema|module|endpoint|route|symbol|export(?:s|ed)?|import(?:s|ed)?|requestedLaneSchema|server\/|client\/|shared\/|docs\/|[A-Za-z0-9_-]+\.(?:ts|tsx|js|jsx|md|json|py))\b/i;
+
+const isRepoCodeEvidencePrompt = (question: string): boolean =>
+  HELIX_ASK_REPO_CODE_EVIDENCE_PROMPT_PATTERN.test(question.trim());
+
+const resolveAskContextChooserAutoMode = (question: string): {
+  mode: "attached" | "isolated";
+  reason: string;
+} => {
+  const normalized = question.trim();
+  if (
+    isRepoCodeEvidencePrompt(normalized) &&
+    !HELIX_ASK_VISUAL_PROMPT_PATTERN.test(normalized)
+  ) {
+    return {
+      mode: "isolated",
+      reason: "repo_code_evidence_prompt",
+    };
+  }
+  return {
+    mode: "attached",
+    reason: "workspace_context_reasoning_prompt",
+  };
+};
 
 const HELIX_VISUAL_DIAGNOSTIC_SUMMARY_PATTERN =
   /\b(?:visual\s+frame\s+was\s+recorded|no\s+configured\s+vision\s+provider|configured\s+vision\s+provider\s+did\s+not\s+return|did\s+not\s+return\s+an?\s+image\s+description|did\s+not\s+produce\s+usable\s+visual\s+evidence|waiting\s+for\s+image\s+recognition|vision_provider_[a-z_]+|provider\s+(?:missing|failed|unavailable)|analysis_failed|capture\s+(?:and\s+analyze\s+)?(?:a\s+)?fresh\s+frame|recover\s+the\s+vision\s+provider)\b/i;
@@ -25074,6 +25102,7 @@ export function HelixAskPill({
         !options?.contextMode &&
         preliminaryDispatchPlan.should_dispatch_reasoning;
       if (shouldOfferContextChooser) {
+        const autoContext = resolveAskContextChooserAutoMode(trimmed);
         clearAskContextChooserTimer();
         setAskContextChooser({
           id: crypto.randomUUID(),
@@ -25082,9 +25111,15 @@ export function HelixAskPill({
           options: {
             ...options,
           },
+          autoContextMode: autoContext.mode,
+          autoContextReason: autoContext.reason,
         });
         setAskContextChooserCountdownSec(3);
-        setAskStatus("Attach workspace context to this reasoning turn?");
+        setAskStatus(
+          autoContext.mode === "isolated"
+            ? "Repo/code prompt detected; run isolated or attach context?"
+            : "Attach workspace context to this reasoning turn?",
+        );
         return;
       }
       let userMessageCommitted = false;
@@ -25356,13 +25391,15 @@ export function HelixAskPill({
         options?.answerContract?.source === "docs_viewer" && Boolean(docsViewerAnchorPath);
       const pinnedCapsuleCount = getPinnedContextCapsuleCount();
       const inferredMode = inferAskMode(trimmed);
+      const repoCodeEvidencePrompt = isRepoCodeEvidencePrompt(trimmed);
       const simpleConversationTurnLane = isSimpleConversationTurnCandidate(trimmed);
       const simpleDirectPromptLane =
-        docsViewerWorkstationLane ||
-        simpleConversationTurnLane ||
-        (options?.forceReasoningDispatch !== true &&
-          inferredMode === "read" &&
-          isSimpleDirectPromptLaneCandidate(trimmed));
+        !repoCodeEvidencePrompt &&
+        (docsViewerWorkstationLane ||
+          simpleConversationTurnLane ||
+          (options?.forceReasoningDispatch !== true &&
+            inferredMode === "read" &&
+            isSimpleDirectPromptLaneCandidate(trimmed)));
       const allowBackgroundReasoningLane =
         !HELIX_E1_SINGLE_TURN_CONTRACT_FLAG || frozenRunAskDispatchPolicy === "workspace_then_reasoning";
       const backgroundWorkspaceReasoningLane =
@@ -25540,9 +25577,13 @@ export function HelixAskPill({
         setAskStatus("Generating answer...");
         try {
           const askModeForRequest =
-            !manualDispatchHint || inferredMode === "observe" ? undefined : inferredMode;
+            repoCodeEvidencePrompt
+              ? "observe"
+              : !manualDispatchHint || inferredMode === "observe"
+                ? undefined
+                : inferredMode;
           const reasoningContextModeForTurn: "attached" | "isolated" =
-            options?.contextMode === "isolated" ? "isolated" : "attached";
+            options?.contextMode === "isolated" || repoCodeEvidencePrompt ? "isolated" : "attached";
           const workspaceContextSnapshot = buildAskTurnWorkspaceContextSnapshot(sessionId);
           const processGraphContextPackForTurn =
             manualDispatchHint || backgroundWorkspaceReasoningLane || preliminaryDispatchPlan.should_dispatch_reasoning
@@ -25586,7 +25627,7 @@ export function HelixAskPill({
               signal: controller.signal,
               mode: askModeForRequest,
               contextMode: reasoningContextModeForTurn,
-              workspaceContextSnapshot: workspaceContextSnapshotForTurn,
+              workspaceContextSnapshot: reasoningContextModeForTurn === "isolated" ? undefined : workspaceContextSnapshotForTurn,
               turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
@@ -25620,7 +25661,7 @@ export function HelixAskPill({
               debug: userSettings.showHelixAskDebug,
               signal: controller.signal,
               mode: askModeForRequest,
-              workspaceContextSnapshot: workspaceContextSnapshotForTurn,
+              workspaceContextSnapshot: reasoningContextModeForTurn === "isolated" ? undefined : workspaceContextSnapshotForTurn,
               turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
@@ -26507,7 +26548,7 @@ export function HelixAskPill({
         if (remaining <= 0) {
           clearAskContextChooserTimer();
           setAskContextChooserCountdownSec(null);
-          executeAskWithContextMode("attached");
+          executeAskWithContextMode(askContextChooser.autoContextMode ?? "attached");
           return;
         }
         setAskContextChooserCountdownSec(remaining);
@@ -28082,7 +28123,9 @@ export function HelixAskPill({
                   </p>
                   {askContextChooserCountdownSec !== null ? (
                     <p className="mt-1 text-[10px] text-cyan-100/90">
-                      Auto-attaching context in {askContextChooserCountdownSec}s.
+                      {askContextChooser.autoContextMode === "isolated"
+                        ? `Auto-running isolated in ${askContextChooserCountdownSec}s.`
+                        : `Auto-attaching context in ${askContextChooserCountdownSec}s.`}
                     </p>
                   ) : null}
                   <div className="mt-2 flex items-center gap-1.5">

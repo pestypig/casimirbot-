@@ -140,6 +140,12 @@ gated terminal payload is answer authority. `/api/agi/ask/turn` must return an
 equivalent terminal payload for the same request class and must not crash or
 drop the dev server when the streamed route would emit a typed failure.
 
+Workspace context attachment is turn input, not ambient authority. The UI may
+offer an attach/isolated choice before a reasoning turn, but repo/code evidence
+prompts should default the timer to isolated execution unless the user explicitly
+attaches workspace context. Screen, document, visual, and deictic prompts may
+default to attached context.
+
 Model timeouts, missing terminal events, lost debug exports, and connection
 drops are runtime failures. Do not classify them as retrieval, observation, or
 repo-claim gate failures unless the terminal debug payload proves that the
