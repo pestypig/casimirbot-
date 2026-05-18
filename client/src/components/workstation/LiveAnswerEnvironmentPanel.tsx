@@ -193,6 +193,41 @@ type LiveProcedureEpochRead = {
   probe_result_refs?: string[];
   created_at: string;
 };
+type LiveProcedureEpochClosureRead = {
+  closure_id: string;
+  epoch: number;
+  status: string;
+  card_updated: boolean;
+  confidence_changes?: string[];
+  pending_actions?: string[];
+  next_epoch_triggers?: string[];
+  created_at: string;
+};
+type LiveProcedureLedgerItemRead = {
+  ledger_item_id: string;
+  epoch: number;
+  item_kind: string;
+  item_ref: string;
+  summary: string;
+  causality_refs?: string[];
+  created_at: string;
+};
+type LiveAskHandoffConsumptionRead = {
+  consumption_id: string;
+  handoff_id: string;
+  epoch: number;
+  status: string;
+  reasoning_budget: string;
+  selected_evidence_refs?: string[];
+};
+type LivePlanContractExecutionRead = {
+  execution_id: string;
+  plan_id: string;
+  epoch: number;
+  action_id: string;
+  runtime_status: string;
+  receipt_refs?: string[];
+};
 type LiveAgenticReviewReadEntry = {
   review_id: string;
   question?: string;
@@ -367,6 +402,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [probeResults, setProbeResults] = useState<LiveProbeResultRead[]>([]);
   const [confidenceUpdates, setConfidenceUpdates] = useState<LiveConfidenceUpdateRead[]>([]);
   const [procedureEpochs, setProcedureEpochs] = useState<LiveProcedureEpochRead[]>([]);
+  const [procedureEpochClosures, setProcedureEpochClosures] = useState<LiveProcedureEpochClosureRead[]>([]);
+  const [procedureLedgerItems, setProcedureLedgerItems] = useState<LiveProcedureLedgerItemRead[]>([]);
+  const [handoffConsumptions, setHandoffConsumptions] = useState<LiveAskHandoffConsumptionRead[]>([]);
+  const [planExecutions, setPlanExecutions] = useState<LivePlanContractExecutionRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
@@ -473,7 +512,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ? `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}&environment_id=${encodeURIComponent(activeEnvironmentId)}`
         : `/api/agi/situation/live-agentic-review?thread_id=${encodeURIComponent(threadId)}`;
       const roomQuery = loadedEnvironment?.room_id ? `&room_id=${encodeURIComponent(loadedEnvironment.room_id)}` : "";
-      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes, arbitrationCandidateRes, planContractRes, acceptanceRunRes, predictionRes, probeRes, probeResultRes, confidenceUpdateRes, procedureEpochRes] = await Promise.all([
+      const [sourceRes, eventRes, windowRes, commentaryRes, reviewRes, presentStateRes, interpretedLogRes, clarificationRes, lineToolRes, workerRes, visualLatestRes, clientActionRes, clientAdoptionRes, cognitionPlainRes, cognitionInterpretationRes, cognitionGoalRes, cognitionHandoffRes, situationRunRes, fieldWorkerRes, fieldWorkerRunRes, fieldEvaluationRes, tangentRes, arbitrationCandidateRes, planContractRes, acceptanceRunRes, predictionRes, probeRes, probeResultRes, confidenceUpdateRes, procedureEpochRes, procedureClosureRes, procedureLedgerRes, handoffConsumptionRes, planExecutionRes] = await Promise.all([
         fetch("/api/agi/situation/live-source/list"),
         fetch("/api/agi/situation/live-source/events"),
         fetch("/api/agi/situation/live-source/windows"),
@@ -504,8 +543,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         fetch(`/api/agi/situation/live-cognition/probe-results?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/confidence-updates?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
         fetch(`/api/agi/situation/live-cognition/procedure-epochs?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/procedure-epoch-closures?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/procedure-epoch-ledger?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/handoff-consumptions?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
+        fetch(`/api/agi/situation/live-cognition/plan-executions?thread_id=${encodeURIComponent(threadId)}${roomQuery}`),
       ]);
-      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody, arbitrationCandidateBody, planContractBody, acceptanceRunBody, predictionBody, probeBody, probeResultBody, confidenceUpdateBody, procedureEpochBody] = await Promise.all([
+      const [sourceBody, eventBody, windowBody, commentaryBody, reviewBody, presentStateBody, interpretedLogBody, clarificationBody, lineToolBody, workerBody, visualLatestBody, clientActionBody, clientAdoptionBody, cognitionPlainBody, cognitionInterpretationBody, cognitionGoalBody, cognitionHandoffBody, situationRunBody, fieldWorkerBody, fieldWorkerRunBody, fieldEvaluationBody, tangentBody, arbitrationCandidateBody, planContractBody, acceptanceRunBody, predictionBody, probeBody, probeResultBody, confidenceUpdateBody, procedureEpochBody, procedureClosureBody, procedureLedgerBody, handoffConsumptionBody, planExecutionBody] = await Promise.all([
         sourceRes.json(),
         eventRes.json(),
         windowRes.json(),
@@ -536,6 +579,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         probeResultRes.json().catch(() => ({})),
         confidenceUpdateRes.json().catch(() => ({})),
         procedureEpochRes.json().catch(() => ({})),
+        procedureClosureRes.json().catch(() => ({})),
+        procedureLedgerRes.json().catch(() => ({})),
+        handoffConsumptionRes.json().catch(() => ({})),
+        planExecutionRes.json().catch(() => ({})),
       ]);
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
       setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
@@ -574,6 +621,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setProbeResults(Array.isArray(probeResultBody.probe_results) ? probeResultBody.probe_results : []);
       setConfidenceUpdates(Array.isArray(confidenceUpdateBody.confidence_updates) ? confidenceUpdateBody.confidence_updates : []);
       setProcedureEpochs(Array.isArray(procedureEpochBody.procedure_epochs) ? procedureEpochBody.procedure_epochs : []);
+      setProcedureEpochClosures(Array.isArray(procedureClosureBody.closures) ? procedureClosureBody.closures : []);
+      setProcedureLedgerItems(Array.isArray(procedureLedgerBody.ledger_items) ? procedureLedgerBody.ledger_items : []);
+      setHandoffConsumptions(Array.isArray(handoffConsumptionBody.handoff_consumptions) ? handoffConsumptionBody.handoff_consumptions : []);
+      setPlanExecutions(Array.isArray(planExecutionBody.plan_executions) ? planExecutionBody.plan_executions : []);
       setVisualLatest(visualLatestBody ?? null);
       setLastFetchError(null);
     } catch (error) {
@@ -869,25 +920,34 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setLastActionStatus("No visual source is registered.");
       return;
     }
-    stopVisualFrameProducerInterval(sourceId);
+    const stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+    const track = stream?.getVideoTracks()[0] ?? stream?.getTracks()[0] ?? null;
+    stopVisualFrameProducerInterval(sourceId, { stopStream: false });
     await postJson("/api/agi/situation/live-source/producer/heartbeat", {
       source_id: sourceId,
       thread_id: threadId,
       environment_id: environment?.environment_id ?? null,
-      client_stream_confirmed: false,
+      client_stream_confirmed: Boolean(track && track.readyState !== "ended"),
       status: "paused",
       ts: new Date().toISOString(),
     }).catch(() => null);
-    setLastActionStatus("Paused visual interval capture.");
+    setLastActionStatus(track && track.readyState !== "ended"
+      ? "Paused visual interval capture; browser stream is still available for resume."
+      : "Paused visual interval capture; stream is no longer available.");
     await refresh();
   };
 
   const captureVisualFrameNow = async () => {
     let stream: MediaStream | null = null;
+    let ownsStream = false;
     try {
       const source = await ensureVisualSourceRegistered();
       const sourceId = source.source_id;
-      stream = await requestDisplayStream();
+      stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+      if (!stream) {
+        stream = await requestDisplayStream();
+        ownsStream = true;
+      }
       const result = await runVisualFrameProducerOnce({
         sourceId,
         threadId,
@@ -896,12 +956,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         stream,
         postJson,
       });
-      stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      if (ownsStream) stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       stream = null;
       setLastActionStatus(`Captured, analyzed, and aligned one visual frame. ${result.summary}`);
       await refresh();
     } catch (error) {
-      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       setLastActionStatus(error instanceof Error ? error.message : "visual_capture_failed");
     }
   };
@@ -1794,6 +1854,61 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     <div key={epoch.epoch_id} className="rounded border border-white/10 bg-black/20 p-2">
                       <p className="text-xs text-slate-200">Procedure epoch {epoch.epoch}</p>
                       <p className="mt-1 text-[10px] text-slate-600">obs {(epoch.observation_refs ?? []).length} / evals {(epoch.field_evaluation_refs ?? []).length} / preds {(epoch.prediction_refs ?? []).length} / results {(epoch.probe_result_refs ?? []).length}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Procedure Epochs / Closures</p>
+                <p className="mt-1 text-[11px] text-slate-500">Each epoch closes as silent, pending handoff, pending plan, request-input, or suppressed.</p>
+                <div className="mt-3 space-y-2">
+                  {procedureEpochClosures.length === 0 ? <p className="text-xs text-slate-500">No procedure closures yet.</p> : null}
+                  {procedureEpochClosures.slice(-6).reverse().map((closure: LiveProcedureEpochClosureRead) => (
+                    <div key={closure.closure_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-200">Epoch {closure.epoch}: {closure.status}</p>
+                        <span className="text-[10px] text-slate-600">card {String(closure.card_updated)}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-slate-600">
+                        confidence {(closure.confidence_changes ?? []).length} / pending {(closure.pending_actions ?? []).length} / next {(closure.next_epoch_triggers ?? []).length}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-700">{formatTime(closure.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Epoch Ledger</p>
+                <p className="mt-1 text-[11px] text-slate-500">Replayable causal chain without raw images, logs, or assistant answer text.</p>
+                <div className="mt-3 space-y-2">
+                  {procedureLedgerItems.length === 0 ? <p className="text-xs text-slate-500">No ledger items yet.</p> : null}
+                  {procedureLedgerItems.slice(-10).reverse().map((item: LiveProcedureLedgerItemRead) => (
+                    <div key={item.ledger_item_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase text-slate-500">{item.item_kind}</p>
+                        <span className="text-[10px] text-slate-600">epoch {item.epoch}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-200">{item.summary}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">ref {item.item_ref} / causes {(item.causality_refs ?? []).length}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Handoff Consumption / Plan Execution</p>
+                <p className="mt-1 text-[11px] text-slate-500">Handoffs and plans get traces; execution still belongs to the runtime path.</p>
+                <div className="mt-3 space-y-2">
+                  {handoffConsumptions.length === 0 && planExecutions.length === 0 ? <p className="text-xs text-slate-500">No handoff or plan execution traces yet.</p> : null}
+                  {handoffConsumptions.slice(-5).reverse().map((trace: LiveAskHandoffConsumptionRead) => (
+                    <div key={trace.consumption_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">Handoff {trace.status} / epoch {trace.epoch}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">budget {trace.reasoning_budget} / evidence {(trace.selected_evidence_refs ?? []).length} / {trace.handoff_id}</p>
+                    </div>
+                  ))}
+                  {planExecutions.slice(-5).reverse().map((trace: LivePlanContractExecutionRead) => (
+                    <div key={trace.execution_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-slate-200">{trace.action_id}</p>
+                      <p className="mt-1 text-[10px] text-slate-600">epoch {trace.epoch} / {trace.runtime_status} / receipts {(trace.receipt_refs ?? []).length}</p>
                     </div>
                   ))}
                 </div>

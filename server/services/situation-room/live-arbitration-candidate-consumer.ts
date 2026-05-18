@@ -13,6 +13,10 @@ import {
   getLiveArbitrationCandidate,
   updateLiveArbitrationCandidateStatus,
 } from "./live-arbitration-candidate-store";
+import { appendProcedureEpochLedgerItem } from "./procedure-epoch-ledger-store";
+import { recordProcedureEpochClosure } from "./procedure-epoch-closure";
+import { recordAskHandoffConsumption } from "../helix-ask/ask-handoff-consumption-store";
+import { recordPlanContractExecution } from "../helix-ask/plan-contract-execution-store";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -55,7 +59,7 @@ const activeRunMatches = (candidate: HelixLiveArbitrationCandidate): boolean => 
     threadId: candidate.thread_id,
     environmentId: candidate.environment_id,
     limit: 20,
-  }).find((entry) => entry.situation_run_id === candidate.situation_run_id);
+  }).find((entry: { situation_run_id: string }) => entry.situation_run_id === candidate.situation_run_id);
   return Boolean(
     run &&
     run.source_binding_id === candidate.source_binding_id &&
@@ -70,6 +74,35 @@ const suppressed = (
   now: string,
 ): HelixLiveArbitrationCandidateConsumption => {
   updateLiveArbitrationCandidateStatus(candidate.candidate_id, "suppressed");
+  appendProcedureEpochLedgerItem({
+    situation_run_id: candidate.situation_run_id,
+    source_binding_id: candidate.source_binding_id,
+    thread_id: candidate.thread_id,
+    environment_id: candidate.environment_id,
+    epoch: candidate.epoch,
+    item_kind: "arbitration_candidate",
+    item_ref: candidate.candidate_id,
+    summary: `Arbitration candidate suppressed: ${reason}.`,
+    causality_refs: [
+      ...candidate.evidence_refs,
+      ...candidate.field_evaluation_refs,
+      ...candidate.tangent_refs,
+    ],
+    created_at: now,
+  });
+  recordProcedureEpochClosure({
+    situation_run_id: candidate.situation_run_id,
+    thread_id: candidate.thread_id,
+    environment_id: candidate.environment_id,
+    source_binding_id: candidate.source_binding_id,
+    epoch: candidate.epoch,
+    status: reason === "candidate_expired" ? "expired" : "suppressed",
+    card_updated: false,
+    confidence_changes: [],
+    pending_actions: [],
+    next_epoch_triggers: [],
+    created_at: now,
+  });
   return {
     schema: "helix.live_arbitration_candidate_consumption.v1",
     candidate_id: candidate.candidate_id,
@@ -141,6 +174,35 @@ export function consumeLiveArbitrationCandidate(input: {
       raw_content_included: false,
       created_at: now,
     };
+    appendProcedureEpochLedgerItem({
+      situation_run_id: candidate.situation_run_id,
+      source_binding_id: candidate.source_binding_id,
+      thread_id: candidate.thread_id,
+      environment_id: candidate.environment_id,
+      epoch: candidate.epoch,
+      item_kind: "silent_update",
+      item_ref: candidate.candidate_id,
+      summary: "Arbitration candidate consumed as a silent card update.",
+      causality_refs: [
+        ...candidate.evidence_refs,
+        ...candidate.field_evaluation_refs,
+        ...candidate.tangent_refs,
+      ],
+      created_at: now,
+    });
+    recordProcedureEpochClosure({
+      situation_run_id: candidate.situation_run_id,
+      thread_id: candidate.thread_id,
+      environment_id: candidate.environment_id,
+      source_binding_id: candidate.source_binding_id,
+      epoch: candidate.epoch,
+      status: "silent_update",
+      card_updated: true,
+      confidence_changes: [],
+      pending_actions: [],
+      next_epoch_triggers: [],
+      created_at: now,
+    });
     return {
       schema: "helix.live_arbitration_candidate_consumption.v1",
       candidate_id: candidate.candidate_id,
@@ -175,6 +237,46 @@ export function consumeLiveArbitrationCandidate(input: {
       reasoning_budget: candidate.priority === "critical" ? "normal" : "cheap",
       expected_output: "grounded_micro_report",
       raw_context_approved: false,
+      created_at: now,
+    });
+    const consumptionTrace = recordAskHandoffConsumption({
+      handoff_id: handoff.handoff_id,
+      situation_run_id: candidate.situation_run_id,
+      epoch: candidate.epoch,
+      thread_id: candidate.thread_id,
+      selected_evidence_refs: handoff.selected_evidence_refs,
+      reasoning_budget: handoff.reasoning_budget,
+      terminal_turn_required: true,
+      status: "pending",
+      created_at: now,
+    });
+    appendProcedureEpochLedgerItem({
+      situation_run_id: candidate.situation_run_id,
+      source_binding_id: candidate.source_binding_id,
+      thread_id: candidate.thread_id,
+      environment_id: candidate.environment_id,
+      epoch: candidate.epoch,
+      item_kind: "handoff",
+      item_ref: handoff.handoff_id,
+      summary: `Ask handoff pending: ${handoff.question}`,
+      causality_refs: [
+        candidate.candidate_id,
+        consumptionTrace.consumption_id,
+        ...handoff.selected_evidence_refs,
+      ],
+      created_at: now,
+    });
+    recordProcedureEpochClosure({
+      situation_run_id: candidate.situation_run_id,
+      thread_id: candidate.thread_id,
+      environment_id: candidate.environment_id,
+      source_binding_id: candidate.source_binding_id,
+      epoch: candidate.epoch,
+      status: "handoff_pending",
+      card_updated: true,
+      confidence_changes: [],
+      pending_actions: [handoff.handoff_id],
+      next_epoch_triggers: [],
       created_at: now,
     });
     updateLiveArbitrationCandidateStatus(candidate.candidate_id, "consumed");
@@ -218,6 +320,44 @@ export function consumeLiveArbitrationCandidate(input: {
       execute: false,
       created_at: now,
     });
+    const executionTrace = recordPlanContractExecution({
+      plan_id: contract.plan_id,
+      situation_run_id: candidate.situation_run_id,
+      epoch: candidate.epoch,
+      action_id: contract.action_id,
+      runtime_status: "pending",
+      receipt_refs: contract.evidence_refs,
+      created_at: now,
+    });
+    appendProcedureEpochLedgerItem({
+      situation_run_id: candidate.situation_run_id,
+      source_binding_id: candidate.source_binding_id,
+      thread_id: candidate.thread_id,
+      environment_id: candidate.environment_id,
+      epoch: candidate.epoch,
+      item_kind: "plan_contract",
+      item_ref: contract.plan_id,
+      summary: `Plan contract pending for ${contract.action_id}.`,
+      causality_refs: [
+        candidate.candidate_id,
+        executionTrace.execution_id,
+        ...contract.evidence_refs,
+      ],
+      created_at: now,
+    });
+    recordProcedureEpochClosure({
+      situation_run_id: candidate.situation_run_id,
+      thread_id: candidate.thread_id,
+      environment_id: candidate.environment_id,
+      source_binding_id: candidate.source_binding_id,
+      epoch: candidate.epoch,
+      status: "plan_pending",
+      card_updated: true,
+      confidence_changes: [],
+      pending_actions: [contract.plan_id],
+      next_epoch_triggers: [],
+      created_at: now,
+    });
     updateLiveArbitrationCandidateStatus(candidate.candidate_id, "consumed");
     return {
       schema: "helix.live_arbitration_candidate_consumption.v1",
@@ -254,6 +394,31 @@ export function consumeLiveArbitrationCandidate(input: {
     raw_content_included: false,
     created_at: now,
   };
+  appendProcedureEpochLedgerItem({
+    situation_run_id: candidate.situation_run_id,
+    source_binding_id: candidate.source_binding_id,
+    thread_id: candidate.thread_id,
+    environment_id: candidate.environment_id,
+    epoch: candidate.epoch,
+    item_kind: "request_user_input",
+    item_ref: requestInput.request_id,
+    summary: requestInput.question,
+    causality_refs: requestInput.evidence_refs,
+    created_at: now,
+  });
+  recordProcedureEpochClosure({
+    situation_run_id: candidate.situation_run_id,
+    thread_id: candidate.thread_id,
+    environment_id: candidate.environment_id,
+    source_binding_id: candidate.source_binding_id,
+    epoch: candidate.epoch,
+    status: "request_input_pending",
+    card_updated: true,
+    confidence_changes: [],
+    pending_actions: [requestInput.request_id],
+    next_epoch_triggers: [],
+    created_at: now,
+  });
   updateLiveArbitrationCandidateStatus(candidate.candidate_id, "consumed");
   return {
     schema: "helix.live_arbitration_candidate_consumption.v1",
@@ -270,4 +435,3 @@ export function consumeLiveArbitrationCandidate(input: {
     created_at: now,
   };
 }
-

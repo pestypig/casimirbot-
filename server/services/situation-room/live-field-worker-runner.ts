@@ -20,6 +20,8 @@ import {
 } from "./live-observation-probe-runner";
 import { recordLiveProcedureEpoch } from "./live-procedure-epoch-store";
 import { HELIX_LIVE_PROCEDURE_EPOCH_SCHEMA } from "@shared/helix-live-procedure-epoch";
+import { appendProcedureEpochLedgerItem } from "./procedure-epoch-ledger-store";
+import { recordProcedureEpochClosure } from "./procedure-epoch-closure";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -205,6 +207,18 @@ export function runLiveFieldWorkersForObservation(input: {
     observation: input.observation,
     now,
   });
+  appendProcedureEpochLedgerItem({
+    situation_run_id: run.situation_run_id,
+    source_binding_id: run.source_binding_id,
+    thread_id: run.thread_id,
+    environment_id: run.environment_id,
+    epoch: run.current_epoch,
+    item_kind: "observation",
+    item_ref: input.observation.observation_id,
+    summary: input.observation.text,
+    causality_refs: input.observation.evidence_refs,
+    created_at: now,
+  });
   const genericVisual = run.modality_scope === "generic_visual";
   const workerRuns: HelixLiveFieldWorkerRun[] = [];
   const evaluations = workers
@@ -216,7 +230,7 @@ export function runLiveFieldWorkersForObservation(input: {
         input.observation?.observation_id,
         now,
       ])}`;
-      recordLiveFieldWorkerRun({
+      const started = recordLiveFieldWorkerRun({
         schema: HELIX_LIVE_FIELD_WORKER_RUN_SCHEMA,
         worker_run_id: workerRunId,
         worker_id: worker.worker_id,
@@ -233,6 +247,18 @@ export function runLiveFieldWorkersForObservation(input: {
         assistant_answer: false,
         raw_content_included: false,
         role: "validation",
+      });
+      appendProcedureEpochLedgerItem({
+        situation_run_id: run.situation_run_id,
+        source_binding_id: run.source_binding_id,
+        thread_id: run.thread_id,
+        environment_id: run.environment_id,
+        epoch: run.current_epoch,
+        item_kind: "field_worker_run",
+        item_ref: started.worker_run_id,
+        summary: `${started.field_key} worker started.`,
+        causality_refs: started.trigger_observation_refs,
+        created_at: now,
       });
       const evaluation = recordLiveFieldEvaluation(evaluateField({
         environment: input.environment,
@@ -262,6 +288,30 @@ export function runLiveFieldWorkersForObservation(input: {
         raw_content_included: false,
         role: "validation",
       });
+      appendProcedureEpochLedgerItem({
+        situation_run_id: run.situation_run_id,
+        source_binding_id: run.source_binding_id,
+        thread_id: run.thread_id,
+        environment_id: run.environment_id,
+        epoch: run.current_epoch,
+        item_kind: "field_evaluation",
+        item_ref: evaluation.evaluation_id,
+        summary: `${evaluation.field_key}: ${evaluation.value}`,
+        causality_refs: [workerRunId, ...evaluation.evidence_refs],
+        created_at: evaluation.created_at,
+      });
+      appendProcedureEpochLedgerItem({
+        situation_run_id: run.situation_run_id,
+        source_binding_id: run.source_binding_id,
+        thread_id: run.thread_id,
+        environment_id: run.environment_id,
+        epoch: run.current_epoch,
+        item_kind: "field_worker_run",
+        item_ref: completed.worker_run_id,
+        summary: `${completed.field_key} worker completed.`,
+        causality_refs: [evaluation.evaluation_id, ...completed.trigger_observation_refs],
+        created_at: completed.completed_at ?? now,
+      });
       workerRuns.push(completed);
       return evaluation;
     });
@@ -270,7 +320,76 @@ export function runLiveFieldWorkersForObservation(input: {
     evaluations,
     now,
   });
+  for (const prediction of predictionFeedback.predictions) {
+    appendProcedureEpochLedgerItem({
+      situation_run_id: run.situation_run_id,
+      source_binding_id: run.source_binding_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      epoch: run.current_epoch,
+      item_kind: "prediction",
+      item_ref: prediction.prediction_id,
+      summary: prediction.claim,
+      causality_refs: prediction.based_on_evaluation_refs,
+      created_at: prediction.created_at,
+    });
+  }
+  for (const probe of predictionFeedback.probes) {
+    appendProcedureEpochLedgerItem({
+      situation_run_id: run.situation_run_id,
+      source_binding_id: run.source_binding_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      epoch: run.current_epoch,
+      item_kind: "probe",
+      item_ref: probe.probe_id,
+      summary: `${probe.probe_type} waiting for ${probe.expected_observation_signals.join(", ") || "next observation"}.`,
+      causality_refs: [probe.prediction_id],
+      created_at: probe.created_at,
+    });
+  }
   const arbitration = arbitrateLiveSituationHandoffs({ run, evaluations });
+  if (arbitration?.arbitration_candidate) {
+    appendProcedureEpochLedgerItem({
+      situation_run_id: run.situation_run_id,
+      source_binding_id: run.source_binding_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      epoch: run.current_epoch,
+      item_kind: "arbitration_candidate",
+      item_ref: arbitration.arbitration_candidate.candidate_id,
+      summary: arbitration.arbitration_candidate.reason,
+      causality_refs: [
+        ...arbitration.arbitration_candidate.evidence_refs,
+        ...arbitration.arbitration_candidate.field_evaluation_refs,
+        ...arbitration.arbitration_candidate.tangent_refs,
+      ],
+      created_at: now,
+    });
+  }
+  const closureStatus = arbitration?.arbitration_candidate?.candidate_type === "ask_handoff_candidate"
+    ? "handoff_pending"
+    : arbitration?.arbitration_candidate?.candidate_type === "plan_contract_candidate"
+      ? "plan_pending"
+      : arbitration?.arbitration_candidate?.candidate_type === "request_user_input_candidate"
+        ? "request_input_pending"
+        : "silent_update";
+  const epochClosure = recordProcedureEpochClosure({
+    situation_run_id: run.situation_run_id,
+    thread_id: run.thread_id,
+    environment_id: run.environment_id,
+    source_binding_id: run.source_binding_id,
+    epoch: run.current_epoch,
+    status: closureStatus,
+    card_updated: evaluations.length > 0,
+    confidence_changes: probeFeedback.confidence_updates.map((entry: { confidence_update_id: string }) => entry.confidence_update_id),
+    pending_actions: [
+      ...(arbitration?.arbitration_candidate ? [arbitration.arbitration_candidate.candidate_id] : []),
+      ...probeFeedback.spawned_candidate_refs,
+    ],
+    next_epoch_triggers: predictionFeedback.probes.map((entry: { probe_id: string }) => entry.probe_id),
+    created_at: now,
+  });
   const procedureEpoch = recordLiveProcedureEpoch({
     schema: HELIX_LIVE_PROCEDURE_EPOCH_SCHEMA,
     epoch_id: `live_procedure_epoch:${hashShort([run.situation_run_id, run.current_epoch, input.observation.observation_id])}`,
@@ -281,11 +400,29 @@ export function runLiveFieldWorkersForObservation(input: {
     epoch: run.current_epoch,
     observation_refs: [input.observation.observation_id],
     field_evaluation_refs: evaluations.map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id),
-    prediction_refs: predictionFeedback.predictions.map((entry) => entry.prediction_id),
-    probe_result_refs: probeFeedback.probe_results.map((entry) => entry.probe_result_id),
+    prediction_refs: predictionFeedback.predictions.map((entry: { prediction_id: string }) => entry.prediction_id),
+    probe_result_refs: probeFeedback.probe_results.map((entry: { probe_result_id: string }) => entry.probe_result_id),
     assistant_answer: false,
     raw_content_included: false,
     role: "validation",
+    created_at: now,
+  });
+  appendProcedureEpochLedgerItem({
+    situation_run_id: run.situation_run_id,
+    source_binding_id: run.source_binding_id,
+    thread_id: run.thread_id,
+    environment_id: run.environment_id,
+    epoch: run.current_epoch,
+    item_kind: "epoch_closure",
+    item_ref: procedureEpoch.epoch_id,
+    summary: `Procedure epoch ${run.current_epoch} recorded.`,
+    causality_refs: [
+      input.observation.observation_id,
+      ...evaluations.map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id),
+      ...predictionFeedback.predictions.map((entry: { prediction_id: string }) => entry.prediction_id),
+      ...probeFeedback.probe_results.map((entry: { probe_result_id: string }) => entry.probe_result_id),
+      epochClosure.closure_id,
+    ],
     created_at: now,
   });
   return {
@@ -299,6 +436,7 @@ export function runLiveFieldWorkersForObservation(input: {
     probe_results: probeFeedback.probe_results,
     confidence_updates: probeFeedback.confidence_updates,
     procedure_epoch: procedureEpoch,
+    procedure_epoch_closure: epochClosure,
     assistant_answer: false as const,
     raw_content_included: false as const,
   };

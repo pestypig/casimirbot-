@@ -247,6 +247,7 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     live_probe_results: fieldWorkerRun?.probe_results ?? [],
     live_confidence_updates: fieldWorkerRun?.confidence_updates ?? [],
     live_procedure_epoch: fieldWorkerRun?.procedure_epoch ?? null,
+    live_procedure_epoch_closure: fieldWorkerRun?.procedure_epoch_closure ?? null,
     assistant_answer: false as const,
     raw_content_included: false as const,
     context_policy: "compact_context_pack_only" as const,

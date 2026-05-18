@@ -28,6 +28,7 @@ import { recordLiveTangentEvaluation } from "./live-tangent-evaluation-store";
 import { HELIX_LIVE_TANGENT_EVALUATION_SCHEMA } from "@shared/helix-live-tangent-evaluation";
 import { recordLiveArbitrationCandidate } from "./live-arbitration-candidate-store";
 import { HELIX_LIVE_ARBITRATION_CANDIDATE_SCHEMA } from "@shared/helix-live-arbitration-candidate";
+import { appendProcedureEpochLedgerItem } from "./procedure-epoch-ledger-store";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -226,6 +227,34 @@ export function runObservationProbesForObservation(input: {
       });
       tangentRefs.push(tangent.tangent_id);
       candidateRefs.push(candidate.candidate_id);
+      appendProcedureEpochLedgerItem({
+        situation_run_id: input.run.situation_run_id,
+        source_binding_id: input.run.source_binding_id,
+        thread_id: input.run.thread_id,
+        environment_id: input.run.environment_id,
+        epoch: input.run.current_epoch,
+        item_kind: "tangent",
+        item_ref: tangent.tangent_id,
+        summary: tangent.claim,
+        causality_refs: tangent.evidence_refs,
+        created_at: now,
+      });
+      appendProcedureEpochLedgerItem({
+        situation_run_id: input.run.situation_run_id,
+        source_binding_id: input.run.source_binding_id,
+        thread_id: input.run.thread_id,
+        environment_id: input.run.environment_id,
+        epoch: input.run.current_epoch,
+        item_kind: "arbitration_candidate",
+        item_ref: candidate.candidate_id,
+        summary: candidate.reason,
+        causality_refs: [
+          ...candidate.evidence_refs,
+          ...candidate.field_evaluation_refs,
+          ...candidate.tangent_refs,
+        ],
+        created_at: now,
+      });
     }
     const result = recordLiveProbeResult({
       schema: HELIX_LIVE_PROBE_RESULT_SCHEMA,
@@ -267,6 +296,36 @@ export function runObservationProbesForObservation(input: {
       role: "validation",
       created_at: now,
     });
+    appendProcedureEpochLedgerItem({
+      situation_run_id: input.run.situation_run_id,
+      source_binding_id: input.run.source_binding_id,
+      thread_id: input.run.thread_id,
+      environment_id: input.run.environment_id,
+      epoch: input.run.current_epoch,
+      item_kind: "probe_result",
+      item_ref: result.probe_result_id,
+      summary: `Probe ${status}; observed ${observedSignals.join(", ") || "no matching signal"}.`,
+      causality_refs: [
+        probe.probe_id,
+        prediction.prediction_id,
+        input.observation.observation_id,
+        ...tangentRefs,
+        ...candidateRefs,
+      ],
+      created_at: result.created_at,
+    });
+    appendProcedureEpochLedgerItem({
+      situation_run_id: input.run.situation_run_id,
+      source_binding_id: input.run.source_binding_id,
+      thread_id: input.run.thread_id,
+      environment_id: input.run.environment_id,
+      epoch: input.run.current_epoch,
+      item_kind: "confidence_update",
+      item_ref: update.confidence_update_id,
+      summary: update.reason,
+      causality_refs: [result.probe_result_id, prediction.prediction_id, ...update.evidence_refs],
+      created_at: update.created_at,
+    });
     updateLiveObservationProbeStatus(probe.probe_id, status === "expired" ? "expired" : "completed");
     updateLiveSituationPredictionStatus(prediction.prediction_id, status);
     results.push(result);
@@ -281,4 +340,3 @@ export function runObservationProbesForObservation(input: {
     spawned_candidate_refs: spawnedCandidateRefs,
   };
 }
-

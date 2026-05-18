@@ -23,6 +23,41 @@ const normalize = (value: string): string =>
 
 const has = (text: string, pattern: RegExp): boolean => pattern.test(text);
 
+const hasLiveVisualDeicticCue = (text: string): boolean =>
+  /\b(?:right\s+now|currently|current|latest|this|that|these|those|here|on\s+(?:my|the)\s+screen|screen|window|tab|folder|file|document|image|picture|photo|selected|selection|clicking|clicked|looking\s+at|viewing|showing|show\s+you|about\s+to\s+show|can\s+you\s+see|do\s+you\s+see|what\s+am\s+i\s+(?:looking\s+at|doing)|what\s+is\s+(?:this|that))\b/.test(text) &&
+  /\b(?:see|show|screen|window|tab|folder|file|document|image|picture|photo|selected|selection|clicking|clicked|looking|viewing|compare|open|current|latest|right\s+now|doing)\b/.test(text);
+
+const isVisualWorkstationEnvironment = (environment: LiveAnswerEnvironment): boolean => {
+  const preset = String(environment.preset ?? "").trim();
+  const objective = String(environment.objective ?? "").toLowerCase();
+  const sourceText = environment.source_ids.join(" ").toLowerCase();
+  const lineText = environment.lines
+    .map((line: LiveAnswerEnvironment["lines"][number]) => `${line.key} ${line.label} ${line.value ?? ""}`)
+    .join(" ")
+    .toLowerCase();
+  if (/\b(?:visual|screen|window|browser\s+tab|file\s+explorer|file manager|folder|document|image|picture|photo|workstation)\b/.test(objective)) {
+    return true;
+  }
+  if (/\bvisual[_:-]?source|visual[_:-]?capture|visual[_:-]?frame|screen|window|browser[_:-]?tab\b/.test(sourceText)) {
+    return true;
+  }
+  if (/\b(?:scene|activity|objects?|evidence|uncertainty|next\s+check|last\s+update)\b/.test(lineText) && preset !== "minecraft_run_monitor") {
+    return true;
+  }
+  return false;
+};
+
+const uniqueEnvironments = (environments: LiveAnswerEnvironment[]): LiveAnswerEnvironment[] => {
+  const seen = new Set<string>();
+  const result: LiveAnswerEnvironment[] = [];
+  for (const environment of environments) {
+    if (seen.has(environment.environment_id)) continue;
+    seen.add(environment.environment_id);
+    result.push(environment);
+  }
+  return result;
+};
+
 const environmentKeywords = (environment: LiveAnswerEnvironment): RegExp[] => {
   const preset = String(environment.preset ?? "").trim();
   const objective = String(environment.objective ?? "").toLowerCase();
@@ -113,7 +148,7 @@ const environmentPromptScore = (environment: LiveAnswerEnvironment, text: string
   let score = 0;
   const objective = String(environment.objective ?? "").toLowerCase();
   const lineText = environment.lines
-    .map((line) => `${line.key} ${line.label}`)
+    .map((line: LiveAnswerEnvironment["lines"][number]) => `${line.key} ${line.label}`)
     .join(" ")
     .toLowerCase();
   if (/\bprime\s+gaps?\b/.test(text) && /\bprime\s+gaps?\b/.test(objective)) score += 8;
@@ -127,10 +162,10 @@ const environmentPromptScore = (environment: LiveAnswerEnvironment, text: string
 
 const isGeneralConceptQuestion = (text: string): boolean =>
   /\b(?:what\s+is|what\s+are|explain|define|teach\s+me|how\s+does)\b/.test(text) &&
-  !/\b(?:we|current|currently|latest|so\s+far|right\s+now|on\s+the\s+stream|live\s+card|environment|tracker|status|progress|changed|found|checked)\b/.test(text);
+  !/\b(?:we|current|currently|latest|so\s+far|right\s+now|on\s+the\s+stream|on\s+(?:my|the)\s+screen|this|that|these|those|selected|clicking|clicked|looking\s+at|viewing|live\s+card|environment|tracker|status|progress|changed|found|checked)\b/.test(text);
 
 const hasCurrentStateCue = (text: string): boolean =>
-  /\b(?:current|currently|right\s+now|latest|status|progress|changed|so\s+far|what\s+changed|where\s+are\s+we|are\s+we\s+on|what\s+.*\s+on|found|checked|count|next\s+check|live\s+card|environment|tracker|stream)\b/.test(text);
+  /\b(?:current|currently|right\s+now|latest|status|progress|changed|so\s+far|what\s+changed|where\s+are\s+we|are\s+we\s+on|what\s+.*\s+on|found|checked|count|next\s+check|live\s+card|environment|tracker|stream|screen|window|tab|folder|file|document|image|picture|photo|selected|selection|clicking|clicked|looking\s+at|viewing|showing|show\s+you|about\s+to\s+show|can\s+you\s+see|do\s+you\s+see)\b/.test(text);
 
 export function evaluateLiveEnvironmentTurnRelevance(args: {
   threadId: string;
@@ -140,7 +175,7 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
 }): LiveEnvironmentTurnRelevance {
   const prompt = args.prompt.trim();
   const text = normalize(prompt);
-  const active = args.environments.filter((environment) => environment.status === "active");
+  const active = args.environments.filter((environment: LiveAnswerEnvironment) => environment.status === "active");
   if (!text || active.length === 0) {
     return {
       schema: "helix.live_environment_turn_relevance.v1",
@@ -157,15 +192,24 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
   }
 
   const explicitEnvironmentCue = /\b(?:live\s+(?:answer\s+)?environment|live\s+card|this\s+environment|this\s+stream|this\s+tracker)\b/.test(text);
-  const matched = active.filter((environment) =>
-    environmentKeywords(environment).some((keyword) => has(text, keyword)),
+  const visualDeicticCue = hasLiveVisualDeicticCue(text);
+  const keywordMatched = active.filter((environment: LiveAnswerEnvironment) =>
+    environmentKeywords(environment).some((keyword: RegExp) => has(text, keyword)),
   );
+  const visualMatched = visualDeicticCue
+    ? active.filter((environment: LiveAnswerEnvironment) => isVisualWorkstationEnvironment(environment))
+    : [];
+  const matched = uniqueEnvironments([...keywordMatched, ...visualMatched]);
   const scoredMatches = matched
-    .map((environment) => ({ environment, score: environmentPromptScore(environment, text) }))
-    .sort((a, b) => b.score - a.score || b.environment.updated_at.localeCompare(a.environment.updated_at));
+    .map((environment: LiveAnswerEnvironment) => ({ environment, score: environmentPromptScore(environment, text) }))
+    .sort((a: { environment: LiveAnswerEnvironment; score: number }, b: { environment: LiveAnswerEnvironment; score: number }) =>
+      b.score - a.score || b.environment.updated_at.localeCompare(a.environment.updated_at),
+    );
   const bestScore = scoredMatches[0]?.score ?? 0;
   const relevantMatches = bestScore > 0
-    ? scoredMatches.filter((entry) => entry.score === bestScore).map((entry) => entry.environment)
+    ? scoredMatches
+        .filter((entry: { environment: LiveAnswerEnvironment; score: number }) => entry.score === bestScore)
+        .map((entry: { environment: LiveAnswerEnvironment; score: number }) => entry.environment)
     : matched;
 
   if (relevantMatches.length === 0) {
@@ -189,7 +233,7 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
       thread_id: args.threadId,
       turn_id: args.turnId ?? null,
       prompt,
-      relevant_environment_ids: relevantMatches.map((environment) => environment.environment_id),
+      relevant_environment_ids: relevantMatches.map((environment: LiveAnswerEnvironment) => environment.environment_id),
       relevance: "context_available",
       reason: "multiple_matching_live_environments_need_clarification",
       confidence: 0.64,
@@ -204,7 +248,7 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
       thread_id: args.threadId,
       turn_id: args.turnId ?? null,
       prompt,
-      relevant_environment_ids: relevantMatches.map((environment) => environment.environment_id),
+      relevant_environment_ids: relevantMatches.map((environment: LiveAnswerEnvironment) => environment.environment_id),
       relevance: "context_available",
       reason: "domain_keyword_used_as_general_concept_question",
       confidence: 0.78,
@@ -219,7 +263,7 @@ export function evaluateLiveEnvironmentTurnRelevance(args: {
     thread_id: args.threadId,
     turn_id: args.turnId ?? null,
     prompt,
-    relevant_environment_ids: relevantMatches.map((environment) => environment.environment_id),
+    relevant_environment_ids: relevantMatches.map((environment: LiveAnswerEnvironment) => environment.environment_id),
     relevance: explicitEnvironmentCue
       ? "explicit_environment_question"
       : synthesize

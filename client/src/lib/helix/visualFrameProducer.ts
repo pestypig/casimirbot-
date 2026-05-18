@@ -60,8 +60,10 @@ export function getActiveVisualFrameStream(sourceId?: string | null): MediaStrea
 export function getLatestActiveVisualFrameStream(threadId?: string | null): { sourceId: string; stream: MediaStream } | null {
   const states = useVisualSourceCaptureStore.getState().producers;
   const candidates = Object.values(states)
-    .filter((state) => (!threadId || state.thread_id === threadId) && state.stream_active && state.track_ready_state !== "ended")
-    .sort((a, b) => Date.parse(b.last_heartbeat_at ?? b.last_frame_at ?? "0") - Date.parse(a.last_heartbeat_at ?? a.last_frame_at ?? "0"));
+    .filter((state: { thread_id: string; stream_active: boolean; track_ready_state: string }) =>
+      (!threadId || state.thread_id === threadId) && state.stream_active && state.track_ready_state !== "ended")
+    .sort((a: { last_heartbeat_at?: string | null; last_frame_at?: string | null }, b: { last_heartbeat_at?: string | null; last_frame_at?: string | null }) =>
+      Date.parse(b.last_heartbeat_at ?? b.last_frame_at ?? "0") - Date.parse(a.last_heartbeat_at ?? a.last_frame_at ?? "0"));
   for (const candidate of candidates) {
     const stream = getActiveVisualFrameStream(candidate.source_id);
     if (stream) return { sourceId: candidate.source_id, stream };
@@ -75,7 +77,7 @@ export function getLatestActiveVisualFrameStream(threadId?: string | null): { so
 const hashFramePreview = async (dataUrl: string): Promise<string> => {
   const bytes = new TextEncoder().encode(dataUrl.slice(0, 4096));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest)).slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(digest)).slice(0, 8).map((byte: number) => byte.toString(16).padStart(2, "0")).join("");
 };
 
 const waitForVideoReady = async (video: HTMLVideoElement): Promise<void> => {
@@ -583,12 +585,15 @@ export async function adoptServerVisualProducerPolicies(input: {
       });
       continue;
     }
+    const liveTrack = getLiveTrack(stream);
+    if (!liveTrack) continue;
     const current = useVisualSourceCaptureStore.getState().producers[sourceId];
     if (
       current?.interval_active &&
       current.cadence_ms === producer.cadence_ms &&
       current.producer_id === producer.producer_id
     ) {
+      const trackReadyState = liveTrack.readyState;
       await postSchedulerAdoption({
         postJson: input.postJson,
         producerId: producer.producer_id ?? null,
@@ -627,7 +632,7 @@ export async function adoptServerVisualProducerPolicies(input: {
           client_stream_confirmed: true,
           interval_active: true,
           cadence_ms: producer.cadence_ms,
-          track_ready_state: track.readyState,
+          track_ready_state: trackReadyState,
           latest_chunk_id: current.last_chunk_id ?? null,
           scheduler_adoption_status: "adopted",
         },
@@ -635,6 +640,7 @@ export async function adoptServerVisualProducerPolicies(input: {
       adopted += 1;
       continue;
     }
+    const trackReadyState = liveTrack.readyState;
     await startVisualFrameProducerInterval({
       sourceId,
       threadId: input.threadId,
@@ -660,7 +666,7 @@ export async function adoptServerVisualProducerPolicies(input: {
         client_stream_confirmed: true,
         interval_active: true,
         cadence_ms: producer.cadence_ms,
-        track_ready_state: track.readyState,
+        track_ready_state: trackReadyState,
         latest_chunk_id: updated?.last_chunk_id ?? null,
         scheduler_adoption_status: "adopted",
       },

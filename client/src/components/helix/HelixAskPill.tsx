@@ -61,7 +61,12 @@ import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
-import { adoptServerVisualProducerPolicies, runVisualFrameProducerOnce } from "@/lib/helix/visualFrameProducer";
+import {
+  adoptServerVisualProducerPolicies,
+  getActiveVisualFrameStream,
+  getLatestActiveVisualFrameStream,
+  runVisualFrameProducerOnce,
+} from "@/lib/helix/visualFrameProducer";
 import {
   createSituationRoomState,
   sourceLabelForSituationSource,
@@ -17874,7 +17879,10 @@ export function HelixAskPill({
     let stream: MediaStream | null = null;
     try {
       const sourceId = await ensureHelixAskVisualSource();
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream("helix-ask:desktop")?.stream ?? null;
+      if (!stream) {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      }
       const result = await runVisualFrameProducerOnce({
         sourceId,
         threadId: "helix-ask:desktop",
