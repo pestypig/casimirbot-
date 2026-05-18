@@ -2,6 +2,7 @@ export type HelixLiveSourceContinuationIntentKind =
   | "live_source_continuation"
   | "live_pipeline_control"
   | "live_pipeline_inspect"
+  | "live_environment_binding_diagnosis"
   | "live_pipeline_repair"
   | "live_runtime_repair"
   | "live_answer_environment_setup";
@@ -55,10 +56,24 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const inspect =
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
     /\b(?:pipeline|visual source|screen|live answer|analysis|frame|minecraft events|world events|minehut|world event)\b/.test(text);
+  const bindingDiagnosis =
+    /\b(?:worker\s+lanes?|lanes?|tabs?|field\s+evaluations?|interpretations?|live\s+cognition|live\s+answer\s+(?:panel|environment|card)|no\s+active\s+live\s+answer\s+environment|scene\s+epoch|visual\s+delta|screen\s+delta|latest\s+frame|previous\s+frame)\b/.test(text) &&
+    /\b(?:visual|screen|capture|live\s+answer|source|scene|frame|updating|bound|binding|attach|environment)\b/.test(text);
   const repair =
     /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame|not updating|stale|attach)\b/.test(text) &&
     /\b(?:pipeline|visual|frame|source|analysis|live answer|minecraft events|world events|minehut)\b/.test(text);
 
+  if (bindingDiagnosis) {
+    return {
+      schema: "helix.live_source_continuation_intent.v1",
+      kind: "live_environment_binding_diagnosis",
+      confidence: "high",
+      reason: "Prompt asks whether visual capture is bound into Live Answer/SituationRun cognition.",
+      requested_rate_ms: readLiveSourceRequestedRateMs(prompt),
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   if (repair) {
     return {
       schema: "helix.live_source_continuation_intent.v1",
@@ -110,16 +125,19 @@ export function buildLiveSourceContinuationCanonicalGoalFrame(input: {
   turnId: string;
   intent: HelixLiveSourceContinuationIntent;
 }) {
+  const diagnosis = input.intent.kind === "live_environment_binding_diagnosis";
   return {
     turn_id: input.turnId,
     goal_kind: input.intent.kind,
     answer_scope: "workspace_state",
-    required_terminal_kind: "live_pipeline_receipt",
+    required_terminal_kind: diagnosis ? "live_environment_binding_diagnosis" : "live_pipeline_receipt",
     allows_workspace_context: true,
     allows_prior_artifacts: true,
-    corpus_anchors: [],
+    corpus_anchors: diagnosis ? ["visual_capture", "live_answer_environment", "situation_run"] : [],
     numeric_tokens: [],
-    concept_tokens: ["live_source", "pipeline"],
+    concept_tokens: diagnosis
+      ? ["live_source", "live_answer_environment", "situation_run", "field_evaluations", "interpretations"]
+      : ["live_source", "pipeline"],
     confidence: input.intent.confidence,
     classifier_reasons: [input.intent.reason],
   };

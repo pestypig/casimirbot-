@@ -223,6 +223,39 @@ Procedure-memory prompts must terminate as `procedure_epoch_replay`,
 evidence, or a typed procedure-memory failure. A process-graph overview is not
 a valid terminal product for those turns.
 
+## Live Capture Is Not Live Cognition
+
+A browser-adopted visual producer is only a capture source. It is not, by
+itself, an active Live Answer situation.
+
+For visual live answers, Helix must distinguish:
+
+1. capture pipeline status,
+2. client adoption status,
+3. source freshness,
+4. live environment binding,
+5. active SituationRun,
+6. field-worker evaluation availability,
+7. interpretation availability,
+8. live-card projection freshness,
+9. terminal answer authority.
+
+A route that asks about scene epochs, visual deltas, worker lanes,
+interpretations, or Live Answer panel readiness must not terminate as a generic
+`live_pipeline_receipt`.
+
+It must either:
+
+- select current SituationRun evidence,
+- produce a live environment binding diagnosis,
+- create a repair candidate,
+- or fail closed with a typed visual situation reason.
+
+This preserves Codex discipline: capture, observations, evaluations,
+diagnoses, repair candidates, and terminal answers are separate items. No
+client shortcut or pipeline receipt may collapse them into one deterministic
+answer.
+
 Use these stable labels when a UI turn cannot be reconciled:
 
 ```txt

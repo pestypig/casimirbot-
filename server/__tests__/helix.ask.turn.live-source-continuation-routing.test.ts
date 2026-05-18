@@ -390,6 +390,71 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 20_000);
 
+  it("routes worker-lane live cognition questions to binding diagnosis", async () => {
+    const app = await createApp();
+    const cadence = await request(app)
+      .post("/api/agi/situation/live-source/producer/set-cadence")
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:diagnosis",
+        cadence_ms: 15_000,
+        capture_mode: "interval",
+        client_stream_confirmed: true,
+      })
+      .expect(200);
+    await request(app)
+      .post(`/api/agi/client-action/${encodeURIComponent(cadence.body.client_action_request.action_request_id)}/adopt`)
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:diagnosis",
+        producer_id: cadence.body.producer.producer_id,
+        client_id: "current_browser",
+        ok: true,
+        observed_state: {
+          client_stream_confirmed: true,
+          interval_active: true,
+          cadence_ms: 10_000,
+        },
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "why are the worker lanes not updating even though visual capture is running?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("live_environment_binding_diagnosis");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("live_environment_binding_diagnosis");
+    expect(response.body?.final_answer_source).toBe("live_environment_binding_diagnosis");
+    expect(response.body?.terminal_artifact_kind).toBe("live_environment_binding_diagnosis");
+    expect(response.body?.live_environment_binding_diagnosis).toMatchObject({
+      schema: "helix.live_environment_binding_diagnosis.v1",
+      target_source: "visual_capture",
+      client_adoption_status: "adopted",
+      client_interval_active: true,
+      server_cadence_ms: 15_000,
+      client_observed_cadence_ms: 10_000,
+      cadence_match: false,
+      capture_ready: true,
+      scene_procedure_ready: false,
+      live_card_ready: false,
+      blocking_reason: "producer_stale",
+      next_required_action: "capture_frame_now",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body?.latest_field_evaluation_absence_reason).toBeTruthy();
+    expect(response.body?.latest_interpretation_absence_reason).toBeTruthy();
+    expect(response.body?.answer).toContain("capture alone is not live cognition");
+    expect(response.body?.answer).not.toContain("Visual capture is running every");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 20_000);
+
   it("routes Minecraft event attachment questions to world binding diagnostics", async () => {
     const app = await createApp();
     const response = await request(app)
