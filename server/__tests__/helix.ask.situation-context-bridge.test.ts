@@ -266,6 +266,12 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.ask_turn_preflight_context?.retrieval_required_signal).toBeTruthy();
     expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
     expect(response.body?.terminal_presentation?.concise_text).toBe(response.body?.answer);
+    expect(response.body?.terminal_presentation_coverage_audit).toMatchObject({
+      schema: "helix.terminal_presentation_coverage_audit.v1",
+      terminal_presenter_used: true,
+      raw_route_text_returned: false,
+      violations: [],
+    });
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
 
@@ -418,6 +424,13 @@ describe("thread-bound situation context bridge", () => {
     expect(recall.answer_text).toContain("Reasoning snapshot:");
     expect(recall.answer_text).toContain("Evidence refs:");
     expect(recall.answer_text).toContain("observation:folder-view");
+    expect(recall.procedure_memory_recall).toMatchObject({
+      schema: "helix.procedure_memory_recall.v1",
+      recall_type: "show_evidence",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(recall.procedure_memory_recall?.snapshot_refs).toContain(first.reasoning_snapshot?.snapshot_id);
     expect(recall.answer_distillation?.assistant_answer).toBe(false);
     expect(recall.reasoning_snapshot?.assistant_answer).toBe(false);
   });

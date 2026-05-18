@@ -141,8 +141,18 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.ask_turn_preflight_context?.retrieval_required_signal).toBeTruthy();
     expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
     expect(response.body?.terminal_presentation?.concise_text).toBe(response.body?.answer);
+    expect(response.body?.terminal_presentation_coverage_audit).toMatchObject({
+      schema: "helix.terminal_presentation_coverage_audit.v1",
+      terminal_presenter_used: true,
+      raw_route_text_returned: false,
+      violations: [],
+    });
     expect(response.body?.receipt_presentation_snapshot?.schema).toBe("helix.receipt_presentation_snapshot.v1");
     expect(response.body?.receipt_presentation_snapshot?.full_summary).toContain("Producer freshness:");
+    expect(response.body?.source_binding_statuses?.some((entry: any) =>
+      entry?.schema === "helix.source_binding_status.v1" &&
+      entry?.modality === "visual_frame"
+    )).toBe(true);
     expect(
       response.body?.current_turn_artifact_ledger?.some(
         (entry: any) => entry?.payload?.schema === "helix.live_pipeline_turn_receipt.v1",
@@ -394,6 +404,11 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.route_reason_code).toBe("live_pipeline_inspect");
     expect(response.body?.world_event_thread_binding_check?.schema).toBe("helix.world_event_thread_binding_check.v1");
     expect(response.body?.world_event_thread_binding_check?.assistant_answer).toBe(false);
+    expect(response.body?.source_binding_statuses?.some((entry: any) =>
+      entry?.schema === "helix.source_binding_status.v1" &&
+      entry?.modality === "world_event" &&
+      ["observed_unbound", "stale"].includes(entry.status)
+    )).toBe(true);
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 20_000);
 
@@ -454,5 +469,12 @@ describe("live source continuation Ask routing", () => {
 
     expect(response.body?.route_reason_code).not.toMatch(/^live_/);
     expect(response.body?.canonical_goal_frame?.goal_kind).not.toMatch(/^live_/);
+    expect(response.body?.ask_turn_preflight_context?.schema).toBe("helix.ask_turn_preflight_context.v1");
+    expect(response.body?.terminal_presentation?.schema).toBe("helix.terminal_presentation.v1");
+    expect(response.body?.terminal_presentation_coverage_audit).toMatchObject({
+      terminal_presenter_used: true,
+      raw_route_text_returned: false,
+      violations: [],
+    });
   });
 });

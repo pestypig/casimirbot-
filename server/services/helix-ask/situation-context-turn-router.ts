@@ -16,6 +16,12 @@ import type {
 } from "@shared/helix-deictic-reference";
 import type { HelixSituationEvidenceSelection } from "@shared/helix-situation-evidence-selection";
 import type { HelixVisualComparisonSession } from "@shared/helix-visual-comparison-session";
+import {
+  HELIX_PROCEDURE_MEMORY_RECALL_SCHEMA,
+  type HelixProcedureMemoryRecall,
+  type HelixProcedureMemoryRecallMode,
+  type HelixProcedureMemoryRecallType,
+} from "@shared/helix-procedure-memory-recall";
 import { detectDeicticReference } from "./deictic-reference-detector";
 import { selectSituationEvidence } from "./situation-evidence-selector";
 import { resolveActiveSituationContext } from "../situation-room/active-situation-context-resolver";
@@ -51,6 +57,7 @@ export type SituationContextTurnRoute = {
   answer_text: string | null;
   reasoning_snapshot?: HelixProcedureReasoningSnapshot | null;
   answer_distillation?: HelixConversationalAnswerDistillation | null;
+  procedure_memory_recall?: HelixProcedureMemoryRecall | null;
   comparison_session?: HelixVisualComparisonSession | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
   binding_repair?: ReturnType<typeof repairUnboundVisualSituationContext> | null;
@@ -71,6 +78,20 @@ const isComparisonPrompt = (prompt: string): boolean =>
 const isEvidenceExpansionPrompt = (prompt: string): boolean =>
   /\b(?:show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|why\s+that|go\s+to\s+log|replay\s+that|show\s+refs?|what\s+evidence)\b/i.test(prompt);
 
+const classifyProcedureRecallType = (prompt: string): HelixProcedureMemoryRecallType => {
+  if (/\b(?:show\s+(?:the\s+)?evidence|show\s+refs?|what\s+evidence)\b/i.test(prompt)) return "show_evidence";
+  if (/\bwhy\s+(?:did\s+you\s+say|that)\b/i.test(prompt)) return "why_answer";
+  if (/\b(?:confidence\s+change|activity\s+confidence)\b/i.test(prompt)) return "confidence_change";
+  if (/\b(?:go\s+to\s+log|log)\b/i.test(prompt)) return "log_navigation";
+  return "epoch_replay";
+};
+
+const classifyProcedureRecallMode = (prompt: string): HelixProcedureMemoryRecallMode => {
+  if (/\b(?:show\s+(?:the\s+)?evidence|show\s+refs?|what\s+evidence)\b/i.test(prompt)) return "brief_evidence";
+  if (/\bwhy\s+(?:did\s+you\s+say|that)\b/i.test(prompt)) return "expanded_trace";
+  return "epoch_replay";
+};
+
 const selectedEvidenceRefs = (selection: HelixSituationEvidenceSelection): string[] =>
   Array.from(new Set([
     ...selection.selected_observation_refs,
@@ -79,6 +100,45 @@ const selectedEvidenceRefs = (selection: HelixSituationEvidenceSelection): strin
     ...selection.selected_epoch_closure_refs,
     ...selection.selected_source_descriptor_refs,
   ])).slice(0, 24);
+
+const buildProcedureMemoryRecall = (input: {
+  threadId: string;
+  turnId: string;
+  prompt: string;
+  activeContext: HelixActiveSituationContext;
+  selection: HelixSituationEvidenceSelection;
+  snapshot?: HelixProcedureReasoningSnapshot | null;
+  distillation?: HelixConversationalAnswerDistillation | null;
+}): HelixProcedureMemoryRecall => {
+  const ledger = listProcedureEpochLedger({
+    threadId: input.activeContext.thread_id || input.threadId,
+    environmentId: input.activeContext.environment_id ?? null,
+    situationRunId: input.activeContext.situation_run_id ?? null,
+    epoch: input.activeContext.latest_epoch ?? null,
+    limit: 24,
+  });
+  return {
+    schema: HELIX_PROCEDURE_MEMORY_RECALL_SCHEMA,
+    recall_id: `procedure_memory_recall:${hashShort([
+      input.turnId,
+      input.prompt,
+      input.snapshot?.snapshot_id,
+      input.distillation?.distillation_id,
+      ledger.map((entry) => entry.ledger_item_id),
+    ])}`,
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    source_turn_id: input.snapshot?.turn_id ?? input.distillation?.turn_id ?? null,
+    snapshot_refs: input.snapshot ? [input.snapshot.snapshot_id] : [],
+    epoch_ledger_refs: ledger.map((entry) => entry.ledger_item_id),
+    distillation_refs: input.distillation ? [input.distillation.distillation_id] : [],
+    selected_evidence_refs: selectedEvidenceRefs(input.selection),
+    recall_type: classifyProcedureRecallType(input.prompt),
+    recall_mode: classifyProcedureRecallMode(input.prompt),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const getSituationFields = (context: HelixActiveSituationContext) => {
   const evaluations = context.situation_run_id
@@ -435,6 +495,15 @@ export function routeSituationContextTurn(input: {
       }),
       reasoning_snapshot: latestSnapshot,
       answer_distillation: latestDistillation,
+      procedure_memory_recall: buildProcedureMemoryRecall({
+        threadId: input.threadId,
+        turnId,
+        prompt: input.promptText,
+        activeContext,
+        selection,
+        snapshot: latestSnapshot,
+        distillation: latestDistillation,
+      }),
       comparison_session: null,
       voice_live_handoff: null,
       binding_repair: null,
@@ -454,6 +523,7 @@ export function routeSituationContextTurn(input: {
       answer_text: null,
       reasoning_snapshot: null,
       answer_distillation: null,
+      procedure_memory_recall: null,
       comparison_session: null,
       voice_live_handoff: null,
       binding_repair: null,
@@ -517,6 +587,7 @@ export function routeSituationContextTurn(input: {
       ].join(" "),
       reasoning_snapshot: null,
       answer_distillation: null,
+      procedure_memory_recall: null,
       comparison_session: null,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
@@ -541,6 +612,7 @@ export function routeSituationContextTurn(input: {
       ].join("\n"),
       reasoning_snapshot: null,
       answer_distillation: null,
+      procedure_memory_recall: null,
       comparison_session: comparisonSession,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
@@ -571,6 +643,15 @@ export function routeSituationContextTurn(input: {
       answer_text: distillationBundle.terminalText,
       reasoning_snapshot: distillationBundle.snapshot,
       answer_distillation: distillationBundle.distillation,
+      procedure_memory_recall: buildProcedureMemoryRecall({
+        threadId: input.threadId,
+        turnId,
+        prompt: input.promptText,
+        activeContext: resolvedActiveContext,
+        selection,
+        snapshot: distillationBundle.snapshot,
+        distillation: distillationBundle.distillation,
+      }),
       comparison_session: null,
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
@@ -610,6 +691,7 @@ export function routeSituationContextTurn(input: {
     answer_text: distillationBundle.terminalText,
     reasoning_snapshot: distillationBundle.snapshot,
     answer_distillation: distillationBundle.distillation,
+    procedure_memory_recall: null,
     comparison_session: null,
     voice_live_handoff: voiceLiveHandoff,
     binding_repair: bindingRepair,

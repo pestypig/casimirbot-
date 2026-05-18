@@ -122,8 +122,10 @@ export function presentTerminalArtifact(input: {
     conciseText = distillSituationContextText(input.rawTerminalText);
   }
   const receiptSnapshot = input.terminalArtifactKind === "live_pipeline_receipt" ||
+    input.terminalArtifactKind === "live_answer_environment_receipt" ||
     input.terminalArtifactKind === "workspace_action_receipt" ||
     input.terminalArtifactKind === "tool_evaluation" ||
+    input.terminalArtifactKind === "workstation_tool_evaluation" ||
     input.terminalArtifactKind === "request_user_input" ||
     input.terminalArtifactKind === "typed_failure"
       ? recordReceiptPresentationSnapshot({

@@ -275,6 +275,18 @@ type VisualLatestRead = {
   visual_evidence_health?: HelixVisualEvidenceHealth | null;
 };
 
+type SourceBindingTransitionRead = {
+  transition_id: string;
+  source_id: string;
+  thread_id?: string | null;
+  modality: string;
+  from: string;
+  to: string;
+  reason: string;
+  evidence_refs?: string[];
+  created_at?: string | null;
+};
+
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "present_state", label: "Present State" },
   { id: "worker_lanes", label: "Worker Lanes" },
@@ -404,6 +416,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [procedureEpochs, setProcedureEpochs] = useState<LiveProcedureEpochRead[]>([]);
   const [procedureEpochClosures, setProcedureEpochClosures] = useState<LiveProcedureEpochClosureRead[]>([]);
   const [procedureLedgerItems, setProcedureLedgerItems] = useState<LiveProcedureLedgerItemRead[]>([]);
+  const [sourceBindingTransitions, setSourceBindingTransitions] = useState<SourceBindingTransitionRead[]>([]);
   const [handoffConsumptions, setHandoffConsumptions] = useState<LiveAskHandoffConsumptionRead[]>([]);
   const [planExecutions, setPlanExecutions] = useState<LivePlanContractExecutionRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
@@ -623,6 +636,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setProcedureEpochs(Array.isArray(procedureEpochBody.procedure_epochs) ? procedureEpochBody.procedure_epochs : []);
       setProcedureEpochClosures(Array.isArray(procedureClosureBody.closures) ? procedureClosureBody.closures : []);
       setProcedureLedgerItems(Array.isArray(procedureLedgerBody.ledger_items) ? procedureLedgerBody.ledger_items : []);
+      const sourceBindingLedgerBody = await fetch(`/api/agi/situation/source-binding-status-ledger?thread_id=${encodeURIComponent(threadId)}&limit=80`).then((response) => response.json()).catch(() => ({}));
+      setSourceBindingTransitions(Array.isArray(sourceBindingLedgerBody.transitions) ? sourceBindingLedgerBody.transitions : []);
       setHandoffConsumptions(Array.isArray(handoffConsumptionBody.handoff_consumptions) ? handoffConsumptionBody.handoff_consumptions : []);
       setPlanExecutions(Array.isArray(planExecutionBody.plan_executions) ? planExecutionBody.plan_executions : []);
       setVisualLatest(visualLatestBody ?? null);
@@ -1684,6 +1699,26 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                         <span className="text-[10px] text-slate-500">{run.status} / {run.reasoning_budget}</span>
                       </div>
                       <p className="mt-1 truncate text-[10px] text-slate-600">fields {(run.active_fields ?? []).join(", ") || "none"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Source Binding Status</p>
+                <p className="mt-1 text-[11px] text-slate-500">Source Binding History, Repair Candidates, Repair Acceptance, Bound Evidence, and Excluded Unbound Evidence.</p>
+                <div className="mt-3 space-y-2">
+                  {sourceBindingTransitions.length === 0 ? <p className="text-xs text-slate-500">No source binding transitions yet.</p> : null}
+                  {sourceBindingTransitions.slice(-8).reverse().map((transition: SourceBindingTransitionRead) => (
+                    <div key={transition.transition_id} className="rounded border border-white/10 bg-black/20 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-slate-100">{transition.source_id}</p>
+                        <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">{transition.modality}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-300">{transition.from} to {transition.to}</p>
+                      <p className="mt-1 text-[10px] text-slate-500">{transition.reason}</p>
+                      <p className="mt-1 truncate text-[10px] text-slate-600">
+                        evidence {(transition.evidence_refs ?? []).slice(0, 3).join(", ") || "none"} / {formatTime(transition.created_at)}
+                      </p>
                     </div>
                   ))}
                 </div>

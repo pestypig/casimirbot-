@@ -9,6 +9,7 @@ import { runVisualCadenceAcceptance } from "./visual-cadence-acceptance-runner";
 import { createSituationThreadBinding } from "./thread-binding-store";
 import { listLiveSourceProducers, setLiveSourceProducerStatus } from "./live-source-chunk-buffer";
 import { setVisualProducerCadence } from "./live-source-producer-binding";
+import { recordSourceBindingRepairAccepted } from "./source-binding-status-ledger";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -26,7 +27,10 @@ export function executeLiveRuntimeRepair(input: {
 }): HelixLiveRuntimeRepairReceipt {
   const selectedActionId = input.selectedActionId ?? input.plan.selected_action_id ?? null;
   const producer = input.plan.producer_id
-    ? listLiveSourceProducers().find((entry) => entry.producer_id === input.plan.producer_id || entry.source_id === input.plan.producer_id) ?? null
+    ? listLiveSourceProducers().find(
+        (entry: { producer_id: string; source_id: string }) =>
+          entry.producer_id === input.plan.producer_id || entry.source_id === input.plan.producer_id,
+      ) ?? null
     : null;
   const before = input.plan.producer_id ? runVisualCadenceAcceptance({ producerId: input.plan.producer_id }) : null;
   const refs: string[] = [];
@@ -35,8 +39,12 @@ export function executeLiveRuntimeRepair(input: {
   let nextRequiredAction: string | null = null;
   if (selectedActionId === "run_due_analysis") {
     const executions = runDueLiveSourceAnalysisJobs({ threadId: input.plan.thread_id });
-    ok = executions.some((entry) => entry.ok);
-    refs.push(...executions.map((entry) => entry.job?.job_id).filter(Boolean) as string[]);
+    ok = executions.some((entry: { ok?: boolean }) => entry.ok);
+    refs.push(
+      ...(executions
+        .map((entry: { job?: { job_id?: string | null } | null }) => entry.job?.job_id)
+        .filter(Boolean) as string[]),
+    );
     summary = `Ran ${executions.length} due analysis job${executions.length === 1 ? "" : "s"}.`;
     nextRequiredAction = ok ? "rerun_acceptance" : "inspect_analysis_jobs";
   } else if (selectedActionId === "rerun_acceptance") {
@@ -81,6 +89,16 @@ export function executeLiveRuntimeRepair(input: {
       });
       ok = receipt.ok;
       refs.push(receipt.binding?.binding_id ?? input.worldBindingSource.source_id);
+      if (receipt.ok) {
+        const transition = recordSourceBindingRepairAccepted({
+          source_id: input.worldBindingSource.source_id,
+          thread_id: input.plan.thread_id,
+          modality: "world_event",
+          reason: "live runtime repair attached exact world-event source to thread",
+          evidence_refs: [receipt.binding?.binding_id ?? input.worldBindingSource.source_id],
+        });
+        refs.push(transition.transition_id);
+      }
       summary = receipt.ok ? "Attached exact world-event source to Helix thread." : receipt.message ?? "World-event source attach failed.";
       nextRequiredAction = receipt.ok ? "rerun_acceptance" : "check_world_source_ids";
     }
