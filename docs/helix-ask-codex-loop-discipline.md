@@ -105,6 +105,10 @@ unsupported implementation claims without mutating the answer. In `repair`
 mode unsupported implementation claims are downgraded into `Next evidence
 needed`. In `fail` mode unsupported repo implementation claims fail closed with
 `REPO_CLAIM_OBSERVATION_SUPPORT_MISSING`.
+Gate debug must include a compact support trace: claim ids, support status,
+matched observation ids, match reasons, and matched observation file/line
+locations. Visible repo sources are rendered from matched observations only;
+legacy file lists remain retrieval metadata, not proof.
 
 The loop can rank evidence, but it cannot promote one lane to answer authority
 without passing the same proof/coverage gates. A live source is equal in

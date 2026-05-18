@@ -11,6 +11,7 @@ import {
 import type { SituationSalienceReceipt } from "@shared/helix-situation-standby";
 import type { HelixSituationSourceBinding } from "@shared/helix-situation-source-binding";
 import type { HelixObservationJournalEntry } from "@shared/helix-observation-journal";
+import type { HelixSalienceHygieneDecision } from "@shared/helix-salience-hygiene";
 import { appendObservationJournalEntry } from "./observation-journal-store";
 import {
   getSituationSourceBinding,
@@ -26,6 +27,8 @@ import {
   recordSourceBindingRepairCandidate,
   recordSourceBindingStatusTransitions,
 } from "./source-binding-status-ledger";
+import { applySalienceHygienePolicy } from "./salience-hygiene-policy";
+import { recordSourceFusionSelection } from "./source-fusion-selection-builder";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -76,6 +79,9 @@ const buildSourceSet = (input: {
   return set;
 };
 
+const sourceSetRefFor = (sourceSet: HelixProcedureEpochSourceSet): string =>
+  `procedure_epoch_source_set:${hashShort(sourceSet)}`;
+
 const eventLooksRisky = (
   event: HelixWorldEvent,
   salienceReceipt?: SituationSalienceReceipt | null,
@@ -94,6 +100,9 @@ const recordFusionEvaluation = (input: {
   status: HelixLiveFieldEvaluation["status"];
   now: string;
   salienceReceipt?: SituationSalienceReceipt | null;
+  salienceHygieneDecision?: HelixSalienceHygieneDecision | null;
+  sourceSetRef: string;
+  replayed: boolean;
 }): HelixLiveFieldEvaluation => {
   const workerRunId = `live_field_worker_run:${hashShort([
     input.binding.situation_run_id,
@@ -122,8 +131,10 @@ const recordFusionEvaluation = (input: {
     evidence_refs: uniq([
       input.observation.observation_id,
       input.salienceReceipt?.receipt_id,
+      input.salienceHygieneDecision?.decision_id,
       ...input.observation.evidence_refs,
     ]),
+    evidence_provenance: input.replayed ? "replayed" : "live",
     missing_evidence: [],
     corroboration_state: {
       world_event: "present",
@@ -165,6 +176,43 @@ const recordFusionEvaluation = (input: {
     causality_refs: evaluation.evidence_refs,
     created_at: input.now,
   });
+  const selectedEvidence = uniq([
+    input.observation.observation_id,
+    input.salienceReceipt?.receipt_id,
+    input.salienceHygieneDecision?.decision_id,
+    ...input.observation.evidence_refs,
+  ]);
+  const selection = recordSourceFusionSelection({
+    situation_run_id: input.binding.situation_run_id,
+    epoch: input.epoch,
+    thread_id: input.binding.thread_id,
+    source_set_ref: input.sourceSetRef,
+    field_key: input.fieldKey,
+    selected_modalities: ["world_event"],
+    selected_evidence_refs: selectedEvidence,
+    excluded_evidence_refs: [],
+    exclusion_reasons: [
+      "visual_frame_not_required_for_bound_world_event_field",
+      "audio_transcript_not_required_for_bound_world_event_field",
+    ],
+    authority_reason:
+      input.fieldKey === "risk"
+        ? "Risk worker prefers bound world_event evidence for Minecraft danger state."
+        : "Activity worker selected bound world_event evidence for Minecraft activity state.",
+  });
+  evaluation.evidence_refs.push(selection.selection_id);
+  appendProcedureEpochLedgerItem({
+    situation_run_id: input.binding.situation_run_id,
+    source_binding_id: input.binding.binding_id,
+    thread_id: input.binding.thread_id,
+    environment_id: input.binding.environment_id ?? "",
+    epoch: input.epoch,
+    item_kind: "field_evaluation",
+    item_ref: selection.selection_id,
+    summary: `source fusion selection for ${input.fieldKey}: ${selection.authority_reason}`,
+    causality_refs: selectedEvidence,
+    created_at: input.now,
+  });
   return evaluation;
 };
 
@@ -179,6 +227,9 @@ export type SourceBindingEpochBridgeReceipt = {
   environment_id?: string | null;
   observation?: HelixObservationJournalEntry | null;
   source_set?: HelixProcedureEpochSourceSet | null;
+  source_set_ref?: string | null;
+  salience_hygiene_decision?: HelixSalienceHygieneDecision | null;
+  source_fusion_selection_refs: string[];
   field_evaluation_refs: string[];
   ledger_item_refs: string[];
   replay_status: "live" | "replayed";
@@ -241,6 +292,9 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
       environment_id: null,
       observation: null,
       source_set: null,
+      source_set_ref: null,
+      salience_hygiene_decision: null,
+      source_fusion_selection_refs: [],
       field_evaluation_refs: [],
       ledger_item_refs: [],
       replay_status: input.replayed ? "replayed" : "live",
@@ -261,6 +315,9 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
       environment_id: binding.environment_id ?? null,
       observation: null,
       source_set: null,
+      source_set_ref: null,
+      salience_hygiene_decision: null,
+      source_fusion_selection_refs: [],
       field_evaluation_refs: [],
       ledger_item_refs: [],
       replay_status: input.replayed ? "replayed" : "live",
@@ -282,6 +339,9 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
       environment_id: binding.environment_id ?? null,
       observation: null,
       source_set: null,
+      source_set_ref: null,
+      salience_hygiene_decision: null,
+      source_fusion_selection_refs: [],
       field_evaluation_refs: [],
       ledger_item_refs: [],
       replay_status: input.replayed ? "replayed" : "live",
@@ -315,6 +375,13 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
     created_at: now,
   });
   const sourceSet = buildSourceSet({ observation, replayed });
+  const sourceSetRef = sourceSetRefFor(sourceSet);
+  const salienceHygieneDecision = applySalienceHygienePolicy({
+    event: input.event,
+    situation_run_id: run.situation_run_id,
+    salienceReceipt: input.salienceReceipt ?? null,
+    now,
+  });
   const observationLedger = appendProcedureEpochLedgerItem({
     situation_run_id: run.situation_run_id,
     source_binding_id: binding.binding_id,
@@ -328,18 +395,44 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
     created_at: now,
   });
   const evaluations: HelixLiveFieldEvaluation[] = [];
-  evaluations.push(recordFusionEvaluation({
-    binding,
-    observation,
-    epoch: run.current_epoch,
-    fieldKey: "activity",
-    value: `Bound world-event activity: ${input.event.event_type}.`,
-    confidence: replayed ? 0.68 : 0.78,
-    status: replayed ? "tentative" : "supported",
-    now,
-    salienceReceipt: input.salienceReceipt ?? null,
-  }));
-  if (eventLooksRisky(input.event, input.salienceReceipt)) {
+  const suppressFieldEvaluation =
+    salienceHygieneDecision.decision === "projection_only" ||
+    salienceHygieneDecision.decision === "dedupe" ||
+    salienceHygieneDecision.decision === "suppress";
+  if (!suppressFieldEvaluation) {
+    evaluations.push(recordFusionEvaluation({
+      binding,
+      observation,
+      epoch: run.current_epoch,
+      fieldKey: "activity",
+      value: salienceHygieneDecision.decision === "resolve"
+        ? `Bound world-event recovery: ${input.event.event_type}.`
+        : `Bound world-event activity: ${input.event.event_type}.`,
+      confidence: replayed ? 0.68 : 0.78,
+      status: replayed ? "tentative" : "supported",
+      now,
+      salienceReceipt: input.salienceReceipt ?? null,
+      salienceHygieneDecision,
+      sourceSetRef,
+      replayed,
+    }));
+  }
+  if (!suppressFieldEvaluation && salienceHygieneDecision.decision === "resolve") {
+    evaluations.push(recordFusionEvaluation({
+      binding,
+      observation,
+      epoch: run.current_epoch,
+      fieldKey: "risk",
+      value: "Bound world-event risk resolved: health recovered.",
+      confidence: replayed ? 0.62 : 0.76,
+      status: replayed ? "tentative" : "supported",
+      now,
+      salienceReceipt: input.salienceReceipt ?? null,
+      salienceHygieneDecision,
+      sourceSetRef,
+      replayed,
+    }));
+  } else if (!suppressFieldEvaluation && eventLooksRisky(input.event, input.salienceReceipt)) {
     evaluations.push(recordFusionEvaluation({
       binding,
       observation,
@@ -351,6 +444,9 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
       status: replayed ? "tentative" : "supported",
       now,
       salienceReceipt: input.salienceReceipt ?? null,
+      salienceHygieneDecision,
+      sourceSetRef,
+      replayed,
     }));
   }
   const closure = recordProcedureEpochClosure({
@@ -375,6 +471,11 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
     environment_id: binding.environment_id ?? run.environment_id,
     observation,
     source_set: sourceSet,
+    source_set_ref: sourceSetRef,
+    salience_hygiene_decision: salienceHygieneDecision,
+    source_fusion_selection_refs: evaluations.flatMap((entry: HelixLiveFieldEvaluation) =>
+      entry.evidence_refs.filter((ref: string) => ref.startsWith("source_fusion_selection:")),
+    ),
     field_evaluation_refs: evaluations.map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id),
     ledger_item_refs: uniq([
       observationLedger.ledger_item_id,

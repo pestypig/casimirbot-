@@ -16,6 +16,7 @@ export type HelixRepoClaim = {
   kind: HelixRepoClaimKind;
   requiresObservation: boolean;
   matchedObservationIds: string[];
+  matchedBecause: string[];
   supportStatus: "supported" | "unsupported" | "not_required";
   reason?: string;
 };
@@ -26,6 +27,25 @@ export type HelixRepoClaimObservationGateResult = {
   supportedClaims: HelixRepoClaim[];
   observationCount: number;
   reason?: "REPO_CLAIM_OBSERVATION_SUPPORT_MISSING";
+};
+
+export type HelixRepoClaimSupportTrace = {
+  claims: Array<{
+    id: string;
+    text: string;
+    kind: HelixRepoClaimKind;
+    supportStatus: HelixRepoClaim["supportStatus"];
+    matchedObservationIds: string[];
+    matchedBecause: string[];
+  }>;
+  observations: Array<{
+    id: string;
+    filePath?: string;
+    lineStart?: number;
+    lineEnd?: number;
+    sourceStage?: HelixEvidenceObservation["sourceStage"];
+    lane: HelixEvidenceObservation["lane"];
+  }>;
 };
 
 const REPO_CLAIM_OBSERVATION_SUPPORT_MISSING =
@@ -43,6 +63,25 @@ const HYPOTHESIS_OR_NEXT_EVIDENCE_HEADING =
 
 const GENERIC_SKIP_RE =
   /\b(?:may|might|could|possibly|hypothesis|open question|next evidence|needs verification|should verify)\b/i;
+
+const LOW_SIGNAL_MATCH_TOKENS = new Set([
+  "file",
+  "path",
+  "module",
+  "route",
+  "runtime",
+  "supports",
+  "support",
+  "emits",
+  "records",
+  "builds",
+  "handles",
+  "code",
+  "contract",
+  "schema",
+  "debug",
+  "trace",
+]);
 
 const normalizeText = (value: string): string =>
   String(value ?? "")
@@ -114,14 +153,19 @@ const looksLikeRepoClaim = (text: string): boolean => {
 const observationMatchesClaim = (
   claimText: string,
   observation: HelixEvidenceObservation,
-): boolean => {
+): string[] => {
+  const matchedBecause: string[] = [];
   const claimLower = claimText.toLowerCase();
   const filePath = String(observation.filePath ?? "").replace(/\\/g, "/").toLowerCase();
-  if (filePath && claimLower.includes(filePath)) return true;
+  if (filePath && claimLower.includes(filePath)) matchedBecause.push("file_path_exact");
   const term = String(observation.term ?? "").trim().toLowerCase();
-  if (term.length >= 3 && claimLower.includes(term)) return true;
+  if (term.length >= 3 && !LOW_SIGNAL_MATCH_TOKENS.has(term) && claimLower.includes(term)) {
+    matchedBecause.push("term_exact");
+  }
   const query = String(observation.query ?? "").trim().toLowerCase();
-  if (query.length >= 4 && claimLower.includes(query)) return true;
+  if (query.length >= 4 && !LOW_SIGNAL_MATCH_TOKENS.has(query) && claimLower.includes(query)) {
+    matchedBecause.push("query_overlap");
+  }
 
   const claimTokens = new Set(tokenize(claimText));
   const supportTokens = unique([
@@ -129,12 +173,13 @@ const observationMatchesClaim = (
     ...tokenize(String(observation.term ?? "")),
     ...tokenize(String(observation.query ?? "")),
     ...tokenize(String(observation.filePath ?? "")),
-  ]);
+  ]).filter((token) => !LOW_SIGNAL_MATCH_TOKENS.has(token));
   let overlap = 0;
   for (const token of supportTokens) {
     if (claimTokens.has(token)) overlap += 1;
   }
-  return overlap >= 2;
+  if (overlap >= 2) matchedBecause.push("snippet_token_overlap");
+  return unique(matchedBecause);
 };
 
 export const evaluateHelixRepoClaimObservationGate = (args: {
@@ -161,15 +206,21 @@ export const evaluateHelixRepoClaimObservationGate = (args: {
     if (!text || candidate.evidenceExempt || GENERIC_SKIP_RE.test(text) || !looksLikeRepoClaim(text)) {
       continue;
     }
-    const matchedObservationIds = args.observations
-      .filter((observation) => observationMatchesClaim(text, observation))
-      .map((observation) => observation.id);
+    const matchReasonsByObservation = args.observations
+      .map((observation) => ({
+        observation,
+        matchedBecause: observationMatchesClaim(text, observation),
+      }))
+      .filter((entry) => entry.matchedBecause.length > 0);
+    const matchedObservationIds = matchReasonsByObservation.map((entry) => entry.observation.id);
+    const matchedBecause = unique(matchReasonsByObservation.flatMap((entry) => entry.matchedBecause));
     const claim: HelixRepoClaim = {
       id: `repo_claim_${index + 1}`,
       text,
       kind: classifyClaimKind(text),
       requiresObservation: true,
       matchedObservationIds,
+      matchedBecause,
       supportStatus: matchedObservationIds.length > 0 ? "supported" : "unsupported",
       ...(matchedObservationIds.length > 0
         ? {}
@@ -204,6 +255,77 @@ export const evaluateHelixRepoClaimObservationGate = (args: {
     observationCount: args.observations.length,
     reason: REPO_CLAIM_OBSERVATION_SUPPORT_MISSING,
   };
+};
+
+export const buildHelixRepoClaimSupportTrace = (args: {
+  gate: HelixRepoClaimObservationGateResult;
+  observations: HelixEvidenceObservation[];
+}): HelixRepoClaimSupportTrace => {
+  const claims = [...args.gate.supportedClaims, ...args.gate.unsupportedClaims];
+  const matchedIds = new Set(claims.flatMap((claim) => claim.matchedObservationIds));
+  return {
+    claims: claims.map((claim) => ({
+      id: claim.id,
+      text: claim.text,
+      kind: claim.kind,
+      supportStatus: claim.supportStatus,
+      matchedObservationIds: claim.matchedObservationIds,
+      matchedBecause: claim.matchedBecause,
+    })),
+    observations: args.observations
+      .filter((observation) => matchedIds.has(observation.id))
+      .map((observation) => ({
+        id: observation.id,
+        filePath: observation.filePath,
+        lineStart: observation.lineStart,
+        lineEnd: observation.lineEnd ?? observation.lineStart,
+        sourceStage: observation.sourceStage,
+        lane: observation.lane,
+      })),
+  };
+};
+
+export const renderHelixRepoClaimObservationSources = (args: {
+  gate: HelixRepoClaimObservationGateResult;
+  observations: HelixEvidenceObservation[];
+}): string[] => {
+  const matchedIds = new Set(args.gate.supportedClaims.flatMap((claim) => claim.matchedObservationIds));
+  const sources: string[] = [];
+  const seen = new Set<string>();
+  for (const observation of args.observations) {
+    if (!matchedIds.has(observation.id)) continue;
+    const filePath = String(observation.filePath ?? "").replace(/\\/g, "/").trim();
+    if (!filePath) continue;
+    const lineStart = Number.isFinite(observation.lineStart)
+      ? Math.max(1, Math.trunc(Number(observation.lineStart)))
+      : null;
+    const lineEnd = Number.isFinite(observation.lineEnd)
+      ? Math.max(lineStart ?? 1, Math.trunc(Number(observation.lineEnd)))
+      : lineStart;
+    const lineSuffix = lineStart
+      ? lineEnd && lineEnd !== lineStart
+        ? `:${lineStart}-${lineEnd}`
+        : `:${lineStart}`
+      : "";
+    const rendered = `${filePath}${lineSuffix}`;
+    if (seen.has(rendered)) continue;
+    seen.add(rendered);
+    sources.push(rendered);
+  }
+  return sources;
+};
+
+export const applyHelixRepoClaimObservationSources = (args: {
+  answer: string;
+  sources: string[];
+}): string => {
+  if (args.sources.length === 0) return args.answer;
+  const sourceBlock = ["Sources:", ...args.sources.map((source) => `- ${source}`)].join("\n");
+  const withoutSources = String(args.answer ?? "")
+    .replace(/\n+Sources:\s*(?:\n\s*[-*]\s+.+)+\s*$/ims, "")
+    .replace(/\n+Sources:\s*.+\s*$/ims, "")
+    .trim();
+  return `${withoutSources}\n\n${sourceBlock}`.trim();
 };
 
 export const repairHelixRepoClaimObservationAnswer = (args: {

@@ -25,6 +25,7 @@ export type HelixLiveFieldEvaluation = {
   status: HelixLiveFieldEvaluationStatus;
   confidence: number;
   evidence_refs: string[];
+  evidence_provenance?: "live" | "replayed" | "mixed";
   missing_evidence: string[];
   corroboration_state: Record<string, "present" | "missing_not_required" | "missing_required" | "stale" | "not_applicable">;
   next_check: string;

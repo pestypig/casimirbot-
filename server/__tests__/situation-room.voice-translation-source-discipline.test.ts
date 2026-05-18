@@ -14,7 +14,11 @@ import {
 } from "../services/helix-thread/ledger";
 import {
   createLiveTranslationProcedure,
+  evaluateLiveTranslationProcedureActivationGate,
   evaluateTranslationVoiceRelayGate,
+  listLiveProcedureActivationGates,
+  listLiveProcedureLedgerItems,
+  listLiveTranslationProcedures,
   recordTranslationObservation,
   resetLiveTranslationProcedures,
 } from "../services/situation-room/live-translation-procedure-store";
@@ -279,6 +283,169 @@ describe("voice and translation live-source discipline", () => {
     });
 
     const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:braid" });
+    expect(events.some((event) => event.item_type === "answer")).toBe(false);
+    expect(events.every((event) => !event.assistant_text)).toBe(true);
+  }, 60_000);
+
+  it("blocks ambient translation activation but allows commander-requested activation with text relay defaults", async () => {
+    const app = createApp();
+    const started = await request(app)
+      .post("/api/discord/session/start")
+      .send({
+        guild_id: "guild-activation",
+        voice_channel_id: "voice-activation",
+        thread_id: "helix-ask:activation",
+      })
+      .expect(200);
+    const sessionId = started.body.session.session_id;
+    const linkCode = await request(app)
+      .post("/api/discord/session/link-code")
+      .send({
+        session_id: sessionId,
+        discord_user_id: "owner-user",
+      })
+      .expect(200);
+    await request(app)
+      .post("/api/discord/session/complete-link")
+      .send({
+        code: linkCode.body.code.code,
+        profile_id: "profile:owner",
+        discord_user_id: "owner-user",
+      })
+      .expect(200);
+
+    const guestAmbient = await request(app)
+      .post("/api/discord/source-event")
+      .send({
+        session_id: sessionId,
+        event_type: "ambient_context",
+        discord_user_id: "guest-user",
+        display_name: "Alex",
+        text: "I don't understand Spanish.",
+        evidence_refs: ["discord:activation:guest-confused"],
+      })
+      .expect(200);
+    expect(guestAmbient.body).toMatchObject({
+      voice_lane_receipt: {
+        decision: "record_context",
+        source_observation: {
+          speaker_id: "discord:guest-user",
+          speaker_authority: "untrusted_speaker",
+        },
+        output_decision: {
+          speakable: false,
+        },
+      },
+      ask_turn_bridge: {
+        answer_created: false,
+      },
+    });
+    const blockedGate = evaluateLiveTranslationProcedureActivationGate({
+      source_id: `discord:${sessionId}:voice`,
+      speaker_id: "discord:guest-user",
+      authority: "transcribe_only",
+      consent_granted: true,
+      evidence_refs: ["discord:activation:guest-confused"],
+    });
+    expect(blockedGate).toMatchObject({
+      schema: "helix.live_procedure_activation_gate.v1",
+      procedure_kind: "translation",
+      decision: "journal_only",
+      reason: "untrusted_speaker",
+      assistant_answer: false,
+      raw_audio_included: false,
+      raw_transcript_included: false,
+    });
+    expect(listLiveTranslationProcedures()).toHaveLength(0);
+
+    const commanderRequest = await request(app)
+      .post("/api/discord/source-event")
+      .send({
+        session_id: sessionId,
+        event_type: "direct_address",
+        discord_user_id: "owner-user",
+        text: "Helix, start Spanish-English translation for Alex.",
+        evidence_refs: ["discord:activation:owner-translation-request"],
+      })
+      .expect(200);
+    expect(commanderRequest.body).toMatchObject({
+      voice_lane_receipt: {
+        decision: "start_user_turn",
+        source_observation: {
+          speaker_id: "discord:owner-user",
+          speaker_authority: "authorized_user",
+        },
+      },
+      ask_turn_bridge: {
+        decision: "queued",
+        answer_created: false,
+      },
+    });
+    const activationGate = evaluateLiveTranslationProcedureActivationGate({
+      source_id: `discord:${sessionId}:voice`,
+      speaker_id: "discord:owner-user",
+      authority: "command_allowed",
+      consent_granted: true,
+      evidence_refs: ["discord:activation:owner-translation-request"],
+    });
+    expect(activationGate).toMatchObject({
+      decision: "activate",
+      reason: "authorized_direct_request",
+    });
+    const procedure = createLiveTranslationProcedure({
+      thread_id: "helix-ask:activation",
+      room_id: "room:discord:activation",
+      activation_gate: activationGate,
+      source_bindings: [
+        {
+          source_id: `discord:${sessionId}:voice`,
+          source_surface: "discord_user_stream",
+          speaker_id: "discord:guest-user",
+          display_name: "Alex",
+          role: "guest",
+          authority: "transcribe_only",
+          input_language: "es",
+          output_language: "en",
+          consent_state: "granted",
+        },
+      ],
+    });
+    expect(procedure).toMatchObject({
+      schema: "helix.live_translation_procedure.v1",
+      status: "active",
+      output_policy: {
+        render_text: true,
+        speak_translation: false,
+        require_confirm_for_unknown_speaker: true,
+      },
+      assistant_answer: false,
+      raw_audio_included: false,
+      raw_transcript_included: false,
+    });
+    expect(procedure.evidence_refs).toContain(activationGate.gate_id);
+    expect(listLiveProcedureActivationGates().map((gate) => gate.decision)).toEqual([
+      "journal_only",
+      "activate",
+    ]);
+    expect(listLiveTranslationProcedures()).toHaveLength(1);
+    expect(listLiveProcedureLedgerItems(procedure.procedure_id)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "activation_requested",
+          decision: "activate",
+          reason: "authorized_direct_request",
+          assistant_answer: false,
+        }),
+        expect.objectContaining({
+          event: "activation_decided",
+          decision: "activate",
+          reason: "authorized_direct_request",
+          assistant_answer: false,
+        }),
+      ]),
+    );
+
+    const events = getHelixThreadLedgerEvents({ threadId: "helix-ask:activation" });
     expect(events.some((event) => event.item_type === "answer")).toBe(false);
     expect(events.every((event) => !event.assistant_text)).toBe(true);
   }, 60_000);

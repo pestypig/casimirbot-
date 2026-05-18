@@ -9,9 +9,17 @@ import {
 } from "@shared/helix-live-translation-procedure";
 import { buildHelixEvidenceObservation } from "@shared/helix-evidence-observation";
 import type { HelixVoiceOutputDecision } from "@shared/helix-voice-output-decision";
+import {
+  HELIX_LIVE_PROCEDURE_ACTIVATION_GATE_SCHEMA,
+  HELIX_LIVE_PROCEDURE_LEDGER_ITEM_SCHEMA,
+  type HelixLiveProcedureActivationGate,
+  type HelixLiveProcedureLedgerItem,
+} from "@shared/helix-live-procedure-activation";
 
 const procedures = new Map<string, HelixLiveTranslationProcedure>();
 const observations: HelixTranslationObservation[] = [];
+const activationGates: HelixLiveProcedureActivationGate[] = [];
+const procedureLedger: HelixLiveProcedureLedgerItem[] = [];
 
 const shortHash = (value: unknown, size = 16): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -23,10 +31,127 @@ const clampConfidence = (value: number | null | undefined): number => {
   return Math.max(0, Math.min(1, Number(value)));
 };
 
+const normalizeRefs = (refs: string[] | null | undefined, fallback: string): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const ref of refs?.length ? refs : [fallback]) {
+    const normalized = String(ref ?? "").trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+};
+
+function appendLiveProcedureLedgerItem(input: {
+  procedure_id: string;
+  event: HelixLiveProcedureLedgerItem["event"];
+  summary: string;
+  decision?: string | null;
+  reason?: string | null;
+  evidence_refs?: string[] | null;
+  now?: string;
+}): HelixLiveProcedureLedgerItem {
+  const ts = input.now ?? nowIso();
+  const ledgerItem: HelixLiveProcedureLedgerItem = {
+    schema: HELIX_LIVE_PROCEDURE_LEDGER_ITEM_SCHEMA,
+    ledger_item_id: `live_procedure_ledger:${shortHash([
+      input.procedure_id,
+      input.event,
+      input.decision,
+      input.reason,
+      input.evidence_refs,
+      ts,
+    ], 18)}`,
+    procedure_id: input.procedure_id,
+    procedure_kind: "translation",
+    event: input.event,
+    summary: input.summary,
+    decision: input.decision ?? null,
+    reason: input.reason ?? null,
+    evidence_refs: normalizeRefs(
+      input.evidence_refs,
+      `live_procedure_ledger:${shortHash([input.procedure_id, input.event, ts], 10)}`,
+    ),
+    ts,
+    assistant_answer: false,
+    raw_audio_included: false,
+    raw_transcript_included: false,
+  };
+  procedureLedger.push(ledgerItem);
+  return ledgerItem;
+}
+
+export function evaluateLiveTranslationProcedureActivationGate(input: {
+  source_id: string;
+  speaker_id?: string | null;
+  authority: HelixLiveProcedureActivationGate["requested_by"]["authority"];
+  evidence_refs?: string[] | null;
+  consent_granted?: boolean | null;
+  ambiguous_source?: boolean | null;
+  policy_enabled?: boolean | null;
+  already_active?: boolean | null;
+  now?: string;
+}): HelixLiveProcedureActivationGate {
+  const now = input.now ?? nowIso();
+  const evidenceRefs = normalizeRefs(
+    input.evidence_refs,
+    `translation_activation:${shortHash([input.source_id, input.speaker_id, now], 10)}`,
+  );
+  const decisionAndReason = (() => {
+    if (input.already_active) {
+      return { decision: "journal_only" as const, reason: "already_active" as const };
+    }
+    if (input.policy_enabled === false) {
+      return { decision: "blocked" as const, reason: "policy_disabled" as const };
+    }
+    if (input.ambiguous_source) {
+      return { decision: "request_confirmation" as const, reason: "ambiguous_source" as const };
+    }
+    if (input.consent_granted === false) {
+      return { decision: "request_confirmation" as const, reason: "missing_consent" as const };
+    }
+    if (input.authority === "command_allowed" || input.authority === "system") {
+      return { decision: "activate" as const, reason: "authorized_direct_request" as const };
+    }
+    if (input.authority === "command_confirm") {
+      return { decision: "request_confirmation" as const, reason: "needs_confirmation" as const };
+    }
+    return { decision: "journal_only" as const, reason: "untrusted_speaker" as const };
+  })();
+  const gate: HelixLiveProcedureActivationGate = {
+    schema: HELIX_LIVE_PROCEDURE_ACTIVATION_GATE_SCHEMA,
+    gate_id: `live_procedure_activation_gate:${shortHash([
+      "translation",
+      input.source_id,
+      input.speaker_id,
+      input.authority,
+      decisionAndReason,
+      now,
+    ], 18)}`,
+    procedure_kind: "translation",
+    requested_by: {
+      source_id: input.source_id,
+      speaker_id: input.speaker_id ?? null,
+      authority: input.authority,
+    },
+    decision: decisionAndReason.decision,
+    reason: decisionAndReason.reason,
+    evidence_refs: evidenceRefs,
+    context_policy: "compact_context_pack_only",
+    assistant_answer: false,
+    raw_audio_included: false,
+    raw_transcript_included: false,
+  };
+  activationGates.push(gate);
+  return gate;
+}
+
 export function createLiveTranslationProcedure(input: {
   thread_id: string;
   room_id: string;
   source_bindings: HelixLiveTranslationSourceBinding[];
+  activation_gate?: HelixLiveProcedureActivationGate | null;
   render_text?: boolean;
   speak_translation?: boolean;
   voice_profile?: string | null;
@@ -36,6 +161,28 @@ export function createLiveTranslationProcedure(input: {
   now?: string;
 }): HelixLiveTranslationProcedure {
   const now = input.now ?? nowIso();
+  const activationGate =
+    input.activation_gate ??
+    evaluateLiveTranslationProcedureActivationGate({
+      source_id: "system:translation_procedure",
+      speaker_id: null,
+      authority: "system",
+      evidence_refs: input.evidence_refs,
+      consent_granted: true,
+      now,
+    });
+  if (activationGate.decision !== "activate") {
+    appendLiveProcedureLedgerItem({
+      procedure_id: `translation_procedure:blocked:${shortHash([input.thread_id, input.room_id, now], 10)}`,
+      event: "blocked",
+      summary: "Translation procedure activation was blocked before procedure creation.",
+      decision: activationGate.decision,
+      reason: activationGate.reason,
+      evidence_refs: activationGate.evidence_refs,
+      now,
+    });
+    throw new Error("live_procedure_activation_blocked");
+  }
   const procedure: HelixLiveTranslationProcedure = {
     schema: HELIX_LIVE_TRANSLATION_PROCEDURE_SCHEMA,
     procedure_id: `translation_procedure:${shortHash([
@@ -56,9 +203,15 @@ export function createLiveTranslationProcedure(input: {
         input.require_confirm_for_unknown_speaker ?? true,
       suppress_overlap: input.suppress_overlap ?? true,
     },
-    evidence_refs: input.evidence_refs?.length
-      ? input.evidence_refs
-      : [`translation_setup:${shortHash([input.thread_id, now], 10)}`],
+    evidence_refs: Array.from(
+      new Set([
+        ...normalizeRefs(
+          input.evidence_refs,
+          `translation_setup:${shortHash([input.thread_id, now], 10)}`,
+        ),
+        activationGate.gate_id,
+      ]),
+    ),
     created_at: now,
     updated_at: now,
     context_policy: "compact_context_pack_only",
@@ -67,6 +220,24 @@ export function createLiveTranslationProcedure(input: {
     raw_transcript_included: false,
   };
   procedures.set(procedure.procedure_id, procedure);
+  appendLiveProcedureLedgerItem({
+    procedure_id: procedure.procedure_id,
+    event: "activation_requested",
+    summary: "Translation procedure activation was requested.",
+    decision: activationGate.decision,
+    reason: activationGate.reason,
+    evidence_refs: activationGate.evidence_refs,
+    now,
+  });
+  appendLiveProcedureLedgerItem({
+    procedure_id: procedure.procedure_id,
+    event: "activation_decided",
+    summary: "Translation procedure activation gate allowed procedure creation.",
+    decision: activationGate.decision,
+    reason: activationGate.reason,
+    evidence_refs: [activationGate.gate_id, ...activationGate.evidence_refs],
+    now,
+  });
   return procedure;
 }
 
@@ -152,6 +323,13 @@ export function recordTranslationObservation(input: {
     updated_at: now,
     evidence_refs: Array.from(new Set([...procedure.evidence_refs, observationId])),
   });
+  appendLiveProcedureLedgerItem({
+    procedure_id: input.procedure_id,
+    event: "observation_recorded",
+    summary: "Translation observation recorded as compact procedure evidence.",
+    evidence_refs: [observationId, ...evidenceRefs],
+    now,
+  });
   return observation;
 }
 
@@ -167,6 +345,23 @@ export function listTranslationObservations(
   return observations.filter(
     (observation: HelixTranslationObservation) =>
       !procedureId || observation.procedure_id === procedureId,
+  );
+}
+
+export function listLiveTranslationProcedures(): HelixLiveTranslationProcedure[] {
+  return Array.from(procedures.values()).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+}
+
+export function listLiveProcedureActivationGates(): HelixLiveProcedureActivationGate[] {
+  return [...activationGates];
+}
+
+export function listLiveProcedureLedgerItems(
+  procedureId?: string | null,
+): HelixLiveProcedureLedgerItem[] {
+  return procedureLedger.filter(
+    (item: HelixLiveProcedureLedgerItem) =>
+      !procedureId || item.procedure_id === procedureId,
   );
 }
 
@@ -200,4 +395,6 @@ export function evaluateTranslationVoiceRelayGate(input: {
 export function resetLiveTranslationProcedures(): void {
   procedures.clear();
   observations.length = 0;
+  activationGates.length = 0;
+  procedureLedger.length = 0;
 }
