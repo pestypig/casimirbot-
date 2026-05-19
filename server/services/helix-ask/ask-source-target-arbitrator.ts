@@ -250,6 +250,10 @@ const mapRepoRequestedOutputs = (
     if (output === "file_path") return ["file_path" as const];
     if (output === "line_backed_source") return ["line_backed_source" as const];
     if (output === "implementation_location") return ["implementation_location" as const];
+    if (output === "route_trace") return ["route_trace" as const];
+    if (output === "tool_call_eligibility") return ["tool_call_eligibility" as const];
+    if (output === "terminal_contract") return ["terminal_contract" as const];
+    if (output === "codex_comparison") return ["codex_comparison" as const];
     return ["repo_code" as const];
   });
 

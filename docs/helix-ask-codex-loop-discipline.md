@@ -183,6 +183,45 @@ Project-local entity definition prompts such as `What is StarSim?`, `What is
 NHM2?`, or `What is Helix Ask?` should use repo evidence unless the user
 explicitly asks for background-only or general-concept-only reasoning.
 
+## Project-Local Agent Loop Questions
+
+Questions about Helix Ask, Codex discipline, the agentic turn loop, route
+planning, source-target intent, terminal authority, tool eligibility, repo grep
+behavior, process-graph shortcuts, SituationRun, field workers, interpretation
+workers, or Live Answer environment binding are project-local implementation
+questions unless explicitly scoped as background-only.
+
+They must not terminate as `model_only_concept / no_tool_direct`.
+
+They must enter either:
+
+- repo/runtime evidence diagnosis,
+- route/tool eligibility diagnosis,
+- or typed failure.
+
+For hard project-local implementation turns, Helix Ask must set:
+
+```txt
+retrieval_required_signal.required = true
+retrieval_required_signal.strength = hard
+source_target_intent.target_source = repo_code
+source_target_intent.allow_client_shortcut = false
+source_target_intent.allow_no_tool_direct = false
+```
+
+The terminal answer must include enough debug evidence to explain whether a
+tool path was allowed or blocked: route classification, retrieval requirement,
+source-target intent, route product contract, and terminal authority.
+
+Codex owns the generic runtime loop: model sampling, tool execution,
+observations, follow-up sampling, cancellation, and terminal turn completion.
+Helix owns source-target admission, evidence identity, live SituationRun
+procedure memory, repo/code proof gates, and terminal eligibility.
+
+Therefore Helix may decide that repo/runtime evidence is required, but it must
+not execute tools through private worker loops. Tool execution must still pass
+through the shared runtime/tool adapter path.
+
 ## Source Target Admission
 
 Every source-targeted turn must bind a `helix.ask_source_target_intent.v1`

@@ -518,10 +518,28 @@ describe("thread-bound situation context bridge", () => {
     });
     expect(response.body?.route_product_contract).toMatchObject({
       schema: "helix.route_product_contract.v1",
+      thread_id: "helix-ask:desktop",
       source_target: "docs_viewer",
     });
-    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("situation_context_pack");
+    expect(response.body?.route_product_contract?.allowed_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining(["doc_location_result", "docs_viewer_receipt", "workspace_action_receipt"]),
+    );
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining(["situation_context_pack", "no_tool_direct", "model_only_concept"]),
+    );
+    expect(response.body?.ask_turn_preflight_context?.deictic_reference).toBeNull();
+    expect(response.body?.deictic_reference ?? null).toBeNull();
     expect(response.body?.terminal_artifact_kind).toBe("doc_location_result");
+    expect(response.body?.doc_location_result).toMatchObject({
+      schema: "helix.doc_location_result.v1",
+      turn_id: expect.stringMatching(/^ask:/),
+      doc_path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      locate_query: "Okay, can you open up Docs and read me the latest NHM2 white paper?",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body?.doc_location_result?.result_id).toMatch(/^doc_location_result:/);
+    expect(response.body?.doc_location_result?.locations?.length).toBeGreaterThan(0);
     expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
     expect(finalAnswer).toContain("Locations:");
     expect(finalAnswer).not.toContain("File Explorer");

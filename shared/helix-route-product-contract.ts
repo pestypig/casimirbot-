@@ -20,10 +20,11 @@ export type HelixRouteProductSourceTarget =
 export type HelixRouteProductContract = {
   schema: typeof HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA;
   turn_id: string;
+  thread_id: string;
   source_target: HelixRouteProductSourceTarget;
   allowed_terminal_artifact_kinds: string[];
   forbidden_terminal_artifact_kinds: string[];
-  required_artifact_refs?: string[];
+  required_artifact_refs: string[];
   precedence_reason: string;
   assistant_answer: false;
   raw_content_included: false;

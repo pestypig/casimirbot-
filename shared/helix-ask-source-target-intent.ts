@@ -28,6 +28,10 @@ export type HelixAskSourceTargetRequestedOutput =
   | "file_path"
   | "line_backed_source"
   | "implementation_location"
+  | "route_trace"
+  | "tool_call_eligibility"
+  | "terminal_contract"
+  | "codex_comparison"
   | "process_overview";
 
 export type HelixAskSourceTargetIntent = {

@@ -7,6 +7,7 @@ import {
 
 const DOC_VIEWER_ALLOWED_TERMINAL_PRODUCTS = [
   "doc_location_result",
+  "docs_viewer_receipt",
   "doc_evidence_location",
   "doc_location_matches",
   "workspace_action_receipt",
@@ -21,6 +22,8 @@ const DOC_VIEWER_FORBIDDEN_TERMINAL_PRODUCTS = [
   "visual_context_pack",
   "visual_frame_evidence",
   "live_card_projection",
+  "no_tool_direct",
+  "model_only_concept",
 ];
 
 const VISUAL_ALLOWED_TERMINAL_PRODUCTS = [
@@ -59,7 +62,6 @@ const PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS = [
 ];
 
 const REPO_CODE_ALLOWED_TERMINAL_PRODUCTS = [
-  "direct_answer_text",
   "repo_code_evidence_answer",
   "repo_entity_definition",
   "tool_evaluation",
@@ -69,6 +71,10 @@ const REPO_CODE_ALLOWED_TERMINAL_PRODUCTS = [
 ];
 
 const REPO_CODE_FORBIDDEN_TERMINAL_PRODUCTS = [
+  "direct_answer_text",
+  "no_tool_direct",
+  "model_only_concept",
+  "process_graph_overview",
   "situation_context_pack",
   "visual_context_pack",
   "visual_frame_evidence",
@@ -149,6 +155,7 @@ export const isStructuredDocsViewerPrompt = (promptText: string): boolean => {
 
 export function buildRouteProductContract(input: {
   turnId: string;
+  threadId?: string | null;
   sourceTargetIntent?: HelixAskSourceTargetIntent | Record<string, unknown> | null;
   promptText?: string | null;
 }): HelixRouteProductContract {
@@ -161,9 +168,11 @@ export function buildRouteProductContract(input: {
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,
+      thread_id: input.threadId ?? "",
       source_target: "docs_viewer",
       allowed_terminal_artifact_kinds: DOC_VIEWER_ALLOWED_TERMINAL_PRODUCTS,
       forbidden_terminal_artifact_kinds: DOC_VIEWER_FORBIDDEN_TERMINAL_PRODUCTS,
+      required_artifact_refs: [],
       precedence_reason: "docs_viewer_source_target_allows_only_document_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
@@ -174,9 +183,11 @@ export function buildRouteProductContract(input: {
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,
+      thread_id: input.threadId ?? "",
       source_target: "visual_capture",
       allowed_terminal_artifact_kinds: VISUAL_ALLOWED_TERMINAL_PRODUCTS,
       forbidden_terminal_artifact_kinds: VISUAL_FORBIDDEN_TERMINAL_PRODUCTS,
+      required_artifact_refs: [],
       precedence_reason: "visual_source_target_allows_only_visual_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
@@ -187,9 +198,11 @@ export function buildRouteProductContract(input: {
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,
+      thread_id: input.threadId ?? "",
       source_target: sourceTarget,
       allowed_terminal_artifact_kinds: PROCEDURE_ALLOWED_TERMINAL_PRODUCTS,
       forbidden_terminal_artifact_kinds: PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS,
+      required_artifact_refs: [],
       precedence_reason: "procedure_memory_source_target_allows_only_epoch_recall_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
@@ -200,9 +213,11 @@ export function buildRouteProductContract(input: {
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,
+      thread_id: input.threadId ?? "",
       source_target: "repo_code",
       allowed_terminal_artifact_kinds: REPO_CODE_ALLOWED_TERMINAL_PRODUCTS,
       forbidden_terminal_artifact_kinds: REPO_CODE_FORBIDDEN_TERMINAL_PRODUCTS,
+      required_artifact_refs: [],
       precedence_reason: "repo_code_source_target_allows_only_repo_evidence_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
@@ -213,9 +228,11 @@ export function buildRouteProductContract(input: {
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,
+      thread_id: input.threadId ?? "",
       source_target: "world_event",
       allowed_terminal_artifact_kinds: WORLD_ALLOWED_TERMINAL_PRODUCTS,
       forbidden_terminal_artifact_kinds: ["active_doc_identity", "doc_location_matches", "doc_evidence_location"],
+      required_artifact_refs: [],
       precedence_reason: "world_event_source_target_allows_world_and_binding_terminal_products",
       assistant_answer: false,
       raw_content_included: false,
@@ -225,9 +242,11 @@ export function buildRouteProductContract(input: {
   return {
     schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
     turn_id: input.turnId,
+    thread_id: input.threadId ?? "",
     source_target: sourceTarget,
     allowed_terminal_artifact_kinds: DEFAULT_ALLOWED_TERMINAL_PRODUCTS,
     forbidden_terminal_artifact_kinds: [],
+    required_artifact_refs: [],
     precedence_reason: "default_terminal_product_contract",
     assistant_answer: false,
     raw_content_included: false,

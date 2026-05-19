@@ -9,6 +9,10 @@ export type HelixRepoCodeEvidenceIntent = {
     | "implementation_location"
     | "symbol_contract"
     | "module_mapping"
+    | "route_trace"
+    | "tool_call_eligibility"
+    | "terminal_contract"
+    | "codex_comparison"
   >;
   projectEntity?: string | null;
 };
@@ -70,6 +74,16 @@ const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
     pattern: /\b(?:server|client|shared|docs|scripts|tools)\/[A-Za-z0-9_./-]+|\b[A-Za-z0-9_-]+\.(?:ts|tsx|js|jsx|md|json|py)\b/i,
     outputs: ["repo_code", "file_path"],
   },
+  {
+    reason: "project_local_agent_loop",
+    pattern: /\b(?:helix\s+ask\s+backend|agentic\s+turn(?:-|\s+)based\s+system|top\s+of\s+the\s+agentic\s+(?:loop|turn|system)|codex\s+(?:discipline|clone|agent|loop)|tool\s+calls?|repo\s+grep|route\s+planner|source_target_intent|source[-_\s]?target\s+intent|terminal\s+authority|situation\s*run|field\s+workers?|interpretation\s+workers?|process\s+graph\s+shortcut|procedure\s+epoch\s+replay|live\s+answer\s+environment)\b/i,
+    outputs: ["repo_code", "implementation_location", "route_trace", "tool_call_eligibility", "terminal_contract", "codex_comparison", "line_backed_source"],
+  },
+  {
+    reason: "project_local_tool_eligibility_question",
+    pattern: /\b(?:why\s+did(?:n'?t| not)\s+(?:it|the\s+agent|helix)\s+(?:make|run|call|use)|can\s+(?:it|the\s+agent|helix)\s+make|able\s+to\s+make)\b[\s\S]{0,120}\b(?:tool\s+calls?|repo\s+grep|grep|right\s+calls?)\b/i,
+    outputs: ["repo_code", "implementation_location", "route_trace", "tool_call_eligibility", "terminal_contract", "line_backed_source"],
+  },
 ];
 
 const PROJECT_LOCAL_ENTITIES: Array<{ canonical: string; pattern: RegExp }> = [
@@ -78,6 +92,11 @@ const PROJECT_LOCAL_ENTITIES: Array<{ canonical: string; pattern: RegExp }> = [
   { canonical: "Needle Hull", pattern: /\bneedle\s+hull\b/i },
   { canonical: "deep mixing", pattern: /\bdeep\s+mixing\b/i },
   { canonical: "Helix Ask", pattern: /\bhelix\s+ask\b/i },
+  { canonical: "Codex", pattern: /\bcodex\b/i },
+  { canonical: "agentic turn loop", pattern: /\bagentic\s+turn(?:-|\s+)based\s+system\b|\bagentic\s+(?:loop|turn|system)\b/i },
+  { canonical: "tool eligibility", pattern: /\btool\s+calls?\b|\brepo\s+grep\b|\btool\s+eligibility\b/i },
+  { canonical: "terminal authority", pattern: /\bterminal\s+authority\b/i },
+  { canonical: "source target intent", pattern: /\bsource_target_intent\b|\bsource[-_\s]?target\s+intent\b/i },
   { canonical: "Stage0", pattern: /\bstage\s*0\b|\bstage0\b/i },
   { canonical: "code lattice", pattern: /\bcode\s+lattice\b/i },
 ];
