@@ -66,6 +66,23 @@ const rules: CueRule[] = [
     ],
   },
   {
+    target: "live_pipeline",
+    reason: "explicit_live_pipeline_control_source_target",
+    confidence: 0.94,
+    strength: "hard",
+    requestedOutputs: ["live_pipeline_receipt"],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
+    suppressedRoutes: ["situation_context_question", "active_doc_identity", "active_doc_summary", "model_only_concept"],
+    cues: [
+      { label: "set_interval", pattern: /\bset\s+(?:the\s+)?(?:interval|cadence|rate)\b/i },
+      { label: "capture_cadence", pattern: /\b(?:capture|visual|screen|frame)\b[\s\S]{0,80}\b(?:cadence|interval|every\s+\d{1,3}\s*(?:seconds?|sec|s))\b/i },
+      { label: "start_live_source", pattern: /\bstart\b[\s\S]{0,80}\b(?:live\s+source|visual\s+capture|screen\s+capture)\b/i },
+      { label: "attach_source", pattern: /\battach\b[\s\S]{0,80}\b(?:source|visual|capture|producer)\b/i },
+      { label: "adopt_producer", pattern: /\badopt\b[\s\S]{0,80}\b(?:producer|visual\s+producer|capture)\b/i },
+    ],
+  },
+  {
     target: "visual_capture",
     reason: "explicit_visual_source_target",
     confidence: 0.94,

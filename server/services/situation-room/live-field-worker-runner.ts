@@ -23,6 +23,7 @@ import { HELIX_LIVE_PROCEDURE_EPOCH_SCHEMA } from "@shared/helix-live-procedure-
 import { appendProcedureEpochLedgerItem } from "./procedure-epoch-ledger-store";
 import { recordProcedureEpochClosure } from "./procedure-epoch-closure";
 import { runLiveInterpretationWorkersForObservation } from "./live-interpretation-worker-runner";
+import { recordVisualSceneMemoryIndex } from "./visual-scene-memory-store";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -424,6 +425,16 @@ export function runLiveFieldWorkersForObservation(input: {
     role: "validation",
     created_at: now,
   });
+  const visualSceneMemory = recordVisualSceneMemoryIndex({
+    situationRunId: run.situation_run_id,
+    threadId: run.thread_id,
+    environmentId: run.environment_id,
+    epoch: run.current_epoch,
+    observation: input.observation,
+    evaluations,
+    procedureEpoch,
+    createdAt: now,
+  });
   appendProcedureEpochLedgerItem({
     situation_run_id: run.situation_run_id,
     source_binding_id: run.source_binding_id,
@@ -454,6 +465,7 @@ export function runLiveFieldWorkersForObservation(input: {
     confidence_updates: probeFeedback.confidence_updates,
     procedure_epoch: procedureEpoch,
     procedure_epoch_closure: epochClosure,
+    visual_scene_memory: visualSceneMemory,
     ...interpretationWorkerRun,
     assistant_answer: false as const,
     raw_content_included: false as const,

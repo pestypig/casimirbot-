@@ -8,9 +8,11 @@ export type HelixAskSourceTarget =
   | "active_doc"
   | "active_note"
   | "repo_code"
+  | "live_pipeline"
   | "situation_epoch"
   | "process_graph"
   | "workstation_state"
+  | "workstation_panel"
   | "general_background"
   | "workspace_panel"
   | "procedure_memory"
@@ -32,6 +34,7 @@ export type HelixAskSourceTargetRequestedOutput =
   | "tool_call_eligibility"
   | "terminal_contract"
   | "codex_comparison"
+  | "live_pipeline_receipt"
   | "process_overview";
 
 export type HelixAskSourceTargetIntent = {

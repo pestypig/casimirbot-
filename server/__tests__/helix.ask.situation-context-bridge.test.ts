@@ -17,6 +17,10 @@ import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live
 import { resetProcedureReasoningSnapshotsForTest } from "../services/situation-room/procedure-reasoning-snapshot-store";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import {
+  recordVisualSceneMemoryIndex,
+  resetVisualSceneMemoryForTest,
+} from "../services/situation-room/visual-scene-memory-store";
+import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
 } from "../services/situation-room/live-source-chunk-buffer";
@@ -134,6 +138,131 @@ const seedTemporalVisualSituationRun = () => {
   return { environment, run };
 };
 
+const seedVisualSceneMemoryComparison = () => {
+  const { environment, run } = seedVisualSituationRun();
+  const priorAt = "2026-05-18T12:00:00.000Z";
+  const currentAt = "2026-05-18T12:00:10.000Z";
+  const priorObservation = appendObservationJournalEntry({
+    thread_id: "helix-ask:desktop",
+    observation_id: "observation:soho-folder",
+    kind: "model_perception_observation",
+    modality: "visual_frame",
+    source_id: "visual_source:test",
+    text: "A Windows File Explorer folder labeled \"SOHO\" is visible with solar assets.",
+    evidence_refs: ["live_source_analysis_job:soho"],
+    model_invoked: true,
+    confidence: 0.8,
+    created_at: priorAt,
+  });
+  const priorSceneEval = recordLiveFieldEvaluation({
+    schema: "helix.live_field_evaluation.v1",
+    evaluation_id: "field_eval:scene:soho",
+    worker_run_id: "field_worker_run:scene:soho",
+    worker_id: "field_worker:scene",
+    situation_run_id: run.situation_run_id,
+    thread_id: run.thread_id,
+    environment_id: run.environment_id,
+    field_key: "scene",
+    value: "The screen shows File Explorer in a folder labeled \"SOHO\" with solar-observation files including soho-index.png.",
+    status: "supported",
+    confidence: 0.77,
+    evidence_refs: [priorObservation.observation_id],
+    missing_evidence: [],
+    corroboration_state: { visual: "present" },
+    next_check: null,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    created_at: priorAt,
+    role: "ui_projection",
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  const currentObservation = appendObservationJournalEntry({
+    thread_id: "helix-ask:desktop",
+    observation_id: "observation:paperplay-folder",
+    kind: "model_perception_observation",
+    modality: "visual_frame",
+    source_id: "visual_source:test",
+    text: "A Windows File Explorer folder labeled \"PAPERPLAY 2\" is visible with artwork files.",
+    evidence_refs: ["live_source_analysis_job:paperplay"],
+    model_invoked: true,
+    confidence: 0.83,
+    created_at: currentAt,
+  });
+  const currentSceneEval = recordLiveFieldEvaluation({
+    schema: "helix.live_field_evaluation.v1",
+    evaluation_id: "field_eval:scene:paperplay",
+    worker_run_id: "field_worker_run:scene:paperplay",
+    worker_id: "field_worker:scene",
+    situation_run_id: run.situation_run_id,
+    thread_id: run.thread_id,
+    environment_id: run.environment_id,
+    field_key: "scene",
+    value: "The screen shows File Explorer in a folder labeled \"PAPERPLAY 2\" with artwork files including paperplay-cover.png.",
+    status: "supported",
+    confidence: 0.81,
+    evidence_refs: [currentObservation.observation_id],
+    missing_evidence: [],
+    corroboration_state: { visual: "present" },
+    next_check: null,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    created_at: currentAt,
+    role: "ui_projection",
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  recordVisualSceneMemoryIndex({
+    situationRunId: run.situation_run_id,
+    threadId: run.thread_id,
+    environmentId: run.environment_id,
+    epoch: 0,
+    observation: priorObservation,
+    evaluations: [priorSceneEval],
+    procedureEpoch: {
+      schema: "helix.live_procedure_epoch.v1",
+      epoch_id: "procedure_epoch:soho",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      source_binding_id: run.source_binding_id,
+      epoch: 0,
+      observation_refs: [priorObservation.observation_id],
+      field_evaluation_refs: [priorSceneEval.evaluation_id],
+      prediction_refs: [],
+      probe_result_refs: [],
+      assistant_answer: false,
+      raw_content_included: false,
+      role: "validation",
+      created_at: priorAt,
+    },
+  });
+  recordVisualSceneMemoryIndex({
+    situationRunId: run.situation_run_id,
+    threadId: run.thread_id,
+    environmentId: run.environment_id,
+    epoch: run.current_epoch,
+    observation: currentObservation,
+    evaluations: [currentSceneEval],
+    procedureEpoch: {
+      schema: "helix.live_procedure_epoch.v1",
+      epoch_id: "procedure_epoch:paperplay",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      source_binding_id: run.source_binding_id,
+      epoch: run.current_epoch,
+      observation_refs: [currentObservation.observation_id],
+      field_evaluation_refs: [currentSceneEval.evaluation_id],
+      prediction_refs: [],
+      probe_result_refs: [],
+      assistant_answer: false,
+      raw_content_included: false,
+      role: "validation",
+      created_at: currentAt,
+    },
+  });
+  return { environment, run };
+};
+
 describe("thread-bound situation context bridge", () => {
   beforeEach(() => {
     resetLiveAnswerEnvironments();
@@ -149,6 +278,7 @@ describe("thread-bound situation context bridge", () => {
     resetLiveFieldWorkerRunsForTest();
     resetProcedureReasoningSnapshotsForTest();
     resetConversationalAnswerDistillationsForTest();
+    resetVisualSceneMemoryForTest();
   });
   it("resolves a typed selected-file prompt through active SituationRun evidence", () => {
     seedVisualSituationRun();
@@ -1008,5 +1138,40 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Current observation:");
+  });
+
+  it("selects a prior visual scene by props and compares it with the current scene", () => {
+    seedVisualSceneMemoryComparison();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Compare what I'm looking at now to the last SOHO folder scene.",
+      inputModality: "typed",
+      turnId: "ask:scene-memory-compare",
+    });
+
+    expect(route.route).toBe("procedure_epoch_replay_question");
+    expect(route.visual_scene_query_intent).toMatchObject({
+      schema: "helix.visual_scene_query_intent.v1",
+      compare_to_current: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.visual_scene_query_intent?.query_terms.map((term) => term.toLowerCase())).toContain("soho");
+    expect(route.selected_visual_scene_set).toMatchObject({
+      schema: "helix.selected_visual_scene_set.v1",
+      selection_reason: "matched_scene_memory_terms",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.selected_visual_scene_set?.selected_scenes[0]?.scene_memory.visible_title).toBe("SOHO");
+    expect(route.visual_scene_comparison_result).toMatchObject({
+      schema: "helix.visual_scene_comparison_result.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.visual_scene_comparison_result?.summary).toContain("Compared current epoch");
+    expect(route.visual_scene_comparison_result?.summary).toContain("SOHO");
+    expect(route.answer_text).toContain("Compared current epoch");
+    expect(route.answer_text).toContain("SOHO");
   });
 });

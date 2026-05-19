@@ -122,6 +122,30 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.route_reason_code).toBe("live_pipeline_control");
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_pipeline_control");
     expect(response.body?.canonical_goal_frame?.allows_workspace_context).toBe(true);
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "live_pipeline",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.route_product_contract).toMatchObject({
+      schema: "helix.route_product_contract.v1",
+      source_target: "live_pipeline",
+    });
+    expect(response.body?.route_product_contract?.allowed_terminal_artifact_kinds).toContain("live_pipeline_receipt");
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("situation_context_pack");
+    expect(response.body?.tool_call_admission_decision).toMatchObject({
+      schema: "helix.tool_call_admission_decision.v1",
+      source_target: "live_pipeline",
+      required: true,
+      admitted_tool_families: ["live_pipeline"],
+    });
+    expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("situation_context_pack");
+    expect(response.body?.terminal_artifact_selection_guard).toMatchObject({
+      schema: "helix.terminal_artifact_selection_guard.v1",
+      allowed: true,
+      terminal_artifact_kind: "live_pipeline_receipt",
+    });
     expect(response.body?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.cadence_ms).toBe(10_000);
     expect(response.body?.workspace_action_receipt?.action_id).toBe("situation-room.live-source.set_rate");
