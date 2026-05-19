@@ -304,6 +304,15 @@ describe("Helix Ask tool admission acceptance matrix", () => {
       route_authority_ok: true,
       route_authority_violation_code: null,
     });
+    expect(response.body?.loop_parity_trace).toMatchObject({
+      schema: "helix.loop_parity_trace.v1",
+      selected_route: response.body?.route_reason_code,
+      admitted_tool_families: ["situation_run"],
+      actual_tool_calls: [],
+      unexpected_tool_calls: [],
+      route_authority_ok: true,
+      short_circuit_risk_flags: [],
+    });
     expectCleanToolAdmissionCoverage(response.body, "visual_capture");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
@@ -337,6 +346,23 @@ describe("Helix Ask tool admission acceptance matrix", () => {
       route_authority_ok: true,
       route_authority_violation_code: null,
     });
+    expect(response.body?.loop_parity_trace).toMatchObject({
+      schema: "helix.loop_parity_trace.v1",
+      selected_route: "live_pipeline_control",
+      admitted_tool_families: ["live_pipeline"],
+      unexpected_tool_calls: [],
+      route_authority_ok: true,
+    });
+    expect(response.body?.loop_parity_trace?.actual_tool_calls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tool_id: "situation-room.live-source.set_rate",
+          family: "live_pipeline",
+          admitted: true,
+          mutating: true,
+        }),
+      ]),
+    );
     expectCleanToolAdmissionCoverage(response.body, "live_pipeline");
   }, 30000);
 

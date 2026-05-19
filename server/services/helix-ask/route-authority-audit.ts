@@ -7,6 +7,7 @@ import type { HelixProductAuthorityGuard } from "./product-authority-guard";
 
 export type HelixRouteAuthorityViolationCode =
   | "terminal_product_authority_mismatch"
+  | "route_contract_missing"
   | "receipt_used_as_content_answer"
   | "client_projection_used_as_answer"
   | "process_graph_used_as_visual_evidence"
@@ -32,6 +33,8 @@ export type HelixRouteAuthorityAudit = {
   forbidden_terminal_artifact_kinds: string[];
   terminal_artifact_allowed: boolean;
   route_authority_ok: boolean;
+  primary_violation_code: HelixRouteAuthorityViolationCode | null;
+  violation_codes: HelixRouteAuthorityViolationCode[];
   route_authority_violation_code: HelixRouteAuthorityViolationCode | null;
   assistant_answer: false;
   raw_content_included: false;
@@ -61,40 +64,57 @@ const sourceTargeted = new Set([
   "active_note",
 ]);
 
-const classifyViolation = (input: {
+const uniqueViolationCodes = (codes: HelixRouteAuthorityViolationCode[]): HelixRouteAuthorityViolationCode[] =>
+  Array.from(new Set(codes));
+
+const isVisualContentPrompt = (promptText: string): boolean =>
+  /\b(?:review|explain|describe|summari[sz]e|compare|what(?:'s|\s+is)?|what\s+changed|look\s+at|see|seeing)\b[\s\S]{0,120}\b(?:screen|screenshot|capture|visual|frame|window|tab)\b/i.test(promptText) ||
+  /\b(?:screen|screenshot|capture|visual|frame|window|tab)\b[\s\S]{0,120}\b(?:show|shows|showing|seeing|visible|happening|changed)\b/i.test(promptText);
+
+const isProcedureMemoryPrompt = (promptText: string): boolean =>
+  /\b(?:what\s+changed|since\s+(?:the\s+)?(?:previous|last)|compare\s+(?:this|current)|replay|earlier|last\s+turn|previous\s+(?:visual|capture|frame|scene))\b/i.test(promptText);
+
+const classifyViolations = (input: {
   sourceTarget: string;
   targetKind: string;
   selectedRoute: string;
   terminalArtifactKind: string;
   finalAnswerSource: string;
+  promptText: string;
   terminalArtifactAllowed: boolean;
-}): HelixRouteAuthorityViolationCode | null => {
+  routeProductContractMissing: boolean;
+  hardSourceTarget: boolean;
+}): HelixRouteAuthorityViolationCode[] => {
   const terminal = input.terminalArtifactKind;
   const route = input.selectedRoute;
   const sourceTarget = input.sourceTarget;
   const targetKind = input.targetKind;
+  const codes: HelixRouteAuthorityViolationCode[] = [];
+  const visualContentPrompt = isVisualContentPrompt(input.promptText);
+  const procedureMemoryPrompt = isProcedureMemoryPrompt(input.promptText);
 
-  if (!input.terminalArtifactAllowed) return "terminal_product_authority_mismatch";
-  if (terminal === "client_projection" || input.finalAnswerSource === "client_projection") return "client_projection_used_as_answer";
-  if (sourceTargeted.has(sourceTarget) && terminal === "model_only_concept") return "model_only_used_for_source_targeted_turn";
-  if (sourceTargeted.has(sourceTarget) && terminal === "no_tool_direct") return "no_tool_direct_used_for_hard_source_target";
-  if ((sourceTarget === "visual_capture" || /visual|screen|capture/i.test(route)) && terminal === "process_graph_overview") {
-    return "process_graph_used_as_visual_evidence";
+  if ((sourceTarget === "visual_capture" || visualContentPrompt || /visual|screen|capture/i.test(route)) && terminal === "process_graph_overview") {
+    codes.push("process_graph_used_as_visual_evidence");
   }
-  if ((sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch") && terminal === "live_pipeline_receipt") {
-    return "receipt_used_as_content_answer";
+  if ((sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && terminal === "live_pipeline_receipt") {
+    codes.push("receipt_used_as_content_answer");
   }
-  if ((sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch") && route === "live_pipeline_control") {
-    return "pipeline_status_used_as_live_cognition";
+  if ((sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && route === "live_pipeline_control") {
+    codes.push("pipeline_status_used_as_live_cognition");
   }
-  if ((sourceTarget === "procedure_memory" || targetKind === "situation_epoch") && terminal !== "procedure_epoch_replay" && terminal !== "visual_scene_comparison_result" && terminal !== "typed_failure") {
-    return "procedure_memory_bypassed";
+  if ((sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || procedureMemoryPrompt) && terminal !== "procedure_epoch_replay" && terminal !== "visual_scene_comparison_result" && terminal !== "typed_failure") {
+    codes.push("procedure_memory_bypassed");
   }
   if ((sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") && terminal !== "repo_code_evidence_answer" && terminal !== "repo_entity_definition" && terminal !== "typed_failure") {
-    return "repo_evidence_bypassed";
+    codes.push("repo_evidence_bypassed");
   }
-  if (sourceTarget === "visual_capture" && terminal === "live_pipeline_receipt") return "visual_evidence_bypassed";
-  return null;
+  if ((sourceTarget === "visual_capture" || visualContentPrompt) && terminal === "live_pipeline_receipt") codes.push("visual_evidence_bypassed");
+  if (input.hardSourceTarget && input.routeProductContractMissing) codes.push("route_contract_missing");
+  if (!input.terminalArtifactAllowed) codes.push("terminal_product_authority_mismatch");
+  if (terminal === "client_projection" || input.finalAnswerSource === "client_projection") codes.push("client_projection_used_as_answer");
+  if (sourceTargeted.has(sourceTarget) && terminal === "model_only_concept") codes.push("model_only_used_for_source_targeted_turn");
+  if (sourceTargeted.has(sourceTarget) && terminal === "no_tool_direct") codes.push("no_tool_direct_used_for_hard_source_target");
+  return uniqueViolationCodes(codes);
 };
 
 export function auditRouteAuthority(input: {
@@ -115,23 +135,33 @@ export function auditRouteAuthority(input: {
   const productGuard = input.productAuthorityGuard as Record<string, unknown> | null | undefined;
   const sourceTarget = readString(sourceTargetRecord?.target_source) || readString(contract?.source_target) || "unknown";
   const targetKind = readString(sourceTargetRecord?.target_kind) || sourceTarget;
+  const hardSourceTarget =
+    readString(sourceTargetRecord?.strength) === "hard" ||
+    sourceTargetRecord?.must_enter_backend_ask === true ||
+    (sourceTargeted.has(sourceTarget) && sourceTarget !== "unknown");
+  const routeProductContractMissing = !contract || readString(contract.schema) !== "helix.route_product_contract.v1";
   const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
   const allowedTerminalArtifactKinds = readStringArray(contract?.allowed_terminal_artifact_kinds);
   const forbiddenTerminalArtifactKinds = readStringArray(contract?.forbidden_terminal_artifact_kinds);
   const terminalArtifactAllowed =
+    !(hardSourceTarget && routeProductContractMissing) &&
     selectionGuard?.allowed !== false &&
     productGuard?.allowed !== false &&
     !forbiddenTerminalArtifactKinds.includes(terminalArtifactKind) &&
     (allowedTerminalArtifactKinds.length === 0 || allowedTerminalArtifactKinds.includes(terminalArtifactKind));
-  const violationCode = classifyViolation({
+  const violationCodes = classifyViolations({
     sourceTarget,
     targetKind,
     selectedRoute: input.selectedRoute,
     terminalArtifactKind,
     finalAnswerSource,
+    promptText: input.promptText,
     terminalArtifactAllowed,
+    routeProductContractMissing,
+    hardSourceTarget,
   });
+  const primaryViolationCode = violationCodes[0] ?? null;
   return {
     schema: "helix.route_authority_audit.v1",
     audit_id: `route-authority:${hashShort([input.turnId, input.promptText, sourceTarget, input.selectedRoute, terminalArtifactKind])}`,
@@ -146,8 +176,10 @@ export function auditRouteAuthority(input: {
     allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
     forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
     terminal_artifact_allowed: terminalArtifactAllowed,
-    route_authority_ok: terminalArtifactAllowed && violationCode === null,
-    route_authority_violation_code: violationCode,
+    route_authority_ok: terminalArtifactAllowed && violationCodes.length === 0,
+    primary_violation_code: primaryViolationCode,
+    violation_codes: violationCodes,
+    route_authority_violation_code: primaryViolationCode,
     assistant_answer: false,
     raw_content_included: false,
   };

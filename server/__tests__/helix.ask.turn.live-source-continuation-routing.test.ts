@@ -369,7 +369,14 @@ describe("live source continuation Ask routing", () => {
       terminalArtifactSelectionGuard: guard,
     })).toMatchObject({
       route_authority_ok: false,
-      route_authority_violation_code: "terminal_product_authority_mismatch",
+      route_authority_violation_code: "receipt_used_as_content_answer",
+      primary_violation_code: "receipt_used_as_content_answer",
+      violation_codes: expect.arrayContaining([
+        "receipt_used_as_content_answer",
+        "pipeline_status_used_as_live_cognition",
+        "visual_evidence_bypassed",
+        "terminal_product_authority_mismatch",
+      ]),
       terminal_artifact_allowed: false,
     });
   });
