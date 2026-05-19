@@ -33,6 +33,7 @@ export function selectSituationEvidence(input: {
   if (context.status === "stale" && input.askingHistory !== true) exclusions.push("stale_evidence_caveat");
   if (context.latest_observation_refs.length === 0) exclusions.push("missing_observation_refs");
   if (context.latest_field_evaluation_refs.length === 0) exclusions.push("missing_field_evaluation_refs");
+  if ((context.latest_interpretation_hypothesis_refs ?? []).length === 0) exclusions.push("missing_interpretation_refs");
   if (context.source_binding_status_refs.length === 0) exclusions.push("missing_bound_source_status_refs");
   if (context.observed_unbound_source_refs.length > 0) exclusions.push("observed_unbound_sources_excluded");
   const sourceStatuses = listSourceBindingStatuses({
@@ -57,6 +58,7 @@ export function selectSituationEvidence(input: {
     (
       context.latest_observation_refs.length > 0 ||
       context.latest_field_evaluation_refs.length > 0 ||
+      (context.latest_interpretation_hypothesis_refs ?? []).length > 0 ||
       context.latest_probe_result_refs.length > 0 ||
       context.latest_closure_refs.length > 0
     );
@@ -73,6 +75,11 @@ export function selectSituationEvidence(input: {
     deictic_reference_id: input.deicticReference?.reference_id ?? null,
     selected_observation_refs: answerable ? unique(context.latest_observation_refs).slice(-3) : [],
     selected_field_evaluation_refs: answerable ? unique(context.latest_field_evaluation_refs).slice(-10) : [],
+    selected_interpretation_run_refs: answerable ? unique(context.latest_interpretation_run_refs ?? []).slice(-4) : [],
+    selected_interpretation_worker_run_refs: answerable ? unique(context.latest_interpretation_worker_run_refs ?? []).slice(-12) : [],
+    selected_interpretation_hypothesis_refs: answerable ? unique(context.latest_interpretation_hypothesis_refs ?? []).slice(-12) : [],
+    selected_interpretation_graph_refs: answerable ? unique(context.latest_interpretation_graph_refs ?? []).slice(-4) : [],
+    selected_interpretation_tangent_refs: answerable ? unique(context.latest_interpretation_tangent_refs ?? []).slice(-8) : [],
     selected_probe_result_refs: answerable ? unique(context.latest_probe_result_refs).slice(-6) : [],
     selected_epoch_closure_refs: answerable ? unique(context.latest_closure_refs).slice(-4) : [],
     selected_source_descriptor_refs: answerable ? unique(context.latest_source_descriptor_refs).slice(-6) : [],

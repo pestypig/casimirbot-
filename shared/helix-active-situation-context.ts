@@ -22,6 +22,11 @@ export type HelixActiveSituationContext = {
   active_modalities: string[];
   latest_observation_refs: string[];
   latest_field_evaluation_refs: string[];
+  latest_interpretation_run_refs: string[];
+  latest_interpretation_worker_run_refs: string[];
+  latest_interpretation_hypothesis_refs: string[];
+  latest_interpretation_graph_refs: string[];
+  latest_interpretation_tangent_refs: string[];
   latest_probe_result_refs: string[];
   latest_closure_refs: string[];
   latest_source_descriptor_refs: string[];

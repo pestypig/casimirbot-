@@ -9,6 +9,11 @@ export type HelixSituationEvidenceSelection = {
   deictic_reference_id?: string | null;
   selected_observation_refs: string[];
   selected_field_evaluation_refs: string[];
+  selected_interpretation_run_refs: string[];
+  selected_interpretation_worker_run_refs: string[];
+  selected_interpretation_hypothesis_refs: string[];
+  selected_interpretation_graph_refs: string[];
+  selected_interpretation_tangent_refs: string[];
   selected_probe_result_refs: string[];
   selected_epoch_closure_refs: string[];
   selected_source_descriptor_refs: string[];

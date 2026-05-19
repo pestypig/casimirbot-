@@ -14,6 +14,11 @@ import { resetVisualComparisonSessionsForTest } from "../services/situation-room
 import { resetVoiceLiveHandoffsForTest } from "../services/situation-room/voice-live-handoff-router";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
 import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live-field-worker-run-store";
+import { ensureLiveInterpretationRun, resetLiveInterpretationRunsForTest } from "../services/situation-room/live-interpretation-run-store";
+import { recordLiveInterpretationWorkerRun, resetLiveInterpretationWorkerRunsForTest } from "../services/situation-room/live-interpretation-worker-run-store";
+import { recordLiveInterpretationHypothesis, resetLiveInterpretationHypothesesForTest } from "../services/situation-room/live-interpretation-hypothesis-store";
+import { updateLiveInterpretationGraph, resetLiveInterpretationGraphsForTest } from "../services/situation-room/live-interpretation-graph-store";
+import { recordLiveTangentEvaluation, resetLiveTangentEvaluationsForTest } from "../services/situation-room/live-tangent-evaluation-store";
 import { resetProcedureReasoningSnapshotsForTest } from "../services/situation-room/procedure-reasoning-snapshot-store";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import {
@@ -119,6 +124,100 @@ const seedVisualSituationRun = () => {
     created_at: now,
   });
   return { environment, run, observation };
+};
+
+const seedVisualSituationRunWithInterpretation = () => {
+  const seeded = seedVisualSituationRun();
+  const now = new Date().toISOString();
+  const interpretationRun = ensureLiveInterpretationRun({
+    run: seeded.run,
+    observation: seeded.observation,
+    now,
+  });
+  const workerRun = recordLiveInterpretationWorkerRun({
+    schema: "helix.live_interpretation_worker_run.v1",
+    interpretation_worker_run_id: "live_interpretation_worker_run:bridge-activity",
+    interpretation_worker_id: "live_interpretation_worker:activity",
+    worker_kind: "activity",
+    situation_run_id: seeded.run.situation_run_id,
+    interpretation_run_id: interpretationRun.interpretation_run_id,
+    thread_id: seeded.run.thread_id,
+    source_epoch: seeded.run.current_epoch,
+    scene_epoch_id: seeded.observation.observation_id,
+    trigger_observation_refs: [seeded.observation.observation_id],
+    trigger_summary_refs: [seeded.observation.observation_id],
+    status: "completed",
+    model_invoked: false,
+    model_budget_used: "none",
+    input_digest: "bridge-input",
+    output_digest: "bridge-output",
+    artifact_count: 1,
+    hypothesis_count: 1,
+    failure_reason: null,
+    started_at: now,
+    completed_at: now,
+    output_hypothesis_id: "live_interpretation_hypothesis:bridge-activity",
+    assistant_answer: false,
+    raw_content_included: false,
+    role: "validation",
+  });
+  const hypothesis = recordLiveInterpretationHypothesis({
+    schema: "helix.live_interpretation_hypothesis.v1",
+    hypothesis_id: "live_interpretation_hypothesis:bridge-activity",
+    interpretation_worker_run_id: workerRun.interpretation_worker_run_id,
+    interpretation_run_id: interpretationRun.interpretation_run_id,
+    situation_run_id: seeded.run.situation_run_id,
+    source_epoch: seeded.run.current_epoch,
+    latest_source_epoch: seeded.run.current_epoch,
+    lens: "activity",
+    kind: "activity",
+    claim: "The user is likely reviewing a research folder in File Explorer.",
+    normalized_key: "reviewing_research_folder",
+    confidence: 0.71,
+    evidence_refs: [seeded.observation.observation_id],
+    missing_evidence: [],
+    uncertainty: [],
+    supports: [],
+    contradicts: [],
+    supersedes: [],
+    predicted_signals: ["folder_navigation_change"],
+    recommended_next_check: "Compare the next epoch for folder navigation or selection changes.",
+    recommended_candidate: "silent_update",
+    status: "active",
+    stale_after_epoch_count: 3,
+    validation_state: {},
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    assistant_answer: false,
+    raw_content_included: false,
+    role: "validation",
+  });
+  const graph = updateLiveInterpretationGraph({
+    interpretationRun,
+    hypotheses: [hypothesis],
+    workerRuns: [workerRun],
+    artifacts: [],
+    now,
+  });
+  const tangent = recordLiveTangentEvaluation({
+    schema: "helix.live_tangent_evaluation.v1",
+    tangent_id: "live_tangent:bridge-activity",
+    situation_run_id: seeded.run.situation_run_id,
+    thread_id: seeded.run.thread_id,
+    tangent_type: "interpretation_bridge_check",
+    trigger_observation_refs: [seeded.observation.observation_id],
+    claim: "Interpretation bridge tangent remains validation evidence only.",
+    confidence: 0.6,
+    evidence_refs: [hypothesis.hypothesis_id],
+    missing_evidence: [],
+    supports: [hypothesis.hypothesis_id],
+    contradicts: [],
+    recommended_handoff: { type: "none", reason: "validation_only" },
+    assistant_answer: false,
+    raw_content_included: false,
+    role: "validation",
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  });
+  return { ...seeded, interpretationRun, workerRun, hypothesis, graph, tangent };
 };
 
 const seedTemporalVisualSituationRun = () => {
@@ -382,6 +481,11 @@ describe("thread-bound situation context bridge", () => {
     resetLiveSourceChunkBufferForTest();
     resetLiveFieldWorkersForTest();
     resetLiveFieldWorkerRunsForTest();
+    resetLiveInterpretationRunsForTest();
+    resetLiveInterpretationWorkerRunsForTest();
+    resetLiveInterpretationHypothesesForTest();
+    resetLiveInterpretationGraphsForTest();
+    resetLiveTangentEvaluationsForTest();
     resetProcedureReasoningSnapshotsForTest();
     resetConversationalAnswerDistillationsForTest();
     resetVisualSceneMemoryForTest();
@@ -408,6 +512,29 @@ describe("thread-bound situation context bridge", () => {
     expect(route.answer_text).not.toContain("Evidence refs:");
     expect(route.reasoning_snapshot?.assistant_answer).toBe(false);
     expect(route.answer_distillation?.assistant_answer).toBe(false);
+  });
+
+  it("selects interpretation artifacts as first-class Ask evidence", () => {
+    const seeded = seedVisualSituationRunWithInterpretation();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "What am I looking at now in the visual screen capture?",
+      inputModality: "typed",
+      turnId: "ask:interpretation-bridge",
+    });
+
+    expect(route.active_situation_context.latest_interpretation_run_refs).toContain(seeded.interpretationRun.interpretation_run_id);
+    expect(route.active_situation_context.latest_interpretation_worker_run_refs).toContain(seeded.workerRun.interpretation_worker_run_id);
+    expect(route.active_situation_context.latest_interpretation_hypothesis_refs).toContain(seeded.hypothesis.hypothesis_id);
+    expect(route.active_situation_context.latest_interpretation_graph_refs).toContain(seeded.graph.graph_id);
+    expect(route.active_situation_context.latest_interpretation_tangent_refs).toContain(seeded.tangent.tangent_id);
+    expect(route.situation_evidence_selection.selected_interpretation_run_refs).toContain(seeded.interpretationRun.interpretation_run_id);
+    expect(route.situation_evidence_selection.selected_interpretation_worker_run_refs).toContain(seeded.workerRun.interpretation_worker_run_id);
+    expect(route.situation_evidence_selection.selected_interpretation_hypothesis_refs).toContain(seeded.hypothesis.hypothesis_id);
+    expect(route.situation_evidence_selection.selected_interpretation_graph_refs).toContain(seeded.graph.graph_id);
+    expect(route.situation_evidence_selection.selected_interpretation_tangent_refs).toContain(seeded.tangent.tangent_id);
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(seeded.hypothesis.hypothesis_id);
+    expect(route.answer_distillation?.selected_evidence_refs).toContain(seeded.hypothesis.hypothesis_id);
   });
 
   it("creates a voice live handoff instead of quick-response authority", () => {

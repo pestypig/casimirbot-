@@ -199,6 +199,11 @@ const selectedEvidenceRefs = (selection: HelixSituationEvidenceSelection): strin
     ...selection.selected_source_binding_status_refs,
     ...selection.selected_observation_refs,
     ...selection.selected_field_evaluation_refs,
+    ...(selection.selected_interpretation_run_refs ?? []),
+    ...(selection.selected_interpretation_worker_run_refs ?? []),
+    ...(selection.selected_interpretation_hypothesis_refs ?? []),
+    ...(selection.selected_interpretation_graph_refs ?? []),
+    ...(selection.selected_interpretation_tangent_refs ?? []),
     ...selection.selected_probe_result_refs,
     ...selection.selected_epoch_closure_refs,
     ...selection.selected_source_descriptor_refs,
@@ -608,7 +613,10 @@ const filterActiveSituationContextByWindow = (
     return !binding.excluded_observation_refs.some((entry) => entry.reason === "after_anchor");
   });
   const status =
-    context.status === "active" && latestObservationRefs.length === 0 && latestFieldEvaluationRefs.length === 0
+    context.status === "active" &&
+    latestObservationRefs.length === 0 &&
+    latestFieldEvaluationRefs.length === 0 &&
+    (context.latest_interpretation_hypothesis_refs ?? []).length === 0
       ? "no_fresh_evidence"
       : context.status;
   return {
@@ -1193,6 +1201,8 @@ const buildReplayAnswerBundle = (input: {
     `Evidence refs: ${[
       previousObservationRef,
       currentObservationRef,
+      ...(input.selection.selected_interpretation_hypothesis_refs ?? []),
+      ...(input.selection.selected_interpretation_graph_refs ?? []),
       ...input.selection.selected_probe_result_refs,
       ...input.selection.selected_epoch_closure_refs,
       ...input.selection.selected_field_evaluation_refs,
@@ -1207,6 +1217,7 @@ const buildReplayAnswerBundle = (input: {
     `Evidence refs: ${[
       previousObservationRef,
       currentObservationRef,
+      ...(input.selection.selected_interpretation_hypothesis_refs ?? []),
       ...input.selection.selected_field_evaluation_refs,
       ...input.selection.selected_epoch_closure_refs,
     ].filter(Boolean).slice(0, 6).join(", ") || "none selected"}.`,

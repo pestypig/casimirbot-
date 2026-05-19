@@ -14,6 +14,11 @@ import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descri
 import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
 import type { HelixSourceBindingStatus } from "@shared/helix-source-binding-status";
 import type { HelixSourceBindingRepairCandidate } from "@shared/helix-source-binding-repair-candidate";
+import type { HelixLiveInterpretationRun } from "@shared/helix-live-interpretation-run";
+import type { HelixLiveInterpretationWorkerRun } from "@shared/helix-live-interpretation-worker-run";
+import type { HelixLiveInterpretationHypothesis } from "@shared/helix-live-interpretation-hypothesis";
+import type { HelixLiveInterpretationGraph } from "@shared/helix-live-interpretation-graph";
+import type { HelixLiveTangentEvaluation } from "@shared/helix-live-tangent-evaluation";
 import { listLiveSituationRuns } from "./live-situation-run-store";
 import { listObservationJournalEntries } from "./observation-journal-store";
 import { listLiveFieldEvaluations } from "./live-field-evaluation-store";
@@ -23,6 +28,11 @@ import { listLiveSourceDescriptors } from "./live-source-descriptor-builder";
 import { listLiveAnswerEnvironments } from "./live-answer-environment-store";
 import { listLiveSourceProducers } from "./live-source-chunk-buffer";
 import { readLiveSourceProducerFreshness } from "./live-source-producer-freshness";
+import { listLiveInterpretationRuns } from "./live-interpretation-run-store";
+import { listLiveInterpretationWorkerRuns } from "./live-interpretation-worker-run-store";
+import { listLiveInterpretationHypotheses } from "./live-interpretation-hypothesis-store";
+import { listLiveInterpretationGraphs } from "./live-interpretation-graph-store";
+import { listLiveTangentEvaluations } from "./live-tangent-evaluation-store";
 import {
   createSourceBindingRepairCandidate,
   listSourceBindingRepairCandidates,
@@ -113,6 +123,42 @@ export function resolveActiveSituationContext(input: {
         limit: 24,
       })
     : [];
+  const interpretationRuns = run
+    ? listLiveInterpretationRuns({
+        threadId,
+        situationRunId: run.situation_run_id,
+        limit: 12,
+      })
+    : [];
+  const interpretationRunIds = new Set(interpretationRuns.map((entry: HelixLiveInterpretationRun) => entry.interpretation_run_id));
+  const interpretationWorkerRuns = run
+    ? listLiveInterpretationWorkerRuns({
+        threadId,
+        situationRunId: run.situation_run_id,
+        limit: 80,
+      }).filter((entry: HelixLiveInterpretationWorkerRun) => interpretationRunIds.size === 0 || interpretationRunIds.has(entry.interpretation_run_id))
+    : [];
+  const interpretationHypotheses = run
+    ? listLiveInterpretationHypotheses({
+        situationRunId: run.situation_run_id,
+        limit: 80,
+      }).filter((entry: HelixLiveInterpretationHypothesis) =>
+        (interpretationRunIds.size === 0 || interpretationRunIds.has(entry.interpretation_run_id)) &&
+        !["rejected", "expired", "stale"].includes(entry.status)
+      )
+    : [];
+  const interpretationGraphs = run
+    ? listLiveInterpretationGraphs({
+        situationRunId: run.situation_run_id,
+      }).filter((entry: HelixLiveInterpretationGraph) => interpretationRunIds.size === 0 || interpretationRunIds.has(entry.interpretation_run_id))
+    : [];
+  const interpretationTangents = run
+    ? listLiveTangentEvaluations({
+        threadId,
+        situationRunId: run.situation_run_id,
+        limit: 40,
+      })
+    : [];
   const probeResults = run
     ? listLiveProbeResults({
         threadId,
@@ -153,11 +199,19 @@ export function resolveActiveSituationContext(input: {
       )
     : fieldEvaluations;
   const latestFieldEvaluationRefs = unique(scopedFieldEvaluations.slice(-8).map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id));
+  const latestInterpretationRunRefs = unique(interpretationRuns.slice(-4).map((entry: HelixLiveInterpretationRun) => entry.interpretation_run_id));
+  const latestInterpretationWorkerRunRefs = unique(interpretationWorkerRuns.slice(-12).map((entry: HelixLiveInterpretationWorkerRun) => entry.interpretation_worker_run_id));
+  const latestInterpretationHypothesisRefs = unique(interpretationHypotheses.slice(-12).map((entry: HelixLiveInterpretationHypothesis) => entry.hypothesis_id));
+  const latestInterpretationGraphRefs = unique(interpretationGraphs.slice(-4).map((entry: HelixLiveInterpretationGraph) => entry.graph_id));
+  const latestInterpretationTangentRefs = unique(interpretationTangents.slice(-8).map((entry: HelixLiveTangentEvaluation) => entry.tangent_id));
   const latestProbeResultRefs = unique(probeResults.slice(-4).map((entry: HelixLiveProbeResult) => entry.probe_result_id));
   const latestClosureRefs = unique(closures.slice(-3).map((entry: HelixProcedureEpochClosure) => entry.closure_id));
   const latestSourceDescriptorRefs = unique(scopedDescriptors.slice(-6).map((entry: HelixLiveSourceDescriptor) => entry.descriptor_id));
   const latestEvidenceTime = [
     ...fieldEvaluations.map((entry: HelixLiveFieldEvaluation) => entry.created_at),
+    ...interpretationRuns.map((entry: HelixLiveInterpretationRun) => entry.updated_at),
+    ...interpretationWorkerRuns.map((entry: HelixLiveInterpretationWorkerRun) => entry.completed_at ?? entry.started_at),
+    ...interpretationGraphs.map((entry: HelixLiveInterpretationGraph) => entry.updated_at),
     ...probeResults.map((entry: HelixLiveProbeResult) => entry.created_at),
     ...closures.map((entry: HelixProcedureEpochClosure) => entry.created_at),
     ...observations.map((entry: HelixObservationJournalEntry) => entry.created_at),
@@ -170,7 +224,7 @@ export function resolveActiveSituationContext(input: {
     ? activeEnvironment
       ? "missing"
       : "missing"
-    : latestObservationRefs.length === 0 && latestFieldEvaluationRefs.length === 0
+    : latestObservationRefs.length === 0 && latestFieldEvaluationRefs.length === 0 && latestInterpretationHypothesisRefs.length === 0
       ? "no_fresh_evidence"
       : stale
         ? "stale"
@@ -214,6 +268,11 @@ export function resolveActiveSituationContext(input: {
       run?.situation_run_id ?? activeEnvironment?.environment_id ?? activeProducer?.producer.producer_id ?? "missing",
       latestObservationRefs,
       latestFieldEvaluationRefs,
+      latestInterpretationRunRefs,
+      latestInterpretationWorkerRunRefs,
+      latestInterpretationHypothesisRefs,
+      latestInterpretationGraphRefs,
+      latestInterpretationTangentRefs,
       latestProbeResultRefs,
       latestClosureRefs,
     ])}`,
@@ -235,6 +294,11 @@ export function resolveActiveSituationContext(input: {
     active_modalities: activeModalities,
     latest_observation_refs: latestObservationRefs,
     latest_field_evaluation_refs: latestFieldEvaluationRefs,
+    latest_interpretation_run_refs: latestInterpretationRunRefs,
+    latest_interpretation_worker_run_refs: latestInterpretationWorkerRunRefs,
+    latest_interpretation_hypothesis_refs: latestInterpretationHypothesisRefs,
+    latest_interpretation_graph_refs: latestInterpretationGraphRefs,
+    latest_interpretation_tangent_refs: latestInterpretationTangentRefs,
     latest_probe_result_refs: latestProbeResultRefs,
     latest_closure_refs: latestClosureRefs,
     latest_source_descriptor_refs: latestSourceDescriptorRefs,
