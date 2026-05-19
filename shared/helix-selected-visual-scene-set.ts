@@ -11,9 +11,17 @@ export type HelixSelectedVisualScene = {
 
 export type HelixRejectedVisualScene = {
   scene_memory_ref: string;
-  reason: string;
+  reason:
+    | "lower_score_than_selected_scene"
+    | "wrong_scene_kind"
+    | "wrong_app_or_surface"
+    | "outside_anchor_window"
+    | "insufficient_term_overlap"
+    | "future_or_post_anchor"
+    | "missing_evidence_refs";
   score: number;
   matched_terms: string[];
+  evidence_refs: string[];
 };
 
 export type HelixSelectedVisualSceneSet = {
@@ -24,6 +32,14 @@ export type HelixSelectedVisualSceneSet = {
   query_intent_id: string;
   selected_scenes: HelixSelectedVisualScene[];
   current_scene?: HelixVisualSceneMemoryIndex | null;
+  current_scene_ref?: string | null;
+  candidate_pool_size: number;
+  source_target_ref: string;
+  selection_policy:
+    | "exact_title_first"
+    | "semantic_terms_with_recency"
+    | "last_kind_match"
+    | "no_match";
   selection_reason: string;
   confidence: number;
   evidence_refs: string[];

@@ -57,6 +57,17 @@ const buildAcceptedCandidate = (input: {
   server_authoritative: true,
 });
 
+const withAcceptedCalloutAuthority = <T extends { text: string; evidenceRefs?: string[] }>(payload: T) => ({
+  ...payload,
+  voiceAuthorityState: "callout_voice" as const,
+  accepted_arbitration_candidate: buildAcceptedCandidate({
+    text: payload.text,
+    text_certainty: "reasoned",
+    voice_certainty: "reasoned",
+    evidence_refs: payload.evidenceRefs ?? ["docs/helix-ask-flow.md#L1"],
+  }),
+});
+
 const ORIGINAL_ENV = {
   VOICE_PROXY_DRY_RUN: process.env.VOICE_PROXY_DRY_RUN,
   TTS_BASE_URL: process.env.TTS_BASE_URL,
@@ -389,6 +400,25 @@ describe("voice routes", () => {
     expect(res.body.reason).toBe("missing_accepted_arbitration_candidate");
   });
 
+  it("suppresses Dot callout voice when authority fields are omitted", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Action required: rerun verifier.",
+      mode: "callout",
+      priority: "action",
+      voiceProfile: "dottie_default",
+      missionId: "mission-dot-omitted-authority",
+      evidenceRefs: ["docs/verify.md#L1"],
+      traceId: "trace-dot-omitted-authority",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("missing_accepted_arbitration_candidate");
+  });
+
   it("suppresses callout_voice when candidate text hash does not match", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     const app = buildApp();
@@ -545,7 +575,7 @@ describe("voice routes", () => {
     const missionId = uniqueId("mission");
     const dedupeKey = uniqueId("event");
 
-    const first = await request(app).post("/api/voice/speak").send({
+    const first = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "Evidence gate passed.",
       mode: "callout",
       priority: "warn",
@@ -554,12 +584,12 @@ describe("voice routes", () => {
       eventId: dedupeKey,
       dedupe_key: dedupeKey,
       traceId: "trace-first",
-    });
+    }));
     expect(first.status).toBe(200);
     expect(first.body.ok).toBe(true);
     expect(first.body.dryRun).toBe(true);
 
-    const second = await request(app).post("/api/voice/speak").send({
+    const second = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "Evidence gate passed.",
       mode: "callout",
       priority: "warn",
@@ -568,7 +598,7 @@ describe("voice routes", () => {
       eventId: dedupeKey,
       dedupe_key: dedupeKey,
       traceId: "trace-second",
-    });
+    }));
     expect(second.status).toBe(200);
     expect(second.body.suppressed).toBe(true);
     expect(second.body.reason).toBe("dedupe_cooldown");
@@ -603,12 +633,12 @@ describe("voice routes", () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     const app = buildApp();
 
-    const res = await request(app).post("/api/voice/speak").send({
+    const res = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "Meter this callout.",
       missionId: uniqueId("mission-meter"),
       repoAttributed: false,
       durationMs: 1200,
-    });
+    }));
 
     expect(res.status).toBe(200);
     expect(res.body.metering?.requestCount).toBe(1);
@@ -624,22 +654,22 @@ describe("voice routes", () => {
     const app = buildApp();
     const missionId = uniqueId("mission-untrusted-clock");
 
-    const first = await request(app).post("/api/voice/speak").send({
+    const first = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "first",
       missionId,
       eventId: uniqueId("evt-untrusted"),
       repoAttributed: false,
       policyTsMs: 0,
       replayMode: true,
-    });
-    const second = await request(app).post("/api/voice/speak").send({
+    }));
+    const second = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "second",
       missionId,
       eventId: uniqueId("evt-untrusted"),
       repoAttributed: false,
       policyTsMs: 4102444800000,
       replayMode: true,
-    });
+    }));
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(429);
@@ -654,22 +684,22 @@ describe("voice routes", () => {
     const app = buildApp();
     const missionId = uniqueId("mission-trusted-clock");
 
-    const first = await request(app).post("/api/voice/speak").send({
+    const first = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "first",
       missionId,
       eventId: uniqueId("evt-trusted"),
       repoAttributed: false,
       policyTsMs: 1000,
       replayMode: true,
-    });
-    const second = await request(app).post("/api/voice/speak").send({
+    }));
+    const second = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "second",
       missionId,
       eventId: uniqueId("evt-trusted"),
       repoAttributed: false,
       policyTsMs: 62000,
       replayMode: true,
-    });
+    }));
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
@@ -687,15 +717,15 @@ describe("voice routes", () => {
     const first = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-a")
-      .send({ text: "one", missionId, eventId: uniqueId("event"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "one", missionId, eventId: uniqueId("event"), repoAttributed: false }));
     const second = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-a")
-      .send({ text: "two", missionId, eventId: uniqueId("event"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "two", missionId, eventId: uniqueId("event"), repoAttributed: false }));
     const missionBudget = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-a")
-      .send({ text: "three", missionId, eventId: uniqueId("event"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "three", missionId, eventId: uniqueId("event"), repoAttributed: false }));
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
@@ -706,19 +736,19 @@ describe("voice routes", () => {
     const tenantMissionA = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-one", missionId: uniqueId("mission-b"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "b-one", missionId: uniqueId("mission-b"), repoAttributed: false }));
     const tenantMissionB = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-two", missionId: uniqueId("mission-b"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "b-two", missionId: uniqueId("mission-b"), repoAttributed: false }));
     const tenantDaily = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-three", missionId: uniqueId("mission-b"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "b-three", missionId: uniqueId("mission-b"), repoAttributed: false }));
     const tenantDailyExceeded = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-four", missionId: uniqueId("mission-b"), repoAttributed: false });
+      .send(withAcceptedCalloutAuthority({ text: "b-four", missionId: uniqueId("mission-b"), repoAttributed: false }));
 
     expect(tenantMissionA.status).toBe(200);
     expect(tenantMissionB.status).toBe(200);
@@ -734,7 +764,7 @@ describe("voice routes", () => {
     const missionId = uniqueId("mission-rate");
 
     const send = (eventId: string) =>
-      request(app).post("/api/voice/speak").send({
+      request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
         text: "Status update.",
         mode: "callout",
         priority: "info",
@@ -742,7 +772,7 @@ describe("voice routes", () => {
       evidenceRefs: ["docs/helix-ask-flow.md#L1"],
         eventId,
         dedupe_key: eventId,
-      });
+      }));
 
     const first = await send(uniqueId("evt"));
     const second = await send(uniqueId("evt"));
@@ -804,9 +834,18 @@ describe("voice routes", () => {
       if (!address || typeof address !== "object") throw new Error("no port");
       process.env.TTS_BASE_URL = `http://127.0.0.1:${address.port}`;
       const app = buildApp();
+      const text = "profile passthrough";
       const res = await request(app).post("/api/voice/speak").send({
-        text: "profile passthrough",
+        text,
+        mode: "briefing",
         voice_profile_id: "dottie_governed",
+        voiceAuthorityState: "status_voice",
+        terminal_answer_authority: buildTestTerminalAuthority({
+          terminal_kind: "answer",
+          terminal_artifact_kind: "assistant_answer",
+          final_answer_source: "terminal_final_answer",
+          terminal_text: text,
+        }),
         utteranceId: "utt-meta-1",
         chunkIndex: 0,
         chunkCount: 1,
@@ -844,14 +883,14 @@ describe("voice routes", () => {
       const app = buildApp();
 
       const sendFail = () =>
-        request(app).post("/api/voice/speak").send({
+        request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
           text: "Backend unstable.",
           mode: "callout",
           priority: "warn",
           missionId: uniqueId("mission-breaker"),
           eventId: uniqueId("event-breaker"),
           evidenceRefs: ["docs/helix-ask-flow.md#L1"],
-        });
+        }));
 
       const first = await sendFail();
       const second = await sendFail();
@@ -893,18 +932,18 @@ describe("voice routes", () => {
     const app = buildApp();
     const missionId = uniqueId("mission-overload");
 
-    const first = await request(app).post("/api/voice/speak").send({
+    const first = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "baseline",
       missionId,
       evidenceRefs: ["docs/helix-ask-flow.md#L1"],
       eventId: uniqueId("event-overload"),
-    });
-    const overloaded = await request(app).post("/api/voice/speak").send({
+    }));
+    const overloaded = await request(app).post("/api/voice/speak").send(withAcceptedCalloutAuthority({
       text: "overload",
       missionId,
       evidenceRefs: ["docs/helix-ask-flow.md#L1"],
       eventId: uniqueId("event-overload"),
-    });
+    }));
 
     expect(first.status).toBe(200);
     expect(overloaded.status).toBe(429);
@@ -941,14 +980,14 @@ describe("voice routes", () => {
           response.on("data", (chunk: Buffer) => chunks.push(chunk));
           response.on("end", () => callback(null, Buffer.concat(chunks)));
         })
-        .send({
+        .send(withAcceptedCalloutAuthority({
           text: "Proxy this voice message.",
           mode: "callout",
           priority: "action",
           missionId: uniqueId("mission-audio"),
           eventId: uniqueId("event-audio"),
           evidenceRefs: ["docs/helix-ask-flow.md#L1"],
-        });
+        }));
 
       expect(res.status).toBe(200);
       expect(res.headers["x-voice-provider"]).toBe("proxy");
@@ -1144,7 +1183,7 @@ describe("voice routes", () => {
   });
 
 
-  it("suppresses mission callout without evidence by default", async () => {
+  it("suppresses mission callout without source authority before evidence parity", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     const app = buildApp();
 
@@ -1157,10 +1196,10 @@ describe("voice routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.suppressed).toBe(true);
-    expect(res.body.reason).toBe("missing_evidence");
+    expect(res.body.reason).toBe("missing_accepted_arbitration_candidate");
   });
 
-  it("keeps explicit repoAttributed false behavior for mission callouts", async () => {
+  it("suppresses mission callout even with explicit repoAttributed false when source authority is omitted", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     const app = buildApp();
 
@@ -1173,8 +1212,8 @@ describe("voice routes", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.suppressed ?? false).toBe(false);
-    expect(res.body.reason).toBeUndefined();
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("missing_accepted_arbitration_candidate");
   });
 
   it("suppresses when voice certainty exceeds text certainty", async () => {

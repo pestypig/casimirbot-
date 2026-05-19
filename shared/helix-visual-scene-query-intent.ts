@@ -8,6 +8,24 @@ export type HelixVisualSceneQueryIntent = {
   thread_id: string;
   query_text: string;
   query_terms: string[];
+  query_mode:
+    | "find_prior_scene"
+    | "compare_prior_to_current"
+    | "changed_since_prior"
+    | "compare_current_app_to_prior_kind";
+  target_scene_kind?: "folder" | "app_window" | "task_manager" | "media_roll" | "unknown";
+  target_app_terms: string[];
+  target_window_terms: string[];
+  target_file_folder_terms: string[];
+  target_object_terms: string[];
+  target_activity_terms: string[];
+  target_intent_terms: string[];
+  relative_time:
+    | "last_matching"
+    | "last_folder_scene"
+    | "latest_any"
+    | "unspecified";
+  requires_current_scene: boolean;
   compare_to_current: boolean;
   strength: "none" | "soft" | "hard";
   reason: string;

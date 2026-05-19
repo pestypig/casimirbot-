@@ -18,6 +18,7 @@ export type HelixVisualSceneMemoryIndex = {
   closure_refs: string[];
   app_or_surface?: string | null;
   visible_title?: string | null;
+  scene_kind?: "folder" | "app_window" | "document" | "browser" | "task_manager" | "media_roll" | "unknown";
   app_hints: string[];
   window_title_hints: string[];
   visible_object_terms: string[];
@@ -25,6 +26,12 @@ export type HelixVisualSceneMemoryIndex = {
   activity_terms: string[];
   uncertainty_terms: string[];
   user_objective_terms: string[];
+  normalized_title_terms: string[];
+  normalized_path_terms: string[];
+  semantic_tags: string[];
+  observed_at?: string | null;
+  available_at?: string | null;
+  index_version: "visual_scene_memory_index.semantic_v2";
   objects: string[];
   file_names: string[];
   activity_summary: string;

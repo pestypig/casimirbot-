@@ -35,7 +35,11 @@ export type HelixAskSourceTargetRequestedOutput =
   | "terminal_contract"
   | "codex_comparison"
   | "live_pipeline_receipt"
-  | "process_overview";
+  | "process_overview"
+  | "visual_scene_query_intent"
+  | "selected_visual_scene_set"
+  | "visual_scene_comparison_result"
+  | "typed_failure";
 
 export type HelixAskSourceTargetIntent = {
   schema: typeof HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA;

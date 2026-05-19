@@ -16,6 +16,11 @@ export type HelixVisualSceneComparisonResult = {
   changed_activity: string[];
   changed_app_or_window: string[];
   changed_user_focus: string[];
+  added_terms: string[];
+  removed_terms: string[];
+  shared_terms: string[];
+  prior_scene_evidence_refs: string[];
+  current_scene_evidence_refs: string[];
   confidence: number;
   shared_traits: string[];
   differences: string[];

@@ -1134,6 +1134,31 @@ const suppressionEnvelope = (reason: string) => ({
   suppression_reason: reason,
 });
 
+const hasDotVoiceAuthorityFields = (payload: VoiceRequest): boolean =>
+  Boolean(
+    payload.voiceAuthorityState ||
+      payload.terminal_answer_authority ||
+      payload.accepted_arbitration_candidate ||
+      payload.sourceKind ||
+      payload.sourceTextHash ||
+      payload.terminal_voice_text_hash,
+  );
+
+const isDotVoiceProfile = (value: string | undefined): boolean =>
+  /\b(?:dot|dottie)\b|(?:^|[_-])(?:dot|dottie)(?:[_-]|$)/i.test(value?.trim() ?? "");
+
+const hasDotTraceMetadata = (payload: VoiceRequest): boolean =>
+  [payload.traceId, payload.missionId, payload.eventId, payload.utteranceId, payload.turnKey].some((value) =>
+    /(?:^|[:_-])(?:helix|dot|dottie)(?:[:_-]|$)|^ask:/i.test(value?.trim() ?? ""),
+  );
+
+const isDotVoiceRequest = (payload: VoiceRequest): boolean => {
+  if (hasDotVoiceAuthorityFields(payload)) return true;
+  if (isDotVoiceProfile(payload.voiceProfile) || isDotVoiceProfile(payload.voice_profile_id)) return true;
+  if (payload.mode === "callout" && (payload.missionId?.trim() || payload.eventId?.trim())) return true;
+  return hasDotTraceMetadata(payload);
+};
+
 const buildInlineAudioDataUri = (file: Express.Multer.File): string => {
   const mimeType = file.mimetype?.trim() || "audio/webm";
   return `data:${mimeType};base64,${file.buffer.toString("base64")}`;
@@ -2375,18 +2400,10 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const payload = parsed.data;
   const policyNowMs = resolvePolicyNowMs(payload);
-  const shouldRunDotVoiceSourceGate = Boolean(
-    payload.voiceAuthorityState ||
-      payload.terminal_answer_authority ||
-      payload.accepted_arbitration_candidate ||
-      payload.sourceKind ||
-      payload.sourceTextHash ||
-      payload.terminal_voice_text_hash,
-  );
-  if (shouldRunDotVoiceSourceGate) {
+  if (isDotVoiceRequest(payload)) {
     const voiceSourceDecision = authorizeDotVoiceSource({
       text: payload.text,
-      voiceAuthorityState: payload.voiceAuthorityState,
+      voiceAuthorityState: payload.voiceAuthorityState ?? (payload.mode === "callout" ? "callout_voice" : "status_voice"),
       terminalAnswerAuthority: payload.terminal_answer_authority,
       acceptedArbitrationCandidate: payload.accepted_arbitration_candidate,
       sourceKind: payload.sourceKind,
