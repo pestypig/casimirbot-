@@ -1176,7 +1176,7 @@ describe("thread-bound situation context bridge", () => {
     expect(recall.reasoning_snapshot?.assistant_answer).toBe(false);
   });
 
-  it("routes scene-delta prompts through procedure replay", () => {
+  it("routes scene-delta prompts through procedure replay and refuses fake comparisons without prior evidence", () => {
     seedVisualSituationRun();
     const route = routeSituationContextTurn({
       threadId: "helix-ask:desktop",
@@ -1189,7 +1189,7 @@ describe("thread-bound situation context bridge", () => {
     expect(route.deictic_reference.reference_type).toBe("latest_epoch_change");
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
-      "Activity: Likely browsing, reviewing, or organizing visible workstation files.",
+      "previous visual observation evidence is unavailable",
     );
     expect(route.procedure_memory_recall).toMatchObject({
       schema: "helix.procedure_memory_recall.v1",
@@ -1197,9 +1197,13 @@ describe("thread-bound situation context bridge", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
-      "Raw images, audio, and logs were not injected into Ask context.",
-    );
+    expect(route.typed_failure).toMatchObject({
+      schema: "helix.typed_failure.v1",
+      error_code: "procedure_epoch_previous_unavailable",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.answer_text).not.toContain("The attached image shows");
   });
 
   it.each([
@@ -1242,13 +1246,15 @@ describe("thread-bound situation context bridge", () => {
     expect(route.procedure_memory_recall?.recall_type).toBe("epoch_replay");
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
-    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Current observation:");
-    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Change:");
-    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Unchanged:");
-    expect(route.answer_text).toContain("Current:");
-    expect(route.answer_text).toContain("Previous:");
-    expect(route.procedure_epoch_replay_delta).toMatchObject({
-      schema: "helix.procedure_epoch_replay_delta.v1",
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Current observation");
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Previous observation");
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("previous visual observation evidence is unavailable");
+    expect(route.answer_text).toContain("Current observation");
+    expect(route.answer_text).toContain("Previous observation");
+    expect(route.answer_text).not.toContain("The attached image shows");
+    expect(route.typed_failure).toMatchObject({
+      schema: "helix.typed_failure.v1",
+      error_code: "procedure_epoch_previous_unavailable",
       assistant_answer: false,
       raw_content_included: false,
     });
@@ -1292,8 +1298,9 @@ describe("thread-bound situation context bridge", () => {
     expect(route.visual_scene_comparison_result?.next_check).toContain("Capture another visual epoch");
     expect(route.visual_scene_comparison_result?.summary).toContain("Compared current epoch");
     expect(route.visual_scene_comparison_result?.summary).toContain("SOHO");
-    expect(route.answer_text).toContain("Compared current epoch");
-    expect(route.answer_text).toContain("SOHO");
+    expect(route.answer_text).toContain("Current observation");
+    expect(route.answer_text).toContain("Previous observation");
+    expect(route.answer_text).not.toContain("The attached image shows");
   });
 
   it("retrieves the SUN folder scene semantically and compares it with current Task Manager", () => {

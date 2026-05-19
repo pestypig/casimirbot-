@@ -6,6 +6,7 @@ import {
   type HelixDeicticReferenceType,
   type HelixDeicticResolutionStatus,
 } from "@shared/helix-deictic-reference";
+import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -30,11 +31,11 @@ export function detectDeicticReference(input: {
   const text = normalize(prompt);
   const repoCodeContextWithoutScreen = repoCodeContextRe.test(prompt) && !explicitScreenContextRe.test(prompt);
   const epochChangeRe =
-    /\b(?:what\s+changed|changed|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+step|card\s+update|confidence\s+change|why\s+did|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen)))\b/;
+    /\b(?:changed|last\s+step|card\s+update|confidence\s+change|why\s+did)\b/;
   const referenceType: HelixDeicticReferenceType =
     repoCodeContextWithoutScreen
       ? "unknown"
-      : epochChangeRe.test(text)
+      : isSceneEpochReplayPrompt(prompt) || epochChangeRe.test(text)
       ? "latest_epoch_change"
       : /\b(?:compare|comparison|next\s+(?:one|file|image|picture|screen)|about\s+to\s+show|first\s+(?:picture|image|file))\b/.test(text)
       ? "comparison_target"

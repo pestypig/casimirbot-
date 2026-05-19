@@ -1,4 +1,5 @@
 import type { ProcessGraphContextPack } from "./buildProcessGraphContextPack";
+import { isSceneEpochReplayPrompt } from "@shared/helix-scene-epoch-replay-intent";
 
 const OVERVIEW_PROMPT_PATTERN =
   /\b(?:what(?:'s| is)\s+(?:happening|going on)|what\s+are\s+you\s+doing|what\s+(?:tools|artifacts)\s+are\s+active|current\s+workspace|active\s+(?:jobs?|tools?|panels?|pipeline|artifacts)|why\s+did\s+that\s+fail|what\s+changed|latest\s+(?:artifact|result|job))\b/i;
@@ -11,11 +12,21 @@ const PROCEDURE_MEMORY_PROMPT_PATTERN =
 
 export function shouldUseProcessGraphContextPack(prompt: string): boolean {
   const trimmed = prompt.trim();
+  if (isSceneEpochReplayPrompt(trimmed) && !EXPLICIT_PROCESS_GRAPH_PROMPT_PATTERN.test(trimmed)) return false;
   const asksOverview = OVERVIEW_PROMPT_PATTERN.test(trimmed);
   if (!asksOverview) return false;
   const asksProcedureMemory = PROCEDURE_MEMORY_PROMPT_PATTERN.test(trimmed);
   if (!asksProcedureMemory) return true;
   return EXPLICIT_PROCESS_GRAPH_PROMPT_PATTERN.test(trimmed);
+}
+
+export function declineProcessGraphAskOverview(prompt: string): { declined: true; reason: string } | null {
+  return isSceneEpochReplayPrompt(prompt) && !EXPLICIT_PROCESS_GRAPH_PROMPT_PATTERN.test(prompt)
+    ? {
+        declined: true,
+        reason: "procedure_epoch_replay_prompt_requires_backend_ask",
+      }
+    : null;
 }
 
 function formatList(

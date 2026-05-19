@@ -8,6 +8,10 @@ export type HelixMultimodalIntentRoute = {
   docs_route_allowed: boolean;
 };
 
+export const isExplicitVisualEpochDeltaPrompt = (promptText: string): boolean =>
+  /\b(?:what\s+changed|changed\s+since|compare(?:d)?\b[\s\S]{0,100}\b(?:previous|prior|last)\s+(?:one|scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:previous|prior|last)\s+(?:one|scene|frame|visual|screen|capture|epoch)|previous\s+(?:one|scene|frame|visual|screen|capture|epoch)|prior\s+(?:one|scene|frame|visual|screen|capture|epoch)|since\s+(?:the\s+)?(?:previous|prior|last)\s+(?:one|scene|frame|visual|screen|capture|epoch)|scene\s+epoch|visual\s+epoch)\b/i
+    .test(promptText);
+
 export function routeHelixMultimodalIntent(context: HelixMultimodalTurnContext): HelixMultimodalIntentRoute {
   const userText = getUserTextFromTurnInputItems(context.turn_input_items);
   const hasVisualEvidence = context.visual_evidence_refs.length > 0;
@@ -23,7 +27,7 @@ export function routeHelixMultimodalIntent(context: HelixMultimodalTurnContext):
     /\b(?:compare|contrast|check|match|against)\b[\s\S]*\b(?:doc|document|whitepaper|paper|viewer|open file|current file)\b/i
       .test(userText);
   const visualSummary = getVisualEvidenceSummaryFromTurnInputItems(context.turn_input_items);
-  if (!hasVisualEvidence || !asksAboutVisual || asksForLiveOrchestration) {
+  if (!hasVisualEvidence || !asksAboutVisual || asksForLiveOrchestration || isExplicitVisualEpochDeltaPrompt(userText)) {
     return { route: "none", selected_evidence_refs: [], visual_summary: null, docs_route_allowed: true };
   }
   if (asksForDocumentCompare) {

@@ -97,6 +97,34 @@ describe("helix ask visual evidence routing", () => {
     );
   });
 
+  it("does not answer explicit visual epoch deltas from a single attached frame", async () => {
+    const question = "What changed in the visual screen capture compared with the previous scene epoch?";
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        sessionId: "helix-ask:desktop",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: question, source: "user" },
+          {
+            type: "evidence_ref",
+            evidence_id: "visual_evidence:current-only",
+            evidence_kind: "visual_frame_evidence",
+            compact_summary: "The current frame shows a project management UI.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).not.toBe("multimodal_visual_answer");
+    expect(response.body.final_answer_source).not.toBe("artifact_synthesis");
+    expect(response.body.terminal_artifact_kind).not.toBe("visual_frame_evidence");
+    expect(response.body.answer).not.toContain("The attached image shows");
+  });
+
   it("does not surface hotbar counts for generic image descriptions", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")

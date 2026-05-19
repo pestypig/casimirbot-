@@ -10344,6 +10344,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     coerceText(canonicalGoalFrame?.turn_id).trim() ||
     coerceText(turnTruthTable?.turn_id).trim() ||
     reply.id;
+  const terminalAuthorityForDebug = readAgentLoopAuditRecord(
+    payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
+  );
+  const canonicalActiveTurnId = coerceText(terminalAuthorityForDebug?.turn_id).trim() || activeTurnId;
+  const clientActiveTurnId = reply.id && reply.id !== canonicalActiveTurnId ? reply.id : null;
   const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
   const lifecycleEvents = Array.isArray(workspaceActionSource?.workspace_action_lifecycle_events)
     ? workspaceActionSource.workspace_action_lifecycle_events
@@ -10354,7 +10359,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
-    active_turn_id: activeTurnId,
+    active_turn_id: canonicalActiveTurnId,
+    backend_turn_id: canonicalActiveTurnId,
+    client_active_turn_id: clientActiveTurnId,
     active_prompt: activePrompt,
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
     selected_final_answer: selectedFinalAnswer,
@@ -10365,7 +10372,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
     resolved_turn_summary: {
-      turn_id: activeTurnId,
+      turn_id: canonicalActiveTurnId,
       final_status:
         (liveEnvironmentAnswerApplied ? "final_answer" : null) ||
         coerceText(resolvedTurnSummary?.final_status).trim() ||
@@ -10454,8 +10461,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       agentLoop?.live_interpretation_hypotheses,
     live_interpretation_graph:
       payload.live_interpretation_graph ?? debug?.live_interpretation_graph ?? agentLoop?.live_interpretation_graph,
+    live_interpretation_epoch_delta:
+      payload.live_interpretation_epoch_delta ??
+      debug?.live_interpretation_epoch_delta ??
+      agentLoop?.live_interpretation_epoch_delta,
     pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
-    terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
+    terminal_answer_authority: terminalAuthorityForDebug,
     poison_audit: payload.poison_audit ?? debug?.poison_audit ?? agentLoop?.poison_audit,
     prompt_poison_audit: payload.prompt_poison_audit ?? debug?.prompt_poison_audit ?? agentLoop?.prompt_poison_audit,
     selected_evidence_pack: payload.selected_evidence_pack ?? debug?.selected_evidence_pack ?? agentLoop?.selected_evidence_pack,
@@ -10472,10 +10483,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     backend_debug_response_ref:
       readAgentLoopAuditRecord(debug?.debug_export_ref) ??
       readAgentLoopAuditRecord(payload.debug_export_ref) ??
-      (activeTurnId
+      (canonicalActiveTurnId
         ? {
-            endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
-            turn_id: activeTurnId,
+            endpoint: `/api/agi/ask/turn/${encodeURIComponent(canonicalActiveTurnId)}/debug-export`,
+            turn_id: canonicalActiveTurnId,
           }
         : undefined),
     debug_export_anti_determinism_audit: {
@@ -10484,7 +10495,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
         { check: "projection_only_patch", passed: true, evidence: "debug_export" },
         { check: "no_goal_mutation", passed: true, evidence: coerceText(readAgentLoopAuditRecord(debug?.canonical_goal_frame)?.goal_kind).trim() || "unknown" },
         { check: "no_terminal_mutation", passed: true, evidence: terminalArtifactKind ?? "none" },
-        { check: "active_turn_only", passed: true, evidence: activeTurnId },
+        { check: "active_turn_only", passed: true, evidence: canonicalActiveTurnId },
         { check: "no_dom_scrape_source", passed: true, evidence: "reply_payload" },
         { check: "receipt_not_fabricated", passed: true, evidence: receipt ? "current_turn_ledger" : "no_workspace_receipt" },
       ],

@@ -62,7 +62,7 @@ describe("helix ask pill E68 debug export envelope", () => {
   it("preserves durable live interpretation debug attachments", () => {
     const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
       {
-        id: "turn-live",
+        id: "client-turn-live",
         question: "Check live interpretation state",
         content: "Live interpretation state is attached.",
         mode: "read",
@@ -98,11 +98,31 @@ describe("helix ask pill E68 debug export envelope", () => {
           selected_final_answer: "Live interpretation state is attached.",
           final_answer_source: "live_environment_binding_diagnosis",
           terminal_artifact_kind: "live_environment_binding_diagnosis",
+          terminal_answer_authority: {
+            turn_id: "ask:backend-live",
+            server_authoritative: true,
+          },
+        },
+        live_interpretation_epoch_delta: {
+          schema: "helix.live_interpretation_epoch_delta.v1",
+          delta_id: "live_interpretation_epoch_delta:test",
+          interpretation_run_id: "live_interpretation_run:test",
+          previous_scene_epoch_id: "observation:first",
+          current_scene_epoch_id: "observation:latest",
+          reinforced_hypothesis_ids: ["hypothesis:1"],
+          contradicted_hypothesis_ids: [],
+          superseded_hypothesis_ids: [],
+          expired_hypothesis_ids: [],
+          newly_created_hypothesis_ids: ["hypothesis:2"],
         },
       },
     );
     const parsed = JSON.parse(payload);
 
+    expect(parsed.active_turn_id).toBe("ask:backend-live");
+    expect(parsed.backend_turn_id).toBe("ask:backend-live");
+    expect(parsed.client_active_turn_id).toBe("client-turn-live");
+    expect(parsed.resolved_turn_summary.turn_id).toBe("ask:backend-live");
     expect(parsed.live_interpretation_debug.counts.workers).toBe(9);
     expect(parsed.live_interpretation_run.interpretation_run_id).toBe("live_interpretation_run:test");
     expect(parsed.live_interpretation_workers.map((worker: any) => worker.kind)).toEqual(["scene_neutral", "verifier"]);
@@ -110,5 +130,12 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.live_interpretation_validation_artifacts[0].artifact_type).toBe("contradiction");
     expect(parsed.live_interpretation_hypotheses[0].status).toBe("active");
     expect(parsed.live_interpretation_graph.edges[0].relation).toBe("seeded_by");
+    expect(parsed.live_interpretation_epoch_delta).toEqual(
+      expect.objectContaining({
+        interpretation_run_id: "live_interpretation_run:test",
+        previous_scene_epoch_id: "observation:first",
+        current_scene_epoch_id: "observation:latest",
+      }),
+    );
   });
 });

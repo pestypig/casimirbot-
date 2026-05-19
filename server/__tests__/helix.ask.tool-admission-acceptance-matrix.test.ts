@@ -403,7 +403,8 @@ describe("Helix Ask tool admission acceptance matrix", () => {
       admitted_tool_families: expect.arrayContaining(["procedure_memory", "situation_run"]),
     });
     expect(response.body?.deictic_reference?.reference_type).toBe("latest_epoch_change");
-    expect(response.body?.terminal_artifact_kind).toMatch(/procedure_epoch_replay|visual_scene_comparison_result/);
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(response.body?.typed_failure?.error_code).toBe("procedure_epoch_previous_unavailable");
     expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("process_graph_overview");
     expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("live_environment_binding_diagnosis");
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
@@ -480,13 +481,48 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     });
     expect(response.body?.route_reason_code).toBe("procedure_epoch_replay_question");
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("procedure_epoch_replay_question");
-    expect(response.body?.terminal_artifact_kind).toBe("procedure_epoch_replay");
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(response.body?.typed_failure?.error_code).toBe("procedure_epoch_previous_unavailable");
     expect(response.body?.final_answer_source).not.toBe("live_environment_binding_diagnosis");
     expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("live_environment_binding_diagnosis");
     expectCleanToolAdmissionCoverage(response.body, "procedure_memory");
   }, 60000);
 
-  it("admits semantic scene-memory comparisons to selected scene products", async () => {
+  it("answers generic previous/current scene replay with procedure epoch replay when two observations exist", async () => {
+    const app = createApp();
+    seedVisualSceneMemoryComparison();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "What changed since last seen epoch?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "procedure_memory",
+      target_kind: "situation_epoch",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.route_reason_code).toBe("procedure_epoch_replay_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("procedure_epoch_replay_question");
+    expect(response.body?.terminal_artifact_kind).toBe("procedure_epoch_replay");
+    expect(response.body?.final_answer_source).toBe("procedure_epoch_replay");
+    expect(response.body?.procedure_epoch_replay).toMatchObject({
+      schema: "helix.procedure_epoch_replay.v1",
+    });
+    expect(String(response.body?.answer)).toMatch(
+      /Current observation[\s\S]+Previous observation[\s\S]+Changed elements[\s\S]+Unchanged elements[\s\S]+Uncertainty[\s\S]+Evidence refs[\s\S]+Terminal authority/,
+    );
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("visual_scene_comparison_result");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 60000);
+
+  it("wraps semantic scene-memory comparisons as evidence under procedure replay authority", async () => {
     const app = createApp();
     seedVisualSceneMemoryComparison();
     const response = await request(app)
@@ -505,7 +541,8 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     });
     expect(response.body?.selected_visual_scene_set?.selected_scenes[0]?.scene_memory?.visible_title).toBe("SOHO");
     expect(response.body?.visual_scene_comparison_result?.schema).toBe("helix.visual_scene_comparison_result.v1");
-    expect(response.body?.terminal_artifact_kind).toBe("visual_scene_comparison_result");
+    expect(response.body?.terminal_artifact_kind).toBe("procedure_epoch_replay");
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("visual_scene_comparison_result");
     expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
     expectCleanToolAdmissionCoverage(response.body, "procedure_memory");

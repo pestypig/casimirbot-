@@ -6,6 +6,7 @@ import {
 import { buildProcessGraphContextPack } from "../buildProcessGraphContextPack";
 import {
   buildProcessGraphOverviewText,
+  declineProcessGraphAskOverview,
   shouldUseProcessGraphContextPack,
 } from "../processGraphAskOverview";
 
@@ -101,5 +102,9 @@ describe("workstation process graph context pack", () => {
     expect(shouldUseProcessGraphContextPack("What changed in the visual epoch?")).toBe(false);
     expect(shouldUseProcessGraphContextPack("Replay the procedure memory.")).toBe(false);
     expect(shouldUseProcessGraphContextPack("Okay, so what is the difference between the last scene in the scene I'm looking at now")).toBe(false);
+    expect(declineProcessGraphAskOverview("Compare the current scene to the previous visual")).toMatchObject({
+      declined: true,
+      reason: "procedure_epoch_replay_prompt_requires_backend_ask",
+    });
   });
 });

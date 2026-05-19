@@ -56,13 +56,24 @@ import type { HelixSelectedVisualSceneSet } from "@shared/helix-selected-visual-
 import type { HelixVisualSceneComparisonResult } from "@shared/helix-visual-scene-comparison-result";
 import type { HelixRelativeSessionSemanticIntent } from "@shared/helix-relative-session-semantic-intent";
 import type { HelixSelectedSessionSemanticBinding } from "@shared/helix-selected-session-semantic-binding";
+import {
+  HELIX_PROCEDURE_EPOCH_REPLAY_SCHEMA,
+  type HelixProcedureEpochReplay,
+} from "@shared/helix-procedure-epoch-replay";
+import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 
 type HelixSituationTypedFailure = {
   schema: "helix.typed_failure.v1";
   failure_id: string;
   turn_id: string;
   thread_id: string;
-  error_code: "visual_scene_memory_no_match" | "visual_scene_memory_current_missing";
+  error_code:
+    | "visual_scene_memory_no_match"
+    | "visual_scene_memory_current_missing"
+    | "procedure_epoch_current_unavailable"
+    | "procedure_epoch_previous_unavailable"
+    | "procedure_epoch_replay_evidence_unavailable"
+    | "procedure_epoch_replay_terminal_authority_rejected";
   message: string;
   evidence_refs: string[];
   query_intent_id: string;
@@ -122,6 +133,7 @@ export type SituationContextTurnRoute = {
   visual_scene_comparison_result?: HelixVisualSceneComparisonResult | null;
   procedure_epoch_replay_delta?: HelixProcedureEpochReplayDelta | null;
   typed_failure?: HelixSituationTypedFailure | null;
+  procedure_epoch_replay?: HelixProcedureEpochReplay | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
   binding_repair?: ReturnType<typeof repairUnboundVisualSituationContext> | null;
 };
@@ -136,7 +148,7 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
 const isProcedureReplayPrompt = (prompt: string): boolean =>
-  /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
+  /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+(?:the\s+)?current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
 
 const isComparisonPrompt = (prompt: string): boolean =>
   /\b(?:compare\s+this|compare\s+(?:this|the)\s+(?:file|image|picture|screen)|next\s+(?:one|file|image|picture|screen)|remember\s+this\s+as\s+the\s+first)\b/i.test(prompt);
@@ -166,6 +178,114 @@ const selectedEvidenceRefs = (selection: HelixSituationEvidenceSelection): strin
     ...selection.selected_epoch_closure_refs,
     ...selection.selected_source_descriptor_refs,
   ])).slice(0, 24);
+
+const withRefPrefix = (kind: string, refs: string[]): string[] =>
+  refs
+    .map((ref) => ref.trim())
+    .filter(Boolean)
+    .map((ref) => ref.includes(":") ? ref : `${kind}:${ref}`);
+
+const renderProcedureEpochTerminalAuthority = (terminalArtifactKind: "procedure_epoch_replay" | "typed_failure"): string =>
+  [
+    "Terminal authority",
+    "server_authoritative=true",
+    `terminal_artifact_kind=${terminalArtifactKind}`,
+    "source_target=procedure_memory",
+    "target_kind=situation_epoch",
+    "client_shortcut_allowed=false",
+    "no_tool_direct_allowed=false",
+  ].join("\n");
+
+const renderProcedureEpochReplayAnswer = (replay: HelixProcedureEpochReplay): string =>
+  [
+    "Current observation",
+    replay.current_observation ?? "Unavailable",
+    "",
+    "Previous observation",
+    replay.previous_observation ?? "Unavailable",
+    "",
+    "Changed elements",
+    ...(replay.changed_elements.length ? replay.changed_elements.map((entry) => `- ${entry}`) : ["- none confidently selected"]),
+    "",
+    "Unchanged elements",
+    ...(replay.unchanged_elements.length ? replay.unchanged_elements.map((entry) => `- ${entry}`) : ["- none confidently selected"]),
+    "",
+    "Uncertainty",
+    ...(replay.uncertainty.length ? replay.uncertainty.map((entry) => `- ${entry}`) : ["- comparison confidence unavailable"]),
+    "",
+    "Evidence refs",
+    ...(replay.evidence_refs.length ? replay.evidence_refs.map((entry) => `- ${entry}`) : ["- none selected"]),
+    "",
+    renderProcedureEpochTerminalAuthority("procedure_epoch_replay"),
+  ].join("\n");
+
+const renderProcedureEpochFailureAnswer = (failure: HelixSituationTypedFailure): string =>
+  [
+    failure.message,
+    "",
+    "Current observation",
+    failure.error_code === "procedure_epoch_current_unavailable" ? "Unavailable" : "Unavailable or insufficiently selected",
+    "",
+    "Previous observation",
+    failure.error_code === "procedure_epoch_previous_unavailable" ? "Unavailable" : "Unavailable or insufficiently selected",
+    "",
+    "Changed elements",
+    "- none confidently selected",
+    "",
+    "Unchanged elements",
+    "- none confidently selected",
+    "",
+    "Uncertainty",
+    ...uniqueStrings([
+      ...failure.missing_evidence,
+      failure.message,
+    ]).map((entry) => `- ${entry}`),
+    "",
+    "Evidence refs",
+    ...(failure.evidence_refs.length ? failure.evidence_refs.map((entry) => `- ${entry}`) : ["- none selected"]),
+    "",
+    renderProcedureEpochTerminalAuthority("typed_failure"),
+  ].join("\n");
+
+const buildProcedureEpochTypedFailure = (input: {
+  turnId: string;
+  threadId: string;
+  errorCode: HelixSituationTypedFailure["error_code"];
+  message: string;
+  evidenceRefs?: string[];
+  missingEvidence?: string[];
+  selection?: HelixSituationEvidenceSelection | null;
+  queryIntentId?: string | null;
+  selectedSceneSetId?: string | null;
+}): HelixSituationTypedFailure => {
+  const evidenceRefs = uniqueStrings([
+    ...(input.evidenceRefs ?? []),
+    ...(input.selection ? selectedEvidenceRefs(input.selection) : []),
+  ]);
+  return {
+    schema: "helix.typed_failure.v1",
+    failure_id: `typed_failure:${hashShort([input.turnId, input.errorCode, evidenceRefs, input.missingEvidence])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    error_code: input.errorCode,
+    message: input.message,
+    evidence_refs: evidenceRefs,
+    query_intent_id: input.queryIntentId ?? "",
+    selected_scene_set_id: input.selectedSceneSetId ?? "",
+    query_terms: [],
+    candidate_pool_size: 0,
+    rejected_candidate_refs: [],
+    missing_evidence: uniqueStrings(input.missingEvidence ?? []),
+    next_required_action:
+      input.errorCode === "procedure_epoch_current_unavailable"
+        ? "capture_current_visual_epoch"
+        : input.errorCode === "procedure_epoch_previous_unavailable"
+          ? "wait_for_scene_memory_index"
+          : "none",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const buildProcedureMemoryRecall = (input: {
   threadId: string;
@@ -553,9 +673,17 @@ const refsForObservation = (refs: string[], observationRef: string | null): stri
 };
 
 const buildReplayAnswerBundle = (input: {
+  turnId: string;
+  threadId: string;
   activeContext: HelixActiveSituationContext;
   selection: HelixSituationEvidenceSelection;
-}): { fullReasoning: string; conciseAnswer: string; delta: HelixProcedureEpochReplayDelta } => {
+}): {
+  fullReasoning: string;
+  conciseAnswer: string;
+  delta: HelixProcedureEpochReplayDelta;
+  replay: HelixProcedureEpochReplay;
+  typedFailure: HelixSituationTypedFailure | null;
+} => {
   const context = input.activeContext;
   if (!context.situation_run_id || context.latest_epoch === null || context.latest_epoch === undefined) {
     const delta: HelixProcedureEpochReplayDelta = {
@@ -574,10 +702,45 @@ const buildReplayAnswerBundle = (input: {
       assistant_answer: false,
       raw_content_included: false,
     };
+    const typedFailure = buildProcedureEpochTypedFailure({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      errorCode: "procedure_epoch_current_unavailable",
+      message: "I do not have a current bound situation epoch to replay yet.",
+      missingEvidence: ["bound_situation_epoch_missing", "current_observation_missing"],
+      selection: input.selection,
+    });
+    const replay: HelixProcedureEpochReplay = {
+      schema: HELIX_PROCEDURE_EPOCH_REPLAY_SCHEMA,
+      replay_id: `procedure_epoch_replay:${hashShort([input.turnId, "current_unavailable"])}`,
+      turn_id: input.turnId,
+      thread_id: input.threadId,
+      situation_run_id: null,
+      current_epoch: null,
+      previous_epoch: null,
+      current_observation: null,
+      previous_observation: null,
+      changed_elements: [],
+      unchanged_elements: [],
+      uncertainty: typedFailure.missing_evidence,
+      current_observation_refs: [],
+      previous_observation_refs: [],
+      current_field_evaluation_refs: [],
+      previous_field_evaluation_refs: [],
+      probe_result_refs: [],
+      epoch_closure_refs: [],
+      evidence_refs: typedFailure.evidence_refs,
+      comparison_confidence: 0,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const failureText = renderProcedureEpochFailureAnswer(typedFailure);
     return {
-      fullReasoning: "I do not have a bound situation epoch to replay yet.",
-      conciseAnswer: "I do not have a bound situation epoch to replay yet.",
+      fullReasoning: failureText,
+      conciseAnswer: failureText,
       delta,
+      replay,
+      typedFailure,
     };
   }
   const closures = listProcedureEpochClosures({
@@ -616,19 +779,23 @@ const buildReplayAnswerBundle = (input: {
   });
   const { scene, activity, objects } = getSituationFields(context);
   const selectedObservationSet = new Set(input.selection.selected_observation_refs);
+  const recentObservations = listObservationJournalEntries({
+    threadId: context.thread_id,
+    limit: 80,
+  }).filter((entry) => entry.modality === "visual_frame");
   const selectedObservations = selectedObservationSet.size > 0
-    ? listObservationJournalEntries({
-        threadId: context.thread_id,
-        limit: 80,
-      }).filter((entry) => selectedObservationSet.has(entry.observation_id))
-    : [];
-  const selectedObservationSummary = selectedObservations
+    ? recentObservations.filter((entry) => selectedObservationSet.has(entry.observation_id))
+    : recentObservations.slice(-2);
+  const replayObservations = selectedObservations.length >= 2
+    ? selectedObservations
+    : recentObservations.slice(-2);
+  const selectedObservationSummary = replayObservations
     .map((entry) => entry.text.trim())
     .filter(Boolean)
     .slice(-2)
     .join(" Then ");
-  const selectedPreviousObservation = selectedObservations.at(-2) ?? null;
-  const selectedCurrentObservation = selectedObservations.at(-1) ?? null;
+  const selectedPreviousObservation = replayObservations.at(-2) ?? null;
+  const selectedCurrentObservation = replayObservations.at(-1) ?? null;
   const currentObservationLedger = ledger.filter((entry) => entry.item_kind === "observation").at(-1) ?? null;
   const previousObservationLedger = previousEpochLedger.filter((entry) => entry.item_kind === "observation").at(-1) ?? null;
   const currentObservation = currentObservationLedger?.summary ?? selectedCurrentObservation?.text.trim() ?? selectedObservationSummary;
@@ -692,6 +859,83 @@ const buildReplayAnswerBundle = (input: {
     assistant_answer: false,
     raw_content_included: false,
   };
+  const changedElements = uniqueStrings([
+    ...changedAppWindow.map((entry) => `app/window changed: ${entry}`),
+    ...changedObjects.map((entry) => `object changed: ${entry}`),
+    ...changedActivity,
+    ...metricChanges,
+  ]);
+  const unchangedElements = unchangedObjects.map((entry) => `stable app/window/object: ${entry}`);
+  const uncertainty = uniqueStrings([
+    ...missingEvidence,
+    context.status === "stale" ? "selected situation evidence is stale" : null,
+    latestProbe ? null : "probe_result_missing",
+    closure ? null : "epoch_closure_missing",
+    `comparison confidence ${comparisonConfidence.toFixed(2)}`,
+  ]);
+  const evidenceRefs = uniqueStrings([
+    ...withRefPrefix("observation", [previousObservationRef ?? "", currentObservationRef ?? ""]),
+    ...withRefPrefix("field_eval", [
+      ...currentFieldEvaluationRefs,
+      ...previousFieldEvaluationRefs,
+    ]),
+    ...withRefPrefix("procedure_epoch", input.selection.selected_epoch_closure_refs),
+    ...withRefPrefix("probe_result", input.selection.selected_probe_result_refs),
+    ...withRefPrefix("procedure_memory_recall", []),
+    `selection:${input.selection.selection_id}`,
+  ]);
+  const replay: HelixProcedureEpochReplay = {
+    schema: HELIX_PROCEDURE_EPOCH_REPLAY_SCHEMA,
+    replay_id: `procedure_epoch_replay:${hashShort([
+      input.turnId,
+      context.situation_run_id,
+      epoch,
+      previousEpoch,
+      currentObservationRef,
+      previousObservationRef,
+    ])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    situation_run_id: context.situation_run_id,
+    current_epoch: epoch,
+    previous_epoch: previousEpoch,
+    current_observation: currentObservation ?? null,
+    previous_observation: previousObservation ?? null,
+    changed_elements: changedElements,
+    unchanged_elements: unchangedElements,
+    uncertainty,
+    current_observation_refs: currentObservationRefs,
+    previous_observation_refs: previousObservationRefs,
+    current_field_evaluation_refs: uniqueStrings(currentFieldEvaluationRefs),
+    previous_field_evaluation_refs: uniqueStrings(previousFieldEvaluationRefs),
+    probe_result_refs: input.selection.selected_probe_result_refs,
+    epoch_closure_refs: input.selection.selected_epoch_closure_refs,
+    evidence_refs: evidenceRefs,
+    comparison_confidence: comparisonConfidence,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const typedFailure = !currentObservation
+    ? buildProcedureEpochTypedFailure({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        errorCode: "procedure_epoch_current_unavailable",
+        message: "I could not replay the scene epoch because current visual observation evidence is unavailable.",
+        evidenceRefs,
+        missingEvidence,
+        selection: input.selection,
+      })
+    : !previousObservation
+      ? buildProcedureEpochTypedFailure({
+          turnId: input.turnId,
+          threadId: input.threadId,
+          errorCode: "procedure_epoch_previous_unavailable",
+          message: "I could not compare scene epochs because previous visual observation evidence is unavailable.",
+          evidenceRefs,
+          missingEvidence,
+          selection: input.selection,
+        })
+      : null;
   const changeLine = missingEvidence.length > 0
     ? `Change: comparison is incomplete because ${missingEvidence.join(", ")}.`
     : sameWorkspace
@@ -735,7 +979,13 @@ const buildReplayAnswerBundle = (input: {
       ...input.selection.selected_epoch_closure_refs,
     ].filter(Boolean).slice(0, 6).join(", ") || "none selected"}.`,
   ].filter(Boolean).join("\n");
-  return { fullReasoning, conciseAnswer, delta };
+  return {
+    fullReasoning,
+    conciseAnswer,
+    delta,
+    replay,
+    typedFailure,
+  };
 };
 
 const buildSceneComparisonAnswer = (result: HelixVisualSceneComparisonResult): string =>
@@ -972,6 +1222,45 @@ export function routeSituationContextTurn(input: {
         situationEvidenceSelection: selection,
       })
     : null;
+  const wantsSceneEpochReplay =
+    isSceneEpochReplayPrompt(input.promptText) ||
+    deicticReference.reference_type === "latest_epoch_change";
+  if (wantsSceneEpochReplay && !selection.answerable) {
+    const errorCode = temporalActiveContext.situation_run_id
+      ? "procedure_epoch_replay_evidence_unavailable"
+      : "procedure_epoch_current_unavailable";
+    const typedFailure = buildProcedureEpochTypedFailure({
+      turnId,
+      threadId: input.threadId,
+      errorCode,
+      message: errorCode === "procedure_epoch_current_unavailable"
+        ? "I could not replay scene epochs because current visual SituationRun evidence is unavailable."
+        : "I could not replay scene epochs because selected procedure epoch evidence is unavailable.",
+      missingEvidence: uniqueStrings([
+        selection.answerability_reason,
+        temporalActiveContext.situation_run_id ? null : "active_situation_run_missing",
+        ...selection.exclusion_reasons,
+      ]),
+      selection,
+    });
+    return {
+      route: "procedure_epoch_replay_question",
+      deictic_reference: deicticReference,
+      active_situation_context: temporalActiveContext,
+      situation_evidence_selection: selection,
+      answer_text: renderProcedureEpochFailureAnswer(typedFailure),
+      reasoning_snapshot: null,
+      answer_distillation: null,
+      procedure_memory_recall: null,
+      live_context_window_binding: liveContextWindowBinding,
+      comparison_session: null,
+      visual_scene_comparison_result: null,
+      selected_visual_scene_set: null,
+      typed_failure: typedFailure,
+      voice_live_handoff: voiceLiveHandoff,
+      binding_repair: bindingRepair,
+    };
+  }
   if (!selection.answerable) {
     return {
       route: "situation_context_question",
@@ -1106,6 +1395,62 @@ export function routeSituationContextTurn(input: {
       selectedSceneSet: selectedVisualSceneSet,
     });
     if (visualSceneComparisonResult) {
+      if (wantsSceneEpochReplay) {
+        const replayBundle = buildReplayAnswerBundle({
+          turnId,
+          threadId: input.threadId,
+          activeContext: temporalActiveContext,
+          selection,
+        });
+        const replayText = replayBundle.typedFailure
+          ? renderProcedureEpochFailureAnswer(replayBundle.typedFailure)
+          : renderProcedureEpochReplayAnswer(replayBundle.replay);
+        const distillationBundle = recordReasoningAndDistillation({
+          turnId,
+          threadId: input.threadId,
+          prompt: input.promptText,
+          activeContext: temporalActiveContext,
+          selection,
+          sourceAnswerKind: "procedure_epoch_replay",
+          fullReasoningSummary: replayText,
+          conciseAnswer: replayText,
+          caveat: null,
+          style: chooseLiveAnswerStyle({
+            promptText: input.promptText,
+            inputModality: input.inputModality,
+          }),
+        });
+        return {
+          route: "procedure_epoch_replay_question",
+          deictic_reference: deicticReference,
+          active_situation_context: temporalActiveContext,
+          situation_evidence_selection: selection,
+          answer_text: replayText,
+          reasoning_snapshot: distillationBundle.snapshot,
+          answer_distillation: distillationBundle.distillation,
+          procedure_memory_recall: buildProcedureMemoryRecall({
+            threadId: input.threadId,
+            turnId,
+            prompt: input.promptText,
+            activeContext: temporalActiveContext,
+            selection,
+            snapshot: distillationBundle.snapshot,
+            distillation: distillationBundle.distillation,
+          }),
+          live_context_window_binding: liveContextWindowBinding,
+          comparison_session: null,
+          relative_session_semantic_intent: relativeSessionSemanticIntent,
+          selected_session_semantic_binding: selectedSessionSemanticBinding,
+          visual_scene_query_intent: boundVisualSceneQueryIntent,
+          selected_visual_scene_set: selectedVisualSceneSet,
+          visual_scene_comparison_result: visualSceneComparisonResult,
+          procedure_epoch_replay_delta: replayBundle.delta,
+          procedure_epoch_replay: replayBundle.replay,
+          typed_failure: replayBundle.typedFailure,
+          voice_live_handoff: voiceLiveHandoff,
+          binding_repair: bindingRepair,
+        };
+      }
       const fullReasoning = buildSceneComparisonAnswer(visualSceneComparisonResult);
       const distillationBundle = recordReasoningAndDistillation({
         turnId,
@@ -1237,7 +1582,17 @@ export function routeSituationContextTurn(input: {
     };
   }
   if (isProcedureReplayPrompt(input.promptText) || deicticReference.reference_type === "latest_epoch_change") {
-    const replayBundle = buildReplayAnswerBundle({ activeContext: temporalActiveContext, selection });
+    const replayBundle = buildReplayAnswerBundle({
+      turnId,
+      threadId: input.threadId,
+      activeContext: temporalActiveContext,
+      selection,
+    });
+    const replayText = wantsSceneEpochReplay && replayBundle.typedFailure
+      ? renderProcedureEpochFailureAnswer(replayBundle.typedFailure)
+      : wantsSceneEpochReplay
+        ? renderProcedureEpochReplayAnswer(replayBundle.replay)
+        : replayBundle.fullReasoning;
     const distillationBundle = recordReasoningAndDistillation({
       turnId,
       threadId: input.threadId,
@@ -1245,8 +1600,8 @@ export function routeSituationContextTurn(input: {
       activeContext: temporalActiveContext,
       selection,
       sourceAnswerKind: "procedure_epoch_replay",
-      fullReasoningSummary: replayBundle.fullReasoning,
-      conciseAnswer: replayBundle.conciseAnswer,
+      fullReasoningSummary: replayText,
+      conciseAnswer: replayText,
       caveat: null,
       style: chooseLiveAnswerStyle({
         promptText: input.promptText,
@@ -1258,10 +1613,12 @@ export function routeSituationContextTurn(input: {
       deictic_reference: deicticReference,
       active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
-      answer_text: distillationBundle.terminalText,
+      answer_text: replayText,
       reasoning_snapshot: distillationBundle.snapshot,
       answer_distillation: distillationBundle.distillation,
       procedure_epoch_replay_delta: replayBundle.delta,
+      procedure_epoch_replay: replayBundle.replay,
+      typed_failure: wantsSceneEpochReplay ? replayBundle.typedFailure : null,
       procedure_memory_recall: buildProcedureMemoryRecall({
         threadId: input.threadId,
         turnId,

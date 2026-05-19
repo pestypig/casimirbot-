@@ -4,6 +4,7 @@ import {
   type HelixRouteProductContract,
   type HelixRouteProductSourceTarget,
 } from "@shared/helix-route-product-contract";
+import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 
 const DOC_VIEWER_ALLOWED_TERMINAL_PRODUCTS = [
   "doc_location_result",
@@ -50,6 +51,8 @@ const VISUAL_FORBIDDEN_TERMINAL_PRODUCTS = [
 ];
 
 const PROCEDURE_ALLOWED_TERMINAL_PRODUCTS = [
+  "interpretation_epoch_delta",
+  "live_interpretation_delta",
   "procedure_epoch_replay",
   "procedure_memory_recall",
   "visual_scene_comparison_result",
@@ -71,6 +74,32 @@ const PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS = [
   "workspace_action_receipt",
   "live_pipeline_receipt",
   "live_environment_binding_diagnosis",
+  "no_tool_direct",
+  "model_only_concept",
+];
+
+const PROCEDURE_EPOCH_REPLAY_ALLOWED_TERMINAL_PRODUCTS = [
+  "interpretation_epoch_delta",
+  "live_interpretation_delta",
+  "procedure_epoch_replay",
+  "typed_failure",
+];
+
+const PROCEDURE_EPOCH_REPLAY_FORBIDDEN_TERMINAL_PRODUCTS = [
+  "process_graph_overview",
+  "doc_location_result",
+  "active_doc_identity",
+  "active_doc_summary",
+  "workspace_action_receipt",
+  "live_pipeline_receipt",
+  "live_environment_binding_diagnosis",
+  "visual_scene_comparison_result",
+  "selected_visual_scene_set",
+  "situation_context_pack",
+  "situation_context_pack_with_epoch_evidence",
+  "procedure_memory_recall",
+  "procedure_memory_unavailable",
+  "procedure_epoch_previous_unavailable",
   "no_tool_direct",
   "model_only_concept",
 ];
@@ -204,6 +233,15 @@ export function buildRouteProductContract(input: {
   const sourceTarget = isStructuredDocsViewerPrompt(promptText)
     ? "docs_viewer"
     : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
+  const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
+  const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
+    ? sourceTargetRecord.requested_outputs
+    : [];
+  const targetKind = normalizeSourceTarget(sourceTargetRecord?.target_kind);
+  const strictProcedureEpochReplay =
+    (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") &&
+    targetKind === "situation_epoch" &&
+    (requestedOutputs.includes("procedure_epoch_replay") || isSceneEpochReplayPrompt(promptText));
 
   if (sourceTarget === "docs_viewer") {
     return {
@@ -236,6 +274,20 @@ export function buildRouteProductContract(input: {
   }
 
   if (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") {
+    if (strictProcedureEpochReplay) {
+      return {
+        schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
+        turn_id: input.turnId,
+        thread_id: input.threadId ?? "",
+        source_target: sourceTarget,
+        allowed_terminal_artifact_kinds: PROCEDURE_EPOCH_REPLAY_ALLOWED_TERMINAL_PRODUCTS,
+        forbidden_terminal_artifact_kinds: PROCEDURE_EPOCH_REPLAY_FORBIDDEN_TERMINAL_PRODUCTS,
+        required_artifact_refs: [],
+        precedence_reason: "procedure_memory_situation_epoch_requires_epoch_replay_or_typed_failure",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     return {
       schema: HELIX_ROUTE_PRODUCT_CONTRACT_SCHEMA,
       turn_id: input.turnId,

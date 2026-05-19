@@ -6,6 +6,10 @@ import {
   type HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
+import {
+  isSceneEpochReplayPrompt,
+  SCENE_EPOCH_REPLAY_FORBIDDEN_ROUTES,
+} from "./scene-epoch-replay-intent";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -355,6 +359,23 @@ export function arbitrateAskSourceTarget(input: {
   promptText: string;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isSceneEpochReplayPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "procedure_memory",
+      targetKind: "situation_epoch",
+      strength: "hard",
+      explicitCues: ["scene_epoch_replay"],
+      reasons: ["explicit_visual_epoch_delta_source_target", "scene_epoch_replay"],
+      requestedOutputs: PROCEDURE_EPOCH_REQUESTED_OUTPUTS,
+      suppressedRoutes: [...SCENE_EPOCH_REPLAY_FORBIDDEN_ROUTES],
+      precedenceReason: "explicit_visual_epoch_delta_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isStructuredDocsViewerPrompt(prompt)) {
     const docsRule = rules.find((rule) => rule.target === "docs_viewer");
     if (docsRule) {

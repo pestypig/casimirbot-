@@ -111,16 +111,23 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(agentLoop?.terminal_artifact_kind) ??
     readString(debug?.terminal_artifact_kind) ??
     null;
+  const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
+  const canonicalActiveTurnId = readString(terminalAuthority?.turn_id) ?? activeTurnId;
+  const clientActiveTurnId = readString(reply.id);
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
-    active_turn_id: activeTurnId,
+    active_turn_id: canonicalActiveTurnId,
+    backend_turn_id: canonicalActiveTurnId,
+    client_active_turn_id: clientActiveTurnId && clientActiveTurnId !== canonicalActiveTurnId
+      ? clientActiveTurnId
+      : null,
     active_prompt: readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
     active_prompt_hash: hashDebugExportText(readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? ""),
     selected_final_answer: selectedFinalAnswer,
     final_answer_source: readString(agentLoop?.final_answer_source) ?? readString(debug?.final_answer_source),
     resolved_turn_summary: {
-      turn_id: activeTurnId,
+      turn_id: canonicalActiveTurnId,
       final_status: "final_answer",
       resolved_route_label: "unknown",
       terminal_artifact_kind: terminalArtifactKind,
@@ -185,14 +192,18 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       agentLoop?.live_interpretation_hypotheses,
     live_interpretation_graph:
       payload.live_interpretation_graph ?? debug?.live_interpretation_graph ?? agentLoop?.live_interpretation_graph,
+    live_interpretation_epoch_delta:
+      payload.live_interpretation_epoch_delta ??
+      debug?.live_interpretation_epoch_delta ??
+      agentLoop?.live_interpretation_epoch_delta,
     pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
     backend_debug_response_ref:
       asRecord(debug?.debug_export_ref) ??
       asRecord(payload.debug_export_ref) ??
-      (activeTurnId
+      (canonicalActiveTurnId
         ? {
-            endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
-            turn_id: activeTurnId,
+            endpoint: `/api/agi/ask/turn/${encodeURIComponent(canonicalActiveTurnId)}/debug-export`,
+            turn_id: canonicalActiveTurnId,
           }
         : undefined),
     debug_export_anti_determinism_audit: {
