@@ -1,5 +1,12 @@
 import { transcribeVoice, type VoiceTranscribeResponse } from "@/lib/agi/api";
 import type { HelixSituationEvent } from "./situation-room";
+import {
+  buildLiveVoiceSituationObservation,
+  classifyDotModeUtterance,
+  type HelixAskDotModePolicy,
+  type LiveVoiceSpeakerAuthority,
+  type LiveVoiceSpeakerRole,
+} from "@shared/helix-dot-mode-policy";
 
 export type MicAudioSituationSessionOptions = {
   roomId: string;
@@ -11,6 +18,10 @@ export type MicAudioSituationSessionOptions = {
   onError?: (error: Error) => void;
   onStop?: (reason: "manual" | "track_ended") => void;
   transcribe?: typeof transcribeVoice;
+  dotModePolicy?: HelixAskDotModePolicy | null;
+  speakerAuthority?: LiveVoiceSpeakerAuthority;
+  speakerRole?: LiveVoiceSpeakerRole;
+  speakerId?: string | null;
 };
 
 export type MicAudioSituationSession = {
@@ -49,11 +60,40 @@ const buildTranscriptEvent = (args: {
   captureSessionId: string;
   chunkIndex: number;
   result: VoiceTranscribeResponse;
+  dotModePolicy?: HelixAskDotModePolicy | null;
+  speakerAuthority?: LiveVoiceSpeakerAuthority;
+  speakerRole?: LiveVoiceSpeakerRole;
+  speakerId?: string | null;
 }): HelixSituationEvent | null => {
   const text = args.result.text?.trim() ?? "";
   if (!text) return null;
+  const eventId = `situation:${args.captureSessionId}:${args.chunkIndex}`;
+  const ts = new Date().toISOString();
+  const dotDecision = args.dotModePolicy
+    ? classifyDotModeUtterance({
+        text,
+        observedAt: ts,
+        speakerAuthority: args.speakerAuthority ?? "command_allowed",
+        policy: args.dotModePolicy,
+      })
+    : null;
+  const liveVoiceObservation = dotDecision
+    ? buildLiveVoiceSituationObservation({
+        observationId: `${eventId}:voice_observation`,
+        threadId: args.threadId ?? args.roomId,
+        roomId: args.roomId,
+        sourceId: args.captureSessionId,
+        transcriptText: text,
+        decision: dotDecision,
+        speakerId: args.speakerId ?? null,
+        speakerRole: args.speakerRole ?? "owner",
+        speakerAuthority: args.speakerAuthority ?? "command_allowed",
+        observedAt: ts,
+        evidenceRefs: [`voice:transcribe:${args.captureSessionId}:${args.chunkIndex}`],
+      })
+    : null;
   return {
-    id: `situation:${args.captureSessionId}:${args.chunkIndex}`,
+    id: eventId,
     room_id: args.roomId,
     mission_id: args.missionId,
     thread_id: args.threadId,
@@ -64,7 +104,7 @@ const buildTranscriptEvent = (args: {
     evidence_refs: [`voice:transcribe:${args.captureSessionId}:${args.chunkIndex}`],
     capture_session_id: args.captureSessionId,
     chunk_index: args.chunkIndex,
-    ts: new Date().toISOString(),
+    ts,
     meta: {
       confidence: typeof args.result.confidence === "number" ? args.result.confidence : null,
       language: args.result.language_detected ?? args.result.source_language ?? args.result.language ?? null,
@@ -74,6 +114,9 @@ const buildTranscriptEvent = (args: {
       engine: args.result.engine ?? null,
       capture_source: "mic",
       command_lane_enabled: false,
+      assistant_answer: false,
+      dot_mode_decision: dotDecision,
+      live_voice_observation: liveVoiceObservation,
     },
   };
 };
@@ -147,6 +190,10 @@ export async function startMicAudioSituationSession(
             captureSessionId,
             chunkIndex: currentChunk,
             result,
+            dotModePolicy: options.dotModePolicy,
+            speakerAuthority: options.speakerAuthority,
+            speakerRole: options.speakerRole,
+            speakerId: options.speakerId,
           });
           if (event) options.onEvent(event);
         })

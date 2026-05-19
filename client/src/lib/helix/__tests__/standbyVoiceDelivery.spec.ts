@@ -99,4 +99,34 @@ describe("standby voice delivery", () => {
     expect(receipt.reason).toBe("suppressed_policy");
     expect(speak).not.toHaveBeenCalled();
   });
+
+  it("keeps direct-address-only silent unless a Dot direct address authorizes speech", async () => {
+    const { deliverStandbyVoiceCallout } = await load();
+    const speak = vi.fn().mockResolvedValue({ kind: "json", status: 200, payload: { ok: true }, headers: {} });
+    const policy = {
+      ...DEFAULT_MINECRAFT_STANDBY_VOICE_POLICY,
+      voice_output_enabled: true,
+      standby_voice_mode: "direct_address_only" as const,
+    };
+
+    const ambientReceipt = await deliverStandbyVoiceCallout({
+      ...baseInput,
+      policy,
+      requiresConfirmation: false,
+      speak: speak as never,
+    });
+    expect(ambientReceipt.delivered).toBe(false);
+    expect(ambientReceipt.reason).toBe("suppressed_policy");
+
+    const directReceipt = await deliverStandbyVoiceCallout({
+      ...baseInput,
+      policy,
+      requiresConfirmation: false,
+      directAddressAuthorized: true,
+      speak: speak as never,
+    });
+    expect(directReceipt.delivered).toBe(true);
+    expect(directReceipt.reason).toBe("delivered");
+    expect(speak).toHaveBeenCalledTimes(1);
+  });
 });

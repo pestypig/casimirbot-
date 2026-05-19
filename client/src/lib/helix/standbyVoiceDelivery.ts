@@ -19,6 +19,7 @@ export type StandbyVoiceDeliveryInput = {
   evidenceRefs: string[];
   policy?: HelixStandbyVoicePolicy | null;
   requiresConfirmation?: boolean;
+  directAddressAuthorized?: boolean;
   dedupeKey?: string | null;
   traceId?: string | null;
   speak?: typeof speakVoice;
@@ -43,6 +44,7 @@ export async function deliverStandbyVoiceCallout(
     policy: input.policy,
     priority: input.priority,
     requiresConfirmation: input.requiresConfirmation,
+    directAddressAuthorized: input.directAddressAuthorized,
   });
   if (!allowed) {
     const reason = input.policy?.voice_output_enabled
