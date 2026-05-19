@@ -35,8 +35,10 @@ import { listProcedureEpochClosures } from "../situation-room/procedure-epoch-cl
 import { listLiveProbeResults } from "../situation-room/live-probe-result-store";
 import { createVisualComparisonSession } from "../situation-room/visual-comparison-session-store";
 import {
+  buildRelativeSessionSemanticIntent,
   buildVisualSceneComparisonResult,
   buildVisualSceneQueryIntent,
+  selectSessionSemanticBinding,
   selectVisualScenesForQuery,
 } from "../situation-room/visual-scene-memory-store";
 import { createVoiceLiveHandoff } from "../situation-room/voice-live-handoff-router";
@@ -52,6 +54,8 @@ import { chooseLiveAnswerStyle, formatDistilledAnswer } from "./live-answer-styl
 import type { HelixVisualSceneQueryIntent } from "@shared/helix-visual-scene-query-intent";
 import type { HelixSelectedVisualSceneSet } from "@shared/helix-selected-visual-scene-set";
 import type { HelixVisualSceneComparisonResult } from "@shared/helix-visual-scene-comparison-result";
+import type { HelixRelativeSessionSemanticIntent } from "@shared/helix-relative-session-semantic-intent";
+import type { HelixSelectedSessionSemanticBinding } from "@shared/helix-selected-session-semantic-binding";
 
 type HelixSituationTypedFailure = {
   schema: "helix.typed_failure.v1";
@@ -111,6 +115,8 @@ export type SituationContextTurnRoute = {
   procedure_memory_recall?: HelixProcedureMemoryRecall | null;
   live_context_window_binding?: HelixLiveContextWindowBinding | null;
   comparison_session?: HelixVisualComparisonSession | null;
+  relative_session_semantic_intent?: HelixRelativeSessionSemanticIntent | null;
+  selected_session_semantic_binding?: HelixSelectedSessionSemanticBinding | null;
   visual_scene_query_intent?: HelixVisualSceneQueryIntent | null;
   selected_visual_scene_set?: HelixSelectedVisualSceneSet | null;
   visual_scene_comparison_result?: HelixVisualSceneComparisonResult | null;
@@ -807,6 +813,11 @@ export function routeSituationContextTurn(input: {
     promptText: input.promptText,
     inputModality: input.inputModality ?? "typed",
   });
+  const earlyRelativeSessionSemanticIntent = buildRelativeSessionSemanticIntent({
+    turnId,
+    threadId: input.threadId,
+    promptText: input.promptText,
+  });
   const earlyVisualSceneQueryIntent = buildVisualSceneQueryIntent({
     turnId,
     threadId: input.threadId,
@@ -989,15 +1000,36 @@ export function routeSituationContextTurn(input: {
     promptText: input.promptText,
   }) ?? earlyVisualSceneQueryIntent;
   if (visualSceneQueryIntent && temporalActiveContext.situation_run_id) {
+    const relativeSessionSemanticIntent = earlyRelativeSessionSemanticIntent ?? buildRelativeSessionSemanticIntent({
+      turnId,
+      threadId: input.threadId,
+      promptText: input.promptText,
+    });
+    const selectedSessionSemanticBinding = relativeSessionSemanticIntent
+      ? selectSessionSemanticBinding({
+          turnId,
+          threadId: input.threadId,
+          semanticIntent: relativeSessionSemanticIntent,
+          situationRunId: temporalActiveContext.situation_run_id,
+          environmentId: temporalActiveContext.environment_id ?? null,
+          currentEpoch: temporalActiveContext.latest_epoch ?? null,
+        })
+      : null;
+    const boundVisualSceneQueryIntent = buildVisualSceneQueryIntent({
+      turnId,
+      threadId: input.threadId,
+      promptText: input.promptText,
+      semanticBinding: selectedSessionSemanticBinding,
+    }) ?? visualSceneQueryIntent;
     const selectedVisualSceneSet = selectVisualScenesForQuery({
       turnId,
       threadId: input.threadId,
-      queryIntent: visualSceneQueryIntent,
+      queryIntent: boundVisualSceneQueryIntent,
       situationRunId: temporalActiveContext.situation_run_id,
       environmentId: temporalActiveContext.environment_id ?? null,
       currentEpoch: temporalActiveContext.latest_epoch ?? null,
     });
-    if (!visualSceneQueryIntent.compare_to_current) {
+    if (!boundVisualSceneQueryIntent.compare_to_current) {
       const selected = selectedVisualSceneSet.selected_scenes[0]?.scene_memory ?? null;
       const fullReasoning = selected
         ? [
@@ -1011,14 +1043,14 @@ export function routeSituationContextTurn(input: {
           ].filter(Boolean).join("\n")
         : [
             "I could not find a prior visual scene matching the requested props or intent.",
-            `Query terms: ${visualSceneQueryIntent.query_terms.join(", ") || "none selected"}.`,
+            `Query terms: ${boundVisualSceneQueryIntent.query_terms.join(", ") || "none selected"}.`,
             `Missing evidence: ${selectedVisualSceneSet.missing_evidence.join(", ") || "prior_scene_match_missing"}.`,
             "Raw images, audio, and logs were not injected into Ask context.",
           ].join("\n");
       const typedFailure = selected ? null : buildVisualSceneMemoryFailure({
         turnId,
         threadId: input.threadId,
-        queryIntent: visualSceneQueryIntent,
+        queryIntent: boundVisualSceneQueryIntent,
         selectedSceneSet: selectedVisualSceneSet,
       });
       const distillationBundle = recordReasoningAndDistillation({
@@ -1057,7 +1089,9 @@ export function routeSituationContextTurn(input: {
         }),
         live_context_window_binding: liveContextWindowBinding,
         comparison_session: null,
-        visual_scene_query_intent: visualSceneQueryIntent,
+        relative_session_semantic_intent: relativeSessionSemanticIntent,
+        selected_session_semantic_binding: selectedSessionSemanticBinding,
+        visual_scene_query_intent: boundVisualSceneQueryIntent,
         selected_visual_scene_set: selectedVisualSceneSet,
         visual_scene_comparison_result: null,
         typed_failure: typedFailure,
@@ -1068,7 +1102,7 @@ export function routeSituationContextTurn(input: {
     const visualSceneComparisonResult = buildVisualSceneComparisonResult({
       turnId,
       threadId: input.threadId,
-      queryIntent: visualSceneQueryIntent,
+      queryIntent: boundVisualSceneQueryIntent,
       selectedSceneSet: selectedVisualSceneSet,
     });
     if (visualSceneComparisonResult) {
@@ -1107,7 +1141,9 @@ export function routeSituationContextTurn(input: {
         }),
         live_context_window_binding: liveContextWindowBinding,
         comparison_session: null,
-        visual_scene_query_intent: visualSceneQueryIntent,
+        relative_session_semantic_intent: relativeSessionSemanticIntent,
+        selected_session_semantic_binding: selectedSessionSemanticBinding,
+        visual_scene_query_intent: boundVisualSceneQueryIntent,
         selected_visual_scene_set: selectedVisualSceneSet,
         visual_scene_comparison_result: visualSceneComparisonResult,
         voice_live_handoff: voiceLiveHandoff,
@@ -1117,12 +1153,12 @@ export function routeSituationContextTurn(input: {
     const typedFailure = buildVisualSceneMemoryFailure({
       turnId,
       threadId: input.threadId,
-      queryIntent: visualSceneQueryIntent,
+      queryIntent: boundVisualSceneQueryIntent,
       selectedSceneSet: selectedVisualSceneSet,
     });
     const fullReasoning = [
       typedFailure.message,
-      `Query terms: ${visualSceneQueryIntent.query_terms.join(", ") || "none selected"}.`,
+      `Query terms: ${boundVisualSceneQueryIntent.query_terms.join(", ") || "none selected"}.`,
       `Selection reason: ${selectedVisualSceneSet.selection_reason}.`,
       selectedVisualSceneSet.missing_evidence.length
         ? `Missing evidence: ${selectedVisualSceneSet.missing_evidence.join(", ")}.`
@@ -1164,7 +1200,9 @@ export function routeSituationContextTurn(input: {
       }),
       live_context_window_binding: liveContextWindowBinding,
       comparison_session: null,
-      visual_scene_query_intent: visualSceneQueryIntent,
+      relative_session_semantic_intent: relativeSessionSemanticIntent,
+      selected_session_semantic_binding: selectedSessionSemanticBinding,
+      visual_scene_query_intent: boundVisualSceneQueryIntent,
       selected_visual_scene_set: selectedVisualSceneSet,
       visual_scene_comparison_result: null,
       typed_failure: typedFailure,

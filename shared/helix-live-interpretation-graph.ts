@@ -1,6 +1,19 @@
 export const HELIX_LIVE_INTERPRETATION_GRAPH_SCHEMA =
   "helix.live_interpretation_graph.v1" as const;
 
+export type HelixLiveInterpretationGraphRelation =
+  | "seeded_by"
+  | "observed_in"
+  | "emitted_by"
+  | "supports"
+  | "reinforces"
+  | "contradicts"
+  | "supersedes"
+  | "expires"
+  | "derived_from"
+  | "reviewed_by"
+  | "blocked_by_gate";
+
 export type HelixLiveInterpretationGraph = {
   schema: typeof HELIX_LIVE_INTERPRETATION_GRAPH_SCHEMA;
   graph_id: string;
@@ -11,7 +24,9 @@ export type HelixLiveInterpretationGraph = {
   edges: Array<{
     from: string;
     to: string;
-    relation: "supports" | "contradicts" | "supersedes";
+    relation: HelixLiveInterpretationGraphRelation;
+    weight?: number | null;
+    metadata?: Record<string, unknown>;
   }>;
   updated_at: string;
   assistant_answer: false;

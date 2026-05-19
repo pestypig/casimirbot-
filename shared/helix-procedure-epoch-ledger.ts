@@ -7,6 +7,7 @@ export type HelixProcedureEpochLedgerItemKind =
   | "field_evaluation"
   | "interpretation_run"
   | "interpretation_worker_run"
+  | "interpretation_validation_artifact"
   | "interpretation_hypothesis"
   | "prediction"
   | "probe"

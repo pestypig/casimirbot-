@@ -64,6 +64,11 @@ const inferObjects = (text: string): string => {
 const contradicts = (previous: string, next: string): boolean => {
   const left = lower(previous);
   const right = lower(next);
+  if (/\bempty\b/.test(right) && /\b(?:user|person|seated|present|visible)\b/.test(left)) return true;
+  if (/\babsent|not\s+present|no\s+longer\s+visible|missing\b/.test(right)) {
+    const absentTargets = right.match(/\b(?:red\s+mug|mug|blue\s+bottle|bottle|file\s+explorer|folder|task\s+manager)\b/g) ?? [];
+    if (absentTargets.some((target) => left.includes(target))) return true;
+  }
   const pairs = [
     ["file explorer", "browser"],
     ["folder", "browser"],
@@ -72,6 +77,8 @@ const contradicts = (previous: string, next: string): boolean => {
     ["document", "inventory"],
     ["inventory", "file explorer"],
     ["chest", "file explorer"],
+    ["red mug", "blue bottle"],
+    ["blue bottle", "red mug"],
   ];
   return pairs.some(([a, b]) => left.includes(a) && right.includes(b));
 };
@@ -80,6 +87,26 @@ const reinforces = (previous: string, next: string): boolean => {
   const previousTokens = new Set(lower(previous).split(/[^a-z0-9]+/).filter((entry) => entry.length > 4));
   const nextTokens = lower(next).split(/[^a-z0-9]+/).filter((entry) => entry.length > 4);
   return nextTokens.some((token) => previousTokens.has(token));
+};
+
+const normalizedKeyFor = (text: string): string =>
+  lower(text)
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 2)
+    .slice(0, 12)
+    .join(":");
+
+const kindForLens = (lens: HelixLiveInterpretationWorker["lens"]): HelixLiveInterpretationHypothesis["kind"] => {
+  if (lens === "scene_neutral") return "observation";
+  if (lens === "objects") return "object";
+  if (lens === "verifier_lane") return "verification";
+  if (lens === "protocol_lane") return "protocol";
+  if (lens === "risk_lane") return "risk";
+  if (lens === "workstation_affordance_lane") return "workstation_affordance";
+  if (lens === "user_notice_lane") return "user_notice";
+  return lens;
 };
 
 export function runInterpretationReasoning(input: {
@@ -122,23 +149,23 @@ export function runInterpretationReasoning(input: {
     predictedSignals = ["selected_file_change", "window_title_change", "opened_document_change"];
     recommendedNextCheck = "Capture the next frame and compare visible selection/window state.";
   } else if (input.worker.lens === "workstation_affordance_lane") {
-    claim = "If the user asks about visible files or documents, a docs/file inspection capability may become relevant.";
+    claim = "Available workstation affordances may include visible file or document context, but no action plan is authorized.";
     confidence = 0.58;
     missingEvidence = ["No user request for a side-effect action."];
-    recommendedCandidate = "plan_contract_candidate";
+    recommendedCandidate = "none";
     recommendedNextCheck = "Wait for explicit user request before proposing any workstation action.";
   } else if (input.worker.lens === "risk_lane") {
     claim = /\b(?:danger|damage|health|lava|fire|hostile|fall)\b/i.test(text)
       ? "There may be a risk state in the current source evidence."
       : "No urgent risk is confirmed from this observation.";
     confidence = /\b(?:danger|damage|health|lava|fire|hostile|fall)\b/i.test(text) ? 0.76 : 0.42;
-    recommendedCandidate = confidence > 0.7 ? "ask_handoff_candidate" : "silent_update";
+    recommendedCandidate = "none";
   } else if (input.worker.lens === "protocol_lane") {
-    claim = "No protocol lane is asserted without a configured procedure context.";
+    claim = "No protocol lane is asserted without a configured procedure context; avoid over-trusting procedure.";
     confidence = 0.35;
-    uncertainty = ["No active protocol objective was supplied."];
+    uncertainty = ["No active protocol objective was supplied.", "Protocol-driven interpretations require verifier and authority-gate review."];
   } else {
-    claim = "No user notice is warranted; keep this as a silent interpretation update.";
+    claim = "No user notice candidate is warranted; keep this as a silent interpretation update.";
     confidence = 0.64;
     recommendedCandidate = "silent_update";
   }
@@ -146,8 +173,21 @@ export function runInterpretationReasoning(input: {
   const previousForLens = input.previousHypotheses
     .filter((entry) => entry.lens === input.worker.lens)
     .slice(-1)[0] ?? null;
-  const supports = previousForLens && reinforces(previousForLens.claim, claim) ? [previousForLens.hypothesis_id] : [];
-  const contradictionRefs = previousForLens && contradicts(previousForLens.claim, claim) ? [previousForLens.hypothesis_id] : [];
+  const verifierContradiction = input.worker.lens === "verifier_lane"
+    ? input.previousHypotheses.find((entry) => !["contradicted", "superseded", "expired", "rejected"].includes(entry.status) && contradicts(entry.claim, text))
+    : null;
+  if (verifierContradiction) {
+    claim = `Verifier contradiction: latest epoch conflicts with prior hypothesis "${verifierContradiction.claim}".`;
+    confidence = Math.max(confidence, 0.72);
+    uncertainty = Array.from(new Set([...uncertainty, "Contradiction requires orchestrator review before terminal action."]));
+  }
+  const comparisonPrevious = verifierContradiction ?? previousForLens;
+  const supports = comparisonPrevious && reinforces(comparisonPrevious.claim, claim) ? [comparisonPrevious.hypothesis_id] : [];
+  const contradictionRefs = verifierContradiction
+    ? [verifierContradiction.hypothesis_id]
+    : comparisonPrevious && contradicts(comparisonPrevious.claim, claim)
+      ? [comparisonPrevious.hypothesis_id]
+      : [];
   const status: HelixLiveInterpretationHypothesis["status"] =
     contradictionRefs.length > 0
       ? "contradicted"
@@ -169,8 +209,11 @@ export function runInterpretationReasoning(input: {
     interpretation_run_id: input.interpretationRun.interpretation_run_id,
     situation_run_id: input.interpretationRun.situation_run_id,
     source_epoch: input.workerRun.source_epoch,
+    latest_source_epoch: input.workerRun.source_epoch,
     lens: input.worker.lens,
+    kind: kindForLens(input.worker.lens),
     claim,
+    normalized_key: normalizedKeyFor(claim),
     confidence,
     evidence_refs: Array.from(new Set([
       input.observation.observation_id,
@@ -180,12 +223,19 @@ export function runInterpretationReasoning(input: {
     uncertainty,
     supports,
     contradicts: contradictionRefs,
-    supersedes: contradictionRefs.length > 0 ? contradictionRefs : [],
+    supersedes: [],
     predicted_signals: predictedSignals,
     recommended_next_check: recommendedNextCheck,
     recommended_candidate: recommendedCandidate,
     status,
+    stale_after_epoch_count: 3,
+    validation_state: {
+      worker_kind: input.worker.kind,
+      terminal_authority: false,
+      worker_validation_lane: true,
+    },
     expires_at: new Date(Date.parse(input.now) + 60_000).toISOString(),
+    expired_at: null,
     assistant_answer: false,
     raw_content_included: false,
     role: "validation",

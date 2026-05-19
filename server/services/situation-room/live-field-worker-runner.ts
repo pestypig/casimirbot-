@@ -39,6 +39,7 @@ const emptyInterpretationWorkerRun = () => ({
   interpretation_workers: [],
   interpretation_worker_runs: [],
   interpretation_hypotheses: [],
+  interpretation_validation_artifacts: [],
   interpretation_graph: null,
   interpretation_tangents: [],
 });

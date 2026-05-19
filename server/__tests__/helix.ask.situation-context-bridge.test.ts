@@ -1305,8 +1305,33 @@ describe("thread-bound situation context bridge", () => {
       turnId: "ask:scene-memory-sun",
     });
 
+    expect(route.relative_session_semantic_intent).toMatchObject({
+      schema: "helix.relative_session_semantic_intent.v1",
+      local_label_terms: expect.arrayContaining(["SUN"]),
+      target_domain: "visual_scene_memory",
+      requires_binding: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.selected_session_semantic_binding).toMatchObject({
+      schema: "helix.selected_session_semantic_binding.v1",
+      selected_bindings: [
+        expect.objectContaining({
+          user_phrase: "SUN",
+          bound_kind: "visual_scene",
+          evidence_refs: expect.arrayContaining(["observation:sun-folder", "field_eval:scene:sun"]),
+        }),
+      ],
+      ambiguity: "none",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(route.visual_scene_query_intent).toMatchObject({
       schema: "helix.visual_scene_query_intent.v1",
+      semantic_binding_refs: expect.arrayContaining([
+        route.selected_session_semantic_binding?.selected_bindings[0]?.bound_ref,
+      ]),
+      bound_query_terms: expect.arrayContaining(["sun"]),
       query_mode: "compare_prior_to_current",
       target_scene_kind: "folder",
       target_file_folder_terms: expect.arrayContaining(["sun"]),
@@ -1350,6 +1375,12 @@ describe("thread-bound situation context bridge", () => {
       turnId: "ask:scene-memory-camera-roll",
     });
 
+    expect(route.relative_session_semantic_intent?.local_label_terms).toEqual(expect.arrayContaining(["Camera Roll"]));
+    expect(route.selected_session_semantic_binding?.selected_bindings[0]).toMatchObject({
+      user_phrase: "Camera Roll",
+      bound_kind: "visual_scene",
+      match_basis: "visible_label",
+    });
     expect(route.visual_scene_query_intent).toMatchObject({
       query_mode: "find_prior_scene",
       compare_to_current: false,
@@ -1370,6 +1401,11 @@ describe("thread-bound situation context bridge", () => {
       turnId: "ask:scene-memory-audio-export",
     });
 
+    expect(route.selected_session_semantic_binding?.selected_bindings[0]).toMatchObject({
+      user_phrase: "audio export",
+      bound_kind: "visual_scene",
+      match_basis: "visible_label",
+    });
     expect(route.visual_scene_query_intent).toMatchObject({
       query_mode: "changed_since_prior",
       compare_to_current: true,

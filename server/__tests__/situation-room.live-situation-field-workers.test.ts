@@ -5,23 +5,33 @@ import {
   createLiveAnswerEnvironment,
   resetLiveAnswerEnvironments,
 } from "../services/situation-room/live-answer-environment-store";
-import { resetAskHandoffsForTest } from "../services/helix-ask/ask-handoff-router";
+import { listAskHandoffs, resetAskHandoffsForTest } from "../services/helix-ask/ask-handoff-router";
+import { listPlanContracts, resetPlanContractsForTest } from "../services/helix-ask/plan-contract-boundary-guard";
 import { resetGoalCardsForTest } from "../services/situation-room/goal-finder-store";
 import { resetInterpretationCardsForTest } from "../services/situation-room/interpretation-card-store";
 import { resetLiveFieldEvaluationsForTest } from "../services/situation-room/live-field-evaluation-store";
 import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live-field-worker-run-store";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
 import { resetLiveInterpretationGraphsForTest } from "../services/situation-room/live-interpretation-graph-store";
-import { resetLiveInterpretationHypothesesForTest } from "../services/situation-room/live-interpretation-hypothesis-store";
+import {
+  listActiveLiveInterpretationHypotheses,
+  listLiveInterpretationHypotheses,
+  resetLiveInterpretationHypothesesForTest,
+} from "../services/situation-room/live-interpretation-hypothesis-store";
 import { resetLiveInterpretationRunsForTest } from "../services/situation-room/live-interpretation-run-store";
 import { resetLiveInterpretationWorkerRunsForTest } from "../services/situation-room/live-interpretation-worker-run-store";
 import { resetLiveInterpretationWorkersForTest } from "../services/situation-room/live-interpretation-worker-registry";
+import {
+  listLiveInterpretationValidationArtifacts,
+  resetLiveInterpretationValidationArtifactsForTest,
+} from "../services/situation-room/live-interpretation-validation-artifact-store";
 import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
 import { resetLiveSourceIdentitiesForTest } from "../services/situation-room/live-source-identity-store";
 import { resetLiveTangentEvaluationsForTest } from "../services/situation-room/live-tangent-evaluation-store";
 import { resetObservationJournalForTest } from "../services/situation-room/observation-journal-store";
 import { projectPresentStateCard } from "../services/situation-room/present-state-card-projector";
 import { routeLiveSourceAnalysisOutput } from "../services/situation-room/live-source-analysis-output-router";
+import { rejectForbiddenInterpretationWorkerOutput } from "../services/situation-room/live-interpretation-worker-runner";
 
 const threadId = "helix-ask:desktop";
 
@@ -57,6 +67,15 @@ const jobFor = (chunk: HelixLiveSourceChunk): HelixLiveSourceAnalysisJob => ({
   raw_content_included: false,
 });
 
+const handoffsDoNotOriginateFromInterpretationWorkers = (): boolean =>
+  listAskHandoffs({ threadId, limit: 50 }).every((handoff) =>
+    ![
+      ...handoff.selected_evidence_refs,
+      ...handoff.interpretation_refs,
+      ...handoff.goal_refs,
+    ].some((ref) => /\blive_interpretation_(?:worker_run|hypothesis|artifact)\b/.test(ref))
+  );
+
 describe("live situation field workers", () => {
   beforeEach(() => {
     resetLiveAnswerEnvironments();
@@ -64,6 +83,7 @@ describe("live situation field workers", () => {
     resetInterpretationCardsForTest();
     resetGoalCardsForTest();
     resetAskHandoffsForTest();
+    resetPlanContractsForTest();
     resetLiveSituationRunsForTest();
     resetLiveSourceIdentitiesForTest();
     resetLiveFieldWorkersForTest();
@@ -73,6 +93,7 @@ describe("live situation field workers", () => {
     resetLiveInterpretationWorkersForTest();
     resetLiveInterpretationWorkerRunsForTest();
     resetLiveInterpretationHypothesesForTest();
+    resetLiveInterpretationValidationArtifactsForTest();
     resetLiveInterpretationGraphsForTest();
     resetLiveTangentEvaluationsForTest();
   });
@@ -271,22 +292,60 @@ describe("live situation field workers", () => {
       "objects",
       "uncertainty",
       "verifier_lane",
+      "protocol_lane",
+      "risk_lane",
       "workstation_affordance_lane",
       "user_notice_lane",
     ]));
+    expect(routed.live_interpretation_run?.first_scene_epoch_id).toBe(routed.live_interpretation_run?.current_scene_epoch_id);
+    expect(routed.live_interpretation_run?.allowed_worker_kinds).toEqual([
+      "scene_neutral",
+      "activity",
+      "objects",
+      "uncertainty",
+      "verifier",
+      "protocol_lane",
+      "risk_lane",
+      "workstation_affordance_lane",
+      "user_notice_lane",
+    ]);
     expect(routed.live_interpretation_workers.length).toBe(routed.live_interpretation_run?.active_lenses.length);
+    expect(routed.live_interpretation_workers.map((worker) => worker.kind)).toEqual([
+      "scene_neutral",
+      "activity",
+      "objects",
+      "uncertainty",
+      "verifier",
+      "protocol_lane",
+      "risk_lane",
+      "workstation_affordance_lane",
+      "user_notice_lane",
+    ]);
     expect(routed.live_interpretation_workers.every((worker) =>
       worker.may_execute_tool === false &&
+      worker.can_execute_tools === false &&
+      worker.can_create_ask_handoff === false &&
+      worker.can_create_plan_contract === false &&
+      worker.can_emit_assistant_answer === false &&
       worker.may_emit_assistant_answer === false &&
       worker.assistant_answer === false
     )).toBe(true);
     expect(routed.live_interpretation_worker_runs.length).toBe(routed.live_interpretation_workers.length);
     expect(routed.live_interpretation_worker_runs.every((run) =>
       run.status === "completed" &&
+      run.scene_epoch_id === routed.live_interpretation_run?.first_scene_epoch_id &&
+      run.artifact_count === 1 &&
+      run.hypothesis_count === 1 &&
       run.assistant_answer === false &&
       run.raw_content_included === false
     )).toBe(true);
     expect(routed.live_interpretation_hypotheses.length).toBe(routed.live_interpretation_workers.length);
+    expect(routed.live_interpretation_validation_artifacts.length).toBe(routed.live_interpretation_workers.length);
+    expect(routed.live_interpretation_validation_artifacts.every((artifact) =>
+      artifact.role === "validation" &&
+      artifact.assistant_answer === false &&
+      artifact.raw_content_included === false
+    )).toBe(true);
     expect(routed.live_interpretation_hypotheses.every((hypothesis) =>
       hypothesis.assistant_answer === false &&
       hypothesis.raw_content_included === false &&
@@ -300,6 +359,11 @@ describe("live situation field workers", () => {
     expect(routed.live_interpretation_graph?.nodes).toEqual(
       expect.arrayContaining(routed.live_interpretation_hypotheses.map((hypothesis) => hypothesis.hypothesis_id)),
     );
+    expect(routed.live_interpretation_graph?.edges.map((edge) => edge.relation)).toEqual(
+      expect.arrayContaining(["seeded_by", "observed_in", "emitted_by", "derived_from"]),
+    );
+    expect(handoffsDoNotOriginateFromInterpretationWorkers()).toBe(true);
+    expect(listPlanContracts({ threadId, limit: 20 })).toEqual([]);
   });
 
   it("records interpretation contradictions as validation tangents without action authority", () => {
@@ -340,6 +404,23 @@ describe("live situation field workers", () => {
       hypothesis.status === "contradicted" &&
       (hypothesis.contradicts ?? []).length > 0
     )).toBe(true);
+    const verifierContradiction = routed.live_interpretation_hypotheses.find((hypothesis) =>
+      hypothesis.lens === "verifier_lane" &&
+      hypothesis.status === "contradicted"
+    );
+    expect(verifierContradiction).toBeTruthy();
+    expect(routed.live_interpretation_validation_artifacts.some((artifact) =>
+      artifact.artifact_type === "contradiction" &&
+      artifact.payload.hypothesis_id === verifierContradiction?.hypothesis_id
+    )).toBe(true);
+    const allHypotheses = listLiveInterpretationHypotheses({
+      interpretationRunId: routed.live_interpretation_run?.interpretation_run_id,
+      limit: 100,
+    });
+    expect(allHypotheses.some((hypothesis) =>
+      hypothesis.status === "contradicted" &&
+      hypothesis.validation_state?.contradicted_by_hypothesis_id === verifierContradiction?.hypothesis_id
+    )).toBe(true);
     expect(routed.live_interpretation_graph?.edges.some((edge) => edge.relation === "contradicts")).toBe(true);
     expect(routed.live_interpretation_tangents.length).toBeGreaterThan(0);
     expect(routed.live_interpretation_tangents.every((tangent) =>
@@ -348,5 +429,110 @@ describe("live situation field workers", () => {
       tangent.raw_content_included === false &&
       tangent.recommended_handoff.type === "none"
     )).toBe(true);
+    expect(handoffsDoNotOriginateFromInterpretationWorkers()).toBe(true);
+    expect(listPlanContracts({ threadId, limit: 20 })).toEqual([]);
+  });
+
+  it("expires stale interpretation hypotheses after epoch TTL without reinforcement", () => {
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:interpretation-expiry",
+      objective: "Track transient visible objects on the workstation.",
+      preset: "custom",
+      source_ids: ["source:documents"],
+    });
+    const first: HelixLiveSourceChunk = {
+      ...visualChunk(),
+      compact_summary: "A red mug is present on the workstation beside a notes window.",
+    };
+    const firstRoute = routeLiveSourceAnalysisOutput({
+      job: jobFor(first),
+      chunk: first,
+      status: "completed",
+      summary: first.compact_summary,
+      outputRefs: ["visual_evidence:red-mug"],
+      modelInvoked: true,
+    });
+    const runId = firstRoute.live_interpretation_run?.interpretation_run_id;
+    expect(runId).toBeTruthy();
+
+    for (let index = 2; index <= 5; index += 1) {
+      const next: HelixLiveSourceChunk = {
+        ...visualChunk(),
+        chunk_id: `live_source_chunk:expiry:${index}`,
+        sequence_index: index,
+        ts: `2026-05-17T21:30:${String(index * 10).padStart(2, "0")}.000Z`,
+        payload_ref: `visual_frame:expiry:${index}`,
+        compact_summary: "A blank notes window is visible with no mug mentioned.",
+      };
+      routeLiveSourceAnalysisOutput({
+        job: { ...jobFor(next), job_id: `live_source_analysis_job:expiry:${index}` },
+        chunk: next,
+        status: "completed",
+        summary: next.compact_summary,
+        outputRefs: [`visual_evidence:expiry:${index}`],
+        modelInvoked: true,
+      });
+    }
+
+    const hypotheses = listLiveInterpretationHypotheses({ interpretationRunId: runId, limit: 300 });
+    expect(hypotheses.some((hypothesis) =>
+      hypothesis.status === "expired" &&
+      Boolean(hypothesis.expired_at) &&
+      /red mug|mug/i.test(hypothesis.claim)
+    )).toBe(true);
+    expect(listLiveInterpretationValidationArtifacts({
+      interpretationRunId: runId,
+      artifactType: "expiry",
+    }).length).toBeGreaterThan(0);
+    expect(listActiveLiveInterpretationHypotheses({ interpretationRunId: runId, limit: 300 })
+      .some((hypothesis) => hypothesis.status === "expired")).toBe(false);
+    expect(handoffsDoNotOriginateFromInterpretationWorkers()).toBe(true);
+    expect(listPlanContracts({ threadId, limit: 20 })).toEqual([]);
+  });
+
+  it("blocks interpretation worker terminal authority attempts at the gate", () => {
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:interpretation-terminal-gate",
+      objective: "Track current screen interpretation.",
+      preset: "custom",
+      source_ids: ["source:documents"],
+    });
+    const chunk = visualChunk();
+    const routed = routeLiveSourceAnalysisOutput({
+      job: jobFor(chunk),
+      chunk,
+      status: "completed",
+      summary: chunk.compact_summary,
+      outputRefs: ["visual_evidence:terminal-gate"],
+      modelInvoked: true,
+    });
+    const workerRun = routed.live_interpretation_worker_runs[0];
+    expect(workerRun).toBeTruthy();
+
+    const rejected = rejectForbiddenInterpretationWorkerOutput({
+      interpretationRun: routed.live_interpretation_run!,
+      workerRun,
+      attemptedOutput: {
+        assistant_answer: true,
+        terminal_authority: true,
+        tool_calls: [{ name: "dangerous.tool" }],
+        ask_handoff: { schema: "helix.ask_handoff.v1" },
+        plan_contract: { schema: "helix.plan_contract.v1" },
+      },
+      now: "2026-05-17T21:30:15.000Z",
+    });
+
+    expect(rejected.validation.ok).toBe(false);
+    expect(rejected.worker_run.status).toBe("failed");
+    expect(rejected.worker_run.failure_reason).toContain("assistant_answer_true");
+    expect(rejected.artifact.artifact_type).toBe("gate_block");
+    expect(listLiveInterpretationValidationArtifacts({
+      interpretationRunId: routed.live_interpretation_run?.interpretation_run_id,
+      artifactType: "gate_block",
+    }).length).toBeGreaterThan(0);
+    expect(handoffsDoNotOriginateFromInterpretationWorkers()).toBe(true);
+    expect(listPlanContracts({ threadId, limit: 20 })).toEqual([]);
   });
 });

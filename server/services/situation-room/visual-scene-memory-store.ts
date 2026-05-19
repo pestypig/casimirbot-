@@ -18,6 +18,15 @@ import {
   HELIX_VISUAL_SCENE_COMPARISON_RESULT_SCHEMA,
   type HelixVisualSceneComparisonResult,
 } from "@shared/helix-visual-scene-comparison-result";
+import {
+  HELIX_RELATIVE_SESSION_SEMANTIC_INTENT_SCHEMA,
+  type HelixRelativeSessionSemanticIntent,
+} from "@shared/helix-relative-session-semantic-intent";
+import {
+  HELIX_SELECTED_SESSION_SEMANTIC_BINDING_SCHEMA,
+  type HelixSelectedSessionSemanticBinding,
+  type HelixSessionSemanticBindingMatchBasis,
+} from "@shared/helix-selected-session-semantic-binding";
 
 const sceneMemoryByRun = new Map<string, HelixVisualSceneMemoryIndex[]>();
 
@@ -69,6 +78,164 @@ const semanticTermsFor = (values: Array<string | null | undefined>): string[] =>
   const text = values.map((value) => String(value ?? "")).join(" ");
   return unique(semanticExpansionMap.flatMap((entry) => entry.pattern.test(text) ? [entry.tag, ...entry.terms] : []));
 };
+
+const deicticTermRe = /\b(?:this|that|current|last|previous|same|that\s+one|the\s+export|the\s+folder)\b/gi;
+const actionTermRe = /\b(?:compare|find|changed\s+since|what\s+changed|open|summari[sz]e)\b/gi;
+
+const extractLocalLabelTerms = (prompt: string): string[] => {
+  const quoted = Array.from(prompt.matchAll(/"([^"]+)"/g)).map((match) => match[1]);
+  const knownPhrases = [
+    prompt.match(/\b(camera\s*roll)\b/i)?.[1],
+    prompt.match(/\b(audio\s*export)\b/i)?.[1],
+    prompt.match(/\b(task\s*manager)\b/i)?.[1],
+    prompt.match(/\b(SUN|SOHO|SDO)\b/)?.[1],
+  ];
+  const namedScene = [
+    prompt.match(/\bto\s+(?:the\s+)?([A-Za-z0-9 _.-]{2,60}?)(?:\s+folder)?\s+scene\b/i)?.[1],
+    prompt.match(/\bfind\s+(?:the\s+)?([A-Za-z0-9 _.-]{2,60}?)\s+scene\b/i)?.[1],
+    prompt.match(/\bchanged\s+since\s+(?:the\s+)?([A-Za-z0-9 _.-]{2,60}?)(?:\s+folder)?(?:\?|\.|$)/i)?.[1],
+  ];
+  return unique([...quoted, ...knownPhrases, ...namedScene]
+    .map((term) => term?.replace(/\b(?:the|last|previous|current|this|that|scene|folder)\b/gi, " ").replace(/\s+/g, " ").trim())
+    .filter((term) => term && !/^(?:last|previous|current|this|that|scene|folder|epoch|visual)$/i.test(term)));
+};
+
+export function buildRelativeSessionSemanticIntent(input: {
+  turnId: string;
+  threadId: string;
+  promptText: string;
+}): HelixRelativeSessionSemanticIntent | null {
+  const prompt = input.promptText.trim();
+  const localLabelTerms = extractLocalLabelTerms(prompt);
+  const actionTerms = unique(Array.from(prompt.matchAll(actionTermRe)).map((match) => normalizePhrase(match[0])));
+  const targetDomain =
+    /\b(?:scene|folder|camera\s*roll|task\s*manager|audio\s*export|what\s+changed|changed\s+since|compare)\b/i.test(prompt)
+      ? "visual_scene_memory"
+      : "unknown";
+  if (targetDomain !== "visual_scene_memory" || (localLabelTerms.length === 0 && !/\blast\s+folder\s+scene\b/i.test(prompt))) {
+    return null;
+  }
+  return {
+    schema: HELIX_RELATIVE_SESSION_SEMANTIC_INTENT_SCHEMA,
+    semantic_intent_id: `relative_session_semantic_intent:${hashShort([input.turnId, prompt, localLabelTerms])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    raw_user_text: prompt,
+    literal_terms: tokenize(prompt),
+    deictic_terms: unique(Array.from(prompt.matchAll(deicticTermRe)).map((match) => normalizePhrase(match[0]))),
+    local_label_terms: localLabelTerms,
+    action_terms: actionTerms,
+    target_domain: targetDomain,
+    session_semantic_scope: "current_situation_run",
+    requires_binding: true,
+    reason: "scene_memory_prompt_requires_session_local_semantic_binding",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+export function selectSessionSemanticBinding(input: {
+  turnId: string;
+  threadId: string;
+  semanticIntent: HelixRelativeSessionSemanticIntent;
+  situationRunId?: string | null;
+  environmentId?: string | null;
+  currentEpoch?: number | null;
+}): HelixSelectedSessionSemanticBinding {
+  const memories = listVisualSceneMemory({
+    threadId: input.threadId,
+    environmentId: input.environmentId,
+    situationRunId: input.situationRunId,
+    limit: 500,
+  }).filter((entry) =>
+    entry.assistant_answer === false &&
+    entry.raw_content_included === false &&
+    entry.evidence_refs.length > 0 &&
+    (input.currentEpoch === null || input.currentEpoch === undefined || entry.epoch <= input.currentEpoch)
+  );
+  const currentScene = memories.at(-1) ?? null;
+  const candidatePool = memories.filter((entry) => !currentScene || entry.scene_memory_id !== currentScene.scene_memory_id);
+  const userPhrases = input.semanticIntent.local_label_terms.length > 0
+    ? input.semanticIntent.local_label_terms
+    : input.semanticIntent.literal_terms;
+  const scored = candidatePool.flatMap((scene) => {
+    const searchTerms = sceneSearchTerms(scene);
+    const normalizedTitle = normalizedTerms(scene.visible_title);
+    const haystack = ` ${searchTerms.join(" ")} `;
+    return userPhrases.map((phrase) => {
+      const phraseTerms = normalizedTerms(phrase);
+      const directVisibleLabelMatch = phraseTerms.some((term) => normalizedTitle.includes(term));
+      const priorUserPhraseReuse = phraseTerms.some((term) => scene.window_title_hints.flatMap(normalizedTerms).includes(term));
+      const sceneMemoryTermMatches = phraseTerms.filter((term) => haystack.includes(` ${term} `) || haystack.includes(term)).length;
+      const weakSemanticMatches = semanticTermsFor(phraseTerms).filter((term) => haystack.includes(term)).length;
+      const appWindowMatch = phraseTerms.some((term) => normalizedTerms(scene.app_or_surface).includes(term));
+      const recency = Math.max(0, Math.min(35, scene.epoch));
+      const evidenceBonus = Math.min(10, scene.evidence_refs.length);
+      const ambiguityPenalty = sceneMemoryTermMatches === 0 && !directVisibleLabelMatch && !priorUserPhraseReuse ? 20 : 0;
+      const confidenceScore =
+        (directVisibleLabelMatch ? 60 : 0) +
+        (priorUserPhraseReuse ? 55 : 0) +
+        recency +
+        (sceneMemoryTermMatches * 30) +
+        (appWindowMatch ? 25 : 0) +
+        (weakSemanticMatches * 15) +
+        evidenceBonus -
+        ambiguityPenalty;
+      const matchBasis: HelixSessionSemanticBindingMatchBasis =
+        directVisibleLabelMatch ? "visible_label" :
+        priorUserPhraseReuse ? "recent_user_phrase" :
+        sceneMemoryTermMatches > 0 ? "prior_scene_memory" :
+        weakSemanticMatches > 0 ? "semantic_similarity" :
+        "procedure_memory";
+      return {
+        phrase,
+        scene,
+        confidenceScore,
+        matchBasis,
+      };
+    });
+  }).sort((a, b) =>
+    b.confidenceScore - a.confidenceScore ||
+    b.scene.epoch - a.scene.epoch ||
+    b.scene.timestamp.localeCompare(a.scene.timestamp)
+  );
+  const selected = scored.filter((entry) => entry.confidenceScore >= 50).slice(0, 1);
+  const rejected = scored
+    .filter((entry) => !selected.some((selectedEntry) => selectedEntry.scene.scene_memory_id === entry.scene.scene_memory_id && selectedEntry.phrase === entry.phrase))
+    .slice(0, 5);
+  const ambiguity =
+    selected.length === 0
+      ? (candidatePool.length === 0 ? "missing_local_referent" : "insufficient_context")
+      : scored[1] && scored[1].confidenceScore >= selected[0].confidenceScore - 8
+        ? "multiple_plausible_bindings"
+        : "none";
+  return {
+    schema: HELIX_SELECTED_SESSION_SEMANTIC_BINDING_SCHEMA,
+    binding_id: `selected_session_semantic_binding:${hashShort([input.turnId, input.semanticIntent.semantic_intent_id, selected.map((entry) => entry.scene.scene_memory_id)])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    semantic_intent_id: input.semanticIntent.semantic_intent_id,
+    selected_bindings: selected.map((entry) => ({
+      user_phrase: entry.phrase,
+      bound_kind: "visual_scene",
+      bound_ref: entry.scene.scene_memory_id,
+      confidence: Math.min(0.95, Math.max(0.1, entry.confidenceScore / 120)),
+      evidence_refs: evidenceBundleForScene(entry.scene),
+      match_basis: entry.matchBasis,
+    })),
+    rejected_bindings: rejected.map((entry) => ({
+      user_phrase: entry.phrase,
+      candidate_ref: entry.scene.scene_memory_id,
+      reason: entry.confidenceScore < 50 ? "lower_confidence" : "ambiguous",
+      confidence: Math.min(0.95, Math.max(0.1, entry.confidenceScore / 120)),
+      evidence_refs: evidenceBundleForScene(entry.scene),
+    })),
+    ambiguity,
+    missing_evidence: selected.length === 0 ? ["session_semantic_binding_missing"] : [],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
 
 const inferSceneKind = (input: {
   text: string;
@@ -243,6 +410,7 @@ export function buildVisualSceneQueryIntent(input: {
   turnId: string;
   threadId: string;
   promptText: string;
+  semanticBinding?: HelixSelectedSessionSemanticBinding | null;
 }): HelixVisualSceneQueryIntent | null {
   const prompt = input.promptText.trim();
   if (!/\b(?:compare|find|scene where|camera roll|soho|sun|audio export|task manager|folder scene|changed since|last folder scene)\b/i.test(prompt)) return null;
@@ -308,10 +476,14 @@ export function buildVisualSceneQueryIntent(input: {
   ]).filter((term) => !["find", "changed", "since", "compare", "current", "scene"].includes(term.toLowerCase())).slice(0, 16);
   const targetFileFolderTerms = unique([
     ...phraseTerms.filter((term) => !/\btask\s*manager\b/i.test(term)),
+    ...(input.semanticBinding?.selected_bindings.map((entry) => entry.user_phrase) ?? []),
     /\bcamera\s*roll\b/i.test(prompt) ? "camera roll" : null,
     /\baudio\s*export\b/i.test(prompt) ? "audio export" : null,
     /\bsun\b/i.test(prompt) ? "sun" : null,
   ]);
+  const semanticBindingRefs = input.semanticBinding?.selected_bindings.map((entry) => entry.bound_ref) ?? [];
+  const boundQueryTerms = unique(input.semanticBinding?.selected_bindings.flatMap((entry) => normalizedTerms(entry.user_phrase)) ?? []);
+  const bindingConfidence = input.semanticBinding?.selected_bindings[0]?.confidence ?? 0;
   return {
     schema: HELIX_VISUAL_SCENE_QUERY_INTENT_SCHEMA,
     query_intent_id: `visual_scene_query_intent:${hashShort([input.turnId, prompt, terms])}`,
@@ -319,6 +491,10 @@ export function buildVisualSceneQueryIntent(input: {
     thread_id: input.threadId,
     query_text: prompt,
     query_terms: terms,
+    semantic_binding_refs: semanticBindingRefs,
+    literal_query_terms: terms,
+    bound_query_terms: boundQueryTerms,
+    binding_confidence: bindingConfidence,
     query_mode: queryMode,
     target_scene_kind: targetSceneKind,
     target_app_terms: /\btask\s*manager\b/i.test(prompt) ? ["task manager"] : [],
@@ -368,6 +544,7 @@ export function selectVisualScenesForQuery(input: {
     ...input.queryIntent.target_object_terms,
     ...input.queryIntent.target_activity_terms,
     ...input.queryIntent.target_intent_terms,
+    ...(input.queryIntent.bound_query_terms ?? []),
   ].flatMap(normalizedTerms));
   const expandedQueryTerms = unique([
     ...queryLiteralTerms,
@@ -403,6 +580,7 @@ export function selectVisualScenesForQuery(input: {
           ? Math.max(0, Math.min(20, entry.epoch))
           : 0;
       const evidenceQualityBonus = Math.min(15, entry.evidence_refs.length * 2);
+      const sessionBindingBonus = input.queryIntent.semantic_binding_refs?.includes(entry.scene_memory_id) ? 70 : 0;
       const sceneKindMismatch =
         input.queryIntent.target_scene_kind &&
         input.queryIntent.target_scene_kind !== "unknown" &&
@@ -424,6 +602,7 @@ export function selectVisualScenesForQuery(input: {
         (objectMatches * 12) +
         (activityMatches * 10) +
         (intentMatches * 8) +
+        sessionBindingBonus +
         recencyBonus +
         evidenceQualityBonus -
         (sceneKindMismatch ? 35 : 0) -

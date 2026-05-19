@@ -314,6 +314,7 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     live_interpretation_workers: fieldWorkerRun?.interpretation_workers ?? [],
     live_interpretation_worker_runs: fieldWorkerRun?.interpretation_worker_runs ?? [],
     live_interpretation_hypotheses: fieldWorkerRun?.interpretation_hypotheses ?? [],
+    live_interpretation_validation_artifacts: fieldWorkerRun?.interpretation_validation_artifacts ?? [],
     live_interpretation_graph: fieldWorkerRun?.interpretation_graph ?? null,
     live_interpretation_tangents: fieldWorkerRun?.interpretation_tangents ?? [],
     assistant_answer: false as const,
