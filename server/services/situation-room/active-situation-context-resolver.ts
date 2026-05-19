@@ -69,7 +69,17 @@ export function resolveActiveSituationContext(input: {
           return bTime - aTime || b.producer.producer_id.localeCompare(a.producer.producer_id);
         })[0] ?? null;
   const threadId = run?.thread_id ?? activeEnvironment?.thread_id ?? activeProducer?.producer.thread_id ?? input.threadId;
-  const observations = listObservationJournalEntries({ threadId, limit: 12 });
+  const activeSourceIds = unique([
+    input.sourceId ?? null,
+    ...(run?.source_ids ?? []),
+  ]);
+  const observations = listObservationJournalEntries({ threadId, limit: 50 })
+    .filter((entry: HelixObservationJournalEntry) =>
+      activeSourceIds.length === 0 ||
+      !entry.source_id ||
+      activeSourceIds.includes(entry.source_id),
+    )
+    .slice(-12);
   const fieldEvaluations = run
     ? listLiveFieldEvaluations({
         threadId,

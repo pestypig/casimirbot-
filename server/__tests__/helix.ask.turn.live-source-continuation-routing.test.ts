@@ -23,6 +23,27 @@ import { resetClientCapabilityActionsForTest } from "../services/client-capabili
 import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabilities/client-adoption-store";
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
 import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
+import { buildLiveEnvironmentBindingDiagnosis } from "../services/helix-ask/live-environment-binding-diagnosis";
+import {
+  createLiveAnswerEnvironment,
+} from "../services/situation-room/live-answer-environment-store";
+import {
+  ensureLiveSituationRunForEnvironment,
+  resetLiveSituationRunsForTest,
+} from "../services/situation-room/live-situation-run-store";
+import {
+  appendObservationJournalEntry,
+  resetObservationJournalForTest,
+} from "../services/situation-room/observation-journal-store";
+import {
+  recordLiveFieldEvaluation,
+  resetLiveFieldEvaluationsForTest,
+} from "../services/situation-room/live-field-evaluation-store";
+import {
+  recordLiveInterpretationHypothesis,
+  resetLiveInterpretationHypothesesForTest,
+} from "../services/situation-room/live-interpretation-hypothesis-store";
+import type { HelixLiveSourceProducerFreshness } from "@shared/helix-live-source-producer-freshness";
 
 const threadId = "thread:live-source-continuation";
 
@@ -32,6 +53,122 @@ const createApp = async (): Promise<express.Express> => {
   app.use(express.json({ limit: "2mb" }));
   app.use("/api/agi", planRouter);
   return app;
+};
+
+const freshProducer = (overrides: Partial<HelixLiveSourceProducerFreshness> = {}): HelixLiveSourceProducerFreshness => ({
+  schema: "helix.live_source_producer_freshness.v1",
+  producer_id: "live_source_producer:diagnosis-unit",
+  source_id: "visual_source:diagnosis-unit",
+  thread_id: "helix-ask:desktop",
+  readiness_state: "ready",
+  cadence_ms: 10_000,
+  last_capture_at: new Date().toISOString(),
+  last_chunk_id: "live_source_chunk:diagnosis-unit",
+  last_analysis_job_id: "live_source_analysis_job:diagnosis-unit",
+  last_visual_evidence_id: "visual_evidence:diagnosis-unit",
+  last_card_delta_at: "2026-05-19T00:00:01.000Z",
+  client_action_request_id: "client_action:diagnosis-unit",
+  client_action_status: "completed",
+  client_adoption_id: "client_adoption:diagnosis-unit",
+  client_adoption_ok: true,
+  client_adoption_status: "adopted",
+  client_observed_state: {
+    client_stream_confirmed: true,
+    interval_active: true,
+    cadence_ms: 10_000,
+  },
+  is_fresh: true,
+  stale_reason: null,
+  next_required_action: null,
+  assistant_answer: false,
+  raw_content_included: false,
+  ...overrides,
+});
+
+const seedSituationRun = (input: {
+  sourceId?: string;
+  withObservation?: boolean;
+  withFieldEvaluation?: boolean;
+  withInterpretation?: boolean;
+} = {}) => {
+  const now = new Date().toISOString();
+  const sourceId = input.sourceId ?? "visual_source:diagnosis-unit";
+  const { environment } = createLiveAnswerEnvironment({
+    thread_id: "helix-ask:desktop",
+    created_turn_id: "ask:diagnosis-seed",
+    objective: "Use visual SituationRun evidence for live diagnosis tests.",
+    preset: "custom",
+    source_ids: [sourceId],
+    now,
+  });
+  const run = ensureLiveSituationRunForEnvironment({
+    environment,
+    advanceEpoch: false,
+    now,
+  });
+  const observation = input.withObservation === false
+    ? null
+    : appendObservationJournalEntry({
+        thread_id: "helix-ask:desktop",
+        observation_id: "observation:diagnosis-unit",
+        kind: "model_perception_observation",
+        modality: "visual_frame",
+        source_id: sourceId,
+        text: "A live visual frame is available for diagnosis.",
+        evidence_refs: ["visual_evidence:diagnosis-unit"],
+        model_invoked: true,
+        confidence: 0.8,
+        created_at: now,
+      });
+  if (input.withFieldEvaluation && observation) {
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:diagnosis-unit",
+      worker_run_id: "field_worker_run:diagnosis-unit",
+      worker_id: "field_worker:diagnosis-unit",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: "The current visual scene has a supported field evaluation.",
+      status: "supported",
+      confidence: 0.75,
+      evidence_refs: [observation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: null,
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: now,
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }
+  if (input.withInterpretation) {
+    recordLiveInterpretationHypothesis({
+      schema: "helix.live_interpretation_hypothesis.v1",
+      hypothesis_id: "live_interpretation_hypothesis:diagnosis-unit",
+      interpretation_worker_run_id: "live_interpretation_worker_run:diagnosis-unit",
+      interpretation_run_id: "live_interpretation_run:diagnosis-unit",
+      situation_run_id: run.situation_run_id,
+      source_epoch: run.current_epoch,
+      latest_source_epoch: run.current_epoch,
+      lens: "scene_neutral",
+      kind: "activity",
+      claim: "The live procedure state has an active interpretation.",
+      normalized_key: "diagnosis-unit",
+      confidence: 0.7,
+      evidence_refs: ["field_eval:diagnosis-unit"],
+      missing_evidence: [],
+      uncertainty: [],
+      status: "active",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      assistant_answer: false,
+      raw_content_included: false,
+      role: "validation",
+    });
+  }
+  return { environment, run, observation };
 };
 
 describe("live source continuation Ask routing", () => {
@@ -49,6 +186,10 @@ describe("live source continuation Ask routing", () => {
     resetClientCapabilityActionsForTest();
     resetClientCapabilityAdoptionsForTest();
     resetReceiptPresentationSnapshotsForTest();
+    resetLiveSituationRunsForTest();
+    resetObservationJournalForTest();
+    resetLiveFieldEvaluationsForTest();
+    resetLiveInterpretationHypothesesForTest();
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -457,7 +598,7 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.final_answer_source).toBe("live_environment_binding_diagnosis");
     expect(response.body?.terminal_artifact_kind).toBe("live_environment_binding_diagnosis");
     expect(response.body?.live_environment_binding_diagnosis).toMatchObject({
-      schema: "helix.live_environment_binding_diagnosis.v1",
+      schema: "helix.live_environment_binding_diagnosis.v2",
       target_source: "visual_capture",
       client_adoption_status: "adopted",
       client_interval_active: true,
@@ -472,12 +613,193 @@ describe("live source continuation Ask routing", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(response.body?.live_environment_binding_diagnosis?.source_freshness?.status).toBe("stale");
+    expect(response.body?.live_environment_binding_diagnosis?.auntie_dot?.sensor_readiness_summary).toContain("Sensor readiness:");
+    expect(response.body?.live_environment_binding_diagnosis?.auntie_dot?.mission_state_summary).toContain("Mission-state interpretation:");
     expect(response.body?.latest_field_evaluation_absence_reason).toBeTruthy();
     expect(response.body?.latest_interpretation_absence_reason).toBeTruthy();
-    expect(response.body?.answer).toContain("capture alone is not live cognition");
+    expect(response.body?.answer).toContain("Capture alone is not live cognition");
+    expect(response.body?.answer).toContain("Sensor readiness:");
+    expect(response.body?.answer).toContain("Mission-state interpretation:");
     expect(response.body?.answer).not.toContain("Visual capture is running every");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
+  }, 20_000);
+
+  it("keeps capture readiness separate from missing SituationRun cognition", () => {
+    const diagnosis = buildLiveEnvironmentBindingDiagnosis({
+      turnId: "ask:diagnosis-no-run",
+      threadId: "helix-ask:desktop",
+      sourceId: "visual_source:diagnosis-unit",
+      producerId: "live_source_producer:diagnosis-unit",
+      producerFreshness: freshProducer(),
+      producerBindingStatus: "bound",
+      serverCadenceMs: 10_000,
+    });
+
+    expect(diagnosis).toMatchObject({
+      schema: "helix.live_environment_binding_diagnosis.v2",
+      capture_ready: true,
+      scene_procedure_ready: false,
+      live_card_ready: false,
+      active_situation_run_status: "missing",
+      blocking_reason: "no_active_situation_run",
+      next_required_action: "create_or_resume_situation_run",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(diagnosis.latest_observation_refs).toEqual([]);
+    expect(diagnosis.summary).toContain("Sensor readiness:");
+    expect(diagnosis.summary).toContain("Mission-state interpretation:");
+  });
+
+  it("blocks procedure readiness when the producer freshness is stale", () => {
+    seedSituationRun({ withObservation: true, withFieldEvaluation: true, withInterpretation: true });
+
+    const diagnosis = buildLiveEnvironmentBindingDiagnosis({
+      turnId: "ask:diagnosis-stale-source",
+      threadId: "helix-ask:desktop",
+      sourceId: "visual_source:diagnosis-unit",
+      producerId: "live_source_producer:diagnosis-unit",
+      producerFreshness: freshProducer({
+        is_fresh: false,
+        readiness_state: "stale",
+        stale_reason: "no_chunk_after_two_cadence_windows",
+        next_required_action: "capture_frame_now",
+      }),
+      producerBindingStatus: "bound",
+      serverCadenceMs: 10_000,
+    });
+
+    expect(diagnosis.capture_ready).toBe(true);
+    expect(diagnosis.source_freshness.status).toBe("stale");
+    expect(diagnosis.scene_procedure_ready).toBe(false);
+    expect(diagnosis.blocking_reason).toBe("producer_stale");
+    expect(diagnosis.next_required_action).toBe("capture_frame_now");
+  });
+
+  it("requires field evaluations and interpretations before scene procedure readiness", () => {
+    seedSituationRun({ withObservation: true });
+    const noFields = buildLiveEnvironmentBindingDiagnosis({
+      turnId: "ask:diagnosis-no-fields",
+      threadId: "helix-ask:desktop",
+      sourceId: "visual_source:diagnosis-unit",
+      producerFreshness: freshProducer(),
+      producerBindingStatus: "bound",
+      serverCadenceMs: 10_000,
+    });
+
+    expect(noFields.latest_observation_refs.length).toBeGreaterThan(0);
+    expect(noFields.field_evaluation_refs).toEqual([]);
+    expect(noFields.scene_procedure_ready).toBe(false);
+    expect(noFields.blocking_reason).toBe("no_field_evaluations");
+    expect(noFields.next_required_action).toBe("run_field_workers_for_latest_observation");
+
+    resetLiveFieldEvaluationsForTest();
+    resetLiveInterpretationHypothesesForTest();
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:diagnosis-unit",
+      worker_run_id: "field_worker_run:diagnosis-unit",
+      worker_id: "field_worker:diagnosis-unit",
+      situation_run_id: noFields.situation_run_id ?? "",
+      thread_id: "helix-ask:desktop",
+      environment_id: noFields.live_environment_id ?? "",
+      field_key: "scene",
+      value: "Field evidence exists without interpretation.",
+      status: "supported",
+      confidence: 0.7,
+      evidence_refs: ["observation:diagnosis-unit"],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: null,
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString(),
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const noInterpretations = buildLiveEnvironmentBindingDiagnosis({
+      turnId: "ask:diagnosis-no-interpretations",
+      threadId: "helix-ask:desktop",
+      sourceId: "visual_source:diagnosis-unit",
+      producerFreshness: freshProducer(),
+      producerBindingStatus: "bound",
+      serverCadenceMs: 10_000,
+    });
+
+    expect(noInterpretations.field_evaluation_refs.length).toBeGreaterThan(0);
+    expect(noInterpretations.interpretation_refs).toEqual([]);
+    expect(noInterpretations.blocking_reason).toBe("no_interpretation_artifacts");
+    expect(noInterpretations.next_required_action).toBe("run_interpretation_workers_for_latest_evaluations");
+  });
+
+  it("keeps a ready procedure separate from a missing live card delta", () => {
+    seedSituationRun({ withObservation: true, withFieldEvaluation: true, withInterpretation: true });
+
+    const diagnosis = buildLiveEnvironmentBindingDiagnosis({
+      turnId: "ask:diagnosis-no-card",
+      threadId: "helix-ask:desktop",
+      sourceId: "visual_source:diagnosis-unit",
+      producerFreshness: freshProducer({ last_card_delta_at: null }),
+      producerBindingStatus: "bound",
+      serverCadenceMs: 10_000,
+    });
+
+    expect(diagnosis.scene_procedure_ready).toBe(true);
+    expect(diagnosis.live_card_ready).toBe(false);
+    expect(diagnosis.card_delta_status).toBe("missing");
+    expect(diagnosis.blocking_reason).toBe("card_delta_missing");
+    expect(diagnosis.next_required_action).toBe("repair_card_projection_binding");
+  });
+
+  it("routes scene comparison through procedure evidence and keeps diagnosis as a side artifact", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "Okay, what are we looking at now and how does it compare to the last scene epoch?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).not.toBe("live_environment_binding_diagnosis");
+    expect(response.body?.terminal_artifact_kind).not.toBe("live_environment_binding_diagnosis");
+    expect([
+      "visual_scene_comparison_result",
+      "procedure_epoch_replay",
+      "situation_context_pack_with_epoch_evidence",
+      "typed_failure",
+    ]).toContain(response.body?.terminal_artifact_kind);
+    expect(response.body?.side_artifacts?.live_environment_binding_diagnosis?.schema).toBe(
+      "helix.live_environment_binding_diagnosis.v2",
+    );
+  }, 20_000);
+
+  it("returns typed failure rather than a receipt when procedure memory is unavailable", async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "What does procedure memory say about the last scene?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(response.body?.typed_failure).toMatchObject({
+      schema: "helix.typed_failure.v1",
+      failure_kind: "procedure_memory_unavailable",
+      requested_capability: "procedure_memory",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body?.typed_failure?.repair_hint).toBeTruthy();
+    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+    expect(response.body?.answer).not.toContain("Pipeline:");
+    expect(response.body?.answer).toContain("Auntie Dot: sensors are separate from mission memory.");
   }, 20_000);
 
   it("does not classify scene-epoch comparison prompts as binding diagnosis", () => {

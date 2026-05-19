@@ -72,8 +72,14 @@ type HelixSituationTypedFailure = {
     | "visual_scene_memory_current_missing"
     | "procedure_epoch_current_unavailable"
     | "procedure_epoch_previous_unavailable"
+    | "procedure_memory_unavailable"
     | "procedure_epoch_replay_evidence_unavailable"
     | "procedure_epoch_replay_terminal_authority_rejected";
+  failure_kind?: string;
+  requested_capability?: string;
+  blocking_reason?: string;
+  repair_hint?: string;
+  live_environment_binding_diagnosis_id?: string | null;
   message: string;
   evidence_refs: string[];
   query_intent_id: string;
@@ -86,6 +92,7 @@ type HelixSituationTypedFailure = {
     | "capture_current_visual_epoch"
     | "wait_for_scene_memory_index"
     | "ask_user_for_more_specific_scene_terms"
+    | "repair_procedure_memory"
     | "none";
   assistant_answer: false;
   raw_content_included: false;
@@ -149,6 +156,9 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 
 const isProcedureReplayPrompt = (prompt: string): boolean =>
   /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+(?:the\s+)?current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
+
+const isProcedureMemoryPrompt = (prompt: string): boolean =>
+  /\bprocedure\s+memory\b/i.test(prompt);
 
 const isComparisonPrompt = (prompt: string): boolean =>
   /\b(?:compare\s+this|compare\s+(?:this|the)\s+(?:file|image|picture|screen)|next\s+(?:one|file|image|picture|screen)|remember\s+this\s+as\s+the\s+first)\b/i.test(prompt);
@@ -281,7 +291,18 @@ const buildProcedureEpochTypedFailure = (input: {
         ? "capture_current_visual_epoch"
         : input.errorCode === "procedure_epoch_previous_unavailable"
           ? "wait_for_scene_memory_index"
+          : input.errorCode === "procedure_memory_unavailable"
+            ? "repair_procedure_memory"
           : "none",
+    ...(input.errorCode === "procedure_memory_unavailable"
+      ? {
+          failure_kind: "procedure_memory_unavailable",
+          requested_capability: "procedure_memory",
+          blocking_reason: "no_active_situation_run",
+          repair_hint: "create_or_resume_situation_run",
+          live_environment_binding_diagnosis_id: null,
+        }
+      : {}),
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -1120,6 +1141,48 @@ export function routeSituationContextTurn(input: {
       }),
       live_context_window_binding: null,
       comparison_session: null,
+      voice_live_handoff: null,
+      binding_repair: null,
+    };
+  }
+  if (isProcedureMemoryPrompt(input.promptText) && !activeContext.situation_run_id) {
+    const selection = selectSituationEvidence({
+      threadId: input.threadId,
+      activeContext,
+      deicticReference: initialReference,
+      askingHistory: true,
+    });
+    const typedFailure = buildProcedureEpochTypedFailure({
+      turnId,
+      threadId: input.threadId,
+      errorCode: "procedure_memory_unavailable",
+      message: "Auntie Dot: sensors are separate from mission memory.\nVisual capture status: unavailable or not bound into procedure memory.\nProcedure memory is unavailable because no_active_situation_run.\nRepair hint: create_or_resume_situation_run.",
+      evidenceRefs: [],
+      missingEvidence: ["active_situation_run", "procedure_memory"],
+      selection,
+    });
+    return {
+      route: "procedure_epoch_replay_question",
+      deictic_reference: {
+        ...initialReference,
+        reference_type: "latest_epoch_change",
+        candidate_signal: true,
+        resolution_status: "missing_context",
+        resolved_context_refs: [activeContext.context_id],
+      },
+      active_situation_context: activeContext,
+      situation_evidence_selection: selection,
+      answer_text: typedFailure.message,
+      reasoning_snapshot: null,
+      answer_distillation: null,
+      procedure_memory_recall: null,
+      live_context_window_binding: null,
+      comparison_session: null,
+      relative_session_semantic_intent: earlyRelativeSessionSemanticIntent,
+      visual_scene_query_intent: earlyVisualSceneQueryIntent,
+      selected_visual_scene_set: null,
+      visual_scene_comparison_result: null,
+      typed_failure: typedFailure,
       voice_live_handoff: null,
       binding_repair: null,
     };

@@ -26,6 +26,7 @@ export type HelixRouteProductContract = {
   source_target: HelixRouteProductSourceTarget;
   allowed_terminal_artifact_kinds: string[];
   forbidden_terminal_artifact_kinds: string[];
+  side_artifact_kinds_allowed?: string[];
   required_artifact_refs: string[];
   precedence_reason: string;
   assistant_answer: false;
