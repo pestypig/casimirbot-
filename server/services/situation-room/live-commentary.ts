@@ -75,7 +75,7 @@ const getLineValue = (environment: LiveAnswerEnvironment, key: string): string |
 const commentarySubgoalForPreset = (environment: LiveAnswerEnvironment): string => {
   if (environment.preset === "calculator_prime_stream") return "Detect prime milestones without surfacing routine candidate checks.";
   if (environment.preset === "physics_stability_tracker") return "Watch stability, residual, and anomaly lines for meaningful changes.";
-  if (environment.preset === "minecraft_run_monitor") return "Watch risk, progress, and next-check lines for useful user-facing updates.";
+  if (environment.preset === "minecraft_run_monitor") return "Watch risk, possibilities, rehearsal, recommendation, and next-check lines for useful user-facing updates.";
   return "Watch compact live lines and surface only meaningful changes.";
 };
 

@@ -1,0 +1,146 @@
+export const HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA =
+  "helix.environment_state_snapshot.v1" as const;
+
+export type HelixEnvironmentDomain =
+  | "minecraft"
+  | "game"
+  | "virtual_world"
+  | "browser_app"
+  | "desktop_app"
+  | "robotics"
+  | "real_world"
+  | "custom";
+
+export type EnvironmentPosition = { x: number; y: number; z?: number | null };
+
+export type EnvironmentItemSummary = {
+  item_ref?: string | null;
+  item_type: string;
+  count: number;
+  slot?: string | number | null;
+  display_name?: string | null;
+  durability?: { remaining: number; max: number } | null;
+  tags?: string[];
+};
+
+export type EnvironmentObjectSummary = {
+  object_ref: string;
+  object_type: string;
+  position?: EnvironmentPosition;
+  distance?: number | null;
+  relative_direction?: string | null;
+  tags?: string[];
+  state?: Record<string, unknown>;
+};
+
+export type EnvironmentContainerSummary = {
+  container_ref: string;
+  container_type: string;
+  position?: EnvironmentPosition;
+  contents_known: boolean;
+  contents_summary?: EnvironmentItemSummary[];
+  contents_hash?: string | null;
+  last_verified_at?: string | null;
+};
+
+export type EnvironmentResourceSummary = {
+  resource_ref: string;
+  resource_type: string;
+  position?: EnvironmentPosition;
+  state?: "available" | "growing" | "depleted" | "unknown";
+  amount?: number | null;
+  tags?: string[];
+};
+
+export type EnvironmentHazardSummary = {
+  hazard_ref: string;
+  hazard_type: string;
+  severity: "info" | "watch" | "warning" | "critical";
+  position?: EnvironmentPosition;
+  evidence_refs: string[];
+};
+
+export type EnvironmentCellSummary = {
+  cell_ref: string;
+  cell_type: string;
+  position?: EnvironmentPosition;
+  tags?: string[];
+};
+
+export type HelixEnvironmentStateSnapshot = {
+  schema: typeof HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA;
+  snapshot_id: string;
+  domain: HelixEnvironmentDomain;
+  domain_adapter: string;
+  room_id: string;
+  world_id?: string | null;
+  source_id: string;
+  actor_id?: string | null;
+  actor_label?: string | null;
+  ts: string;
+  source_tick?: number | null;
+  coordinate_frame?: {
+    kind: "world_xyz" | "screen_xy" | "robot_map" | "gps" | "custom";
+    dimension?: string | null;
+    units?: "blocks" | "pixels" | "meters" | "custom";
+  };
+  actor_state?: {
+    pose?: {
+      position?: EnvironmentPosition;
+      eye?: EnvironmentPosition;
+      yaw?: number | null;
+      pitch?: number | null;
+      facing?: string | null;
+    };
+    health?: number | null;
+    food_level?: number | null;
+    saturation?: number | null;
+    mode?: string | null;
+    status_flags?: string[];
+  };
+  inventory_state?: {
+    selected_item?: EnvironmentItemSummary | null;
+    carried_items?: EnvironmentItemSummary[];
+    equipped_items?: EnvironmentItemSummary[];
+    inventory_hash?: string | null;
+    changed_since_last_snapshot?: boolean;
+  };
+  object_state?: {
+    nearby_entities?: EnvironmentObjectSummary[];
+    nearby_containers?: EnvironmentContainerSummary[];
+    resources?: EnvironmentResourceSummary[];
+    hazards?: EnvironmentHazardSummary[];
+  };
+  local_map?: {
+    radius?: number | null;
+    salient_cells?: EnvironmentCellSummary[];
+    map_hash?: string | null;
+    changed_since_last_snapshot?: boolean;
+  };
+  focus?: {
+    target_kind: "object" | "entity" | "block" | "ui" | "empty" | "unknown";
+    target_ref?: string | null;
+    target_type?: string | null;
+    distance?: number | null;
+    line_of_sight?: boolean | null;
+    reachable?: boolean | null;
+  };
+  section_hashes: Record<string, string>;
+  changed_sections: string[];
+  domain_specific?: {
+    minecraft?: {
+      raw_nbt_included: false;
+      nbt_component_keys_seen?: string[];
+      paper_api_fields_seen?: string[];
+      block_data_fields_seen?: string[];
+    };
+    [key: string]: unknown;
+  };
+  evidence_refs: string[];
+  deterministic: true;
+  model_invoked: false;
+  assistant_answer: false;
+  raw_payload_included: false;
+  context_policy: "compact_context_pack_only";
+};
+

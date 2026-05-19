@@ -4,12 +4,15 @@ export const HELIX_LIVE_SOURCE_DESCRIPTOR_SCHEMA =
 export type HelixLiveSourceDescriptorModality =
   | "visual_frame"
   | "world_event"
+  | "environment_state"
+  | "environment_affordance"
   | "audio_transcript"
   | "text_chat"
   | "calculator_stream"
   | "simulation_stream"
   | "document_context"
   | "note_context"
+  | "procedure_graph"
   | "process_graph";
 
 export type HelixLiveSourceSurface =

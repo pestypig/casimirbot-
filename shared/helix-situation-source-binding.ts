@@ -4,11 +4,14 @@ export const HELIX_SITUATION_SOURCE_BINDING_SCHEMA =
 export type HelixSituationSourceBindingModality =
   | "visual_frame"
   | "world_event"
+  | "environment_state"
+  | "environment_affordance"
   | "audio_transcript"
   | "calculator_stream"
   | "simulation_stream"
   | "document_context"
   | "note_context"
+  | "procedure_graph"
   | "process_graph";
 
 export type HelixSituationSourceBindingStatus =

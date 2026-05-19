@@ -83,6 +83,34 @@ const defaultLineValues = (input: LiveSourceAnalysisRouterInput): Record<string,
       progress: { value: input.summary, confidence: 0.6 },
     };
   }
+  if (input.chunk.modality === "environment_state") {
+    return {
+      situation: { value: input.summary, confidence: 0.72 },
+      actor_state: { value: "Structured actor state updated.", confidence: 0.72 },
+      resources: { value: "Inventory/resource state updated.", confidence: 0.72 },
+      affordances: { value: "Awaiting affordance reducer or latest focus target.", confidence: 0.45 },
+      risk: { value: "No risk promoted unless hazards or status thresholds are present.", confidence: 0.55 },
+      possibilities: { value: "No action graph generated yet.", confidence: 0.45 },
+      rehearsal: { value: "No rehearsal result yet.", confidence: 0.45 },
+      recommendation: { value: "Awaiting rehearsal before recommending action.", confidence: 0.45 },
+      next_check: { value: "Watch changed state sections and request rehearsal for candidate suggestions.", confidence: 0.65 },
+    };
+  }
+  if (input.chunk.modality === "environment_affordance") {
+    return {
+      affordances: { value: input.summary, confidence: 0.68 },
+      possibilities: { value: "Candidate procedures still require a possibility graph.", confidence: 0.45 },
+      next_check: { value: "Generate or refresh the possibility graph from current affordances.", confidence: 0.62 },
+    };
+  }
+  if (input.chunk.modality === "procedure_graph" || input.chunk.modality === "process_graph") {
+    return {
+      possibilities: { value: input.summary, confidence: 0.68 },
+      rehearsal: { value: "Procedure graph is possible, not validated.", confidence: 0.45 },
+      recommendation: { value: "Awaiting rehearsal before recommending action.", confidence: 0.45 },
+      next_check: { value: "Run read-only rehearsal before surfacing a recommendation.", confidence: 0.68 },
+    };
+  }
   if (input.chunk.modality === "calculator_stream" || input.chunk.modality === "simulation_stream") {
     return {
       progress: { value: input.summary, confidence: 0.65 },

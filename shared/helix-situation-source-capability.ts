@@ -3,12 +3,15 @@ export const HELIX_SITUATION_SOURCE_CAPABILITY_SCHEMA =
 
 export type HelixSituationSourceModality =
   | "world_event"
+  | "environment_state"
+  | "environment_affordance"
   | "visual_frame"
   | "audio_transcript"
   | "voice_identity"
   | "text_chat"
   | "calculator_stream"
   | "simulation_stream"
+  | "procedure_graph"
   | "document_context"
   | "note_context";
 
@@ -31,7 +34,14 @@ export type HelixSituationSourceContribution =
   | "identity"
   | "calculation"
   | "reference"
-  | "memory";
+  | "memory"
+  | "actor_state"
+  | "inventory"
+  | "object_state"
+  | "affordance"
+  | "procedure"
+  | "simulation"
+  | "recommendation";
 
 export type HelixSituationSourceCapability = {
   schema: typeof HELIX_SITUATION_SOURCE_CAPABILITY_SCHEMA;

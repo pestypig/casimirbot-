@@ -27,12 +27,15 @@ const cleanString = (value: unknown): string | null => {
 const normalizeModality = (value: unknown): HelixSituationSourceModality => {
   if (
     value === "world_event" ||
+    value === "environment_state" ||
+    value === "environment_affordance" ||
     value === "visual_frame" ||
     value === "audio_transcript" ||
     value === "voice_identity" ||
     value === "text_chat" ||
     value === "calculator_stream" ||
     value === "simulation_stream" ||
+    value === "procedure_graph" ||
     value === "document_context" ||
     value === "note_context"
   ) return value;
@@ -63,7 +66,14 @@ const normalizeContribution = (value: unknown): HelixSituationSourceContribution
     value === "identity" ||
     value === "calculation" ||
     value === "reference" ||
-    value === "memory"
+    value === "memory" ||
+    value === "actor_state" ||
+    value === "inventory" ||
+    value === "object_state" ||
+    value === "affordance" ||
+    value === "procedure" ||
+    value === "simulation" ||
+    value === "recommendation"
   ) return value;
   return "activity";
 };
@@ -89,10 +99,14 @@ const modalityForKind = (kind: WorkstationLiveSourceKind): HelixSituationSourceM
 
 const contributionForModality = (modality: HelixSituationSourceModality): HelixSituationSourceContribution => {
   if (modality === "world_event") return "risk";
+  if (modality === "environment_state") return "actor_state";
+  if (modality === "environment_affordance") return "affordance";
   if (modality === "visual_frame") return "visual_scene";
   if (modality === "audio_transcript") return "dialogue";
   if (modality === "voice_identity") return "identity";
   if (modality === "calculator_stream") return "calculation";
+  if (modality === "simulation_stream") return "simulation";
+  if (modality === "procedure_graph") return "procedure";
   if (modality === "document_context") return "reference";
   if (modality === "note_context") return "memory";
   return "activity";

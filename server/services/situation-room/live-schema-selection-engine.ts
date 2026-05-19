@@ -38,6 +38,15 @@ const modalityForLine = (line: LiveAnswerLineDefinition, preset: "generic_visual
   return ["visual_frame", "world_event"];
 };
 
+const environmentModalityForLine = (line: LiveAnswerLineDefinition): string[] => {
+  if (line.key === "rehearsal") return ["procedure_graph", "simulation_stream", "environment_state"];
+  if (line.key === "possibilities") return ["procedure_graph", "environment_state", "environment_affordance"];
+  if (line.key === "affordances") return ["environment_affordance", "environment_state", "visual_frame"];
+  if (line.key === "recommendation") return ["procedure_graph", "environment_state"];
+  if (line.key === "risk") return ["environment_state", "visual_frame", "world_event"];
+  return ["environment_state", "visual_frame", "world_event"];
+};
+
 const defaultToolForLine = (line: LiveAnswerLineDefinition, preset: "generic_visual" | "minecraft_cortana"): string | null => {
   if (preset === "generic_visual") {
     if (line.key === "evidence") return "observation_journal.latest";
@@ -50,6 +59,14 @@ const defaultToolForLine = (line: LiveAnswerLineDefinition, preset: "generic_vis
   return "visual.latest_observation";
 };
 
+const defaultEnvironmentToolForLine = (line: LiveAnswerLineDefinition): string | null => {
+  if (line.key === "possibilities") return "environment.build_possibility_graph";
+  if (line.key === "rehearsal") return "environment.rehearse_possibility_graph";
+  if (line.key === "recommendation") return "environment.recommend_after_rehearsal";
+  if (line.key === "affordances") return "environment.reduce_affordances";
+  return "environment.reduce_state_snapshot";
+};
+
 const toSelectionLine = (
   line: LiveAnswerLineDefinition,
   preset: "generic_visual" | "minecraft_cortana",
@@ -59,6 +76,16 @@ const toSelectionLine = (
   purpose: linePurpose(line),
   primary_modalities: modalityForLine(line, preset),
   default_tool: defaultToolForLine(line, preset),
+});
+
+const toEnvironmentSelectionLine = (
+  line: LiveAnswerLineDefinition,
+): HelixLiveSchemaSelectionLine => ({
+  key: line.key,
+  label: line.label,
+  purpose: linePurpose(line),
+  primary_modalities: environmentModalityForLine(line),
+  default_tool: defaultEnvironmentToolForLine(line),
 });
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
@@ -83,6 +110,9 @@ export const SOURCE_DESCRIBED_MINECRAFT_VISUAL_SCHEMA: LiveAnswerLineDefinition[
   { key: "missing_evidence", label: "Missing evidence", update_policy: "projection_only", visibility: "answer_card", priority: "warn" },
   { key: "next_check", label: "Next check", update_policy: "projection_only", visibility: "answer_card", priority: "action" },
 ];
+
+export const SOURCE_DESCRIBED_ENVIRONMENT_SCHEMA: LiveAnswerLineDefinition[] =
+  LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS.environment_run_monitor;
 
 export function excludedLiveSchemaDomains(objectiveText: string): string[] {
   const text = lower(objectiveText);
@@ -121,6 +151,10 @@ function objectiveAsksGameMonitoring(objectiveText: string): boolean {
 
 function objectiveAsksGenericVisual(objectiveText: string): boolean {
   return /\b(?:generic workstation|generic visual|workstation live answer|screen|window|file explorer|folder|document|latest visual observation|do not use minecraft)\b/i.test(objectiveText);
+}
+
+function objectiveAsksEnvironmentMonitoring(objectiveText: string): boolean {
+  return /\b(?:environment state|affordance|possibilit(?:y|ies)|rehears(?:al|e)|dry[-\s]?run|procedure graph|robotics|browser app|simulated world|state snapshot)\b/i.test(objectiveText);
 }
 
 export function liveSchemaSelectionToLineDefinitions(selection: HelixLiveSchemaSelection): LiveAnswerLineDefinition[] {
@@ -163,22 +197,39 @@ export function selectLiveSchemaForEnvironment(input: {
   const genericSource = sourceLooksGenericWorkstation(looseDescriptors, observations);
   const gameSource = sourceLooksGame(looseDescriptors, observations);
   const wantsGeneric = objectiveAsksGenericVisual(objectiveText) || excludedDomains.includes("game");
+  const wantsEnvironment = objectiveAsksEnvironmentMonitoring(objectiveText) || input.activeModalities?.some((modality) =>
+    modality === "environment_state" ||
+    modality === "environment_affordance" ||
+    modality === "procedure_graph"
+  );
   const wantsGame = objectiveAsksGameMonitoring(objectiveText);
+  const explicitEnvironment = explicitPreset === "environment_run_monitor" || input.environment.preset === "environment_run_monitor";
   const environmentMinecraftPreset =
     input.environment.preset === "minecraft_run_monitor" &&
     wantsGame &&
     !wantsGeneric &&
     !excludedDomains.includes("game");
   const explicitMinecraft = explicitPreset === "minecraft_run_monitor" || environmentMinecraftPreset;
-  const useMinecraft = explicitMinecraft || (!excludedDomains.includes("game") && gameSource && wantsGame && !genericSource && !wantsGeneric);
-  const selectedPreset: "generic_visual" | "minecraft_cortana" = useMinecraft ? "minecraft_cortana" : "generic_visual";
+  const useEnvironment = explicitEnvironment || (wantsEnvironment && !wantsGeneric);
+  const useMinecraft = !useEnvironment && (explicitMinecraft || (!excludedDomains.includes("game") && gameSource && wantsGame && !genericSource && !wantsGeneric));
+  const selectedPreset: "generic_visual" | "minecraft_cortana" | "environment_run_monitor" = useEnvironment
+    ? "environment_run_monitor"
+    : useMinecraft ? "minecraft_cortana" : "generic_visual";
   const sourceDescriptorRefs = looseDescriptors.map((descriptor) => descriptor.descriptor_id);
   const observationRefs = observations.slice(-12).map((entry) => entry.observation_id);
-  const baseSchema = selectedPreset === "minecraft_cortana"
-    ? SOURCE_DESCRIBED_MINECRAFT_VISUAL_SCHEMA
-    : SOURCE_DESCRIBED_GENERIC_VISUAL_SCHEMA;
-  const selectedSchema = baseSchema.map((line) => toSelectionLine(line, selectedPreset));
-  const rationale = useMinecraft
+  const baseSchema = selectedPreset === "environment_run_monitor"
+    ? SOURCE_DESCRIBED_ENVIRONMENT_SCHEMA
+    : selectedPreset === "minecraft_cortana"
+      ? SOURCE_DESCRIBED_MINECRAFT_VISUAL_SCHEMA
+      : SOURCE_DESCRIBED_GENERIC_VISUAL_SCHEMA;
+  const selectedSchema = selectedPreset === "environment_run_monitor"
+    ? baseSchema.map((line) => toEnvironmentSelectionLine(line))
+    : baseSchema.map((line) => toSelectionLine(line, selectedPreset));
+  const rationale = useEnvironment
+    ? explicitEnvironment
+      ? "Explicit user-selected environment run monitor preset is authoritative."
+      : "Objective or active modalities indicate structured environment state, affordance, or procedure rehearsal."
+    : useMinecraft
     ? explicitMinecraft
       ? "Explicit user-selected Minecraft preset is authoritative."
       : "Source descriptor and objective both indicate game monitoring."
@@ -187,7 +238,9 @@ export function selectLiveSchemaForEnvironment(input: {
       : wantsGeneric
         ? "Objective asks for generic visual/workstation presentation or excludes game-specific assumptions."
         : "No explicit domain preset is supported by source descriptors, so generic visual schema is selected.";
-  const confidence = useMinecraft
+  const confidence = useEnvironment
+    ? explicitEnvironment ? 0.94 : 0.8
+    : useMinecraft
     ? explicitMinecraft ? 0.92 : 0.76
     : genericSource ? 0.84 : wantsGeneric ? 0.78 : 0.68;
   return {
@@ -211,7 +264,7 @@ export function selectLiveSchemaForEnvironment(input: {
     preset_hint: selectedPreset,
     preset_authority: explicitPreset
       ? "explicit_user_selected"
-      : selectedPreset === "minecraft_cortana"
+      : selectedPreset === "minecraft_cortana" || selectedPreset === "environment_run_monitor"
         ? "hint_only"
         : "none",
     assistant_answer: false,

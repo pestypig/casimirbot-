@@ -1,0 +1,336 @@
+{
+  "artifactId": "curvature_leverage_benchmark_ladder",
+  "schemaVersion": "v1",
+  "generatedAt": "2026-05-19T23:47:08.847Z",
+  "source": {
+    "constantsRef": "configs/constants/codata-2022.v1.json",
+    "benchmarksRef": "configs/curvature-leverage-benchmarks.v1.json",
+    "nhm2ReportRef": "artifacts/research/full-solve/curvature-leverage/nhm2-curvature-leverage-latest.json",
+    "claimRoute": "cross_scale_diagnostic_only"
+  },
+  "equationRefs": [
+    "curvature_leverage_scale_normalization",
+    "nhm2_full_solve_regional_tensor_leverage"
+  ],
+  "claimIds": [
+    "claim:curvature.leverage:scale_normalized_dimensionless",
+    "claim:curvature.leverage:external_observables_are_calibrators",
+    "claim:curvature.leverage:benchmark_ladder_compactness_anchor"
+  ],
+  "promotionAllowed": false,
+  "benchmarks": [
+    {
+      "id": "earth_nominal_iau_b3",
+      "label": "Earth nominal compactness",
+      "lane": "compactness_identity",
+      "formula": "kappa_body(3M/(4*pi*R^3))*R^2 = 2*mu/(R*c^2)",
+      "leverage": 1.390704935334958e-9,
+      "referenceLeverage": 1.3907049353349578e-9,
+      "relativeError": 1.486980795739028e-16,
+      "referenceUncertaintyRel": 0,
+      "sigmaMargin": null,
+      "marginBand": "planetary",
+      "ordersFromHorizon": -8.856765004119437,
+      "promotionAllowed": false,
+      "inputs": {
+        "massParameterKey": "nominal_terrestrial_GM_m3_s2",
+        "radiusKey": "nominal_terrestrial_equatorial_radius_m",
+        "mu_m3_s2": 398600400000000,
+        "radius_m": 6378100,
+        "meanDensity_kg_m3": 5495.021865555212
+      }
+    },
+    {
+      "id": "sun_nominal_iau_b3",
+      "label": "Sun nominal compactness",
+      "lane": "compactness_identity",
+      "formula": "kappa_body(3M/(4*pi*R^3))*R^2 = 2*mu/(R*c^2)",
+      "leverage": 0.000004245005140290716,
+      "referenceLeverage": 0.000004245005140290713,
+      "relativeError": 5.986091318581719e-16,
+      "referenceUncertaintyRel": 0,
+      "sigmaMargin": null,
+      "marginBand": "stellar",
+      "ordersFromHorizon": -5.37212177953109,
+      "promotionAllowed": false,
+      "inputs": {
+        "massParameterKey": "nominal_solar_GM_m3_s2",
+        "radiusKey": "nominal_solar_radius_m",
+        "mu_m3_s2": 132712440000000000000,
+        "radius_m": 695700000,
+        "meanDensity_kg_m3": 1409.7798243075258
+      }
+    },
+    {
+      "id": "jupiter_nominal_iau_b3",
+      "label": "Jupiter nominal compactness",
+      "lane": "compactness_identity",
+      "formula": "kappa_body(3M/(4*pi*R^3))*R^2 = 2*mu/(R*c^2)",
+      "leverage": 3.943316027128585e-8,
+      "referenceLeverage": 3.943316027128586e-8,
+      "relativeError": 1.6781421663641966e-16,
+      "referenceUncertaintyRel": 0,
+      "sigmaMargin": null,
+      "marginBand": "planetary",
+      "ordersFromHorizon": -7.404138416094873,
+      "promotionAllowed": false,
+      "inputs": {
+        "massParameterKey": "nominal_jovian_GM_m3_s2",
+        "radiusKey": "nominal_jovian_equatorial_radius_m",
+        "mu_m3_s2": 126686530000000000,
+        "radius_m": 71492000,
+        "meanDensity_kg_m3": 1240.1201602615063
+      }
+    },
+    {
+      "id": "hydrogen_bohr_radius",
+      "label": "Hydrogen atom at Bohr radius",
+      "lane": "quantum_scale_floor",
+      "formula": "2*G*M/(R*c^2)",
+      "leverage": 4.697143401851841e-44,
+      "referenceLeverage": 4.697143401851841e-44,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022000002273308975,
+      "sigmaMargin": 0,
+      "marginBand": "quantum_floor",
+      "ordersFromHorizon": -43.328166180782844,
+      "promotionAllowed": false,
+      "inputs": {
+        "massKey": "hydrogen_atom_mass_kg",
+        "radiusKey": "bohr_radius_m",
+        "mass_kg": 1.6735575e-27,
+        "radius_m": 5.29177210544e-11
+      }
+    },
+    {
+      "id": "proton_charge_radius",
+      "label": "Proton at charge radius",
+      "lane": "quantum_scale_floor",
+      "formula": "2*G*M/(R*c^2)",
+      "leverage": 2.954253416992896e-39,
+      "referenceLeverage": 2.954253416992896e-39,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.0010002419707251322,
+      "sigmaMargin": 0,
+      "marginBand": "quantum_floor",
+      "ordersFromHorizon": -38.52955225347867,
+      "promotionAllowed": false,
+      "inputs": {
+        "massKey": "proton_mass_kg",
+        "radiusKey": "proton_charge_radius_m",
+        "mass_kg": 1.67262192595e-27,
+        "radius_m": 8.409e-16
+      }
+    },
+    {
+      "id": "planck_mass_planck_length",
+      "label": "Planck mass at Planck length",
+      "lane": "quantum_scale_floor",
+      "formula": "2Gm_P/(l_P c^2)",
+      "leverage": 2,
+      "referenceLeverage": 2,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginBand": "horizon_order",
+      "ordersFromHorizon": 0.3010299956639812,
+      "promotionAllowed": false,
+      "inputs": {
+        "planckMass_kg": 2.1764343427178984e-8,
+        "planckLength_m": 1.6162550244237053e-35
+      }
+    },
+    {
+      "id": "casimir_1nm_gap_scale",
+      "label": "Raw 1 nm Casimir leverage at gap scale",
+      "lane": "casimir_raw_energy",
+      "formula": "abs((8*pi*G/c^4) * abs(E/A)/a) * L^2",
+      "leverage": 8.999676207949176e-53,
+      "referenceLeverage": 8.999676207949176e-53,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginBand": "raw_casimir_or_below",
+      "ordersFromHorizon": -52.045773115408515,
+      "promotionAllowed": false,
+      "inputs": {
+        "gap_m": 1e-9,
+        "leverLength_m": 1e-9,
+        "energyPerAreaAbs_J_m2": 0.43337525774812174,
+        "energyDensityAbs_J_m3": 433375257.74812174,
+        "kappa_m2": 8.999676207949175e-35
+      }
+    },
+    {
+      "id": "casimir_1nm_1km_scale",
+      "label": "Raw 1 nm Casimir leverage over 1 km",
+      "lane": "casimir_raw_energy",
+      "formula": "abs((8*pi*G/c^4) * abs(E/A)/a) * L^2",
+      "leverage": 8.999676207949175e-29,
+      "referenceLeverage": 8.999676207949175e-29,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginBand": "small_body",
+      "ordersFromHorizon": -28.045773115408515,
+      "promotionAllowed": false,
+      "inputs": {
+        "gap_m": 1e-9,
+        "leverLength_m": 1000,
+        "energyPerAreaAbs_J_m2": 0.43337525774812174,
+        "energyDensityAbs_J_m3": 433375257.74812174,
+        "kappa_m2": 8.999676207949175e-35
+      }
+    },
+    {
+      "id": "mimas_compactness",
+      "label": "Mimas compactness",
+      "lane": "external_observable_calibration",
+      "formula": "2*G*M/(R*c^2)",
+      "leverage": 2.809576457821051e-13,
+      "referenceLeverage": 2.809576457821051e-13,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginBand": "small_body",
+      "ordersFromHorizon": -12.551359144826257,
+      "promotionAllowed": false,
+      "inputs": {
+        "mass_kg": 37493000000000000000,
+        "radius_m": 198200
+      }
+    },
+    {
+      "id": "ceres_compactness",
+      "label": "Ceres compactness",
+      "lane": "external_observable_calibration",
+      "formula": "2*G*M/(R*c^2)",
+      "leverage": 2.967143916767085e-12,
+      "referenceLeverage": 2.967143916767085e-12,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginBand": "small_body",
+      "ordersFromHorizon": -11.527661388384209,
+      "promotionAllowed": false,
+      "inputs": {
+        "mass_kg": 938350000000000000000,
+        "radius_m": 469700
+      }
+    },
+    {
+      "id": "potato_radius_ice_250km_density_1000",
+      "label": "Potato-radius ice-body scale",
+      "lane": "external_observable_calibration",
+      "formula": "kappa_body(rho)*R^2",
+      "leverage": 3.888328424307267e-13,
+      "referenceLeverage": 3.888328424307267e-13,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginBand": "small_body",
+      "ordersFromHorizon": -12.410237059887605,
+      "promotionAllowed": false,
+      "inputs": {
+        "density_kg_m3": 1000,
+        "radius_m": 250000,
+        "observable": "self_gravity_shape"
+      }
+    },
+    {
+      "id": "schwarzschild_horizon",
+      "label": "Schwarzschild horizon compactness",
+      "lane": "horizon_reference",
+      "formula": "declared_reference_leverage",
+      "leverage": 1,
+      "referenceLeverage": 1,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0,
+      "sigmaMargin": null,
+      "marginBand": "horizon_order",
+      "ordersFromHorizon": 0,
+      "promotionAllowed": false,
+      "inputs": {}
+    }
+  ],
+  "nhm2Comparisons": [
+    {
+      "region": "global",
+      "leverage": 1.742413724619296e-29,
+      "nearestBenchmark": {
+        "id": "casimir_1nm_1km_scale",
+        "label": "Raw 1 nm Casimir leverage over 1 km",
+        "lane": "casimir_raw_energy",
+        "leverage": 8.999676207949175e-29,
+        "ordersFromReference": -0.7130756013217996
+      },
+      "ordersAboveRawCasimir1km": -0.7130756013217996,
+      "ordersBelowBlackHoleHorizon": 28.758848716730316,
+      "sourceClosureStatus": "review",
+      "observerClosureStatus": "review",
+      "qeiStatus": "missing",
+      "conservationStatus": "missing",
+      "promotionAllowed": false
+    },
+    {
+      "region": "hull",
+      "leverage": 2.19359928410875e-28,
+      "nearestBenchmark": {
+        "id": "casimir_1nm_1km_scale",
+        "label": "Raw 1 nm Casimir leverage over 1 km",
+        "lane": "casimir_raw_energy",
+        "leverage": 8.999676207949175e-29,
+        "ordersFromReference": 0.38693041111996873
+      },
+      "ordersAboveRawCasimir1km": 0.38693041111996873,
+      "ordersBelowBlackHoleHorizon": 27.65884270428855,
+      "sourceClosureStatus": "fail",
+      "observerClosureStatus": "fail",
+      "qeiStatus": "missing",
+      "conservationStatus": "missing",
+      "promotionAllowed": false
+    },
+    {
+      "region": "wall",
+      "leverage": 5.082254980266378e-28,
+      "nearestBenchmark": {
+        "id": "casimir_1nm_1km_scale",
+        "label": "Raw 1 nm Casimir leverage over 1 km",
+        "lane": "casimir_raw_energy",
+        "leverage": 8.999676207949175e-29,
+        "ordersFromReference": 0.7518295655256164
+      },
+      "ordersAboveRawCasimir1km": 0.7518295655256164,
+      "ordersBelowBlackHoleHorizon": 27.2939435498829,
+      "sourceClosureStatus": "fail",
+      "observerClosureStatus": "fail",
+      "qeiStatus": "missing",
+      "conservationStatus": "missing",
+      "promotionAllowed": false
+    },
+    {
+      "region": "exterior_shell",
+      "leverage": 5.081114445830644e-28,
+      "nearestBenchmark": {
+        "id": "casimir_1nm_1km_scale",
+        "label": "Raw 1 nm Casimir leverage over 1 km",
+        "lane": "casimir_raw_energy",
+        "leverage": 8.999676207949175e-29,
+        "ordersFromReference": 0.7517320923760785
+      },
+      "ordersAboveRawCasimir1km": 0.7517320923760785,
+      "ordersBelowBlackHoleHorizon": 27.294041023032438,
+      "sourceClosureStatus": "fail",
+      "observerClosureStatus": "fail",
+      "qeiStatus": "missing",
+      "conservationStatus": "missing",
+      "promotionAllowed": false
+    }
+  ],
+  "forbiddenClaims": [
+    "does not validate NHM2",
+    "does not certify source closure",
+    "does not promote a Casimir source mechanism",
+    "does not use external gravitational observables as NHM2 proof"
+  ]
+}

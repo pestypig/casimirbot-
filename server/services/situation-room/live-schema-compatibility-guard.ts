@@ -74,7 +74,8 @@ export function inspectLiveSchemaCompatibility(input: {
   if (
     input.environment.line_schema.some((line) => line.key === "risk") &&
     !capabilityModalities.includes("world_event") &&
-    selection.preset_hint !== "minecraft_cortana"
+    selection.preset_hint !== "minecraft_cortana" &&
+    selection.preset_hint !== "environment_run_monitor"
   ) {
     issues.push({
       code: "world_risk_without_world_source",

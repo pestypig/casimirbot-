@@ -1,11 +1,15 @@
 import crypto from "node:crypto";
 import type { HelixVisualFrameEvidence } from "@shared/helix-visual-frame-evidence";
-import type { LiveAnswerEnvironment, LiveAnswerLineDefinition } from "@shared/helix-live-answer-environment";
+import {
+  LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS,
+  type LiveAnswerEnvironment,
+  type LiveAnswerLineDefinition,
+} from "@shared/helix-live-answer-environment";
+import type { HelixSituationSourceModality } from "@shared/helix-situation-source-capability";
 import {
   HELIX_LIVE_LINE_SCHEMA_DERIVATION_SCHEMA,
   type HelixLiveLineSchemaDerivation,
 } from "@shared/helix-live-line-schema-derivation";
-import type { HelixSituationSourceModality } from "@shared/helix-situation-source-capability";
 import {
   liveSchemaSelectionToLineDefinitions,
   selectLiveSchemaForEnvironment,
@@ -94,7 +98,23 @@ export function deriveLiveLineSchema(input: {
   });
   const selectedKeys = new Set(liveSchemaSelectionToLineDefinitions(schemaSelection).map((entry) => entry.key));
 
-  const schema = selectedKeys.has("place") || schemaSelection.preset_hint === "minecraft_cortana"
+  const environmentLines: HelixLiveLineSchemaDerivation["line_schema"] =
+    LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS.environment_run_monitor.map((entry: LiveAnswerLineDefinition) =>
+      line(
+        entry.key,
+        entry.label,
+        entry.description ?? `${entry.label} line for environment state.`,
+        entry.key === "rehearsal" || entry.key === "possibilities" ? "procedure_graph" : entry.key === "affordances" ? "environment_affordance" : "environment_state",
+        entry.key === "recommendation" ? "Awaiting rehearsal before recommending action." : `Waiting for ${entry.label.toLowerCase()} evidence.`,
+        evidenceRefs,
+        missing,
+        entry.key === "rehearsal" ? "environment.rehearse_possibility_graph" : "environment.reduce_state_snapshot",
+      )
+    );
+
+  const schema = schemaSelection.preset_hint === "environment_run_monitor"
+    ? environmentLines
+    : selectedKeys.has("place") || schemaSelection.preset_hint === "minecraft_cortana"
     ? [
         line("place", "Place", "Current Minecraft place or scene.", "visual_frame", summary || "Waiting for visual or world evidence.", evidenceRefs, missing, "visual.align_latest_with_event_window"),
         line("activity", "Activity", "Current player activity.", "mixed", "Waiting for supported activity evidence.", evidenceRefs, missing, "visual.align_latest_with_event_window"),

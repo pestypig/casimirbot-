@@ -4,6 +4,7 @@ export const HELIX_LIVE_SCHEMA_SELECTION_SCHEMA =
   "helix.live_schema_selection.v1" as const;
 
 export type HelixLiveSchemaPresetHint =
+  | "environment_run_monitor"
   | "minecraft_cortana"
   | "generic_visual"
   | "equation_stream"

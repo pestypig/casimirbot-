@@ -47,6 +47,7 @@ const normalizeMode = (value?: string | null): LiveAnswerEnvironmentMode => {
 const normalizePreset = (value?: string | null): LiveAnswerEnvironmentPreset => {
   if (
     value === "discord_interpreter" ||
+    value === "environment_run_monitor" ||
     value === "calculator_equation_interpreter" ||
     value === "calculator_prime_stream" ||
     value === "physics_stability_tracker" ||
@@ -82,6 +83,8 @@ const normalizeLineDefinition = (line: LiveAnswerLineDefinition): LiveAnswerLine
     line.update_policy === "anomaly_only" ||
     line.update_policy === "model_reviewed"
       ? line.update_policy
+      : line.update_policy === "simulation_stream"
+        ? line.update_policy
       : "episode_based";
   const visibility =
     line.visibility === "situation_panel" || line.visibility === "debug_only"
@@ -126,6 +129,13 @@ export function resolveLiveAnswerLineSchema(input: {
 
 const initialValueForLine = (line: LiveAnswerLineDefinition, objective: string): string => {
   if (line.key === "now") return "Live answer environment is active.";
+  if (line.key === "situation") return "Live answer environment is active.";
+  if (line.key === "actor_state") return "Waiting for structured actor state.";
+  if (line.key === "resources") return "Waiting for structured resource state.";
+  if (line.key === "affordances") return "Waiting for affordance evidence.";
+  if (line.key === "possibilities") return "No action graph generated yet.";
+  if (line.key === "rehearsal") return "No rehearsal result yet.";
+  if (line.key === "recommendation") return "Awaiting rehearsal before recommending action.";
   if (line.key === "goal" || line.key === "hypothesis") return objective;
   if (line.key === "risk") return "No current risk above policy threshold.";
   if (line.key === "progress") return "Waiting for meaningful progress events.";

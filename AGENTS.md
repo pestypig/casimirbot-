@@ -64,6 +64,33 @@ When touching Helix Ask routing, frontier scaffolds, fallback behavior, output
 cleaning, or ideology narrative contracts, use:
 - `docs/helix-ask-readiness-debug-loop.md`
 
+## Helix Ask / Codex loop discipline (required for agent-loop changes)
+When touching Helix Ask agent-loop, source-target, route admission,
+tool-admission, live-source, workstation-action, route-product, terminal
+authority, loop-parity, debug-export, or Ask API behavior, also read and follow:
+- `docs/helix-ask-codex-loop-discipline.md`
+- `docs/helix-ask-api-parity-matrix.md`
+
+Patch-time contract:
+- Classify the change as `runtime-adapter`, `evidence-lane`,
+  `retrieval-gate`, `proof-policy`, `live-source`, `presentation`, or
+  Codex-owned runtime behavior before editing.
+- Codex owns generic sampling loops, tool execution, retries, approval,
+  sandboxing, compaction, session lifecycle, subagent orchestration, and
+  terminal turn completion. Do not recreate those in Helix Ask.
+- Helix Ask may add source-target admission, evidence identity, provenance,
+  proof gates, route/product contracts, terminal eligibility, and debug traces.
+- Lexical cues in user text are not execution. Contextual, negated, historical,
+  future, quoted, or screen-visible tool/control words must not admit mutating
+  tools unless the prompt is an affirmative operator command.
+- Receipts, live-card projections, process graphs, client projections, and
+  panel-generated text are not answer authority unless the route-product
+  contract explicitly allows that terminal product.
+- For applicable Helix Ask changes, run the API parity test or live-server
+  parity probe and report any disabled/frontier scenarios separately:
+  `npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks`
+  or `npm run helix:ask:api-parity`.
+
 Agent expectations for readiness loop:
 - Run contract battery + variety battery and report probability scorecard.
 - Treat Casimir verification as a hard gate for completion claims.

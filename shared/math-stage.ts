@@ -2946,4 +2946,32 @@ export const mathStageRegistry: MathStageEntry[] = [
       residualRelLInf: "1",
     },
   },
+  {
+    tag: "CURVATURE_LEVERAGE",
+    module: "scripts/curvature-leverage-benchmark-ladder.ts",
+    stage: "diagnostic",
+    notes: "Cross-scale curvature leverage benchmark ladder for compactness, quantum floors, raw Casimir energy, external observables, and NHM2 regional comparisons.",
+    motivation:
+      "The ladder gives curvature leverage a known diagnostic scale without converting external observables into NHM2 validation.",
+    conceptualWaypoints: [
+      "body-density leverage reduces to compactness",
+      "quantum and raw Casimir fixtures expose microscopic gravity leverage floors",
+      "NHM2 regions are compared against the ladder without changing source-closure gates",
+      "promotionAllowed remains false for benchmark and NHM2 comparison records",
+    ],
+    checks: [
+      { type: "test", path: "tests/curvature-leverage-benchmark-ladder.spec.ts" },
+      { type: "test", path: "tests/curvature-leverage-claims.spec.ts" },
+      { type: "snapshot", path: "tests/curvature-leverage-benchmark-ladder.spec.ts" },
+    ],
+    units: {
+      leverage: "1",
+      referenceLeverage: "1",
+      relativeError: "1",
+      sigmaMargin: "1",
+      ordersFromReference: "1",
+      ordersAboveRawCasimir1km: "1",
+      ordersBelowBlackHoleHorizon: "1",
+    },
+  },
 ];

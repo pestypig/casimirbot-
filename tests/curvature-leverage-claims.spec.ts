@@ -60,4 +60,17 @@ describe("curvature leverage claim registry", () => {
     expect(claim?.statement).toContain("do not validate NHM2");
     expect(JSON.stringify(claim)).toContain("NHM2 claims must route through full-solve tensor artifacts");
   });
+
+  it("binds the benchmark ladder to compactness without promotion", () => {
+    const registry = loadRegistry();
+    const claim = registry.claims.find(
+      (entry) =>
+        entry.claimId === "claim:curvature.leverage:benchmark_ladder_compactness_anchor",
+    );
+
+    expect(claim).toBeTruthy();
+    expect(claim?.statement).toContain("kappa_body R^2 = 2GM/(Rc^2)");
+    expect(claim?.repoBindings).toContain("scripts/curvature-leverage-benchmark-ladder.ts");
+    expect(JSON.stringify(claim)).toContain("promotionAllowed must remain false");
+  });
 });

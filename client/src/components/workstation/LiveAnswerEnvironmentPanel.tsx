@@ -354,6 +354,9 @@ const modalityLabel = (modality: HelixSituationSourceModality): string => {
   if (modality === "text_chat") return "Text chat";
   if (modality === "calculator_stream") return "Calculator";
   if (modality === "simulation_stream") return "Simulation";
+  if (modality === "environment_state") return "Environment state";
+  if (modality === "environment_affordance") return "Affordances";
+  if (modality === "procedure_graph") return "Procedure graph";
   if (modality === "document_context") return "Documents";
   return "Notes";
 };

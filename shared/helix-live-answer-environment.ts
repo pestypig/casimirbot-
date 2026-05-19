@@ -12,6 +12,7 @@ export type LiveAnswerLineUpdatePolicy =
   | "tick_based"
   | "windowed_summary"
   | "computation_tick"
+  | "simulation_stream"
   | "stability_window"
   | "anomaly_only"
   | "model_reviewed";
@@ -22,6 +23,7 @@ export type LiveAnswerLineVisibility =
   | "debug_only";
 
 export type LiveAnswerEnvironmentPreset =
+  | "environment_run_monitor"
   | "minecraft_run_monitor"
   | "calculator_equation_interpreter"
   | "calculator_prime_stream"
@@ -192,14 +194,29 @@ export const LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS: Record<
   Exclude<LiveAnswerEnvironmentPreset, "custom">,
   LiveAnswerLineDefinition[]
 > = {
-  minecraft_run_monitor: [
-    answer("now", "Now", "episode_based", "Current compact world state."),
-    answer("goal", "Goal", "episode_based", "Likely objective or user goal."),
-    answer("risk", "Risk", "salience_only", "Danger or safety status."),
-    answer("progress", "Progress", "episode_based", "Meaningful progress updates."),
+  environment_run_monitor: [
+    answer("situation", "Situation", "episode_based", "Current compact environment state."),
+    answer("actor_state", "Actor", "episode_based", "Actor, player, or operator state."),
+    answer("resources", "Resources", "episode_based", "Relevant inventory, supplies, tools, or available objects."),
+    answer("affordances", "Affordances", "episode_based", "What can currently be seen, reached, used, traversed, or changed."),
+    answer("risk", "Risk", "salience_only", "Hazards, blockers, or safety issues."),
+    answer("possibilities", "Possibilities", "projection_only", "Candidate next actions not yet recommended."),
+    answer("rehearsal", "Rehearsal", "simulation_stream", "Dry-run feasibility of candidate action scripts."),
+    answer("recommendation", "Recommendation", "model_reviewed", "Validated user-facing suggestion, if any."),
     answer("unknowns", "Unknowns", "projection_only", "Known sensor or context gaps."),
-    answer("last_decision", "Last decision", "salience_only", "Latest interjection decision."),
-    answer("next_check", "Next check", "episode_based", "What the monitor should watch next."),
+    answer("next_check", "Next check", "episode_based", "What should be observed or rehearsed next."),
+  ],
+  minecraft_run_monitor: [
+    answer("situation", "Situation", "episode_based", "Current compact Minecraft state."),
+    answer("actor_state", "Actor", "episode_based", "Player state, pose, health, hunger, and status flags."),
+    answer("resources", "Resources", "episode_based", "Relevant inventory, supplies, containers, tools, or available objects."),
+    answer("affordances", "Affordances", "episode_based", "What the player can currently see, reach, use, traverse, or change."),
+    answer("risk", "Risk", "salience_only", "Hazards, blockers, or safety issues."),
+    answer("possibilities", "Possibilities", "projection_only", "Candidate next actions not yet recommended."),
+    answer("rehearsal", "Rehearsal", "simulation_stream", "Dry-run feasibility of candidate action scripts."),
+    answer("recommendation", "Recommendation", "model_reviewed", "Validated user-facing suggestion, if any."),
+    answer("unknowns", "Unknowns", "projection_only", "Known sensor or context gaps."),
+    answer("next_check", "Next check", "episode_based", "What should be observed or rehearsed next."),
   ],
   calculator_prime_stream: [
     answer("current_candidate", "Current candidate", "computation_tick", "Current integer being checked."),

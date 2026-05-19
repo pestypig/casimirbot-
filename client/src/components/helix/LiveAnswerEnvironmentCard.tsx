@@ -94,6 +94,17 @@ export function LiveAnswerEnvironmentCard({
         confidence: null,
         updated_at: entry.updated_at,
       }));
+  const procedureLines = environment.lines.filter((line: LiveAnswerLineState) =>
+    line.key === "possibilities" ||
+    line.key === "rehearsal" ||
+    line.key === "recommendation" ||
+    line.key === "unknowns"
+  );
+  const sourceSummary = [
+    environment.source_ids.length ? `Sources ${environment.source_ids.length}` : "No bound source",
+    environment.context_policy,
+    "raw payloads excluded",
+  ].join(" / ");
   const pendingQuestion = presentStateCard?.pending_request_input?.question ?? null;
   return (
     <section className="mb-2 w-full rounded-lg border border-cyan-300/20 bg-cyan-950/15 px-3 py-2 text-left text-xs text-cyan-50">
@@ -109,6 +120,10 @@ export function LiveAnswerEnvironmentCard({
         </span>
       </div>
       <div className="mt-2 grid gap-1.5 text-[11px] text-cyan-50/90">
+        <p>
+          <span className="text-cyan-200/80">Sources: </span>
+          {sourceSummary}
+        </p>
         {visibleLines.map((line: HelixPresentStateCardLine) => (
           <p key={line.key}>
             <span className="text-cyan-200/80">{line.label}: </span>
@@ -125,6 +140,19 @@ export function LiveAnswerEnvironmentCard({
           </p>
         ) : null}
       </div>
+      {procedureLines.length > 0 ? (
+        <details className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/20 px-2 py-1 text-[11px] text-cyan-50/90">
+          <summary className="cursor-pointer text-cyan-100">Procedure / rehearsal trace</summary>
+          <div className="mt-1 grid gap-1">
+            {procedureLines.map((line: LiveAnswerLineState) => (
+              <p key={line.key}>
+                <span className="text-cyan-200/80">{line.label}: </span>
+                {cleanLine(line)}
+              </p>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button
           type="button"

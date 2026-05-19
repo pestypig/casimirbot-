@@ -2,6 +2,8 @@ export const HELIX_LIVE_SOURCE_CHUNK_SCHEMA = "helix.live_source_chunk.v1" as co
 
 export type HelixLiveSourceChunkModality =
   | "world_event"
+  | "environment_state"
+  | "environment_affordance"
   | "visual_frame"
   | "audio_transcript"
   | "text_chat"
@@ -9,6 +11,7 @@ export type HelixLiveSourceChunkModality =
   | "simulation_stream"
   | "document_context"
   | "note_context"
+  | "procedure_graph"
   | "process_graph";
 
 export type HelixLiveSourceChunkContextPolicy = "compact_context_pack_only";

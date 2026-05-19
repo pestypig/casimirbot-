@@ -3,12 +3,15 @@ import type { HelixSituationSourceModality, HelixSituationSourceStatus } from "@
 
 const TTL_BY_MODALITY_MS: Record<HelixSituationSourceModality, number | null> = {
   world_event: 60_000,
+  environment_state: 30_000,
+  environment_affordance: 30_000,
   visual_frame: 45_000,
   audio_transcript: 30_000,
   voice_identity: 60_000,
   text_chat: 120_000,
   calculator_stream: 30_000,
   simulation_stream: 30_000,
+  procedure_graph: 120_000,
   document_context: null,
   note_context: null,
 };

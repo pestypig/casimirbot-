@@ -1,0 +1,85 @@
+{
+  "$schema": "https://casimirbot.local/schemas/constants/codata-2022.v1.json",
+  "schemaVersion": "v1",
+  "registryId": "codata-2022-curvature-leverage",
+  "updatedAt": "2026-05-19",
+  "sources": [
+    {
+      "id": "nist-codata-2022",
+      "citation": "NIST/CODATA recommended values of the fundamental physical constants: 2022.",
+      "url": "https://physics.nist.gov/constants"
+    },
+    {
+      "id": "iau-2015-b3",
+      "citation": "IAU 2015 Resolution B3 nominal conversion constants for selected solar and planetary properties.",
+      "url": "https://www.iau.org/static/resolutions/IAU2015_English.pdf"
+    }
+  ],
+  "constants": {
+    "c_m_s": {
+      "value": 299792458,
+      "relativeUncertainty": 0,
+      "sourceId": "nist-codata-2022"
+    },
+    "G_m3_kg_s2": {
+      "value": 6.6743e-11,
+      "relativeUncertainty": 0.000022,
+      "sourceId": "nist-codata-2022"
+    },
+    "hbar_J_s": {
+      "value": 1.0545718176461565e-34,
+      "relativeUncertainty": 0,
+      "sourceId": "nist-codata-2022"
+    },
+    "proton_mass_kg": {
+      "value": 1.67262192595e-27,
+      "relativeUncertainty": 3.1e-10,
+      "sourceId": "nist-codata-2022"
+    },
+    "hydrogen_atom_mass_kg": {
+      "value": 1.6735575e-27,
+      "relativeUncertainty": 1e-8,
+      "sourceId": "nist-codata-2022"
+    },
+    "bohr_radius_m": {
+      "value": 5.29177210544e-11,
+      "relativeUncertainty": 1.6e-10,
+      "sourceId": "nist-codata-2022"
+    },
+    "proton_charge_radius_m": {
+      "value": 8.409e-16,
+      "relativeUncertainty": 0.001,
+      "sourceId": "nist-codata-2022"
+    },
+    "nominal_solar_GM_m3_s2": {
+      "value": 1.3271244e20,
+      "relativeUncertainty": 0,
+      "sourceId": "iau-2015-b3"
+    },
+    "nominal_solar_radius_m": {
+      "value": 695700000,
+      "relativeUncertainty": 0,
+      "sourceId": "iau-2015-b3"
+    },
+    "nominal_terrestrial_GM_m3_s2": {
+      "value": 398600400000000,
+      "relativeUncertainty": 0,
+      "sourceId": "iau-2015-b3"
+    },
+    "nominal_terrestrial_equatorial_radius_m": {
+      "value": 6378100,
+      "relativeUncertainty": 0,
+      "sourceId": "iau-2015-b3"
+    },
+    "nominal_jovian_GM_m3_s2": {
+      "value": 1.2668653e17,
+      "relativeUncertainty": 0,
+      "sourceId": "iau-2015-b3"
+    },
+    "nominal_jovian_equatorial_radius_m": {
+      "value": 71492000,
+      "relativeUncertainty": 0,
+      "sourceId": "iau-2015-b3"
+    }
+  }
+}

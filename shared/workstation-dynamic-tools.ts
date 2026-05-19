@@ -1028,7 +1028,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
   if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
-  if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "calculator_stream", "simulation_stream"] };
+  if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "environment_state", "environment_affordance", "procedure_graph", "calculator_stream", "simulation_stream"] };
   if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };
   if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
   if (arg === "status") return { enum: ["active", "paused", "stopped"] };

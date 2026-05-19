@@ -98,6 +98,10 @@ import {
 import { getActiveLiveAnswerEnvironmentForRoom } from "./live-answer-environment-store";
 import { reduceLiveAnswerEnvironmentFromWorldEvent } from "./live-answer-line-reducer";
 import {
+  extractEnvironmentStateSnapshotFromWorldEvent,
+  ingestEnvironmentStateSnapshot,
+} from "./environment-state-snapshot-window";
+import {
   ingestMinecraftSpatialWorldEvent,
   resetMinecraftSpatialWindows,
 } from "./minecraft-spatial-window";
@@ -1105,6 +1109,10 @@ export const ingestWorldEvent = async (
     resolvedBinding && options.appendToThread !== false
       ? getActiveLiveAnswerEnvironmentForRoom(resolvedBinding.room_id)
       : null;
+  const environmentStateSnapshot = extractEnvironmentStateSnapshotFromWorldEvent(event);
+  if (environmentStateSnapshot) {
+    ingestEnvironmentStateSnapshot(environmentStateSnapshot);
+  }
   const liveArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId
       ? buildLiveSituationUpdate({

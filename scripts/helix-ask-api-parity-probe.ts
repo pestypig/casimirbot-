@@ -1,0 +1,178 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import {
+  API_PARITY_SCENARIOS,
+  getEnabledApiParityScenarios,
+  type HelixApiParityScenario,
+} from "../server/services/helix-ask/api-parity-matrix";
+import { buildApiParityProbeResult } from "../server/services/helix-ask/api-parity-probe";
+
+type RecordLike = Record<string, unknown>;
+
+const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5050").replace(/\/+$/, "");
+const OUT_DIR = process.env.HELIX_ASK_API_PARITY_OUT ?? "artifacts/helix-ask-api-parity";
+const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_API_PARITY_TIMEOUT_MS ?? 180_000));
+const INCLUDE_DISABLED = process.env.HELIX_ASK_API_PARITY_INCLUDE_DISABLED === "1";
+const SCENARIO_FILTER = (process.env.HELIX_ASK_API_PARITY_SCENARIOS ?? "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
+const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    const text = await response.text();
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 800)}`);
+    return JSON.parse(text) as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const seedBodyFor = (scenario: HelixApiParityScenario, threadId: string): RecordLike | null => {
+  if (scenario.seed === "none") return null;
+  if (scenario.seed === "active_run_with_unbound_visual_source") {
+    return {
+      scenario: "active_run_with_unbound_visual_source",
+      thread_id: threadId,
+      bound_source_id: `visual_source:${scenario.id}:bound`,
+      unbound_source_id: `visual_source:${scenario.id}:fresh`,
+      bound_scene_text: "A backend-seeded visual capture shows File Explorer open to a research folder.",
+      unbound_scene_text: "A fresh visual capture shows the Helix Ask UI with worker-lane debug output.",
+      confidence: 0.82,
+    };
+  }
+  const startButton = scenario.seed === "visual_frame_with_start_button";
+  return {
+    thread_id: threadId,
+    source_id: `visual_source:${scenario.id}`,
+    scene_text: startButton
+      ? "A backend-seeded visual capture shows a workstation panel with a visible Start button and status controls."
+      : "A backend-seeded visual capture shows File Explorer open to a research folder.",
+    activity: startButton
+      ? "Reviewing a workstation panel that includes a Start button."
+      : "Reviewing a research folder in File Explorer.",
+    objects: startButton
+      ? "workstation panel, Start button, status controls"
+      : "File Explorer window, research folder, visible file list",
+    confidence: 0.82,
+  };
+};
+
+const runScenario = async (scenario: HelixApiParityScenario, runId: string, outputDir: string): Promise<RecordLike> => {
+  const threadId = `helix-ask:api-parity:${runId}:${scenario.id}`;
+  const scenarioDir = path.join(outputDir, scenario.id);
+  await fs.mkdir(scenarioDir, { recursive: true });
+
+  const seedBody = seedBodyFor(scenario, threadId);
+  const seed = seedBody
+    ? await fetchJson<RecordLike>(`${BASE_URL}/api/agi/situation/test-harness/live-visual-source`, {
+        method: "POST",
+        body: JSON.stringify(seedBody),
+      })
+    : null;
+
+  if (seed) await fs.writeFile(path.join(scenarioDir, "seed.json"), `${JSON.stringify(seed, null, 2)}\n`);
+
+  const ask = await fetchJson<RecordLike>(`${BASE_URL}/api/agi/ask/turn`, {
+    method: "POST",
+    body: JSON.stringify({
+      sessionId: threadId,
+      question: scenario.prompt,
+      mode: "read",
+      debug: true,
+    }),
+  });
+  const turnId = typeof ask.turn_id === "string" ? ask.turn_id : "";
+  const debug = turnId
+    ? await fetchJson<RecordLike>(`${BASE_URL}/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+    : null;
+  const result = buildApiParityProbeResult({
+    scenario,
+    askTurn: ask,
+    debugExport: debug,
+    terminalEventSeen: true,
+    streamClosedAfterTerminal: true,
+  });
+
+  await fs.writeFile(path.join(scenarioDir, "ask-response.json"), `${JSON.stringify(ask, null, 2)}\n`);
+  await fs.writeFile(path.join(scenarioDir, "debug-export.json"), `${JSON.stringify(debug, null, 2)}\n`);
+  await fs.writeFile(path.join(scenarioDir, "probe-result.json"), `${JSON.stringify(result, null, 2)}\n`);
+  return result;
+};
+
+const renderMarkdownSummary = (input: { runId: string; results: RecordLike[] }): string => {
+  const lines = [
+    "# Helix Ask API Parity Probe",
+    "",
+    `- run_id: ${input.runId}`,
+    `- base_url: ${BASE_URL}`,
+    "",
+    "## Scenarios",
+  ];
+  for (const result of input.results) {
+    const ok = result.procedural_ok === true;
+    lines.push(
+      "",
+      `### ${ok ? "PASS" : "FAIL"} ${result.scenario_id}`,
+      "",
+      `- prompt: ${result.prompt}`,
+      `- turn_id: ${result.non_stream_turn_id}`,
+      `- source_target: ${result.source_target}`,
+      `- route: ${result.selected_route}`,
+      `- terminal: ${result.terminal_artifact_kind}`,
+      `- route_authority_ok: ${String((result.route_authority as RecordLike | undefined)?.ok ?? null)}`,
+      `- terminal_authority_ok: ${String(result.terminal_authority_ok)}`,
+      `- failures: ${JSON.stringify(result.failures ?? [])}`,
+    );
+  }
+  return `${lines.join("\n")}\n`;
+};
+
+const main = async (): Promise<void> => {
+  const selected = new Set(SCENARIO_FILTER);
+  const scenarios = (SCENARIO_FILTER.length ? API_PARITY_SCENARIOS.filter((scenario) => selected.has(scenario.id)) : getEnabledApiParityScenarios(INCLUDE_DISABLED));
+  const runId = `api-parity-${Date.now()}`;
+  const outputDir = path.resolve(OUT_DIR, runId);
+  await fs.mkdir(outputDir, { recursive: true });
+
+  const results: RecordLike[] = [];
+  for (const scenario of scenarios) {
+    try {
+      results.push(await runScenario(scenario, runId, outputDir));
+    } catch (error) {
+      results.push({
+        schema: "helix.api_parity_probe_result.v1",
+        scenario_id: scenario.id,
+        prompt: scenario.prompt,
+        procedural_ok: false,
+        failures: [error instanceof Error ? error.message : String(error)],
+      });
+    }
+  }
+
+  const summary = {
+    ok: results.every((result) => result.procedural_ok === true),
+    run_id: runId,
+    output_dir: outputDir,
+    results,
+  };
+  await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results }));
+  console.log(JSON.stringify(summary, null, 2));
+  if (!summary.ok) process.exitCode = 1;
+};
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

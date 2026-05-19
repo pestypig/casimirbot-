@@ -32,12 +32,15 @@ const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 const normalizeModality = (value: unknown): HelixLiveSourceDescriptorModality => {
   if (
     value === "world_event" ||
+    value === "environment_state" ||
+    value === "environment_affordance" ||
     value === "audio_transcript" ||
     value === "text_chat" ||
     value === "calculator_stream" ||
     value === "simulation_stream" ||
     value === "document_context" ||
     value === "note_context" ||
+    value === "procedure_graph" ||
     value === "process_graph"
   ) return value;
   return "visual_frame";
@@ -105,6 +108,7 @@ export function inferLiveSourceSurface(input: {
   if (origin === "minehut_plugin") return "game";
   if (modality === "calculator_stream") return "calculator";
   if (modality === "simulation_stream") return "simulation";
+  if (modality === "environment_state" || modality === "environment_affordance" || modality === "procedure_graph") return "app";
   if (modality === "document_context" || /\b(?:pdf|docx?|document|paper|page)\b/.test(text)) return "document";
   if (modality === "process_graph") return "app";
   if (/\b(?:file explorer|windows explorer|finder|folder|directory|downloads|documents|desktop|\.wav|\.asd|\.png|\.jpg)\b/.test(text)) {

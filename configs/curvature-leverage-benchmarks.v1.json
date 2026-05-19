@@ -1,0 +1,130 @@
+{
+  "$schema": "https://casimirbot.local/schemas/curvature-leverage-benchmarks.v1.json",
+  "schemaVersion": "v1",
+  "registryId": "curvature-leverage-benchmark-ladder",
+  "updatedAt": "2026-05-19",
+  "claimTier": "diagnostic",
+  "promotionAllowed": false,
+  "benchmarkGroups": [
+    {
+      "lane": "compactness_identity",
+      "description": "Mean-density body leverage identity Lambda_body = kappa_body R^2 = 2GM/(Rc^2).",
+      "fixtures": [
+        {
+          "id": "earth_nominal_iau_b3",
+          "label": "Earth nominal compactness",
+          "massParameterKey": "nominal_terrestrial_GM_m3_s2",
+          "radiusKey": "nominal_terrestrial_equatorial_radius_m",
+          "densityMode": "mu_first"
+        },
+        {
+          "id": "sun_nominal_iau_b3",
+          "label": "Sun nominal compactness",
+          "massParameterKey": "nominal_solar_GM_m3_s2",
+          "radiusKey": "nominal_solar_radius_m",
+          "densityMode": "mu_first"
+        },
+        {
+          "id": "jupiter_nominal_iau_b3",
+          "label": "Jupiter nominal compactness",
+          "massParameterKey": "nominal_jovian_GM_m3_s2",
+          "radiusKey": "nominal_jovian_equatorial_radius_m",
+          "densityMode": "mu_first"
+        }
+      ]
+    },
+    {
+      "lane": "quantum_scale_floor",
+      "description": "Microscopic compactness references and Planck mass/length unit sanity check.",
+      "fixtures": [
+        {
+          "id": "hydrogen_bohr_radius",
+          "label": "Hydrogen atom at Bohr radius",
+          "massKey": "hydrogen_atom_mass_kg",
+          "radiusKey": "bohr_radius_m"
+        },
+        {
+          "id": "proton_charge_radius",
+          "label": "Proton at charge radius",
+          "massKey": "proton_mass_kg",
+          "radiusKey": "proton_charge_radius_m"
+        },
+        {
+          "id": "planck_mass_planck_length",
+          "label": "Planck mass at Planck length",
+          "formula": "2Gm_P/(l_P c^2)",
+          "expectedLeverage": 2
+        }
+      ]
+    },
+    {
+      "lane": "casimir_raw_energy",
+      "description": "Ideal parallel-plate raw Casimir energy-density leverage; diagnostic only.",
+      "fixtures": [
+        {
+          "id": "casimir_1nm_gap_scale",
+          "label": "Raw 1 nm Casimir leverage at gap scale",
+          "gap_m": 1e-9,
+          "leverLength_m": 1e-9
+        },
+        {
+          "id": "casimir_1nm_1km_scale",
+          "label": "Raw 1 nm Casimir leverage over 1 km",
+          "gap_m": 1e-9,
+          "leverLength_m": 1000
+        }
+      ]
+    },
+    {
+      "lane": "external_observable_calibration",
+      "description": "External gravity observables used as dimensional calibrators, not NHM2 validators.",
+      "fixtures": [
+        {
+          "id": "mimas_compactness",
+          "label": "Mimas compactness",
+          "mass_kg": 3.7493e19,
+          "radius_m": 198200
+        },
+        {
+          "id": "ceres_compactness",
+          "label": "Ceres compactness",
+          "mass_kg": 9.3835e20,
+          "radius_m": 469700
+        },
+        {
+          "id": "potato_radius_ice_250km_density_1000",
+          "label": "Potato-radius ice-body scale",
+          "density_kg_m3": 1000,
+          "radius_m": 250000,
+          "observable": "self_gravity_shape"
+        }
+      ]
+    },
+    {
+      "lane": "horizon_reference",
+      "description": "Order-unity reference for Schwarzschild compactness.",
+      "fixtures": [
+        {
+          "id": "schwarzschild_horizon",
+          "label": "Schwarzschild horizon compactness",
+          "expectedLeverage": 1
+        }
+      ]
+    }
+  ],
+  "comparisonPolicy": {
+    "nearestBenchmarkExcludes": [
+      "planck_mass_planck_length",
+      "schwarzschild_horizon"
+    ],
+    "rawCasimirOneKilometerBenchmarkId": "casimir_1nm_1km_scale",
+    "horizonBenchmarkId": "schwarzschild_horizon",
+    "epsilon": 1e-300
+  },
+  "forbiddenClaims": [
+    "does not validate NHM2",
+    "does not certify source closure",
+    "does not promote a Casimir source mechanism",
+    "does not use external gravitational observables as NHM2 proof"
+  ]
+}

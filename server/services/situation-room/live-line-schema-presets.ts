@@ -6,6 +6,7 @@ import {
 
 export function resolveLiveLineSchemaPreset(preset: LiveAnswerEnvironmentPreset | string | null | undefined): LiveAnswerLineDefinition[] {
   const key =
+    preset === "environment_run_monitor" ||
     preset === "calculator_prime_stream" ||
     preset === "calculator_equation_interpreter" ||
     preset === "physics_stability_tracker" ||
@@ -15,6 +16,6 @@ export function resolveLiveLineSchemaPreset(preset: LiveAnswerEnvironmentPreset 
     preset === "research_session" ||
     preset === "minecraft_run_monitor"
       ? preset
-      : "minecraft_run_monitor";
+      : "environment_run_monitor";
   return LIVE_ANSWER_ENVIRONMENT_LINE_PRESETS[key].map((line: LiveAnswerLineDefinition) => ({ ...line }));
 }

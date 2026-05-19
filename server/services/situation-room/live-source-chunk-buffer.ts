@@ -60,6 +60,8 @@ const cleanString = (value: unknown): string | null => {
 export const normalizeLiveSourceModality = (value: unknown): HelixLiveSourceChunkModality => {
   if (
     value === "world_event" ||
+    value === "environment_state" ||
+    value === "environment_affordance" ||
     value === "visual_frame" ||
     value === "audio_transcript" ||
     value === "text_chat" ||
@@ -67,6 +69,7 @@ export const normalizeLiveSourceModality = (value: unknown): HelixLiveSourceChun
     value === "simulation_stream" ||
     value === "document_context" ||
     value === "note_context" ||
+    value === "procedure_graph" ||
     value === "process_graph"
   ) return value;
   return "text_chat";
@@ -115,10 +118,13 @@ const analyzerForModality = (modality: HelixLiveSourceChunkModality): string => 
   if (modality === "visual_frame") return "visual_analysis";
   if (modality === "audio_transcript") return "transcript_intent";
   if (modality === "world_event") return "world_sense";
+  if (modality === "environment_state") return "environment_state_window";
+  if (modality === "environment_affordance") return "environment_affordance_window";
   if (modality === "calculator_stream") return "calculator_stream_window";
   if (modality === "simulation_stream") return "simulation_stability_window";
   if (modality === "document_context") return "document_context_extraction";
   if (modality === "note_context") return "note_context_summary";
+  if (modality === "procedure_graph") return "procedure_graph_window";
   if (modality === "process_graph") return "process_graph_window";
   return "text_chat_summary";
 };

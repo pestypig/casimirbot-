@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-19T22:57:31.620Z",
-  "registryCount": 123,
+  "generatedAt": "2026-05-19T23:47:54.068Z",
+  "registryCount": 124,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 59,
+      "count": 60,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -130,7 +130,8 @@
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts",
         "shared/curvature-leverage.ts",
-        "scripts/curvature-leverage-full-solve-report.ts"
+        "scripts/curvature-leverage-full-solve-report.ts",
+        "scripts/curvature-leverage-benchmark-ladder.ts"
       ]
     },
     "certified": {
@@ -207,7 +208,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 123,
+    "entriesWithUnits": 124,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -221,8 +222,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 59,
-        "withUnits": 59,
+        "total": 60,
+        "withUnits": 60,
         "missing": []
       },
       "certified": {
@@ -243,8 +244,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1453,
-    "edgeCount": 3415
+    "nodeCount": 1470,
+    "edgeCount": 3449
   },
   "evidenceProfiles": [
     {

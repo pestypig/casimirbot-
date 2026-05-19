@@ -28,7 +28,7 @@ describe("live answer environment", () => {
     expect(receipt).toMatchObject({
       schema: "helix.live_answer_environment_receipt.v1",
       ok: true,
-      line_keys: expect.arrayContaining(["now", "risk", "progress", "next_check"]),
+      line_keys: expect.arrayContaining(["situation", "risk", "possibilities", "rehearsal", "recommendation", "next_check"]),
       command_lane_enabled: false,
     });
     expect(environment.lines.filter((line) => line.visibility === "answer_card").map((line) => line.key)).toContain("risk");
@@ -151,7 +151,7 @@ describe("live answer environment", () => {
     expect(update?.delta).toMatchObject({
       schema: "helix.live_answer_environment_delta.v1",
       reason: "salience_update",
-      changed_line_keys: expect.arrayContaining(["now", "risk", "last_decision"]),
+      changed_line_keys: expect.arrayContaining(["situation", "risk", "rehearsal", "recommendation"]),
     });
     expect(update?.environment.lines.find((line) => line.key === "risk")?.value).toContain("4 health");
     expect(listLiveAnswerEnvironmentDeltas(environment.environment_id)).toHaveLength(1);

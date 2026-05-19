@@ -10,6 +10,11 @@ import type {
 } from "@shared/helix-situation-standby";
 import type { SituationEpisode } from "@shared/helix-situation-episode";
 import { updateLiveAnswerEnvironment } from "./live-answer-environment-store";
+import {
+  extractEnvironmentStateSnapshotFromWorldEvent,
+  ingestEnvironmentStateSnapshot,
+} from "./environment-state-snapshot-window";
+import { reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot } from "./live-environment-state-line-reducer";
 
 const eventLabel = (event: HelixWorldEvent): string =>
   event.actor_label || event.actor_id || "The source";
@@ -36,6 +41,20 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
 }): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
   const environment = input.environment;
   if (!environment || environment.status !== "active") return null;
+  const environmentSnapshot = extractEnvironmentStateSnapshotFromWorldEvent(input.event);
+  if (environmentSnapshot) {
+    ingestEnvironmentStateSnapshot(environmentSnapshot);
+    const environmentUpdate = reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot({
+      environment,
+      snapshot: environmentSnapshot,
+      threadId: environment.thread_id,
+      objective: environment.objective,
+      now: input.now ?? input.signal.ts,
+    });
+    return environmentUpdate
+      ? { environment: environmentUpdate.environment, delta: environmentUpdate.delta }
+      : null;
+  }
   const now = input.now ?? input.signal.ts;
   const episodes = input.episodes ?? [];
   const goals = input.goalHypotheses ?? [];
@@ -82,9 +101,11 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
   };
 
   setLine("now", nowSummary, salience?.should_notify_helix ? 0.86 : 0.68);
+  setLine("situation", nowSummary, salience?.should_notify_helix ? 0.86 : 0.68);
   if (goalLabel) setLine("goal", goalLabel, goals.at(-1)?.confidence ?? 0.68);
   if (riskSummary) setLine("risk", riskSummary, 0.86);
   if (progressSummary) setLine("progress", progressSummary, 0.76);
+  if (progressSummary) setLine("possibilities", "No procedure graph generated from this world event.", 0.45);
   if (episodeSummary && !progressSummary && environment.lines.some((line) => line.key === "progress")) {
     setLine("progress", episodeSummary, 0.64);
   }
@@ -112,6 +133,12 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
   }
   if (environment.lines.some((line) => line.key === "unknowns")) {
     setLine("unknowns", "Raw logs are compacted; source-specific gaps remain explicit in Situation Room Debug.", 0.62);
+  }
+  if (environment.lines.some((line) => line.key === "rehearsal")) {
+    setLine("rehearsal", "No rehearsal result yet.", 0.45);
+  }
+  if (environment.lines.some((line) => line.key === "recommendation")) {
+    setLine("recommendation", "Awaiting rehearsal before recommending action.", 0.45);
   }
   if (environment.lines.some((line) => line.key === "claim")) setLine("claim", nowSummary, 0.6);
   if (environment.lines.some((line) => line.key === "evidence")) setLine("evidence", evidenceRefs[0] ?? input.signal.signal_id, 0.65);

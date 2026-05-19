@@ -18,6 +18,56 @@ Codex and Helix Ask overlap in agent vocabulary, but they should not overlap in
 ownership. Codex owns the generic agent runtime. Helix Ask owns the domain
 evidence loop.
 
+## Patch-Time Contract
+
+Every Helix Ask patch that touches routing, source-target admission,
+tool-admission, live-source handling, workstation actions, route-product
+contracts, terminal authority, loop-parity traces, debug exports, or Ask API
+behavior must start from this boundary check:
+
+```txt
+What part of this change is Codex-owned runtime mechanics?
+What part is Helix-owned evidence/admission/proof policy?
+What test proves a lexical cue did not become execution or answer authority?
+```
+
+Classify the patch before editing:
+
+```txt
+runtime-adapter
+evidence-lane
+retrieval-gate
+proof-policy
+live-source
+presentation
+Codex-owned runtime behavior
+```
+
+If the patch manages sampling, generic tool execution, retries, approvals,
+sandboxing, compaction, session lifecycle, subagent orchestration, or terminal
+turn completion, it belongs to Codex or to a thin Codex-compatible adapter. Do
+not implement a parallel private loop in Helix Ask.
+
+If the patch selects, normalizes, ranks, gates, proves, or rejects domain
+evidence, it belongs in Helix Ask and must preserve equal-identity evidence:
+observations are not assistant answers, receipts are not cognition, and
+terminal authority requires the route-product contract.
+
+For applicable patches, run the API parity matrix:
+
+```bash
+npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+```
+
+When testing against a running local server, use the top-level API probe:
+
+```bash
+npm run helix:ask:api-parity
+```
+
+Report disabled/frontier scenarios separately. Do not present a disabled
+scenario as proof of the current contract.
+
 ## Codex-Owned Responsibilities
 
 Do not recreate these in Helix Ask unless Codex cannot expose the capability:
