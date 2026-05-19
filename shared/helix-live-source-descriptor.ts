@@ -9,7 +9,8 @@ export type HelixLiveSourceDescriptorModality =
   | "calculator_stream"
   | "simulation_stream"
   | "document_context"
-  | "note_context";
+  | "note_context"
+  | "process_graph";
 
 export type HelixLiveSourceSurface =
   | "screen"

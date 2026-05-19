@@ -15,6 +15,14 @@ export const CORE_TERMINAL_PRODUCTS = [
   "doc_location_result",
   "repo_code_evidence_answer",
   "process_graph_overview",
+  "audio_transcript_context_pack",
+  "note_context_pack",
+  "note_location_result",
+  "calculator_stream_result",
+  "calculation_trace",
+  "process_node_detail",
+  "source_binding_status",
+  "source_binding_repair_candidate",
 ] as const;
 
 export const UNIVERSAL_TERMINAL_PRODUCTS = [
@@ -64,7 +72,7 @@ function completeContract(
   return {
     allowed_terminal_artifact_kinds: Array.from(allowedSet),
     forbidden_terminal_artifact_kinds: [
-      ...ALL_ROUTE_TERMINAL_PRODUCTS.filter((kind) => !allowedSet.has(kind)),
+      ...ALL_ROUTE_TERMINAL_PRODUCTS.filter((kind: string) => !allowedSet.has(kind)),
       ...forbiddenExtra,
     ],
   };
@@ -99,10 +107,12 @@ const normalizeSourceTarget = (
 ): HelixRouteProductSourceTarget => {
   if (
     sourceTarget === "visual_capture" ||
+    sourceTarget === "audio_transcript" ||
     sourceTarget === "active_doc" ||
     sourceTarget === "docs_viewer" ||
     sourceTarget === "live_pipeline" ||
     sourceTarget === "active_note" ||
+    sourceTarget === "calculator_stream" ||
     sourceTarget === "repo_code" ||
     sourceTarget === "runtime_evidence" ||
     sourceTarget === "situation_epoch" ||
@@ -166,7 +176,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget,
       allowedCore: ["doc_location_result"],
-      allowedExtra: ["active_doc_identity", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "tool_evaluation", "workstation_tool_evaluation"],
+      allowedExtra: ["active_doc_identity", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation"],
       forbiddenExtra: ["situation_context_pack_with_epoch_evidence", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "no_tool_direct", "model_only_concept"],
       precedenceReason: "docs_source_target_allows_only_document_terminal_products",
     });
@@ -178,7 +188,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget: "visual_capture",
       allowedCore: targetKind === "situation_epoch" ? ["situation_context_pack", "procedure_epoch_replay"] : ["situation_context_pack"],
-      allowedExtra: ["live_visual_answer", "live_source_typed_failure", "visual_frame_evidence"],
+      allowedExtra: ["live_visual_answer", "live_source_typed_failure", "visual_frame_evidence", "source_binding_status", "source_binding_repair_candidate"],
       forbiddenExtra: ["active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer", "process_graph_overview"],
       precedenceReason: "visual_source_target_allows_current_situation_terminal_products",
     });
@@ -251,9 +261,45 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget: "process_graph",
       allowedCore: ["process_graph_overview"],
-      allowedExtra: ["workstation_tool_evaluation"],
+      allowedExtra: ["process_node_detail", "source_binding_status", "source_binding_repair_candidate", "workstation_tool_evaluation"],
       forbiddenExtra: ["procedure_epoch_replay", "visual_scene_comparison_result", "repo_code_evidence_answer", "doc_location_result", "situation_context_pack", "no_tool_direct", "model_only_concept"],
       precedenceReason: "process_graph_source_target_allows_only_workstation_process_products",
+    });
+  }
+
+  if (sourceTarget === "audio_transcript" || sourceTarget === "workstation_state") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: ["situation_context_pack"],
+      allowedExtra: ["audio_transcript_context_pack", "source_binding_status", "source_binding_repair_candidate"],
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "process_graph_overview", "no_tool_direct", "model_only_concept"],
+      precedenceReason: "audio_transcript_source_target_allows_transcript_context_products",
+    });
+  }
+
+  if (sourceTarget === "active_note") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "active_note",
+      allowedCore: [],
+      allowedExtra: ["note_context_pack", "note_location_result", "source_binding_status", "source_binding_repair_candidate"],
+      forbiddenExtra: ["situation_context_pack", "visual_frame_evidence", "doc_location_result", "process_graph_overview", "no_tool_direct", "model_only_concept"],
+      precedenceReason: "notes_source_target_allows_note_terminal_products",
+    });
+  }
+
+  if (sourceTarget === "calculator_stream") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "calculator_stream",
+      allowedCore: ["situation_context_pack"],
+      allowedExtra: ["calculator_stream_result", "calculation_trace", "source_binding_status", "source_binding_repair_candidate"],
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "process_graph_overview", "no_tool_direct", "model_only_concept"],
+      precedenceReason: "calculator_source_target_allows_calculator_stream_products",
     });
   }
 
@@ -273,9 +319,9 @@ export function buildRouteProductContract(input: {
     turnId: input.turnId,
     threadId: input.threadId,
     sourceTarget,
-    allowedCore: [],
+    allowedCore: sourceTarget === "unknown" ? ["situation_context_pack"] : [],
     allowedExtra: sourceTarget === "model_only" || sourceTarget === "general_background" || sourceTarget === "unknown"
-      ? ["direct_answer_text", "no_tool_direct", "model_only_concept"]
+      ? ["direct_answer_text", "no_tool_direct", "model_only_concept", "source_binding_status", "source_binding_repair_candidate"]
       : ["direct_answer_text", "workspace_action_receipt", "workstation_tool_evaluation", "tool_evaluation", "active_doc_identity", "doc_summary", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "composite_turn_receipt", "pending_server_request"],
     precedenceReason: "default_terminal_product_contract_allows_only_universal_terminal_products",
   });

@@ -41,6 +41,9 @@ export type HelixLiveSourceIdentity = {
     | "audio_transcript"
     | "world_event"
     | "document_context"
+    | "note_context"
+    | "calculator_stream"
+    | "process_graph"
     | string;
   source_surface: HelixLiveSourceSurface;
   source_origin: HelixLiveSourceOrigin;

@@ -182,12 +182,21 @@ const classifyProcedureRecallMode = (prompt: string): HelixProcedureMemoryRecall
 
 const selectedEvidenceRefs = (selection: HelixSituationEvidenceSelection): string[] =>
   Array.from(new Set([
+    ...selection.selected_source_binding_status_refs,
     ...selection.selected_observation_refs,
     ...selection.selected_field_evaluation_refs,
     ...selection.selected_probe_result_refs,
     ...selection.selected_epoch_closure_refs,
     ...selection.selected_source_descriptor_refs,
   ])).slice(0, 24);
+
+const selectedSourceRefs = (selection: HelixSituationEvidenceSelection): string[] =>
+  Array.from(new Set([
+    ...selection.selected_source_binding_status_refs.map((ref) => ref.startsWith("source_binding_status:") ? ref : `source_binding_status:${ref}`),
+    ...selection.selected_source_refs.map((ref) => ref.startsWith("source:") ? ref : `source:${ref}`),
+    ...selection.selected_observation_refs.map((ref) => ref.startsWith("observation:") ? ref : `observation:${ref}`),
+    ...selection.selected_field_evaluation_refs.map((ref) => ref.startsWith("field_eval:") ? ref : `field_eval:${ref}`),
+  ])).slice(0, 16);
 
 const withRefPrefix = (kind: string, refs: string[]): string[] =>
   refs
@@ -436,6 +445,7 @@ const buildSituationFullReasoning = (input: {
     line("Uncertainty", uncertainty?.value),
     line("Next check", nextCheck?.next_check || nextCheck?.value),
     `Evidence refs: ${selectedEvidenceRefs(input.selection).slice(0, 8).join(", ") || "none selected"}.`,
+    `Source refs: ${selectedSourceRefs(input.selection).join(", ") || "none selected"}.`,
     context.status === "stale" ? "Freshness caveat: selected evidence is stale." : "",
     "Raw images, audio, and logs were not injected into Ask context.",
   ].filter(Boolean).join("\n");
@@ -621,12 +631,15 @@ const recordReasoningAndDistillation = (input: {
   return {
     snapshot,
     distillation,
-    terminalText: formatDistilledAnswer({
+    terminalText: [
+      formatDistilledAnswer({
       conciseAnswer: distillation.concise_answer,
       caveat: distillation.caveat,
       style: distillation.style,
       expansionAvailable: distillation.expansion_available,
-    }),
+      }),
+      `Source refs: ${selectedSourceRefs(input.selection).join(", ") || "none selected"}.`,
+    ].join("\n"),
   };
 };
 
@@ -1212,24 +1225,7 @@ export function routeSituationContextTurn(input: {
     activeContext,
     promptText: input.promptText,
   });
-  const baseResolvedActiveContext = bindingRepair?.status === "applied"
-    ? resolveActiveSituationContext({
-        threadId: bindingRepair.thread_id,
-        environmentId: bindingRepair.environment_id,
-      })
-    : activeContext;
-  const resolvedActiveContext = bindingRepair?.status === "applied"
-    ? {
-        ...baseResolvedActiveContext,
-        latest_field_evaluation_refs: uniqueStrings([
-          ...baseResolvedActiveContext.latest_field_evaluation_refs,
-          ...bindingRepair.field_evaluation_refs,
-        ]),
-        status: baseResolvedActiveContext.status === "no_fresh_evidence"
-          ? "active" as const
-          : baseResolvedActiveContext.status,
-      }
-    : baseResolvedActiveContext;
+  const resolvedActiveContext = activeContext;
   const answerStartedAt = input.answerStartedAt ?? new Date().toISOString();
   const liveContextWindowBinding = buildLiveContextWindowBinding({
     threadId: resolvedActiveContext.thread_id || input.threadId,
@@ -1332,8 +1328,8 @@ export function routeSituationContextTurn(input: {
       situation_evidence_selection: selection,
       answer_text: [
         "I resolved this as a live situation-context question, but there is no server-bound active SituationRun evidence to answer from yet.",
-        bindingRepair?.status === "failed"
-          ? "I attempted to bind the live visual source into a SituationRun, but the repair failed."
+        bindingRepair
+          ? `Repair candidate created: ${bindingRepair.repair_candidate_id}. Explicit acceptance is required before this source can power an answer.`
           : selection.answerability_reason,
         `Next required action: ${temporalActiveContext.next_required_action ?? "start or bind a live source"}.`,
       ].join(" "),

@@ -12,6 +12,10 @@ export type HelixSituationEvidenceSelection = {
   selected_probe_result_refs: string[];
   selected_epoch_closure_refs: string[];
   selected_source_descriptor_refs: string[];
+  selected_source_refs: string[];
+  selected_source_binding_status_refs: string[];
+  rejected_unbound_source_refs: string[];
+  source_binding_ledger_refs: string[];
   exclusion_reasons: string[];
   answerable: boolean;
   answerability_reason: string;

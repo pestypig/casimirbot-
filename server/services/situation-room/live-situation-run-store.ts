@@ -7,7 +7,9 @@ import {
 import { liveSourceIdentityRefFor, type HelixLiveSourceIdentity } from "@shared/helix-live-source-identity";
 import type { HelixObservationJournalEntry } from "@shared/helix-observation-journal";
 import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
+import type { HelixSourceBindingStatus } from "@shared/helix-source-binding-status";
 import { inferLineReasoningModalityScope } from "./live-line-observation-context-selector";
+import { attachSourceToSituationRun, resetSourceBindingStatusForTest } from "./source-binding-status-store";
 
 const runsByEnvironment = new Map<string, HelixLiveSituationRun>();
 
@@ -58,6 +60,26 @@ export function ensureLiveSituationRunForEnvironment(input: {
       1,
     ])}`;
   const latestObservationRef = input.observation?.observation_id ?? existing?.latest_observation_ref ?? null;
+  const situationRunId = existing?.situation_run_id ?? `live_situation_run:${hashShort([
+    input.environment.thread_id,
+    input.environment.environment_id,
+    input.environment.objective,
+  ])}`;
+  const sourceBindingStatuses = input.environment.source_ids.map((sourceId: string) => attachSourceToSituationRun({
+    threadId: input.environment.thread_id,
+    sourceId,
+    modality: input.observation?.source_id === sourceId
+      ? input.observation.modality ?? input.sourceIdentity?.modality ?? undefined
+      : input.sourceIdentity?.source_id === sourceId
+        ? input.sourceIdentity.modality
+        : undefined,
+    situationRunId,
+    environmentId: input.environment.environment_id,
+    bindingPolicy: "session_start",
+    replayPolicy: "future_only",
+    observationRefs: input.observation?.source_id === sourceId && input.observation.source_binding_id ? [input.observation.observation_id] : [],
+    now,
+  }));
   const incomingSeq = input.observation?.source_seq ?? null;
   const sameBoundSource = !input.observation?.source_id || input.environment.source_ids.length === 0 || input.environment.source_ids.includes(input.observation.source_id);
   const notStale = input.observation?.replay_status !== "replayed";
@@ -78,16 +100,13 @@ export function ensureLiveSituationRunForEnvironment(input: {
     : existing.latest_epoch_observation_refs;
   const run: HelixLiveSituationRun = {
     schema: HELIX_LIVE_SITUATION_RUN_SCHEMA,
-    situation_run_id: existing?.situation_run_id ?? `live_situation_run:${hashShort([
-      input.environment.thread_id,
-      input.environment.environment_id,
-      input.environment.objective,
-    ])}`,
+    situation_run_id: situationRunId,
     thread_id: input.environment.thread_id,
     environment_id: input.environment.environment_id,
     pipeline_id: input.pipelineId ?? existing?.pipeline_id ?? null,
     source_ids: input.environment.source_ids,
     source_binding_id: sourceBindingId,
+    source_binding_status_refs: sourceBindingStatuses.map((status: HelixSourceBindingStatus) => status.status_id),
     primary_source_identity_ref: sourceIdentityRef,
     latest_observation_ref: latestObservationRef,
     latest_epoch_observation_refs: latestEpochObservationRefs,
@@ -142,4 +161,5 @@ export function listLiveSituationRuns(input: {
 
 export function resetLiveSituationRunsForTest(): void {
   runsByEnvironment.clear();
+  resetSourceBindingStatusForTest();
 }

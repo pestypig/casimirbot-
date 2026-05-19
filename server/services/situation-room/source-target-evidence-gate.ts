@@ -23,8 +23,11 @@ export function gateEvidenceForSourceTarget(input: {
     if (mixed) return available;
     if (input.target_source === "visual_capture") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "visual_frame");
     if (input.target_source === "world_event") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "world_event");
+    if (input.target_source === "audio_transcript" || input.target_source === "workstation_state") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "audio_transcript");
     if (input.target_source === "active_doc") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "document_context");
     if (input.target_source === "active_note") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "note_context");
+    if (input.target_source === "calculator_stream") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "calculator_stream");
+    if (input.target_source === "process_graph") return available.filter((modality: HelixSituationSourceBindingModality) => modality === "process_graph");
     if (input.target_source === "procedure_memory") return [];
     return available;
   })();

@@ -8,7 +8,8 @@ export type HelixLiveSourceChunkModality =
   | "calculator_stream"
   | "simulation_stream"
   | "document_context"
-  | "note_context";
+  | "note_context"
+  | "process_graph";
 
 export type HelixLiveSourceChunkContextPolicy = "compact_context_pack_only";
 

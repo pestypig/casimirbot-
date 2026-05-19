@@ -27,6 +27,7 @@ import {
   recordSourceBindingRepairCandidate,
   recordSourceBindingStatusTransitions,
 } from "./source-binding-status-ledger";
+import { upsertSourceBindingStatus } from "./source-binding-status-store";
 import { applySalienceHygienePolicy } from "./salience-hygiene-policy";
 import { recordSourceFusionSelection } from "./source-fusion-selection-builder";
 
@@ -252,22 +253,19 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
     threadId: input.threadId ?? null,
   });
   if (!binding) {
-    const status = {
-      schema: "helix.source_binding_status.v1" as const,
-      source_id: sourceId,
-      thread_id: input.threadId ?? null,
-      environment_id: null,
-      situation_run_id: null,
+    const status = upsertSourceBindingStatus({
       modality: "world_event",
-      status: "observed_unbound" as const,
-      evidence_refs: uniq([
+      source_id: sourceId,
+      thread_id: input.threadId ?? "helix-ask:desktop",
+      state: "observed_unbound",
+      latest_observation_refs: uniq([
         ...input.event.evidence_refs,
         input.salienceReceipt?.receipt_id,
       ]),
-      next_required_action: "attach_source_to_active_run",
-      assistant_answer: false as const,
-      raw_content_included: false as const,
-    };
+      terminal_eligible: false,
+      terminal_ineligible_reason: "attach_source_to_active_run",
+      now,
+    });
     recordSourceBindingStatusTransitions({
       statuses: [status],
       reason: "world event observed without SituationRun source binding",
@@ -278,7 +276,7 @@ export function bridgeWorldEventToBoundSituationProcedure(input: {
       thread_id: input.threadId ?? null,
       modality: "world_event",
       reason: "world event ingested with no SituationRun source binding",
-      evidence_refs: status.evidence_refs,
+      evidence_refs: status.latest_observation_refs,
       now,
     });
     return {

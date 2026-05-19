@@ -1,86 +1,54 @@
-import crypto from "node:crypto";
+import { helixEvidenceSourceKindForModality } from "@shared/helix-evidence-source-kind";
 import type { HelixSourceBindingStatus } from "@shared/helix-source-binding-status";
+import type { HelixSourceBindingStatusLedgerTransition } from "@shared/helix-source-binding-status-ledger";
 import {
-  HELIX_SOURCE_BINDING_STATUS_LEDGER_SCHEMA,
-  type HelixSourceBindingStatusLedgerState,
-  type HelixSourceBindingStatusLedgerTransition,
-} from "@shared/helix-source-binding-status-ledger";
+  appendSourceBindingStatusLedger,
+  listSourceBindingStatusLedger as listLedger,
+  resetSourceBindingStatusForTest,
+} from "./source-binding-status-store";
 
-const transitions: HelixSourceBindingStatusLedgerTransition[] = [];
-const latestStateByKey = new Map<string, HelixSourceBindingStatusLedgerState>();
+const stateFor = (status: HelixSourceBindingStatus): HelixSourceBindingStatus["state"] =>
+  status.state ?? (status as unknown as { status?: HelixSourceBindingStatus["state"] }).status ?? "missing";
 
-const hashShort = (value: unknown, size = 18): string =>
-  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
+const evidenceRefsFor = (status: HelixSourceBindingStatus): string[] =>
+  [
+    ...((status as unknown as { evidence_refs?: string[] }).evidence_refs ?? []),
+    ...status.latest_descriptor_refs,
+    ...status.latest_observation_refs,
+    ...status.latest_chunk_refs,
+  ];
 
-const keyFor = (input: { source_id: string; thread_id?: string | null; modality: string }): string =>
-  [input.thread_id ?? "none", input.source_id, input.modality].join("::");
-
-const transition = (input: {
-  source_id: string;
-  thread_id?: string | null;
-  environment_id?: string | null;
-  situation_run_id?: string | null;
-  modality: string;
-  from: HelixSourceBindingStatusLedgerState;
-  to: HelixSourceBindingStatusLedgerState;
-  reason: string;
-  evidence_refs?: string[];
-  now?: string;
-}): HelixSourceBindingStatusLedgerTransition => {
-  const createdAt = input.now ?? new Date().toISOString();
-  const entry: HelixSourceBindingStatusLedgerTransition = {
-    schema: HELIX_SOURCE_BINDING_STATUS_LEDGER_SCHEMA,
-    transition_id: `binding-transition:${hashShort([
-      input.source_id,
-      input.thread_id ?? null,
-      input.modality,
-      input.from,
-      input.to,
-      input.reason,
-      createdAt,
-    ])}`,
-    source_id: input.source_id,
-    thread_id: input.thread_id ?? null,
-    environment_id: input.environment_id ?? null,
-    situation_run_id: input.situation_run_id ?? null,
-    modality: input.modality,
-    from: input.from,
-    to: input.to,
-    reason: input.reason,
-    evidence_refs: input.evidence_refs ?? [],
-    created_at: createdAt,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  transitions.push(entry);
-  latestStateByKey.set(keyFor(input), input.to);
-  return entry;
-};
+const compat = (entry: ReturnType<typeof appendSourceBindingStatusLedger>): HelixSourceBindingStatusLedgerTransition => ({
+  ...entry,
+  transition_id: entry.ledger_id,
+  modality: entry.source_kind,
+  from: entry.from_state ?? "missing",
+  to: entry.event_kind === "repair_candidate_created"
+    ? "repair_candidate_created"
+    : entry.event_kind === "repair_accepted"
+      ? "repair_accepted"
+      : entry.to_state,
+});
 
 export function recordSourceBindingStatusTransitions(input: {
   statuses: HelixSourceBindingStatus[];
   reason: string;
   now?: string;
 }): HelixSourceBindingStatusLedgerTransition[] {
-  const recorded: HelixSourceBindingStatusLedgerTransition[] = [];
-  for (const status of input.statuses) {
-    const key = keyFor(status);
-    const previous = latestStateByKey.get(key) ?? "missing";
-    if (previous === status.status) continue;
-    recorded.push(transition({
-      source_id: status.source_id,
-      thread_id: status.thread_id,
-      environment_id: status.environment_id,
-      situation_run_id: status.situation_run_id,
-      modality: status.modality,
-      from: previous,
-      to: status.status,
-      reason: input.reason,
-      evidence_refs: status.evidence_refs,
-      now: input.now,
-    }));
-  }
-  return recorded;
+  return input.statuses.map((status: HelixSourceBindingStatus) => compat(appendSourceBindingStatusLedger({
+    thread_id: status.thread_id ?? "helix-ask:desktop",
+    source_id: status.source_id,
+    source_kind: status.source_kind ?? helixEvidenceSourceKindForModality(status.modality),
+    situation_run_id: status.situation_run_id ?? null,
+    environment_id: status.environment_id ?? null,
+    binding_id: status.binding_id ?? null,
+    from_state: null,
+    to_state: stateFor(status),
+    event_kind: stateFor(status) === "observed_unbound" ? "source_observed_unbound" : "binding_attached_to_run",
+    reason: input.reason,
+    evidence_refs: evidenceRefsFor(status),
+    created_at: input.now,
+  })));
 }
 
 export function recordSourceBindingRepairCandidate(input: {
@@ -91,13 +59,17 @@ export function recordSourceBindingRepairCandidate(input: {
   evidence_refs?: string[];
   now?: string;
 }): HelixSourceBindingStatusLedgerTransition {
-  const key = keyFor(input);
-  const previous = latestStateByKey.get(key) ?? "observed_unbound";
-  return transition({
-    ...input,
-    from: previous,
-    to: "repair_candidate_created",
-  });
+  return compat(appendSourceBindingStatusLedger({
+    thread_id: input.thread_id ?? "helix-ask:desktop",
+    source_id: input.source_id,
+    source_kind: helixEvidenceSourceKindForModality(input.modality),
+    from_state: "observed_unbound",
+    to_state: "repair_candidate",
+    event_kind: "repair_candidate_created",
+    reason: input.reason,
+    evidence_refs: input.evidence_refs ?? [],
+    created_at: input.now,
+  }));
 }
 
 export function recordSourceBindingRepairAccepted(input: {
@@ -110,13 +82,19 @@ export function recordSourceBindingRepairAccepted(input: {
   evidence_refs?: string[];
   now?: string;
 }): HelixSourceBindingStatusLedgerTransition {
-  const key = keyFor(input);
-  const previous = latestStateByKey.get(key) ?? "repair_candidate_created";
-  return transition({
-    ...input,
-    from: previous,
-    to: "repair_accepted",
-  });
+  return compat(appendSourceBindingStatusLedger({
+    thread_id: input.thread_id ?? "helix-ask:desktop",
+    source_id: input.source_id,
+    source_kind: helixEvidenceSourceKindForModality(input.modality),
+    environment_id: input.environment_id ?? null,
+    situation_run_id: input.situation_run_id ?? null,
+    from_state: "repair_candidate",
+    to_state: "pending_repair",
+    event_kind: "repair_accepted",
+    reason: input.reason,
+    evidence_refs: input.evidence_refs ?? [],
+    created_at: input.now,
+  }));
 }
 
 export function listSourceBindingStatusLedger(input?: {
@@ -124,14 +102,9 @@ export function listSourceBindingStatusLedger(input?: {
   sourceId?: string | null;
   limit?: number;
 }): HelixSourceBindingStatusLedgerTransition[] {
-  const limit = Math.max(1, Math.min(input?.limit ?? 50, 500));
-  return transitions
-    .filter((entry) => !input?.threadId || entry.thread_id === input.threadId)
-    .filter((entry) => !input?.sourceId || entry.source_id === input.sourceId)
-    .slice(-limit);
+  return listLedger(input);
 }
 
 export function resetSourceBindingStatusLedgerForTest(): void {
-  transitions.length = 0;
-  latestStateByKey.clear();
+  resetSourceBindingStatusForTest();
 }

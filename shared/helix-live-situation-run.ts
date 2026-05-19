@@ -18,6 +18,7 @@ export type HelixLiveSituationRun = {
   pipeline_id?: string | null;
   source_ids: string[];
   source_binding_id: string;
+  source_binding_status_refs: string[];
   primary_source_identity_ref: string;
   latest_observation_ref?: string | null;
   latest_epoch_observation_refs: string[];

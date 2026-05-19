@@ -1104,7 +1104,7 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.answerable).toBe(false);
   });
 
-  it("binds an unbound visual producer with observations into a SituationRun for deictic Ask", () => {
+  it("surfaces an explicit repair candidate for an unbound visual producer with observations", () => {
     upsertLiveSourceProducer({
       sourceId: "visual_source:desktop-active",
       threadId: "helix-ask:desktop",
@@ -1134,13 +1134,15 @@ describe("thread-bound situation context bridge", () => {
     });
 
     expect(route.route).toBe("situation_context_question");
-    expect(route.binding_repair?.status).toBe("applied");
-    expect(route.active_situation_context.status).toBe("active");
-    expect(route.active_situation_context.situation_run_id).toBeTruthy();
-    expect(route.situation_evidence_selection.answerable).toBe(true);
-    expect(route.situation_evidence_selection.selected_observation_refs).toContain("observation:barrier-formula-screen");
-    expect(route.situation_evidence_selection.selected_field_evaluation_refs.length).toBeGreaterThan(0);
-    expect(String(route.answer_text ?? "")).toContain("Details are saved in the procedure log");
+    expect(route.binding_repair?.status).toBe("candidate_created");
+    expect(route.binding_repair?.requires_explicit_acceptance).toBe(true);
+    expect(route.active_situation_context.status).toBe("unbound");
+    expect(route.active_situation_context.situation_run_id).toBeNull();
+    expect(route.active_situation_context.repair_candidate_refs).toContain(route.binding_repair?.repair_candidate_id);
+    expect(route.situation_evidence_selection.answerable).toBe(false);
+    expect(route.situation_evidence_selection.selected_observation_refs).not.toContain("observation:barrier-formula-screen");
+    expect(String(route.answer_text ?? "")).toContain("Repair candidate created");
+    expect(String(route.answer_text ?? "")).toContain("Explicit acceptance is required");
     expect(String(route.answer_text ?? "")).not.toContain("Evidence refs:");
   });
 

@@ -5,6 +5,9 @@ import {
 } from "@shared/helix-situation-evidence-selection";
 import type { HelixActiveSituationContext } from "@shared/helix-active-situation-context";
 import type { HelixDeicticReference } from "@shared/helix-deictic-reference";
+import type { HelixSourceBindingStatus } from "@shared/helix-source-binding-status";
+import type { HelixSourceBindingStatusLedgerTransition } from "@shared/helix-source-binding-status-ledger";
+import { listSourceBindingStatusLedger, listSourceBindingStatuses } from "../situation-room/source-binding-status-store";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -30,9 +33,27 @@ export function selectSituationEvidence(input: {
   if (context.status === "stale" && input.askingHistory !== true) exclusions.push("stale_evidence_caveat");
   if (context.latest_observation_refs.length === 0) exclusions.push("missing_observation_refs");
   if (context.latest_field_evaluation_refs.length === 0) exclusions.push("missing_field_evaluation_refs");
+  if (context.source_binding_status_refs.length === 0) exclusions.push("missing_bound_source_status_refs");
+  if (context.observed_unbound_source_refs.length > 0) exclusions.push("observed_unbound_sources_excluded");
+  const sourceStatuses = listSourceBindingStatuses({
+    threadId: context.thread_id,
+    situationRunId: context.situation_run_id ?? null,
+    limit: 200,
+  }).filter((status: HelixSourceBindingStatus) => context.source_binding_status_refs.includes(status.status_id));
+  const boundSourceStatuses = sourceStatuses.filter((status: HelixSourceBindingStatus) =>
+    status.situation_run_id === context.situation_run_id &&
+    (status.state === "bound" || status.state === "repair_applied")
+  );
+  const ledgerRefs = listSourceBindingStatusLedger({
+    threadId: context.thread_id,
+    limit: 100,
+  }).filter((entry: HelixSourceBindingStatusLedgerTransition) => boundSourceStatuses.some((status: HelixSourceBindingStatus) => status.source_id === entry.source_id))
+    .map((entry: HelixSourceBindingStatusLedgerTransition) => entry.ledger_id)
+    .slice(-24);
   const answerable =
     Boolean(context.situation_run_id) &&
     (context.status === "active" || context.status === "stale") &&
+    boundSourceStatuses.length > 0 &&
     (
       context.latest_observation_refs.length > 0 ||
       context.latest_field_evaluation_refs.length > 0 ||
@@ -50,11 +71,15 @@ export function selectSituationEvidence(input: {
     thread_id: input.threadId,
     situation_run_id: context.situation_run_id ?? null,
     deictic_reference_id: input.deicticReference?.reference_id ?? null,
-    selected_observation_refs: unique(context.latest_observation_refs).slice(-3),
-    selected_field_evaluation_refs: unique(context.latest_field_evaluation_refs).slice(-10),
-    selected_probe_result_refs: unique(context.latest_probe_result_refs).slice(-6),
-    selected_epoch_closure_refs: unique(context.latest_closure_refs).slice(-4),
-    selected_source_descriptor_refs: unique(context.latest_source_descriptor_refs).slice(-6),
+    selected_observation_refs: answerable ? unique(context.latest_observation_refs).slice(-3) : [],
+    selected_field_evaluation_refs: answerable ? unique(context.latest_field_evaluation_refs).slice(-10) : [],
+    selected_probe_result_refs: answerable ? unique(context.latest_probe_result_refs).slice(-6) : [],
+    selected_epoch_closure_refs: answerable ? unique(context.latest_closure_refs).slice(-4) : [],
+    selected_source_descriptor_refs: answerable ? unique(context.latest_source_descriptor_refs).slice(-6) : [],
+    selected_source_refs: unique(boundSourceStatuses.map((status: HelixSourceBindingStatus) => status.source_id)),
+    selected_source_binding_status_refs: unique(boundSourceStatuses.map((status: HelixSourceBindingStatus) => status.status_id)),
+    rejected_unbound_source_refs: unique(context.observed_unbound_source_refs),
+    source_binding_ledger_refs: unique(ledgerRefs),
     exclusion_reasons: unique(exclusions),
     answerable,
     answerability_reason: answerable

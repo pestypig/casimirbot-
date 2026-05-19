@@ -32,6 +32,7 @@ import {
 } from "@shared/helix-live-source-rate-policy";
 import { recordSituationSourceHeartbeat } from "./situation-source-capability-store";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
+import { observeSourceBindingState } from "./source-binding-status-store";
 
 const chunksBySource = new Map<string, HelixLiveSourceChunk[]>();
 const producersBySource = new Map<string, HelixLiveSourceProducer>();
@@ -65,7 +66,8 @@ export const normalizeLiveSourceModality = (value: unknown): HelixLiveSourceChun
     value === "calculator_stream" ||
     value === "simulation_stream" ||
     value === "document_context" ||
-    value === "note_context"
+    value === "note_context" ||
+    value === "process_graph"
   ) return value;
   return "text_chat";
 };
@@ -117,6 +119,7 @@ const analyzerForModality = (modality: HelixLiveSourceChunkModality): string => 
   if (modality === "simulation_stream") return "simulation_stability_window";
   if (modality === "document_context") return "document_context_extraction";
   if (modality === "note_context") return "note_context_summary";
+  if (modality === "process_graph") return "process_graph_window";
   return "text_chat_summary";
 };
 
@@ -286,6 +289,15 @@ export function appendLiveSourceChunk(input: {
       createdAt: ts,
     });
   }
+  observeSourceBindingState({
+    threadId: chunk.thread_id,
+    sourceId: chunk.source_id,
+    modality: chunk.modality,
+    environmentId: chunk.environment_id ?? null,
+    chunkRef: chunk.chunk_id,
+    evidenceRefs: chunk.evidence_refs,
+    now: ts,
+  });
   return {
     chunk,
     producer,

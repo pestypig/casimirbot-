@@ -15,6 +15,9 @@ export type HelixActiveSituationContext = {
   situation_run_id?: string | null;
   environment_id?: string | null;
   source_binding_ids: string[];
+  source_binding_status_refs: string[];
+  observed_unbound_source_refs: string[];
+  repair_candidate_refs: string[];
   latest_epoch?: number | null;
   active_modalities: string[];
   latest_observation_refs: string[];

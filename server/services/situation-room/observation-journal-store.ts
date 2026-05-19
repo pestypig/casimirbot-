@@ -4,6 +4,7 @@ import {
   type HelixObservationJournalEntry,
   type HelixObservationJournalRole,
 } from "@shared/helix-observation-journal";
+import { observeSourceBindingState, upsertSourceBindingStatus, listSourceBindingStatuses } from "./source-binding-status-store";
 
 const observationsByThread = new Map<string, HelixObservationJournalEntry[]>();
 
@@ -37,6 +38,30 @@ const normalizeRole = (value: unknown): HelixObservationJournalRole => {
 
 const forbiddenObservationTerms = /\b(?:strategy|goal|intent|risk conclusion|final answer|should do|next objective)\b/i;
 
+const inferActiveSourceBindingId = (input: {
+  threadId: string;
+  sourceId: string | null;
+  environmentId?: string | null;
+  observedAt?: string | null;
+}): string | null => {
+  if (!input.sourceId) return null;
+  const observedMs = Date.parse(String(input.observedAt ?? ""));
+  return listSourceBindingStatuses({
+    threadId: input.threadId,
+    sourceId: input.sourceId,
+    limit: 20,
+  }).reverse().find((status) =>
+    (status.state === "bound" || status.state === "repair_applied") &&
+    status.binding_id &&
+    (
+      !Number.isFinite(observedMs) ||
+      Date.parse(status.updated_at) <= observedMs ||
+      status.replay_policy === "explicit_replay_window"
+    ) &&
+    (!input.environmentId || !status.environment_id || status.environment_id === input.environmentId)
+  )?.binding_id ?? null;
+};
+
 export function appendObservationJournalEntry(input: Record<string, unknown>): HelixObservationJournalEntry {
   const threadId = cleanString(input.thread_id ?? input.threadId);
   const text = cleanString(input.text ?? input.summary);
@@ -53,12 +78,17 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
   const observedAt = normalizeTimestamp(input.observed_at ?? input.observedAt ?? input.event_ts ?? input.eventTs, now);
   const ingestedAt = normalizeTimestamp(input.ingested_at ?? input.ingestedAt, now);
   const availableAt = normalizeTimestamp(input.available_at ?? input.availableAt ?? input.finalized_at ?? input.finalizedAt, ingestedAt);
+  const sourceId = cleanString(input.source_id ?? input.sourceId);
+  const environmentId = cleanString(input.environment_id ?? input.environmentId);
+  const sourceBindingId =
+    cleanString(input.source_binding_id ?? input.sourceBindingId) ??
+    inferActiveSourceBindingId({ threadId, sourceId, environmentId, observedAt });
   const entry: HelixObservationJournalEntry = {
     schema: HELIX_OBSERVATION_JOURNAL_ENTRY_SCHEMA,
     observation_id: cleanString(input.observation_id ?? input.observationId) ?? `observation:${hashShort([threadId, role, text, now])}`,
     thread_id: threadId,
     room_id: cleanString(input.room_id ?? input.roomId),
-    source_id: cleanString(input.source_id ?? input.sourceId),
+    source_id: sourceId,
     role,
     modality: cleanString(input.modality),
     text,
@@ -80,7 +110,7 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
         : input.replay_status === "live"
           ? "live"
           : null,
-    source_binding_id: cleanString(input.source_binding_id ?? input.sourceBindingId),
+    source_binding_id: sourceBindingId,
     source_epoch: typeof input.source_epoch === "number" && Number.isFinite(input.source_epoch)
       ? Math.max(1, Math.trunc(input.source_epoch))
       : typeof input.sourceEpoch === "number" && Number.isFinite(input.sourceEpoch)
@@ -93,6 +123,39 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
     created_at: now,
   };
   observationsByThread.set(threadId, [...(observationsByThread.get(threadId) ?? []), entry].slice(-500));
+  if (entry.source_id && entry.modality) {
+    if (entry.source_binding_id) {
+      const boundStatus = listSourceBindingStatuses({
+        threadId,
+        sourceId: entry.source_id,
+        limit: 20,
+      }).reverse().find((status) => status.binding_id === entry.source_binding_id);
+      if (boundStatus) {
+        upsertSourceBindingStatus({
+          thread_id: boundStatus.thread_id,
+          source_id: boundStatus.source_id,
+          source_kind: boundStatus.source_kind,
+          modality: boundStatus.modality,
+          situation_run_id: boundStatus.situation_run_id,
+          environment_id: boundStatus.environment_id,
+          binding_id: boundStatus.binding_id,
+          state: boundStatus.state,
+          replay_policy: boundStatus.replay_policy,
+          latest_observation_refs: [entry.observation_id],
+          terminal_eligible: boundStatus.terminal_eligible,
+        });
+      }
+    } else {
+      observeSourceBindingState({
+        threadId,
+        sourceId: entry.source_id,
+        modality: entry.modality,
+        observationRef: entry.observation_id,
+        evidenceRefs: entry.evidence_refs,
+        now,
+      });
+    }
+  }
   return entry;
 }
 

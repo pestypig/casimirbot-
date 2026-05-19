@@ -8,7 +8,8 @@ export type HelixSituationSourceBindingModality =
   | "calculator_stream"
   | "simulation_stream"
   | "document_context"
-  | "note_context";
+  | "note_context"
+  | "process_graph";
 
 export type HelixSituationSourceBindingStatus =
   | "bound"
@@ -16,7 +17,10 @@ export type HelixSituationSourceBindingStatus =
   | "stale"
   | "missing"
   | "pending_repair"
-  | "detached";
+  | "repair_candidate"
+  | "repair_applied"
+  | "detached"
+  | "blocked";
 
 export type HelixSituationSourceBindingPolicy =
   | "explicit_user"

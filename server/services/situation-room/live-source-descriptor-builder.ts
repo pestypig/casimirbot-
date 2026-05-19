@@ -37,7 +37,8 @@ const normalizeModality = (value: unknown): HelixLiveSourceDescriptorModality =>
     value === "calculator_stream" ||
     value === "simulation_stream" ||
     value === "document_context" ||
-    value === "note_context"
+    value === "note_context" ||
+    value === "process_graph"
   ) return value;
   return "visual_frame";
 };
@@ -105,6 +106,7 @@ export function inferLiveSourceSurface(input: {
   if (modality === "calculator_stream") return "calculator";
   if (modality === "simulation_stream") return "simulation";
   if (modality === "document_context" || /\b(?:pdf|docx?|document|paper|page)\b/.test(text)) return "document";
+  if (modality === "process_graph") return "app";
   if (/\b(?:file explorer|windows explorer|finder|folder|directory|downloads|documents|desktop|\.wav|\.asd|\.png|\.jpg)\b/.test(text)) {
     return "file_manager";
   }

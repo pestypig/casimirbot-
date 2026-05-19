@@ -11,6 +11,9 @@ import type { HelixLiveFieldEvaluation } from "@shared/helix-live-field-evaluati
 import type { HelixLiveProbeResult } from "@shared/helix-live-probe-result";
 import type { HelixProcedureEpochClosure } from "@shared/helix-procedure-epoch-closure";
 import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descriptor";
+import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
+import type { HelixSourceBindingStatus } from "@shared/helix-source-binding-status";
+import type { HelixSourceBindingRepairCandidate } from "@shared/helix-source-binding-repair-candidate";
 import { listLiveSituationRuns } from "./live-situation-run-store";
 import { listObservationJournalEntries } from "./observation-journal-store";
 import { listLiveFieldEvaluations } from "./live-field-evaluation-store";
@@ -20,6 +23,12 @@ import { listLiveSourceDescriptors } from "./live-source-descriptor-builder";
 import { listLiveAnswerEnvironments } from "./live-answer-environment-store";
 import { listLiveSourceProducers } from "./live-source-chunk-buffer";
 import { readLiveSourceProducerFreshness } from "./live-source-producer-freshness";
+import {
+  createSourceBindingRepairCandidate,
+  listSourceBindingRepairCandidates,
+  listSourceBindingStatuses,
+  recordObservedUnboundSource,
+} from "./source-binding-status-store";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -55,15 +64,14 @@ export function resolveActiveSituationContext(input: {
   const activeProducer = run || activeEnvironment
     ? null
     : listLiveSourceProducers()
-        .filter((producer) => producer.status === "active" || producer.status === "waiting_for_client")
-        .filter((producer) => producer.modality === "visual_frame")
-        .filter((producer) => threadCandidates.includes(producer.thread_id))
-        .filter((producer) => !input.sourceId || producer.source_id === input.sourceId)
-        .map((producer) => ({
+        .filter((producer: HelixLiveSourceProducer) => producer.status === "active" || producer.status === "waiting_for_client")
+        .filter((producer: HelixLiveSourceProducer) => threadCandidates.includes(producer.thread_id))
+        .filter((producer: HelixLiveSourceProducer) => !input.sourceId || producer.source_id === input.sourceId)
+        .map((producer: HelixLiveSourceProducer) => ({
           producer,
           freshness: readLiveSourceProducerFreshness({ producerId: producer.producer_id, now: now.toISOString() }),
         }))
-        .sort((a, b) => {
+        .sort((a: { producer: HelixLiveSourceProducer; freshness: ReturnType<typeof readLiveSourceProducerFreshness> }, b: { producer: HelixLiveSourceProducer; freshness: ReturnType<typeof readLiveSourceProducerFreshness> }) => {
           const bTime = Date.parse(b.freshness?.last_capture_at ?? "") || 0;
           const aTime = Date.parse(a.freshness?.last_capture_at ?? "") || 0;
           return bTime - aTime || b.producer.producer_id.localeCompare(a.producer.producer_id);
@@ -73,11 +81,28 @@ export function resolveActiveSituationContext(input: {
     input.sourceId ?? null,
     ...(run?.source_ids ?? []),
   ]);
+  const sourceStatuses = run
+    ? listSourceBindingStatuses({ threadId, situationRunId: run.situation_run_id, limit: 200 })
+        .filter((status: HelixSourceBindingStatus) => run.source_ids.includes(status.source_id))
+    : [];
+  const boundSourceStatuses = sourceStatuses.filter((status: HelixSourceBindingStatus) =>
+    (status.state === "bound" || status.state === "repair_applied") &&
+    status.situation_run_id === run?.situation_run_id
+  );
+  const boundBindingIds = new Set(unique([
+    run?.source_binding_id ?? null,
+    ...boundSourceStatuses.map((status: HelixSourceBindingStatus) => status.binding_id ?? null),
+  ]));
   const observations = listObservationJournalEntries({ threadId, limit: 50 })
     .filter((entry: HelixObservationJournalEntry) =>
       activeSourceIds.length === 0 ||
       !entry.source_id ||
       activeSourceIds.includes(entry.source_id),
+    )
+    .filter((entry: HelixObservationJournalEntry) =>
+      !run ||
+      Boolean(entry.source_binding_id && boundBindingIds.has(entry.source_binding_id)) ||
+      Boolean(entry.replay_status === "replayed" && entry.source_binding_id && boundBindingIds.has(entry.source_binding_id))
     )
     .slice(-12);
   const fieldEvaluations = run
@@ -114,14 +139,23 @@ export function resolveActiveSituationContext(input: {
         }),
       )
     : [];
+  const boundSourceIds = new Set(boundSourceStatuses.map((status: HelixSourceBindingStatus) => status.source_id));
+  const scopedDescriptors = run ? descriptors.filter((descriptor: HelixLiveSourceDescriptor) => boundSourceIds.has(descriptor.source_id)) : descriptors;
   const latestObservationRefs = unique([
     ...observations.slice(-3).map((entry: HelixObservationJournalEntry) => entry.observation_id),
-    ...descriptors.flatMap((descriptor: HelixLiveSourceDescriptor) => descriptor.latest_observation_refs.slice(-2)),
+    ...scopedDescriptors.flatMap((descriptor: HelixLiveSourceDescriptor) => descriptor.latest_observation_refs.slice(-2)),
   ]);
-  const latestFieldEvaluationRefs = unique(fieldEvaluations.slice(-8).map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id));
+  const allowedObservationRefs = new Set(latestObservationRefs);
+  const scopedFieldEvaluations = run
+    ? fieldEvaluations.filter((entry: HelixLiveFieldEvaluation) =>
+        entry.evidence_refs.length === 0 ||
+        entry.evidence_refs.some((ref: string) => allowedObservationRefs.has(ref))
+      )
+    : fieldEvaluations;
+  const latestFieldEvaluationRefs = unique(scopedFieldEvaluations.slice(-8).map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id));
   const latestProbeResultRefs = unique(probeResults.slice(-4).map((entry: HelixLiveProbeResult) => entry.probe_result_id));
   const latestClosureRefs = unique(closures.slice(-3).map((entry: HelixProcedureEpochClosure) => entry.closure_id));
-  const latestSourceDescriptorRefs = unique(descriptors.slice(-6).map((entry: HelixLiveSourceDescriptor) => entry.descriptor_id));
+  const latestSourceDescriptorRefs = unique(scopedDescriptors.slice(-6).map((entry: HelixLiveSourceDescriptor) => entry.descriptor_id));
   const latestEvidenceTime = [
     ...fieldEvaluations.map((entry: HelixLiveFieldEvaluation) => entry.created_at),
     ...probeResults.map((entry: HelixLiveProbeResult) => entry.created_at),
@@ -144,7 +178,34 @@ export function resolveActiveSituationContext(input: {
   const activeModalities = unique([
     run?.modality_scope ?? null,
     activeProducer?.producer.modality ?? null,
-    ...descriptors.map((descriptor: HelixLiveSourceDescriptor) => descriptor.modality),
+    ...scopedDescriptors.map((descriptor: HelixLiveSourceDescriptor) => descriptor.modality),
+  ]);
+  const unboundProducers = listLiveSourceProducers({ threadId })
+    .filter((producer: HelixLiveSourceProducer) => producer.status === "active" || producer.status === "waiting_for_client")
+    .filter((producer: HelixLiveSourceProducer) => !run || !boundSourceIds.has(producer.source_id));
+  const observedUnboundStatuses = unboundProducers.map((producer: HelixLiveSourceProducer) => recordObservedUnboundSource({
+    threadId: producer.thread_id,
+    sourceId: producer.source_id,
+    modality: producer.modality,
+    chunkRef: producer.latest_chunk_id ?? null,
+    evidenceRefs: producer.latest_chunk_id ? [producer.latest_chunk_id] : [],
+    now: now.toISOString(),
+  }));
+  const repairCandidates = observedUnboundStatuses.map((status: HelixSourceBindingStatus) => createSourceBindingRepairCandidate({
+    threadId: status.thread_id,
+    sourceId: status.source_id,
+    sourceKind: status.source_kind,
+    modality: status.modality,
+    targetSituationRunId: run?.situation_run_id ?? null,
+    targetEnvironmentId: run?.environment_id ?? activeEnvironment?.environment_id ?? null,
+    proposedReplayPolicy: "future_only",
+    oldUnboundObservationRefs: status.latest_observation_refs,
+    oldUnboundChunkRefs: status.latest_chunk_refs,
+  }));
+  const existingRepairCandidates = listSourceBindingRepairCandidates({ threadId, limit: 50 });
+  const sourceBindingStatusRefs = unique([
+    ...boundSourceStatuses.map((status: HelixSourceBindingStatus) => status.status_id),
+    ...observedUnboundStatuses.map((status: HelixSourceBindingStatus) => status.status_id),
   ]);
   return {
     schema: HELIX_ACTIVE_SITUATION_CONTEXT_SCHEMA,
@@ -159,7 +220,17 @@ export function resolveActiveSituationContext(input: {
     thread_id: threadId,
     situation_run_id: run?.situation_run_id ?? null,
     environment_id: run?.environment_id ?? activeEnvironment?.environment_id ?? null,
-    source_binding_ids: run ? [run.source_binding_id] : activeProducer ? [activeProducer.producer.producer_id] : [],
+    source_binding_ids: run
+        ? unique([run.source_binding_id, ...boundSourceStatuses.map((status: HelixSourceBindingStatus) => status.binding_id ?? null)])
+      : activeProducer
+        ? [activeProducer.producer.producer_id]
+        : [],
+    source_binding_status_refs: sourceBindingStatusRefs,
+    observed_unbound_source_refs: observedUnboundStatuses.map((status) => status.status_id),
+    repair_candidate_refs: unique([
+      ...repairCandidates.map((candidate: HelixSourceBindingRepairCandidate) => candidate.repair_candidate_id),
+      ...existingRepairCandidates.map((candidate: HelixSourceBindingRepairCandidate) => candidate.repair_candidate_id),
+    ]),
     latest_epoch: run?.current_epoch ?? null,
     active_modalities: activeModalities,
     latest_observation_refs: latestObservationRefs,
