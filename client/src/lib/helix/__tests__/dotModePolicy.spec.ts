@@ -163,7 +163,7 @@ describe("Dot mode policy", () => {
     expect(decision.temporal_context_window).toBeUndefined();
   });
 
-  it("defaults omitted speaker authority to transcribe-only", () => {
+  it("defaults omitted speaker authority to transcribe-only and never speakable", () => {
     const decision = classifyDotModeUtterance({
       text: "Dot, what just happened?",
       observedAt,
@@ -175,6 +175,45 @@ describe("Dot mode policy", () => {
       requires_confirmation: false,
       speakable: false,
       voice_output_reason: "untrusted_speaker",
+    });
+  });
+
+  it("does not let command-confirm stop output without confirmation", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot stop",
+      observedAt,
+      speakerAuthority: "command_confirm",
+    });
+
+    expect(decision.creates_user_turn).toBe(false);
+    expect(decision.requires_confirmation).toBe(true);
+    expect(decision.cancels_active_answer).toBe(false);
+    expect(decision.cancels_voice_output).toBe(false);
+    expect(decision.disables_voice_capture).toBe(false);
+    expect(decision.next_voice_mode).toBeNull();
+  });
+
+  it("creates a pending confirmation candidate for command-confirm stop output", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot stop",
+      observedAt,
+      speakerAuthority: "command_confirm",
+    });
+
+    const candidate = buildDotConfirmationCandidate({
+      originalDecisionId: "decision_stop",
+      originalObservedAt: observedAt,
+      originalText: "Dot stop",
+      decision,
+      speakerId: "guest_1",
+      evidenceRefs: ["voice:chunk:stop"],
+      now: observedAt,
+    });
+
+    expect(candidate).toMatchObject({
+      status: "pending",
+      speaker_authority: "command_confirm",
+      requested_action: "stop_output",
     });
   });
 

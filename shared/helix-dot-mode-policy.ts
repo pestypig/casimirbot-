@@ -247,11 +247,14 @@ export function classifyDotModeUtterance(args: {
 
   const kind = inferDirectAddressKind(addressed.rest);
   const addressable = canAddressDot(speakerAuthority);
+  const commandAllowed = canAutoStartTurn(speakerAuthority);
+  const confirmationOnly = canRequestConfirmation(speakerAuthority);
   const stopOutput = kind === "stop_output" || kind === "stand_by";
   const stopListening = kind === "stop_listening";
   const turnCandidate = !stopOutput && !stopListening;
-  const createsUserTurn = canAutoStartTurn(speakerAuthority) && turnCandidate;
-  const requiresConfirmation = canRequestConfirmation(speakerAuthority) && turnCandidate;
+  const immediateCommand = commandAllowed && (stopOutput || stopListening);
+  const createsUserTurn = commandAllowed && turnCandidate;
+  const requiresConfirmation = confirmationOnly && (turnCandidate || stopOutput || stopListening);
   const outputEnabled = policy.voice_output_enabled;
 
   return {
@@ -262,13 +265,19 @@ export function classifyDotModeUtterance(args: {
     addressed_text: addressed.rest,
     creates_user_turn: createsUserTurn,
     requires_confirmation: requiresConfirmation,
-    cancels_active_answer: stopOutput || stopListening,
-    cancels_voice_output: stopOutput || stopListening,
-    disables_voice_capture: stopListening,
-    next_voice_mode: stopListening ? "off" : stopOutput ? "observant" : kind === "resume" && addressable ? "dot" : null,
+    cancels_active_answer: immediateCommand,
+    cancels_voice_output: immediateCommand,
+    disables_voice_capture: commandAllowed && stopListening,
+    next_voice_mode: immediateCommand
+      ? stopListening
+        ? "off"
+        : "observant"
+      : kind === "resume" && addressable && commandAllowed
+        ? "dot"
+        : null,
     voice_output_reason: !addressable
       ? "untrusted_speaker"
-      : stopOutput || stopListening
+      : immediateCommand
         ? "dot_stop_command"
       : createsUserTurn && outputEnabled
         ? "dot_direct_address"

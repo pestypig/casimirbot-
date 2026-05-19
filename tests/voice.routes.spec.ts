@@ -2,6 +2,8 @@ import express from "express";
 import request from "supertest";
 import type { Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
+import { hashDotVoiceSourceText } from "../shared/helix-dot-voice-authority";
+import { buildHelixTurnTerminalAuthority } from "../server/services/helix-ask/turn-terminal-authority";
 import { resetVoiceRouteState, voiceRouter } from "../server/routes/voice";
 
 const buildApp = () => {
@@ -13,6 +15,47 @@ const buildApp = () => {
 
 const uniqueId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+
+const buildTestTerminalAuthority = (input: {
+  terminal_kind?: "answer" | "request_user_input" | "workspace_action_receipt" | "situation_context_pack" | "live_answer_environment" | "tool_evaluation" | "failure";
+  terminal_artifact_kind?: string;
+  final_answer_source?: string;
+  terminal_text: string;
+}) =>
+  buildHelixTurnTerminalAuthority({
+    thread_id: "thread_voice_test",
+    turn_id: "turn_voice_test",
+    route: "/ask",
+    terminal_kind: input.terminal_kind ?? "answer",
+    terminal_artifact_kind: input.terminal_artifact_kind ?? "assistant_answer",
+    final_answer_source: input.final_answer_source ?? "terminal_final_answer",
+    terminal_text: input.terminal_text,
+  });
+
+const buildAcceptedCandidate = (input: {
+  text: string;
+  text_certainty: string;
+  voice_certainty: string;
+  evidence_refs?: string[];
+  expires_at?: string | null;
+}) => ({
+  schema: "helix.accepted_arbitration_candidate.v1",
+  candidate_id: uniqueId("candidate"),
+  arbiter_id: "server_arbiter_test",
+  accepted_at: "2026-05-18T10:00:00.000Z",
+  expires_at: input.expires_at ?? "2099-01-01T00:00:00.000Z",
+  status: "accepted",
+  voice_authority_state: "callout_voice",
+  source_kind: "operator_callout_v1",
+  source_event_ids: ["event_voice_test"],
+  evidence_refs: input.evidence_refs ?? ["docs/verify.md#L1"],
+  text_certainty: input.text_certainty,
+  voice_certainty: input.voice_certainty,
+  text_hash: hashDotVoiceSourceText(input.text),
+  normalized_text_preview: input.text.trim().slice(0, 240),
+  suppression_reason: null,
+  server_authoritative: true,
+});
 
 const ORIGINAL_ENV = {
   VOICE_PROXY_DRY_RUN: process.env.VOICE_PROXY_DRY_RUN,
@@ -172,8 +215,9 @@ describe("voice routes", () => {
       traceId: "trace-unconfigured",
     });
 
-    expect(res.status).toBe(503);
-    expect(res.body.error).toBe("voice_unavailable");
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("voice_unavailable");
     expect(res.body.traceId).toBe("trace-unconfigured");
     expect(res.body.details?.providerConfigured).toBe(false);
   });
@@ -192,9 +236,231 @@ describe("voice routes", () => {
       traceId: "trace-elevenlabs-unconfigured",
     });
 
-    expect(res.status).toBe(503);
-    expect(res.body.error).toBe("voice_unavailable");
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("voice_unavailable");
     expect(res.body.traceId).toBe("trace-elevenlabs-unconfigured");
+  });
+
+  it("suppresses Dot voice when authority is omitted", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Status: verifier passed.",
+      mode: "callout",
+      priority: "info",
+      voiceAuthorityState: "status_voice",
+      traceId: "trace-omitted-authority",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("missing_terminal_authority");
+  });
+
+  it("suppresses status_voice without terminal authority", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Status: terminal ready.",
+      mode: "callout",
+      priority: "info",
+      voiceAuthorityState: "status_voice",
+      traceId: "trace-status-missing-authority",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("missing_terminal_authority");
+  });
+
+  it("suppresses status_voice from legacy context packs", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const text = "Status: context pack summary.";
+    const terminalAuthority = buildTestTerminalAuthority({
+      terminal_kind: "situation_context_pack",
+      terminal_text: text,
+    });
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text,
+      mode: "callout",
+      priority: "info",
+      voiceAuthorityState: "status_voice",
+      terminal_answer_authority: terminalAuthority,
+      traceId: "trace-status-context-pack",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("legacy_context_pack_not_speakable");
+  });
+
+  it("allows status_voice from a matching server-authoritative terminal answer", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const text = "Status: verifier passed.";
+    const terminalAuthority = buildTestTerminalAuthority({
+      terminal_kind: "answer",
+      terminal_artifact_kind: "assistant_answer",
+      final_answer_source: "terminal_final_answer",
+      terminal_text: text,
+    });
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text,
+      mode: "callout",
+      priority: "info",
+      voiceAuthorityState: "status_voice",
+      terminal_answer_authority: terminalAuthority,
+      repoAttributed: false,
+      traceId: "trace-status-authorized",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.suppressed ?? false).toBe(false);
+  });
+
+  it("suppresses status_voice when the declared source is a raw transcript", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const text = "Status: verifier passed.";
+    const res = await request(app).post("/api/voice/speak").send({
+      text,
+      mode: "callout",
+      priority: "info",
+      voiceAuthorityState: "status_voice",
+      sourceKind: "raw_transcript",
+      terminal_answer_authority: buildTestTerminalAuthority({
+        terminal_kind: "answer",
+        terminal_artifact_kind: "assistant_answer",
+        final_answer_source: "terminal_final_answer",
+        terminal_text: text,
+      }),
+      repoAttributed: false,
+      traceId: "trace-status-raw-transcript",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("raw_transcript_not_speakable");
+  });
+
+  it("suppresses command_execute as a non-voice lane", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Execute verifier rerun.",
+      mode: "callout",
+      priority: "action",
+      voiceAuthorityState: "command_execute",
+      evidenceRefs: ["docs/verify.md#L1"],
+      traceId: "trace-command-execute-not-voice",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("command_execute_not_voice");
+  });
+
+  it("suppresses callout_voice without accepted arbitration candidate", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Action required: rerun verifier.",
+      mode: "callout",
+      priority: "action",
+      voiceAuthorityState: "callout_voice",
+      evidenceRefs: ["docs/verify.md#L1"],
+      traceId: "trace-callout-missing-candidate",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("missing_accepted_arbitration_candidate");
+  });
+
+  it("suppresses callout_voice when candidate text hash does not match", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Action required: rerun verifier.",
+      mode: "callout",
+      priority: "action",
+      voiceAuthorityState: "callout_voice",
+      accepted_arbitration_candidate: buildAcceptedCandidate({
+        text: "Different accepted text.",
+        text_certainty: "reasoned",
+        voice_certainty: "reasoned",
+        evidence_refs: ["docs/verify.md#L1"],
+      }),
+      evidenceRefs: ["docs/verify.md#L1"],
+      traceId: "trace-callout-hash-mismatch",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("candidate_text_hash_mismatch");
+  });
+
+  it("allows callout_voice from accepted arbitration candidate", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const text = "Action required: rerun verifier.";
+    const res = await request(app).post("/api/voice/speak").send({
+      text,
+      mode: "callout",
+      priority: "action",
+      voiceAuthorityState: "callout_voice",
+      accepted_arbitration_candidate: buildAcceptedCandidate({
+        text,
+        text_certainty: "reasoned",
+        voice_certainty: "reasoned",
+        evidence_refs: ["docs/verify.md#L1"],
+      }),
+      evidenceRefs: ["docs/verify.md#L1"],
+      traceId: "trace-callout-accepted",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.suppressed ?? false).toBe(false);
+  });
+
+  it("suppresses hypothesis-only callout_voice", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const text = "Possible risk: verifier may fail.";
+    const res = await request(app).post("/api/voice/speak").send({
+      text,
+      mode: "callout",
+      priority: "warn",
+      voiceAuthorityState: "callout_voice",
+      accepted_arbitration_candidate: buildAcceptedCandidate({
+        text,
+        text_certainty: "hypothesis",
+        voice_certainty: "hypothesis",
+        evidence_refs: ["docs/verify.md#L1"],
+      }),
+      evidenceRefs: ["docs/verify.md#L1"],
+      traceId: "trace-callout-hypothesis",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("field_hypothesis_not_speakable");
   });
 
   it("enforces local-only provider mode", async () => {

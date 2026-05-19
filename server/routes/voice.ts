@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";
 import { evaluateCalloutEligibility as evaluateSharedEligibility } from "../../shared/callout-eligibility";
+import { authorizeDotVoiceSource } from "../../shared/helix-dot-voice-authority";
 import {
   OPERATOR_CALLOUT_V1_KIND,
   validateOperatorCalloutV1,
@@ -103,6 +104,16 @@ const requestSchema = z.object({
   replayMode: z.boolean().optional(),
   policyTsMs: z.number().int().nonnegative().optional(),
   tsMs: z.number().int().nonnegative().optional(),
+  voiceAuthorityState: z
+    .enum(["transcribe_only", "status_voice", "callout_voice", "command_confirm", "command_execute"])
+    .optional(),
+  terminal_answer_authority: z.unknown().optional(),
+  accepted_arbitration_candidate: z.unknown().optional(),
+  sourceKind: z.string().trim().min(1).max(120).optional(),
+  sourceTextHash: z.string().trim().min(1).max(256).optional(),
+  terminal_voice_text_hash: z.string().trim().min(1).max(256).optional(),
+  threadId: z.string().trim().min(1).max(200).optional(),
+  turnId: z.string().trim().min(1).max(200).optional(),
 });
 
 type VoiceRequest = z.infer<typeof requestSchema>;
@@ -2364,6 +2375,36 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const payload = parsed.data;
   const policyNowMs = resolvePolicyNowMs(payload);
+  const shouldRunDotVoiceSourceGate = Boolean(
+    payload.voiceAuthorityState ||
+      payload.terminal_answer_authority ||
+      payload.accepted_arbitration_candidate ||
+      payload.sourceKind ||
+      payload.sourceTextHash ||
+      payload.terminal_voice_text_hash,
+  );
+  if (shouldRunDotVoiceSourceGate) {
+    const voiceSourceDecision = authorizeDotVoiceSource({
+      text: payload.text,
+      voiceAuthorityState: payload.voiceAuthorityState,
+      terminalAnswerAuthority: payload.terminal_answer_authority,
+      acceptedArbitrationCandidate: payload.accepted_arbitration_candidate,
+      sourceKind: payload.sourceKind,
+      sourceTextHash: payload.sourceTextHash,
+      terminalVoiceTextHash: payload.terminal_voice_text_hash,
+      currentThreadId: payload.threadId,
+      currentTurnId: payload.turnId,
+      nowMs: policyNowMs,
+    });
+    if (!voiceSourceDecision.ok) {
+      return res.status(200).json({
+        ok: true,
+        suppressed: true,
+        ...suppressionEnvelope(voiceSourceDecision.reason),
+        traceId: payload.traceId ?? null,
+      });
+    }
+  }
   if (payload.mode === "callout") {
     const contextEligibility = evaluateSharedEligibility({
       contextTier: payload.contextTier,
