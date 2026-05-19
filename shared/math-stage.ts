@@ -2893,4 +2893,57 @@ export const mathStageRegistry: MathStageEntry[] = [
       gate_delta_limit: "varies",
     },
   },
+  {
+    tag: "CURVATURE_LEVERAGE",
+    module: "shared/curvature-leverage.ts",
+    stage: "diagnostic",
+    notes: "Scale-normalized curvature leverage contract with non-promoting NHM2 full-solve records.",
+    motivation:
+      "Curvature leverage is a dimensionless diagnostic bridge; it must stay separate from source validation and promotion.",
+    conceptualWaypoints: [
+      "raw leverage is abs(kappa) times lever length squared",
+      "response weighting is separate from raw leverage",
+      "NHM2 records route through metric-required tensor refs",
+      "promotionAllowed remains false by construction",
+    ],
+    checks: [
+      { type: "test", path: "tests/curvature-leverage.spec.ts" },
+      { type: "test", path: "tests/curvature-leverage-claims.spec.ts" },
+      { type: "snapshot", path: "tests/curvature-leverage.spec.ts" },
+    ],
+    units: {
+      kappa_m2: "L^-2",
+      leverLength_m: "L",
+      leverage: "1",
+      responseGain: "1",
+      closureQuality: "1",
+      tensorNorm_m2: "L^-2",
+    },
+  },
+  {
+    tag: "CURVATURE_LEVERAGE",
+    module: "scripts/curvature-leverage-full-solve-report.ts",
+    stage: "diagnostic",
+    notes: "NHM2 full-solve curvature leverage report generator from metric-required regional tensor artifacts.",
+    motivation:
+      "The report makes the tensor-first leverage route auditable from equation IDs and claim IDs to full-solve artifacts.",
+    conceptualWaypoints: [
+      "load metric-required regional tensor evidence",
+      "convert SI energy-density tensor magnitudes to curvature units when needed",
+      "compute regional abs(kappa) times lever length squared",
+      "emit explicit observer, QEI, conservation, and promotion gates",
+    ],
+    checks: [
+      { type: "test", path: "tests/curvature-leverage-full-solve-report.spec.ts" },
+      { type: "test", path: "tests/curvature-leverage-claims.spec.ts" },
+      { type: "snapshot", path: "tests/curvature-leverage-full-solve-report.spec.ts" },
+    ],
+    units: {
+      tensorNormInput: "varies",
+      tensorNorm_m2: "L^-2",
+      leverLength_m: "L",
+      leverage: "1",
+      residualRelLInf: "1",
+    },
+  },
 ];

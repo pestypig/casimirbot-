@@ -6,6 +6,7 @@ export const NHM2_OBSERVABLE_EQUATION_MAP_SCHEMA_VERSION = "v1" as const;
 export type Nhm2EquationFamily =
   | "geometry_3p1"
   | "metric_required_source"
+  | "curvature_leverage"
   | "observer_projection"
   | "source_model"
   | "tile_effective_counterpart"
@@ -54,6 +55,7 @@ export type Nhm2ObservableUnits =
   | "geometric_units"
   | "repo_normalized"
   | "dimensionless_diagnostic"
+  | "mixed_declared"
   | "layout_units"
   | "unknown";
 
@@ -136,6 +138,7 @@ export interface Nhm2EquationEdge {
 export const NHM2_EQUATION_FAMILIES: readonly Nhm2EquationFamily[] = [
   "geometry_3p1",
   "metric_required_source",
+  "curvature_leverage",
   "observer_projection",
   "source_model",
   "tile_effective_counterpart",
@@ -188,6 +191,7 @@ export const NHM2_OBSERVABLE_UNITS: readonly Nhm2ObservableUnits[] = [
   "geometric_units",
   "repo_normalized",
   "dimensionless_diagnostic",
+  "mixed_declared",
   "layout_units",
   "unknown",
 ];

@@ -297,6 +297,13 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
     expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expect(response.body?.route_authority_audit).toMatchObject({
+      schema: "helix.route_authority_audit.v1",
+      source_target: "visual_capture",
+      terminal_artifact_kind: "situation_context_pack",
+      route_authority_ok: true,
+      route_authority_violation_code: null,
+    });
     expectCleanToolAdmissionCoverage(response.body, "visual_capture");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
@@ -323,6 +330,13 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.answer).not.toContain("Producer freshness:");
     expect(response.body?.receipt_presentation_snapshot?.full_summary).toContain("Producer freshness:");
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expect(response.body?.route_authority_audit).toMatchObject({
+      schema: "helix.route_authority_audit.v1",
+      source_target: "live_pipeline",
+      terminal_artifact_kind: "live_pipeline_receipt",
+      route_authority_ok: true,
+      route_authority_violation_code: null,
+    });
     expectCleanToolAdmissionCoverage(response.body, "live_pipeline");
   }, 30000);
 

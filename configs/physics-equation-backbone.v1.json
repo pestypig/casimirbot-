@@ -94,6 +94,61 @@
       ]
     },
     {
+      "id": "curvature_leverage_scale_normalization",
+      "name": "Scale-normalized curvature leverage",
+      "category": "curvature_leverage",
+      "expression": "Lambda = abs(kappa) * L^2",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Lambda",
+          "quantity": "dimensionless curvature leverage",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "kappa",
+          "quantity": "curvature or curvature-proxy scalar",
+          "units": "1/m^2"
+        },
+        {
+          "symbol": "L",
+          "quantity": "observable or regional lever length",
+          "units": "m"
+        }
+      ],
+      "root_lane": "curvature_leverage"
+    },
+    {
+      "id": "nhm2_full_solve_regional_tensor_leverage",
+      "name": "NHM2 full-solve regional tensor leverage",
+      "category": "curvature_leverage",
+      "expression": "Lambda_R = norm(G_ab[g_NHM2])_R * L_R^2 = 8*pi*norm(T_required_ab)_R * L_R^2",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Lambda_R",
+          "quantity": "regional full-solve curvature leverage",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "G_ab[g_NHM2]",
+          "quantity": "Einstein tensor of the NHM2 solved metric",
+          "units": "1/m^2"
+        },
+        {
+          "symbol": "T_required_ab",
+          "quantity": "metric-required stress-energy tensor",
+          "units": "geometric_units"
+        },
+        {
+          "symbol": "L_R",
+          "quantity": "region lever length for global/hull/wall/exterior shell",
+          "units": "m"
+        }
+      ],
+      "root_lane": "nhm2_full_solve"
+    },
+    {
       "id": "uncertainty_propagation",
       "name": "First-order uncertainty propagation",
       "category": "uncertainty",

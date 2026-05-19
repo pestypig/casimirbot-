@@ -5,7 +5,7 @@
   "sourceWhitepaperRefs": [
     {
       "path": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-      "sha256": "832ff05bd2ab5d8a6bf695dab2a6047685d2a3fd680f2c3c135374ac86dc83b5",
+      "sha256": "01b1818e933d049b92e1f0435a925e29d5c7c6f1064aa7b185f7d284b007a41a",
       "role": "status_whitepaper"
     },
     {
@@ -1236,6 +1236,63 @@
       "forbiddenClaims": ["no reproducibility promotion without full chain"]
     },
     {
+      "id": "curvature_leverage_full_solve",
+      "family": "curvature_leverage",
+      "symbol": "Lambda_R",
+      "displayEquation": "Lambda_R = ||G_ab[g_NHM2]||_R L_R^2",
+      "equationLatex": "\\Lambda_R = \\|G_{ab}[g_{\\rm NHM2}]\\|_R L_R^2",
+      "plainMeaning": "Dimensionless regional curvature leverage for the NHM2 full solve, computed from the metric-required tensor route and the declared region scale.",
+      "whyItMatters": "This connects scale-normalized curvature reasoning to the full-solve tensor path without promoting mechanism-side source closure.",
+      "repoBindings": [
+        {
+          "artifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
+          "fieldName": "diagonalTensor",
+          "units": "geometric_units",
+          "hashRequired": true
+        },
+        {
+          "artifactPath": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-regional-source-closure-evidence.json",
+          "fieldName": "regions",
+          "units": "mixed_declared",
+          "hashRequired": true
+        }
+      ],
+      "figurePlan": [
+        {
+          "figureId": "curvature_leverage_regional_table",
+          "figureType": "residual_chart",
+          "purpose": "Show Lambda_R by region beside tensor source refs, residual status, and blocked closure gates.",
+          "requiredAxesOrEncodings": ["region", "tensor norm", "lever length", "Lambda_R", "closure status"],
+          "allowedRenderer": "svg_table"
+        }
+      ],
+      "status": "diagnostic",
+      "blockerRefs": [
+        {
+          "blockerId": "source_to_geometry_closure_required",
+          "sourceArtifact": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "status": "review"
+        },
+        {
+          "blockerId": "qei_conservation_reproduction_gates_required",
+          "sourceArtifact": "artifacts/research/full-solve/reference/nhm2-reference-ledger-2026-05-05-v1/nhm2-regional-source-closure-evidence.json",
+          "status": "review"
+        }
+      ],
+      "literatureRefs": ["gourgoulhon_2007_3p1_formalism", "alcubierre_1994_warp_metric"],
+      "claimBoundary": {
+        "doesValidateNHM2": false,
+        "maySupportContextOnly": true,
+        "promotionAllowed": false
+      },
+      "forbiddenClaims": [
+        "no source mechanism confirmation",
+        "no external observable promotion",
+        "no route ETA claim",
+        "no speed claim"
+      ]
+    },
+    {
       "id": "claim_locks",
       "family": "claim_boundary",
       "symbol": "validationClaimAllowed=false; physicalMechanismClaimAllowed=false; promotionAllowed=false",
@@ -1331,6 +1388,27 @@
       "relation": "requires",
       "plainMeaning": "Regional closure requires region-specific metric-required tensors.",
       "claimBoundaryNote": "Global residuals cannot substitute for region-resolved closure."
+    },
+    {
+      "from": "einstein_tensor_source",
+      "to": "curvature_leverage_full_solve",
+      "relation": "defines",
+      "plainMeaning": "The metric-required tensor route supplies the curvature norm used by NHM2 regional leverage.",
+      "claimBoundaryNote": "This tensor-first leverage is diagnostic and does not confirm a source mechanism."
+    },
+    {
+      "from": "regional_metric_source",
+      "to": "curvature_leverage_full_solve",
+      "relation": "requires",
+      "plainMeaning": "Region masks and lever lengths define the scale factor in Lambda_R.",
+      "claimBoundaryNote": "Scale-normalization cannot replace same-basis regional closure."
+    },
+    {
+      "from": "curvature_leverage_full_solve",
+      "to": "same_basis_closure",
+      "relation": "documents",
+      "plainMeaning": "Curvature leverage records the regional tensor scale beside the closure residual.",
+      "claimBoundaryNote": "Lambda_R is a diagnostic tensor measure, not a closure verdict."
     },
     {
       "from": "casimir_tile_layout",

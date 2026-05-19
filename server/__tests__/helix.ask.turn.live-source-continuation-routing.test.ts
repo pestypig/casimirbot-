@@ -26,6 +26,7 @@ import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live
 import { buildLiveEnvironmentBindingDiagnosis } from "../services/helix-ask/live-environment-binding-diagnosis";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { guardTerminalArtifactSelection } from "../services/helix-ask/terminal-artifact-selection-guard";
+import { auditRouteAuthority } from "../services/helix-ask/route-authority-audit";
 import {
   createLiveAnswerEnvironment,
 } from "../services/situation-room/live-answer-environment-store";
@@ -279,6 +280,11 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.workspace_action_receipt?.action_id).not.toBe("situation-room.live-source.set_rate");
     expect(response.body?.visual_producer_cadence_receipt).toBeFalsy();
     expect(response.body?.tool_call_admission_decision?.source_target).not.toBe("live_pipeline");
+    expect(response.body?.route_authority_audit).toMatchObject({
+      schema: "helix.route_authority_audit.v1",
+      source_target: "visual_capture",
+      route_authority_ok: true,
+    });
   }, 20_000);
 
   it("treats future/contextual cadence language in visual questions as visual evidence context", async () => {
@@ -302,6 +308,8 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.live_source_continuation_intent).toBeFalsy();
     expect(response.body?.action_id).not.toBe("situation-room.live-source.set_rate");
     expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+    expect(response.body?.route_authority_audit?.source_target).toBe("visual_capture");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
   }, 20_000);
 
   it("keeps procedure-epoch visual questions out of live pipeline receipts even when asking about interval state", async () => {
@@ -323,6 +331,8 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
     expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
     expect(response.body?.action_id).not.toBe("situation-room.live-source.set_rate");
+    expect(response.body?.route_authority_audit?.source_target).toBe("procedure_memory");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
   }, 20_000);
 
   it("rejects live pipeline receipts at the terminal guard for visual-content prompts even under live-pipeline source target", () => {
@@ -345,6 +355,23 @@ describe("live source continuation Ask routing", () => {
     expect(contract.forbidden_terminal_artifact_kinds).toContain("live_pipeline_receipt");
     expect(guard.allowed).toBe(false);
     expect(guard.reason).toBe("terminal_artifact_forbidden_by_route_product_contract");
+    expect(auditRouteAuthority({
+      turnId: "ask:guard-unit",
+      promptText: "review the current screen before I start the 10 second interval",
+      selectedRoute: "live_pipeline_control",
+      terminalArtifactKind: "live_pipeline_receipt",
+      finalAnswerSource: "live_pipeline_receipt",
+      sourceTargetIntent: {
+        target_source: "live_pipeline",
+        target_kind: "live_pipeline",
+      },
+      routeProductContract: contract,
+      terminalArtifactSelectionGuard: guard,
+    })).toMatchObject({
+      route_authority_ok: false,
+      route_authority_violation_code: "terminal_product_authority_mismatch",
+      terminal_artifact_allowed: false,
+    });
   });
 
   it("routes direct visual interval commands to producer cadence control", async () => {

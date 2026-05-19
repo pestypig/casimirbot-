@@ -1,0 +1,149 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "curvature-leverage-core",
+  "domain": "scale-normalized-curvature-diagnostics",
+  "updatedAt": "2026-05-19",
+  "claims": [
+    {
+      "claimId": "claim:curvature.leverage:scale_normalized_dimensionless",
+      "statement": "Curvature leverage is admissible as a diagnostic scalar only when computed as abs(kappa) * L^2, where kappa has units of inverse square length and L is the declared observable or regional lever length.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "curvature leverage diagnostics",
+        "constraints": [
+          "kappa must be finite",
+          "lever length must be positive and finite",
+          "the result is dimensionless",
+          "the result is not a validation or promotion claim"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "shared/curvature-leverage.ts",
+          "equation": "Lambda = abs(kappa) * L^2",
+          "note": "Canonical repo implementation of scale-normalized curvature leverage."
+        }
+      ],
+      "repoBindings": [
+        "shared/curvature-leverage.ts",
+        "tests/curvature-leverage.spec.ts"
+      ],
+      "clCeiling": "CL0",
+      "status": "active",
+      "falsifier": {
+        "condition": "A record is emitted with nonfinite kappa, nonpositive lever length, or promotionAllowed=true.",
+        "evidence": "tests/curvature-leverage.spec.ts"
+      }
+    },
+    {
+      "claimId": "claim:curvature.leverage:response_weighting_non_promoting",
+      "statement": "Response gain and closure quality may weight a curvature-leverage diagnostic, but this weighting must stay separate from raw abs(kappa) * L^2 and must not enable promotion.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "curvature leverage diagnostics",
+        "constraints": [
+          "responseGain must be nonnegative and finite",
+          "closureQuality must be nonnegative and finite",
+          "promotionAllowed must remain false"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "shared/curvature-leverage.ts",
+          "equation": "responseWeightedLeverage = leverage * responseGain * closureQuality",
+          "note": "Response weighting is computed as a separate diagnostic field."
+        }
+      ],
+      "repoBindings": [
+        "shared/curvature-leverage.ts",
+        "tests/curvature-leverage.spec.ts"
+      ],
+      "clCeiling": "CL0",
+      "status": "active",
+      "falsifier": {
+        "condition": "Response weighting overwrites raw leverage or enables promotion.",
+        "evidence": "tests/curvature-leverage.spec.ts"
+      }
+    },
+    {
+      "claimId": "claim:curvature.leverage:nhm2_full_solve_tensor_precedence",
+      "statement": "For NHM2 full solve claims, curvature leverage must be derived from the metric-required same-chart tensor route or its tensor norm, not from a mechanism-side curvature proxy.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "NHM2 full solve",
+        "constraints": [
+          "lane must be nhm2_full_solve",
+          "metricRequiredTensorRef must be present",
+          "region must be global, hull, wall, or exterior_shell",
+          "observerClosureStatus, qeiStatus, and conservationStatus must be explicit",
+          "promotionAllowed must remain false"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "spec",
+          "citation": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          "equation": "T_required_ab = G_ab[g_NHM2] / 8pi",
+          "note": "The full solve owns the metric-required tensor route and blocks source-mechanism promotion."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "shared/curvature-leverage.ts",
+          "note": "NHM2 leverage records require metricRequiredTensorRef and force promotionAllowed=false."
+        }
+      ],
+      "repoBindings": [
+        "shared/curvature-leverage.ts",
+        "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        "docs/research/nhm2-observable-equation-map.v1.json"
+      ],
+      "clCeiling": "CL0",
+      "status": "active",
+      "falsifier": {
+        "condition": "An NHM2 curvature leverage record omits metricRequiredTensorRef or derives from an external/mechanism proxy route.",
+        "evidence": "tests/curvature-leverage-full-solve-report.spec.ts"
+      }
+    },
+    {
+      "claimId": "claim:curvature.leverage:external_observables_are_calibrators",
+      "statement": "Self-gravity shape, tidal response, ring-wave response, and stellar hydrostatic lanes may calibrate scale-normalized curvature reasoning, but they do not validate NHM2 full-solve source closure.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "cross-scale gravitational observable loom",
+        "constraints": [
+          "external lanes must remain diagnostic",
+          "external observables must not promote NHM2",
+          "promotionAllowed must remain false",
+          "NHM2 claims must route through full-solve tensor artifacts"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "spec",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "Lambda = abs(kappa) * L^2",
+          "note": "General scale-normalized curvature equation is separate from NHM2 source closure."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/research/nhm2-observable-equation-map.v1.json",
+          "note": "The observable map keeps external context non-promoting."
+        }
+      ],
+      "repoBindings": [
+        "shared/curvature-leverage.ts",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/research/nhm2-observable-equation-map.v1.json"
+      ],
+      "clCeiling": "CL0",
+      "status": "active",
+      "falsifier": {
+        "condition": "A cross-scale observable is used as an NHM2 validation or source-closure proof.",
+        "evidence": "tests/curvature-leverage-claims.spec.ts"
+      }
+    }
+  ]
+}

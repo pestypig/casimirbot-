@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-19T22:25:23.245Z",
-  "registryCount": 121,
+  "generatedAt": "2026-05-19T22:57:31.620Z",
+  "registryCount": 123,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 57,
+      "count": 59,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -128,7 +128,9 @@
         "shared/er-epr-tiny-syk-validation-safe-language.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
-        "server/routes/halobank-solar.ts"
+        "server/routes/halobank-solar.ts",
+        "shared/curvature-leverage.ts",
+        "scripts/curvature-leverage-full-solve-report.ts"
       ]
     },
     "certified": {
@@ -205,7 +207,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 121,
+    "entriesWithUnits": 123,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -219,8 +221,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 57,
-        "withUnits": 57,
+        "total": 59,
+        "withUnits": 59,
         "missing": []
       },
       "certified": {
@@ -241,8 +243,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1452,
-    "edgeCount": 3409
+    "nodeCount": 1453,
+    "edgeCount": 3415
   },
   "evidenceProfiles": [
     {

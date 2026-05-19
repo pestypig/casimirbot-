@@ -157,6 +157,43 @@ describe("validatePhysicsEquationBackbone", () => {
     expect(equation?.symbols?.some((entry) => entry.symbol === "V_proxy" && entry.units === "m^3")).toBe(true);
   });
 
+  it("registers curvature leverage and NHM2 full-solve regional tensor leverage", () => {
+    const repoRoot = process.cwd();
+    const backbone = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
+    ) as {
+      equations: Array<{
+        id: string;
+        category?: string;
+        claim_tier?: string;
+        root_lane?: string;
+        symbols?: Array<{ symbol?: string; units?: string }>;
+      }>;
+    };
+
+    const scale = backbone.equations.find(
+      (entry) => entry.id === "curvature_leverage_scale_normalization",
+    );
+    expect(scale).toBeDefined();
+    expect(scale?.category).toBe("curvature_leverage");
+    expect(scale?.claim_tier).toBe("diagnostic");
+    expect(scale?.root_lane).toBe("curvature_leverage");
+    expect(scale?.symbols?.some((entry) => entry.symbol === "Lambda" && entry.units === "dimensionless")).toBe(true);
+    expect(scale?.symbols?.some((entry) => entry.symbol === "kappa" && entry.units === "1/m^2")).toBe(true);
+    expect(scale?.symbols?.some((entry) => entry.symbol === "L" && entry.units === "m")).toBe(true);
+
+    const nhm2 = backbone.equations.find(
+      (entry) => entry.id === "nhm2_full_solve_regional_tensor_leverage",
+    );
+    expect(nhm2).toBeDefined();
+    expect(nhm2?.category).toBe("curvature_leverage");
+    expect(nhm2?.claim_tier).toBe("diagnostic");
+    expect(nhm2?.root_lane).toBe("nhm2_full_solve");
+    expect(nhm2?.symbols?.some((entry) => entry.symbol === "Lambda_R" && entry.units === "dimensionless")).toBe(true);
+    expect(nhm2?.symbols?.some((entry) => entry.symbol === "G_ab[g_NHM2]" && entry.units === "1/m^2")).toBe(true);
+    expect(nhm2?.symbols?.some((entry) => entry.symbol === "T_required_ab" && entry.units === "geometric_units")).toBe(true);
+  });
+
   it("registers the stellar radiation null-model contract equations in repo backbone", () => {
     const repoRoot = process.cwd();
     const backbone = JSON.parse(

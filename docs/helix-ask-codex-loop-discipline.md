@@ -316,6 +316,117 @@ cadence mention detected, contextual/negated cadence detected, affirmative
 control act detected, requested rate, visual-content request detected, and final
 control admission.
 
+## Route Authority Audit
+
+Helix Ask must distinguish content correctness from route authority correctness.
+
+A terminal answer is valid only when both are true:
+
+1. the terminal text is server-authoritative and not projection/fabrication
+   poison;
+2. the terminal artifact kind is allowed for the prompt, source-target intent,
+   route product contract, and available evidence state.
+
+A clean poison audit does not imply a correct route. A route may be invalid even
+when selected text is stable, server-authored, and visible-client-matched.
+
+Every source-targeted turn must emit or make available
+`helix.route_authority_audit.v1` with:
+
+```txt
+turn_id
+prompt_hash
+source_target
+target_kind
+selected_route
+terminal_artifact_kind
+final_answer_source
+route_product_precedence_reason
+allowed_terminal_artifact_kinds
+forbidden_terminal_artifact_kinds
+terminal_artifact_allowed
+route_authority_ok
+route_authority_violation_code
+```
+
+Stable violation codes:
+
+```txt
+terminal_product_authority_mismatch
+receipt_used_as_content_answer
+client_projection_used_as_answer
+process_graph_used_as_visual_evidence
+pipeline_status_used_as_live_cognition
+model_only_used_for_source_targeted_turn
+no_tool_direct_used_for_hard_source_target
+procedure_memory_bypassed
+repo_evidence_bypassed
+visual_evidence_bypassed
+```
+
+If `route_authority_ok = false`, the turn must fail closed with a typed failure
+or be rejected before presentation. It must not present the forbidden artifact as
+the final answer.
+
+## Contextual Tool-Verb Admission
+
+Tool verbs inside user text are not tool calls by default.
+
+Words such as `open`, `click`, `run`, `start`, `stop`, `capture`, `search`,
+`inspect`, `repair`, `attach`, `adopt`, `refresh`, and `verify` may create route
+candidates, but they may not admit execution unless the prompt is an affirmative
+operator command.
+
+Treat these as context, not commands:
+
+```txt
+I haven't clicked it yet
+before I open that panel
+after we run the verification
+if we later refresh the source
+was the capture running?
+why did it inspect the pipeline?
+the previous answer said to run repair
+the screen shows a button labeled Start
+```
+
+Treat these as possible commands only after source-target admission:
+
+```txt
+click that button
+open the current document
+run the verification path
+start the live source
+refresh the capture
+inspect the pipeline status
+repair the live answer binding
+```
+
+For mixed prompts, content questions beat control verbs unless the user clearly
+asks for the control action as the requested output.
+
+Examples:
+
+```txt
+review the current screen before I click Start
+```
+
+Required: `visual_capture / situation_context_question`, no click action
+admitted.
+
+```txt
+what changed since the last scene after the capture refreshed?
+```
+
+Required: `procedure_memory / situation_epoch`, no refresh action admitted.
+
+```txt
+click Start, then tell me whether the click was accepted
+```
+
+Required: workstation/control receipt only; no visual-scene answer unless a
+second admitted evidence turn runs.
+
 ## Non-Redundancy Gate
 
 Before adding backend logic, classify it as one of:
