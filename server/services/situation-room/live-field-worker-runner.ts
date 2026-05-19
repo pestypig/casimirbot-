@@ -26,6 +26,7 @@ import { appendProcedureEpochLedgerItem } from "./procedure-epoch-ledger-store";
 import { recordProcedureEpochClosure } from "./procedure-epoch-closure";
 import { runLiveInterpretationWorkersForObservation } from "./live-interpretation-worker-runner";
 import { recordVisualSceneMemoryIndex } from "./visual-scene-memory-store";
+import { repairLiveFieldEvaluations } from "./scene-field-repair";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -51,6 +52,7 @@ const emptyProcedureWorkerFeedback = () => ({
   confidence_updates: [],
   procedure_epoch: null,
   procedure_epoch_closure: null,
+  field_repair_artifact: null,
 });
 
 const isTaskManagerSummary = (text: string): boolean =>
@@ -283,7 +285,7 @@ export function runLiveFieldWorkersForObservation(input: {
   });
   const genericVisual = run.modality_scope === "generic_visual";
   const workerRuns: HelixLiveFieldWorkerRun[] = [];
-  const evaluations = workers
+  const preparedEvaluations = workers
     .filter((worker) => worker.status === "active")
     .map((worker) => {
       const workerRunId = `live_field_worker_run:${hashShort([
@@ -323,7 +325,7 @@ export function runLiveFieldWorkersForObservation(input: {
         causality_refs: started.trigger_observation_refs,
         created_at: now,
       });
-      const evaluation = recordLiveFieldEvaluation(evaluateField({
+      const evaluation = evaluateField({
         environment: input.environment,
         runId: run.situation_run_id,
         workerRunId,
@@ -332,55 +334,72 @@ export function runLiveFieldWorkersForObservation(input: {
         observation: input.observation as HelixObservationJournalEntry,
         genericVisual,
         now,
-      }));
-      const completed = recordLiveFieldWorkerRun({
-        schema: HELIX_LIVE_FIELD_WORKER_RUN_SCHEMA,
-        worker_run_id: workerRunId,
-        worker_id: worker.worker_id,
-        situation_run_id: run.situation_run_id,
-        thread_id: run.thread_id,
-        environment_id: run.environment_id,
-        field_key: worker.field_key,
-        status: "completed",
-        trigger_observation_refs: [input.observation?.observation_id ?? ""].filter(Boolean),
-        tool_calls: [],
-        started_at: now,
-        completed_at: now,
-        output_evaluation_id: evaluation.evaluation_id,
-        error: null,
-        assistant_answer: false,
-        raw_content_included: false,
-        role: "validation",
       });
-      appendProcedureEpochLedgerItem({
-        situation_run_id: run.situation_run_id,
-        source_binding_id: run.source_binding_id,
-        thread_id: run.thread_id,
-        environment_id: run.environment_id,
-        epoch: run.current_epoch,
-        item_kind: "field_evaluation",
-        item_ref: evaluation.evaluation_id,
-        summary: `${evaluation.field_key}: ${evaluation.value}`,
-        causality_refs: [workerRunId, ...evaluation.evidence_refs],
-        created_at: evaluation.created_at,
-      });
-      appendProcedureEpochLedgerItem({
-        situation_run_id: run.situation_run_id,
-        source_binding_id: run.source_binding_id,
-        thread_id: run.thread_id,
-        environment_id: run.environment_id,
-        epoch: run.current_epoch,
-        item_kind: "field_worker_run",
-        item_ref: completed.worker_run_id,
-        summary: `${completed.field_key} worker completed.`,
-        causality_refs: [evaluation.evaluation_id, ...completed.trigger_observation_refs],
-        created_at: completed.completed_at ?? now,
-      });
-      workerRuns.push(completed);
-      assertLiveArtifactNonTerminal(evaluation);
-      assertLiveArtifactNonTerminal(completed);
-      return evaluation;
+      return { worker, workerRunId, evaluation };
     });
+  const fieldRepair = genericVisual
+    ? repairLiveFieldEvaluations({
+        frameId: input.observation.observation_id,
+        observationText: input.observation.text,
+        evaluations: preparedEvaluations.map((entry) => entry.evaluation),
+      })
+    : {
+        evaluations: preparedEvaluations.map((entry) => entry.evaluation),
+        repairArtifact: null,
+      };
+  const repairedByOriginalId = new Map(
+    preparedEvaluations.map((entry, index) => [entry.evaluation.evaluation_id, fieldRepair.evaluations[index] ?? entry.evaluation]),
+  );
+  const evaluations = preparedEvaluations.map(({ worker, workerRunId, evaluation: rawEvaluation }) => {
+    const evaluation = recordLiveFieldEvaluation(repairedByOriginalId.get(rawEvaluation.evaluation_id) ?? rawEvaluation);
+    const completed = recordLiveFieldWorkerRun({
+      schema: HELIX_LIVE_FIELD_WORKER_RUN_SCHEMA,
+      worker_run_id: workerRunId,
+      worker_id: worker.worker_id,
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: worker.field_key,
+      status: "completed",
+      trigger_observation_refs: [input.observation?.observation_id ?? ""].filter(Boolean),
+      tool_calls: [],
+      started_at: now,
+      completed_at: now,
+      output_evaluation_id: evaluation.evaluation_id,
+      error: null,
+      assistant_answer: false,
+      raw_content_included: false,
+      role: "validation",
+    });
+    appendProcedureEpochLedgerItem({
+      situation_run_id: run.situation_run_id,
+      source_binding_id: run.source_binding_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      epoch: run.current_epoch,
+      item_kind: "field_evaluation",
+      item_ref: evaluation.evaluation_id,
+      summary: `${evaluation.field_key}: ${evaluation.value}`,
+      causality_refs: [workerRunId, ...evaluation.evidence_refs],
+      created_at: evaluation.created_at,
+    });
+    appendProcedureEpochLedgerItem({
+      situation_run_id: run.situation_run_id,
+      source_binding_id: run.source_binding_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      epoch: run.current_epoch,
+      item_kind: "field_worker_run",
+      item_ref: completed.worker_run_id,
+      summary: `${completed.field_key} worker completed.`,
+      causality_refs: [evaluation.evaluation_id, ...completed.trigger_observation_refs],
+      created_at: completed.completed_at ?? now,
+    });
+    workerRuns.push(completed);
+    assertLiveArtifactNonTerminal(evaluation);
+    assertLiveArtifactNonTerminal(completed);
+    return evaluation;
+  });
   const predictionFeedback = createPredictionsForFieldEvaluations({
     run,
     evaluations,
@@ -514,6 +533,7 @@ export function runLiveFieldWorkersForObservation(input: {
     procedure_epoch: procedureEpoch,
     procedure_epoch_closure: epochClosure,
     visual_scene_memory: visualSceneMemory,
+    field_repair_artifact: fieldRepair.repairArtifact,
     ...interpretationWorkerRun,
     assistant_answer: false as const,
     raw_content_included: false as const,
