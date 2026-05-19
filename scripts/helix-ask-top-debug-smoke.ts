@@ -101,6 +101,18 @@ const debugSummaryFor = (debug: Record<string, unknown> | null): Record<string, 
     window_source_watermarks: watermarks,
     poison_ok: getPath(payload, ["poison_audit", "ok"]) ?? null,
     terminal_authority: getPath(payload, ["terminal_answer_authority", "terminal_artifact_kind"]) ?? null,
+    route_authority_ok: getPath(payload, ["route_authority_audit", "route_authority_ok"]) ?? null,
+    route_authority_violation_code: getPath(payload, ["route_authority_audit", "route_authority_violation_code"]) ?? null,
+    route_authority_violation_codes: getPath(payload, ["route_authority_audit", "violation_codes"]) ?? [],
+    loop_trace_present: getPath(payload, ["loop_parity_trace", "schema"]) === "helix.loop_parity_trace.v1",
+    loop_selected_route: getPath(payload, ["loop_parity_trace", "selected_route"]) ?? null,
+    loop_admitted_tool_families: getPath(payload, ["loop_parity_trace", "admitted_tool_families"]) ?? [],
+    loop_actual_tool_calls: getPath(payload, ["loop_parity_trace", "actual_tool_calls"]) ?? [],
+    loop_unexpected_tool_calls: getPath(payload, ["loop_parity_trace", "unexpected_tool_calls"]) ?? [],
+    loop_short_circuit_risk_flags: getPath(payload, ["loop_parity_trace", "short_circuit_risk_flags"]) ?? [],
+    poison_clean_but_authority_failed:
+      getPath(payload, ["poison_audit", "ok"]) === true &&
+      getPath(payload, ["route_authority_audit", "route_authority_ok"]) === false,
   };
 };
 
@@ -142,6 +154,13 @@ const renderMarkdownSummary = (input: {
         `- exclusion_reasons: ${JSON.stringify(debug.exclusion_reasons ?? [])}`,
         `- source_watermarks: ${JSON.stringify(debug.window_source_watermarks ?? [])}`,
         `- poison_ok: ${debug.poison_ok}`,
+        `- route_authority_ok: ${debug.route_authority_ok}`,
+        `- route_authority_violation_codes: ${JSON.stringify(debug.route_authority_violation_codes ?? [])}`,
+        `- loop_trace_present: ${debug.loop_trace_present}`,
+        `- loop_admitted_tool_families: ${JSON.stringify(debug.loop_admitted_tool_families ?? [])}`,
+        `- loop_actual_tool_calls: ${JSON.stringify(debug.loop_actual_tool_calls ?? [])}`,
+        `- loop_unexpected_tool_calls: ${JSON.stringify(debug.loop_unexpected_tool_calls ?? [])}`,
+        `- loop_short_circuit_risk_flags: ${JSON.stringify(debug.loop_short_circuit_risk_flags ?? [])}`,
       );
     }
     if (entry.error) lines.push(`- error: ${entry.error}`);
