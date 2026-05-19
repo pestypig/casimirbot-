@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLiveVoiceSituationObservation,
+  buildDotConfirmationCandidate,
   classifyDotModeUtterance,
   DEFAULT_HELIX_DOT_MODE_POLICY,
+  promoteDotConfirmationCandidate,
 } from "@shared/helix-dot-mode-policy";
 
 const observedAt = "2026-05-18T10:00:00.000Z";
@@ -174,5 +176,118 @@ describe("Dot mode policy", () => {
       speakable: false,
       voice_output_reason: "untrusted_speaker",
     });
+  });
+
+  it("creates a pending confirmation candidate for command-confirm direct address", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot, what just happened?",
+      observedAt,
+      speakerAuthority: "command_confirm",
+    });
+    const candidate = buildDotConfirmationCandidate({
+      originalDecisionId: "decision_1",
+      originalObservedAt: observedAt,
+      originalText: "Dot, what just happened?",
+      decision,
+      speakerId: "guest_1",
+      evidenceRefs: ["voice:chunk:10"],
+      now: observedAt,
+      ttlMs: 30_000,
+    });
+
+    expect(candidate).toMatchObject({
+      schema: "helix.dot_confirmation_candidate.v1",
+      original_decision_id: "decision_1",
+      original_observed_at: observedAt,
+      original_text: "Dot, what just happened?",
+      addressed_text: "what just happened?",
+      speaker_id: "guest_1",
+      speaker_authority: "command_confirm",
+      requested_action: "start_user_turn",
+      status: "pending",
+      evidence_refs: ["voice:chunk:10"],
+      context_policy: "compact_context_pack_only",
+    });
+    expect(candidate?.expires_at).toBe("2026-05-18T10:00:30.000Z");
+  });
+
+  it("does not create a confirmation candidate for transcribe-only utterances", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot, what just happened?",
+      observedAt,
+      speakerAuthority: "transcribe_only",
+    });
+
+    expect(buildDotConfirmationCandidate({
+      originalDecisionId: "decision_ignored",
+      originalObservedAt: observedAt,
+      originalText: "Dot, what just happened?",
+      decision,
+    })).toBeNull();
+  });
+
+  it("promotes command-confirm with the original utterance timestamp as the answer anchor", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot, what just happened?",
+      observedAt,
+      speakerAuthority: "command_confirm",
+    });
+    const candidate = buildDotConfirmationCandidate({
+      originalDecisionId: "decision_2",
+      originalObservedAt: observedAt,
+      originalText: "Dot, what just happened?",
+      decision,
+    });
+    expect(candidate).not.toBeNull();
+
+    const promotion = promoteDotConfirmationCandidate({
+      candidate: candidate!,
+      confirmedAt: "2026-05-18T10:00:15.000Z",
+      voiceOutputEnabled: true,
+    });
+
+    expect(promotion).toMatchObject({
+      schema: "helix.dot_confirmation_promotion.v1",
+      promoted_at: "2026-05-18T10:00:15.000Z",
+      original_observed_at: observedAt,
+      creates_user_turn: true,
+      speakable: true,
+      temporal_context_window: {
+        anchor_observed_at: observedAt,
+        include_observed_before_or_at: observedAt,
+        exclude_post_anchor: true,
+      },
+      promoted_decision: {
+        creates_user_turn: true,
+        requires_confirmation: false,
+        temporal_context_window: {
+          anchor_observed_at: observedAt,
+          include_observed_before_or_at: observedAt,
+          exclude_post_anchor: true,
+        },
+      },
+    });
+  });
+
+  it("does not promote rejected, expired, or confirmed candidates", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot, what just happened?",
+      observedAt,
+      speakerAuthority: "command_confirm",
+    });
+    const candidate = buildDotConfirmationCandidate({
+      originalDecisionId: "decision_3",
+      originalObservedAt: observedAt,
+      originalText: "Dot, what just happened?",
+      decision,
+    });
+    expect(candidate).not.toBeNull();
+
+    expect(promoteDotConfirmationCandidate({
+      candidate: {
+        ...candidate!,
+        status: "expired",
+      },
+    })).toBeNull();
   });
 });

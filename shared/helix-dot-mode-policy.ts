@@ -105,6 +105,41 @@ export type DotModeUtteranceDecision = {
   };
 };
 
+export type DotConfirmationCandidate = {
+  schema: "helix.dot_confirmation_candidate.v1";
+  candidate_id: string;
+  original_decision_id: string;
+  original_observed_at: string;
+  original_text: string;
+  addressed_text: string;
+  speaker_id?: string | null;
+  speaker_authority: "command_confirm";
+  requested_action:
+    | "start_user_turn"
+    | "procedure_activation_request"
+    | "stop_output"
+    | "stop_listening";
+  status: "pending" | "confirmed" | "rejected" | "expired";
+  expires_at: string;
+  evidence_refs: string[];
+  context_policy: "compact_context_pack_only";
+};
+
+export type DotConfirmationPromotion = {
+  schema: "helix.dot_confirmation_promotion.v1";
+  candidate_id: string;
+  promoted_at: string;
+  original_observed_at: string;
+  creates_user_turn: boolean;
+  speakable: boolean;
+  temporal_context_window?: {
+    anchor_observed_at: string;
+    include_observed_before_or_at: string;
+    exclude_post_anchor: true;
+  };
+  promoted_decision: DotModeUtteranceDecision;
+};
+
 const DEFAULT_TOPIC_TAGS = ["voice", "situation_room"];
 
 export const DEFAULT_HELIX_DOT_MODE_POLICY: HelixAskDotModePolicy = {
@@ -164,6 +199,22 @@ function buildTemporalWindow(observedAt: string): DotModeUtteranceDecision["temp
     include_observed_before_or_at: observedAt,
     exclude_post_anchor: true,
   };
+}
+
+function hashStableText(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = Math.imul(31, hash) + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).slice(0, 10);
+}
+
+function requestedActionForDecision(decision: DotModeUtteranceDecision): DotConfirmationCandidate["requested_action"] {
+  if (decision.kind === "procedure_activation_request") return "procedure_activation_request";
+  if (decision.kind === "stop_output" || decision.kind === "stand_by") return "stop_output";
+  if (decision.kind === "stop_listening") return "stop_listening";
+  return "start_user_turn";
 }
 
 export function classifyDotModeUtterance(args: {
@@ -226,6 +277,89 @@ export function classifyDotModeUtterance(args: {
           : "voice_output_disabled",
     speakable: createsUserTurn && outputEnabled,
     ...(createsUserTurn ? { temporal_context_window: buildTemporalWindow(observedAt) } : {}),
+  };
+}
+
+export function buildDotConfirmationCandidate(args: {
+  originalDecisionId: string;
+  originalObservedAt: string;
+  originalText: string;
+  decision: DotModeUtteranceDecision;
+  speakerId?: string | null;
+  evidenceRefs?: string[];
+  now?: string;
+  ttlMs?: number;
+}): DotConfirmationCandidate | null {
+  if (!args.decision.requires_confirmation) return null;
+  const nowMs = Date.parse(args.now ?? args.originalObservedAt);
+  const ttlMs = Math.max(1000, args.ttlMs ?? 30_000);
+  const expiresAt = new Date((Number.isFinite(nowMs) ? nowMs : Date.now()) + ttlMs).toISOString();
+  const stem = `${args.originalDecisionId}:${args.originalObservedAt}:${args.originalText}`;
+  return {
+    schema: "helix.dot_confirmation_candidate.v1",
+    candidate_id: `dot_confirm:${hashStableText(stem)}`,
+    original_decision_id: args.originalDecisionId,
+    original_observed_at: args.originalObservedAt,
+    original_text: normalizeTranscript(args.originalText),
+    addressed_text: args.decision.addressed_text ?? "",
+    speaker_id: args.speakerId ?? null,
+    speaker_authority: "command_confirm",
+    requested_action: requestedActionForDecision(args.decision),
+    status: "pending",
+    expires_at: expiresAt,
+    evidence_refs: args.evidenceRefs ?? [`dot_decision:${args.originalDecisionId}`],
+    context_policy: "compact_context_pack_only",
+  };
+}
+
+export function promoteDotConfirmationCandidate(args: {
+  candidate: DotConfirmationCandidate;
+  confirmedAt?: string;
+  voiceOutputEnabled?: boolean;
+}): DotConfirmationPromotion | null {
+  if (args.candidate.status !== "pending") return null;
+  const confirmedAt = args.confirmedAt ?? new Date().toISOString();
+  const anchor = args.candidate.original_observed_at;
+  const kind: DotModeUtteranceKind =
+    args.candidate.requested_action === "procedure_activation_request"
+      ? "procedure_activation_request"
+    : args.candidate.requested_action === "stop_output"
+      ? "stop_output"
+    : args.candidate.requested_action === "stop_listening"
+      ? "stop_listening"
+      : "direct_address";
+  const createsUserTurn = kind !== "stop_output" && kind !== "stop_listening";
+  const speakable = createsUserTurn && args.voiceOutputEnabled !== false;
+  const promotedDecision: DotModeUtteranceDecision = {
+    schema: "helix.dot_utterance_decision.v1",
+    kind,
+    transcript_kind: kind === "stop_output" || kind === "stop_listening" ? "command_candidate" : "direct_address",
+    wake_name: "dot",
+    addressed_text: args.candidate.addressed_text,
+    creates_user_turn: createsUserTurn,
+    requires_confirmation: false,
+    cancels_active_answer: kind === "stop_output" || kind === "stop_listening",
+    cancels_voice_output: kind === "stop_output" || kind === "stop_listening",
+    disables_voice_capture: kind === "stop_listening",
+    next_voice_mode: kind === "stop_listening" ? "off" : kind === "stop_output" ? "observant" : null,
+    voice_output_reason:
+      kind === "stop_output" || kind === "stop_listening"
+        ? "dot_stop_command"
+      : speakable
+        ? "dot_direct_address"
+        : "voice_output_disabled",
+    speakable,
+    ...(createsUserTurn ? { temporal_context_window: buildTemporalWindow(anchor) } : {}),
+  };
+  return {
+    schema: "helix.dot_confirmation_promotion.v1",
+    candidate_id: args.candidate.candidate_id,
+    promoted_at: confirmedAt,
+    original_observed_at: anchor,
+    creates_user_turn: createsUserTurn,
+    speakable,
+    promoted_decision: promotedDecision,
+    ...(createsUserTurn ? { temporal_context_window: buildTemporalWindow(anchor) } : {}),
   };
 }
 
