@@ -36,27 +36,32 @@ const hashShort = (value: unknown, size = 18): string =>
 const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
 
+type ProbeComparison = {
+  status: HelixLiveProbeResultStatus;
+  observedSignals: string[];
+  confidenceDelta: number;
+  reason: string;
+  contradiction: boolean;
+};
+
 const signalsForText = (text: string): string[] => {
   const normalized = lower(text);
   const signals: string[] = [];
-  if (/\bselected|highlighted|chosen|clicked\b/.test(normalized)) signals.push("selection_changed");
-  if (/\bopened|open document|document opened|viewer\b/.test(normalized)) signals.push("opened_document");
-  if (/\bfolder path|navigated|different folder|new folder|directory changed\b/.test(normalized)) signals.push("folder_path_changed");
-  if (/\bsame folder|stable|still showing|remains|unchanged\b/.test(normalized)) signals.push("file_list_stable");
-  if (/\bwindow changed|different app|browser|terminal|editor\b/.test(normalized)) signals.push("window_changed");
+  if (/\bselection|selected|highlighted|chosen|clicked\b/.test(normalized)) signals.push("selection_changed");
+  if (/\bopened|open document|document opened|opened document|viewer\b/.test(normalized)) signals.push("opened_document");
+  if (/\bfolder path|folder path changes?|navigated|different folder|new folder|directory changed|path changed\b/.test(normalized)) signals.push("folder_path_changed");
+  if (/\bsame folder|same file explorer|stable|still showing|remains|unchanged|list remains|files remain|folder remains\b/.test(normalized)) signals.push("file_list_stable");
+  if (/\bwindow changes?|window changed|different app|browser|terminal|editor|replaced the expected view|instead of the folder view\b/.test(normalized)) signals.push("window_changed");
   if (signals.length === 0 && /\bfile explorer|folder|files?\b/.test(normalized)) signals.push("file_list_stable");
   return Array.from(new Set(signals));
 };
 
 const expectedSignalsFor = (evaluation: HelixLiveFieldEvaluation): string[] => {
-  const text = lower(`${evaluation.value} ${evaluation.next_check}`);
-  if (/\bselection|selected|file\b/.test(text)) {
-    return ["selection_changed", "opened_document", "folder_path_changed", "file_list_stable"];
-  }
-  if (/\bwindow|screen|content\b/.test(text)) {
-    return ["window_changed", "file_list_stable"];
-  }
-  return ["file_list_stable", "window_changed"];
+  const fromNextCheck = signalsForText(evaluation.next_check);
+  const fromEvaluationValue = signalsForText(evaluation.value);
+  const combined = Array.from(new Set([...fromNextCheck, ...fromEvaluationValue]));
+  if (combined.length > 0) return combined;
+  return ["file_list_stable"];
 };
 
 const probeTypeFor = (evaluation: HelixLiveFieldEvaluation): HelixLiveSituationProbeType => {
@@ -65,6 +70,54 @@ const probeTypeFor = (evaluation: HelixLiveFieldEvaluation): HelixLiveSituationP
   if (/\buser|permission|input\b/.test(text)) return "request_user_input";
   return "passive_next_frame";
 };
+
+function classifyProbeAgainstObservation(input: {
+  probe: HelixLiveObservationProbe;
+  prediction: HelixLiveSituationPrediction;
+  observation: HelixObservationJournalEntry;
+  now: string;
+}): ProbeComparison {
+  const observedSignals = signalsForText(input.observation.text);
+  if (Date.parse(input.probe.expires_at) <= Date.parse(input.now)) {
+    return {
+      status: "expired",
+      observedSignals,
+      confidenceDelta: -0.04,
+      reason: `Probe expired for ${input.prediction.field_key}.`,
+      contradiction: false,
+    };
+  }
+  const expectedSignals = input.probe.expected_observation_signals;
+  const matches = observedSignals.filter((signal: string) => expectedSignals.includes(signal));
+  const expectedContinuity = expectedSignals.includes("file_list_stable");
+  const observedChangedWindow = observedSignals.includes("window_changed");
+  const strongIncompatibleSignal = expectedContinuity && observedChangedWindow;
+  if (strongIncompatibleSignal) {
+    return {
+      status: "contradicted",
+      observedSignals,
+      confidenceDelta: -0.18,
+      reason: `Probe contradicted for ${input.prediction.field_key}.`,
+      contradiction: true,
+    };
+  }
+  if (matches.length > 0) {
+    return {
+      status: "satisfied",
+      observedSignals,
+      confidenceDelta: 0.08,
+      reason: `Probe satisfied for ${input.prediction.field_key}.`,
+      contradiction: false,
+    };
+  }
+  return {
+    status: "inconclusive",
+    observedSignals,
+    confidenceDelta: 0,
+    reason: `Probe inconclusive for ${input.prediction.field_key}.`,
+    contradiction: false,
+  };
+}
 
 export function createPredictionsForFieldEvaluations(input: {
   run: HelixLiveSituationRun;
@@ -145,6 +198,7 @@ export function runObservationProbesForObservation(input: {
     threadId: input.run.thread_id,
     situationRunId: input.run.situation_run_id,
     status: "waiting_for_observation",
+    includeExpired: true,
     limit: 200,
   }).filter((probe: HelixLiveObservationProbe) => probe.source_epoch < input.run.current_epoch);
   const predictions = listLiveSituationPredictions({
@@ -154,7 +208,6 @@ export function runObservationProbesForObservation(input: {
     includeExpired: true,
     limit: 400,
   });
-  const observedSignals = signalsForText(input.observation.text);
   const results: HelixLiveProbeResult[] = [];
   const updates: HelixLiveConfidenceUpdate[] = [];
   const spawnedTangentRefs: string[] = [];
@@ -162,24 +215,26 @@ export function runObservationProbesForObservation(input: {
   for (const probe of pending) {
     const prediction = predictions.find((entry: HelixLiveSituationPrediction) => entry.prediction_id === probe.prediction_id);
     if (!prediction) continue;
-    if (probe.source_binding_id !== input.run.source_binding_id) {
-      updateLiveObservationProbeStatus(probe.probe_id, "blocked_unbound");
-      continue;
-    }
-    const expired = Date.parse(probe.expires_at) <= Date.parse(now);
-    const matches = observedSignals.filter((signal: string) => probe.expected_observation_signals.includes(signal));
-    const changedAway = observedSignals.includes("window_changed") && !probe.expected_observation_signals.includes("window_changed");
-    const status: HelixLiveProbeResultStatus = expired
-      ? "expired"
-      : matches.length > 0
-        ? "satisfied"
-        : changedAway
-          ? "contradicted"
-          : "inconclusive";
-    const confidenceDelta = status === "satisfied" ? 0.08 : status === "contradicted" ? -0.18 : status === "expired" ? -0.04 : 0;
+    const sourceBindingMismatch =
+      probe.source_binding_id !== input.run.source_binding_id ||
+      Boolean(input.observation.source_binding_id && input.observation.source_binding_id !== probe.source_binding_id);
+    const comparison: ProbeComparison = sourceBindingMismatch
+      ? {
+          status: "blocked",
+          observedSignals: signalsForText(input.observation.text),
+          confidenceDelta: 0,
+          reason: `Probe blocked for ${prediction.field_key}: source binding mismatch.`,
+          contradiction: false,
+        }
+      : classifyProbeAgainstObservation({
+          probe,
+          prediction,
+          observation: input.observation,
+          now,
+        });
     const tangentRefs: string[] = [];
     const candidateRefs: string[] = [];
-    if (status === "contradicted") {
+    if (comparison.contradiction) {
       const tangent = recordLiveTangentEvaluation({
         schema: HELIX_LIVE_TANGENT_EVALUATION_SCHEMA,
         tangent_id: `live_tangent:${hashShort([prediction.prediction_id, input.observation.observation_id, "contradiction"])}`,
@@ -258,18 +313,18 @@ export function runObservationProbesForObservation(input: {
     }
     const result = recordLiveProbeResult({
       schema: HELIX_LIVE_PROBE_RESULT_SCHEMA,
-      probe_result_id: `live_probe_result:${hashShort([probe.probe_id, input.observation.observation_id, status])}`,
+      probe_result_id: `live_probe_result:${hashShort([probe.probe_id, input.observation.observation_id, comparison.status])}`,
       prediction_id: prediction.prediction_id,
       probe_id: probe.probe_id,
       situation_run_id: input.run.situation_run_id,
       thread_id: input.run.thread_id,
       environment_id: input.run.environment_id,
-      source_binding_id: input.run.source_binding_id,
+      source_binding_id: probe.source_binding_id,
       tested_at_epoch: input.run.current_epoch,
-      status,
-      observed_signals: observedSignals,
+      status: comparison.status,
+      observed_signals: comparison.observedSignals,
       evidence_refs: [input.observation.observation_id],
-      confidence_delta: confidenceDelta,
+      confidence_delta: comparison.confidenceDelta,
       spawned_tangent_refs: tangentRefs,
       spawned_candidate_refs: candidateRefs,
       assistant_answer: false,
@@ -279,7 +334,7 @@ export function runObservationProbesForObservation(input: {
     });
     const update = recordLiveConfidenceUpdate({
       schema: HELIX_LIVE_CONFIDENCE_UPDATE_SCHEMA,
-      confidence_update_id: `live_confidence_update:${hashShort([result.probe_result_id, confidenceDelta])}`,
+      confidence_update_id: `live_confidence_update:${hashShort([result.probe_result_id, comparison.confidenceDelta])}`,
       situation_run_id: input.run.situation_run_id,
       thread_id: input.run.thread_id,
       environment_id: input.run.environment_id,
@@ -287,9 +342,9 @@ export function runObservationProbesForObservation(input: {
       prediction_id: prediction.prediction_id,
       probe_result_id: result.probe_result_id,
       prior_confidence: prediction.confidence,
-      confidence_delta: confidenceDelta,
-      updated_confidence: clamp(prediction.confidence + confidenceDelta),
-      reason: `Probe ${status} for ${prediction.field_key}.`,
+      confidence_delta: comparison.confidenceDelta,
+      updated_confidence: clamp(prediction.confidence + comparison.confidenceDelta),
+      reason: comparison.reason,
       evidence_refs: result.evidence_refs,
       assistant_answer: false,
       raw_content_included: false,
@@ -304,7 +359,7 @@ export function runObservationProbesForObservation(input: {
       epoch: input.run.current_epoch,
       item_kind: "probe_result",
       item_ref: result.probe_result_id,
-      summary: `Probe ${status}; observed ${observedSignals.join(", ") || "no matching signal"}.`,
+      summary: `Probe ${comparison.status}; observed ${comparison.observedSignals.join(", ") || "no matching signal"}.`,
       causality_refs: [
         probe.probe_id,
         prediction.prediction_id,
@@ -326,8 +381,18 @@ export function runObservationProbesForObservation(input: {
       causality_refs: [result.probe_result_id, prediction.prediction_id, ...update.evidence_refs],
       created_at: update.created_at,
     });
-    updateLiveObservationProbeStatus(probe.probe_id, status === "expired" ? "expired" : "completed");
-    updateLiveSituationPredictionStatus(prediction.prediction_id, status);
+    updateLiveObservationProbeStatus(
+      probe.probe_id,
+      comparison.status === "blocked"
+        ? "blocked_unbound"
+        : comparison.status === "expired"
+          ? "expired"
+          : "completed",
+    );
+    updateLiveSituationPredictionStatus(
+      prediction.prediction_id,
+      comparison.status === "blocked" ? "inconclusive" : comparison.status,
+    );
     results.push(result);
     updates.push(update);
     spawnedTangentRefs.push(...tangentRefs);
