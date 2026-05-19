@@ -15,7 +15,10 @@ import {
   PROCEDURE_RECALL_SUPPRESSED_ROUTES,
   procedureRecallTargetSource,
 } from "./procedure-memory-recall-router";
-import { isLiveSourceCadenceControlPrompt } from "./live-source-continuation-intent";
+import {
+  isContextualLiveSourceCadenceMention,
+  isLiveSourceCadenceControlPrompt,
+} from "./live-source-continuation-intent";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -380,6 +383,9 @@ const filterLivePipelineCues = (prompt: string, cues: string[]): string[] =>
   cues.filter((cue: string) => {
     if (cue !== "set_interval" && cue !== "capture_cadence") return true;
     return isLiveSourceCadenceControlPrompt(prompt);
+  }).filter((cue: string) => {
+    if (cue !== "start_live_source") return true;
+    return !isContextualLiveSourceCadenceMention(prompt);
   });
 
 const PROCEDURE_EPOCH_REQUESTED_OUTPUTS: HelixAskSourceTargetRequestedOutput[] = [

@@ -49,9 +49,23 @@ export const isNegatedLiveSourceCadenceMention = (prompt: string): boolean => {
   );
 };
 
+export const isContextualLiveSourceCadenceMention = (prompt: string): boolean => {
+  const text = normalize(prompt);
+  if (!text) return false;
+  const cadenceCue = String.raw`(?:interval|cadence|rate|every\s+\d{1,3}\s*(?:seconds?|sec|secs|s|minutes?|min|mins|m)|\d{1,3}\s*(?:seconds?|sec|secs|s|minutes?|min|mins|m)\s+(?:interval|cadence|rate))`;
+  const activationCue = String.raw`(?:start|set|enable|activate|turn\s+on|run|use|adopt)`;
+  return (
+    isNegatedLiveSourceCadenceMention(prompt) ||
+    new RegExp(String.raw`\b(?:before|after)\b[\s\S]{0,80}\b(?:${activationCue}\b[\s\S]{0,60})?${cadenceCue}\b`).test(text) ||
+    new RegExp(String.raw`\b(?:if|when)\b[\s\S]{0,100}\b(?:later\s+)?(?:${activationCue}\b[\s\S]{0,60})?${cadenceCue}\b`).test(text) ||
+    new RegExp(String.raw`\b(?:whether|was|were|had)\b[\s\S]{0,80}\b${cadenceCue}\b[\s\S]{0,60}\b(?:running|active|enabled|started|set)\b`).test(text) ||
+    new RegExp(String.raw`\b${cadenceCue}\b[\s\S]{0,80}\b(?:was|were|running|active|enabled|started)\b`).test(text)
+  );
+};
+
 export const isLiveSourceCadenceControlPrompt = (prompt: string): boolean => {
   const text = normalize(prompt);
-  if (!text || isNegatedLiveSourceCadenceMention(prompt)) return false;
+  if (!text || isContextualLiveSourceCadenceMention(prompt)) return false;
   const hasRateValue = extractLiveSourceRequestedRateMs(prompt) !== null;
   const hasCadenceMention = hasRateValue || /\b(?:interval|cadence|rate)\b/.test(text);
   if (!hasCadenceMention) return false;
@@ -63,11 +77,12 @@ export const isLiveSourceCadenceControlPrompt = (prompt: string): boolean => {
 };
 
 export const readLiveSourceRequestedRateMs = (text: string): number | null =>
-  isNegatedLiveSourceCadenceMention(text) ? null : extractLiveSourceRequestedRateMs(text);
+  isContextualLiveSourceCadenceMention(text) ? null : extractLiveSourceRequestedRateMs(text);
 
 export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveSourceContinuationIntent | null {
   const text = normalize(prompt);
   if (!text) return null;
+  const contextualCadence = isContextualLiveSourceCadenceMention(prompt);
   const cadenceControl = isLiveSourceCadenceControlPrompt(prompt);
   const requestedRateMs = readLiveSourceRequestedRateMs(prompt);
 
@@ -84,8 +99,10 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const contentQuestion =
     /\b(?:review|describe|explain|summari[sz]e|what)\b[\s\S]{0,100}\b(?:happening|see|seeing|visuals?|screen|capture|frame|image|picture|window)\b/.test(text) &&
     !cadenceControl &&
-    !/\b(?:keep|continue|watch|checking|check|monitor|track|set\s+up|setup|start|create|turn on|enable|pipeline|live answer)\b/.test(text);
+    !/\b(?:keep|continue|watch|checking|check|monitor|track|set\s+up|setup|create|pipeline|live answer)\b/.test(text);
   const setup =
+    !contextualCadence &&
+    !contentQuestion &&
     /\b(?:start|setup|set up|create|make|turn on|enable)\b/.test(text) &&
     /\b(?:live answer|live source|pipeline|visual source|screen|tab|window)\b/.test(text);
   const inspect =

@@ -153,6 +153,10 @@ export const isStructuredDocsViewerPrompt = (promptText: string): boolean => {
 const isExplicitLiveBindingDiagnosisPrompt = (promptText: string): boolean =>
   /\b(?:worker\s+lanes?|lanes?\s+(?:not\s+)?updating|not\s+updating|live\s+answer\s+readiness|capture\s+(?:health|bound|binding|adopted|adoption|running)|visual\s+capture\s+(?:health|bound|binding|adopted|adoption|running)|producer\s+(?:stale|fresh|status)|client\s+adoption|scene_procedure_ready|active\s+live\s+answer\s+environment)\b/i.test(promptText);
 
+const isVisualContentRequestPrompt = (promptText: string): boolean =>
+  /\b(?:review|describe|explain|summari[sz]e|what|compare|answer)\b[\s\S]{0,140}\b(?:happening|visible|shown|showing|see|seeing|looking\s+at|screen|capture|frame|image|picture|window|visual)\b/i.test(promptText) ||
+  /\b(?:current|latest|right\s+now)\s+(?:screen|capture|frame|image|picture|window|visual)\b/i.test(promptText);
+
 export function buildRouteProductContract(input: {
   turnId: string;
   threadId?: string | null;
@@ -288,6 +292,27 @@ export function buildRouteProductContract(input: {
   }
 
   if (sourceTarget === "live_pipeline") {
+    if (isVisualContentRequestPrompt(promptText) || isSceneEpochReplayPrompt(promptText)) {
+      return makeContract({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        sourceTarget: "live_pipeline",
+        allowedCore: [],
+        allowedExtra: ["live_source_typed_failure"],
+        forbiddenExtra: [
+          "live_pipeline_receipt",
+          "visual_producer_cadence_receipt",
+          "live_workstation_pipeline_receipt",
+          "workspace_action_receipt",
+          "process_graph_overview",
+          "client_projection",
+          "no_tool_direct",
+          "model_only_concept",
+          "panel_generated_answer",
+        ],
+        precedenceReason: "live_pipeline_receipt_rejected_for_visual_or_procedure_content_request",
+      });
+    }
     return makeContract({
       turnId: input.turnId,
       threadId: input.threadId,

@@ -253,6 +253,95 @@ Required behavior:
 - forbidden: `live_pipeline_control`, `live_pipeline_receipt`,
   `situation-room.live-source.set_rate`, and cadence adoption requests
 
+Control/status contrast prompt:
+
+```txt
+keep checking my screen as a live answer every 10 seconds
+```
+
+Required behavior:
+
+- route: `live_pipeline_control`
+- terminal artifact: `live_pipeline_receipt`
+- answer authority: control/status receipt only
+- forbidden: visual scene answer text
+
+Contextual cadence prompts:
+
+```txt
+review the current screen before I start the 10 second interval
+what changed since the previous visual capture, and was the 10 second interval running?
+```
+
+Required behavior:
+
+- route: visual/SituationRun evidence or procedure-memory evidence
+- `requested_rate_ms = null`
+- `control_tool_admitted = false`
+- forbidden: `live_pipeline_receipt` as final answer
+
+## Receipt Boundary
+
+`live_pipeline_receipt` is valid only for control/status operations. It is not a
+valid terminal answer for visual-content, procedure-memory, scene-epoch,
+visual-delta, repo-evidence, or project-local implementation questions.
+
+A visual-content question may terminate as visual/SituationRun evidence,
+procedure epoch evidence, scene comparison evidence, or a typed visual/procedure
+failure. It must not terminate as `live_pipeline_control`,
+`live_pipeline_receipt`, `client_projection`, `process_graph_overview`,
+`model_only_concept`, `no_tool_direct`, or `panel_generated_answer`.
+
+If no answerable visual/SituationRun evidence exists, fail closed with a typed
+visual evidence reason. Do not substitute a capture/cadence/pipeline receipt.
+
+## Debug Admission Trace
+
+Every source-targeted turn must expose a compact admission trace through the
+existing debug surfaces:
+
+- `turn_id`
+- `source_target_intent`
+- route candidate and selected route
+- suppressed routes
+- terminal artifact kind
+- selected and rejected source refs
+- whether a control tool was admitted
+- control tool name and call id when present
+- proof gate status
+- typed failure reason when present
+
+For cadence decisions, debug must make these facts inferable or explicit:
+cadence mention detected, contextual/negated cadence detected, affirmative
+control act detected, requested rate, visual-content request detected, and final
+control admission.
+
+## Non-Redundancy Gate
+
+Before adding backend logic, classify it as one of:
+
+```txt
+runtime-adapter
+evidence-lane
+retrieval-gate
+proof-policy
+live-source
+presentation
+```
+
+If the change manages sampling, tool execution, session lifecycle, retries,
+sandboxing, approvals, patches, compaction, or subagents, it belongs to Codex or
+to a thin Codex-compatible adapter.
+
+If the change selects, normalizes, ranks, gates, proves, or rejects domain
+evidence, it belongs in Helix Ask.
+
+If the change emits user-visible claims, it must cite proof pointers or return a
+typed unknown/fail-closed result. If the change consumes a live source, it must
+record source id, consent, freshness, provenance, observation role, and terminal
+eligibility. If the change triggers execution or verification, the result must
+attach to a proof packet or explicit fail reason.
+
 ## Project-Local Agent Loop Questions
 
 Questions about Helix Ask, Codex discipline, the agentic turn loop, route

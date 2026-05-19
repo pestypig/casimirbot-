@@ -24,6 +24,8 @@ import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabi
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
 import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
 import { buildLiveEnvironmentBindingDiagnosis } from "../services/helix-ask/live-environment-binding-diagnosis";
+import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
+import { guardTerminalArtifactSelection } from "../services/helix-ask/terminal-artifact-selection-guard";
 import {
   createLiveAnswerEnvironment,
 } from "../services/situation-room/live-answer-environment-store";
@@ -278,6 +280,72 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.visual_producer_cadence_receipt).toBeFalsy();
     expect(response.body?.tool_call_admission_decision?.source_target).not.toBe("live_pipeline");
   }, 20_000);
+
+  it("treats future/contextual cadence language in visual questions as visual evidence context", async () => {
+    const question = "review the current screen before I start the 10 second interval";
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question,
+        debug: true,
+      })
+      .expect(200);
+
+    expect(classifyLiveSourceContinuationIntent(question)).toBeNull();
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      target_kind: "visual_capture",
+    });
+    expect(response.body?.live_source_continuation_intent).toBeFalsy();
+    expect(response.body?.action_id).not.toBe("situation-room.live-source.set_rate");
+    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+  }, 20_000);
+
+  it("keeps procedure-epoch visual questions out of live pipeline receipts even when asking about interval state", async () => {
+    const question = "what changed since the previous visual capture, and was the 10 second interval running?";
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question,
+        debug: true,
+      })
+      .expect(200);
+
+    expect(classifyLiveSourceContinuationIntent(question)).toBeNull();
+    expect(response.body?.source_target_intent?.target_source).toBe("procedure_memory");
+    expect(response.body?.source_target_intent?.target_kind).toBe("situation_epoch");
+    expect(response.body?.route_reason_code).not.toBe("live_pipeline_control");
+    expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
+    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+    expect(response.body?.action_id).not.toBe("situation-room.live-source.set_rate");
+  }, 20_000);
+
+  it("rejects live pipeline receipts at the terminal guard for visual-content prompts even under live-pipeline source target", () => {
+    const contract = buildRouteProductContract({
+      turnId: "ask:guard-unit",
+      threadId,
+      promptText: "review the current screen before I start the 10 second interval",
+      sourceTargetIntent: {
+        target_source: "live_pipeline",
+        target_kind: "live_pipeline",
+        requested_outputs: ["live_pipeline_receipt"],
+      },
+    });
+    const guard = guardTerminalArtifactSelection({
+      contract,
+      terminalArtifactKind: "live_pipeline_receipt",
+    });
+
+    expect(contract.precedence_reason).toBe("live_pipeline_receipt_rejected_for_visual_or_procedure_content_request");
+    expect(contract.forbidden_terminal_artifact_kinds).toContain("live_pipeline_receipt");
+    expect(guard.allowed).toBe(false);
+    expect(guard.reason).toBe("terminal_artifact_forbidden_by_route_product_contract");
+  });
 
   it("routes direct visual interval commands to producer cadence control", async () => {
     const app = await createApp();
