@@ -12,6 +12,13 @@ export type HelixTerminalPresentationCoverageAudit = {
   receipt_snapshot_id?: string | null;
   distillation_id?: string | null;
   terminal_authority_count?: number;
+  canonical_terminal_text_hash?: string | null;
+  selected_final_answer_hash?: string | null;
+  presentation_text_hash?: string | null;
+  authority_text_hash?: string | null;
+  terminal_event_text_hash?: string | null;
+  visible_answer_hash?: string | null;
+  authority_origin?: string | null;
   violations: string[];
   assistant_answer: false;
 };

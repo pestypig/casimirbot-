@@ -44,6 +44,12 @@ export type HelixPoisonViolationKind =
   | "raw_content_in_context"
   | "missing_terminal_authority"
   | "client_fallback_overrode_terminal"
+  | "terminal_selected_presentation_mismatch"
+  | "terminal_authority_presentation_mismatch"
+  | "terminal_event_presentation_mismatch"
+  | "terminal_visible_answer_mismatch"
+  | "terminal_authority_created_from_fallback"
+  | "terminal_artifact_forbidden_by_route_contract"
   | "assistant_history_contains_projection"
   | "steering_promoted_to_truth"
   | "clarification_question_as_answer"
@@ -73,6 +79,12 @@ export type HelixTerminalAuthority = {
   terminal_item_id?: string | null;
   terminal_text_hash: string;
   terminal_text_preview: string;
+  authority_origin?:
+    | "terminal_presentation"
+    | "selected_final_answer"
+    | "request_user_input"
+    | "typed_failure"
+    | "fallback";
   live_source_authority?: HelixLiveSourceTerminalAuthority | null;
   server_authoritative: true;
   created_at: string;

@@ -94,12 +94,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const lifecycleEvents = Array.isArray(receipt?.workspace_action_lifecycle_events)
     ? receipt.workspace_action_lifecycle_events
     : [];
+  const terminalPresentation = asRecord(payload.terminal_presentation ?? debug?.terminal_presentation ?? agentLoop?.terminal_presentation);
+  const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
   const selectedFinalAnswer =
-    readString(payload.selectedDebugFinalAnswer) ??
-    readString(payload.finalAnswer) ??
+    readString(terminalPresentation?.concise_text) ??
+    readString(payload.selected_final_answer) ??
     readString(agentLoop?.selected_final_answer) ??
     readString(debug?.selected_final_answer) ??
-    readString(reply.content);
+    readString(terminalAuthority?.terminal_text_preview) ??
+    readString(payload.selectedDebugFinalAnswer) ??
+    readString(payload.finalAnswer);
   const canonicalGoalFrame = asRecord(debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame);
   const activeTurnId =
     readString(debug?.turn_id) ??
@@ -111,7 +115,6 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(agentLoop?.terminal_artifact_kind) ??
     readString(debug?.terminal_artifact_kind) ??
     null;
-  const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
   const canonicalActiveTurnId = readString(terminalAuthority?.turn_id) ?? activeTurnId;
   const clientActiveTurnId = readString(reply.id);
   const envelopeWithoutHash = {

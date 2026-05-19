@@ -18,6 +18,62 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function readTerminalPresentationText(payload: Record<string, unknown>): string | null {
+  const presentation = asRecord(payload.terminal_presentation);
+  return presentation?.schema === "helix.terminal_presentation.v1"
+    ? readString(presentation.concise_text)
+    : null;
+}
+
+function readTerminalAnswerEventText(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    for (const event of [...value].reverse()) {
+      const record = asRecord(event);
+      if (record?.type === "terminal_answer") return readString(record.text);
+    }
+    return null;
+  }
+  return readString(asRecord(asRecord(value)?.terminal_answer)?.text);
+}
+
+function readVisibleAnswerText(payload: Record<string, unknown>): string | null {
+  return (
+    readString(payload.answer) ??
+    readString(payload.text) ??
+    readString(payload.finalAnswer) ??
+    readString(payload.content)
+  );
+}
+
+function addMismatchViolation(input: {
+  violations: HelixPoisonAuditViolation[];
+  kind: HelixPoisonAuditViolation["kind"];
+  itemId?: string | null;
+  surface: string;
+  actual: string | null;
+  expected: string;
+}) {
+  if (input.actual !== input.expected) {
+    input.violations.push({
+      kind: input.kind,
+      item_id: input.itemId ?? null,
+      summary: `${input.surface} did not match the canonical terminal presentation text.`,
+    });
+  }
+}
+
+function terminalArtifactForbiddenByContract(payload: Record<string, unknown>): boolean {
+  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  const contract = asRecord(payload.route_product_contract);
+  const selectionGuard = asRecord(payload.terminal_artifact_selection_guard);
+  const productGuard = asRecord(payload.product_authority_guard);
+  const forbidden = Array.isArray(contract?.forbidden_terminal_artifact_kinds)
+    ? contract.forbidden_terminal_artifact_kinds
+    : [];
+  if (terminalArtifactKind && forbidden.includes(terminalArtifactKind)) return true;
+  return selectionGuard?.allowed === false || productGuard?.allowed === false;
+}
+
 function collectPayloadArtifacts(payload: Record<string, unknown>): Array<{ artifact: unknown; role?: HelixArtifactRole }> {
   const artifacts: Array<{ artifact: unknown; role?: HelixArtifactRole }> = [];
   const push = (key: string, role?: HelixArtifactRole) => {
@@ -112,6 +168,9 @@ export function auditHelixAskContextForPoison(input: {
   for (const entry of quarantined) roleCounts[entry.role] += 1;
 
   const payload = input.payload ?? null;
+  const payloadPresentationText = payload ? readTerminalPresentationText(payload) : null;
+  const payloadSelectedText = payload ? readString(payload.selected_final_answer) : null;
+  const canonicalTerminalText = payloadPresentationText ?? payloadSelectedText ?? "";
   const terminalAuthority =
     input.terminal_authority ??
     (payload
@@ -120,13 +179,13 @@ export function auditHelixAskContextForPoison(input: {
           turn_id: input.turn_id ?? readString(payload.turn_id),
           final_answer_source: readString(payload.final_answer_source),
           terminal_artifact_kind: readString(payload.terminal_artifact_kind),
-          terminal_text:
-            readString(payload.assistant_answer) ??
-            readString(payload.answer) ??
-            readString(payload.text) ??
-            readString(payload.selected_final_answer) ??
-            "",
+          terminal_text: canonicalTerminalText,
           route: readString(payload.route_reason_code) ?? readString(payload.route),
+          authority_origin: payloadPresentationText
+            ? "terminal_presentation"
+            : payloadSelectedText
+              ? "selected_final_answer"
+              : undefined,
           created_at: input.created_at,
         })
       : null);
@@ -145,6 +204,57 @@ export function auditHelixAskContextForPoison(input: {
       kind: "client_fallback_overrode_terminal",
       item_id: input.turn_id ?? null,
       summary: "Client visible answer hash differs from server terminal answer hash.",
+    });
+  }
+
+  if (payload && canonicalTerminalText) {
+    addMismatchViolation({
+      violations,
+      kind: "terminal_selected_presentation_mismatch",
+      itemId: input.turn_id ?? readString(payload.turn_id),
+      surface: "selected_final_answer",
+      actual: payloadSelectedText,
+      expected: canonicalTerminalText,
+    });
+    addMismatchViolation({
+      violations,
+      kind: "terminal_authority_presentation_mismatch",
+      itemId: input.turn_id ?? readString(payload.turn_id),
+      surface: "terminal_answer_authority.terminal_text_preview",
+      actual: readString(terminalAuthority?.terminal_text_preview),
+      expected: canonicalTerminalText,
+    });
+    addMismatchViolation({
+      violations,
+      kind: "terminal_event_presentation_mismatch",
+      itemId: input.turn_id ?? readString(payload.turn_id),
+      surface: "current_turn_events.terminal_answer.text",
+      actual: readTerminalAnswerEventText(payload.current_turn_events) ?? readTerminalAnswerEventText(payload.turn_events),
+      expected: canonicalTerminalText,
+    });
+    addMismatchViolation({
+      violations,
+      kind: "terminal_visible_answer_mismatch",
+      itemId: input.turn_id ?? readString(payload.turn_id),
+      surface: "visible answer",
+      actual: readVisibleAnswerText(payload),
+      expected: canonicalTerminalText,
+    });
+  }
+
+  if (terminalAuthority?.authority_origin === "fallback") {
+    violations.push({
+      kind: "terminal_authority_created_from_fallback",
+      item_id: input.turn_id ?? (payload ? readString(payload.turn_id) : null),
+      summary: "Terminal authority was created from fallback text instead of terminal presentation or selected answer.",
+    });
+  }
+
+  if (payload && terminalArtifactForbiddenByContract(payload)) {
+    violations.push({
+      kind: "terminal_artifact_forbidden_by_route_contract",
+      item_id: input.turn_id ?? readString(payload.turn_id),
+      summary: "Terminal artifact kind was rejected by the route-product or tool-admission contract.",
     });
   }
 

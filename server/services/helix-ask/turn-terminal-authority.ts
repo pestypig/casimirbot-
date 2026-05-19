@@ -46,9 +46,11 @@ export function buildHelixTurnTerminalAuthority(input: {
   terminal_item_id?: string | null;
   route?: HelixTerminalAuthority["route"] | null;
   terminal_kind?: HelixTerminalAuthority["terminal_kind"] | null;
+  authority_origin?: HelixTerminalAuthority["authority_origin"] | null;
   live_source_authority?: HelixLiveSourceTerminalAuthority | null;
   created_at?: string;
 }): HelixTerminalAuthority {
+  const terminalText = normalizeText(input.terminal_text);
   return {
     schema: HELIX_TERMINAL_AUTHORITY_SCHEMA,
     thread_id: input.thread_id,
@@ -58,8 +60,9 @@ export function buildHelixTurnTerminalAuthority(input: {
     final_answer_source: normalizeText(input.final_answer_source) || "unknown",
     terminal_artifact_kind: normalizeText(input.terminal_artifact_kind) || "unknown",
     terminal_item_id: normalizeText(input.terminal_item_id) || null,
-    terminal_text_hash: hashHelixTerminalText(input.terminal_text),
-    terminal_text_preview: normalizeText(input.terminal_text).slice(0, 240),
+    terminal_text_hash: hashHelixTerminalText(terminalText),
+    terminal_text_preview: terminalText,
+    authority_origin: input.authority_origin ?? undefined,
     live_source_authority: input.live_source_authority ?? null,
     server_authoritative: true,
     created_at: input.created_at ?? new Date().toISOString(),
