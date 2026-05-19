@@ -11,6 +11,7 @@ export type HelixLiveFieldWorkerRun = {
   field_key: string;
   status: "started" | "completed" | "failed" | "expired";
   trigger_observation_refs: string[];
+  tool_calls: [];
   started_at: string;
   completed_at?: string | null;
   output_evaluation_id?: string | null;

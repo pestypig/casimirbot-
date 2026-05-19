@@ -19,6 +19,9 @@ export type LiveCognitionPromotionRouterInput = {
   summary: string;
   outputRefs: string[];
   evidenceRefs?: string[];
+  sourceIdentityRef?: string | null;
+  sourceBindingId?: string | null;
+  sourceEpoch?: number | null;
   modelInvoked?: boolean;
 };
 
@@ -49,8 +52,13 @@ export function promoteLiveSourceAnalysisOutput(input: LiveCognitionPromotionRou
     modality: input.chunk.modality,
     text: input.summary,
     evidence_refs: evidenceRefs,
+    source_identity_ref: input.sourceIdentityRef ?? input.chunk.source_identity_ref ?? null,
     model_invoked: role === "model_perception_observation" ? true : input.modelInvoked === true,
     confidence: input.status === "completed" ? 0.7 : 0.2,
+    source_seq: input.chunk.sequence_index,
+    source_binding_id: input.sourceBindingId ?? input.chunk.source_binding_id ?? null,
+    source_epoch: input.sourceEpoch ?? input.chunk.source_epoch ?? null,
+    replay_status: "live",
     raw_image_ref: input.chunk.modality === "visual_frame" ? input.chunk.payload_ref ?? input.chunk.chunk_id : null,
   });
 

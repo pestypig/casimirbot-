@@ -27,6 +27,8 @@ const DOC_VIEWER_FORBIDDEN_TERMINAL_PRODUCTS = [
 ];
 
 const VISUAL_ALLOWED_TERMINAL_PRODUCTS = [
+  "live_visual_answer",
+  "live_source_typed_failure",
   "situation_context_pack",
   "procedure_epoch_replay",
   "visual_frame_evidence",
@@ -40,6 +42,11 @@ const VISUAL_FORBIDDEN_TERMINAL_PRODUCTS = [
   "doc_location_matches",
   "doc_summary",
   "active_doc_identity",
+  "live_pipeline_receipt",
+  "client_projection",
+  "model_only_concept",
+  "no_tool_direct",
+  "panel_generated_answer",
 ];
 
 const PROCEDURE_ALLOWED_TERMINAL_PRODUCTS = [

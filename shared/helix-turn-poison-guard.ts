@@ -73,9 +73,45 @@ export type HelixTerminalAuthority = {
   terminal_item_id?: string | null;
   terminal_text_hash: string;
   terminal_text_preview: string;
+  live_source_authority?: HelixLiveSourceTerminalAuthority | null;
   server_authoritative: true;
   created_at: string;
 };
+
+export type HelixLiveSourceTerminalAuthority = {
+  schema: "helix.live_source_terminal_authority.v1";
+  thread_id: string;
+  turn_id: string;
+  situation_run_id: string;
+  source_binding_id: string;
+  source_identity_ref: string;
+  source_epoch: number;
+  terminal_item_id: string;
+  terminal_artifact_kind:
+    | "live_visual_answer"
+    | "procedure_epoch_replay"
+    | "live_source_typed_failure"
+    | "request_user_input";
+  selected_evidence_refs: string[];
+  selected_field_evaluation_refs: string[];
+  selected_interpretation_refs: string[];
+  selected_probe_result_refs: string[];
+  arbitration_candidate_ref?: string | null;
+  authority_path: "terminal_presenter_from_selected_live_evidence";
+  server_authoritative: true;
+  assistant_answer: false;
+  created_at: string;
+};
+
+export function assertLiveArtifactNonTerminal(item: {
+  assistant_answer: boolean;
+  raw_content_included?: boolean;
+  role?: string;
+}) {
+  if (item.assistant_answer !== false) {
+    throw new Error("live_artifact_promoted_to_answer");
+  }
+}
 
 export type HelixPoisonAuditResult = {
   schema: typeof HELIX_TURN_POISON_AUDIT_SCHEMA;

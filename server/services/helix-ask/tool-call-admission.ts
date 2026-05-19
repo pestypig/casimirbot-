@@ -39,8 +39,8 @@ export function buildToolCallAdmissionDecision(input: {
     reason = "docs_viewer_requires_document_tool_path";
   } else if (sourceTarget === "visual_capture") {
     admittedToolFamilies = ["situation_run"];
-    extraForbiddenTerminalKinds = ["active_doc_identity", "doc_summary", "doc_location_matches", "no_tool_direct", "model_only_concept"];
-    extraForbiddenRoutes = ["active_doc_identity", "active_doc_summary", "doc_open_best"];
+    extraForbiddenTerminalKinds = ["active_doc_identity", "doc_summary", "doc_location_matches", "live_pipeline_receipt", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer"];
+    extraForbiddenRoutes = ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_receipt", "client_projection", "model_only_concept", "no_tool_direct", "panel_generated_answer"];
     reason = "visual_capture_requires_situation_run_path";
   } else if (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") {
     admittedToolFamilies = ["procedure_memory", "situation_run"];

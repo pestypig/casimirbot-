@@ -63,6 +63,7 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
     modality: cleanString(input.modality),
     text,
     evidence_refs: cleanStrings(input.evidence_refs ?? input.evidenceRefs),
+    source_identity_ref: cleanString(input.source_identity_ref ?? input.sourceIdentityRef),
     model_invoked: input.model_invoked === true,
     confidence: typeof input.confidence === "number" ? Math.max(0, Math.min(1, input.confidence)) : null,
     observed_at: observedAt,
@@ -80,6 +81,11 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
           ? "live"
           : null,
     source_binding_id: cleanString(input.source_binding_id ?? input.sourceBindingId),
+    source_epoch: typeof input.source_epoch === "number" && Number.isFinite(input.source_epoch)
+      ? Math.max(1, Math.trunc(input.source_epoch))
+      : typeof input.sourceEpoch === "number" && Number.isFinite(input.sourceEpoch)
+        ? Math.max(1, Math.trunc(input.sourceEpoch))
+        : null,
     raw_image_ref: cleanString(input.raw_image_ref ?? input.rawImageRef),
     raw_content_included: false,
     assistant_answer: false,

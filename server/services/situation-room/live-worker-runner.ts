@@ -57,7 +57,7 @@ const workerEvent = (input: {
   });
 };
 
-const visualAnalysisWatchdog = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerRun): HelixLiveWorkerRun => {
+const visualSourceMaintenanceCheck = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerRun): HelixLiveWorkerRun => {
   const environment = getLiveAnswerEnvironment(lane.environment_id);
   const health = getVisualEvidenceHealth({
     threadId: lane.thread_id,
@@ -76,6 +76,8 @@ const visualAnalysisWatchdog = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerR
   ];
   const validations: string[] = [];
   const toolCalls: HelixLiveWorkerRun["tool_calls"] = [];
+  const requestedRuntimeItems: HelixLiveWorkerRun["requested_runtime_items"] = [];
+  const maintenanceReceiptRefs: string[] = [];
   let status: HelixLiveWorkerRun["status"] = "completed";
   let summary = "Visual analysis worker found no repair work.";
   if (health.status === "analysis_ready") {
@@ -96,6 +98,12 @@ const visualAnalysisWatchdog = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerR
       dynamic_tool_call_id: job.job_id,
       receipt_refs: [latestChunk.chunk_id],
     });
+    requestedRuntimeItems.push({
+      item_id: job.job_id,
+      runtime_adapter: "shared_ask_runtime",
+      receipt_refs: [latestChunk.chunk_id],
+    });
+    maintenanceReceiptRefs.push(job.job_id);
     validations.push(job.job_id);
     summary = job.summary;
   } else if (health.status === "no_source" || health.status === "permission_required" || health.status === "waiting_for_first_frame") {
@@ -117,6 +125,8 @@ const visualAnalysisWatchdog = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerR
     status,
     summary,
     toolCalls,
+    requestedRuntimeItems,
+    maintenanceReceiptRefs,
     observations,
     validations,
     updatedLineKeys: ["scene", "place", "activity", "missing_evidence", "next_check"],
@@ -260,7 +270,7 @@ export function runLiveWorkerLane(input: {
     lane,
     triggerReason: input.triggerReason ?? "manual",
   });
-  if (lane.lane_key === "visual_analysis") return visualAnalysisWatchdog(lane, run);
+  if (lane.lane_key === "visual_analysis") return visualSourceMaintenanceCheck(lane, run);
   if (lane.lane_key === "source_health") return sourceHealthWatchdog(lane, run);
   if (lane.lane_key === "present_state_synthesis") return presentStateSynthesisWorker(lane, run);
   if (lane.lane_key.startsWith("line_")) return lineWorker(lane, run);

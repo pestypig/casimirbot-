@@ -19,6 +19,7 @@ export type HelixObservationJournalEntry = {
   modality?: string | null;
   text: string;
   evidence_refs: string[];
+  source_identity_ref?: string | null;
   model_invoked: boolean;
   confidence?: number | null;
   observed_at: string;
@@ -27,6 +28,7 @@ export type HelixObservationJournalEntry = {
   source_seq?: number | null;
   replay_status?: "live" | "replayed" | null;
   source_binding_id?: string | null;
+  source_epoch?: number | null;
   raw_image_ref?: string | null;
   raw_content_included: false;
   assistant_answer: false;

@@ -35,6 +35,31 @@ Do not recreate these in Helix Ask unless Codex cannot expose the capability:
 Helix Ask may call or mirror status from these surfaces, but it should not build
 a parallel general-purpose agent loop around them.
 
+Live visual capture is a domain evidence producer inside that same boundary:
+
+```txt
+source identity
+  -> live source observation
+  -> SituationRun epoch
+  -> field worker run
+  -> field evaluation
+  -> interpretation / prediction / probe artifacts
+  -> arbitration candidate
+  -> terminal answer only through terminal authority
+```
+
+Live visual capture may create source items, observation items, validation
+items, interpretation items, probe items, and arbitration candidates. It may not
+create an independent assistant loop. It may not execute tools outside the
+shared Ask/runtime adapter. It may not emit terminal text outside terminal
+authority.
+
+For hard visual/live/procedure-memory source-target intents, the preflight and
+terminal guard must fail closed if the route tries to terminate as
+`live_pipeline_receipt`, `client_projection`, `model_only_concept`,
+`no_tool_direct`, or `panel_generated_answer`. Those artifacts are receipts or
+views, not answer authority.
+
 ## Helix-Ask-Owned Responsibilities
 
 Keep these first-class in Helix Ask because they are repo/domain policy, not

@@ -18,6 +18,11 @@ export type HelixLiveSourceChunk = {
   source_id: string;
   thread_id: string;
   environment_id?: string | null;
+  source_identity_ref?: string | null;
+  source_binding_id?: string | null;
+  source_epoch?: number | null;
+  freshness_ms?: number | null;
+  consent_state?: "not_required" | "requested" | "granted" | "revoked";
   participant_id?: string | null;
   modality: HelixLiveSourceChunkModality;
   sequence_index: number;

@@ -17,6 +17,7 @@ import { resetLiveInterpretationRunsForTest } from "../services/situation-room/l
 import { resetLiveInterpretationWorkerRunsForTest } from "../services/situation-room/live-interpretation-worker-run-store";
 import { resetLiveInterpretationWorkersForTest } from "../services/situation-room/live-interpretation-worker-registry";
 import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
+import { resetLiveSourceIdentitiesForTest } from "../services/situation-room/live-source-identity-store";
 import { resetLiveTangentEvaluationsForTest } from "../services/situation-room/live-tangent-evaluation-store";
 import { resetObservationJournalForTest } from "../services/situation-room/observation-journal-store";
 import { projectPresentStateCard } from "../services/situation-room/present-state-card-projector";
@@ -64,6 +65,7 @@ describe("live situation field workers", () => {
     resetGoalCardsForTest();
     resetAskHandoffsForTest();
     resetLiveSituationRunsForTest();
+    resetLiveSourceIdentitiesForTest();
     resetLiveFieldWorkersForTest();
     resetLiveFieldWorkerRunsForTest();
     resetLiveFieldEvaluationsForTest();
@@ -98,7 +100,26 @@ describe("live situation field workers", () => {
       status: "active",
       assistant_answer: false,
       source_binding_id: expect.stringMatching(/^source_binding:/),
+      primary_source_identity_ref: expect.stringMatching(/^live_source_identity:/),
+      latest_observation_ref: expect.stringMatching(/^observation:/),
+      terminal_authority_required: true,
       current_epoch: 1,
+    });
+    expect(routed.live_source_identity).toMatchObject({
+      schema: "helix.live_source_identity.v1",
+      source_id: "source:documents",
+      source_binding_id: expect.stringMatching(/^source_binding:/),
+      latest_epoch: 1,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(routed.live_cognition_promotion.observation).toMatchObject({
+      source_id: "source:documents",
+      source_identity_ref: expect.stringMatching(/^live_source_identity:/),
+      source_binding_id: expect.stringMatching(/^source_binding:/),
+      source_epoch: 1,
+      source_seq: 1,
+      assistant_answer: false,
     });
     expect(routed.live_situation_run?.terminal_policy).toMatchObject({
       worker_outputs_are_terminal: false,
@@ -114,6 +135,7 @@ describe("live situation field workers", () => {
     expect(routed.live_field_workers.every((worker) => worker.may_execute_tool === false && worker.assistant_answer === false)).toBe(true);
     expect(routed.live_field_worker_runs.length).toBe(routed.live_field_workers.length);
     expect(routed.live_field_worker_runs.every((run) => run.status === "completed" && run.assistant_answer === false)).toBe(true);
+    expect(routed.live_field_worker_runs.every((run) => Array.isArray(run.tool_calls) && run.tool_calls.length === 0)).toBe(true);
     const activity = routed.live_field_evaluations.find((entry) => entry.field_key === "activity");
     expect(activity).toMatchObject({
       status: "tentative",

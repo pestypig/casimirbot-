@@ -15,6 +15,12 @@ export type HelixLiveWorkerRun = {
     dynamic_tool_call_id: string;
     receipt_refs: string[];
   }>;
+  requested_runtime_items?: Array<{
+    item_id: string;
+    runtime_adapter: "shared_ask_runtime";
+    receipt_refs: string[];
+  }>;
+  maintenance_receipt_refs?: string[];
   observations: string[];
   validations: string[];
   updated_line_keys: string[];

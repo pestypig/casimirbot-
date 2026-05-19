@@ -1,5 +1,6 @@
 import type { HelixLiveSourceAnalysisJob } from "@shared/helix-live-source-analysis-job";
 import type { HelixLiveSourceChunk } from "@shared/helix-live-source-chunk";
+import { liveSourceIdentityRefFor } from "@shared/helix-live-source-identity";
 import { appendInterpretedEvent } from "./interpreted-event-log-store";
 import { recordSyntheticEvidence } from "./synthetic-evidence-ledger";
 import {
@@ -21,6 +22,20 @@ import {
 import { inspectLiveSchemaCompatibility } from "./live-schema-compatibility-guard";
 import { buildLiveCardLineProjection } from "./live-card-line-projection-builder";
 import { runLiveFieldWorkersForObservation } from "./live-field-worker-runner";
+import {
+  liveSourceBindingIdFor,
+  upsertLiveSourceIdentityFromChunk,
+} from "./live-source-identity-store";
+
+type RoutedLiveLineValue = {
+  value: string;
+  confidence?: number | null;
+  evidence_refs?: string[];
+  source_event_ids?: string[];
+  source?: "deterministic_reducer" | "tool_observation" | "model_review" | "manual";
+  model_invoked?: boolean;
+  deterministic?: boolean;
+};
 
 export type LiveSourceAnalysisRouterInput = {
   job: HelixLiveSourceAnalysisJob;
@@ -28,14 +43,11 @@ export type LiveSourceAnalysisRouterInput = {
   status: "completed" | "failed" | "suppressed";
   summary: string;
   outputRefs: string[];
-  lineValues?: Record<string, {
-    value: string;
-    confidence?: number | null;
-  }>;
+  lineValues?: Record<string, RoutedLiveLineValue>;
   modelInvoked?: boolean;
 };
 
-const defaultLineValues = (input: LiveSourceAnalysisRouterInput): Record<string, { value: string; confidence?: number | null }> => {
+const defaultLineValues = (input: LiveSourceAnalysisRouterInput): Record<string, RoutedLiveLineValue> => {
   if (input.status !== "completed") {
     return {
       next_check: {
@@ -85,6 +97,33 @@ const defaultLineValues = (input: LiveSourceAnalysisRouterInput): Record<string,
 };
 
 export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInput) {
+  const environment =
+    getActiveLiveAnswerEnvironmentForSource(input.chunk.source_id) ??
+    getActiveLiveAnswerEnvironmentForThread(input.chunk.thread_id);
+  const sourceIsBound = Boolean(
+    environment &&
+    (environment.source_ids.length === 0 || environment.source_ids.includes(input.chunk.source_id)),
+  );
+  const sourceBindingId = sourceIsBound
+    ? input.chunk.source_binding_id ?? liveSourceBindingIdFor({
+        thread_id: input.chunk.thread_id,
+        environment_id: environment?.environment_id ?? input.chunk.environment_id ?? null,
+        source_id: input.chunk.source_id,
+        modality: input.chunk.modality,
+      })
+    : null;
+  const sourceEpoch = Math.max(1, Math.trunc(input.chunk.source_epoch ?? input.chunk.sequence_index ?? 1));
+  const sourceIdentity = upsertLiveSourceIdentityFromChunk({
+    chunk: {
+      ...input.chunk,
+      source_binding_id: sourceBindingId,
+      source_epoch: sourceEpoch,
+    },
+    sourceBindingId,
+    bindingStatus: sourceIsBound ? "bound" : "observed_unbound",
+    latestEvidenceRefs: input.outputRefs,
+  });
+  const sourceIdentityRef = liveSourceIdentityRefFor(sourceIdentity);
   const refs = Array.from(new Set([
     input.job.job_id,
     input.chunk.chunk_id,
@@ -117,12 +156,32 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
   });
   const liveCognitionPromotion = promoteLiveSourceAnalysisOutput({
     job: input.job,
-    chunk: input.chunk,
+    chunk: {
+      ...input.chunk,
+      source_identity_ref: sourceIdentityRef,
+      source_binding_id: sourceBindingId,
+      source_epoch: sourceEpoch,
+    },
     status: input.status,
     summary: input.summary,
     outputRefs: input.outputRefs,
     evidenceRefs: [syntheticEvidence.evidence_id, interpretedEvent.event_id],
+    sourceIdentityRef,
+    sourceBindingId,
+    sourceEpoch,
     modelInvoked: input.modelInvoked,
+  });
+  const refreshedSourceIdentity = upsertLiveSourceIdentityFromChunk({
+    chunk: {
+      ...input.chunk,
+      source_identity_ref: sourceIdentityRef,
+      source_binding_id: sourceBindingId,
+      source_epoch: sourceEpoch,
+    },
+    sourceBindingId,
+    bindingStatus: sourceIsBound ? "bound" : "observed_unbound",
+    latestObservationId: liveCognitionPromotion.observation?.observation_id ?? null,
+    latestEvidenceRefs: [syntheticEvidence.evidence_id, interpretedEvent.event_id, ...input.outputRefs],
   });
   if (input.chunk.modality === "visual_frame") {
     upsertLiveSourceDescriptor({
@@ -139,9 +198,6 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
       capabilities: ["capture_frame", "interval_capture", "client_adoption"],
     });
   }
-  const environment =
-    getActiveLiveAnswerEnvironmentForSource(input.chunk.source_id) ??
-    getActiveLiveAnswerEnvironmentForThread(input.chunk.thread_id);
   const schemaSelection = environment
     ? selectLiveSchemaForEnvironment({ environment })
     : null;
@@ -159,6 +215,8 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     ? runLiveFieldWorkersForObservation({
         environment: scopedEnvironment,
         observation: liveCognitionPromotion.observation ?? null,
+        sourceIdentity: refreshedSourceIdentity,
+        sourceBindingId,
       })
     : null;
   const lineProjection = scopedEnvironment
@@ -181,10 +239,10 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
   const lineReasoning = scopedEnvironment
     ? reasonLiveCardLinesForEnvironment({ environment: scopedEnvironment })
     : null;
-  const lineValues = projectionLineValues && Object.keys(projectionLineValues).length > 0
+  const lineValues: Record<string, RoutedLiveLineValue> = projectionLineValues && Object.keys(projectionLineValues).length > 0
     ? projectionLineValues
     : Object.keys(lineReasoning?.line_values ?? {}).length > 0
-    ? lineReasoning?.line_values ?? {}
+    ? (lineReasoning?.line_values ?? {}) as Record<string, RoutedLiveLineValue>
     : input.lineValues ?? defaultLineValues(input);
   const delta = scopedEnvironment
     ? updateLiveAnswerEnvironment({
@@ -228,6 +286,10 @@ export function routeLiveSourceAnalysisOutput(input: LiveSourceAnalysisRouterInp
     interpreted_event: interpretedEvent,
     live_environment_delta: delta?.delta ?? null,
     live_answer_environment: delta?.environment ?? environment ?? null,
+    live_source_identity: refreshedSourceIdentity,
+    source_identity_ref: sourceIdentityRef,
+    source_binding_id: sourceBindingId,
+    source_epoch: sourceEpoch,
     present_state_card: presentStateCard,
     live_cognition_promotion: liveCognitionPromotion,
     live_cognition_promotion_audit: liveCognitionPromotion.audit,

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import {
   HELIX_TERMINAL_AUTHORITY_SCHEMA,
   type HelixTerminalAuthority,
+  type HelixLiveSourceTerminalAuthority,
 } from "@shared/helix-turn-poison-guard";
 
 const normalizeText = (value: unknown): string =>
@@ -45,6 +46,7 @@ export function buildHelixTurnTerminalAuthority(input: {
   terminal_item_id?: string | null;
   route?: HelixTerminalAuthority["route"] | null;
   terminal_kind?: HelixTerminalAuthority["terminal_kind"] | null;
+  live_source_authority?: HelixLiveSourceTerminalAuthority | null;
   created_at?: string;
 }): HelixTerminalAuthority {
   return {
@@ -58,6 +60,7 @@ export function buildHelixTurnTerminalAuthority(input: {
     terminal_item_id: normalizeText(input.terminal_item_id) || null,
     terminal_text_hash: hashHelixTerminalText(input.terminal_text),
     terminal_text_preview: normalizeText(input.terminal_text).slice(0, 240),
+    live_source_authority: input.live_source_authority ?? null,
     server_authoritative: true,
     created_at: input.created_at ?? new Date().toISOString(),
   };

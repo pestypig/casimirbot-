@@ -8,6 +8,10 @@ export type HelixVisualSceneQueryIntent = {
   thread_id: string;
   query_text: string;
   query_terms: string[];
+  semantic_binding_refs?: string[];
+  literal_query_terms?: string[];
+  bound_query_terms?: string[];
+  binding_confidence?: number;
   query_mode:
     | "find_prior_scene"
     | "compare_prior_to_current"

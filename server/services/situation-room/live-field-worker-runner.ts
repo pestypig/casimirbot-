@@ -8,7 +8,9 @@ import {
   type HelixLiveFieldWorkerRun,
 } from "@shared/helix-live-field-worker-run";
 import type { HelixObservationJournalEntry } from "@shared/helix-observation-journal";
+import type { HelixLiveSourceIdentity } from "@shared/helix-live-source-identity";
 import type { LiveAnswerEnvironment } from "@shared/helix-live-answer-environment";
+import { assertLiveArtifactNonTerminal } from "@shared/helix-turn-poison-guard";
 import { ensureLiveSituationRunForEnvironment } from "./live-situation-run-store";
 import { registerFieldWorkersForSituationRun } from "./live-field-worker-registry";
 import { recordLiveFieldEvaluation } from "./live-field-evaluation-store";
@@ -39,6 +41,15 @@ const emptyInterpretationWorkerRun = () => ({
   interpretation_hypotheses: [],
   interpretation_graph: null,
   interpretation_tangents: [],
+});
+
+const emptyProcedureWorkerFeedback = () => ({
+  predictions: [],
+  probes: [],
+  probe_results: [],
+  confidence_updates: [],
+  procedure_epoch: null,
+  procedure_epoch_closure: null,
 });
 
 const isTaskManagerSummary = (text: string): boolean =>
@@ -194,6 +205,8 @@ const evaluateField = (input: {
 export function runLiveFieldWorkersForObservation(input: {
   environment: LiveAnswerEnvironment;
   observation: HelixObservationJournalEntry | null;
+  sourceIdentity?: HelixLiveSourceIdentity | null;
+  sourceBindingId?: string | null;
   now?: string;
 }) {
   if (!input.observation) {
@@ -203,6 +216,7 @@ export function runLiveFieldWorkersForObservation(input: {
       worker_runs: [],
       evaluations: [],
       arbitration: null,
+      ...emptyProcedureWorkerFeedback(),
       ...emptyInterpretationWorkerRun(),
       assistant_answer: false as const,
       raw_content_included: false as const,
@@ -211,6 +225,9 @@ export function runLiveFieldWorkersForObservation(input: {
   const now = input.now ?? new Date().toISOString();
   const run = ensureLiveSituationRunForEnvironment({
     environment: input.environment,
+    observation: input.observation,
+    sourceIdentity: input.sourceIdentity ?? null,
+    sourceBindingId: input.sourceBindingId ?? input.observation.source_binding_id ?? null,
     now,
     advanceEpoch: true,
   });
@@ -225,6 +242,7 @@ export function runLiveFieldWorkersForObservation(input: {
       worker_runs: [],
       evaluations: [],
       arbitration: null,
+      ...emptyProcedureWorkerFeedback(),
       ...emptyInterpretationWorkerRun(),
       assistant_answer: false as const,
       raw_content_included: false as const,
@@ -239,6 +257,12 @@ export function runLiveFieldWorkersForObservation(input: {
     run,
     environment: input.environment,
   });
+  for (const worker of workers) {
+    if (worker.may_execute_tool !== false) {
+      throw new Error("field_worker_tool_execution_forbidden");
+    }
+    assertLiveArtifactNonTerminal(worker);
+  }
   const probeFeedback = runObservationProbesForObservation({
     run,
     observation: input.observation,
@@ -277,6 +301,7 @@ export function runLiveFieldWorkersForObservation(input: {
         field_key: worker.field_key,
         status: "started",
         trigger_observation_refs: [input.observation?.observation_id ?? ""].filter(Boolean),
+        tool_calls: [],
         started_at: now,
         completed_at: null,
         output_evaluation_id: null,
@@ -317,6 +342,7 @@ export function runLiveFieldWorkersForObservation(input: {
         field_key: worker.field_key,
         status: "completed",
         trigger_observation_refs: [input.observation?.observation_id ?? ""].filter(Boolean),
+        tool_calls: [],
         started_at: now,
         completed_at: now,
         output_evaluation_id: evaluation.evaluation_id,
@@ -350,6 +376,8 @@ export function runLiveFieldWorkersForObservation(input: {
         created_at: completed.completed_at ?? now,
       });
       workerRuns.push(completed);
+      assertLiveArtifactNonTerminal(evaluation);
+      assertLiveArtifactNonTerminal(completed);
       return evaluation;
     });
   const predictionFeedback = createPredictionsForFieldEvaluations({

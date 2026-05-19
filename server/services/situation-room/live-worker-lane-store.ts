@@ -194,6 +194,8 @@ export function completeLiveWorkerRun(input: {
   status: HelixLiveWorkerRun["status"];
   summary: string;
   toolCalls?: HelixLiveWorkerRun["tool_calls"];
+  requestedRuntimeItems?: HelixLiveWorkerRun["requested_runtime_items"];
+  maintenanceReceiptRefs?: string[];
   observations?: string[];
   validations?: string[];
   updatedLineKeys?: string[];
@@ -205,6 +207,8 @@ export function completeLiveWorkerRun(input: {
     completed_at: input.now ?? nowIso(),
     summary: input.summary,
     tool_calls: input.toolCalls ?? input.run.tool_calls,
+    requested_runtime_items: input.requestedRuntimeItems ?? input.run.requested_runtime_items,
+    maintenance_receipt_refs: input.maintenanceReceiptRefs ?? input.run.maintenance_receipt_refs,
     observations: input.observations ?? input.run.observations,
     validations: input.validations ?? input.run.validations,
     updated_line_keys: input.updatedLineKeys ?? input.run.updated_line_keys,
