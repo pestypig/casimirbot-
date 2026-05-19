@@ -48,6 +48,7 @@ import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { guardTerminalArtifactSelection } from "../services/helix-ask/terminal-artifact-selection-guard";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
+import { auditToolAdmissionCoverage } from "../services/helix-ask/tool-admission-coverage-audit";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -247,6 +248,16 @@ const seedVisualSceneMemoryComparison = () => {
   });
 };
 
+const expectCleanToolAdmissionCoverage = (body: Record<string, any>, sourceTarget: string): void => {
+  expect(body?.tool_admission_coverage_audit).toMatchObject({
+    schema: "helix.tool_admission_coverage_audit.v1",
+    ok: true,
+    source_target: sourceTarget,
+    tool_admission_required: true,
+    violations: [],
+  });
+};
+
 describe("Helix Ask tool admission acceptance matrix", () => {
   beforeEach(resetAll);
 
@@ -275,6 +286,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
     expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expectCleanToolAdmissionCoverage(response.body, "visual_capture");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);
@@ -300,6 +312,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.answer).not.toContain("Producer freshness:");
     expect(response.body?.receipt_presentation_snapshot?.full_summary).toContain("Producer freshness:");
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expectCleanToolAdmissionCoverage(response.body, "live_pipeline");
   }, 30000);
 
   it("admits structured docs locate prompts to doc_location_result and suppresses visual deictic routing", async () => {
@@ -338,6 +351,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toContain("situation_context_pack");
     expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expectCleanToolAdmissionCoverage(response.body, "docs_viewer");
     expect(String(response.body?.answer ?? "")).toContain("Locations:");
     expect(String(response.body?.answer ?? "")).not.toContain("File Explorer");
   }, 60000);
@@ -364,6 +378,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toEqual(
       expect.arrayContaining(["no_tool_direct", "model_only_concept", "process_graph_overview"]),
     );
+    expectCleanToolAdmissionCoverage(response.body, "repo_code");
     expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
   }, 90000);
 
@@ -391,6 +406,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.terminal_artifact_kind).toMatch(/procedure_epoch_replay|visual_scene_comparison_result/);
     expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("process_graph_overview");
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expectCleanToolAdmissionCoverage(response.body, "procedure_memory");
   }, 60000);
 
   it("admits semantic scene-memory comparisons to selected scene products", async () => {
@@ -415,6 +431,7 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.terminal_artifact_kind).toBe("visual_scene_comparison_result");
     expect(response.body?.terminal_artifact_selection_guard?.allowed).toBe(true);
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expectCleanToolAdmissionCoverage(response.body, "procedure_memory");
   }, 60000);
 
   it("rejects terminal products forbidden by tool admission", () => {
@@ -456,5 +473,34 @@ describe("Helix Ask tool admission acceptance matrix", () => {
         terminal_artifact_kind: "situation_context_pack",
       }),
     });
+  });
+
+  it("flags retrieval-required turns that did not resolve a source target", () => {
+    const audit = auditToolAdmissionCoverage({
+      payload: {
+        ask_turn_preflight_context: {
+          retrieval_required_signal: {
+            required: true,
+          },
+        },
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "unknown",
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+          terminal_artifact_kind: "situation_context_pack",
+        },
+      },
+    });
+
+    expect(audit).toMatchObject({
+      schema: "helix.tool_admission_coverage_audit.v1",
+      ok: false,
+      retrieval_required: true,
+      source_target: "unknown",
+    });
+    expect(audit.violations).toEqual(expect.arrayContaining(["missing_tool_admission_decision", "retrieval_required_has_source_target"]));
   });
 });
