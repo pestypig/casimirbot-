@@ -45,6 +45,8 @@ const VISUAL_FORBIDDEN_TERMINAL_PRODUCTS = [
 const PROCEDURE_ALLOWED_TERMINAL_PRODUCTS = [
   "procedure_epoch_replay",
   "procedure_memory_recall",
+  "visual_scene_comparison_result",
+  "selected_visual_scene_set",
   "situation_context_pack",
   "situation_context_pack_with_epoch_evidence",
   "request_user_input",

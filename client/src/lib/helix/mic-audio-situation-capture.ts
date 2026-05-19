@@ -53,7 +53,7 @@ const stopTracks = (stream: MediaStream): void => {
   for (const track of stream.getTracks()) track.stop();
 };
 
-const buildTranscriptEvent = (args: {
+export const buildMicAudioSituationTranscriptEvent = (args: {
   roomId: string;
   missionId?: string;
   threadId?: string;
@@ -73,7 +73,7 @@ const buildTranscriptEvent = (args: {
     ? classifyDotModeUtterance({
         text,
         observedAt: ts,
-        speakerAuthority: args.speakerAuthority ?? "command_allowed",
+        speakerAuthority: args.speakerAuthority ?? "transcribe_only",
         policy: args.dotModePolicy,
       })
     : null;
@@ -86,8 +86,8 @@ const buildTranscriptEvent = (args: {
         transcriptText: text,
         decision: dotDecision,
         speakerId: args.speakerId ?? null,
-        speakerRole: args.speakerRole ?? "owner",
-        speakerAuthority: args.speakerAuthority ?? "command_allowed",
+        speakerRole: args.speakerRole ?? "unknown",
+        speakerAuthority: args.speakerAuthority ?? "transcribe_only",
         observedAt: ts,
         evidenceRefs: [`voice:transcribe:${args.captureSessionId}:${args.chunkIndex}`],
       })
@@ -183,7 +183,7 @@ export async function startMicAudioSituationSession(
         durationMs,
       })
         .then((result) => {
-          const event = buildTranscriptEvent({
+          const event = buildMicAudioSituationTranscriptEvent({
             roomId: options.roomId,
             missionId: options.missionId,
             threadId: options.threadId,

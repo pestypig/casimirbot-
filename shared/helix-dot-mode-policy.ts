@@ -91,6 +91,7 @@ export type DotModeUtteranceDecision = {
   wake_name: "dot" | null;
   addressed_text: string | null;
   creates_user_turn: boolean;
+  requires_confirmation: boolean;
   cancels_active_answer: boolean;
   cancels_voice_output: boolean;
   disables_voice_capture: boolean;
@@ -131,8 +132,10 @@ const normalizeTranscript = (value: string): string =>
     .replace(/[‘’]/g, "'")
     .trim();
 
-const isCommandAllowed = (authority: LiveVoiceSpeakerAuthority): boolean =>
-  authority === "command_allowed" || authority === "command_confirm";
+const canAutoStartTurn = (authority: LiveVoiceSpeakerAuthority): boolean => authority === "command_allowed";
+const canRequestConfirmation = (authority: LiveVoiceSpeakerAuthority): boolean => authority === "command_confirm";
+const canAddressDot = (authority: LiveVoiceSpeakerAuthority): boolean =>
+  canAutoStartTurn(authority) || canRequestConfirmation(authority);
 
 function parseDotAddress(text: string): { wake: "dot"; rest: string } | null {
   const normalized = normalizeTranscript(text);
@@ -181,6 +184,7 @@ export function classifyDotModeUtterance(args: {
       wake_name: null,
       addressed_text: null,
       creates_user_turn: false,
+      requires_confirmation: false,
       cancels_active_answer: false,
       cancels_voice_output: false,
       disables_voice_capture: false,
@@ -191,10 +195,12 @@ export function classifyDotModeUtterance(args: {
   }
 
   const kind = inferDirectAddressKind(addressed.rest);
-  const allowed = isCommandAllowed(speakerAuthority);
+  const addressable = canAddressDot(speakerAuthority);
   const stopOutput = kind === "stop_output" || kind === "stand_by";
   const stopListening = kind === "stop_listening";
-  const createsUserTurn = allowed && !stopOutput && !stopListening;
+  const turnCandidate = !stopOutput && !stopListening;
+  const createsUserTurn = canAutoStartTurn(speakerAuthority) && turnCandidate;
+  const requiresConfirmation = canRequestConfirmation(speakerAuthority) && turnCandidate;
   const outputEnabled = policy.voice_output_enabled;
 
   return {
@@ -204,17 +210,20 @@ export function classifyDotModeUtterance(args: {
     wake_name: addressed.wake,
     addressed_text: addressed.rest,
     creates_user_turn: createsUserTurn,
+    requires_confirmation: requiresConfirmation,
     cancels_active_answer: stopOutput || stopListening,
     cancels_voice_output: stopOutput || stopListening,
     disables_voice_capture: stopListening,
-    next_voice_mode: stopListening ? "off" : stopOutput ? "observant" : kind === "resume" && allowed ? "dot" : null,
-    voice_output_reason: !allowed
+    next_voice_mode: stopListening ? "off" : stopOutput ? "observant" : kind === "resume" && addressable ? "dot" : null,
+    voice_output_reason: !addressable
       ? "untrusted_speaker"
       : stopOutput || stopListening
         ? "dot_stop_command"
-      : outputEnabled
+      : createsUserTurn && outputEnabled
         ? "dot_direct_address"
-        : "voice_output_disabled",
+        : requiresConfirmation
+          ? "silent_policy"
+          : "voice_output_disabled",
     speakable: createsUserTurn && outputEnabled,
     ...(createsUserTurn ? { temporal_context_window: buildTemporalWindow(observedAt) } : {}),
   };

@@ -39,6 +39,7 @@ describe("Dot mode policy", () => {
       wake_name: "dot",
       addressed_text: "what just happened?",
       creates_user_turn: true,
+      requires_confirmation: false,
       voice_output_reason: "dot_direct_address",
       speakable: true,
       temporal_context_window: {
@@ -59,6 +60,7 @@ describe("Dot mode policy", () => {
     expect(decision).toMatchObject({
       kind: "procedure_activation_request",
       creates_user_turn: false,
+      requires_confirmation: false,
       voice_output_reason: "untrusted_speaker",
       speakable: false,
     });
@@ -74,6 +76,7 @@ describe("Dot mode policy", () => {
     expect(decision).toMatchObject({
       kind: "stop_output",
       transcript_kind: "command_candidate",
+      requires_confirmation: false,
       cancels_active_answer: true,
       cancels_voice_output: true,
       disables_voice_capture: false,
@@ -139,5 +142,37 @@ describe("Dot mode policy", () => {
     expect(decision.creates_user_turn).toBe(true);
     expect(decision.speakable).toBe(false);
     expect(decision.voice_output_reason).toBe("voice_output_disabled");
+  });
+
+  it("keeps command-confirm direct address as a confirmation candidate, not a user turn", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot, what just happened?",
+      observedAt,
+      speakerAuthority: "command_confirm",
+    });
+
+    expect(decision).toMatchObject({
+      kind: "direct_address",
+      creates_user_turn: false,
+      requires_confirmation: true,
+      speakable: false,
+      voice_output_reason: "silent_policy",
+    });
+    expect(decision.temporal_context_window).toBeUndefined();
+  });
+
+  it("defaults omitted speaker authority to transcribe-only", () => {
+    const decision = classifyDotModeUtterance({
+      text: "Dot, what just happened?",
+      observedAt,
+    });
+
+    expect(decision).toMatchObject({
+      kind: "direct_address",
+      creates_user_turn: false,
+      requires_confirmation: false,
+      speakable: false,
+      voice_output_reason: "untrusted_speaker",
+    });
   });
 });

@@ -35,9 +35,13 @@ const splitObjects = (value: string | null | undefined): string[] =>
   unique(String(value ?? "").split(/[,;|]/).map((entry) => entry.trim())).slice(0, 20);
 
 const fileNameRe = /\b[A-Za-z0-9][A-Za-z0-9 _.-]{1,80}\.(?:png|jpg|jpeg|gif|webp|wav|mp3|mp4|mov|pdf|md|txt|docx|zip|json|ts|tsx|js|py)\b/g;
+const folderHintRe = /\b(?:folder|directory|view)\s+(?:labeled|named|called)?\s*"([^"]+)"/gi;
 
 const fieldValue = (evaluations: HelixLiveFieldEvaluation[], ...keys: string[]): string | null =>
   evaluations.find((entry) => keys.includes(entry.field_key))?.value ?? null;
+
+const termsFrom = (value: string | null | undefined): string[] =>
+  tokenize(String(value ?? "")).slice(0, 30);
 
 export function recordVisualSceneMemoryIndex(input: {
   situationRunId: string;
@@ -55,27 +59,53 @@ export function recordVisualSceneMemoryIndex(input: {
   const titleMatch = scene.match(/\b(?:labeled|titled|called|directory|folder)\s+"([^"]+)"/i);
   const appMatch = scene.match(/\b(File Explorer|Browser|Chrome|Firefox|Docs|PDF viewer|terminal|console)\b/i);
   const textForFiles = [scene, activity, objectsValue, input.observation.text].join(" ");
+  const fileNames = unique(textForFiles.match(fileNameRe) ?? []).slice(0, 40);
+  const folderHints = unique(Array.from(textForFiles.matchAll(folderHintRe)).map((match) => match[1])).slice(0, 20);
+  const objectTerms = unique([...splitObjects(objectsValue).flatMap(termsFrom), ...termsFrom(scene)]).slice(0, 40);
+  const activityTerms = termsFrom(activity || scene);
+  const uncertainty = fieldValue(input.evaluations, "uncertainty", "risk") ?? "";
+  const objective = fieldValue(input.evaluations, "intent", "goal") ?? "";
+  const observationRefs = unique([input.observation.observation_id, ...input.procedureEpoch.observation_refs]);
+  const fieldEvaluationRefs = unique([
+    ...input.evaluations.map((entry) => entry.evaluation_id),
+    ...input.procedureEpoch.field_evaluation_refs,
+  ]);
   const memory: HelixVisualSceneMemoryIndex = {
     schema: HELIX_VISUAL_SCENE_MEMORY_INDEX_SCHEMA,
     scene_memory_id: `visual_scene_memory:${hashShort([input.situationRunId, input.epoch, input.observation.observation_id])}`,
     situation_run_id: input.situationRunId,
     thread_id: input.threadId,
     environment_id: input.environmentId,
+    source_id: input.observation.source_id,
     epoch: input.epoch,
     timestamp: input.procedureEpoch.created_at,
+    summary_ref: input.procedureEpoch.epoch_id,
+    observation_refs: observationRefs,
+    field_evaluation_refs: fieldEvaluationRefs,
+    interpretation_hypothesis_refs: [],
+    probe_result_refs: input.procedureEpoch.probe_result_refs,
+    closure_refs: [input.procedureEpoch.epoch_id],
     app_or_surface: appMatch?.[1] ?? null,
     visible_title: titleMatch?.[1] ?? null,
+    app_hints: unique([appMatch?.[1] ?? null]).slice(0, 10),
+    window_title_hints: unique([titleMatch?.[1] ?? null, ...folderHints]).slice(0, 20),
+    visible_object_terms: objectTerms,
+    file_folder_terms: unique([...fileNames, ...folderHints, ...termsFrom(fileNames.join(" "))]).slice(0, 60),
+    activity_terms: activityTerms,
+    uncertainty_terms: termsFrom(uncertainty),
+    user_objective_terms: termsFrom(objective),
     objects: splitObjects(objectsValue),
-    file_names: unique(textForFiles.match(fileNameRe) ?? []).slice(0, 40),
+    file_names: fileNames,
     activity_summary: activity || scene,
     intent_hypotheses: unique([
       fieldValue(input.evaluations, "intent", "goal"),
       activity,
     ]).slice(0, 10),
     evidence_refs: unique([
-      input.observation.observation_id,
+      ...observationRefs,
       input.procedureEpoch.epoch_id,
-      ...input.evaluations.map((entry) => entry.evaluation_id),
+      ...fieldEvaluationRefs,
+      ...input.procedureEpoch.probe_result_refs,
     ]).slice(0, 80),
     assistant_answer: false,
     raw_content_included: false,
@@ -109,11 +139,18 @@ export function buildVisualSceneQueryIntent(input: {
   promptText: string;
 }): HelixVisualSceneQueryIntent | null {
   const prompt = input.promptText.trim();
-  if (!/\b(?:compare|scene where|last .*scene|previous .*scene|camera roll|soho|folder scene)\b/i.test(prompt)) return null;
+  if (!/\b(?:compare|find|scene where|last .*scene|previous .*scene|camera roll|soho|folder scene)\b/i.test(prompt)) return null;
   const quoted = Array.from(prompt.matchAll(/"([^"]+)"/g)).map((match) => match[1]);
   const afterLast = prompt.match(/\blast\s+([A-Za-z0-9 _.-]{3,60}?)(?:\s+folder)?\s+scene\b/i)?.[1];
-  const afterWith = prompt.match(/\bwith\s+([A-Za-z0-9 _.-]{3,60})(?:\.|$)/i)?.[1];
+  const rawAfterWith = prompt.match(/\bwith\s+([A-Za-z0-9 _.-]{3,60})(?:\.|$)/i)?.[1];
+  const afterWith = rawAfterWith && !/^(?:the\s+)?next\b/i.test(rawAfterWith.trim())
+    ? rawAfterWith
+    : undefined;
   const where = prompt.match(/\bwhere\s+i\s+was\s+in\s+([A-Za-z0-9 _.-]{3,60})(?:\.|$)/i)?.[1];
+  const hasSemanticPriorCue = quoted.length > 0 ||
+    Boolean(afterLast || afterWith || where) ||
+    /\b(?:scene where|camera roll|soho|folder scene|sun folder|audio files?)\b/i.test(prompt);
+  if (!hasSemanticPriorCue) return null;
   const terms = unique([
     ...quoted,
     afterLast,
@@ -161,6 +198,12 @@ export function selectVisualScenesForQuery(input: {
         ...entry.objects,
         ...entry.file_names,
         ...entry.intent_hypotheses,
+        ...entry.app_hints,
+        ...entry.window_title_hints,
+        ...entry.visible_object_terms,
+        ...entry.file_folder_terms,
+        ...entry.activity_terms,
+        ...entry.user_objective_terms,
       ].join(" ").toLowerCase();
       const matchedTerms = termSet.filter((term) => haystack.includes(term));
       return {
@@ -170,17 +213,35 @@ export function selectVisualScenesForQuery(input: {
       };
     })
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || b.scene_memory.epoch - a.scene_memory.epoch)
-    .slice(0, Math.max(1, Math.min(5, input.limit ?? 3)));
+    .sort((a, b) => b.score - a.score || b.scene_memory.epoch - a.scene_memory.epoch);
+  const selectedLimited = selected.slice(0, Math.max(1, Math.min(5, input.limit ?? 3)));
+  const rejectedCandidates = selected.slice(selectedLimited.length, selectedLimited.length + 5).map((entry) => ({
+    scene_memory_ref: entry.scene_memory.scene_memory_id,
+    reason: "lower_score_than_selected_scene",
+    score: entry.score,
+    matched_terms: entry.matched_terms,
+  }));
+  const evidenceRefs = unique([
+    currentScene?.scene_memory_id,
+    ...(currentScene?.evidence_refs ?? []),
+    ...selectedLimited.flatMap((entry) => entry.scene_memory.evidence_refs),
+  ]).slice(0, 40);
   return {
     schema: HELIX_SELECTED_VISUAL_SCENE_SET_SCHEMA,
-    selection_id: `selected_visual_scene_set:${hashShort([input.turnId, input.queryIntent.query_intent_id, selected.map((entry) => entry.scene_memory.scene_memory_id)])}`,
+    selection_id: `selected_visual_scene_set:${hashShort([input.turnId, input.queryIntent.query_intent_id, selectedLimited.map((entry) => entry.scene_memory.scene_memory_id)])}`,
     turn_id: input.turnId,
     thread_id: input.threadId,
     query_intent_id: input.queryIntent.query_intent_id,
-    selected_scenes: selected,
+    selected_scenes: selectedLimited,
     current_scene: currentScene,
-    selection_reason: selected.length > 0 ? "matched_scene_memory_terms" : "no_scene_memory_match",
+    selection_reason: selectedLimited.length > 0 ? "matched_scene_memory_terms" : "no_scene_memory_match",
+    confidence: selectedLimited.length > 0 ? Math.min(0.95, 0.45 + selectedLimited[0].matched_terms.length * 0.15) : 0.2,
+    evidence_refs: evidenceRefs,
+    rejected_candidates: rejectedCandidates,
+    missing_evidence: [
+      !currentScene ? "current_visual_scene_memory_missing" : null,
+      selectedLimited.length === 0 ? "prior_scene_match_missing" : null,
+    ].filter(Boolean) as string[],
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -199,16 +260,32 @@ export function buildVisualSceneComparisonResult(input: {
     current.app_or_surface && previous.app_or_surface && current.app_or_surface === previous.app_or_surface ? current.app_or_surface : null,
     ...current.objects.filter((entry) => previous.objects.includes(entry)),
   ]).slice(0, 8);
-  const differences = unique([
+  const changedObjects = unique([
+    ...previous.objects.filter((entry) => !current.objects.includes(entry)).map((entry) => `removed: ${entry}`),
+    ...current.objects.filter((entry) => !previous.objects.includes(entry)).map((entry) => `added: ${entry}`),
+  ]).slice(0, 12);
+  const unchangedObjects = current.objects.filter((entry) => previous.objects.includes(entry)).slice(0, 12);
+  const changedActivity = previous.activity_summary !== current.activity_summary
+    ? [`from ${previous.activity_summary} to ${current.activity_summary}`]
+    : [];
+  const changedAppOrWindow = unique([
+    current.app_or_surface !== previous.app_or_surface
+      ? `app/surface changed from ${previous.app_or_surface ?? "unknown"} to ${current.app_or_surface ?? "unknown"}`
+      : null,
     current.visible_title !== previous.visible_title
       ? `visible title changed from ${previous.visible_title ?? "unknown"} to ${current.visible_title ?? "unknown"}`
       : null,
+  ]);
+  const changedUserFocus = unique([
     previous.file_names.length || current.file_names.length
       ? `visible files changed from ${previous.file_names.slice(0, 5).join(", ") || "unspecified"} to ${current.file_names.slice(0, 5).join(", ") || "unspecified"}`
       : null,
-    previous.activity_summary !== current.activity_summary
-      ? `activity changed from ${previous.activity_summary} to ${current.activity_summary}`
-      : null,
+  ]);
+  const differences = unique([
+    ...changedAppOrWindow,
+    ...changedUserFocus,
+    ...changedActivity.map((entry) => `activity changed ${entry}`),
+    ...changedObjects,
   ]);
   const summary = `Compared current epoch ${current.epoch} with prior epoch ${previous.epoch}. ${
     differences[0] ?? "No material scene difference was selected from scene memory."
@@ -223,9 +300,18 @@ export function buildVisualSceneComparisonResult(input: {
     current_scene_ref: current.scene_memory_id,
     compared_scene_refs: [previous.scene_memory_id],
     summary,
+    changed_objects: changedObjects,
+    unchanged_objects: unchangedObjects,
+    changed_activity: changedActivity,
+    changed_app_or_window: changedAppOrWindow,
+    changed_user_focus: changedUserFocus,
+    confidence: input.selectedSceneSet.confidence,
     shared_traits: sharedTraits,
     differences,
     evidence_refs: unique([...current.evidence_refs, ...previous.evidence_refs]).slice(0, 24),
+    missing_evidence: input.selectedSceneSet.missing_evidence,
+    next_check: "Capture another visual epoch before comparing future changes.",
+    role: "validation",
     assistant_answer: false,
     raw_content_included: false,
   };

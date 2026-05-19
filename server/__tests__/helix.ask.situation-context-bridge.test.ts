@@ -1160,18 +1160,58 @@ describe("thread-bound situation context bridge", () => {
     expect(route.selected_visual_scene_set).toMatchObject({
       schema: "helix.selected_visual_scene_set.v1",
       selection_reason: "matched_scene_memory_terms",
+      confidence: expect.any(Number),
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(route.selected_visual_scene_set?.evidence_refs.length).toBeGreaterThan(0);
+    expect(route.selected_visual_scene_set?.missing_evidence).toEqual([]);
     expect(route.selected_visual_scene_set?.selected_scenes[0]?.scene_memory.visible_title).toBe("SOHO");
     expect(route.visual_scene_comparison_result).toMatchObject({
       schema: "helix.visual_scene_comparison_result.v1",
+      role: "validation",
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(route.visual_scene_comparison_result?.changed_app_or_window.join(" ")).toContain("SOHO");
+    expect(route.visual_scene_comparison_result?.changed_user_focus.join(" ")).toContain("soho-index.png");
+    expect(route.visual_scene_comparison_result?.next_check).toContain("Capture another visual epoch");
     expect(route.visual_scene_comparison_result?.summary).toContain("Compared current epoch");
     expect(route.visual_scene_comparison_result?.summary).toContain("SOHO");
     expect(route.answer_text).toContain("Compared current epoch");
     expect(route.answer_text).toContain("SOHO");
+  });
+
+  it("returns a typed failure when no prior visual scene matches the requested props", () => {
+    seedVisualSceneMemoryComparison();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Compare what I'm looking at now to the last MOON folder scene.",
+      inputModality: "typed",
+      turnId: "ask:scene-memory-no-match",
+    });
+
+    expect(route.route).toBe("procedure_epoch_replay_question");
+    expect(route.visual_scene_query_intent).toMatchObject({
+      schema: "helix.visual_scene_query_intent.v1",
+      compare_to_current: true,
+    });
+    expect(route.selected_visual_scene_set).toMatchObject({
+      schema: "helix.selected_visual_scene_set.v1",
+      selected_scenes: [],
+      selection_reason: "no_scene_memory_match",
+      missing_evidence: ["prior_scene_match_missing"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.visual_scene_comparison_result).toBeNull();
+    expect(route.typed_failure).toMatchObject({
+      schema: "helix.typed_failure.v1",
+      error_code: "visual_scene_memory_no_match",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.answer_text).toContain("could not find a prior visual scene");
+    expect(route.answer_text).toContain("Missing evidence: prior_scene_match_missing");
   });
 });

@@ -53,6 +53,18 @@ import type { HelixVisualSceneQueryIntent } from "@shared/helix-visual-scene-que
 import type { HelixSelectedVisualSceneSet } from "@shared/helix-selected-visual-scene-set";
 import type { HelixVisualSceneComparisonResult } from "@shared/helix-visual-scene-comparison-result";
 
+type HelixSituationTypedFailure = {
+  schema: "helix.typed_failure.v1";
+  failure_id: string;
+  turn_id: string;
+  thread_id: string;
+  error_code: "visual_scene_memory_no_match" | "visual_scene_memory_current_missing";
+  message: string;
+  evidence_refs: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type SituationContextTurnRouteKind =
   | "none"
   | "situation_context_question"
@@ -74,6 +86,7 @@ export type SituationContextTurnRoute = {
   visual_scene_query_intent?: HelixVisualSceneQueryIntent | null;
   selected_visual_scene_set?: HelixSelectedVisualSceneSet | null;
   visual_scene_comparison_result?: HelixVisualSceneComparisonResult | null;
+  typed_failure?: HelixSituationTypedFailure | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
   binding_repair?: ReturnType<typeof repairUnboundVisualSituationContext> | null;
 };
@@ -552,11 +565,38 @@ const buildReplayAnswer = (input: {
 const buildSceneComparisonAnswer = (result: HelixVisualSceneComparisonResult): string =>
   [
     result.summary,
+    result.changed_app_or_window.length ? `App/window changes: ${result.changed_app_or_window.join("; ")}.` : "",
+    result.changed_objects.length ? `Object changes: ${result.changed_objects.join("; ")}.` : "",
+    result.changed_activity.length ? `Activity changes: ${result.changed_activity.join("; ")}.` : "",
     result.shared_traits.length ? `Shared traits: ${result.shared_traits.join(", ")}.` : "",
     result.differences.length ? `Differences: ${result.differences.join("; ")}.` : "",
+    result.missing_evidence.length ? `Missing evidence: ${result.missing_evidence.join(", ")}.` : "",
+    `Next check: ${result.next_check}`,
     `Evidence refs: ${result.evidence_refs.slice(0, 8).join(", ") || "none selected"}.`,
     "Raw images, audio, and logs were not injected into Ask context.",
   ].filter(Boolean).join("\n");
+
+const buildVisualSceneMemoryFailure = (input: {
+  turnId: string;
+  threadId: string;
+  selectedSceneSet: HelixSelectedVisualSceneSet;
+}): HelixSituationTypedFailure => {
+  const currentMissing = input.selectedSceneSet.missing_evidence.includes("current_visual_scene_memory_missing");
+  const code = currentMissing ? "visual_scene_memory_current_missing" : "visual_scene_memory_no_match";
+  return {
+    schema: "helix.typed_failure.v1",
+    failure_id: `typed_failure:${hashShort([input.turnId, code, input.selectedSceneSet.selection_id])}`,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    error_code: code,
+    message: currentMissing
+      ? "I could not compare scenes because no current visual scene memory entry was selected."
+      : "I could not find a prior visual scene matching the requested props or intent.",
+    evidence_refs: input.selectedSceneSet.evidence_refs,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 export function routeSituationContextTurn(input: {
   threadId: string;
@@ -814,6 +854,62 @@ export function routeSituationContextTurn(input: {
         binding_repair: bindingRepair,
       };
     }
+    const typedFailure = buildVisualSceneMemoryFailure({
+      turnId,
+      threadId: input.threadId,
+      selectedSceneSet: selectedVisualSceneSet,
+    });
+    const fullReasoning = [
+      typedFailure.message,
+      `Query terms: ${visualSceneQueryIntent.query_terms.join(", ") || "none selected"}.`,
+      `Selection reason: ${selectedVisualSceneSet.selection_reason}.`,
+      selectedVisualSceneSet.missing_evidence.length
+        ? `Missing evidence: ${selectedVisualSceneSet.missing_evidence.join(", ")}.`
+        : "",
+      `Evidence refs: ${selectedVisualSceneSet.evidence_refs.slice(0, 8).join(", ") || "none selected"}.`,
+      "Raw images, audio, and logs were not injected into Ask context.",
+    ].filter(Boolean).join("\n");
+    const distillationBundle = recordReasoningAndDistillation({
+      turnId,
+      threadId: input.threadId,
+      prompt: input.promptText,
+      activeContext: temporalActiveContext,
+      selection,
+      sourceAnswerKind: "procedure_epoch_replay",
+      fullReasoningSummary: fullReasoning,
+      conciseAnswer: typedFailure.message,
+      caveat: null,
+      style: chooseLiveAnswerStyle({
+        promptText: input.promptText,
+        inputModality: input.inputModality,
+      }),
+    });
+    return {
+      route: "procedure_epoch_replay_question",
+      deictic_reference: deicticReference,
+      active_situation_context: temporalActiveContext,
+      situation_evidence_selection: selection,
+      answer_text: fullReasoning,
+      reasoning_snapshot: distillationBundle.snapshot,
+      answer_distillation: distillationBundle.distillation,
+      procedure_memory_recall: buildProcedureMemoryRecall({
+        threadId: input.threadId,
+        turnId,
+        prompt: input.promptText,
+        activeContext: temporalActiveContext,
+        selection,
+        snapshot: distillationBundle.snapshot,
+        distillation: distillationBundle.distillation,
+      }),
+      live_context_window_binding: liveContextWindowBinding,
+      comparison_session: null,
+      visual_scene_query_intent: visualSceneQueryIntent,
+      selected_visual_scene_set: selectedVisualSceneSet,
+      visual_scene_comparison_result: null,
+      typed_failure: typedFailure,
+      voice_live_handoff: voiceLiveHandoff,
+      binding_repair: bindingRepair,
+    };
   }
   if (isComparisonPrompt(input.promptText) && temporalActiveContext.situation_run_id && temporalActiveContext.latest_observation_refs[0]) {
     const comparisonSession = createVisualComparisonSession({
