@@ -28,8 +28,26 @@ const latestInterpretation = (cards: HelixInterpretationCard[]): HelixInterpreta
   cards.at(-1) ??
   null;
 
+const isTaskManagerSummary = (text: string): boolean =>
+  /\btask\s+manager\b|\bperformance\s+tab\b|\bcpu\b[\s\S]{0,80}\bmemory\b|\bgpu\b[\s\S]{0,80}\bperformance\b/.test(text);
+
+const taskManagerObjectTerms = (): string =>
+  [
+    "Windows Task Manager",
+    "Performance tab",
+    "CPU panel",
+    "Memory panel",
+    "Disk panel",
+    "Ethernet panel",
+    "GPU panels",
+    "system metrics",
+  ].join(", ");
+
 const inferGenericActivity = (summary: string, interpretation: string | null): string => {
   const text = lower(`${summary}\n${interpretation ?? ""}`);
+  if (isTaskManagerSummary(text)) {
+    return "Likely inspecting Windows Task Manager performance metrics.";
+  }
   if (/\b(?:file explorer|folder|directory|files?|\.wav|\.asd|audio export)\b/.test(text)) {
     return "Likely browsing or organizing files in a folder or file explorer view.";
   }
@@ -42,6 +60,7 @@ const inferGenericActivity = (summary: string, interpretation: string | null): s
 const inferObjects = (summary: string): string => {
   const text = lower(summary);
   const objects: string[] = [];
+  if (isTaskManagerSummary(text)) return taskManagerObjectTerms();
   if (/\bfile explorer\b/.test(text)) objects.push("file explorer window");
   if (/\bfolder\b/.test(text)) objects.push("folder view");
   if (/\b(?:\.wav|audio|sound)\b/.test(text)) objects.push("audio files");

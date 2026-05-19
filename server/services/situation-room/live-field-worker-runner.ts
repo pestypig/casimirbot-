@@ -41,8 +41,26 @@ const emptyInterpretationWorkerRun = () => ({
   interpretation_tangents: [],
 });
 
+const isTaskManagerSummary = (text: string): boolean =>
+  /\btask\s+manager\b|\bperformance\s+tab\b|\bcpu\b[\s\S]{0,80}\bmemory\b|\bgpu\b[\s\S]{0,80}\bperformance\b/.test(text);
+
+const taskManagerObjectTerms = (): string =>
+  [
+    "Windows Task Manager",
+    "Performance tab",
+    "CPU panel",
+    "Memory panel",
+    "Disk panel",
+    "Ethernet panel",
+    "GPU panels",
+    "system metrics",
+  ].join(", ");
+
 const genericActivity = (text: string): string => {
   const normalized = lower(text);
+  if (isTaskManagerSummary(normalized)) {
+    return "Likely inspecting Windows Task Manager performance metrics.";
+  }
   if (/\b(?:file explorer|folder|directory|files?|\.wav|\.asd|audio export|image files?)\b/.test(normalized)) {
     return "Likely browsing, reviewing, or organizing visible workstation files.";
   }
@@ -55,6 +73,7 @@ const genericActivity = (text: string): string => {
 const genericObjects = (text: string): string => {
   const normalized = lower(text);
   const objects: string[] = [];
+  if (isTaskManagerSummary(normalized)) return taskManagerObjectTerms();
   if (/\bfile explorer\b/.test(normalized)) objects.push("file explorer window");
   if (/\bfolder\b/.test(normalized)) objects.push("folder view");
   if (/\b(?:\.wav|audio|sound)\b/.test(normalized)) objects.push("audio files");

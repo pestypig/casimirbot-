@@ -15,8 +15,26 @@ const lower = (value: unknown): string => String(value ?? "").toLowerCase();
 
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
 
+const isTaskManagerSummary = (text: string): boolean =>
+  /\btask\s+manager\b|\bperformance\s+tab\b|\bcpu\b[\s\S]{0,80}\bmemory\b|\bgpu\b[\s\S]{0,80}\bperformance\b/.test(text);
+
+const taskManagerObjectTerms = (): string =>
+  [
+    "Windows Task Manager",
+    "Performance tab",
+    "CPU panel",
+    "Memory panel",
+    "Disk panel",
+    "Ethernet panel",
+    "GPU panels",
+    "system metrics",
+  ].join(", ");
+
 const inferActivity = (text: string): string => {
   const normalized = lower(text);
+  if (isTaskManagerSummary(normalized)) {
+    return "The user may be inspecting Windows Task Manager performance metrics.";
+  }
   if (/\b(?:file explorer|folder|directory|files?)\b/.test(normalized)) {
     return "The user may be browsing, reviewing, or organizing visible workstation files.";
   }
@@ -29,6 +47,9 @@ const inferActivity = (text: string): string => {
 const inferObjects = (text: string): string => {
   const normalized = lower(text);
   const objects: string[] = [];
+  if (isTaskManagerSummary(normalized)) {
+    return `Visible objects include ${taskManagerObjectTerms()}.`;
+  }
   if (/\bfile explorer\b/.test(normalized)) objects.push("file explorer window");
   if (/\bfolder|directory\b/.test(normalized)) objects.push("folder view");
   if (/\b(?:files?|filenames?)\b/.test(normalized)) objects.push("visible file entries");

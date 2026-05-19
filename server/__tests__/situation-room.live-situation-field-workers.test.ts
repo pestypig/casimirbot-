@@ -128,6 +128,38 @@ describe("live situation field workers", () => {
     expect(routed.live_handoff_arbitration?.arbitration.candidate?.type).toBe("none");
   });
 
+  it("classifies Task Manager as performance metrics instead of a browser tab", () => {
+    createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "ask:task-manager-field-workers",
+      objective: "Using the latest visual observation, describe my current screen as a generic workstation live answer.",
+      preset: "custom",
+      source_ids: ["source:documents"],
+    });
+    const chunk: HelixLiveSourceChunk = {
+      ...visualChunk(),
+      chunk_id: "live_source_chunk:task-manager",
+      compact_summary: "The screen displays Windows Task Manager on the Performance tab with CPU, Memory, Disk, Ethernet, and GPU metrics.",
+      payload_ref: "visual_frame:task-manager",
+    };
+    const routed = routeLiveSourceAnalysisOutput({
+      job: jobFor(chunk),
+      chunk,
+      status: "completed",
+      summary: chunk.compact_summary,
+      outputRefs: ["visual_evidence:task-manager"],
+      modelInvoked: true,
+    });
+
+    const activity = routed.live_field_evaluations.find((entry) => entry.field_key === "activity");
+    const objects = routed.live_field_evaluations.find((entry) => entry.field_key === "objects");
+    expect(activity?.value).toMatch(/Task Manager performance metrics/i);
+    expect(objects?.value).toContain("Windows Task Manager");
+    expect(objects?.value).toContain("CPU panel");
+    expect(objects?.value).toContain("GPU panels");
+    expect(objects?.value).not.toMatch(/browser tab/i);
+  });
+
   it("uses field evaluations before fallback in canonical projection", () => {
     createLiveAnswerEnvironment({
       thread_id: threadId,

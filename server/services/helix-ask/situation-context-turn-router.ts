@@ -65,6 +65,23 @@ type HelixSituationTypedFailure = {
   raw_content_included: false;
 };
 
+type HelixProcedureEpochReplayDelta = {
+  schema: "helix.procedure_epoch_replay_delta.v1";
+  current_observation_refs: string[];
+  previous_observation_refs: string[];
+  current_field_evaluation_refs: string[];
+  previous_field_evaluation_refs: string[];
+  changed_objects: string[];
+  unchanged_objects: string[];
+  changed_activity: string[];
+  changed_app_window: string[];
+  metric_or_value_changes: string[];
+  comparison_confidence: number;
+  missing_evidence: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type SituationContextTurnRouteKind =
   | "none"
   | "situation_context_question"
@@ -86,6 +103,7 @@ export type SituationContextTurnRoute = {
   visual_scene_query_intent?: HelixVisualSceneQueryIntent | null;
   selected_visual_scene_set?: HelixSelectedVisualSceneSet | null;
   visual_scene_comparison_result?: HelixVisualSceneComparisonResult | null;
+  procedure_epoch_replay_delta?: HelixProcedureEpochReplayDelta | null;
   typed_failure?: HelixSituationTypedFailure | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
   binding_repair?: ReturnType<typeof repairUnboundVisualSituationContext> | null;
@@ -476,13 +494,74 @@ const buildSnapshotExpansionAnswer = (input: {
   ].filter(Boolean).join("\n");
 };
 
-const buildReplayAnswer = (input: {
+const firstSentence = (value: string | null | undefined, max = 220): string | null => {
+  const trimmed = value?.replace(/\s+/g, " ").trim() ?? "";
+  if (!trimmed) return null;
+  const sentence = trimmed.split(/(?<=[.!?])\s+/)[0] ?? trimmed;
+  return sentence.length > max ? `${sentence.slice(0, max - 3).trim()}...` : sentence;
+};
+
+const extractReplayTerms = (value: string | null | undefined): string[] => {
+  const text = String(value ?? "").toLowerCase();
+  const terms: string[] = [];
+  if (/\btask manager\b/.test(text)) terms.push("Windows Task Manager");
+  if (/\bperformance\s+tab\b|\bperformance\s+panel\b/.test(text)) terms.push("Performance tab");
+  if (/\bcpu\b/.test(text)) terms.push("CPU metrics");
+  if (/\bmemory\b/.test(text)) terms.push("memory metrics");
+  if (/\bdisk\b|\bssd\b/.test(text)) terms.push("disk metrics");
+  if (/\bethernet\b|\bnetwork\b/.test(text)) terms.push("network metrics");
+  if (/\bgpu\b|\bnvidia\b|\bintel uhd\b/.test(text)) terms.push("GPU metrics");
+  if (/\bfile explorer\b/.test(text)) terms.push("File Explorer");
+  const folderMatch = String(value ?? "").match(/\bfolder\s+(?:labeled|named|titled)\s+"([^"]+)"/i);
+  if (folderMatch?.[1]) terms.push(`folder "${folderMatch[1]}"`);
+  if (/\bbrowser\b|\btab\b|\bweb page\b|\bwebsite\b/.test(text) && !/\btask manager\b/.test(text)) terms.push("browser tab");
+  return uniqueStrings(terms);
+};
+
+const extractMetricChangeHints = (current: string | null, previous: string | null): string[] => {
+  const currentTerms = new Set(extractReplayTerms(current));
+  const previousTerms = new Set(extractReplayTerms(previous));
+  const sharedMetricTerms = [...currentTerms].filter((term) => previousTerms.has(term) && /\bmetrics?\b/i.test(term));
+  if (sharedMetricTerms.length === 0) return [];
+  if ((current ?? "").replace(/\s+/g, " ").trim() === (previous ?? "").replace(/\s+/g, " ").trim()) {
+    return [];
+  }
+  return [`Visible ${sharedMetricTerms.join(", ")} refreshed between epochs; values may have shifted while the same performance view stayed open.`];
+};
+
+const refsForObservation = (refs: string[], observationRef: string | null): string[] => {
+  if (!observationRef) return [];
+  const bare = observationRef.replace(/^observation:/, "");
+  return refs.filter((ref) => ref === observationRef || ref === bare || ref.endsWith(bare));
+};
+
+const buildReplayAnswerBundle = (input: {
   activeContext: HelixActiveSituationContext;
   selection: HelixSituationEvidenceSelection;
-}): string => {
+}): { fullReasoning: string; conciseAnswer: string; delta: HelixProcedureEpochReplayDelta } => {
   const context = input.activeContext;
   if (!context.situation_run_id || context.latest_epoch === null || context.latest_epoch === undefined) {
-    return "I do not have a bound situation epoch to replay yet.";
+    const delta: HelixProcedureEpochReplayDelta = {
+      schema: "helix.procedure_epoch_replay_delta.v1",
+      current_observation_refs: [],
+      previous_observation_refs: [],
+      current_field_evaluation_refs: [],
+      previous_field_evaluation_refs: [],
+      changed_objects: [],
+      unchanged_objects: [],
+      changed_activity: [],
+      changed_app_window: [],
+      metric_or_value_changes: [],
+      comparison_confidence: 0,
+      missing_evidence: ["bound_situation_epoch_missing"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    return {
+      fullReasoning: "I do not have a bound situation epoch to replay yet.",
+      conciseAnswer: "I do not have a bound situation epoch to replay yet.",
+      delta,
+    };
   }
   const closures = listProcedureEpochClosures({
     threadId: context.thread_id,
@@ -540,11 +619,78 @@ const buildReplayAnswer = (input: {
   const currentObservationRef = currentObservationLedger?.item_ref ?? selectedCurrentObservation?.observation_id ?? null;
   const previousObservationRef = previousObservationLedger?.item_ref ?? selectedPreviousObservation?.observation_id ?? null;
   const latestProbe = probes.at(-1) ?? null;
-  return [
+  const currentTerms = extractReplayTerms([currentObservation, scene?.value, objects?.value].filter(Boolean).join(" "));
+  const previousTerms = extractReplayTerms(previousObservation);
+  const unchangedObjects = currentTerms.filter((term) => previousTerms.includes(term));
+  const changedObjects = uniqueStrings([
+    ...currentTerms.filter((term) => !previousTerms.includes(term)),
+    ...previousTerms.filter((term) => !currentTerms.includes(term)).map((term) => `previous ${term}`),
+  ]);
+  const currentBrief = firstSentence(currentObservation) ?? "No current observation summary was selected.";
+  const previousBrief = firstSentence(previousObservation) ?? "No previous observation summary was selected.";
+  const metricChanges = extractMetricChangeHints(currentObservation, previousObservation);
+  const sameWorkspace = unchangedObjects.length > 0;
+  const changedActivity = sameWorkspace
+    ? []
+    : changedObjects.length > 0
+      ? ["Visible activity or focus changed between the selected epochs."]
+      : [];
+  const changedAppWindow = sameWorkspace
+    ? []
+    : changedObjects.filter((term) => /\b(?:task manager|file explorer|browser|folder)\b/i.test(term));
+  const missingEvidence = [
+    previousObservation ? null : "previous_observation_missing",
+    currentObservation ? null : "current_observation_missing",
+  ].filter((entry): entry is string => Boolean(entry));
+  const comparisonConfidence = missingEvidence.length > 0 ? 0.35 : sameWorkspace ? 0.72 : 0.64;
+  const currentObservationRefs = refsForObservation(input.selection.selected_observation_refs, currentObservationRef);
+  const previousObservationRefs = refsForObservation(input.selection.selected_observation_refs, previousObservationRef);
+  const selectedFieldEvaluations = context.situation_run_id
+    ? listLiveFieldEvaluations({
+        threadId: context.thread_id,
+        environmentId: context.environment_id ?? null,
+        situationRunId: context.situation_run_id,
+        limit: 80,
+      }).filter((entry) => input.selection.selected_field_evaluation_refs.includes(entry.evaluation_id))
+    : [];
+  const currentFieldEvaluationRefs = selectedFieldEvaluations
+    .filter((entry) => !currentObservationRef || entry.evidence_refs.some((ref) => refsForObservation([ref], currentObservationRef).length > 0))
+    .map((entry) => entry.evaluation_id);
+  const previousFieldEvaluationRefs = selectedFieldEvaluations
+    .filter((entry) => previousObservationRef && entry.evidence_refs.some((ref) => refsForObservation([ref], previousObservationRef).length > 0))
+    .map((entry) => entry.evaluation_id);
+  const delta: HelixProcedureEpochReplayDelta = {
+    schema: "helix.procedure_epoch_replay_delta.v1",
+    current_observation_refs: currentObservationRefs,
+    previous_observation_refs: previousObservationRefs,
+    current_field_evaluation_refs: uniqueStrings(currentFieldEvaluationRefs),
+    previous_field_evaluation_refs: uniqueStrings(previousFieldEvaluationRefs),
+    changed_objects: changedObjects,
+    unchanged_objects: unchangedObjects,
+    changed_activity: changedActivity,
+    changed_app_window: changedAppWindow,
+    metric_or_value_changes: metricChanges,
+    comparison_confidence: comparisonConfidence,
+    missing_evidence: missingEvidence,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const changeLine = missingEvidence.length > 0
+    ? `Change: comparison is incomplete because ${missingEvidence.join(", ")}.`
+    : sameWorkspace
+      ? `Change: the main view appears stable; ${metricChanges[0] ?? "only minor visual or value-level changes were selected."}`
+      : `Change: ${changedObjects.length ? changedObjects.join(", ") : "the visible scene changed between the selected epochs"}.`;
+  const unchangedLine = unchangedObjects.length
+    ? `Unchanged: ${unchangedObjects.join(", ")}.`
+    : "Unchanged: no stable app/window/object terms were confidently selected.";
+  const fullReasoning = [
     `Epoch ${epoch} closed as ${closure?.status ?? "unknown"}.`,
     previousEpoch !== null ? `Compared against epoch ${previousEpoch}.` : "Previous epoch: no earlier bound epoch was selected.",
     line("Previous observation", previousObservation),
     line("Current observation", currentObservation),
+    changeLine,
+    unchangedLine,
+    metricChanges.length ? `Metric/value changes: ${metricChanges.join(" ")}` : "",
     line("Scene", scene?.value),
     line("Activity", activity?.value),
     line("Objects", objects?.value),
@@ -560,6 +706,19 @@ const buildReplayAnswer = (input: {
     ].filter(Boolean).slice(0, 8).join(", ") || "none selected"}.`,
     "Raw images, audio, and logs were not injected into Ask context.",
   ].filter(Boolean).join("\n");
+  const conciseAnswer = [
+    `Current: ${currentBrief}`,
+    `Previous: ${previousBrief}`,
+    changeLine,
+    unchangedObjects.length ? `Unchanged: ${unchangedObjects.join(", ")}.` : null,
+    `Evidence refs: ${[
+      previousObservationRef,
+      currentObservationRef,
+      ...input.selection.selected_field_evaluation_refs,
+      ...input.selection.selected_epoch_closure_refs,
+    ].filter(Boolean).slice(0, 6).join(", ") || "none selected"}.`,
+  ].filter(Boolean).join("\n");
+  return { fullReasoning, conciseAnswer, delta };
 };
 
 const buildSceneComparisonAnswer = (result: HelixVisualSceneComparisonResult): string =>
@@ -938,7 +1097,7 @@ export function routeSituationContextTurn(input: {
     };
   }
   if (isProcedureReplayPrompt(input.promptText) || deicticReference.reference_type === "latest_epoch_change") {
-    const fullReasoning = buildReplayAnswer({ activeContext: temporalActiveContext, selection });
+    const replayBundle = buildReplayAnswerBundle({ activeContext: temporalActiveContext, selection });
     const distillationBundle = recordReasoningAndDistillation({
       turnId,
       threadId: input.threadId,
@@ -946,8 +1105,8 @@ export function routeSituationContextTurn(input: {
       activeContext: temporalActiveContext,
       selection,
       sourceAnswerKind: "procedure_epoch_replay",
-      fullReasoningSummary: fullReasoning,
-      conciseAnswer: fullReasoning.split("\n").slice(0, 3).join(" "),
+      fullReasoningSummary: replayBundle.fullReasoning,
+      conciseAnswer: replayBundle.conciseAnswer,
       caveat: null,
       style: chooseLiveAnswerStyle({
         promptText: input.promptText,
@@ -962,6 +1121,7 @@ export function routeSituationContextTurn(input: {
       answer_text: distillationBundle.terminalText,
       reasoning_snapshot: distillationBundle.snapshot,
       answer_distillation: distillationBundle.distillation,
+      procedure_epoch_replay_delta: replayBundle.delta,
       procedure_memory_recall: buildProcedureMemoryRecall({
         threadId: input.threadId,
         turnId,

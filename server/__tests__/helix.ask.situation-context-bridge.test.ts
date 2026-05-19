@@ -1138,6 +1138,15 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Current observation:");
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Change:");
+    expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("Unchanged:");
+    expect(route.answer_text).toContain("Current:");
+    expect(route.answer_text).toContain("Previous:");
+    expect(route.procedure_epoch_replay_delta).toMatchObject({
+      schema: "helix.procedure_epoch_replay_delta.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
   });
 
   it("selects a prior visual scene by props and compares it with the current scene", () => {
