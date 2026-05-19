@@ -1274,6 +1274,101 @@ describe("thread-bound situation context bridge", () => {
     expect(String(route.answer_text ?? "")).not.toContain("Evidence refs:");
   });
 
+  it("auto-binds a fresh producer for explicit visual screen-capture questions", () => {
+    const now = new Date().toISOString();
+    upsertLiveSourceProducer({
+      sourceId: "visual_source:desktop-active",
+      threadId: "helix-ask:desktop",
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: null,
+      captureMode: "manual",
+      now,
+    });
+    appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: "observation:visual-capture-current",
+      kind: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: "visual_source:desktop-active",
+      text: "A current visual capture frame shows a file management workspace.",
+      evidence_refs: ["live_source_analysis_job:visual-capture-current"],
+      model_invoked: true,
+      confidence: 0.78,
+      observed_at: now,
+      ingested_at: now,
+      available_at: now,
+      created_at: now,
+    });
+
+    const route = routeSituationContextTurn({
+      threadId: "122b027e-56a4-41e7-8d65-dd9e1bd7af36",
+      promptText: "Okay, can you review what is happening right now in the visual screen capture?",
+      inputModality: "typed",
+      turnId: "ask:auto-bind-visual-capture",
+      submittedAt: now,
+      answerStartedAt: now,
+    });
+
+    expect(route.route).toBe("situation_context_question");
+    expect(route.active_situation_context.status).toBe("active");
+    expect(route.active_situation_context.situation_run_id).toMatch(/^live_situation_run:/);
+    expect(route.active_situation_context.environment_id).toMatch(/^live_answer:/);
+    expect(route.situation_evidence_selection.answerable).toBe(true);
+    expect(route.situation_evidence_selection.selected_source_refs).toContain("visual_source:desktop-active");
+    expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
+    expect(route.answer_text).toContain("file management workspace");
+    expect(route.answer_text).toContain("Source refs:");
+  });
+
+  it("auto-accepts a fresh visual capture repair into an existing SituationRun", () => {
+    seedVisualSituationRun();
+    const now = new Date().toISOString();
+    upsertLiveSourceProducer({
+      sourceId: "visual_source:chrome-current",
+      threadId: "helix-ask:desktop",
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: null,
+      captureMode: "manual",
+      now,
+    });
+    appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: "observation:chrome-visual-current",
+      kind: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: "visual_source:chrome-current",
+      text: "A Chrome visual capture frame shows the Helix Ask test UI and worker-lane debug output.",
+      evidence_refs: ["live_source_analysis_job:chrome-visual-current"],
+      model_invoked: true,
+      confidence: 0.79,
+      observed_at: now,
+      ingested_at: now,
+      available_at: now,
+      created_at: now,
+    });
+
+    const route = routeSituationContextTurn({
+      threadId: "122b027e-56a4-41e7-8d65-dd9e1bd7af36",
+      promptText: "Okay, can you explain what the visual capture is seeing right now?",
+      inputModality: "typed",
+      turnId: "ask:auto-accept-active-run-visual-capture",
+      submittedAt: now,
+      answerStartedAt: now,
+    });
+
+    expect(route.route).toBe("situation_context_question");
+    expect(route.active_situation_context.status).toBe("active");
+    expect(route.active_situation_context.situation_run_id).toMatch(/^live_situation_run:/);
+    expect(route.situation_evidence_selection.answerable).toBe(true);
+    expect(route.situation_evidence_selection.selected_source_refs).toContain("visual_source:chrome-current");
+    expect(route.situation_evidence_selection.rejected_unbound_source_refs).not.toContain("visual_source:chrome-current");
+    expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
+    expect(route.answer_text).toContain("Helix Ask test UI");
+    expect(route.answer_text).toContain("Source refs:");
+  });
+
   it("recalls saved evidence through a snapshot expansion prompt", () => {
     seedVisualSituationRun();
     const first = routeSituationContextTurn({

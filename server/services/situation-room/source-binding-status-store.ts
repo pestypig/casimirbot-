@@ -502,20 +502,25 @@ export function replayUnboundEvidenceThroughRepair(input: {
       created_at: now,
     }).observation_id,
   );
-  const syntheticChunkObservationRefs = candidate.old_unbound_chunk_refs.map((chunkRef: string) =>
-    appendObservationJournalEntry({
-      thread_id: candidate.thread_id,
-      source_id: candidate.source_id,
-      role: candidate.source_kind === "display_audio_transcript" ? "transcript_observation" : "raw_source_event",
-      modality: helixDefaultModalityForSourceKind(candidate.source_kind),
-      text: `Replayed bound evidence from ${chunkRef}.`,
-      evidence_refs: [chunkRef],
-      model_invoked: false,
-      replay_status: "replayed",
-      source_binding_id: input.bindingId,
-      created_at: now,
-    }).observation_id,
-  );
+  const shouldSynthesizeChunkObservations =
+    replayedObservationRefs.length === 0 ||
+    helixDefaultModalityForSourceKind(candidate.source_kind) !== "visual_frame";
+  const syntheticChunkObservationRefs = shouldSynthesizeChunkObservations
+    ? candidate.old_unbound_chunk_refs.map((chunkRef: string) =>
+        appendObservationJournalEntry({
+          thread_id: candidate.thread_id,
+          source_id: candidate.source_id,
+          role: candidate.source_kind === "display_audio_transcript" ? "transcript_observation" : "raw_source_event",
+          modality: helixDefaultModalityForSourceKind(candidate.source_kind),
+          text: `Replayed bound evidence from ${chunkRef}.`,
+          evidence_refs: [chunkRef],
+          model_invoked: false,
+          replay_status: "replayed",
+          source_binding_id: input.bindingId,
+          created_at: now,
+        }).observation_id,
+      )
+    : [];
   return unique([...replayedObservationRefs, ...syntheticChunkObservationRefs]);
 }
 

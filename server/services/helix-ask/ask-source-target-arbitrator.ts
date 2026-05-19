@@ -15,6 +15,7 @@ import {
   PROCEDURE_RECALL_SUPPRESSED_ROUTES,
   procedureRecallTargetSource,
 } from "./procedure-memory-recall-router";
+import { isLiveSourceCadenceControlPrompt } from "./live-source-continuation-intent";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -375,6 +376,12 @@ const mapRepoRequestedOutputs = (
 const isSituationEpochCue = (cue: string): boolean =>
   /epoch|changed|since|previous|compare|different|difference|visual|scene|frame|capture/i.test(cue);
 
+const filterLivePipelineCues = (prompt: string, cues: string[]): string[] =>
+  cues.filter((cue: string) => {
+    if (cue !== "set_interval" && cue !== "capture_cadence") return true;
+    return isLiveSourceCadenceControlPrompt(prompt);
+  });
+
 const PROCEDURE_EPOCH_REQUESTED_OUTPUTS: HelixAskSourceTargetRequestedOutput[] = [
   "procedure_epoch_replay",
   "field_evaluation_refs",
@@ -558,7 +565,10 @@ export function arbitrateAskSourceTarget(input: {
     }
   }
   for (const rule of rules) {
-    const explicitCues = matches(prompt, rule.cues);
+    const explicitCues =
+      rule.target === "live_pipeline"
+        ? filterLivePipelineCues(prompt, matches(prompt, rule.cues))
+        : matches(prompt, rule.cues);
     if (explicitCues.length === 0) continue;
     const targetKind =
       rule.target === "procedure_memory" && explicitCues.some(isSituationEpochCue)

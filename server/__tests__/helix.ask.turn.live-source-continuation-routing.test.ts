@@ -250,6 +250,35 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
   }, 20_000);
 
+  it("does not turn a negated interval mention inside a screen question into cadence control", async () => {
+    const question =
+      "all right cool can you review what is happening right now in the screen capture I haven't started the interval 10 seconds yet";
+    const app = await createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question,
+        debug: true,
+      })
+      .expect(200);
+
+    expect(classifyLiveSourceContinuationIntent(question)).toBeNull();
+    expect(response.body?.route_reason_code).toBe("situation_context_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      target_kind: "visual_capture",
+    });
+    expect(response.body?.source_target_intent?.explicit_cues).toContain("screen_capture");
+    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+    expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
+    expect(response.body?.action_id).not.toBe("situation-room.live-source.set_rate");
+    expect(response.body?.workspace_action_receipt?.action_id).not.toBe("situation-room.live-source.set_rate");
+    expect(response.body?.visual_producer_cadence_receipt).toBeFalsy();
+    expect(response.body?.tool_call_admission_decision?.source_target).not.toBe("live_pipeline");
+  }, 20_000);
+
   it("routes direct visual interval commands to producer cadence control", async () => {
     const app = await createApp();
     const response = await request(app)

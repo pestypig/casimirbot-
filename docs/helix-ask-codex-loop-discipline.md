@@ -208,6 +208,51 @@ Project-local entity definition prompts such as `What is StarSim?`, `What is
 NHM2?`, or `What is Helix Ask?` should use repo evidence unless the user
 explicitly asks for background-only or general-concept-only reasoning.
 
+## Live Source Control Admission
+
+Live source control is a tool action, not a lexical side effect. A number,
+cadence, interval, or rate mention is not enough to admit `live_pipeline_control`
+or `situation-room.live-source.set_rate`.
+
+Codex's turn loop samples the model over the full current prompt/history,
+records model-requested tool calls, executes those tool calls, records tool
+outputs back into the turn, and only then samples again or closes the turn. That
+shape means a phrase inside user context cannot silently become a tool action
+unless the turn path admits it as a tool request.
+
+Helix Ask must preserve the same discipline:
+
+1. A visual-content request wins over a cadence mention when the prompt asks to
+   review, explain, describe, or summarize the current screen/capture/frame.
+2. Negated, historical, future, or conditional cadence mentions are context, not
+   commands. Examples: `I haven't started the interval 10 seconds yet`,
+   `without starting the interval`, `not running every 10 seconds yet`.
+3. `live_pipeline_control` requires an affirmative control act such as `set`,
+   `change`, `update`, `start`, `enable`, `turn on`, or a continuation command
+   like `keep checking my screen every 10 seconds`.
+4. If the prompt is a visual question and no answerable evidence exists, fail
+   through the visual/SituationRun evidence contract. Do not switch to a pipeline
+   receipt just because a cadence token appears.
+5. Debug export must expose the admission decision:
+   `source_target_intent`, route candidate, terminal artifact kind, selected
+   source refs, rejected source refs, and whether any control tool was actually
+   admitted.
+
+Regression prompt:
+
+```txt
+all right cool can you review what is happening right now in the screen capture I haven't started the interval 10 seconds yet
+```
+
+Required behavior:
+
+- route: `situation_context_question`
+- source target: `visual_capture`
+- terminal artifact: visual/SituationRun context or typed visual evidence
+  failure
+- forbidden: `live_pipeline_control`, `live_pipeline_receipt`,
+  `situation-room.live-source.set_rate`, and cadence adoption requests
+
 ## Project-Local Agent Loop Questions
 
 Questions about Helix Ask, Codex discipline, the agentic turn loop, route

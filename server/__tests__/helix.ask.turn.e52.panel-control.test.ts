@@ -182,6 +182,28 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(findAction(response.body, "docs-viewer")).toBeTruthy();
   }, 60000);
 
+  it("routes open-up calculator wording to panel control", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Can you open up the scientific calculator panel?",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-open-up-calculator-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workspace_action_receipt");
+    expect(findAction(response.body, "scientific-calculator")).toBeTruthy();
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(response.body?.terminal_consistency_check?.consistent).toBe(true);
+    expect(response.body?.poison_audit?.ok).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Opening panel: Scientific Calculator\./);
+  }, 60000);
+
   it("routes calculator solve requests to the scientific calculator action", async () => {
     const app = createApp();
     const response = await request(app)

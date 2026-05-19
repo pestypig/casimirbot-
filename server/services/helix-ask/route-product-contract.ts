@@ -107,6 +107,7 @@ function makeContract(input: {
 const normalizeSourceTarget = (
   sourceTarget: unknown,
 ): HelixRouteProductSourceTarget => {
+  if (sourceTarget === "workspace_panel") return "workstation_panel";
   if (
     sourceTarget === "visual_capture" ||
     sourceTarget === "audio_transcript" ||
@@ -149,6 +150,9 @@ export const isStructuredDocsViewerPrompt = (promptText: string): boolean => {
     (structuredPathCue && locateQueryCue && locationsListCue);
 };
 
+const isExplicitLiveBindingDiagnosisPrompt = (promptText: string): boolean =>
+  /\b(?:worker\s+lanes?|lanes?\s+(?:not\s+)?updating|not\s+updating|live\s+answer\s+readiness|capture\s+(?:health|bound|binding|adopted|adoption|running)|visual\s+capture\s+(?:health|bound|binding|adopted|adoption|running)|producer\s+(?:stale|fresh|status)|client\s+adoption|scene_procedure_ready|active\s+live\s+answer\s+environment)\b/i.test(promptText);
+
 export function buildRouteProductContract(input: {
   turnId: string;
   threadId?: string | null;
@@ -186,11 +190,16 @@ export function buildRouteProductContract(input: {
   }
 
   if (sourceTarget === "visual_capture") {
+    const explicitBindingDiagnosis = isExplicitLiveBindingDiagnosisPrompt(promptText);
     return makeContract({
       turnId: input.turnId,
       threadId: input.threadId,
       sourceTarget: "visual_capture",
-      allowedCore: targetKind === "situation_epoch" ? ["situation_context_pack", "procedure_epoch_replay"] : ["situation_context_pack"],
+      allowedCore: targetKind === "situation_epoch"
+        ? ["situation_context_pack", "procedure_epoch_replay"]
+        : explicitBindingDiagnosis
+          ? ["situation_context_pack", "live_environment_binding_diagnosis"]
+          : ["situation_context_pack"],
       allowedExtra: ["live_visual_answer", "live_source_typed_failure", "visual_frame_evidence", "source_binding_status", "source_binding_repair_candidate"],
       forbiddenExtra: ["active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer", "process_graph_overview"],
       precedenceReason: "visual_source_target_allows_current_situation_terminal_products",

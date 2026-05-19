@@ -29,6 +29,7 @@ import { detectDeicticReference } from "./deictic-reference-detector";
 import { selectSituationEvidence } from "./situation-evidence-selector";
 import { resolveActiveSituationContext } from "../situation-room/active-situation-context-resolver";
 import { repairUnboundVisualSituationContext } from "../situation-room/live-situation-context-binding-repair";
+import { autoBindExplicitVisualCaptureSituationRun } from "../situation-room/visual-capture-situation-run-autobind";
 import { listObservationJournalEntries } from "../situation-room/observation-journal-store";
 import { listLiveFieldEvaluations } from "../situation-room/live-field-evaluation-store";
 import { buildLiveContextWindowBinding } from "../situation-room/live-context-window-binding-builder";
@@ -165,6 +166,19 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const replayWindowForPrompt = (input: {
+  submittedAt?: string | null;
+  answerStartedAt: string;
+  lookbackMs?: number;
+}): { from_ts: string; to_ts: string } => {
+  const anchorMs = Date.parse(input.submittedAt ?? "") || Date.parse(input.answerStartedAt) || Date.now();
+  const lookbackMs = Math.max(0, Math.trunc(input.lookbackMs ?? 60_000));
+  return {
+    from_ts: new Date(anchorMs - lookbackMs).toISOString(),
+    to_ts: new Date(anchorMs).toISOString(),
+  };
+};
 
 const isProcedureReplayPrompt = (prompt: string): boolean =>
   /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+(?:the\s+)?current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
@@ -583,6 +597,17 @@ const getSituationFields = (context: HelixActiveSituationContext) => {
   };
 };
 
+const getLatestObservationSummary = (context: HelixActiveSituationContext): string | null => {
+  const refs = new Set(context.latest_observation_refs);
+  if (refs.size === 0) return null;
+  return listObservationJournalEntries({
+    threadId: context.thread_id,
+    limit: 120,
+  })
+    .filter((entry) => refs.has(entry.observation_id))
+    .at(-1)?.text?.trim() ?? null;
+};
+
 const filterActiveSituationContextByWindow = (
   context: HelixActiveSituationContext,
   binding: HelixLiveContextWindowBinding | null,
@@ -645,7 +670,7 @@ const buildSituationFullReasoning = (input: {
     : "I can use the active visual SituationRun; this is grounded in compact procedure evidence, not raw screen pixels.";
   return [
     selectionCaveat,
-    line("Scene", scene?.value),
+    line("Scene", scene?.value ?? getLatestObservationSummary(context)),
     line("Activity", activity?.value),
     line("Visible objects", objects?.value),
     line("Uncertainty", uncertainty?.value),
@@ -667,7 +692,7 @@ const summarizeVisibleContext = (value: string | null | undefined): string => {
 const stripSceneLeadIn = (value: string): string => {
   const cleaned = value.replace(/\s+/g, " ").trim();
   return cleaned
-    .replace(/^(?:the\s+)?(?:visible\s+scene|current\s+live\s+frame|live\s+frame|current\s+frame|image|screen)\s+(?:showcases|shows|depicts|displays|features|contains)\s+/i, "")
+    .replace(/^(?:a\s+|the\s+)?(?:visible\s+scene|current\s+live\s+frame|live\s+frame|current\s+frame|visual\s+capture\s+frame|current\s+visual\s+capture\s+frame|image|screen)\s+(?:showcases|shows|depicts|displays|features|contains)\s+/i, "")
     .replace(/^(?:the\s+)?(?:active\s+context|ui)\s+(?:appears\s+to\s+be|suggests)\s+/i, "")
     .trim();
 };
@@ -733,10 +758,11 @@ const buildConciseSituationAnswer = (input: {
   style: HelixConversationalAnswerStyle;
 }): { concise: string; caveat: string | null } => {
   const { scene, activity, objects, uncertainty } = getSituationFields(input.activeContext);
+  const observationSummary = getLatestObservationSummary(input.activeContext);
   const prompt = input.prompt;
   const visible = summarizeVisibleWorkspace({
     prompt,
-    scene: scene?.value,
+    scene: scene?.value ?? observationSummary,
     objects: objects?.value,
   });
   const asksAboutSpecificFile = /\b(?:what|which|describe|see)\b[\s\S]{0,80}\bfile\b|\bfile\s+(?:i'm|i am|am i|that i'm|that i am)\s+(?:looking|clicking|viewing)\b/i.test(prompt);
@@ -1300,12 +1326,29 @@ export function routeSituationContextTurn(input: {
     input.inputModality ?? "typed",
     Date.now(),
   ])}`;
-  const activeContext = resolveActiveSituationContext({ threadId: input.threadId });
+  let activeContext = resolveActiveSituationContext({ threadId: input.threadId });
+  const answerStartedAt = input.answerStartedAt ?? new Date().toISOString();
   const initialReference = detectDeicticReference({
     threadId: input.threadId,
     promptText: input.promptText,
     inputModality: input.inputModality ?? "typed",
   });
+  const autoBoundVisualCapture = autoBindExplicitVisualCaptureSituationRun({
+    activeContext,
+    promptText: input.promptText,
+    turnId,
+    replayWindow: replayWindowForPrompt({
+      submittedAt: input.submittedAt,
+      answerStartedAt,
+      lookbackMs: input.lookbackMs,
+    }),
+    now: answerStartedAt,
+  });
+  if (autoBoundVisualCapture) {
+    activeContext = resolveActiveSituationContext({
+      threadId: activeContext.thread_id || input.threadId,
+    });
+  }
   const earlyRelativeSessionSemanticIntent = buildRelativeSessionSemanticIntent({
     turnId,
     threadId: input.threadId,
@@ -1492,7 +1535,6 @@ export function routeSituationContextTurn(input: {
     promptText: input.promptText,
   });
   const resolvedActiveContext = activeContext;
-  const answerStartedAt = input.answerStartedAt ?? new Date().toISOString();
   const liveContextWindowBinding = buildLiveContextWindowBinding({
     threadId: resolvedActiveContext.thread_id || input.threadId,
     turnId,

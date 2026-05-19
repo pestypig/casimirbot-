@@ -94,6 +94,7 @@
     "agi:export": "tsx scripts/agi-export.ts",
     "agi:gguf-bench": "tsx scripts/agi-gguf-bench.ts",
     "helix:ask:regression": "tsx scripts/helix-ask-regression.ts",
+    "helix:ask:top-debug-smoke": "tsx scripts/helix-ask-top-debug-smoke.ts",
     "helix:ask:regression:light": "cross-env HELIX_ASK_REGRESSION_LIGHT=1 tsx scripts/helix-ask-regression.ts",
     "helix:ask:regression:one": "cross-env HELIX_ASK_REGRESSION_LIGHT=1 HELIX_ASK_REGRESSION_ONLY=repo_pipeline tsx scripts/helix-ask-regression.ts",
     "helix:ask:regression:dry": "cross-env HELIX_ASK_REGRESSION_DRY_RUN=1 HELIX_ASK_REGRESSION_LIGHT=1 tsx scripts/helix-ask-regression.ts",
