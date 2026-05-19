@@ -26,6 +26,7 @@ import {
 } from "../services/situation-room/live-source-chunk-buffer";
 import { routeSituationContextTurn } from "../services/helix-ask/situation-context-turn-router";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
+import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 
 const createApp = async (): Promise<{ app: express.Express }> => {
   const agi = await import("../routes/agi.plan");
@@ -1176,6 +1177,128 @@ describe("thread-bound situation context bridge", () => {
     expect(recall.procedure_memory_recall?.snapshot_refs).toContain(first.reasoning_snapshot?.snapshot_id);
     expect(recall.answer_distillation?.assistant_answer).toBe(false);
     expect(recall.reasoning_snapshot?.assistant_answer).toBe(false);
+  });
+
+  it.each([
+    ["Show the evidence.", "procedure_memory_recall", "brief_evidence"],
+    ["What did you base that on?", "procedure_memory_recall", "brief_evidence"],
+    ["Why did you say that?", "answer_distillation_expansion", "expanded_trace"],
+    ["Replay that.", "procedure_epoch_replay", "epoch_replay"],
+    ["What changed in the last situation epoch?", "procedure_epoch_replay", "epoch_replay"],
+  ])("hard-routes %s to procedure recall products", (promptText, route, mode) => {
+    seedVisualSituationRun();
+    routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "What am I looking at now?",
+      inputModality: "typed",
+      turnId: "ask:anchor",
+    });
+
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:recall-route",
+      threadId: "helix-ask:desktop",
+      promptText,
+    });
+    const contract = buildRouteProductContract({
+      turnId: "ask:recall-route",
+      threadId: "helix-ask:desktop",
+      sourceTargetIntent: sourceTarget,
+      promptText,
+    });
+    const recall = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText,
+      inputModality: "typed",
+      turnId: "ask:recall-route",
+    });
+
+    expect(sourceTarget).toMatchObject({
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.suppressed_routes).toEqual(expect.arrayContaining([
+      "process_graph_overview",
+      "raw_logs",
+      "generic_context_pack",
+      "legacy_context_pack",
+      "no_tool_direct",
+      "model_only_concept",
+    ]));
+    expect(contract.allowed_terminal_artifact_kinds).toContain(route);
+    expect(contract.forbidden_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "process_graph_overview",
+      "no_tool_direct",
+      "model_only_concept",
+      "generic_context_pack",
+      "raw_logs",
+    ]));
+    expect(recall.procedure_memory_recall).toMatchObject({
+      mode,
+      terminal_artifact_kind: route,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(JSON.stringify(recall.procedure_memory_recall)).not.toMatch(/raw_(?:image|audio|logs|frame)|process_graph_snapshot/i);
+    expect(recall.answer_text).not.toMatch(/raw logs|raw image|raw audio|process graph/i);
+  });
+
+  it("prefers active SituationRun refs over legacy context packs for recall", () => {
+    seedVisualSituationRun();
+    routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "What am I looking at now?",
+      inputModality: "typed",
+      turnId: "ask:anchor",
+    });
+
+    const recall = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Show the evidence.",
+      inputModality: "typed",
+      turnId: "ask:active-precedence",
+    });
+
+    expect(recall.procedure_memory_recall?.selection_precedence[0]).toBe("active_situation_run");
+    expect(recall.procedure_memory_recall?.selected_evidence_refs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source_scope: "active_situation_run" }),
+      ]),
+    );
+  });
+
+  it("typed-fails when procedure recall evidence is missing", () => {
+    const recall = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Why did you say that?",
+      inputModality: "typed",
+      turnId: "ask:missing-recall",
+    });
+
+    expect(recall.typed_failure).toMatchObject({
+      schema: "helix.typed_failure.v1",
+      failure_code: "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(recall.answer_text).toContain("Failure: PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING");
+    expect(recall.answer_text).not.toMatch(/I think|probably|based on general/i);
+  });
+
+  it("suppresses voice recall when not terminal-authorized", () => {
+    const recall = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Replay that.",
+      inputModality: "voice",
+      turnId: "ask:voice-recall",
+    });
+
+    expect(recall.voice_live_handoff).toMatchObject({
+      quick_response_suppressed: true,
+      assistant_answer: false,
+    });
+    expect(recall.typed_failure?.failure_code).toBe("PROCEDURE_RECALL_VOICE_NOT_TERMINAL_AUTHORIZED");
   });
 
   it("routes scene-delta prompts through procedure replay and refuses fake comparisons without prior evidence", () => {

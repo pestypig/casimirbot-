@@ -5,6 +5,7 @@ import {
   type HelixRouteProductSourceTarget,
 } from "@shared/helix-route-product-contract";
 import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
+import { matchProcedureRecallPrompt } from "./procedure-memory-recall-router";
 
 export const CORE_TERMINAL_PRODUCTS = [
   "situation_context_pack",
@@ -40,6 +41,7 @@ export const AUXILIARY_TERMINAL_PRODUCTS = [
   "visual_context_pack",
   "situation_context_pack_with_epoch_evidence",
   "procedure_memory_recall",
+  "answer_distillation_expansion",
   "selected_visual_scene_set",
   "live_card_projection",
   "live_pipeline_receipt",
@@ -162,6 +164,7 @@ export function buildRouteProductContract(input: {
     ? sourceTargetRecord.requested_outputs
     : [];
   const targetKind = normalizeSourceTarget(sourceTargetRecord?.target_kind);
+  const procedureRecallRule = matchProcedureRecallPrompt(promptText);
   const strictProcedureEpochReplay =
     (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") &&
     targetKind === "situation_epoch" &&
@@ -203,6 +206,38 @@ export function buildRouteProductContract(input: {
       allowedExtra: ["selected_visual_scene_set"],
       forbiddenExtra: ["process_graph_overview", "live_environment_binding_diagnosis", "live_pipeline_receipt", "situation_context_pack", "no_tool_direct", "model_only_concept"],
       precedenceReason: "visual_scene_memory_source_target_allows_only_selected_scene_products",
+    });
+  }
+
+  if (procedureRecallRule && (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch")) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: procedureRecallRule.mode === "epoch_replay" ? ["procedure_epoch_replay"] : [],
+      allowedExtra: [
+        "procedure_memory_recall",
+        "answer_distillation_expansion",
+        "procedure_memory_unavailable",
+        "procedure_epoch_previous_unavailable",
+      ],
+      forbiddenExtra: [
+        "process_graph_overview",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "live_environment_binding_diagnosis",
+        "situation_context_pack",
+        "generic_context_pack",
+        "legacy_context_pack",
+        "raw_logs",
+        "raw_audio",
+        "raw_image",
+        "raw_frame",
+        "no_tool_direct",
+        "model_only_concept",
+      ],
+      precedenceReason: "procedure_recall_prompt_allows_only_recall_terminal_products",
+      sideArtifactKindsAllowed: ["situation_context_pack_with_epoch_evidence"],
     });
   }
 

@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 import {
   HELIX_CONVERSATIONAL_ANSWER_DISTILLATION_SCHEMA,
   type HelixConversationalAnswerDistillation,
@@ -21,7 +21,9 @@ import {
   HELIX_PROCEDURE_MEMORY_RECALL_SCHEMA,
   type HelixProcedureMemoryRecall,
   type HelixProcedureMemoryRecallMode,
+  type HelixProcedureMemoryRecallRef,
   type HelixProcedureMemoryRecallType,
+  type ProcedureRecallFailureCode,
 } from "@shared/helix-procedure-memory-recall";
 import { detectDeicticReference } from "./deictic-reference-detector";
 import { selectSituationEvidence } from "./situation-evidence-selector";
@@ -61,6 +63,7 @@ import {
   type HelixProcedureEpochReplay,
 } from "@shared/helix-procedure-epoch-replay";
 import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
+import { matchProcedureRecallPrompt } from "./procedure-memory-recall-router";
 
 type HelixSituationTypedFailure = {
   schema: "helix.typed_failure.v1";
@@ -74,7 +77,16 @@ type HelixSituationTypedFailure = {
     | "procedure_epoch_previous_unavailable"
     | "procedure_memory_unavailable"
     | "procedure_epoch_replay_evidence_unavailable"
-    | "procedure_epoch_replay_terminal_authority_rejected";
+    | "procedure_epoch_replay_terminal_authority_rejected"
+    | "PROCEDURE_MEMORY_RECALL_EVIDENCE_MISSING"
+    | "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING"
+    | "PROCEDURE_MEMORY_SELECTED_REFS_MISSING"
+    | "PROCEDURE_REASONING_SNAPSHOT_MISSING"
+    | "PROCEDURE_EPOCH_LEDGER_MISSING"
+    | "PROCEDURE_EPOCH_PREVIOUS_UNAVAILABLE"
+    | "PROCEDURE_RECALL_TERMINAL_AUTHORITY_MISSING"
+    | "PROCEDURE_RECALL_VOICE_NOT_TERMINAL_AUTHORIZED";
+  failure_code?: ProcedureRecallFailureCode;
   failure_kind?: string;
   requested_capability?: string;
   blocking_reason?: string;
@@ -164,10 +176,10 @@ const isComparisonPrompt = (prompt: string): boolean =>
   /\b(?:compare\s+this|compare\s+(?:this|the)\s+(?:file|image|picture|screen)|next\s+(?:one|file|image|picture|screen)|remember\s+this\s+as\s+the\s+first)\b/i.test(prompt);
 
 const isEvidenceExpansionPrompt = (prompt: string): boolean =>
-  /\b(?:show\s+(?:the\s+)?evidence|why\s+did\s+you\s+say|why\s+that|go\s+to\s+log|replay\s+that|show\s+refs?|what\s+evidence)\b/i.test(prompt);
+  /\b(?:show\s+(?:the\s+)?evidence|what\s+did\s+you\s+base\s+that\s+on|why\s+did\s+you\s+say|why\s+that|go\s+to\s+log|replay\s+that|show\s+refs?|what\s+evidence)\b/i.test(prompt);
 
 const classifyProcedureRecallType = (prompt: string): HelixProcedureMemoryRecallType => {
-  if (/\b(?:show\s+(?:the\s+)?evidence|show\s+refs?|what\s+evidence)\b/i.test(prompt)) return "show_evidence";
+  if (/\b(?:show\s+(?:the\s+)?evidence|what\s+did\s+you\s+base\s+that\s+on|show\s+refs?|what\s+evidence)\b/i.test(prompt)) return "show_evidence";
   if (/\bwhy\s+(?:did\s+you\s+say|that)\b/i.test(prompt)) return "why_answer";
   if (/\b(?:confidence\s+change|activity\s+confidence)\b/i.test(prompt)) return "confidence_change";
   if (/\b(?:go\s+to\s+log|log)\b/i.test(prompt)) return "log_navigation";
@@ -175,7 +187,9 @@ const classifyProcedureRecallType = (prompt: string): HelixProcedureMemoryRecall
 };
 
 const classifyProcedureRecallMode = (prompt: string): HelixProcedureMemoryRecallMode => {
-  if (/\b(?:show\s+(?:the\s+)?evidence|show\s+refs?|what\s+evidence)\b/i.test(prompt)) return "brief_evidence";
+  const rule = matchProcedureRecallPrompt(prompt);
+  if (rule) return rule.mode;
+  if (/\b(?:show\s+(?:the\s+)?evidence|what\s+did\s+you\s+base\s+that\s+on|show\s+refs?|what\s+evidence)\b/i.test(prompt)) return "brief_evidence";
   if (/\bwhy\s+(?:did\s+you\s+say|that)\b/i.test(prompt)) return "expanded_trace";
   return "epoch_replay";
 };
@@ -203,6 +217,15 @@ const withRefPrefix = (kind: string, refs: string[]): string[] =>
     .map((ref) => ref.trim())
     .filter(Boolean)
     .map((ref) => ref.includes(":") ? ref : `${kind}:${ref}`);
+
+const sanitizeRecallSummary = (value: string | null | undefined): string | null => {
+  const trimmed = value?.replace(/\s+/g, " ").trim() ?? "";
+  if (!trimmed) return null;
+  return trimmed
+    .replace(/\bRaw images?, audio, and logs were not injected into Ask context\.?/gi, "Unredacted media and log payloads were not included.")
+    .replace(/\bRaw images?, audio, logs, worker traces, and process graph snapshots were not included\.?/gi, "Unredacted media, log, worker-trace, and process-graph payloads were not included.")
+    .replace(/\braw screen pixels\b/gi, "unredacted screen pixels");
+};
 
 const renderProcedureEpochTerminalAuthority = (terminalArtifactKind: "procedure_epoch_replay" | "typed_failure"): string =>
   [
@@ -270,6 +293,7 @@ const buildProcedureEpochTypedFailure = (input: {
   turnId: string;
   threadId: string;
   errorCode: HelixSituationTypedFailure["error_code"];
+  failureCode?: ProcedureRecallFailureCode;
   message: string;
   evidenceRefs?: string[];
   missingEvidence?: string[];
@@ -287,6 +311,7 @@ const buildProcedureEpochTypedFailure = (input: {
     turn_id: input.turnId,
     thread_id: input.threadId,
     error_code: input.errorCode,
+    ...(input.failureCode ? { failure_code: input.failureCode } : {}),
     message: input.message,
     evidence_refs: evidenceRefs,
     query_intent_id: input.queryIntentId ?? "",
@@ -326,6 +351,13 @@ const buildProcedureMemoryRecall = (input: {
   snapshot?: HelixProcedureReasoningSnapshot | null;
   distillation?: HelixConversationalAnswerDistillation | null;
 }): HelixProcedureMemoryRecall => {
+  const mode = classifyProcedureRecallMode(input.prompt);
+  const terminalArtifactKind =
+    mode === "epoch_replay"
+      ? "procedure_epoch_replay"
+      : mode === "expanded_trace"
+        ? "answer_distillation_expansion"
+        : "procedure_memory_recall";
   const ledger = listProcedureEpochLedger({
     threadId: input.activeContext.thread_id || input.threadId,
     environmentId: input.activeContext.environment_id ?? null,
@@ -333,6 +365,73 @@ const buildProcedureMemoryRecall = (input: {
     epoch: input.activeContext.latest_epoch ?? null,
     limit: 24,
   });
+  const toRecallRef = (
+    refId: string,
+    refKind: HelixProcedureMemoryRecallRef["ref_kind"],
+    summary?: string | null,
+  ): HelixProcedureMemoryRecallRef => ({
+    ref_id: refId,
+    ref_kind: refKind,
+    source_scope: input.activeContext.situation_run_id ? "active_situation_run" : "legacy_context_pack",
+    situation_run_id: input.activeContext.situation_run_id ?? null,
+    environment_id: input.activeContext.environment_id ?? null,
+    epoch: input.activeContext.latest_epoch ?? null,
+    created_at: null,
+    observed_at: null,
+    confidence: null,
+    summary: summary ?? null,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  const selectedEvidenceRefIds = selectedEvidenceRefs(input.selection);
+  const selectedEvidence = selectedEvidenceRefIds.map((refId) => toRecallRef(refId, "selected_evidence"));
+  const reasoningSnapshots = input.snapshot
+    ? [toRecallRef(input.snapshot.snapshot_id, "reasoning_snapshot", firstSentence(sanitizeRecallSummary(input.snapshot.full_reasoning_summary)))]
+    : [];
+  const epochLedger = ledger.map((entry) => ({
+    ref_id: entry.ledger_item_id,
+    ref_kind: "epoch_ledger" as const,
+    source_scope: "active_situation_epoch" as const,
+    situation_run_id: entry.situation_run_id,
+    environment_id: entry.environment_id,
+    epoch: entry.epoch,
+    created_at: entry.created_at,
+    observed_at: null,
+    confidence: null,
+    summary: entry.summary,
+    assistant_answer: false as const,
+    raw_content_included: false as const,
+  }));
+  const probeResults = input.selection.selected_probe_result_refs.map((refId) => toRecallRef(refId, "probe_result"));
+  const confidenceUpdates = ledger
+    .filter((entry) => entry.item_kind === "confidence_update")
+    .map((entry) => ({
+      ref_id: entry.ledger_item_id,
+      ref_kind: "confidence_update" as const,
+      source_scope: "active_situation_epoch" as const,
+      situation_run_id: entry.situation_run_id,
+      environment_id: entry.environment_id,
+      epoch: entry.epoch,
+      created_at: entry.created_at,
+      observed_at: null,
+      confidence: null,
+      summary: entry.summary,
+      assistant_answer: false as const,
+      raw_content_included: false as const,
+    }));
+  const closures = input.selection.selected_epoch_closure_refs.map((refId) => toRecallRef(refId, "closure"));
+  const requiredRefsPresent =
+    mode === "epoch_replay"
+      ? epochLedger.length > 0 || selectedEvidence.length > 0
+      : mode === "expanded_trace"
+        ? selectedEvidence.length > 0 && reasoningSnapshots.length > 0
+        : selectedEvidence.length > 0;
+  const missingEvidenceReasons = uniqueStrings([
+    selectedEvidence.length > 0 ? null : "selected_evidence_refs_missing",
+    mode === "expanded_trace" && reasoningSnapshots.length === 0 ? "reasoning_snapshot_refs_missing" : null,
+    mode === "epoch_replay" && epochLedger.length === 0 ? "epoch_ledger_refs_missing" : null,
+  ]);
+  const terminalAuthorized = requiredRefsPresent && input.selection.answerable && input.activeContext.situation_run_id !== null;
   return {
     schema: HELIX_PROCEDURE_MEMORY_RECALL_SCHEMA,
     recall_id: `procedure_memory_recall:${hashShort([
@@ -344,16 +443,115 @@ const buildProcedureMemoryRecall = (input: {
     ])}`,
     thread_id: input.threadId,
     turn_id: input.turnId,
+    anchor_turn_id: input.snapshot?.turn_id ?? input.distillation?.turn_id ?? null,
+    anchor_answer_ref: input.distillation?.distillation_id ?? null,
     source_turn_id: input.snapshot?.turn_id ?? input.distillation?.turn_id ?? null,
+    mode,
+    terminal_artifact_kind: terminalArtifactKind,
+    situation_run_id: input.activeContext.situation_run_id ?? null,
+    environment_id: input.activeContext.environment_id ?? null,
+    source_binding_id: input.activeContext.source_binding_ids[0] ?? null,
+    epoch: input.activeContext.latest_epoch ?? null,
+    selected_evidence_refs: selectedEvidence,
+    reasoning_snapshot_refs: reasoningSnapshots,
+    epoch_ledger_refs: epochLedger,
+    probe_result_refs: probeResults,
+    confidence_update_refs: confidenceUpdates,
+    closure_refs: closures,
+    answer_distillation_ref: input.distillation?.distillation_id ?? null,
+    expansion_ref: input.snapshot?.snapshot_id ?? input.distillation?.expansion_ref ?? null,
+    selection_precedence: [
+      "active_situation_run",
+      "active_situation_epoch",
+      "visual_scene_memory",
+      "answer_distillation",
+      "legacy_context_pack",
+    ],
+    evidence_complete: missingEvidenceReasons.length === 0,
+    missing_evidence_reasons: missingEvidenceReasons,
+    terminal_authorized: terminalAuthorized,
+    voice_read_authorized:
+      terminalAuthorized &&
+      (
+        terminalArtifactKind === "procedure_memory_recall" ||
+        terminalArtifactKind === "answer_distillation_expansion" ||
+        terminalArtifactKind === "procedure_epoch_replay"
+      ),
     snapshot_refs: input.snapshot ? [input.snapshot.snapshot_id] : [],
-    epoch_ledger_refs: ledger.map((entry) => entry.ledger_item_id),
     distillation_refs: input.distillation ? [input.distillation.distillation_id] : [],
-    selected_evidence_refs: selectedEvidenceRefs(input.selection),
+    selected_evidence_ref_ids: selectedEvidenceRefIds,
+    epoch_ledger_ref_ids: ledger.map((entry) => entry.ledger_item_id),
     recall_type: classifyProcedureRecallType(input.prompt),
-    recall_mode: classifyProcedureRecallMode(input.prompt),
+    recall_mode: mode,
     assistant_answer: false,
     raw_content_included: false,
   };
+};
+
+const renderProcedureRecallAnswer = (
+  recall: HelixProcedureMemoryRecall,
+  input: {
+    snapshot?: HelixProcedureReasoningSnapshot | null;
+    distillation?: HelixConversationalAnswerDistillation | null;
+  } = {},
+): string => {
+  const selectedEvidence = recall.selected_evidence_refs.map((ref) => `- ${ref.ref_id}${ref.summary ? `: ${ref.summary}` : ""}`);
+  const reasoning = recall.reasoning_snapshot_refs.map((ref) => `- ${ref.ref_id}${ref.summary ? `: ${ref.summary}` : ""}`);
+  const probes = recall.probe_result_refs.map((ref) => `- ${ref.ref_id}`);
+  const confidence = recall.confidence_update_refs.map((ref) => `- ${ref.ref_id}${ref.summary ? `: ${ref.summary}` : ""}`);
+  const closures = recall.closure_refs.map((ref) => `- ${ref.ref_id}`);
+  if (recall.mode === "brief_evidence") {
+    return [
+      input.distillation?.concise_answer ? `Answered claim: ${input.distillation.concise_answer}` : "Answered claim: latest terminal answer anchor.",
+      input.snapshot?.full_reasoning_summary ? `Reasoning snapshot: ${sanitizeRecallSummary(input.snapshot.full_reasoning_summary)}` : "",
+      "Selected evidence refs",
+      ...(selectedEvidence.length ? selectedEvidence : ["- none selected"]),
+      `Evidence refs: ${recall.selected_evidence_ref_ids.slice(0, 12).join(", ") || "none"}.`,
+      reasoning.length ? "Reasoning snapshot refs" : "",
+      ...reasoning,
+      confidence.length ? "Confidence update refs" : "",
+      ...confidence,
+      recall.evidence_complete ? "" : `Caveat: evidence is partial (${recall.missing_evidence_reasons.join(", ")}).`,
+      "Unredacted media, logs, worker traces, and process-graph payloads were not included.",
+    ].filter(Boolean).join("\n");
+  }
+  if (recall.mode === "expanded_trace") {
+    return [
+      input.distillation?.concise_answer ? `Claim: ${input.distillation.concise_answer}` : "Claim: latest terminal answer anchor.",
+      input.snapshot?.full_reasoning_summary ? `Reasoning snapshot summary: ${sanitizeRecallSummary(input.snapshot.full_reasoning_summary)}` : "",
+      "Evidence refs used",
+      ...(selectedEvidence.length ? selectedEvidence : ["- none selected"]),
+      "Reasoning snapshot refs",
+      ...(reasoning.length ? reasoning : ["- none selected"]),
+      probes.length ? "Probe result refs" : "",
+      ...probes,
+      confidence.length ? "Confidence update refs" : "",
+      ...confidence,
+      closures.length ? "Epoch closure refs" : "",
+      ...closures,
+      recall.missing_evidence_reasons.length
+        ? `Missing or uncertain: ${recall.missing_evidence_reasons.join(", ")}.`
+        : "Missing or uncertain: none selected by the recall artifact.",
+      "This is a replay-safe reasoning snapshot summary, not raw trace output.",
+    ].filter(Boolean).join("\n");
+  }
+  return [
+    `Epoch: ${recall.epoch ?? "unknown"}`,
+    "Ledger item refs",
+    ...(recall.epoch_ledger_refs.length
+      ? recall.epoch_ledger_refs.map((ref) => `- ${ref.ref_id}${ref.summary ? `: ${ref.summary}` : ""}`)
+      : ["- none selected"]),
+    "Selected evidence refs",
+    ...(selectedEvidence.length ? selectedEvidence : ["- none selected"]),
+    closures.length ? "Closure refs" : "",
+    ...closures,
+    confidence.length ? "Confidence deltas" : "",
+    ...confidence,
+    recall.missing_evidence_reasons.length
+      ? `Missing or uncertain: ${recall.missing_evidence_reasons.join(", ")}.`
+      : "",
+    "Unredacted media, logs, worker traces, and process-graph payloads were not included.",
+  ].filter(Boolean).join("\n");
 };
 
 const getSituationFields = (context: HelixActiveSituationContext) => {
@@ -1107,7 +1305,11 @@ export function routeSituationContextTurn(input: {
     threadId: input.threadId,
     promptText: input.promptText,
   });
-  if (!initialReference.candidate_signal && isEvidenceExpansionPrompt(input.promptText)) {
+  const hardRecallRule = matchProcedureRecallPrompt(input.promptText);
+  const useEarlyRecallRoute =
+    Boolean(hardRecallRule && (hardRecallRule.mode !== "epoch_replay" || input.inputModality === "voice")) ||
+    (!initialReference.candidate_signal && isEvidenceExpansionPrompt(input.promptText));
+  if (useEarlyRecallRoute) {
     const latestDistillation = listConversationalAnswerDistillations({
       threadId: input.threadId,
       limit: 1,
@@ -1122,39 +1324,92 @@ export function routeSituationContextTurn(input: {
       deicticReference: initialReference,
       askingHistory: true,
     });
+    const procedureMemoryRecall = buildProcedureMemoryRecall({
+      threadId: input.threadId,
+      turnId,
+      prompt: input.promptText,
+      activeContext,
+      selection,
+      snapshot: latestSnapshot,
+      distillation: latestDistillation,
+    });
+    const missingFailureCode: ProcedureRecallFailureCode =
+      !activeContext.situation_run_id
+        ? "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING"
+        : procedureMemoryRecall.mode === "expanded_trace" && !latestSnapshot
+          ? "PROCEDURE_REASONING_SNAPSHOT_MISSING"
+          : procedureMemoryRecall.selected_evidence_refs.length === 0
+            ? "PROCEDURE_MEMORY_SELECTED_REFS_MISSING"
+            : "PROCEDURE_MEMORY_RECALL_EVIDENCE_MISSING";
+    const voiceUnauthorized =
+      input.inputModality === "voice" &&
+      procedureMemoryRecall.voice_read_authorized !== true;
+    const typedFailure = (!procedureMemoryRecall.terminal_authorized || voiceUnauthorized)
+      ? buildProcedureEpochTypedFailure({
+          turnId,
+          threadId: input.threadId,
+          errorCode: voiceUnauthorized
+            ? "PROCEDURE_RECALL_VOICE_NOT_TERMINAL_AUTHORIZED"
+            : missingFailureCode,
+          failureCode: voiceUnauthorized
+            ? "PROCEDURE_RECALL_VOICE_NOT_TERMINAL_AUTHORIZED"
+            : missingFailureCode,
+          message: voiceUnauthorized
+            ? "I can't read that recall aloud because the procedure recall artifact is not terminal-authorized."
+            : missingFailureCode === "PROCEDURE_REASONING_SNAPSHOT_MISSING"
+              ? "I can't explain the basis for that answer because this turn has no terminal-authorized reasoning snapshot refs."
+              : missingFailureCode === "PROCEDURE_MEMORY_SELECTED_REFS_MISSING"
+                ? "I can't show evidence for that answer because the terminal answer has no selected evidence refs."
+                : missingFailureCode === "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING"
+                  ? "I can't show procedure-memory evidence because there is no active SituationRun bound to this thread."
+                  : "I can't recall procedure evidence because the required selected refs are missing.",
+          evidenceRefs: procedureMemoryRecall.selected_evidence_ref_ids,
+          missingEvidence: procedureMemoryRecall.missing_evidence_reasons,
+          selection,
+        })
+      : null;
+    const recallDeicticReference = {
+      ...initialReference,
+      reference_type: "latest_epoch_change" as const,
+      candidate_signal: true,
+      resolution_status: latestSnapshot || latestDistillation ? "resolved" as const : "missing_context" as const,
+      resolved_context_refs: [
+        activeContext.context_id,
+        latestSnapshot?.snapshot_id ?? "",
+        latestDistillation?.distillation_id ?? "",
+      ].filter(Boolean),
+    };
     return {
       route: "procedure_epoch_replay_question",
-      deictic_reference: {
-        ...initialReference,
-        reference_type: "latest_epoch_change",
-        candidate_signal: true,
-        resolution_status: latestSnapshot || latestDistillation ? "resolved" : "missing_context",
-        resolved_context_refs: [
-          activeContext.context_id,
-          latestSnapshot?.snapshot_id ?? "",
-          latestDistillation?.distillation_id ?? "",
-        ].filter(Boolean),
-      },
+      deictic_reference: recallDeicticReference,
       active_situation_context: activeContext,
       situation_evidence_selection: selection,
-      answer_text: buildSnapshotExpansionAnswer({
-        snapshot: latestSnapshot,
-        distillation: latestDistillation,
-      }),
+      answer_text: typedFailure
+        ? `${typedFailure.message}\nFailure: ${typedFailure.failure_code ?? typedFailure.error_code}`
+        : renderProcedureRecallAnswer(procedureMemoryRecall, {
+            snapshot: latestSnapshot,
+            distillation: latestDistillation,
+          }),
       reasoning_snapshot: latestSnapshot,
       answer_distillation: latestDistillation,
-      procedure_memory_recall: buildProcedureMemoryRecall({
-        threadId: input.threadId,
-        turnId,
-        prompt: input.promptText,
-        activeContext,
-        selection,
-        snapshot: latestSnapshot,
-        distillation: latestDistillation,
-      }),
+      procedure_memory_recall: procedureMemoryRecall,
       live_context_window_binding: null,
       comparison_session: null,
-      voice_live_handoff: null,
+      typed_failure: typedFailure,
+      voice_live_handoff: voiceUnauthorized
+        ? {
+            schema: "helix.voice_live_handoff.v1",
+            handoff_id: `voice_live_handoff:${hashShort([turnId, "procedure_recall_unauthorized"])}`,
+            thread_id: input.threadId,
+            transcript: input.promptText,
+            deictic_reference: recallDeicticReference,
+            situation_evidence_selection: selection,
+            route: "procedure_epoch_replay_question",
+            quick_response_suppressed: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          }
+        : null,
       binding_repair: null,
     };
   }

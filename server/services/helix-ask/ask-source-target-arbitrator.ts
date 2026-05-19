@@ -10,6 +10,11 @@ import {
   isSceneEpochReplayPrompt,
   SCENE_EPOCH_REPLAY_FORBIDDEN_ROUTES,
 } from "./scene-epoch-replay-intent";
+import {
+  matchProcedureRecallPrompt,
+  PROCEDURE_RECALL_SUPPRESSED_ROUTES,
+  procedureRecallTargetSource,
+} from "./procedure-memory-recall-router";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -387,6 +392,24 @@ export function arbitrateAskSourceTarget(input: {
   promptText: string;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  const procedureRecallRule = matchProcedureRecallPrompt(prompt);
+  if (procedureRecallRule) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: procedureRecallTargetSource(procedureRecallRule),
+      targetKind: procedureRecallRule.target_kind,
+      strength: "hard",
+      explicitCues: [procedureRecallRule.cue],
+      reasons: ["hard_procedure_memory_recall_prompt", procedureRecallRule.cue],
+      requestedOutputs: procedureRecallRule.requested_outputs,
+      suppressedRoutes: [...PROCEDURE_RECALL_SUPPRESSED_ROUTES],
+      precedenceReason: "hard_procedure_memory_recall_prompt",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isStructuredDocsViewerPrompt(prompt)) {
     const docsRule = rules.find((rule: CueRule) => rule.target === "docs_viewer");
     if (docsRule) {
