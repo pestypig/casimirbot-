@@ -61,6 +61,17 @@ type HelixSituationTypedFailure = {
   error_code: "visual_scene_memory_no_match" | "visual_scene_memory_current_missing";
   message: string;
   evidence_refs: string[];
+  query_intent_id: string;
+  selected_scene_set_id: string;
+  query_terms: string[];
+  candidate_pool_size: number;
+  rejected_candidate_refs: string[];
+  missing_evidence: string[];
+  next_required_action:
+    | "capture_current_visual_epoch"
+    | "wait_for_scene_memory_index"
+    | "ask_user_for_more_specific_scene_terms"
+    | "none";
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -731,13 +742,16 @@ const buildSceneComparisonAnswer = (result: HelixVisualSceneComparisonResult): s
     result.differences.length ? `Differences: ${result.differences.join("; ")}.` : "",
     result.missing_evidence.length ? `Missing evidence: ${result.missing_evidence.join(", ")}.` : "",
     `Next check: ${result.next_check}`,
-    `Evidence refs: ${result.evidence_refs.slice(0, 8).join(", ") || "none selected"}.`,
+    `Prior evidence refs: ${result.prior_scene_evidence_refs.slice(0, 8).join(", ") || "none selected"}.`,
+    `Current evidence refs: ${result.current_scene_evidence_refs.slice(0, 8).join(", ") || "none selected"}.`,
+    `Evidence refs: ${result.evidence_refs.slice(0, 12).join(", ") || "none selected"}.`,
     "Raw images, audio, and logs were not injected into Ask context.",
   ].filter(Boolean).join("\n");
 
 const buildVisualSceneMemoryFailure = (input: {
   turnId: string;
   threadId: string;
+  queryIntent: HelixVisualSceneQueryIntent;
   selectedSceneSet: HelixSelectedVisualSceneSet;
 }): HelixSituationTypedFailure => {
   const currentMissing = input.selectedSceneSet.missing_evidence.includes("current_visual_scene_memory_missing");
@@ -752,6 +766,17 @@ const buildVisualSceneMemoryFailure = (input: {
       ? "I could not compare scenes because no current visual scene memory entry was selected."
       : "I could not find a prior visual scene matching the requested props or intent.",
     evidence_refs: input.selectedSceneSet.evidence_refs,
+    query_intent_id: input.queryIntent.query_intent_id,
+    selected_scene_set_id: input.selectedSceneSet.selection_id,
+    query_terms: input.queryIntent.query_terms,
+    candidate_pool_size: input.selectedSceneSet.candidate_pool_size,
+    rejected_candidate_refs: input.selectedSceneSet.rejected_candidates.map((entry) => entry.scene_memory_ref),
+    missing_evidence: input.selectedSceneSet.missing_evidence,
+    next_required_action: currentMissing
+      ? "capture_current_visual_epoch"
+      : input.selectedSceneSet.candidate_pool_size === 0
+        ? "wait_for_scene_memory_index"
+        : "ask_user_for_more_specific_scene_terms",
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -781,6 +806,11 @@ export function routeSituationContextTurn(input: {
     threadId: input.threadId,
     promptText: input.promptText,
     inputModality: input.inputModality ?? "typed",
+  });
+  const earlyVisualSceneQueryIntent = buildVisualSceneQueryIntent({
+    turnId,
+    threadId: input.threadId,
+    promptText: input.promptText,
   });
   if (!initialReference.candidate_signal && isEvidenceExpansionPrompt(input.promptText)) {
     const latestDistillation = listConversationalAnswerDistillations({
@@ -833,7 +863,7 @@ export function routeSituationContextTurn(input: {
       binding_repair: null,
     };
   }
-  if (!initialReference.candidate_signal) {
+  if (!initialReference.candidate_signal && !earlyVisualSceneQueryIntent) {
     const selection = selectSituationEvidence({
       threadId: input.threadId,
       activeContext,
@@ -905,6 +935,8 @@ export function routeSituationContextTurn(input: {
         : "missing_context";
   const deicticReference = {
     ...initialReference,
+    candidate_signal: initialReference.candidate_signal || Boolean(earlyVisualSceneQueryIntent),
+    reference_type: earlyVisualSceneQueryIntent ? "latest_epoch_change" as const : initialReference.reference_type,
     resolved_context_refs: [
       resolvedActiveContext.context_id,
       resolvedActiveContext.situation_run_id ?? "",
@@ -955,15 +987,84 @@ export function routeSituationContextTurn(input: {
     turnId,
     threadId: input.threadId,
     promptText: input.promptText,
-  });
-  if (visualSceneQueryIntent?.compare_to_current && temporalActiveContext.situation_run_id) {
+  }) ?? earlyVisualSceneQueryIntent;
+  if (visualSceneQueryIntent && temporalActiveContext.situation_run_id) {
     const selectedVisualSceneSet = selectVisualScenesForQuery({
       turnId,
       threadId: input.threadId,
       queryIntent: visualSceneQueryIntent,
       situationRunId: temporalActiveContext.situation_run_id,
+      environmentId: temporalActiveContext.environment_id ?? null,
       currentEpoch: temporalActiveContext.latest_epoch ?? null,
     });
+    if (!visualSceneQueryIntent.compare_to_current) {
+      const selected = selectedVisualSceneSet.selected_scenes[0]?.scene_memory ?? null;
+      const fullReasoning = selected
+        ? [
+            `I found a prior visual scene matching the requested props or intent: ${selected.visible_title ?? selected.scene_memory_id}.`,
+            `Selected scene: ${selected.scene_memory_id} at epoch ${selected.epoch}.`,
+            selectedVisualSceneSet.rejected_candidates.length
+              ? `Rejected candidates: ${selectedVisualSceneSet.rejected_candidates.map((entry) => `${entry.scene_memory_ref} (${entry.reason}, score ${entry.score})`).join("; ")}.`
+              : "",
+            `Evidence refs: ${selectedVisualSceneSet.evidence_refs.slice(0, 12).join(", ") || "none selected"}.`,
+            "Raw images, audio, and logs were not injected into Ask context.",
+          ].filter(Boolean).join("\n")
+        : [
+            "I could not find a prior visual scene matching the requested props or intent.",
+            `Query terms: ${visualSceneQueryIntent.query_terms.join(", ") || "none selected"}.`,
+            `Missing evidence: ${selectedVisualSceneSet.missing_evidence.join(", ") || "prior_scene_match_missing"}.`,
+            "Raw images, audio, and logs were not injected into Ask context.",
+          ].join("\n");
+      const typedFailure = selected ? null : buildVisualSceneMemoryFailure({
+        turnId,
+        threadId: input.threadId,
+        queryIntent: visualSceneQueryIntent,
+        selectedSceneSet: selectedVisualSceneSet,
+      });
+      const distillationBundle = recordReasoningAndDistillation({
+        turnId,
+        threadId: input.threadId,
+        prompt: input.promptText,
+        activeContext: temporalActiveContext,
+        selection,
+        sourceAnswerKind: "procedure_epoch_replay",
+        fullReasoningSummary: fullReasoning,
+        conciseAnswer: selected
+          ? `Found prior scene ${selected.visible_title ?? selected.scene_memory_id}.`
+          : typedFailure?.message ?? "I could not find a prior visual scene matching the requested props or intent.",
+        caveat: null,
+        style: chooseLiveAnswerStyle({
+          promptText: input.promptText,
+          inputModality: input.inputModality,
+        }),
+      });
+      return {
+        route: "procedure_epoch_replay_question",
+        deictic_reference: deicticReference,
+        active_situation_context: temporalActiveContext,
+        situation_evidence_selection: selection,
+        answer_text: fullReasoning,
+        reasoning_snapshot: distillationBundle.snapshot,
+        answer_distillation: distillationBundle.distillation,
+        procedure_memory_recall: buildProcedureMemoryRecall({
+          threadId: input.threadId,
+          turnId,
+          prompt: input.promptText,
+          activeContext: temporalActiveContext,
+          selection,
+          snapshot: distillationBundle.snapshot,
+          distillation: distillationBundle.distillation,
+        }),
+        live_context_window_binding: liveContextWindowBinding,
+        comparison_session: null,
+        visual_scene_query_intent: visualSceneQueryIntent,
+        selected_visual_scene_set: selectedVisualSceneSet,
+        visual_scene_comparison_result: null,
+        typed_failure: typedFailure,
+        voice_live_handoff: voiceLiveHandoff,
+        binding_repair: bindingRepair,
+      };
+    }
     const visualSceneComparisonResult = buildVisualSceneComparisonResult({
       turnId,
       threadId: input.threadId,
@@ -1016,6 +1117,7 @@ export function routeSituationContextTurn(input: {
     const typedFailure = buildVisualSceneMemoryFailure({
       turnId,
       threadId: input.threadId,
+      queryIntent: visualSceneQueryIntent,
       selectedSceneSet: selectedVisualSceneSet,
     });
     const fullReasoning = [

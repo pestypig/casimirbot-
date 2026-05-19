@@ -263,6 +263,111 @@ const seedVisualSceneMemoryComparison = () => {
   return { environment, run };
 };
 
+const seedSemanticVisualSceneMemoryExamples = () => {
+  const { environment, run } = seedVisualSituationRun();
+  const addScene = (input: {
+    title: string;
+    observationId: string;
+    evaluationId: string;
+    epochId: string;
+    timestamp: string;
+    text: string;
+  }) => {
+    const observation = appendObservationJournalEntry({
+      thread_id: "helix-ask:desktop",
+      observation_id: input.observationId,
+      kind: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: "visual_source:test",
+      text: input.text,
+      evidence_refs: [`live_source_analysis_job:${input.title.toLowerCase().replace(/\s+/g, "-")}`],
+      model_invoked: true,
+      confidence: 0.84,
+      created_at: input.timestamp,
+    });
+    const sceneEval = recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: input.evaluationId,
+      worker_run_id: `field_worker_run:scene:${input.title.toLowerCase().replace(/\s+/g, "-")}`,
+      worker_id: "field_worker:scene",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: input.text,
+      status: "supported",
+      confidence: 0.82,
+      evidence_refs: [observation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: null,
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: input.timestamp,
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    recordVisualSceneMemoryIndex({
+      situationRunId: run.situation_run_id,
+      threadId: run.thread_id,
+      environmentId: run.environment_id,
+      epoch: 0,
+      observation,
+      evaluations: [sceneEval],
+      procedureEpoch: {
+        schema: "helix.live_procedure_epoch.v1",
+        epoch_id: input.epochId,
+        situation_run_id: run.situation_run_id,
+        thread_id: run.thread_id,
+        environment_id: run.environment_id,
+        source_binding_id: run.source_binding_id,
+        epoch: 0,
+        observation_refs: [observation.observation_id],
+        field_evaluation_refs: [sceneEval.evaluation_id],
+        prediction_refs: [],
+        probe_result_refs: [],
+        assistant_answer: false,
+        raw_content_included: false,
+        role: "validation",
+        created_at: input.timestamp,
+      },
+    });
+  };
+  addScene({
+    title: "SUN",
+    observationId: "observation:sun-folder",
+    evaluationId: "field_eval:scene:sun",
+    epochId: "procedure_epoch:sun",
+    timestamp: "2026-05-18T12:00:01.000Z",
+    text: "The screen shows File Explorer in a folder labeled \"SUN\" with solar-observation files including sun-map.png and flare-data.csv.",
+  });
+  addScene({
+    title: "Camera Roll",
+    observationId: "observation:camera-roll",
+    evaluationId: "field_eval:scene:camera-roll",
+    epochId: "procedure_epoch:camera-roll",
+    timestamp: "2026-05-18T12:00:02.000Z",
+    text: "The screen shows File Explorer in a Camera Roll folder labeled \"Camera Roll\" with photos including IMG_0001.jpg.",
+  });
+  addScene({
+    title: "audio export",
+    observationId: "observation:audio-export-folder",
+    evaluationId: "field_eval:scene:audio-export",
+    epochId: "procedure_epoch:audio-export",
+    timestamp: "2026-05-18T12:00:03.000Z",
+    text: "The screen shows File Explorer in a folder labeled \"audio export\" with rendered audio files including mixdown.wav and stems.zip.",
+  });
+  addScene({
+    title: "Task Manager",
+    observationId: "observation:task-manager-current",
+    evaluationId: "field_eval:scene:task-manager-current",
+    epochId: "procedure_epoch:task-manager-current",
+    timestamp: "2026-05-18T12:00:04.000Z",
+    text: "The screen shows Windows Task Manager titled \"Task Manager\" on the Performance tab.",
+  });
+  return { environment, run };
+};
+
 describe("thread-bound situation context bridge", () => {
   beforeEach(() => {
     resetLiveAnswerEnvironments();
@@ -1189,6 +1294,118 @@ describe("thread-bound situation context bridge", () => {
     expect(route.visual_scene_comparison_result?.summary).toContain("SOHO");
     expect(route.answer_text).toContain("Compared current epoch");
     expect(route.answer_text).toContain("SOHO");
+  });
+
+  it("retrieves the SUN folder scene semantically and compares it with current Task Manager", () => {
+    seedSemanticVisualSceneMemoryExamples();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Compare this to the SUN folder scene.",
+      inputModality: "typed",
+      turnId: "ask:scene-memory-sun",
+    });
+
+    expect(route.visual_scene_query_intent).toMatchObject({
+      schema: "helix.visual_scene_query_intent.v1",
+      query_mode: "compare_prior_to_current",
+      target_scene_kind: "folder",
+      target_file_folder_terms: expect.arrayContaining(["sun"]),
+      compare_to_current: true,
+      requires_current_scene: true,
+      strength: "hard",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.selected_visual_scene_set).toMatchObject({
+      schema: "helix.selected_visual_scene_set.v1",
+      candidate_pool_size: expect.any(Number),
+      source_target_ref: "procedure_memory:situation_epoch",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.selected_visual_scene_set?.selected_scenes[0]?.scene_memory.visible_title).toBe("SUN");
+    expect(route.selected_visual_scene_set?.rejected_candidates.length).toBeGreaterThan(0);
+    expect(route.selected_visual_scene_set?.evidence_refs).toEqual(expect.arrayContaining([
+      "observation:sun-folder",
+      "field_eval:scene:sun",
+      "observation:task-manager-current",
+      "field_eval:scene:task-manager-current",
+    ]));
+    expect(route.visual_scene_comparison_result).toMatchObject({
+      schema: "helix.visual_scene_comparison_result.v1",
+      role: "validation",
+      prior_scene_evidence_refs: expect.arrayContaining(["observation:sun-folder", "field_eval:scene:sun"]),
+      current_scene_evidence_refs: expect.arrayContaining(["observation:task-manager-current", "field_eval:scene:task-manager-current"]),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("returns selected scene set for find-only Camera Roll prompts", () => {
+    seedSemanticVisualSceneMemoryExamples();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Find the Camera Roll scene.",
+      inputModality: "typed",
+      turnId: "ask:scene-memory-camera-roll",
+    });
+
+    expect(route.visual_scene_query_intent).toMatchObject({
+      query_mode: "find_prior_scene",
+      compare_to_current: false,
+      requires_current_scene: false,
+      target_scene_kind: "media_roll",
+    });
+    expect(route.selected_visual_scene_set?.selected_scenes[0]?.scene_memory.visible_title).toBe("Camera Roll");
+    expect(route.visual_scene_comparison_result).toBeNull();
+    expect(route.typed_failure).toBeNull();
+  });
+
+  it("compares changes since the audio export folder", () => {
+    seedSemanticVisualSceneMemoryExamples();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "What changed since the audio export folder?",
+      inputModality: "typed",
+      turnId: "ask:scene-memory-audio-export",
+    });
+
+    expect(route.visual_scene_query_intent).toMatchObject({
+      query_mode: "changed_since_prior",
+      compare_to_current: true,
+      target_file_folder_terms: expect.arrayContaining(["audio export"]),
+    });
+    expect(route.selected_visual_scene_set?.selected_scenes[0]?.scene_memory.visible_title).toBe("audio export");
+    expect(route.visual_scene_comparison_result).toMatchObject({
+      schema: "helix.visual_scene_comparison_result.v1",
+      role: "validation",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.visual_scene_comparison_result?.changed_app_or_window.join(" ")).toMatch(/File Explorer|Task Manager/i);
+  });
+
+  it("compares current Task Manager to the last folder scene", () => {
+    seedSemanticVisualSceneMemoryExamples();
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Compare the current Task Manager scene to the last folder scene.",
+      inputModality: "typed",
+      turnId: "ask:scene-memory-task-manager-last-folder",
+    });
+
+    expect(route.visual_scene_query_intent).toMatchObject({
+      query_mode: "compare_current_app_to_prior_kind",
+      target_app_terms: ["task manager"],
+      target_scene_kind: "folder",
+      relative_time: "last_folder_scene",
+      compare_to_current: true,
+      requires_current_scene: true,
+    });
+    expect(route.selected_visual_scene_set?.selection_policy).toBe("last_kind_match");
+    expect(route.selected_visual_scene_set?.selected_scenes[0]?.scene_memory.visible_title).toBe("audio export");
+    expect(route.visual_scene_comparison_result?.summary).toContain("Compared current epoch");
+    expect(route.visual_scene_comparison_result?.changed_app_or_window.join(" ")).toMatch(/File Explorer|Task Manager/i);
   });
 
   it("returns a typed failure when no prior visual scene matches the requested props", () => {

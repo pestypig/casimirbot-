@@ -44,7 +44,7 @@ export function buildToolCallAdmissionDecision(input: {
     reason = "visual_capture_requires_situation_run_path";
   } else if (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") {
     admittedToolFamilies = ["procedure_memory", "situation_run"];
-    extraForbiddenTerminalKinds = ["process_graph_overview", "workspace_action_receipt", "live_pipeline_receipt", "live_environment_binding_diagnosis", "no_tool_direct", "model_only_concept"];
+    extraForbiddenTerminalKinds = ["process_graph_overview", "docs_viewer_receipt", "doc_location_result", "active_doc_identity", "active_doc_summary", "workspace_action_receipt", "live_pipeline_receipt", "live_environment_binding_diagnosis", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["process_graph_overview", "active_doc_identity"];
     reason = "procedure_memory_requires_epoch_replay_path";
   } else if (sourceTarget === "repo_code") {

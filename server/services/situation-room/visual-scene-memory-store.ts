@@ -245,25 +245,73 @@ export function buildVisualSceneQueryIntent(input: {
   promptText: string;
 }): HelixVisualSceneQueryIntent | null {
   const prompt = input.promptText.trim();
-  if (!/\b(?:compare|find|scene where|last .*scene|previous .*scene|camera roll|soho|folder scene)\b/i.test(prompt)) return null;
+  if (!/\b(?:compare|find|scene where|camera roll|soho|sun|audio export|task manager|folder scene|changed since|last folder scene)\b/i.test(prompt)) return null;
   const quoted = Array.from(prompt.matchAll(/"([^"]+)"/g)).map((match) => match[1]);
-  const afterLast = prompt.match(/\blast\s+([A-Za-z0-9 _.-]{3,60}?)(?:\s+folder)?\s+scene\b/i)?.[1];
+  const genericSceneNameRe = /^(?:last|previous|current|this|that|visual|screen|capture|epoch|seen|scene)$/i;
+  const usableSceneName = (value: string | undefined): string | undefined => {
+    const cleaned = value?.replace(/\b(?:the|last|previous|current)\b/gi, " ").replace(/\s+/g, " ").trim();
+    return cleaned && !genericSceneNameRe.test(cleaned) ? cleaned : undefined;
+  };
+  const afterLast = usableSceneName(prompt.match(/\blast\s+([A-Za-z0-9 _.-]{3,60}?)(?:\s+folder)?\s+scene\b/i)?.[1]);
+  const compareNamed = usableSceneName(prompt.match(/\bcompare\b[\s\S]{0,80}\bto\s+(?:the\s+)?([A-Za-z0-9 _.-]{2,60}?)(?:\s+folder)?\s+scene\b/i)?.[1]);
+  const findNamed = usableSceneName(prompt.match(/\bfind\s+(?:the\s+)?([A-Za-z0-9 _.-]{2,60}?)\s+scene\b/i)?.[1]);
+  const changedSinceRaw = prompt.match(/\bchanged\s+since\s+(?:the\s+)?([A-Za-z0-9 _.-]{2,60}?)(?:\s+folder)?(?:\?|\.|$)/i)?.[1];
+  const changedSince = changedSinceRaw && !/^(?:last|previous|seen|visual|scene|screen|capture|epoch)\b/i.test(changedSinceRaw.trim())
+    ? changedSinceRaw
+    : undefined;
   const rawAfterWith = prompt.match(/\bwith\s+([A-Za-z0-9 _.-]{3,60})(?:\.|$)/i)?.[1];
   const afterWith = rawAfterWith && !/^(?:the\s+)?next\b/i.test(rawAfterWith.trim())
     ? rawAfterWith
     : undefined;
   const where = prompt.match(/\bwhere\s+i\s+was\s+in\s+([A-Za-z0-9 _.-]{3,60})(?:\.|$)/i)?.[1];
-  const hasSemanticPriorCue = quoted.length > 0 ||
-    Boolean(afterLast || afterWith || where) ||
-    /\b(?:scene where|camera roll|soho|folder scene|sun folder|audio files?)\b/i.test(prompt);
+  const namedSemanticCue =
+    /\b(?:camera\s*roll|soho|sun\s+folder|audio\s+exports?|task\s*manager|last\s+folder\s+scene)\b/i.test(prompt) ||
+    Boolean(compareNamed || findNamed || changedSince);
+  const hasSemanticPriorCue = namedSemanticCue && (quoted.length > 0 ||
+    Boolean(afterLast || afterWith || where || compareNamed || findNamed || changedSince) ||
+    /\b(?:scene where|camera roll|soho|folder scene|sun folder|audio export|audio files?|task manager|last folder scene)\b/i.test(prompt));
   if (!hasSemanticPriorCue) return null;
-  const terms = unique([
+  const lowerPrompt = prompt.toLowerCase();
+  const targetSceneKind: HelixVisualSceneQueryIntent["target_scene_kind"] =
+    /\bcamera\s*roll|media\s*roll|dcim\b/i.test(prompt) ? "media_roll" :
+    /\btask\s*manager\b/i.test(prompt) && !/\blast\s+folder\s+scene\b/i.test(prompt) ? "task_manager" :
+    /\bfolder|directory|file\s+explorer|explorer\s+window|last\s+folder\s+scene\b/i.test(prompt) ? "folder" :
+    "unknown";
+  const queryMode: HelixVisualSceneQueryIntent["query_mode"] =
+    /\bcompare\b[\s\S]{0,80}\bcurrent\s+task\s*manager\b[\s\S]{0,80}\blast\s+folder\s+scene\b/i.test(prompt)
+      ? "compare_current_app_to_prior_kind"
+      : /\bchanged\s+since\b/i.test(prompt)
+        ? "changed_since_prior"
+        : /\bcompare\b/i.test(prompt)
+          ? "compare_prior_to_current"
+          : "find_prior_scene";
+  const relativeTime: HelixVisualSceneQueryIntent["relative_time"] =
+    /\blast\s+folder\s+scene\b/i.test(prompt) ? "last_folder_scene" :
+    /\blast|previous/i.test(prompt) ? "last_matching" :
+    "unspecified";
+  const phraseTerms = unique([
     ...quoted,
+    compareNamed,
+    findNamed,
+    changedSince,
     afterLast,
     afterWith,
     where,
+    /\bcamera\s*roll\b/i.test(prompt) ? "camera roll" : null,
+    /\baudio\s*export\b/i.test(prompt) ? "audio export" : null,
+    /\btask\s*manager\b/i.test(prompt) ? "task manager" : null,
+    /\bsun\b/i.test(prompt) ? "sun" : null,
+  ]).map((term) => term.replace(/\b(?:the|last|current)\b/gi, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const terms = unique([
+    ...phraseTerms,
     ...tokenize(prompt).filter((token) => /^[A-Z0-9._-]+$/.test(token) || token.length >= 4),
-  ]).slice(0, 12);
+  ]).filter((term) => !["find", "changed", "since", "compare", "current", "scene"].includes(term.toLowerCase())).slice(0, 16);
+  const targetFileFolderTerms = unique([
+    ...phraseTerms.filter((term) => !/\btask\s*manager\b/i.test(term)),
+    /\bcamera\s*roll\b/i.test(prompt) ? "camera roll" : null,
+    /\baudio\s*export\b/i.test(prompt) ? "audio export" : null,
+    /\bsun\b/i.test(prompt) ? "sun" : null,
+  ]);
   return {
     schema: HELIX_VISUAL_SCENE_QUERY_INTENT_SCHEMA,
     query_intent_id: `visual_scene_query_intent:${hashShort([input.turnId, prompt, terms])}`,
@@ -271,7 +319,19 @@ export function buildVisualSceneQueryIntent(input: {
     thread_id: input.threadId,
     query_text: prompt,
     query_terms: terms,
-    compare_to_current: /\bcompare\b/i.test(prompt),
+    query_mode: queryMode,
+    target_scene_kind: targetSceneKind,
+    target_app_terms: /\btask\s*manager\b/i.test(prompt) ? ["task manager"] : [],
+    target_window_terms: /\btask\s*manager\b/i.test(prompt) ? ["task manager"] : [],
+    target_file_folder_terms: targetFileFolderTerms,
+    target_object_terms: [],
+    target_activity_terms: /\bperformance\s+tab|processes\s+tab\b/i.test(prompt)
+      ? unique([lowerPrompt.includes("performance") ? "performance tab" : null, lowerPrompt.includes("processes") ? "processes tab" : null])
+      : [],
+    target_intent_terms: [],
+    relative_time: relativeTime,
+    requires_current_scene: queryMode !== "find_prior_scene",
+    compare_to_current: queryMode !== "find_prior_scene",
     strength: terms.length > 0 ? "hard" : "soft",
     reason: "visual_scene_memory_query",
     assistant_answer: false,
@@ -284,54 +344,133 @@ export function selectVisualScenesForQuery(input: {
   threadId: string;
   queryIntent: HelixVisualSceneQueryIntent;
   situationRunId?: string | null;
+  environmentId?: string | null;
   currentEpoch?: number | null;
   limit?: number;
 }): HelixSelectedVisualSceneSet {
   const memories = listVisualSceneMemory({
     threadId: input.threadId,
+    environmentId: input.environmentId,
     situationRunId: input.situationRunId,
     limit: 500,
-  });
-  const currentScene = memories.filter((entry) => input.currentEpoch === null || input.currentEpoch === undefined || entry.epoch <= input.currentEpoch).at(-1) ?? null;
-  const termSet = input.queryIntent.query_terms.map((term) => term.toLowerCase());
-  const selected = memories
-    .filter((entry) => !currentScene || entry.scene_memory_id !== currentScene.scene_memory_id)
+  }).filter((entry) =>
+    entry.assistant_answer === false &&
+    entry.raw_content_included === false &&
+    entry.evidence_refs.length > 0 &&
+    (input.currentEpoch === null || input.currentEpoch === undefined || entry.epoch <= input.currentEpoch)
+  );
+  const currentScene = memories.at(-1) ?? null;
+  const queryLiteralTerms = unique([
+    ...input.queryIntent.query_terms,
+    ...input.queryIntent.target_file_folder_terms,
+    ...input.queryIntent.target_app_terms,
+    ...input.queryIntent.target_window_terms,
+    ...input.queryIntent.target_object_terms,
+    ...input.queryIntent.target_activity_terms,
+    ...input.queryIntent.target_intent_terms,
+  ].flatMap(normalizedTerms));
+  const expandedQueryTerms = unique([
+    ...queryLiteralTerms,
+    ...semanticTermsFor(queryLiteralTerms),
+    ...(input.queryIntent.relative_time === "last_folder_scene" ? ["folder", "file explorer", "directory"] : []),
+  ]);
+  const candidatePool = memories.filter((entry) => !currentScene || entry.scene_memory_id !== currentScene.scene_memory_id);
+  const threshold = input.queryIntent.strength === "soft" ? 25 : 50;
+  const scored = candidatePool
     .map((entry) => {
-      const haystack = [
-        entry.visible_title,
-        entry.app_or_surface,
-        entry.activity_summary,
-        ...entry.objects,
-        ...entry.file_names,
-        ...entry.intent_hypotheses,
-        ...entry.app_hints,
-        ...entry.window_title_hints,
-        ...entry.visible_object_terms,
-        ...entry.file_folder_terms,
-        ...entry.activity_terms,
-        ...entry.user_objective_terms,
-      ].join(" ").toLowerCase();
-      const matchedTerms = termSet.filter((term) => haystack.includes(term));
+      const searchTerms = sceneSearchTerms(entry);
+      const haystack = ` ${searchTerms.join(" ")} `;
+      const exactTitleMatch = queryLiteralTerms.some((term) =>
+        normalizedTerms(entry.visible_title).includes(term) ||
+        entry.window_title_hints.flatMap(normalizedTerms).includes(term)
+      );
+      const folderFilePhraseMatch = queryLiteralTerms.some((term) =>
+        entry.normalized_path_terms.includes(term) ||
+        entry.file_folder_terms.flatMap(normalizedTerms).includes(term)
+      );
+      const appSurfaceMatch = input.queryIntent.target_app_terms.some((term) =>
+        normalizedTerms(entry.app_or_surface).includes(normalizePhrase(term)) ||
+        entry.app_hints.flatMap(normalizedTerms).includes(normalizePhrase(term))
+      );
+      const matchedTerms = unique(expandedQueryTerms.filter((term) =>
+        haystack.includes(` ${term} `) || haystack.includes(term)
+      ));
+      const objectMatches = input.queryIntent.target_object_terms.filter((term) => haystack.includes(normalizePhrase(term))).length;
+      const activityMatches = input.queryIntent.target_activity_terms.filter((term) => haystack.includes(normalizePhrase(term))).length;
+      const intentMatches = input.queryIntent.target_intent_terms.filter((term) => haystack.includes(normalizePhrase(term))).length;
+      const recencyBonus =
+        input.queryIntent.relative_time === "last_matching" || input.queryIntent.relative_time === "last_folder_scene"
+          ? Math.max(0, Math.min(20, entry.epoch))
+          : 0;
+      const evidenceQualityBonus = Math.min(15, entry.evidence_refs.length * 2);
+      const sceneKindMismatch =
+        input.queryIntent.target_scene_kind &&
+        input.queryIntent.target_scene_kind !== "unknown" &&
+        entry.scene_kind !== input.queryIntent.target_scene_kind;
+      const missingEvidencePenalty = entry.evidence_refs.length === 0 ? 100 : 0;
+      const ambiguityPenalty = matchedTerms.length === 0 && input.queryIntent.relative_time !== "last_folder_scene" ? 20 : 0;
+      const kindBonus =
+        input.queryIntent.target_scene_kind &&
+        input.queryIntent.target_scene_kind !== "unknown" &&
+        entry.scene_kind === input.queryIntent.target_scene_kind
+          ? 25
+          : 0;
+      const score =
+        (exactTitleMatch ? 50 : 0) +
+        (folderFilePhraseMatch ? 45 : 0) +
+        (appSurfaceMatch ? 35 : 0) +
+        kindBonus +
+        (matchedTerms.length * 12) +
+        (objectMatches * 12) +
+        (activityMatches * 10) +
+        (intentMatches * 8) +
+        recencyBonus +
+        evidenceQualityBonus -
+        (sceneKindMismatch ? 35 : 0) -
+        ambiguityPenalty -
+        missingEvidencePenalty;
       return {
         scene_memory: entry,
-        score: matchedTerms.length * 10 + (input.queryIntent.query_text.toLowerCase().includes("last") ? entry.epoch : 0),
+        score,
         matched_terms: matchedTerms,
+        rejection_reason: missingEvidencePenalty
+          ? "missing_evidence_refs"
+          : sceneKindMismatch
+            ? "wrong_scene_kind"
+            : score < threshold
+              ? "insufficient_term_overlap"
+              : "lower_score_than_selected_scene",
       };
     })
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || b.scene_memory.epoch - a.scene_memory.epoch);
-  const selectedLimited = selected.slice(0, Math.max(1, Math.min(5, input.limit ?? 3)));
-  const rejectedCandidates = selected.slice(selectedLimited.length, selectedLimited.length + 5).map((entry) => ({
-    scene_memory_ref: entry.scene_memory.scene_memory_id,
-    reason: "lower_score_than_selected_scene",
-    score: entry.score,
-    matched_terms: entry.matched_terms,
-  }));
+    .sort((a, b) =>
+      b.score - a.score ||
+      b.matched_terms.length - a.matched_terms.length ||
+      b.scene_memory.epoch - a.scene_memory.epoch ||
+      b.scene_memory.evidence_refs.length - a.scene_memory.evidence_refs.length ||
+      b.scene_memory.timestamp.localeCompare(a.scene_memory.timestamp)
+    );
+  const eligible = scored.filter((entry) => entry.score >= threshold);
+  const selectedLimited = eligible.slice(0, Math.max(1, Math.min(5, input.limit ?? 3)));
+  const rejectedCandidates = scored
+    .filter((entry) => !selectedLimited.some((selected) => selected.scene_memory.scene_memory_id === entry.scene_memory.scene_memory_id))
+    .slice(0, 5)
+    .map((entry) => ({
+      scene_memory_ref: entry.scene_memory.scene_memory_id,
+      reason: entry.rejection_reason as "lower_score_than_selected_scene" | "wrong_scene_kind" | "wrong_app_or_surface" | "outside_anchor_window" | "insufficient_term_overlap" | "future_or_post_anchor" | "missing_evidence_refs",
+      score: entry.score,
+      matched_terms: entry.matched_terms,
+      evidence_refs: entry.scene_memory.evidence_refs,
+    }));
   const evidenceRefs = unique([
-    currentScene?.scene_memory_id,
-    ...(currentScene?.evidence_refs ?? []),
-    ...selectedLimited.flatMap((entry) => entry.scene_memory.evidence_refs),
-  ]).slice(0, 40);
+    ...(input.queryIntent.requires_current_scene ? evidenceBundleForScene(currentScene) : []),
+    ...selectedLimited.flatMap((entry) => evidenceBundleForScene(entry.scene_memory)),
+  ]).slice(0, 80);
+  const selectionPolicy: HelixSelectedVisualSceneSet["selection_policy"] =
+    selectedLimited.length === 0 ? "no_match" :
+    input.queryIntent.relative_time === "last_folder_scene" ? "last_kind_match" :
+    selectedLimited[0].matched_terms.some((term) => normalizedTerms(selectedLimited[0].scene_memory.visible_title).includes(term))
+      ? "exact_title_first"
+      : "semantic_terms_with_recency";
   return {
     schema: HELIX_SELECTED_VISUAL_SCENE_SET_SCHEMA,
     selection_id: `selected_visual_scene_set:${hashShort([input.turnId, input.queryIntent.query_intent_id, selectedLimited.map((entry) => entry.scene_memory.scene_memory_id)])}`,
@@ -340,12 +479,16 @@ export function selectVisualScenesForQuery(input: {
     query_intent_id: input.queryIntent.query_intent_id,
     selected_scenes: selectedLimited,
     current_scene: currentScene,
+    current_scene_ref: currentScene?.scene_memory_id ?? null,
+    candidate_pool_size: candidatePool.length,
+    source_target_ref: "procedure_memory:situation_epoch",
+    selection_policy: selectionPolicy,
     selection_reason: selectedLimited.length > 0 ? "matched_scene_memory_terms" : "no_scene_memory_match",
-    confidence: selectedLimited.length > 0 ? Math.min(0.95, 0.45 + selectedLimited[0].matched_terms.length * 0.15) : 0.2,
+    confidence: selectedLimited.length > 0 ? Math.min(0.95, 0.45 + Math.max(1, selectedLimited[0].matched_terms.length) * 0.12) : 0.2,
     evidence_refs: evidenceRefs,
     rejected_candidates: rejectedCandidates,
     missing_evidence: [
-      !currentScene ? "current_visual_scene_memory_missing" : null,
+      input.queryIntent.requires_current_scene && !currentScene ? "current_visual_scene_memory_missing" : null,
       selectedLimited.length === 0 ? "prior_scene_match_missing" : null,
     ].filter(Boolean) as string[],
     assistant_answer: false,
@@ -359,12 +502,22 @@ export function buildVisualSceneComparisonResult(input: {
   queryIntent: HelixVisualSceneQueryIntent;
   selectedSceneSet: HelixSelectedVisualSceneSet;
 }): HelixVisualSceneComparisonResult | null {
+  if (!input.queryIntent.compare_to_current) return null;
   const current = input.selectedSceneSet.current_scene ?? null;
   const previous = input.selectedSceneSet.selected_scenes[0]?.scene_memory ?? null;
   if (!current || !previous) return null;
+  const priorEvidenceRefs = evidenceBundleForScene(previous);
+  const currentEvidenceRefs = evidenceBundleForScene(current);
+  if (priorEvidenceRefs.length === 0 || currentEvidenceRefs.length === 0) return null;
+  const previousTerms = sceneSearchTerms(previous);
+  const currentTerms = sceneSearchTerms(current);
+  const sharedTerms = currentTerms.filter((term) => previousTerms.includes(term)).slice(0, 30);
+  const addedTerms = currentTerms.filter((term) => !previousTerms.includes(term)).slice(0, 30);
+  const removedTerms = previousTerms.filter((term) => !currentTerms.includes(term)).slice(0, 30);
   const sharedTraits = unique([
     current.app_or_surface && previous.app_or_surface && current.app_or_surface === previous.app_or_surface ? current.app_or_surface : null,
     ...current.objects.filter((entry) => previous.objects.includes(entry)),
+    ...sharedTerms.filter((term) => ["folder", "file explorer", "task manager", "camera roll", "audio export", "sun", "solar"].includes(term)),
   ]).slice(0, 8);
   const changedObjects = unique([
     ...previous.objects.filter((entry) => !current.objects.includes(entry)).map((entry) => `removed: ${entry}`),
@@ -411,10 +564,15 @@ export function buildVisualSceneComparisonResult(input: {
     changed_activity: changedActivity,
     changed_app_or_window: changedAppOrWindow,
     changed_user_focus: changedUserFocus,
+    added_terms: addedTerms,
+    removed_terms: removedTerms,
+    shared_terms: sharedTerms,
+    prior_scene_evidence_refs: priorEvidenceRefs,
+    current_scene_evidence_refs: currentEvidenceRefs,
     confidence: input.selectedSceneSet.confidence,
     shared_traits: sharedTraits,
     differences,
-    evidence_refs: unique([...current.evidence_refs, ...previous.evidence_refs]).slice(0, 24),
+    evidence_refs: unique([...priorEvidenceRefs, ...currentEvidenceRefs]).slice(0, 80),
     missing_evidence: input.selectedSceneSet.missing_evidence,
     next_check: "Capture another visual epoch before comparing future changes.",
     role: "validation",

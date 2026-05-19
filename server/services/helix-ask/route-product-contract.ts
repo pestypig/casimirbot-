@@ -57,6 +57,10 @@ const PROCEDURE_ALLOWED_TERMINAL_PRODUCTS = [
 
 const PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS = [
   "process_graph_overview",
+  "docs_viewer_receipt",
+  "doc_location_result",
+  "active_doc_identity",
+  "active_doc_summary",
   "workspace_action_receipt",
   "live_pipeline_receipt",
   "live_environment_binding_diagnosis",

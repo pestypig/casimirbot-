@@ -410,6 +410,58 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expectCleanToolAdmissionCoverage(response.body, "procedure_memory");
   }, 60000);
 
+  it.each([
+    "Compare this to the SUN folder scene.",
+    "Find the Camera Roll scene.",
+    "What changed since the audio export folder?",
+    "Compare the current Task Manager scene to the last folder scene.",
+  ])("admits semantic visual scene-memory prompt %s", async (question) => {
+    const app = createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question,
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "procedure_memory",
+      target_kind: "situation_epoch",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.source_target_intent?.requested_outputs).toEqual(expect.arrayContaining([
+      "procedure_epoch_replay",
+      "field_evaluation_refs",
+      "interpretation_refs",
+      "current_visual_state",
+      "visual_scene_query_intent",
+      "selected_visual_scene_set",
+      "visual_scene_comparison_result",
+      "typed_failure",
+    ]));
+    expect(response.body?.tool_call_admission_decision?.required).toBe(true);
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toEqual(
+      expect.arrayContaining(["procedure_memory", "situation_run"]),
+    );
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining([
+        "process_graph_overview",
+        "no_tool_direct",
+        "model_only_concept",
+        "doc_location_result",
+      ]),
+    );
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(response.body?.terminal_artifact_kind).not.toBe("process_graph_overview");
+    expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 60000);
+
   it("keeps scene-epoch comparison prompts on procedure replay instead of binding diagnosis", async () => {
     const app = createApp();
     seedVisualSituationRun();
