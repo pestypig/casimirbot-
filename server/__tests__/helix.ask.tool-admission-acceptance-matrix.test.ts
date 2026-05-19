@@ -405,7 +405,32 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     expect(response.body?.deictic_reference?.reference_type).toBe("latest_epoch_change");
     expect(response.body?.terminal_artifact_kind).toMatch(/procedure_epoch_replay|visual_scene_comparison_result/);
     expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("process_graph_overview");
+    expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("live_environment_binding_diagnosis");
     expect(response.body?.product_authority_guard?.allowed).toBe(true);
+    expectCleanToolAdmissionCoverage(response.body, "procedure_memory");
+  }, 60000);
+
+  it("keeps scene-epoch comparison prompts on procedure replay instead of binding diagnosis", async () => {
+    const app = createApp();
+    seedVisualSituationRun();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "Okay, what are we looking at now and how does it compare to the last scene epoch?",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "procedure_memory",
+      target_kind: "situation_epoch",
+    });
+    expect(response.body?.route_reason_code).toBe("procedure_epoch_replay_question");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("procedure_epoch_replay_question");
+    expect(response.body?.terminal_artifact_kind).toBe("procedure_epoch_replay");
+    expect(response.body?.final_answer_source).not.toBe("live_environment_binding_diagnosis");
+    expect(response.body?.tool_call_admission_decision?.forbidden_terminal_artifact_kinds).toContain("live_environment_binding_diagnosis");
     expectCleanToolAdmissionCoverage(response.body, "procedure_memory");
   }, 60000);
 

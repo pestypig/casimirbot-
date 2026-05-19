@@ -22,6 +22,7 @@ import { resetVisualProducerSchedulerAdoptionsForTest } from "../services/situat
 import { resetClientCapabilityActionsForTest } from "../services/client-capabilities/client-action-queue";
 import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabilities/client-adoption-store";
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
+import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
 
 const threadId = "thread:live-source-continuation";
 
@@ -478,6 +479,19 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 20_000);
+
+  it("does not classify scene-epoch comparison prompts as binding diagnosis", () => {
+    const comparisonIntent = classifyLiveSourceContinuationIntent(
+      "Okay, what are we looking at now and how does it compare to the last scene epoch?",
+    );
+    const healthIntent = classifyLiveSourceContinuationIntent(
+      "why are the worker lanes not updating even though visual capture is running?",
+    );
+
+    expect(comparisonIntent?.kind).not.toBe("live_environment_binding_diagnosis");
+    expect(comparisonIntent).toBeNull();
+    expect(healthIntent?.kind).toBe("live_environment_binding_diagnosis");
+  });
 
   it("routes Minecraft event attachment questions to world binding diagnostics", async () => {
     const app = await createApp();

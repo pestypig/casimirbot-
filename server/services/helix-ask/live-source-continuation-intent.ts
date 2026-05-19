@@ -41,6 +41,12 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const text = normalize(prompt);
   if (!text) return null;
 
+  const procedureEpochComparison =
+    /\b(?:what\s+changed|changed\s+since|compare|compared|difference|different)\b/.test(text) &&
+    /\b(?:last|previous|prior)\s+(?:seen\s+)?(?:scene|epoch|frame|visual|screen|capture)|\bscene\s+epoch\b|\bvisual\s+epoch\b/.test(text);
+  const explicitBindingDiagnosis =
+    /\b(?:worker\s+lanes?|lanes?|field\s+evaluations?|interpretations?|live\s+cognition|live\s+answer\s+(?:panel|environment|card)|no\s+active\s+live\s+answer\s+environment|producer\s+stale|capture\s+(?:health|bound|binding|adopted|adoption)|client\s+adoption|scene_procedure_ready|live_card_ready)\b/.test(text) &&
+    /\b(?:visual|screen|capture|live\s+answer|source|scene|frame|updating|bound|binding|attach|environment|producer|adopted|adoption|ready|readiness|stale)\b/.test(text);
   const mentionsLiveSurface =
     /\b(?:screen|screenshare|screen share|tab|window|visual|camera|frame|frames|source|live answer|live source|pipeline|share)\b/.test(text);
   const continuation =
@@ -56,9 +62,7 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const inspect =
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
     /\b(?:pipeline|visual source|screen|live answer|analysis|frame|minecraft events|world events|minehut|world event)\b/.test(text);
-  const bindingDiagnosis =
-    /\b(?:worker\s+lanes?|lanes?|tabs?|field\s+evaluations?|interpretations?|live\s+cognition|live\s+answer\s+(?:panel|environment|card)|no\s+active\s+live\s+answer\s+environment|scene\s+epoch|visual\s+delta|screen\s+delta|latest\s+frame|previous\s+frame)\b/.test(text) &&
-    /\b(?:visual|screen|capture|live\s+answer|source|scene|frame|updating|bound|binding|attach|environment)\b/.test(text);
+  const bindingDiagnosis = explicitBindingDiagnosis && !procedureEpochComparison;
   const repair =
     /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame|not updating|stale|attach)\b/.test(text) &&
     /\b(?:pipeline|visual|frame|source|analysis|live answer|minecraft events|world events|minehut)\b/.test(text);

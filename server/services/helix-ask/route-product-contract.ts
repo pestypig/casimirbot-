@@ -59,6 +59,7 @@ const PROCEDURE_FORBIDDEN_TERMINAL_PRODUCTS = [
   "process_graph_overview",
   "workspace_action_receipt",
   "live_pipeline_receipt",
+  "live_environment_binding_diagnosis",
   "no_tool_direct",
   "model_only_concept",
 ];
