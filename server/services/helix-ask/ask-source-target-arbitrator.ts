@@ -26,8 +26,8 @@ type CueRule = {
 
 const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
   cues
-    .filter((cue) => cue.pattern.test(prompt))
-    .map((cue) => cue.label);
+    .filter((cue: CueRule["cues"][number]) => cue.pattern.test(prompt))
+    .map((cue: CueRule["cues"][number]) => cue.label);
 
 const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
   const docsViewerCue =
@@ -42,6 +42,12 @@ const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
   return (docsViewerCue && (structuredPathCue || locateQueryCue || locationsListCue)) ||
     (structuredPathCue && locateQueryCue && locationsListCue);
 };
+
+const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
+  /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
+
+const isGenericSceneEpochPhrase = (prompt: string): boolean =>
+  /\b(?:scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|previous\s+(?:scene|frame|visual|screen|capture)|last\s+(?:scene|frame|visual|screen|capture))\b/i.test(prompt);
 
 const rules: CueRule[] = [
   {
@@ -88,7 +94,7 @@ const rules: CueRule[] = [
   },
   {
     target: "procedure_memory",
-    targetKind: "situation_epoch",
+    targetKind: "visual_scene_memory",
     reason: "explicit_visual_scene_memory_source_target",
     confidence: 0.93,
     strength: "hard",
@@ -253,6 +259,23 @@ const rules: CueRule[] = [
     ],
   },
   {
+    target: "process_graph",
+    reason: "explicit_process_graph_source_target",
+    confidence: 0.92,
+    strength: "hard",
+    requestedOutputs: ["process_overview"],
+    allowClientShortcut: false,
+    allowNoToolDirect: false,
+    suppressedRoutes: ["situation_context_question", "visual_deictic", "active_doc_identity", "active_doc_summary", "model_only_concept"],
+    cues: [
+      { label: "process_graph", pattern: /\bprocess\s+graph\b/i },
+      { label: "workstation_process_graph", pattern: /\bworkstation\s+(?:process\s+)?graph\b/i },
+      { label: "workstation_state", pattern: /\bworkstation\s+state\b/i },
+      { label: "panels_open", pattern: /\b(?:what|which)\s+panels\s+are\s+open\b/i },
+      { label: "show_workstation_process_graph", pattern: /\bshow\b[\s\S]{0,80}\bworkstation\s+(?:process\s+)?graph\b/i },
+    ],
+  },
+  {
     target: "workspace_panel",
     reason: "explicit_workspace_panel_target",
     confidence: 0.78,
@@ -299,10 +322,15 @@ const toSourceTargetIntent = (input: {
   allowClientShortcut?: boolean;
   allowNoToolDirect?: boolean;
 }): HelixAskSourceTargetIntent => {
-  const mustEnterBackendAsk =
+  const hardSourceTarget =
     input.target !== "unknown" &&
     input.target !== "model_only" &&
+    input.target !== "general_background";
+  const mustEnterBackendAsk =
+    hardSourceTarget &&
     input.allowNoToolDirect !== true;
+  const allowClientShortcut = hardSourceTarget ? false : input.allowClientShortcut ?? !mustEnterBackendAsk;
+  const allowNoToolDirect = hardSourceTarget ? false : input.allowNoToolDirect ?? !mustEnterBackendAsk;
   return {
     schema: HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA,
     turn_id: input.turnId,
@@ -316,8 +344,8 @@ const toSourceTargetIntent = (input: {
     suppressed_routes: input.suppressedRoutes,
     precedence_reason: input.precedenceReason,
     must_enter_backend_ask: mustEnterBackendAsk,
-    allow_client_shortcut: input.allowClientShortcut ?? !mustEnterBackendAsk,
-    allow_no_tool_direct: input.allowNoToolDirect ?? !mustEnterBackendAsk,
+    allow_client_shortcut: allowClientShortcut,
+    allow_no_tool_direct: allowNoToolDirect,
     confidence: input.confidence,
     assistant_answer: false,
     raw_content_included: false,
@@ -327,7 +355,7 @@ const toSourceTargetIntent = (input: {
 const mapRepoRequestedOutputs = (
   outputs: ReturnType<typeof detectRepoCodeEvidenceIntent>["requestedOutputs"],
 ): HelixAskSourceTargetRequestedOutput[] =>
-  outputs.flatMap((output) => {
+  outputs.flatMap((output: ReturnType<typeof detectRepoCodeEvidenceIntent>["requestedOutputs"][number]) => {
     if (output === "repo_code") return ["repo_code" as const];
     if (output === "file_path") return ["file_path" as const];
     if (output === "line_backed_source") return ["line_backed_source" as const];
@@ -359,25 +387,8 @@ export function arbitrateAskSourceTarget(input: {
   promptText: string;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
-  if (isSceneEpochReplayPrompt(prompt)) {
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: "procedure_memory",
-      targetKind: "situation_epoch",
-      strength: "hard",
-      explicitCues: ["scene_epoch_replay"],
-      reasons: ["explicit_visual_epoch_delta_source_target", "scene_epoch_replay"],
-      requestedOutputs: PROCEDURE_EPOCH_REQUESTED_OUTPUTS,
-      suppressedRoutes: [...SCENE_EPOCH_REPLAY_FORBIDDEN_ROUTES],
-      precedenceReason: "explicit_visual_epoch_delta_source_target",
-      confidence: 0.96,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
-    });
-  }
   if (isStructuredDocsViewerPrompt(prompt)) {
-    const docsRule = rules.find((rule) => rule.target === "docs_viewer");
+    const docsRule = rules.find((rule: CueRule) => rule.target === "docs_viewer");
     if (docsRule) {
       const explicitCues = matches(prompt, docsRule.cues);
       return toSourceTargetIntent({
@@ -426,9 +437,85 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  const procedureMemoryRule = rules.find((rule) => rule.target === "procedure_memory");
+  if (isExplicitProcessGraphPrompt(prompt)) {
+    const processGraphRule = rules.find((rule: CueRule) => rule.target === "process_graph");
+    if (processGraphRule) {
+      const explicitCues = matches(prompt, processGraphRule.cues);
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target: processGraphRule.target,
+        targetKind: processGraphRule.targetKind,
+        strength: processGraphRule.strength,
+        explicitCues: explicitCues.length > 0 ? explicitCues : ["process_graph"],
+        reasons: [processGraphRule.reason, ...(explicitCues.length > 0 ? explicitCues : ["process_graph"])],
+        requestedOutputs: processGraphRule.requestedOutputs,
+        suppressedRoutes: processGraphRule.suppressedRoutes,
+        precedenceReason: processGraphRule.reason,
+        confidence: processGraphRule.confidence,
+        allowClientShortcut: processGraphRule.allowClientShortcut,
+        allowNoToolDirect: processGraphRule.allowNoToolDirect,
+      });
+    }
+  }
+  const visualSceneMemoryRule = rules.find((rule: CueRule) => rule.reason === "explicit_visual_scene_memory_source_target");
+  if (visualSceneMemoryRule && !isGenericSceneEpochPhrase(prompt)) {
+    const explicitCues = matches(prompt, visualSceneMemoryRule.cues);
+    if (explicitCues.length > 0) {
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target: visualSceneMemoryRule.target,
+        targetKind: "visual_scene_memory",
+        strength: visualSceneMemoryRule.strength,
+        explicitCues,
+        reasons: [visualSceneMemoryRule.reason, ...explicitCues],
+        requestedOutputs: PROCEDURE_EPOCH_REQUESTED_OUTPUTS,
+        suppressedRoutes: visualSceneMemoryRule.suppressedRoutes,
+        precedenceReason: visualSceneMemoryRule.reason,
+        confidence: visualSceneMemoryRule.confidence,
+        allowClientShortcut: visualSceneMemoryRule.allowClientShortcut,
+        allowNoToolDirect: visualSceneMemoryRule.allowNoToolDirect,
+      });
+    }
+  }
+  if (isSceneEpochReplayPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "procedure_memory",
+      targetKind: "situation_epoch",
+      strength: "hard",
+      explicitCues: ["scene_epoch_replay"],
+      reasons: ["explicit_visual_epoch_delta_source_target", "scene_epoch_replay"],
+      requestedOutputs: PROCEDURE_EPOCH_REQUESTED_OUTPUTS,
+      suppressedRoutes: [...SCENE_EPOCH_REPLAY_FORBIDDEN_ROUTES],
+      precedenceReason: "explicit_visual_epoch_delta_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  const procedureMemoryRule = rules.find((rule: CueRule) => rule.target === "procedure_memory");
   if (procedureMemoryRule) {
     const explicitCues = matches(prompt, procedureMemoryRule.cues);
+    if (procedureMemoryRule.reason === "explicit_visual_scene_memory_source_target" && explicitCues.length > 0) {
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target: procedureMemoryRule.target,
+        targetKind: "visual_scene_memory",
+        strength: procedureMemoryRule.strength,
+        explicitCues,
+        reasons: [procedureMemoryRule.reason, ...explicitCues],
+        requestedOutputs: PROCEDURE_EPOCH_REQUESTED_OUTPUTS,
+        suppressedRoutes: procedureMemoryRule.suppressedRoutes,
+        precedenceReason: procedureMemoryRule.reason,
+        confidence: procedureMemoryRule.confidence,
+        allowClientShortcut: procedureMemoryRule.allowClientShortcut,
+        allowNoToolDirect: procedureMemoryRule.allowNoToolDirect,
+      });
+    }
     if (explicitCues.some(isSituationEpochCue)) {
       return toSourceTargetIntent({
         turnId: input.turnId,

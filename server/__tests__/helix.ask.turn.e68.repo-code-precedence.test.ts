@@ -57,7 +57,7 @@ describe("helix ask repo/code intent precedence", () => {
   it("does not treat repo file-path requests as selected visible file references", () => {
     const ref = detectDeicticReference({
       threadId: "test",
-      promptText: "Cite exact file paths and line-backed sources from the repository.",
+      promptText: "Using repo/code evidence only, where is source-target admission enforced? Cite exact file paths and line-backed sources from the repository.",
       inputModality: "typed",
     });
 
@@ -112,6 +112,52 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.repo_claim_support).toBeTruthy();
   }, 90000);
 
+  it("routes source-target admission enforcement questions to repo evidence before visual deictic routing", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Using repo/code evidence only, where is source-target admission enforced? Cite exact file paths and line-backed sources from the repository.",
+        mode: "read",
+        debug: true,
+        sessionId: `repo-code-source-target-${Date.now()}`,
+      })
+      .expect(200);
+
+    const ref = detectDeicticReference({
+      threadId: "test",
+      promptText:
+        "Using repo/code evidence only, where is source-target admission enforced? Cite exact file paths and line-backed sources from the repository.",
+      inputModality: "typed",
+    });
+
+    expect(ref.candidate_signal).toBe(false);
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_code_evidence_question");
+    expect(response.body?.retrieval_required_signal).toMatchObject({
+      required: true,
+      strength: "hard",
+    });
+    expect(response.body?.route_product_contract?.forbidden_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining([
+        "situation_context_pack",
+        "visual_frame_evidence",
+        "process_graph_overview",
+        "no_tool_direct",
+        "model_only_concept",
+      ]),
+    );
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(response.body?.final_answer_source).not.toBe("model_only_concept");
+  }, 90000);
+
   it("routes project-local agent loop prompts away from model-only direct answers", async () => {
     const app = createApp();
     const response = await request(app)
@@ -138,7 +184,7 @@ describe("helix ask repo/code intent precedence", () => {
       allow_no_tool_direct: false,
     });
     expect(response.body?.source_target_intent?.requested_outputs).toEqual(
-      expect.arrayContaining(["tool_call_eligibility", "terminal_contract", "codex_comparison"]),
+      expect.arrayContaining(["tool_call_eligibility", "terminal_contract", "codex_comparison", "line_backed_source"]),
     );
     expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
     expect(response.body?.tool_eligibility_diagnosis).toMatchObject({

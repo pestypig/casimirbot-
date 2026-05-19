@@ -4,9 +4,12 @@ export const HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA =
 export type HelixToolCallAdmissionFamily =
   | "situation_run"
   | "procedure_memory"
+  | "visual_scene_memory"
   | "docs_viewer"
   | "repo_code"
+  | "runtime_evidence"
   | "live_pipeline"
+  | "process_graph"
   | "world_event"
   | "calculator"
   | "notes"

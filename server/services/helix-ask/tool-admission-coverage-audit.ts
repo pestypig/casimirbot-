@@ -23,7 +23,11 @@ const REQUIRED_TOOL_ADMISSION_SOURCES = new Set([
   "docs_viewer",
   "active_doc",
   "repo_code",
+  "runtime_evidence",
   "procedure_memory",
+  "situation_epoch",
+  "visual_scene_memory",
+  "process_graph",
   "live_pipeline",
   "world_event",
   "workspace_action",
@@ -109,9 +113,9 @@ export function auditToolAdmissionCoverage(input: ToolAdmissionCoverageAuditInpu
     },
   ];
   const violations = checks
-    .filter((check) => toolAdmissionRequired || check.check === "retrieval_required_has_source_target")
-    .filter((check) => !check.passed)
-    .map((check) =>
+    .filter((check: (typeof checks)[number]) => toolAdmissionRequired || check.check === "retrieval_required_has_source_target")
+    .filter((check: (typeof checks)[number]) => !check.passed)
+    .map((check: (typeof checks)[number]) =>
       check.check === "tool_call_admission_decision_present"
         ? "missing_tool_admission_decision"
         : check.check,
