@@ -31,17 +31,88 @@ const tokenize = (value: string): string[] =>
   unique(value.toLowerCase().match(/[a-z0-9][a-z0-9._-]{2,}/g) ?? [])
     .filter((token) => !["compare", "current", "scene", "folder", "file", "last", "previous", "looking"].includes(token));
 
+const normalizePhrase = (value: string | null | undefined): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizedTerms = (value: string | null | undefined): string[] => {
+  const phrase = normalizePhrase(value);
+  if (!phrase) return [];
+  return unique([phrase, ...tokenize(phrase)]);
+};
+
 const splitObjects = (value: string | null | undefined): string[] =>
   unique(String(value ?? "").split(/[,;|]/).map((entry) => entry.trim())).slice(0, 20);
 
-const fileNameRe = /\b[A-Za-z0-9][A-Za-z0-9 _.-]{1,80}\.(?:png|jpg|jpeg|gif|webp|wav|mp3|mp4|mov|pdf|md|txt|docx|zip|json|ts|tsx|js|py)\b/g;
-const folderHintRe = /\b(?:folder|directory|view)\s+(?:labeled|named|called)?\s*"([^"]+)"/gi;
+const fileNameRe = /\b[A-Za-z0-9][A-Za-z0-9 _.-]{1,80}\.(?:png|jpg|jpeg|gif|webp|wav|mp3|mp4|mov|pdf|md|txt|docx|zip|json|ts|tsx|js|py|csv)\b/g;
+const folderHintRe = /\b(?:folder|directory|view|camera\s+roll|media\s+roll)\s+(?:labeled|named|called)?\s*"([^"]+)"/gi;
 
 const fieldValue = (evaluations: HelixLiveFieldEvaluation[], ...keys: string[]): string | null =>
   evaluations.find((entry) => keys.includes(entry.field_key))?.value ?? null;
 
 const termsFrom = (value: string | null | undefined): string[] =>
   tokenize(String(value ?? "")).slice(0, 30);
+
+const semanticExpansionMap: Array<{ tag: string; pattern: RegExp; terms: string[] }> = [
+  { tag: "sun", pattern: /\b(?:sun|solar|solar[-\s]?observation|sdo|soho)\b/i, terms: ["sun", "solar", "solar observation", "sdo", "soho"] },
+  { tag: "camera_roll", pattern: /\b(?:camera\s*roll|camera-roll|dcim|photos?|images?|media\s*roll)\b/i, terms: ["camera roll", "camera-roll", "dcim", "photos", "images", "media roll"] },
+  { tag: "audio_export", pattern: /\b(?:audio\s*exports?|wav|mp3|bounce|rendered\s+audio|mixdown|stems)\b/i, terms: ["audio export", "audio exports", "wav", "mp3", "bounce", "rendered audio"] },
+  { tag: "task_manager", pattern: /\b(?:task\s*manager|windows\s+task\s*manager|performance\s+tab|processes\s+tab)\b/i, terms: ["task manager", "windows task manager", "performance tab", "processes tab"] },
+  { tag: "folder", pattern: /\b(?:folder|directory|file\s+explorer|explorer\s+window|windows\s+explorer)\b/i, terms: ["folder", "directory", "file explorer", "explorer window"] },
+];
+
+const semanticTermsFor = (values: Array<string | null | undefined>): string[] => {
+  const text = values.map((value) => String(value ?? "")).join(" ");
+  return unique(semanticExpansionMap.flatMap((entry) => entry.pattern.test(text) ? [entry.tag, ...entry.terms] : []));
+};
+
+const inferSceneKind = (input: {
+  text: string;
+  appOrSurface?: string | null;
+  title?: string | null;
+}): HelixVisualSceneMemoryIndex["scene_kind"] => {
+  const text = `${input.text} ${input.appOrSurface ?? ""} ${input.title ?? ""}`;
+  if (/\b(?:task\s*manager|windows\s+task\s*manager|performance\s+tab|processes\s+tab)\b/i.test(text)) return "task_manager";
+  if (/\b(?:camera\s*roll|camera-roll|dcim|photos?|images?|media\s*roll)\b/i.test(text)) return "media_roll";
+  if (/\b(?:browser|chrome|firefox|edge)\b/i.test(text)) return "browser";
+  if (/\b(?:pdf|docx?|document)\b/i.test(text)) return "document";
+  if (/\b(?:folder|directory|file\s+explorer|explorer\s+window)\b/i.test(text)) return "folder";
+  if (/\b(?:window|app|application)\b/i.test(text)) return "app_window";
+  return "unknown";
+};
+
+const evidenceBundleForScene = (scene: HelixVisualSceneMemoryIndex | null | undefined): string[] =>
+  unique([
+    scene?.scene_memory_id,
+    ...(scene?.observation_refs ?? []),
+    ...(scene?.field_evaluation_refs ?? []),
+    scene?.summary_ref,
+    ...(scene?.probe_result_refs ?? []),
+    ...(scene?.closure_refs ?? []),
+  ]).slice(0, 80);
+
+const sceneSearchTerms = (scene: HelixVisualSceneMemoryIndex): string[] =>
+  unique([
+    scene.visible_title ?? null,
+    scene.app_or_surface ?? null,
+    scene.activity_summary,
+    ...scene.objects,
+    ...scene.file_names,
+    ...scene.intent_hypotheses,
+    ...scene.app_hints,
+    ...scene.window_title_hints,
+    ...scene.visible_object_terms,
+    ...scene.file_folder_terms,
+    ...scene.activity_terms,
+    ...scene.user_objective_terms,
+    ...scene.normalized_title_terms,
+    ...scene.normalized_path_terms,
+    ...scene.semantic_tags,
+  ].flatMap((value) => normalizedTerms(value))).slice(0, 200);
 
 export function recordVisualSceneMemoryIndex(input: {
   situationRunId: string;
@@ -56,8 +127,8 @@ export function recordVisualSceneMemoryIndex(input: {
   const scene = fieldValue(input.evaluations, "scene", "place") ?? input.observation.text;
   const activity = fieldValue(input.evaluations, "activity") ?? "";
   const objectsValue = fieldValue(input.evaluations, "objects", "entities") ?? "";
-  const titleMatch = scene.match(/\b(?:labeled|titled|called|directory|folder)\s+"([^"]+)"/i);
-  const appMatch = scene.match(/\b(File Explorer|Browser|Chrome|Firefox|Docs|PDF viewer|terminal|console)\b/i);
+  const titleMatch = scene.match(/\b(?:labeled|titled|called|directory|folder|window|tab)\s+"([^"]+)"/i);
+  const appMatch = scene.match(/\b(Windows Task Manager|Task Manager|File Explorer|Windows Explorer|Browser|Chrome|Firefox|Edge|Docs|PDF viewer|terminal|console)\b/i);
   const textForFiles = [scene, activity, objectsValue, input.observation.text].join(" ");
   const fileNames = unique(textForFiles.match(fileNameRe) ?? []).slice(0, 40);
   const folderHints = unique(Array.from(textForFiles.matchAll(folderHintRe)).map((match) => match[1])).slice(0, 20);
@@ -70,6 +141,19 @@ export function recordVisualSceneMemoryIndex(input: {
     ...input.evaluations.map((entry) => entry.evaluation_id),
     ...input.procedureEpoch.field_evaluation_refs,
   ]);
+  const title = titleMatch?.[1] ?? null;
+  const appOrSurface = appMatch?.[1] ?? null;
+  const sceneKind = inferSceneKind({ text: textForFiles, appOrSurface, title });
+  const normalizedTitleTerms = unique([
+    ...normalizedTerms(title),
+    ...folderHints.flatMap(normalizedTerms),
+  ]).slice(0, 40);
+  const normalizedPathTerms = unique([
+    ...fileNames.flatMap(normalizedTerms),
+    ...folderHints.flatMap(normalizedTerms),
+    ...termsFrom(fileNames.join(" ")),
+  ]).slice(0, 80);
+  const semanticTags = semanticTermsFor([scene, activity, objectsValue, input.observation.text, title, appOrSurface]);
   const memory: HelixVisualSceneMemoryIndex = {
     schema: HELIX_VISUAL_SCENE_MEMORY_INDEX_SCHEMA,
     scene_memory_id: `visual_scene_memory:${hashShort([input.situationRunId, input.epoch, input.observation.observation_id])}`,
@@ -85,15 +169,22 @@ export function recordVisualSceneMemoryIndex(input: {
     interpretation_hypothesis_refs: [],
     probe_result_refs: input.procedureEpoch.probe_result_refs,
     closure_refs: [input.procedureEpoch.epoch_id],
-    app_or_surface: appMatch?.[1] ?? null,
-    visible_title: titleMatch?.[1] ?? null,
-    app_hints: unique([appMatch?.[1] ?? null]).slice(0, 10),
-    window_title_hints: unique([titleMatch?.[1] ?? null, ...folderHints]).slice(0, 20),
+    app_or_surface: appOrSurface,
+    visible_title: title,
+    scene_kind: sceneKind,
+    app_hints: unique([appOrSurface]).slice(0, 10),
+    window_title_hints: unique([title, ...folderHints]).slice(0, 20),
     visible_object_terms: objectTerms,
-    file_folder_terms: unique([...fileNames, ...folderHints, ...termsFrom(fileNames.join(" "))]).slice(0, 60),
+    file_folder_terms: unique([...fileNames, ...folderHints, ...termsFrom(fileNames.join(" ")), ...semanticTags]).slice(0, 80),
     activity_terms: activityTerms,
     uncertainty_terms: termsFrom(uncertainty),
     user_objective_terms: termsFrom(objective),
+    normalized_title_terms: normalizedTitleTerms,
+    normalized_path_terms: normalizedPathTerms,
+    semantic_tags: semanticTags,
+    observed_at: input.observation.created_at,
+    available_at: input.createdAt ?? input.procedureEpoch.created_at,
+    index_version: "visual_scene_memory_index.semantic_v2",
     objects: splitObjects(objectsValue),
     file_names: fileNames,
     activity_summary: activity || scene,
@@ -110,6 +201,21 @@ export function recordVisualSceneMemoryIndex(input: {
     assistant_answer: false,
     raw_content_included: false,
   };
+  const durableCueCount = [
+    memory.app_or_surface,
+    memory.visible_title,
+    ...memory.file_folder_terms,
+    ...memory.visible_object_terms,
+    ...memory.activity_terms,
+    ...memory.intent_hypotheses,
+  ].filter(Boolean).length;
+  const admitted =
+    input.observation.modality === "visual_frame" &&
+    durableCueCount > 0 &&
+    unique([...observationRefs, ...fieldEvaluationRefs]).length > 0 &&
+    memory.assistant_answer === false &&
+    memory.raw_content_included === false;
+  if (!admitted) return memory;
   const existing = sceneMemoryByRun.get(input.situationRunId) ?? [];
   sceneMemoryByRun.set(input.situationRunId, [
     ...existing.filter((entry) => entry.scene_memory_id !== memory.scene_memory_id),
