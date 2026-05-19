@@ -10434,6 +10434,26 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       debug?.composite_subgoal_explanation ?? agentLoop?.composite_subgoal_explanation ?? payload.composite_subgoal_explanation,
     composite_followup_anti_determinism_audit:
       debug?.composite_followup_anti_determinism_audit ?? agentLoop?.composite_followup_anti_determinism_audit ?? payload.composite_followup_anti_determinism_audit,
+    live_interpretation_debug:
+      payload.live_interpretation_debug ?? debug?.live_interpretation_debug ?? agentLoop?.live_interpretation_debug,
+    live_interpretation_run:
+      payload.live_interpretation_run ?? debug?.live_interpretation_run ?? agentLoop?.live_interpretation_run,
+    live_interpretation_workers:
+      payload.live_interpretation_workers ?? debug?.live_interpretation_workers ?? agentLoop?.live_interpretation_workers,
+    live_interpretation_worker_runs:
+      payload.live_interpretation_worker_runs ??
+      debug?.live_interpretation_worker_runs ??
+      agentLoop?.live_interpretation_worker_runs,
+    live_interpretation_validation_artifacts:
+      payload.live_interpretation_validation_artifacts ??
+      debug?.live_interpretation_validation_artifacts ??
+      agentLoop?.live_interpretation_validation_artifacts,
+    live_interpretation_hypotheses:
+      payload.live_interpretation_hypotheses ??
+      debug?.live_interpretation_hypotheses ??
+      agentLoop?.live_interpretation_hypotheses,
+    live_interpretation_graph:
+      payload.live_interpretation_graph ?? debug?.live_interpretation_graph ?? agentLoop?.live_interpretation_graph,
     pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
     terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
     poison_audit: payload.poison_audit ?? debug?.poison_audit ?? agentLoop?.poison_audit,
