@@ -1,0 +1,227 @@
+import { describe, expect, it } from "vitest";
+import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
+import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
+
+const baseSourceTarget = (target_source: string, target_kind = target_source) => ({
+  schema: "helix.ask_source_target_intent.v1",
+  turn_id: "ask:capability",
+  thread_id: "helix-ask:test",
+  target_source,
+  target_kind,
+  strength: "hard",
+  explicit_cues: [],
+  reasons: [],
+  requested_outputs: [],
+  suppressed_routes: [],
+  precedence_reason: "test",
+  must_enter_backend_ask: true,
+  allow_client_shortcut: false,
+  allow_no_tool_direct: false,
+  confidence: 0.9,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const toolAdmission = (sourceTarget: string, admitted: string[]) => ({
+  schema: "helix.tool_call_admission_decision.v1",
+  turn_id: "ask:capability",
+  source_target: sourceTarget,
+  required: admitted.length > 0,
+  admitted_tool_families: admitted,
+  forbidden_terminal_artifact_kinds: ["no_tool_direct", "model_only_concept"],
+  forbidden_routes: [],
+  reason: "test",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null) => ({
+  turn_id: "ask:capability",
+  goal_kind,
+  answer_scope: "current_turn_doc",
+  required_terminal_kind,
+  allows_workspace_context: true,
+  allows_prior_artifacts: false,
+  corpus_anchors: [],
+  numeric_tokens: [],
+  concept_tokens: [],
+  confidence: "high",
+  classifier_reasons: ["test"],
+});
+
+describe("Helix capability plan contract", () => {
+  it("plans docs capability and only selects doc_open_receipt for doc-open canonical goals", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:docs-open",
+      promptText: "Open the NH-M2 white paper from docs.",
+      sourceTargetIntent: baseSourceTarget("docs_viewer"),
+      toolCallAdmissionDecision: toolAdmission("docs_viewer", ["docs_viewer"]),
+      canonicalGoalFrame: canonicalGoal("doc_open_best", "doc_open_receipt"),
+    });
+
+    expect(plan).toMatchObject({
+      schema: "helix.capability_plan.v1",
+      capability_family: "docs",
+      requested_action: "open_or_validate_document",
+      mutating: true,
+      operator_command_required: true,
+      operator_command_present: true,
+      admission_status: "admitted",
+      required_terminal_kind: "doc_open_receipt",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const result = buildCapabilityResultGate({
+      plan,
+      terminalArtifactKind: "doc_open_receipt",
+      terminalArtifactId: "ask:docs-open:doc_open_receipt",
+      currentTurnArtifacts: [
+        {
+          artifact_id: "ask:docs-open:doc_candidate_validation",
+          kind: "doc_candidate_validation",
+          turn_id: "ask:docs-open",
+          payload: {
+            schema: "helix.doc_candidate_validation.v1",
+            evidence_refs: ["doc_candidate:nhm2"],
+          },
+        },
+        {
+          artifact_id: "ask:docs-open:doc_open_receipt",
+          kind: "doc_open_receipt",
+          turn_id: "ask:docs-open",
+          payload: {
+            kind: "doc_open_receipt",
+            receipt_id: "ask:docs-open:doc_open_receipt",
+          },
+        },
+      ],
+      reenteredRefs: ["ask:docs-open:doc_candidate_validation", "ask:docs-open:doc_open_receipt"],
+    });
+
+    expect(result).toMatchObject({
+      schema: "helix.capability_result.v1",
+      status: "succeeded",
+      receipt_refs: expect.arrayContaining(["ask:docs-open:doc_open_receipt"]),
+      evidence_refs: expect.arrayContaining(["ask:docs-open:doc_candidate_validation", "doc_candidate:nhm2"]),
+      selected_for_answer: true,
+      reentered_solver: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const summaryOnlyPlan = buildCapabilityPlan({
+      turnId: "ask:docs-summary",
+      promptText: "Open the NH-M2 white paper from docs.",
+      sourceTargetIntent: baseSourceTarget("docs_viewer"),
+      toolCallAdmissionDecision: toolAdmission("docs_viewer", ["docs_viewer"]),
+      canonicalGoalFrame: canonicalGoal("doc_summary", "doc_summary"),
+    });
+    const rejectedReceipt = buildCapabilityResultGate({
+      plan: summaryOnlyPlan,
+      terminalArtifactKind: "doc_open_receipt",
+      terminalArtifactId: "ask:docs-summary:doc_open_receipt",
+      currentTurnArtifacts: [
+        {
+          artifact_id: "ask:docs-summary:doc_open_receipt",
+          kind: "doc_open_receipt",
+          turn_id: "ask:docs-summary",
+          payload: { kind: "doc_open_receipt", receipt_id: "ask:docs-summary:doc_open_receipt" },
+        },
+      ],
+      reenteredRefs: ["ask:docs-summary:doc_open_receipt"],
+    });
+
+    expect(rejectedReceipt).toMatchObject({
+      status: "failed",
+      selected_for_answer: false,
+      failure_reason: "receipt_terminal_without_goal_authority",
+    });
+  });
+
+  it("treats a future click mention inside a visual review prompt as contextual, not an admitted workstation action", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:visual-before-click",
+      promptText: "Review the current screen before I click Start.",
+      sourceTargetIntent: baseSourceTarget("visual_capture"),
+      toolCallAdmissionDecision: toolAdmission("visual_capture", ["situation_run"]),
+      canonicalGoalFrame: canonicalGoal("situation_context_question", "situation_context_pack"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "visual_capture",
+      requested_action: "review_current_visual_state",
+      mutating: false,
+      operator_command_required: false,
+      operator_command_present: false,
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_family).not.toBe("workstation_action");
+  });
+
+  it("admits a workstation action only when the prompt contains the operator command and goal accepts action receipt", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:click-start",
+      promptText: "Click Start and report whether the click was accepted.",
+      sourceTargetIntent: baseSourceTarget("workstation_panel", "workstation_panel"),
+      toolCallAdmissionDecision: toolAdmission("workstation_panel", []),
+      canonicalGoalFrame: canonicalGoal("panel_control", "workspace_action_receipt"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "workstation_action",
+      requested_action: "click_or_activate_control",
+      mutating: true,
+      operator_command_required: true,
+      operator_command_present: true,
+      admission_status: "admitted",
+      required_terminal_kind: "workspace_action_receipt",
+    });
+
+    const result = buildCapabilityResultGate({
+      plan,
+      terminalArtifactKind: "workspace_action_receipt",
+      terminalArtifactId: "ask:click-start:workspace_action_receipt",
+      currentTurnArtifacts: [
+        {
+          artifact_id: "ask:click-start:workspace_action_receipt",
+          kind: "workspace_action_receipt",
+          turn_id: "ask:click-start",
+          payload: {
+            kind: "workspace_action_receipt",
+            receipt_id: "ask:click-start:workspace_action_receipt",
+            status: "completed",
+          },
+        },
+      ],
+      reenteredRefs: ["ask:click-start:workspace_action_receipt"],
+    });
+
+    expect(result).toMatchObject({
+      status: "succeeded",
+      selected_for_answer: true,
+      reentered_solver: true,
+    });
+  });
+
+  it("routes set_rate history questions through debug evidence without admitting a new live-source mutation", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:set-rate-debug",
+      promptText: "Why did the last turn call set_rate?",
+      sourceTargetIntent: baseSourceTarget("runtime_evidence", "runtime_evidence"),
+      toolCallAdmissionDecision: toolAdmission("runtime_evidence", ["runtime_evidence", "repo_code"]),
+      canonicalGoalFrame: canonicalGoal("debug_diagnosis", "repo_code_evidence_answer"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      requested_action: "diagnose_debug_or_runtime_evidence",
+      mutating: false,
+      operator_command_required: false,
+      operator_command_present: false,
+      admission_status: "needs_evidence",
+      source_target: "runtime_evidence",
+    });
+    expect(plan.capability_family).not.toBe("live_source");
+  });
+});

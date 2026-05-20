@@ -1,7 +1,10 @@
 import crypto from "node:crypto";
 import type { HelixLoopParityTrace } from "./loop-parity-trace";
+import type { HelixCapabilityPlan } from "@shared/helix-capability-plan";
+import type { HelixCapabilityResult } from "@shared/helix-capability-result";
 import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
 import type { HelixProcedureEvidenceRetrievalResult } from "@shared/helix-procedure-evidence-retrieval-result";
+import type { HelixSolverArtifactReentryAudit } from "@shared/helix-solver-artifact-reentry-audit";
 import {
   interpretHelixAskPrompt,
   type HelixPromptInterpretation,
@@ -128,8 +131,11 @@ export type HelixAskTurnSolverTrace = {
   followup_reasoning_gate: HelixFollowupReasoningGate;
   live_source_identity_audit?: HelixLiveSourceIdentityAudit;
   live_source_identity_audit_ref?: string | null;
+  capability_plan?: HelixCapabilityPlan;
+  capability_result?: HelixCapabilityResult;
   procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan;
   procedure_evidence_retrieval_result?: HelixProcedureEvidenceRetrievalResult;
+  solver_artifact_reentry_audit?: HelixSolverArtifactReentryAudit;
 
   final_arbitration: {
     selected_route: string;
@@ -746,6 +752,16 @@ export function buildAskTurnSolverTrace(input: {
           live_source_identity_audit_ref: liveSourceIdentityAuditRef,
         }
       : {}),
+    ...(readRecord(input.payload.capability_plan)?.schema === "helix.capability_plan.v1"
+      ? {
+          capability_plan: input.payload.capability_plan as HelixCapabilityPlan,
+        }
+      : {}),
+    ...(readRecord(input.payload.capability_result)?.schema === "helix.capability_result.v1"
+      ? {
+          capability_result: input.payload.capability_result as HelixCapabilityResult,
+        }
+      : {}),
     ...(readRecord(input.payload.procedure_evidence_retrieval_plan)?.schema === "helix.procedure_evidence_retrieval_plan.v1"
       ? {
           procedure_evidence_retrieval_plan: input.payload.procedure_evidence_retrieval_plan as HelixProcedureEvidenceRetrievalPlan,
@@ -754,6 +770,11 @@ export function buildAskTurnSolverTrace(input: {
     ...(readRecord(input.payload.procedure_evidence_retrieval_result)?.schema === "helix.procedure_evidence_retrieval_result.v1"
       ? {
           procedure_evidence_retrieval_result: input.payload.procedure_evidence_retrieval_result as HelixProcedureEvidenceRetrievalResult,
+        }
+      : {}),
+    ...(readRecord(input.payload.solver_artifact_reentry_audit)?.schema === "helix.solver_artifact_reentry_audit.v1"
+      ? {
+          solver_artifact_reentry_audit: input.payload.solver_artifact_reentry_audit as HelixSolverArtifactReentryAudit,
         }
       : {}),
     final_arbitration: {

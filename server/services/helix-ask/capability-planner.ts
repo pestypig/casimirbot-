@@ -15,14 +15,14 @@ const readString = (value: unknown): string =>
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
 const normalize = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, " ");
 
 const commandVerbPattern = /\b(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit)\b/i;
 const contextualCommandPattern =
-  /\b(?:before|after|if|when|whether|why|did|last|previous|haven'?t|not\s+yet|without)\b[\s\S]{0,80}\b(?:click|press|tap|open|start|set|change|update|run|repair|attach)\b/i;
+  /\b(?:before|after|if|when|why|did|last|previous|haven'?t|not\s+yet|without)\b[\s\S]{0,80}\b(?:click|press|tap|open|start|set|change|update|run|repair|attach)\b/i;
 
 const hasOperatorCommand = (promptText: string): boolean => {
   const prompt = promptText.trim();
