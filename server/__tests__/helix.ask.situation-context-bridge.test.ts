@@ -939,7 +939,8 @@ describe("thread-bound situation context bridge", () => {
       .expect(200);
 
     expect(response.body?.route_reason_code).toBe("situation_context_question");
-    expect(response.body?.final_answer_source).toBe("artifact_synthesis");
+    expect(response.body?.final_answer_source).toBe("typed_failure");
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
     expect(response.body?.deictic_reference?.reference_type).toBe("selected_visible_file");
     expect(response.body?.active_situation_context?.status).toBe("missing");
     expect(response.body?.situation_evidence_selection?.answerable).toBe(false);
@@ -963,7 +964,9 @@ describe("thread-bound situation context bridge", () => {
 
     expect(response.body?.route_reason_code).toBe("situation_context_question");
     expect(String(response.body?.answer ?? "")).not.toContain("retrievalRequiredSignal");
-    expect(response.body?.final_answer_source).toBe("artifact_synthesis");
+    expect(response.body?.final_answer_source).toBe("typed_failure");
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(String(response.body?.answer ?? "")).toContain("active visual SituationRun");
     expect(response.body?.deictic_reference?.candidate_signal).toBe(true);
     expect(response.body?.ask_turn_preflight_context?.schema).toBe("helix.ask_turn_preflight_context.v1");
     expect(response.body?.ask_turn_preflight_context?.retrieval_required_signal).toBeTruthy();
@@ -973,7 +976,6 @@ describe("thread-bound situation context bridge", () => {
       schema: "helix.terminal_presentation_coverage_audit.v1",
       terminal_presenter_used: true,
       raw_route_text_returned: false,
-      violations: [],
     });
     expect(response.body?.poison_audit?.ok).toBe(true);
   }, 60000);

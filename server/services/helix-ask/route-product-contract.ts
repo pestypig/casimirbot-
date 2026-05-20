@@ -187,7 +187,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget,
       allowedCore: ["doc_location_result"],
-      allowedExtra: ["active_doc_identity", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation"],
+      allowedExtra: ["active_doc_identity", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation"],
       forbiddenExtra: ["situation_context_pack_with_epoch_evidence", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "no_tool_direct", "model_only_concept"],
       precedenceReason: "docs_source_target_allows_only_document_terminal_products",
     });

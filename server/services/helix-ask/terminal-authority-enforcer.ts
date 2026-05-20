@@ -2,6 +2,12 @@ import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 import { buildHelixTurnTerminalAuthority } from "./turn-terminal-authority";
 import { resolveTerminalAnswerEnvelope } from "./terminal-answer-envelope";
 
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const routeBase = (route: string | null): string | null =>
+  route ? route.split("/")[0]?.trim() || route : null;
+
 export function enforceHelixTerminalAuthority(input: {
   thread_id: string;
   turn_id?: string | null;
@@ -12,11 +18,24 @@ export function enforceHelixTerminalAuthority(input: {
     threadId: input.thread_id,
     turnId: input.turn_id,
   });
+  const currentRoute =
+    readString(input.payload.route_reason_code) ??
+    readString(input.payload.route);
+  const currentRouteBase = routeBase(currentRoute);
+  const existingRecord =
+    existing && typeof existing === "object" && !Array.isArray(existing)
+      ? (existing as Record<string, unknown>)
+      : null;
+  const existingRouteBase = routeBase(readString(existingRecord?.route));
+  const existingTerminalArtifactKind = readString(existingRecord?.terminal_artifact_kind);
+  const existingFinalAnswerSource = readString(existingRecord?.final_answer_source);
   if (
-    existing &&
-    typeof existing === "object" &&
-    (existing as Record<string, unknown>).server_authoritative === true &&
-    (existing as Record<string, unknown>).terminal_text_preview === envelope.terminal_text
+    existingRecord &&
+    existingRecord.server_authoritative === true &&
+    existingRecord.terminal_text_preview === envelope.terminal_text &&
+    (!currentRouteBase || !existingRouteBase || currentRouteBase === existingRouteBase) &&
+    (!existingTerminalArtifactKind || existingTerminalArtifactKind === envelope.terminal_artifact_kind) &&
+    (!existingFinalAnswerSource || existingFinalAnswerSource === envelope.final_answer_source)
   ) {
     return existing as HelixTerminalAuthority;
   }
@@ -27,11 +46,7 @@ export function enforceHelixTerminalAuthority(input: {
     terminal_artifact_kind: envelope.terminal_artifact_kind,
     terminal_kind: envelope.terminal_kind,
     terminal_text: envelope.terminal_text,
-    route: typeof input.payload.route_reason_code === "string"
-      ? input.payload.route_reason_code
-      : typeof input.payload.route === "string"
-        ? input.payload.route
-        : null,
+    route: currentRoute,
     authority_origin: envelope.authority_origin,
   });
 }

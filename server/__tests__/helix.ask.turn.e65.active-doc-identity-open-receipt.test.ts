@@ -180,6 +180,33 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Path:/i);
   }, 90000);
 
+  it("does not treat polite 'for me' wording as a document search target", async () => {
+    const app = createApp();
+    const sessionId = `e65-open-docs-for-me-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, open docs for me.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("active_doc_identity");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(JSON.stringify(response.body)).not.toContain('"query":"me"');
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+  }, 90000);
+
   it("treats NH-M2 white-paper-from-docs wording as document acquisition, not panel open", async () => {
     const app = createApp();
     const response = await request(app)
@@ -196,6 +223,10 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_open_receipt");
     expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
     expect(response.body?.terminal_error_code ?? null).not.toBe("terminal_consistency_violation");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.final_route_reconciliation?.ok).toBe(true);
+    expect(response.body?.terminal_answer_authority?.route).toBe("doc_open_best");
+    expect(response.body?.poison_audit?.ok).toBe(true);
     expect(response.body?.execution_trace?.some((step: any) => step?.action?.action_id === "open_doc_by_path")).toBe(true);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Path:/i);
   }, 90000);
