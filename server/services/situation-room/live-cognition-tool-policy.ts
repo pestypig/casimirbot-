@@ -24,6 +24,9 @@ export function selectLiveCognitionToolForLine(
   if (/\b(?:image|visual|screenshot|frame|seen|visible|screen|view|camera)\b/.test(text)) {
     return byId("visual.align_latest_with_event_window");
   }
+  if (/\b(?:route|path|waypoint|gateway|end gateway|return home|go home|drift|wrong direction|navigation|rehearsal|baritone|pathmind)\b/.test(text)) {
+    return byId("minecraft.query_navigation_state");
+  }
   if (/\b(?:threat|risk|danger|hostile|creeper|explosion|damage|lava|bucket|fluid|block|stair|trench|mine)\b/.test(text)) {
     return byId("minecraft.query_event_window");
   }

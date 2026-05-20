@@ -302,6 +302,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { starTelemetryRouter } = await import("./routes/agi.star");
     const { contributionsRouter } = await import("./routes/agi.contributions");
     const { refineryRouter } = await import("./routes/agi.refinery");
+    const { environmentSourceRouter } = await import("./routes/environment-source-routes");
     const enableDebate = flagEnabled(process.env.ENABLE_DEBATE, false);
     if (enableDebate) {
       const { debateRouter } = await import("./routes/agi.debate");
@@ -316,6 +317,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi", trainingTraceRouter);
     app.use("/api/agi", refineryRouter);
     app.use("/api/agi", constraintPacksRouter);
+    app.use("/api/agi/environment", environmentSourceRouter);
     app.use("/api/agi/adapter", adapterRouter);
     const enableTraceApi = flagEnabled(process.env.ENABLE_TRACE_API, false);
     if (enableTraceApi) {

@@ -1,4 +1,5 @@
 import type { HelixEnvironmentStateSnapshot } from "@shared/helix-environment-state-snapshot";
+import { phraseContainerKnowledge } from "./environment-sensor-language";
 
 export type EnvironmentStateSnapshotReduction = {
   schema: "helix.environment_state_snapshot_reduction.v1";
@@ -29,12 +30,7 @@ export function reduceEnvironmentStateSnapshot(snapshot: HelixEnvironmentStateSn
     : "No carried items are confirmed.";
   const containers = snapshot.object_state?.nearby_containers ?? [];
   const containerSummary = containers.length
-    ? containers.slice(0, 4).map((entry) => {
-        const contents = entry.contents_summary?.length
-          ? entry.contents_summary.slice(0, 3).map((item) => `${item.count} ${label(item.item_type)}`).join(", ")
-          : "contents unknown";
-        return `${label(entry.container_type)} (${contents})`;
-      }).join("; ")
+    ? containers.slice(0, 4).map(phraseContainerKnowledge).join(" ")
     : "No known nearby containers.";
   const hazards = snapshot.object_state?.hazards ?? [];
   const risk = hazards.length
@@ -63,4 +59,3 @@ export function reduceEnvironmentStateSnapshot(snapshot: HelixEnvironmentStateSn
     raw_content_included: false,
   };
 }
-

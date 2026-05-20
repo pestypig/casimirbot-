@@ -33,6 +33,15 @@ import type { HelixSyntheticEvidence } from "@shared/helix-synthetic-evidence";
 import type { HelixMinecraftSpatialEvent } from "@shared/helix-minecraft-spatial-event";
 import type { HelixMinecraftSpatialEpisode } from "@shared/helix-minecraft-spatial-episode";
 import type {
+  HelixMinecraftSeedMapClaim,
+  HelixMinecraftSeedMapResult,
+} from "@shared/helix-minecraft-seed-map";
+import type { HelixMinecraftRouteRehearsal } from "@shared/helix-minecraft-route-rehearsal";
+import type {
+  HelixMinecraftRouteDriftEvent,
+  HelixMinecraftWorldDeltaOverlay,
+} from "@shared/helix-minecraft-evidence";
+import type {
   HelixMinecraftWorldSenseContext,
   HelixMinecraftWorldSenseEvent,
 } from "@shared/helix-minecraft-world-sense";
@@ -105,6 +114,25 @@ import {
   ingestMinecraftSpatialWorldEvent,
   resetMinecraftSpatialWindows,
 } from "./minecraft-spatial-window";
+import {
+  buildMinecraftSeedMapQueryFromWorldEvent,
+  getMinecraftSeedMapProvider,
+  resetMinecraftSeedMapProviderForTest,
+} from "./minecraft-seed-map-provider";
+import {
+  reduceMinecraftSpatialGraph,
+  type MinecraftSpatialGraph,
+} from "./minecraft-spatial-graph";
+import { rehearseMinecraftRoute } from "./minecraft-route-rehearsal";
+import { reduceMinecraftWorldDeltaOverlay } from "./minecraft-world-delta-overlay";
+import {
+  reduceMinecraftRouteDrift,
+  resetMinecraftRouteDriftStateForTest,
+} from "./minecraft-route-drift";
+import {
+  recordMinecraftNavigationEvidence,
+  resetMinecraftNavigationStateStoreForTest,
+} from "./minecraft-navigation-state-store";
 import {
   reduceMinecraftSpatialIntent,
 } from "./minecraft-intent-hypothesis-reducer";
@@ -213,6 +241,12 @@ export type WorldEventIngestResult = {
   live_answer_environment_delta?: LiveAnswerEnvironmentDelta | null;
   minecraft_spatial_event?: HelixMinecraftSpatialEvent | null;
   minecraft_spatial_episode?: HelixMinecraftSpatialEpisode | null;
+  minecraft_seed_map_result?: HelixMinecraftSeedMapResult | null;
+  minecraft_seed_map_claims?: HelixMinecraftSeedMapClaim[];
+  minecraft_spatial_graph?: MinecraftSpatialGraph | null;
+  minecraft_route_rehearsal?: HelixMinecraftRouteRehearsal | null;
+  minecraft_route_drift_event?: HelixMinecraftRouteDriftEvent | null;
+  minecraft_world_delta_overlay?: HelixMinecraftWorldDeltaOverlay | null;
   minecraft_world_sense_event?: HelixMinecraftWorldSenseEvent | null;
   minecraft_world_sense_context?: HelixMinecraftWorldSenseContext | null;
   game_semantic_lookup_receipts?: GameSemanticLookupReceipt[];
@@ -347,6 +381,9 @@ export const resetWorldEventIngestState = (options: ResetWorldEventIngestStateOp
   resetProfileLiveSourcesForTest();
   resetMinecraftSpatialWindows();
   resetMinecraftWorldSenseWindows();
+  resetMinecraftSeedMapProviderForTest();
+  resetMinecraftRouteDriftStateForTest();
+  resetMinecraftNavigationStateStoreForTest();
   if (!options.preserveSemanticLedgers) {
     clearGameSemanticLookupReceiptsForTest();
     clearGameUtilityHypothesesForTest();
@@ -841,6 +878,37 @@ export const ingestWorldEvent = async (
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
   const spatialResult = ingestMinecraftSpatialWorldEvent(event);
   const worldSenseResult = ingestMinecraftWorldSenseEvent(event);
+  const minecraftWorldDeltaOverlay = reduceMinecraftWorldDeltaOverlay(spatialResult.spatial_event);
+  const seedMapQuery = buildMinecraftSeedMapQueryFromWorldEvent({
+    event,
+    spatialEvent: spatialResult.spatial_event,
+  });
+  const seedMapResult = seedMapQuery
+    ? getMinecraftSeedMapProvider().querySeedMap(seedMapQuery)
+    : null;
+  const minecraftSpatialGraph = reduceMinecraftSpatialGraph({
+    roomId: event.room_id,
+    worldId: event.world_id,
+    spatialEvent: spatialResult.spatial_event,
+    spatialEpisode: spatialResult.spatial_episode,
+    worldSenseContext: worldSenseResult.world_sense_context,
+    seedClaims: seedMapResult?.claims ?? [],
+    selectedTargetLabel: seedMapQuery?.selected_target_label ?? null,
+  });
+  const minecraftRouteRehearsal = rehearseMinecraftRoute({
+    graph: minecraftSpatialGraph,
+    actorLabel: spatialResult.spatial_event?.actor_label ?? event.actor_label ?? null,
+  });
+  const minecraftRouteDriftEvent = reduceMinecraftRouteDrift({
+    spatialEvent: spatialResult.spatial_event,
+    routeRehearsal: minecraftRouteRehearsal,
+  });
+  recordMinecraftNavigationEvidence({
+    spatialEvent: spatialResult.spatial_event,
+    routeRehearsal: minecraftRouteRehearsal,
+    routeDrift: minecraftRouteDriftEvent,
+    now: event.ts,
+  });
   state.signals.push(signal);
   state.signals.sort((a: SituationEventSignal, b: SituationEventSignal) =>
     a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id),
@@ -1135,6 +1203,8 @@ export const ingestWorldEvent = async (
           salienceReceipt,
           episodes,
           goalHypotheses,
+          routeRehearsal: minecraftRouteRehearsal,
+          routeDriftEvent: minecraftRouteDriftEvent,
           now: signal.ts,
         })
       : null;
@@ -1554,6 +1624,12 @@ export const ingestWorldEvent = async (
     live_answer_environment_delta: liveAnswerEnvironmentUpdate?.delta ?? null,
     minecraft_spatial_event: spatialResult.spatial_event,
     minecraft_spatial_episode: spatialResult.spatial_episode,
+    minecraft_seed_map_result: seedMapResult,
+    minecraft_seed_map_claims: seedMapResult?.claims ?? [],
+    minecraft_spatial_graph: minecraftSpatialGraph,
+    minecraft_route_rehearsal: minecraftRouteRehearsal,
+    minecraft_route_drift_event: minecraftRouteDriftEvent,
+    minecraft_world_delta_overlay: minecraftWorldDeltaOverlay,
     minecraft_world_sense_event: worldSenseResult.world_sense_event,
     minecraft_world_sense_context: worldSenseResult.world_sense_context,
     game_semantic_lookup_receipts: semanticUtilityReduction?.lookup_receipts ?? [],

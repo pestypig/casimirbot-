@@ -12,6 +12,7 @@ import {
 import { lookupGameSemanticReference } from "../situation-room/game-semantic-reference";
 import { alignVisualFrameWithEvents, getLatestVisualFrame } from "../situation-room/visual-snapshot-store";
 import { getLatestMinecraftWorldSenseContextForRoom } from "../situation-room/minecraft-world-sense-window";
+import { queryMinecraftNavigationState } from "../situation-room/minecraft-navigation-state-store";
 import { queryEventWindow } from "../situation-room/event-window-query";
 import { evaluateLiveLineToolRequest } from "./live-line-tool-evaluator";
 
@@ -258,6 +259,42 @@ const runMinecraftSemanticLookup = (input: {
   };
 };
 
+const runMinecraftNavigationStateQuery = (input: {
+  request: HelixLiveLineToolRequest;
+  roomId?: string | null;
+  worldId?: string | null;
+  limit?: number;
+}): {
+  receipt: LiveLineToolChainReceipt;
+  supports: HelixLiveLineToolEvaluation["supports_line"];
+  nextLineValue: string | null;
+  missingEvidence: string[];
+} => {
+  const result = queryMinecraftNavigationState({
+    roomId: input.roomId ?? null,
+    worldId: input.worldId ?? null,
+    limit: input.limit ?? 6,
+  });
+  const state = result.navigation_state ?? null;
+  const summary = state
+    ? `Navigation state has route_status=${state.route_status}, policy_surface_status=${state.policy_surface_status}, solver_observations=${result.latest_solver_observations.length}.`
+    : "No compact Minecraft navigation state is available yet.";
+  return {
+    receipt: makeReceipt({
+      request: input.request,
+      ok: true,
+      summary,
+      evidence_refs: state?.evidence_refs ?? [],
+      observation: result,
+    }),
+    supports: state ? "partial" : "unknown",
+    nextLineValue: state
+      ? `${input.request.line_label} check: route_status=${state.route_status}; policy_surface_status=${state.policy_surface_status}; missing_evidence=${state.missing_evidence.length}.`
+      : null,
+    missingEvidence: result.missing_evidence,
+  };
+};
+
 const runVisualEventAlignment = (input: {
   request: HelixLiveLineToolRequest;
   roomId?: string | null;
@@ -350,10 +387,12 @@ export function runLiveLineToolChainWithReceipt(input: {
     ? runMinecraftEventWindow({ request, roomId, sourceId, worldId, limit: input.limit })
     : request.requested_tool === "minecraft.query_world_sense_window"
       ? runMinecraftWorldSenseWindow({ request, roomId })
-      : request.requested_tool === "minecraft.lookup_semantics"
-        ? runMinecraftSemanticLookup({ request, roomId })
-        : request.requested_tool === "visual.align_latest_with_event_window"
-          ? runVisualEventAlignment({ request, roomId, sourceId, worldId, limit: input.limit })
+      : request.requested_tool === "minecraft.query_navigation_state"
+        ? runMinecraftNavigationStateQuery({ request, roomId, worldId, limit: input.limit })
+        : request.requested_tool === "minecraft.lookup_semantics"
+          ? runMinecraftSemanticLookup({ request, roomId })
+          : request.requested_tool === "visual.align_latest_with_event_window"
+            ? runVisualEventAlignment({ request, roomId, sourceId, worldId, limit: input.limit })
           : {
             receipt: makeReceipt({
               request,

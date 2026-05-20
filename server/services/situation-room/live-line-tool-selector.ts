@@ -26,6 +26,9 @@ export function selectLiveLineTool(input: {
     return "live-cognition.synthesize_line_from_observations";
   }
   if (input.modalityScope === "minecraft_world" || input.worldFresh) {
+    if (key === "rehearsal" || key === "possibilities" || key === "unknowns" || /\b(?:route|path|waypoint|gateway|drift|navigation|baritone|pathmind)\b/.test(text)) {
+      return "minecraft.query_navigation_state";
+    }
     if (key === "risk" || key === "structure") return "minecraft.query_event_window";
     if (key === "entities") return "minecraft.query_world_sense_window";
     if (/\b(?:semantic|meaning|utility|purpose)\b/.test(text)) return "minecraft.lookup_semantics";

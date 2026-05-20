@@ -1,0 +1,87 @@
+{
+  "schema": "helix.environment_state_snapshot.v1",
+  "snapshot_id": "snapshot:source:minecraft-paper-plugin:datdampig:123600",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "room_id": "room:minecraft",
+  "world_id": "minecraft:paper-server",
+  "source_id": "source:minecraft-paper-plugin",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "ts": "2026-05-20T12:00:05.000Z",
+  "source_tick": 123600,
+  "actor_state": {
+    "sensor_scope": "player_observable",
+    "pose": { "position": { "x": 100.2, "y": 64, "z": 200.5 }, "eye": { "x": 100.2, "y": 65.62, "z": 200.5 }, "yaw": 91.4, "pitch": 5.2, "facing": "east" },
+    "health": 18,
+    "food_level": 8,
+    "saturation": 1.2,
+    "mode": "SURVIVAL",
+    "status_flags": ["on_ground"]
+  },
+  "inventory_state": {
+    "sensor_scope": "player_observable",
+    "selected_item": { "item_type": "minecraft:iron_pickaxe", "count": 1, "slot": 0, "durability": { "remaining": 221, "max": 250 }, "sensor_scope": "player_observable" },
+    "carried_items": [{ "item_type": "minecraft:torch", "count": 12, "sensor_scope": "player_observable" }],
+    "equipped_items": [],
+    "inventory_hash": "sha256:inventory-mvp",
+    "changed_since_last_snapshot": true
+  },
+  "object_state": {
+    "sensor_scope": "sensor_observable",
+    "nearby_entities": [
+      { "object_ref": "entity:test-zombie", "object_type": "minecraft:zombie", "distance": 9.4, "tags": ["hostile"], "sensor_scope": "sensor_observable" }
+    ],
+    "nearby_containers": [
+      {
+        "container_ref": "container:minecraft:overworld:281:64:-402",
+        "container_type": "minecraft:chest",
+        "position": { "x": 281, "y": 64, "z": -402 },
+        "contents_known": false,
+        "sensor_scope": "sensor_observable"
+      },
+      {
+        "container_ref": "container:open:datdampig:chest",
+        "container_type": "minecraft:chest",
+        "contents_known": true,
+        "contents_summary": [{ "item_type": "minecraft:cooked_porkchop", "count": 12, "sensor_scope": "player_memory" }],
+        "contents_hash": "sha256:opened-chest",
+        "last_verified_at": "2026-05-20T12:00:04.000Z",
+        "sensor_scope": "player_memory"
+      }
+    ],
+    "resources": [{ "resource_ref": "resource:wheat", "resource_type": "minecraft:wheat", "state": "available", "amount": 1, "tags": ["crop"], "sensor_scope": "sensor_observable" }],
+    "hazards": []
+  },
+  "focus": {
+    "sensor_scope": "player_observable",
+    "target_kind": "block",
+    "target_ref": "block:minecraft:overworld:104:64:200",
+    "target_type": "minecraft:wheat",
+    "distance": 3.7,
+    "line_of_sight": true,
+    "reachable": true
+  },
+  "local_map": {
+    "sensor_scope": "sensor_observable",
+    "radius": 8,
+    "salient_cells": [{ "cell_ref": "cell:stone", "cell_type": "minecraft:stone", "sensor_scope": "sensor_observable" }],
+    "map_hash": "sha256:local-map",
+    "changed_since_last_snapshot": true
+  },
+  "section_hashes": {
+    "actor_state": "sha256:actor",
+    "inventory_state": "sha256:inventory",
+    "object_state": "sha256:object",
+    "focus": "sha256:focus",
+    "local_map": "sha256:local-map"
+  },
+  "changed_sections": ["actor_state", "inventory_state", "object_state", "focus", "local_map"],
+  "domain_specific": { "minecraft": { "raw_nbt_included": false, "paper_api_fields_seen": ["Player", "Inventory", "World#getNearbyEntities", "World#rayTraceBlocks"] } },
+  "evidence_refs": ["minecraft:snapshot:server_tick:123600"],
+  "deterministic": true,
+  "model_invoked": false,
+  "assistant_answer": false,
+  "raw_payload_included": false,
+  "context_policy": "compact_context_pack_only"
+}

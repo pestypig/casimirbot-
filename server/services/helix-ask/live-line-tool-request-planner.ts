@@ -74,6 +74,14 @@ const chooseTools = (input: {
       },
     ];
   }
+  if (/\b(?:route|path|waypoint|gateway|end gateway|return home|go home|drift|wrong direction|navigation|rehearsal|baritone|pathmind)\b/.test(text)) {
+    return [{
+      requested_tool: "minecraft.query_navigation_state",
+      expected_evidence_kind: "missing_evidence",
+      reason: "query_route_state",
+      reason_summary: "Query compact route objective, rehearsal, provider observations, and drift evidence before changing route-related lines.",
+    }];
+  }
   if (
     /\b(?:minecraft|minehut|world|source events?|event window|situation room debug|raw logs?|bucket|lava|water|fluid|block|stair|trench|mine|structure|risk|danger|hostile|threat|damage|missing evidence|next check)\b/.test(text)
   ) {

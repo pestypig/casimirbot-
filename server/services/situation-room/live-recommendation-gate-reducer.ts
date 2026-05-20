@@ -37,6 +37,9 @@ const graphSummary = (graph: HelixPossibilityGraph | null): string =>
 
 const rehearsalSummary = (result: HelixActionRehearsalResult | null): string => {
   if (!result) return "Not rehearsed yet.";
+  if (result.pending_probe_requests?.length) {
+    return `Awaiting read-only probe results: ${result.pending_probe_requests.map((request) => request.probe_type).join(", ")}.`;
+  }
   if (result.feasibility === "feasible") return "Dry-run passed: route and resource checks are feasible.";
   if (result.feasibility === "partial") return `Partial: ${result.blockers.map((blocker) => blocker.summary).join("; ") || "some checks were inconclusive"}.`;
   if (result.feasibility === "blocked") return `Blocked: ${result.blockers.map((blocker) => blocker.summary).join("; ") || "rehearsal failed"}.`;
@@ -235,4 +238,3 @@ export function lineValuesFromRecommendationGate(input: {
   }
   return values;
 }
-

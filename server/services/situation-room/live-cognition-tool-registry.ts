@@ -86,6 +86,16 @@ const tools: HelixLiveCognitionTool[] = [
     requires_user_confirmation: false,
   }),
   tool({
+    tool_id: "minecraft.query_navigation_state",
+    family: "minecraft_event",
+    label: "Query navigation state",
+    input_requirements: ["thread_id_or_room_id", "line_key"],
+    output_evidence_kind: "missing_evidence",
+    allowed_line_keys: ["rehearsal", "possibilities", "unknowns", "next_check", "risk", "missing_evidence"],
+    can_run_automatically: true,
+    requires_user_confirmation: false,
+  }),
+  tool({
     tool_id: "minecraft.lookup_semantics",
     family: "semantic",
     label: "Lookup Minecraft semantics",

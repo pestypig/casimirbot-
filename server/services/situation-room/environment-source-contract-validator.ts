@@ -5,6 +5,14 @@ import {
   type HelixActionRehearsalRequest,
 } from "@shared/helix-action-rehearsal";
 import { HELIX_ENVIRONMENT_POSSIBILITY_GRAPH_SCHEMA } from "@shared/helix-environment-possibility-graph";
+import {
+  HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA,
+  HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
+} from "@shared/helix-environment-probe";
+import {
+  HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA,
+  HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA,
+} from "@shared/helix-environment-source-manifest";
 import { HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA } from "@shared/helix-environment-state-snapshot";
 import { HELIX_RECOMMENDATION_GATE_SCHEMA } from "@shared/helix-recommendation-gate";
 
@@ -38,6 +46,10 @@ const subjectRef = (subject: unknown): string => {
   const record = asRecord(subject);
   return String(
     record?.snapshot_id ??
+    record?.manifest_id ??
+    record?.heartbeat_id ??
+    record?.probe_request_id ??
+    record?.probe_result_id ??
     record?.context_id ??
     record?.graph_id ??
     record?.result_id ??
@@ -49,7 +61,8 @@ const subjectRef = (subject: unknown): string => {
 
 const hasCompactContext = (record: Record<string, unknown>): boolean =>
   record.context_policy === "compact_context_pack_only" ||
-  record.schema === HELIX_ACTION_REHEARSAL_REQUEST_SCHEMA;
+  record.schema === HELIX_ACTION_REHEARSAL_REQUEST_SCHEMA ||
+  record.schema === HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA;
 
 export function auditEnvironmentSourceContract(input: {
   subject: unknown;
@@ -75,6 +88,10 @@ export function auditEnvironmentSourceContract(input: {
       HELIX_ACTION_REHEARSAL_REQUEST_SCHEMA,
       HELIX_ACTION_REHEARSAL_RESULT_SCHEMA,
       HELIX_RECOMMENDATION_GATE_SCHEMA,
+      HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA,
+      HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA,
+      HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA,
+      HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
     ]);
     if (!knownSchemas.has(schema)) issue("unknown_schema", `Unknown environment lane schema: ${schema}.`);
     if (record.assistant_answer !== false) issue("assistant_answer_not_false", "Environment lane artifacts cannot be assistant answers.");
@@ -82,7 +99,57 @@ export function auditEnvironmentSourceContract(input: {
       issue("raw_content_included_not_false", "Environment lane artifacts must exclude raw content.");
     }
     if (!hasCompactContext(record)) issue("context_policy_not_compact", "Environment lane artifacts must use compact context only.");
-    if (!Array.isArray(record.evidence_refs)) issue("evidence_refs_missing", "Environment lane artifacts must carry evidence refs.");
+    if (
+      !Array.isArray(record.evidence_refs) &&
+      schema !== HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA
+    ) {
+      issue("evidence_refs_missing", "Environment lane artifacts must carry evidence refs.");
+    }
+  }
+
+  if (record && schema === HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA) {
+    if (!record.source_id) issue("source_id_missing", "Environment source manifest must declare source_id.");
+    if (!record.room_id) issue("room_id_missing", "Environment source manifest must declare room_id.");
+    if (!Array.isArray(record.modalities)) issue("modalities_missing", "Environment source manifest must declare modalities.");
+    if (!Array.isArray(record.supported_snapshot_sections)) {
+      issue("supported_snapshot_sections_missing", "Environment source manifest must declare supported snapshot sections.");
+    }
+    if (!Array.isArray(record.supported_probe_types)) issue("supported_probe_types_missing", "Environment source manifest must declare supported probe types.");
+    const executionPolicy = asRecord(record.execution_policy);
+    if (executionPolicy?.may_execute_live_actions !== false) {
+      issue("live_execution_enabled", "Environment source manifests must not enable live actions.");
+    }
+    if (executionPolicy?.may_perform_read_only_probes !== true) {
+      issue("read_only_probe_policy_missing", "Environment source manifests must declare read-only probe policy.");
+    }
+    const snapshotPolicy = asRecord(record.snapshot_policy);
+    if (snapshotPolicy?.raw_payload_included !== false) {
+      issue("raw_payload_included_not_false", "Environment source manifests must forbid raw payloads.");
+    }
+    if (snapshotPolicy?.raw_nbt_included === true) {
+      issue("raw_nbt_included", "Minecraft environment source manifests must not allow raw NBT.");
+    }
+  }
+
+  if (record && schema === HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA) {
+    if (!record.source_id) issue("source_id_missing", "Environment source heartbeat must declare source_id.");
+    if (!record.room_id) issue("room_id_missing", "Environment source heartbeat must declare room_id.");
+    if (!record.status) issue("heartbeat_status_missing", "Environment source heartbeat must declare status.");
+  }
+
+  if (record && schema === HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA) {
+    const constraints = asRecord(record.constraints);
+    if (constraints?.read_only !== true) issue("probe_not_read_only", "Environment probe requests must be read-only.");
+    if (constraints?.side_effects_allowed !== false) issue("side_effects_allowed", "Environment probe requests must forbid side effects.");
+  }
+
+  if (record && schema === HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA) {
+    if (record.side_effects_performed !== false) issue("side_effects_performed", "Environment probe results must not perform side effects.");
+    if (!Array.isArray(record.commands_executed) || record.commands_executed.length !== 0) {
+      issue("commands_executed", "Environment probe results must not execute commands.");
+    }
+    if (record.world_mutation_performed !== false) issue("world_mutation_performed", "Environment probe results must not mutate world state.");
+    if (!record.sensor_scope) issue("sensor_scope_missing", "Environment probe results must carry sensor scope.");
   }
 
   if (record && schema === HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA) {

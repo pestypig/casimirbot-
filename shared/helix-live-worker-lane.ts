@@ -10,6 +10,8 @@ export type HelixLiveWorkerLaneKey =
   | "line_structure"
   | "line_entities"
   | "line_risk"
+  | "line_rehearsal"
+  | "line_possibilities"
   | "line_missing_evidence"
   | "line_next_check"
   | "custom_line";

@@ -1,0 +1,14 @@
+name: HelixPaperSensor
+version: 0.1.0
+main: com.casimirbot.helixsensor.HelixPaperSensorPlugin
+api-version: "1.21"
+description: Read-only Helix environment sensor for Minecraft Paper servers.
+author: CasimirBot
+commands:
+  helixsensor:
+    description: Inspect and manually pulse the Helix sensor.
+    usage: /helixsensor status|snapshot|heartbeat|probes|reload|debug-payload
+permissions:
+  helixsensor.admin:
+    description: Allows Helix sensor diagnostics.
+    default: op

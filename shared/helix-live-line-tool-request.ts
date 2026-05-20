@@ -4,6 +4,7 @@ export const HELIX_LIVE_LINE_TOOL_REQUEST_SCHEMA =
 export type HelixLiveLineRequestedTool =
   | "minecraft.query_event_window"
   | "minecraft.query_world_sense_window"
+  | "minecraft.query_navigation_state"
   | "minecraft.lookup_semantics"
   | "visual.align_latest_with_event_window"
   | "visual.latest_observation"
@@ -34,6 +35,7 @@ export type HelixLiveLineToolRequestReason =
   | "verify_math"
   | "lookup_semantics"
   | "query_event_window"
+  | "query_route_state"
   | "store_context"
   | "review_uncertainty";
 

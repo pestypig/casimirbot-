@@ -32,6 +32,7 @@ import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
 import {
   buildRehearsalSpaceCatalog,
   type HelixRehearsalSpace,
+  type HelixRehearsalSpaceAvailabilityInput,
   type HelixRehearsalSpaceId,
 } from "@shared/helix-rehearsal-space";
 import {
@@ -44,7 +45,7 @@ import {
 } from "@/lib/helix/visualFrameProducer";
 import { useVisualSourceCaptureStore, type VisualSourceCaptureState } from "@/store/useVisualSourceCaptureStore";
 
-type LiveEnvironmentTab = "present_state" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type ClientCapabilityActionRead = {
   action_request_id: string;
   capability: string;
@@ -294,6 +295,7 @@ type SourceBindingTransitionRead = {
 
 const tabs: Array<{ id: LiveEnvironmentTab; label: string }> = [
   { id: "present_state", label: "Present State" },
+  { id: "navigation_evidence", label: "Navigation Evidence" },
   { id: "worker_lanes", label: "Worker Lanes" },
   { id: "line_checks", label: "Line Checks" },
   { id: "interpreted_log", label: "Interpreted Log" },
@@ -469,6 +471,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     return window.localStorage.getItem("helix.worldEventSourceLabel") ?? "World-event source";
   });
   const [selectedRehearsalSpaceId, setSelectedRehearsalSpaceId] = useState<HelixRehearsalSpaceId | null>(null);
+  const [sourceAvailabilities, setSourceAvailabilities] = useState<HelixRehearsalSpaceAvailabilityInput[]>([]);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const [lastActionStatus, setLastActionStatus] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
@@ -492,6 +495,21 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const schemaCompatibility = latestReadResponse?.schema_compatibility && typeof latestReadResponse.schema_compatibility === "object"
     ? latestReadResponse.schema_compatibility
     : null;
+  const navigationRead = latestReadResponse?.navigation_state && typeof latestReadResponse.navigation_state === "object"
+    ? latestReadResponse.navigation_state as Record<string, unknown>
+    : null;
+  const navigationState = navigationRead?.navigation_state && typeof navigationRead.navigation_state === "object"
+    ? navigationRead.navigation_state as Record<string, unknown>
+    : null;
+  const navigationLatestDrift = navigationRead?.latest_drift && typeof navigationRead.latest_drift === "object"
+    ? navigationRead.latest_drift as Record<string, unknown>
+    : null;
+  const navigationLatestRehearsal = navigationRead?.latest_rehearsal && typeof navigationRead.latest_rehearsal === "object"
+    ? navigationRead.latest_rehearsal as Record<string, unknown>
+    : null;
+  const navigationSolverObservations = Array.isArray(navigationRead?.latest_solver_observations)
+    ? navigationRead.latest_solver_observations as Array<Record<string, unknown>>
+    : [];
   const loadEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment);
   const environmentSourceIds = Array.isArray(environment?.source_ids) ? environment.source_ids : [];
   const environmentLines = Array.isArray(environment?.lines) ? environment.lines : [];
@@ -536,7 +554,33 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     lineKeys: environmentLines.map((line: LiveAnswerLineState) => line.key),
     objective: environment?.objective ?? null,
     preset: environment?.preset ?? null,
-  }), [environment?.objective, environment?.preset, environmentLines, environmentSourceIds, sourceHealthEntries]);
+    sourceAvailabilities,
+  }), [environment?.objective, environment?.preset, environmentLines, environmentSourceIds, sourceAvailabilities, sourceHealthEntries]);
+  useEffect(() => {
+    let cancelled = false;
+    const ids = environmentSourceIds.filter((sourceId: string) => sourceId.startsWith("source:"));
+    if (ids.length === 0) {
+      setSourceAvailabilities([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+    Promise.all(ids.map((sourceId: string) =>
+      fetch(`/api/agi/environment/sources/${encodeURIComponent(sourceId)}/status`)
+        .then((response) => response.ok ? response.json() : null)
+        .catch(() => null)
+    )).then((bodies) => {
+      if (cancelled) return;
+      setSourceAvailabilities(
+        bodies
+          .map((body) => body?.status)
+          .filter((status): status is HelixRehearsalSpaceAvailabilityInput => Boolean(status?.source_id && status?.domain_adapter && status?.availability)),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [environment?.updated_at, environmentSourceIds]);
   useEffect(() => {
     if (!selectedRehearsalSpaceId || !rehearsalCatalog.spaces.some((space: HelixRehearsalSpace) => space.space_id === selectedRehearsalSpaceId)) {
       setSelectedRehearsalSpaceId(rehearsalCatalog.selected_space_id);
@@ -1192,12 +1236,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     ? "border-cyan-200/50 bg-cyan-300/15 text-cyan-50"
                     : space.status === "available"
                       ? "border-emerald-300/25 text-emerald-100 hover:bg-emerald-400/10"
-                      : space.status === "partial"
-                        ? "border-amber-300/25 text-amber-100 hover:bg-amber-400/10"
+                    : space.status === "limited" || space.status === "partial"
+                      ? "border-amber-300/25 text-amber-100 hover:bg-amber-400/10"
+                      : space.status === "stale"
+                        ? "border-orange-300/25 text-orange-100 hover:bg-orange-400/10"
+                        : space.status === "policy_blocked"
+                          ? "border-rose-300/25 text-rose-100"
                         : "border-white/10 text-slate-500"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
-                {space.label} / {space.status}
+                {space.label} / {space.availability_label ?? space.status}
               </button>
             ))}
           </div>
@@ -1527,6 +1575,77 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   </div>
                 </div>
               )}
+            </div>
+          ) : null}
+          {activeTab === "navigation_evidence" ? (
+            <div className="space-y-3">
+              <div className="rounded border border-cyan-300/20 bg-slate-950/70 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-100">Navigation Evidence</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Route evidence is compact tool evidence. It is not a recommendation or assistant answer.
+                    </p>
+                  </div>
+                  <span className="rounded border border-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                    {String(navigationState?.policy_surface_status ?? "unknown")}
+                  </span>
+                </div>
+                {!navigationState ? (
+                  <p className="mt-3 text-xs text-slate-500">No Minecraft navigation state has been recorded yet.</p>
+                ) : (
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-[10px] uppercase text-slate-500">Route status</p>
+                      <p className="mt-1 text-xs text-slate-100">{String(navigationState.route_status ?? "unknown")}</p>
+                    </div>
+                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-[10px] uppercase text-slate-500">Drift</p>
+                      <p className="mt-1 text-xs text-slate-100">{String(navigationLatestDrift?.drift_status ?? "none")}</p>
+                    </div>
+                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-[10px] uppercase text-slate-500">Updated</p>
+                      <p className="mt-1 text-xs text-slate-100">{formatTime(String(navigationState.updated_at ?? ""))}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-2 lg:grid-cols-2">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-xs font-semibold text-slate-100">Latest rehearsal</p>
+                  <p className="mt-1 text-[11px] text-slate-500">confidence {String(navigationLatestRehearsal?.route_confidence ?? "n/a")} / basis {Array.isArray(navigationLatestRehearsal?.route_basis) ? navigationLatestRehearsal.route_basis.join(", ") : "none"}</p>
+                  <p className="mt-2 text-xs text-slate-200">{String(navigationLatestRehearsal?.route_summary ?? "No rehearsal evidence yet.")}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-xs font-semibold text-slate-100">Missing evidence</p>
+                  <div className="mt-2 space-y-1">
+                    {Array.isArray(navigationRead?.missing_evidence) && navigationRead.missing_evidence.length > 0 ? (
+                      (navigationRead.missing_evidence as string[]).slice(0, 8).map((entry: string) => (
+                        <p key={entry} className="text-[11px] text-slate-300">{entry}</p>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-500">No route-specific gaps reported.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold text-slate-100">Provider observations</p>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  {navigationSolverObservations.length === 0 ? <p className="text-xs text-slate-500">No Pathmind/Baritone/client planner observations yet.</p> : null}
+                  {navigationSolverObservations.slice(-6).reverse().map((observation: Record<string, unknown>) => (
+                    <div key={String(observation.observation_id)} className="rounded border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs font-semibold text-slate-100">{String(observation.provider ?? "provider")}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {String(observation.result_status ?? "unknown")} / {String(observation.planner_side_effect_risk ?? "unknown")}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        confidence {String(observation.provider_confidence ?? "n/a")} / trust {String(observation.evidence_trust ?? "unknown")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
           {activeTab === "worker_lanes" ? (

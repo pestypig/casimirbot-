@@ -1,0 +1,29 @@
+{
+  "schema": "helix.environment_source_heartbeat.v1",
+  "heartbeat_id": "heartbeat:minecraft-paper-plugin:active",
+  "source_id": "source:minecraft-paper-plugin",
+  "room_id": "room:minecraft",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "status": "active",
+  "server_tick": 123461,
+  "latest_snapshot_id": "snapshot:minecraft:player-opened-chest",
+  "latest_snapshot_ts": "2026-05-19T18:30:05.000Z",
+  "active_players": [
+    {
+      "actor_id": "minecraft:player:DatDamPig",
+      "actor_label": "DatDamPig",
+      "dimension": "minecraft:overworld"
+    }
+  ],
+  "pending_probe_count": 0,
+  "backpressure": {
+    "snapshot_upload_pending": false,
+    "skipped_snapshot_count": 0,
+    "avg_payload_bytes": 12000
+  },
+  "evidence_refs": ["minecraft:heartbeat:123461"],
+  "assistant_answer": false,
+  "raw_content_included": false,
+  "created_at": "2026-05-19T18:30:10.000Z"
+}

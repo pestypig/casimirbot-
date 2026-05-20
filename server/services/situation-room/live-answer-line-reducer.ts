@@ -3,6 +3,8 @@ import type {
   LiveAnswerEnvironmentDelta,
 } from "@shared/helix-live-answer-environment";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import type { HelixMinecraftRouteRehearsal } from "@shared/helix-minecraft-route-rehearsal";
+import type { HelixMinecraftRouteDriftEvent } from "@shared/helix-minecraft-evidence";
 import type {
   SituationEventSignal,
   SituationGoalHypothesis,
@@ -37,6 +39,8 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
   salienceReceipt?: SituationSalienceReceipt | null;
   episodes?: SituationEpisode[];
   goalHypotheses?: SituationGoalHypothesis[];
+  routeRehearsal?: HelixMinecraftRouteRehearsal | null;
+  routeDriftEvent?: HelixMinecraftRouteDriftEvent | null;
   now?: string;
 }): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
   const environment = input.environment;
@@ -64,6 +68,8 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
       ...input.signal.evidence_refs,
       ...(salience?.evidence_refs ?? []),
       ...episodes.flatMap((episode) => episode.evidence_refs),
+      ...(input.routeRehearsal?.evidence_refs ?? []),
+      ...(input.routeDriftEvent?.evidence_refs ?? []),
     ]),
   ).slice(-24);
   const actor = eventLabel(input.event);
@@ -123,7 +129,9 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
   if (environment.lines.some((line) => line.key === "next_check")) {
     setLine(
       "next_check",
-      riskSummary
+      input.routeDriftEvent
+        ? "Collect the next timestamped location sample before surfacing route drift."
+        : riskSummary
         ? "Watch health recovery and hostile proximity."
         : progressSummary
           ? "Watch whether this progress advances the current objective."
@@ -132,13 +140,41 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
     );
   }
   if (environment.lines.some((line) => line.key === "unknowns")) {
-    setLine("unknowns", "Raw logs are compacted; source-specific gaps remain explicit in Situation Room Debug.", 0.62);
+    setLine(
+      "unknowns",
+      input.routeRehearsal
+        ? input.routeRehearsal.missing_evidence.slice(0, 3).join(" ")
+        : "Raw logs are compacted; source-specific gaps remain explicit in Situation Room Debug.",
+      input.routeRehearsal ? 0.72 : 0.62,
+    );
   }
   if (environment.lines.some((line) => line.key === "rehearsal")) {
-    setLine("rehearsal", "No rehearsal result yet.", 0.45);
+    setLine(
+      "rehearsal",
+      input.routeRehearsal
+        ? [
+            input.routeRehearsal.route_summary,
+            input.routeDriftEvent
+              ? `drift_status=${input.routeDriftEvent.drift_status}; policy_surface_status=${input.routeDriftEvent.policy_surface_status}; heading_error_degrees=${input.routeDriftEvent.heading_error_degrees}.`
+              : "",
+          ].filter(Boolean).join(" ")
+        : "No rehearsal result yet.",
+      input.routeRehearsal ? input.routeRehearsal.route_confidence : 0.45,
+    );
   }
   if (environment.lines.some((line) => line.key === "recommendation")) {
-    setLine("recommendation", "Awaiting rehearsal before recommending action.", 0.45);
+    setLine(
+      "recommendation",
+      "Awaiting companion policy gate.",
+      0.45,
+    );
+  }
+  if (input.routeRehearsal && environment.lines.some((line) => line.key === "possibilities")) {
+    setLine(
+      "possibilities",
+      `Candidate waypoint: ${input.routeRehearsal.target_label}; route confidence ${input.routeRehearsal.route_confidence.toFixed(2)} with caveats.`,
+      0.68,
+    );
   }
   if (environment.lines.some((line) => line.key === "claim")) setLine("claim", nowSummary, 0.6);
   if (environment.lines.some((line) => line.key === "evidence")) setLine("evidence", evidenceRefs[0] ?? input.signal.signal_id, 0.65);

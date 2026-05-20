@@ -191,7 +191,9 @@ const lineWorker = (lane: HelixLiveWorkerLane, run: HelixLiveWorkerRun): HelixLi
     if (lane.lane_key === "line_structure") return line.key === "structure" || line.key === "evidence";
     if (lane.lane_key === "line_entities") return line.key === "entities" || line.key === "objects";
     if (lane.lane_key === "line_risk") return line.key === "risk";
-    if (lane.lane_key === "line_missing_evidence") return line.key === "missing_evidence" || line.key === "uncertainty";
+    if (lane.lane_key === "line_rehearsal") return line.key === "rehearsal";
+    if (lane.lane_key === "line_possibilities") return line.key === "possibilities";
+    if (lane.lane_key === "line_missing_evidence") return line.key === "missing_evidence" || line.key === "uncertainty" || line.key === "unknowns";
     if (lane.lane_key === "line_next_check") return line.key === "next_check" || line.key === "last_update";
     return false;
   });

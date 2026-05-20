@@ -1,3 +1,5 @@
+import type { HelixEnvironmentSensorScope } from "./helix-environment-sensor-scope";
+
 export const HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA =
   "helix.environment_state_snapshot.v1" as const;
 
@@ -21,6 +23,7 @@ export type EnvironmentItemSummary = {
   display_name?: string | null;
   durability?: { remaining: number; max: number } | null;
   tags?: string[];
+  sensor_scope?: HelixEnvironmentSensorScope;
 };
 
 export type EnvironmentObjectSummary = {
@@ -31,6 +34,7 @@ export type EnvironmentObjectSummary = {
   relative_direction?: string | null;
   tags?: string[];
   state?: Record<string, unknown>;
+  sensor_scope?: HelixEnvironmentSensorScope;
 };
 
 export type EnvironmentContainerSummary = {
@@ -41,6 +45,8 @@ export type EnvironmentContainerSummary = {
   contents_summary?: EnvironmentItemSummary[];
   contents_hash?: string | null;
   last_verified_at?: string | null;
+  sensor_scope?: HelixEnvironmentSensorScope;
+  requires_caveat?: boolean;
 };
 
 export type EnvironmentResourceSummary = {
@@ -50,6 +56,7 @@ export type EnvironmentResourceSummary = {
   state?: "available" | "growing" | "depleted" | "unknown";
   amount?: number | null;
   tags?: string[];
+  sensor_scope?: HelixEnvironmentSensorScope;
 };
 
 export type EnvironmentHazardSummary = {
@@ -58,6 +65,7 @@ export type EnvironmentHazardSummary = {
   severity: "info" | "watch" | "warning" | "critical";
   position?: EnvironmentPosition;
   evidence_refs: string[];
+  sensor_scope?: HelixEnvironmentSensorScope;
 };
 
 export type EnvironmentCellSummary = {
@@ -65,6 +73,7 @@ export type EnvironmentCellSummary = {
   cell_type: string;
   position?: EnvironmentPosition;
   tags?: string[];
+  sensor_scope?: HelixEnvironmentSensorScope;
 };
 
 export type HelixEnvironmentStateSnapshot = {
@@ -85,6 +94,7 @@ export type HelixEnvironmentStateSnapshot = {
     units?: "blocks" | "pixels" | "meters" | "custom";
   };
   actor_state?: {
+    sensor_scope?: HelixEnvironmentSensorScope;
     pose?: {
       position?: EnvironmentPosition;
       eye?: EnvironmentPosition;
@@ -99,6 +109,7 @@ export type HelixEnvironmentStateSnapshot = {
     status_flags?: string[];
   };
   inventory_state?: {
+    sensor_scope?: HelixEnvironmentSensorScope;
     selected_item?: EnvironmentItemSummary | null;
     carried_items?: EnvironmentItemSummary[];
     equipped_items?: EnvironmentItemSummary[];
@@ -106,18 +117,21 @@ export type HelixEnvironmentStateSnapshot = {
     changed_since_last_snapshot?: boolean;
   };
   object_state?: {
+    sensor_scope?: HelixEnvironmentSensorScope;
     nearby_entities?: EnvironmentObjectSummary[];
     nearby_containers?: EnvironmentContainerSummary[];
     resources?: EnvironmentResourceSummary[];
     hazards?: EnvironmentHazardSummary[];
   };
   local_map?: {
+    sensor_scope?: HelixEnvironmentSensorScope;
     radius?: number | null;
     salient_cells?: EnvironmentCellSummary[];
     map_hash?: string | null;
     changed_since_last_snapshot?: boolean;
   };
   focus?: {
+    sensor_scope?: HelixEnvironmentSensorScope;
     target_kind: "object" | "entity" | "block" | "ui" | "empty" | "unknown";
     target_ref?: string | null;
     target_type?: string | null;
@@ -143,4 +157,3 @@ export type HelixEnvironmentStateSnapshot = {
   raw_payload_included: false;
   context_policy: "compact_context_pack_only";
 };
-

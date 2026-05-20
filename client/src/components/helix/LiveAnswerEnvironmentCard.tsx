@@ -7,6 +7,7 @@ import type {
 import {
   buildRehearsalSpaceCatalog,
   type HelixRehearsalSpace,
+  type HelixRehearsalSpaceAvailabilityInput,
   type HelixRehearsalSpaceId,
 } from "@shared/helix-rehearsal-space";
 import type { HelixPresentStateCard, HelixPresentStateCardLine } from "@shared/helix-present-state-card";
@@ -112,12 +113,14 @@ export function LiveAnswerEnvironmentCard({
   const [presentStateCard, setPresentStateCard] = useState<HelixPresentStateCard | null>(null);
   const sourceIds = Array.isArray(environment.source_ids) ? environment.source_ids : [];
   const lines = Array.isArray(environment.lines) ? environment.lines : [];
+  const [sourceAvailabilities, setSourceAvailabilities] = useState<HelixRehearsalSpaceAvailabilityInput[]>([]);
   const rehearsalCatalog = useMemo(() => buildRehearsalSpaceCatalog({
     sourceIds,
     lineKeys: lines.map((line: LiveAnswerLineState) => line.key),
     objective: environment.objective,
     preset: environment.preset,
-  }), [environment.objective, environment.preset, lines, sourceIds]);
+    sourceAvailabilities,
+  }), [environment.objective, environment.preset, lines, sourceAvailabilities, sourceIds]);
   const [selectedRehearsalSpaceId, setSelectedRehearsalSpaceId] = useState<HelixRehearsalSpaceId | null>(
     rehearsalCatalog.selected_space_id,
   );
@@ -141,6 +144,31 @@ export function LiveAnswerEnvironmentCard({
       cancelled = true;
     };
   }, [environment.environment_id, environment.room_id, environment.thread_id, environment.updated_at]);
+  useEffect(() => {
+    let cancelled = false;
+    const availableSourceIds = sourceIds.filter((sourceId: string) => sourceId.startsWith("source:"));
+    if (availableSourceIds.length === 0) {
+      setSourceAvailabilities([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+    Promise.all(availableSourceIds.map((sourceId: string) =>
+      fetch(`/api/agi/environment/sources/${encodeURIComponent(sourceId)}/status`)
+        .then((response) => response.ok ? response.json() : null)
+        .catch(() => null)
+    )).then((bodies) => {
+      if (cancelled) return;
+      setSourceAvailabilities(
+        bodies
+          .map((body) => body?.status)
+          .filter((status): status is HelixRehearsalSpaceAvailabilityInput => Boolean(status?.source_id && status?.domain_adapter && status?.availability)),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [environment.updated_at, sourceIds]);
   const answerLines = lines.filter((line: LiveAnswerLineState) => line.visibility === "answer_card");
   const presentLines = presentStateCard?.lines ?? [];
   const visibleLines = presentLines.length > 0
@@ -230,21 +258,45 @@ export function LiveAnswerEnvironmentCard({
               className={`rounded border px-2 py-1 text-[10px] ${
                 selectedRehearsalSpaceId === space.space_id
                   ? "border-cyan-200/50 bg-cyan-300/15 text-cyan-50"
-                  : space.status === "available"
+                    : space.status === "available"
                     ? "border-emerald-300/25 text-emerald-100 hover:bg-emerald-400/10"
-                    : space.status === "partial"
+                    : space.status === "limited" || space.status === "partial"
                       ? "border-amber-300/25 text-amber-100 hover:bg-amber-400/10"
+                      : space.status === "stale"
+                        ? "border-orange-300/25 text-orange-100 hover:bg-orange-400/10"
+                        : space.status === "policy_blocked"
+                          ? "border-rose-300/25 text-rose-100"
                       : "border-white/10 text-slate-500"
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              {space.label} / {space.status}
+              {space.label} / {space.availability_label ?? space.status}
             </button>
           ))}
         </div>
         {selectedRehearsalSpace ? (
-          <p className="mt-1.5 text-[10px] text-cyan-50/70">
-            {selectedRehearsalSpace.summary} Modes: {selectedRehearsalSpace.supported_rehearsal_modes.join(", ")}. Live actions disabled.
-          </p>
+          <div className="mt-1.5 grid gap-1 text-[10px] text-cyan-50/70">
+            <p>
+              {selectedRehearsalSpace.summary} Modes: {selectedRehearsalSpace.supported_rehearsal_modes.join(", ")}. Live actions disabled.
+            </p>
+            {selectedRehearsalSpace.diagnostics ? (
+              <details className="rounded border border-cyan-300/10 bg-black/10 px-2 py-1">
+                <summary className="cursor-pointer text-cyan-100">Source diagnostics</summary>
+                <div className="mt-1 grid gap-0.5">
+                  <p>Availability: {selectedRehearsalSpace.availability_label ?? selectedRehearsalSpace.status}</p>
+                  <p>Manifest: {selectedRehearsalSpace.diagnostics.manifest ?? "unknown"}</p>
+                  <p>Heartbeat: {selectedRehearsalSpace.diagnostics.heartbeat ?? "unknown"}</p>
+                  <p>Snapshot: {selectedRehearsalSpace.diagnostics.snapshot ?? "unknown"}</p>
+                  <p>Probes: {(selectedRehearsalSpace.diagnostics.probes ?? []).join(", ") || "none"}</p>
+                  <p>Rehearsal: read-only only</p>
+                  <p>Execution: {selectedRehearsalSpace.diagnostics.execution ?? "disabled"}</p>
+                  <p>Sensor scope: {selectedRehearsalSpace.diagnostics.sensor_scope ?? "unknown"}</p>
+                  {selectedRehearsalSpace.diagnostics.reason ? <p>Reason: {selectedRehearsalSpace.diagnostics.reason}</p> : null}
+                  {selectedRehearsalSpace.diagnostics.last_error ? <p>Last error: {selectedRehearsalSpace.diagnostics.last_error}</p> : null}
+                  {selectedRehearsalSpace.diagnostics.suggested_fix ? <p>Suggested fix: {selectedRehearsalSpace.diagnostics.suggested_fix}</p> : null}
+                </div>
+              </details>
+            ) : null}
+          </div>
         ) : null}
       </div>
       {procedureLines.length > 0 ? (

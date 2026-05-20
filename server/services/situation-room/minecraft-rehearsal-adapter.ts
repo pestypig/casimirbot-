@@ -6,6 +6,8 @@ import {
 } from "@shared/helix-action-rehearsal";
 import type { HelixPossibilityGraph } from "@shared/helix-environment-possibility-graph";
 import type { HelixEnvironmentStateSnapshot } from "@shared/helix-environment-state-snapshot";
+import { policyForEnvironmentSensorScope } from "@shared/helix-environment-sensor-scope";
+import { createEnvironmentProbeRequest } from "./environment-probe-broker";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -34,6 +36,7 @@ export function rehearseMinecraftGraph(input: {
   const age = minutesOld(foodContainer?.last_verified_at ?? input.environmentState.ts, now);
   const routeUnknown = !foodContainer && input.graph.nodes.some((node) => node.kind === "navigation");
   const staleContainer = typeof age === "number" && age > 30;
+  const foodScopePolicy = policyForEnvironmentSensorScope(foodContainer?.sensor_scope);
   const blockers: HelixActionRehearsalResult["blockers"] = [];
   if (!foodContainer) {
     blockers.push({
@@ -51,6 +54,16 @@ export function rehearseMinecraftGraph(input: {
       evidence_refs: input.environmentState.evidence_refs,
     });
   }
+  if (foodContainer && foodScopePolicy.requires_caveat) {
+    blockers.push({
+      code: "sensor_scope_requires_caveat",
+      summary: foodContainer.sensor_scope === "privileged_server_state"
+        ? "Food evidence is privileged server sensor state, not player-observed memory."
+        : "Food evidence is sensor-observed state and requires a caveat.",
+      severity: "warn",
+      evidence_refs: input.environmentState.evidence_refs,
+    });
+  }
   if (routeUnknown) {
     blockers.push({
       code: "route_unknown",
@@ -59,6 +72,20 @@ export function rehearseMinecraftGraph(input: {
       evidence_refs: input.environmentState.evidence_refs,
     });
   }
+  const pendingProbeRequests = routeUnknown
+    ? [
+        createEnvironmentProbeRequest({
+          sourceId: input.environmentState.source_id,
+          roomId: input.environmentState.room_id,
+          domain: input.environmentState.domain,
+          probeType: "route_feasibility",
+          reason: "rehearsal",
+          objective: "Verify route feasibility before recommending the candidate procedure.",
+          evidenceRefs: input.environmentState.evidence_refs,
+          ttlMs: 10_000,
+        }),
+      ]
+    : [];
   const feasibility = blockers.some((blocker) => blocker.severity === "critical")
     ? "blocked"
     : blockers.length > 0
@@ -98,6 +125,13 @@ export function rehearseMinecraftGraph(input: {
     expected_outcome: foodContainer
       ? `Actor can plausibly retrieve ${(foodContainer.contents_summary ?? []).find((item) => foodPattern.test(item.item_type))?.item_type ?? "food"} before continuing.`
       : null,
+    pending_probe_requests: pendingProbeRequests.map((request) => ({
+      probe_request_id: request.probe_request_id,
+      probe_type: request.probe_type,
+      source_id: request.source_id,
+      status: "pending",
+      evidence_refs: request.evidence_refs,
+    })),
     recommendation_gate: recommendationGate,
     tested_in: input.request.rehearsal_mode,
     side_effects_performed: false,

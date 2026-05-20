@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { planLiveLineToolRequest } from "../services/helix-ask/live-line-tool-request-planner";
 import { createLiveAnswerEnvironment, resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
 import { clearLiveLineToolRequestStoreForTest } from "../services/situation-room/live-line-tool-request-store";
+import { queryMinecraftNavigationState } from "../services/situation-room/minecraft-navigation-state-store";
 import { ingestWorldEvent, resetWorldEventIngestState } from "../services/situation-room/world-event-ingest";
 import { __resetHelixThreadLedgerStore } from "../services/helix-thread/ledger";
 
@@ -122,5 +123,80 @@ describe("live line tool request run route", () => {
     });
     expect(response.body.evaluation.confidence_delta).toBeGreaterThan(0);
     expect(response.body.receipt.observation.raw_content_included).toBe(false);
+  });
+
+  it("runs a Minecraft navigation-state check as read-only tool evidence", async () => {
+    const app = await createApp();
+    await ingestWorldEvent({
+      schema: "helix.world_event.v1",
+      world_id: "minecraft:minehut",
+      room_id: "room:minecraft-minehut",
+      source_id: "source:minecraft-server",
+      ts: "2026-05-20T12:00:00.000Z",
+      actor_id: "minecraft:player:datdampig",
+      actor_label: "DatDamPig",
+      event_type: "player_location_sample",
+      location: { dimension: "minecraft:overworld", x: 0, y: 68, z: 0 },
+      evidence_refs: ["mc:nav:location:1"],
+      meta: {
+        seed: "123456789",
+        minecraft_version: "1.21.4",
+        edition: "java",
+        seed_map: {
+          radius_chunks: 64,
+          selected_target_label: "village",
+        },
+      },
+    }, {
+      appendToThread: false,
+      threadId,
+      turnId: "turn:navigation-state-route",
+    });
+    const before = queryMinecraftNavigationState({ roomId: "room:minecraft-minehut" }).navigation_state?.updated_at;
+    const planned = planLiveLineToolRequest({
+      threadId,
+      environmentId: "live_answer:test",
+      line: {
+        key: "rehearsal",
+        label: "Rehearsal",
+        value: "drift_status unknown for route rehearsal.",
+        evidence_refs: ["mc:nav:location:1"],
+      },
+    });
+
+    expect(planned?.requested_tool).toBe("minecraft.query_navigation_state");
+
+    const response = await request(app)
+      .post("/api/agi/situation/live-line-tool-request/run")
+      .send({
+        thread_id: threadId,
+        request_id: planned?.request_id,
+        room_id: "room:minecraft-minehut",
+        source_id: "source:minecraft-server",
+        world_id: "minecraft:minehut",
+      })
+      .expect(200);
+
+    expect(response.body.dynamic_tool_call).toMatchObject({
+      tool_id: "minecraft.query_navigation_state",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.receipt).toMatchObject({
+      requested_tool: "minecraft.query_navigation_state",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.receipt.observation).toMatchObject({
+      schema: "helix.minecraft_navigation_state_query_result.v1",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      assistant_answer: false,
+      raw_content_included: false,
+      raw_user_text_included: false,
+    });
+    expect(response.body.receipt.observation.navigation_state.route_status).toBe("rehearsal_ready");
+    expect(queryMinecraftNavigationState({ roomId: "room:minecraft-minehut" }).navigation_state?.updated_at).toBe(before);
   });
 });

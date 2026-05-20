@@ -1,0 +1,55 @@
+helix:
+  enabled: true
+  endpoint: "https://example.trycloudflare.com"
+  bearer_token: "replace-me"
+  source_id: "source:minecraft-paper-plugin"
+  room_id: "room:minecraft"
+  world_id: "minecraft:paper-server"
+  domain_adapter: "minecraft.paper_plugin.v1"
+  source_label: "Minecraft Paper Plugin"
+  snapshot_interval_ticks: 100
+  heartbeat_interval_ticks: 300
+  probe_poll_interval_ticks: 40
+  burst_interval_ticks: 20
+  burst_duration_ticks: 120
+  send_only_changed_sections: true
+  include_section_hashes: true
+  max_payload_bytes: 48000
+  max_pending_uploads: 1
+  sensor_scope_default: "player_observable"
+  allow_privileged_container_scan: false
+  allow_privileged_entity_scan: false
+  privileged_state_requires_caveat: true
+  read_only_probes_enabled: true
+  max_pending_probes_per_poll: 8
+  execution_enabled: false
+  emit_seed_map_metadata: false
+  seed_map:
+    radius_chunks: 64
+    selected_target_label: "village"
+    repeat_on_location_samples: true
+    repeat_every_location_samples: 1
+    expose_seed_to_helix_only: true
+    redact_seed_in_debug_logs: true
+
+snapshot:
+  include_actor_state: true
+  include_inventory_state: true
+  include_focus: true
+  include_nearby_entities: true
+  include_open_container: true
+  include_nearby_container_refs: true
+  include_crops: true
+  include_local_map: true
+  nearby_entity_radius: 16
+  crop_radius: 16
+  local_map_radius: 8
+  max_entities: 24
+  max_crops: 48
+  max_local_blocks: 128
+  max_inventory_stacks: 64
+
+probe:
+  max_route_radius: 64
+  max_probe_duration_ms: 250
+  ttl_ms: 10000

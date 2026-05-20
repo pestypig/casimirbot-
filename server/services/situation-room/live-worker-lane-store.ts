@@ -25,7 +25,9 @@ const lineLaneKey = (lineKey: string): HelixLiveWorkerLaneKey => {
   if (lineKey === "structure" || lineKey === "evidence") return "line_structure";
   if (lineKey === "entities" || lineKey === "objects") return "line_entities";
   if (lineKey === "risk") return "line_risk";
-  if (lineKey === "missing_evidence" || lineKey === "uncertainty") return "line_missing_evidence";
+  if (lineKey === "rehearsal") return "line_rehearsal";
+  if (lineKey === "possibilities") return "line_possibilities";
+  if (lineKey === "missing_evidence" || lineKey === "uncertainty" || lineKey === "unknowns") return "line_missing_evidence";
   if (lineKey === "next_check" || lineKey === "last_update") return "line_next_check";
   return "custom_line";
 };
@@ -44,13 +46,14 @@ const allowedToolsForLane = (laneKey: HelixLiveWorkerLaneKey): string[] => {
     "situation-room.present_state_synthesis",
   ];
   if (laneKey === "present_state_synthesis") return ["situation-room.present_state_synthesis"];
-  if (laneKey === "line_risk") return ["minecraft.query_event_window"];
+  if (laneKey === "line_risk") return ["minecraft.query_event_window", "minecraft.query_navigation_state"];
   if (laneKey === "line_place" || laneKey === "line_activity" || laneKey === "line_structure") {
     return ["visual.align_latest_with_event_window", "minecraft.query_event_window"];
   }
   if (laneKey === "line_entities") return ["minecraft.query_world_sense_window", "minecraft.lookup_semantics"];
-  if (laneKey === "line_missing_evidence") return ["situation-room.run_agentic_review"];
-  if (laneKey === "line_next_check") return ["situation-room.run_agentic_review", "minecraft.query_event_window"];
+  if (laneKey === "line_rehearsal" || laneKey === "line_possibilities") return ["minecraft.query_navigation_state", "situation-room.run_agentic_review"];
+  if (laneKey === "line_missing_evidence") return ["situation-room.run_agentic_review", "minecraft.query_navigation_state"];
+  if (laneKey === "line_next_check") return ["situation-room.run_agentic_review", "minecraft.query_event_window", "minecraft.query_navigation_state"];
   return ["situation-room.run_agentic_review"];
 };
 

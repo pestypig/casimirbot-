@@ -46,6 +46,13 @@ export type HelixActionRehearsalResult = {
     evidence_refs: string[];
   }>;
   expected_outcome?: string | null;
+  pending_probe_requests?: Array<{
+    probe_request_id: string;
+    probe_type: string;
+    source_id: string;
+    status: "pending";
+    evidence_refs: string[];
+  }>;
   recommendation_gate:
     | "safe_to_suggest"
     | "suggest_with_caveat"

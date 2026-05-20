@@ -5,10 +5,15 @@ import {
   type EnvironmentHazardSummary,
   type EnvironmentItemSummary,
   type EnvironmentObjectSummary,
+  type EnvironmentPosition,
   type EnvironmentResourceSummary,
   type HelixEnvironmentDomain,
   type HelixEnvironmentStateSnapshot,
 } from "@shared/helix-environment-state-snapshot";
+import {
+  isHelixEnvironmentSensorScope,
+  type HelixEnvironmentSensorScope,
+} from "@shared/helix-environment-sensor-scope";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 
 const snapshotsByRoom = new Map<string, HelixEnvironmentStateSnapshot[]>();
@@ -34,6 +39,20 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const normalizePosition = (value: unknown): EnvironmentPosition | undefined => {
+  const record = asRecord(value);
+  const x = numberOrNull(record?.x);
+  const y = numberOrNull(record?.y);
+  if (!record || x === null || y === null) return undefined;
+  return { x, y, z: numberOrNull(record.z) };
+};
+
+const normalizeScope = (
+  value: unknown,
+  fallback: HelixEnvironmentSensorScope = "unknown",
+): HelixEnvironmentSensorScope =>
+  isHelixEnvironmentSensorScope(value) ? value : fallback;
 
 const cleanStrings = (value: unknown): string[] =>
   Array.isArray(value) ? value.map(cleanString).filter((entry): entry is string => Boolean(entry)) : [];
@@ -68,6 +87,7 @@ const normalizeItem = (value: unknown): EnvironmentItemSummary | null => {
       ? { remaining: numberOrNull(durability.remaining) ?? 0, max: numberOrNull(durability.max) ?? 0 }
       : null,
     tags: cleanStrings(record.tags),
+    sensor_scope: normalizeScope(record.sensor_scope, "unknown"),
   };
 };
 
@@ -79,10 +99,12 @@ const normalizeObject = (value: unknown): EnvironmentObjectSummary | null => {
   return {
     object_ref: objectRef,
     object_type: objectType,
+    position: normalizePosition(record.position),
     distance: numberOrNull(record.distance),
     relative_direction: cleanString(record.relative_direction) ?? null,
     tags: cleanStrings(record.tags),
     state: asRecord(record.state) ?? undefined,
+    sensor_scope: normalizeScope(record.sensor_scope, "unknown"),
   };
 };
 
@@ -97,10 +119,13 @@ const normalizeContainer = (value: unknown): EnvironmentContainerSummary | null 
   return {
     container_ref: containerRef,
     container_type: containerType,
+    position: normalizePosition(record.position),
     contents_known: record.contents_known === true || contents.length > 0,
     contents_summary: contents,
     contents_hash: cleanString(record.contents_hash) ?? null,
     last_verified_at: cleanString(record.last_verified_at) ?? null,
+    sensor_scope: normalizeScope(record.sensor_scope, contents.length ? "player_memory" : "unknown"),
+    requires_caveat: record.requires_caveat === true,
   };
 };
 
@@ -115,9 +140,11 @@ const normalizeResource = (value: unknown): EnvironmentResourceSummary | null =>
   return {
     resource_ref: resourceRef,
     resource_type: resourceType,
+    position: normalizePosition(record.position),
     state,
     amount: numberOrNull(record.amount),
     tags: cleanStrings(record.tags),
+    sensor_scope: normalizeScope(record.sensor_scope, "unknown"),
   };
 };
 
@@ -133,7 +160,9 @@ const normalizeHazard = (value: unknown): EnvironmentHazardSummary | null => {
     hazard_ref: hazardRef,
     hazard_type: hazardType,
     severity,
+    position: normalizePosition(record.position),
     evidence_refs: cleanStrings(record.evidence_refs),
+    sensor_scope: normalizeScope(record.sensor_scope, "unknown"),
   };
 };
 
@@ -168,6 +197,7 @@ export function normalizeEnvironmentStateSnapshot(input: {
     ts,
     source_tick: numberOrNull(record.source_tick),
     actor_state: actorState ? {
+      sensor_scope: normalizeScope(actorState.sensor_scope, "player_observable"),
       health: numberOrNull(actorState.health),
       food_level: numberOrNull(actorState.food_level),
       saturation: numberOrNull(actorState.saturation),
@@ -175,6 +205,7 @@ export function normalizeEnvironmentStateSnapshot(input: {
       status_flags: cleanStrings(actorState.status_flags),
     } : undefined,
     inventory_state: inventoryState ? {
+      sensor_scope: normalizeScope(inventoryState.sensor_scope, "player_observable"),
       selected_item: normalizeItem(inventoryState.selected_item) ?? null,
       carried_items: Array.isArray(inventoryState.carried_items)
         ? inventoryState.carried_items.map(normalizeItem).filter((entry): entry is EnvironmentItemSummary => Boolean(entry))
@@ -186,6 +217,7 @@ export function normalizeEnvironmentStateSnapshot(input: {
       changed_since_last_snapshot: inventoryState.changed_since_last_snapshot === true,
     } : undefined,
     object_state: objectState ? {
+      sensor_scope: normalizeScope(objectState.sensor_scope, "sensor_observable"),
       nearby_entities: Array.isArray(objectState.nearby_entities)
         ? objectState.nearby_entities.map(normalizeObject).filter((entry): entry is EnvironmentObjectSummary => Boolean(entry))
         : [],
@@ -200,6 +232,7 @@ export function normalizeEnvironmentStateSnapshot(input: {
         : [],
     } : undefined,
     focus: focus ? {
+      sensor_scope: normalizeScope(focus.sensor_scope, "player_observable"),
       target_kind: focus.target_kind === "object" || focus.target_kind === "entity" || focus.target_kind === "block" || focus.target_kind === "ui" || focus.target_kind === "empty"
         ? focus.target_kind
         : "unknown",

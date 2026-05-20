@@ -1,0 +1,40 @@
+{
+  "schema": "helix.environment_source_manifest.v1",
+  "manifest_id": "manifest:source:minecraft-paper-plugin:0.1.0",
+  "source_id": "source:minecraft-paper-plugin",
+  "room_id": "room:minecraft",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "source_label": "Minecraft Paper Plugin",
+  "adapter_version": "0.1.0",
+  "protocol_version": "helix.environment_source_manifest.v1",
+  "modalities": ["environment_state", "environment_affordance"],
+  "supported_snapshot_sections": ["actor_state", "inventory_state", "object_state", "local_map", "focus", "affordances", "domain_specific"],
+  "supported_probe_types": ["route_feasibility", "reachability", "line_of_sight", "container_freshness", "crop_state", "hazard_check", "inventory_check", "local_map_summary"],
+  "forbidden_probe_types": ["move_actor", "use_item", "take_item", "place_block", "break_block", "attack_entity", "open_container"],
+  "snapshot_policy": {
+    "baseline_interval_ms": 5000,
+    "burst_interval_ms": 1000,
+    "send_only_changed_sections": true,
+    "include_section_hashes": true,
+    "max_payload_bytes": 48000,
+    "raw_payload_included": false,
+    "raw_nbt_included": false
+  },
+  "sensor_scope_policy": {
+    "default_scope": "player_observable",
+    "can_report_privileged_state": false,
+    "privileged_state_requires_caveat": true,
+    "player_memory_requires_prior_observation": true
+  },
+  "execution_policy": {
+    "may_execute_live_actions": false,
+    "may_perform_read_only_probes": true,
+    "require_human_approval_for_execution": true
+  },
+  "auth_policy": { "bearer_required": true },
+  "assistant_answer": false,
+  "raw_content_included": false,
+  "context_policy": "compact_context_pack_only",
+  "created_at": "2026-05-20T12:00:00.000Z"
+}

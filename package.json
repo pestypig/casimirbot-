@@ -30,6 +30,7 @@
     "typecheck:qst": "tsc -p tsconfig.qst.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
     "lint:fix": "npm run lint",
+    "test:minecraft-paper-sensor-loopback": "node scripts/minecraft-paper-sensor-loopback.mjs",
     "test": "vitest run",
     "db:push": "drizzle-kit push",
     "link:theory": "node scripts/link-theory.mjs",

@@ -13,6 +13,7 @@ export type LiveAnswerEnvironmentReadResponse = {
   source_descriptors?: Array<Record<string, unknown>>;
   schema_selection?: Record<string, unknown> | null;
   schema_compatibility?: Record<string, unknown> | null;
+  navigation_state?: Record<string, unknown> | null;
   debug?: {
     thread_id?: string | null;
     environment_id?: string | null;

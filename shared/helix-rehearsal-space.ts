@@ -12,9 +12,39 @@ export type HelixRehearsalSpaceId =
 
 export type HelixRehearsalSpaceStatus =
   | "available"
+  | "limited"
+  | "degraded"
+  | "stale"
+  | "auth_error"
+  | "oversized_payload"
+  | "unavailable"
+  | "policy_blocked"
   | "partial"
   | "waiting_for_source"
   | "future";
+
+export type HelixRehearsalSpaceAvailabilityInput = {
+  source_id: string;
+  room_id?: string | null;
+  domain?: string | null;
+  domain_adapter: string;
+  availability: "available" | "limited" | "degraded" | "stale" | "auth_error" | "oversized_payload" | "unavailable" | "policy_blocked";
+  missing_modalities?: string[];
+  missing_snapshot_sections?: string[];
+  missing_probe_types?: string[];
+  strong_rehearsal?: boolean;
+  diagnostics?: {
+    manifest?: string;
+    heartbeat?: string;
+    snapshot?: string;
+    probes?: string[];
+    execution?: string;
+    sensor_scope?: string;
+    reason?: string | null;
+    suggested_fix?: string | null;
+    last_error?: string | null;
+  };
+};
 
 export type HelixRehearsalSpace = {
   space_id: HelixRehearsalSpaceId;
@@ -30,6 +60,9 @@ export type HelixRehearsalSpace = {
   additive_fidelity_hint: number;
   may_execute_live_actions: false;
   default_enabled: boolean;
+  availability_label?: "Available" | "Limited" | "Degraded" | "Stale" | "Auth error" | "Oversized payload" | "Unavailable" | "Policy blocked";
+  strong_rehearsal?: boolean;
+  diagnostics?: HelixRehearsalSpaceAvailabilityInput["diagnostics"];
 };
 
 export type HelixRehearsalSpaceCatalog = {
@@ -57,6 +90,7 @@ export function buildRehearsalSpaceCatalog(input: {
   lineKeys?: string[];
   objective?: string | null;
   preset?: string | null;
+  sourceAvailabilities?: HelixRehearsalSpaceAvailabilityInput[];
 }): HelixRehearsalSpaceCatalog {
   const sourceIds = input.sourceIds ?? [];
   const available = new Set<string>(input.modalities ?? []);
@@ -138,17 +172,44 @@ export function buildRehearsalSpaceCatalog(input: {
   ];
 
   const spaces = definitions.map((definition) => {
-    const status = definition.space_id === "custom"
+    const matchingAvailability = (input.sourceAvailabilities ?? []).find((source) =>
+      source.domain_adapter === definition.domain_adapter ||
+      (definition.space_id === "minecraft" && /^minecraft\./.test(source.domain_adapter))
+    );
+    const status = matchingAvailability?.availability ??
+      (definition.space_id === "custom"
       ? "future" as const
-      : statusFor(definition.required_modalities, available);
+      : statusFor(definition.required_modalities, available));
+    const availabilityLabel = status === "available"
+      ? "Available" as const
+      : status === "degraded"
+        ? "Degraded" as const
+      : status === "limited" || status === "partial"
+        ? "Limited" as const
+        : status === "auth_error"
+          ? "Auth error" as const
+        : status === "oversized_payload"
+          ? "Oversized payload" as const
+        : status === "stale"
+          ? "Stale" as const
+          : status === "policy_blocked"
+            ? "Policy blocked" as const
+            : "Unavailable" as const;
     return {
       ...definition,
       status,
-      available_modalities: definition.required_modalities.filter((entry) => available.has(entry)),
+      available_modalities: matchingAvailability
+        ? definition.required_modalities.filter((entry) => !(matchingAvailability.missing_modalities ?? []).includes(entry))
+        : definition.required_modalities.filter((entry) => available.has(entry)),
       default_enabled: status === "available",
+      availability_label: availabilityLabel,
+      strong_rehearsal: matchingAvailability?.strong_rehearsal ?? false,
+      diagnostics: matchingAvailability?.diagnostics,
     };
   });
-  const selected = spaces.find((space) => space.status === "available") ?? spaces.find((space) => space.status === "partial") ?? null;
+  const selected = spaces.find((space) => space.status === "available") ??
+    spaces.find((space) => space.status === "limited" || space.status === "partial") ??
+    null;
   return {
     schema: HELIX_REHEARSAL_SPACE_CATALOG_SCHEMA,
     spaces,
