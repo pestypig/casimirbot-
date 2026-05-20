@@ -5,6 +5,7 @@ import {
   type HelixAskSourceTargetRequestedOutput,
   type HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
+import type { HelixActiveWorkspaceSourceResolution } from "@shared/helix-active-workspace-source-resolution";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import {
   isSceneEpochReplayPrompt,
@@ -416,26 +417,9 @@ export function arbitrateAskSourceTarget(input: {
   turnId: string;
   threadId: string;
   promptText: string;
+  activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
-  const procedureRecallRule = matchProcedureRecallPrompt(prompt);
-  if (procedureRecallRule) {
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: procedureRecallTargetSource(procedureRecallRule),
-      targetKind: procedureRecallRule.target_kind,
-      strength: "hard",
-      explicitCues: [procedureRecallRule.cue],
-      reasons: ["hard_procedure_memory_recall_prompt", procedureRecallRule.cue],
-      requestedOutputs: procedureRecallRule.requested_outputs,
-      suppressedRoutes: [...PROCEDURE_RECALL_SUPPRESSED_ROUTES],
-      precedenceReason: "hard_procedure_memory_recall_prompt",
-      confidence: 0.98,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
-    });
-  }
   if (isStructuredDocsViewerPrompt(prompt)) {
     const docsRule = rules.find((rule: CueRule) => rule.target === "docs_viewer");
     if (docsRule) {
@@ -456,6 +440,53 @@ export function arbitrateAskSourceTarget(input: {
         allowNoToolDirect: docsRule.allowNoToolDirect,
       });
     }
+  }
+  const activeWorkspaceResolution = input.activeWorkspaceSourceResolution;
+  if (
+    activeWorkspaceResolution &&
+    typeof activeWorkspaceResolution === "object" &&
+    (activeWorkspaceResolution as Record<string, unknown>).schema === "helix.active_workspace_source_resolution.v1"
+  ) {
+    const resolvedSourceTarget = (activeWorkspaceResolution as Record<string, unknown>).resolved_source_target;
+    const reason = String((activeWorkspaceResolution as Record<string, unknown>).reason ?? "");
+    if (resolvedSourceTarget === "active_doc" || resolvedSourceTarget === "docs_viewer") {
+      const target = resolvedSourceTarget;
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target,
+        targetKind: target,
+        strength: "hard",
+        explicitCues: [reason || "active_workspace_source_resolution"],
+        reasons: ["active_workspace_source_resolution", reason || "active_workspace_source_resolution"],
+        requestedOutputs: ["file_path"],
+        suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept"],
+        precedenceReason: "active_workspace_source_resolution",
+        confidence: typeof (activeWorkspaceResolution as Record<string, unknown>).confidence === "number"
+          ? (activeWorkspaceResolution as Record<string, unknown>).confidence as number
+          : 0.9,
+        allowClientShortcut: false,
+        allowNoToolDirect: false,
+      });
+    }
+  }
+  const procedureRecallRule = matchProcedureRecallPrompt(prompt);
+  if (procedureRecallRule) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: procedureRecallTargetSource(procedureRecallRule),
+      targetKind: procedureRecallRule.target_kind,
+      strength: "hard",
+      explicitCues: [procedureRecallRule.cue],
+      reasons: ["hard_procedure_memory_recall_prompt", procedureRecallRule.cue],
+      requestedOutputs: procedureRecallRule.requested_outputs,
+      suppressedRoutes: [...PROCEDURE_RECALL_SUPPRESSED_ROUTES],
+      precedenceReason: "hard_procedure_memory_recall_prompt",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
   }
   if (isDeicticDocsIdentityPrompt(prompt)) {
     const activeDocRule = rules.find((rule: CueRule) => rule.target === "active_doc");

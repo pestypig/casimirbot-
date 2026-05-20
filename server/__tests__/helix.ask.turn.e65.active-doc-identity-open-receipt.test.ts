@@ -71,6 +71,71 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/active visual SituationRun/i);
   }, 90000);
 
+  it("binds generic right-now deictics to the active docs viewer before visual fallback", async () => {
+    const app = createApp();
+    const sessionId = `e65-generic-active-doc-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "that Are we looking at right now?",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          docContextPath: activePath,
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.active_workspace_source_resolution?.schema).toBe(
+      "helix.active_workspace_source_resolution.v1",
+    );
+    expect(response.body?.active_workspace_source_resolution?.resolved_source_target).toBe("active_doc");
+    expect(response.body?.active_workspace_source_resolution?.reason).toBe("generic_deictic_bound_to_active_docs");
+    expect(response.body?.source_target_intent?.target_source).toBe("active_doc");
+    expect(response.body?.terminal_artifact_kind).toBe("active_doc_identity");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain(activePath);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/active visual SituationRun/i);
+  }, 90000);
+
+  it("routes current dock/doc location prompts to active doc search", async () => {
+    const app = createApp();
+    const sessionId = `e65-current-dock-location-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Find where lapse shift is found in the current dock.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          docContextPath: activePath,
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.active_workspace_source_resolution?.resolved_source_target).toBe("docs_viewer");
+    expect(response.body?.active_workspace_source_resolution?.reason).toBe("active_doc_location_prompt");
+    expect(response.body?.source_target_intent?.target_source).toBe("docs_viewer");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_location_result");
+    expect(response.body?.doc_location_result?.doc_path).toBe(activePath);
+    expect(response.body?.doc_location_result?.locate_query).toBe("lapse shift");
+    expect(response.body?.doc_location_result?.assistant_answer).toBe(false);
+    expect(response.body?.doc_location_result?.raw_content_included).toBe(false);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/^(Locations:|No locations found)/i);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/Completed reasoning|model_only|no_tool_direct/i);
+  }, 90000);
+
   it("fails missing docs identity as missing doc context, not missing visual context", async () => {
     const app = createApp();
     const sessionId = `e65-docs-right-now-missing-${Date.now()}`;

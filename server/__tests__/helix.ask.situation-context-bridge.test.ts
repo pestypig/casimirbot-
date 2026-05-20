@@ -801,13 +801,13 @@ describe("thread-bound situation context bridge", () => {
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
   }, 60000);
 
-  it("keeps generic looking-at prompts on the visual terminal presentation when an active doc is present", async () => {
+  it("keeps explicit visual prompts on the visual terminal presentation when an active doc is present", async () => {
     const { app } = await createApp();
     seedVisualSituationRun();
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
-        question: "Okay, explain what I'm looking at right now.",
+        question: "Okay, explain the screen capture right now.",
         mode: "read",
         debug: true,
         sessionId: "helix-ask:desktop",
