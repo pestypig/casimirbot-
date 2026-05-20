@@ -24,6 +24,13 @@ export type HelixApiParityProbeResult = {
     evidence_selected_for_answer_count: number;
     short_circuit_risk_flags: string[];
   };
+  ask_turn_solver_trace: {
+    present: boolean;
+    completed_solver_path: boolean;
+    prompt_shape: string | null;
+    primary_intent_route: string | null;
+    solver_short_circuit_flags: string[];
+  };
   route_authority: {
     ok: boolean;
     primary_violation_code: string | null;
@@ -63,6 +70,9 @@ const readSourceTarget = (ask: RecordLike, debug: RecordLike | null): RecordLike
 
 const readLoopTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.loop_parity_trace) ?? readRecord(debug?.loop_parity_trace);
+
+const readSolverTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+  readRecord(ask.ask_turn_solver_trace) ?? readRecord(debug?.ask_turn_solver_trace);
 
 const readRouteAuthority = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.route_authority_audit) ?? readRecord(debug?.route_authority_audit);
@@ -152,6 +162,7 @@ export function buildApiParityProbeResult(input: {
   const ask = readRecord(input.askTurn) ?? {};
   const debug = extractHelixDebugPayload(input.debugExport);
   const loopTrace = readLoopTrace(ask, debug);
+  const solverTrace = readSolverTrace(ask, debug);
   const routeAuthority = readRouteAuthority(ask, debug);
   const poisonAudit = readPoisonAudit(ask, debug);
   const terminalAuthority = readTerminalAuthority(ask, debug);
@@ -176,14 +187,18 @@ export function buildApiParityProbeResult(input: {
   const terminalAuthorityOk = terminalAuthority?.server_authoritative === true;
   const unexpectedToolCalls = readStringArray(loopTrace?.unexpected_tool_calls);
   const shortCircuitRiskFlags = readStringArray(loopTrace?.short_circuit_risk_flags);
+  const solverShortCircuitFlags = readStringArray(solverTrace?.solver_short_circuit_flags);
   const failures: string[] = [];
 
   if (!debug) failures.push("debug_export_missing");
+  if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
+  if (solverTrace && solverTrace.completed_solver_path !== true) failures.push("ask_turn_solver_path_incomplete");
   if (!input.terminalEventSeen && input.terminalEventSeen !== undefined) failures.push("terminal_event_missing");
   if (!terminalAuthorityOk) failures.push("terminal_authority_not_ok");
   if (!routeAuthorityOk) failures.push("route_authority_not_ok");
   if (unexpectedToolCalls.length > 0) failures.push(`unexpected_tool_calls:${unexpectedToolCalls.join(",")}`);
   if (shortCircuitRiskFlags.length > 0) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
+  if (solverShortCircuitFlags.length > 0) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
   if (poisonAuditOk && !routeAuthorityOk) failures.push("poison_clean_but_authority_failed");
 
   addExpectationFailures({
@@ -218,6 +233,13 @@ export function buildApiParityProbeResult(input: {
       observations_created_count: Array.isArray(loopTrace?.observations_created) ? loopTrace.observations_created.length : 0,
       evidence_selected_for_answer_count: Array.isArray(loopTrace?.evidence_selected_for_answer) ? loopTrace.evidence_selected_for_answer.length : 0,
       short_circuit_risk_flags: shortCircuitRiskFlags,
+    },
+    ask_turn_solver_trace: {
+      present: Boolean(solverTrace),
+      completed_solver_path: solverTrace?.completed_solver_path === true,
+      prompt_shape: readString(getPath(solverTrace, ["prompt_interpretation", "prompt_shape"])),
+      primary_intent_route: readString(getPath(solverTrace, ["primary_intent", "route"])),
+      solver_short_circuit_flags: solverShortCircuitFlags,
     },
     route_authority: {
       ok: routeAuthorityOk,
