@@ -1622,6 +1622,22 @@ describe("thread-bound situation context bridge", () => {
       "probes",
       "uncertainty",
     ]));
+    expect(route.procedure_evidence_retrieval_result).toMatchObject({
+      schema: "helix.procedure_evidence_retrieval_result.v1",
+      answerability: "partially_answerable",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.procedure_evidence_retrieval_result?.selected_current_refs).toEqual(expect.arrayContaining([
+      "observation:folder-view",
+      "field_eval:activity",
+    ]));
+    expect(route.procedure_evidence_retrieval_result?.selected_prior_refs).toEqual([]);
+    expect(route.procedure_evidence_retrieval_result?.uncertainty).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        issue: "prior_evidence_missing",
+      }),
+    ]));
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
       "previous visual observation evidence is unavailable",
@@ -1693,6 +1709,23 @@ describe("thread-bound situation context bridge", () => {
       "field_evaluations",
       "interpretations",
       "uncertainty",
+    ]));
+    expect(route.procedure_evidence_retrieval_result).toMatchObject({
+      schema: "helix.procedure_evidence_retrieval_result.v1",
+      answerability: "partially_answerable",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.procedure_evidence_retrieval_result?.selected_current_refs).toEqual(expect.arrayContaining([
+      "observation:folder-view",
+      "field_eval:activity",
+    ]));
+    expect(route.procedure_evidence_retrieval_result?.selected_prior_refs).toEqual([]);
+    expect(route.procedure_evidence_retrieval_result?.stable_facts.length).toBeGreaterThan(0);
+    expect(route.procedure_evidence_retrieval_result?.uncertainty).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        issue: "prior_evidence_missing",
+      }),
     ]));
     expect(route.procedure_memory_recall?.recall_type).toBe("epoch_replay");
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);

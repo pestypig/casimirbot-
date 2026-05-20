@@ -1,0 +1,40 @@
+export const HELIX_CAPABILITY_PLAN_SCHEMA = "helix.capability_plan.v1" as const;
+
+export type HelixCapabilityFamily =
+  | "docs"
+  | "workstation_action"
+  | "live_source"
+  | "visual_capture"
+  | "procedure_memory"
+  | "repo_evidence"
+  | "process_graph"
+  | "debug_export"
+  | "subagent_runtime_adapter";
+
+export type HelixCapabilityAdmissionStatus =
+  | "admitted"
+  | "rejected"
+  | "needs_evidence"
+  | "needs_user_confirmation";
+
+export type HelixCapabilityPlan = {
+  schema: typeof HELIX_CAPABILITY_PLAN_SCHEMA;
+  turn_id: string;
+
+  capability_family: HelixCapabilityFamily;
+  requested_action: string;
+  mutating: boolean;
+
+  operator_command_required: boolean;
+  operator_command_present: boolean;
+
+  source_target: string;
+  goal_kind: string;
+  required_terminal_kind: string | null;
+
+  admission_status: HelixCapabilityAdmissionStatus;
+  rejection_reason?: string;
+
+  assistant_answer: false;
+  raw_content_included: false;
+};

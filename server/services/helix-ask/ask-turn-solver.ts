@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { HelixLoopParityTrace } from "./loop-parity-trace";
 import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
+import type { HelixProcedureEvidenceRetrievalResult } from "@shared/helix-procedure-evidence-retrieval-result";
 import {
   interpretHelixAskPrompt,
   type HelixPromptInterpretation,
@@ -128,6 +129,7 @@ export type HelixAskTurnSolverTrace = {
   live_source_identity_audit?: HelixLiveSourceIdentityAudit;
   live_source_identity_audit_ref?: string | null;
   procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan;
+  procedure_evidence_retrieval_result?: HelixProcedureEvidenceRetrievalResult;
 
   final_arbitration: {
     selected_route: string;
@@ -747,6 +749,11 @@ export function buildAskTurnSolverTrace(input: {
     ...(readRecord(input.payload.procedure_evidence_retrieval_plan)?.schema === "helix.procedure_evidence_retrieval_plan.v1"
       ? {
           procedure_evidence_retrieval_plan: input.payload.procedure_evidence_retrieval_plan as HelixProcedureEvidenceRetrievalPlan,
+        }
+      : {}),
+    ...(readRecord(input.payload.procedure_evidence_retrieval_result)?.schema === "helix.procedure_evidence_retrieval_result.v1"
+      ? {
+          procedure_evidence_retrieval_result: input.payload.procedure_evidence_retrieval_result as HelixProcedureEvidenceRetrievalResult,
         }
       : {}),
     final_arbitration: {
