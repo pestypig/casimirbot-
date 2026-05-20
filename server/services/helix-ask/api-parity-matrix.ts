@@ -1,6 +1,11 @@
 export type HelixApiParitySeedKind =
   | "active_visual_situation_run"
   | "active_run_with_unbound_visual_source"
+  | "live_source_identity_missing_environment_source"
+  | "live_source_identity_no_situation_run"
+  | "live_source_identity_no_field_evaluations"
+  | "live_source_identity_stale_interpretation"
+  | "live_source_identity_wrong_environment"
   | "visual_source_available"
   | "visual_frame_with_start_button"
   | "none";
@@ -16,6 +21,9 @@ export type HelixApiParityExpected = {
   forbidden_tool_families?: string[];
   required_trace_flags_absent?: string[];
   forbidden_trace_flags?: string[];
+  solver_completed?: boolean;
+  live_source_identity_diagnosis?: string;
+  live_source_identity_ok?: boolean;
 };
 
 export type HelixApiParityScenario = {
@@ -124,6 +132,110 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
       source_target: "runtime_evidence",
       forbidden_tool_calls: ["situation-room.live-source.set_rate"],
       forbidden_terminal_artifacts: ["live_pipeline_receipt"],
+    },
+  },
+  {
+    id: "live_source_identity_active_bound",
+    description: "A visual question with reconciled active environment, producer, SituationRun, field evaluations, and interpretation may answer from visual evidence.",
+    enabled: true,
+    seed: "active_visual_situation_run",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "ok",
+      live_source_identity_ok: true,
+      solver_completed: true,
+    },
+  },
+  {
+    id: "live_source_identity_fresh_unbound",
+    description: "A fresh visual source outside the active environment must be diagnosed instead of becoming a pipeline receipt; disabled until the current explicit visual route stops auto-binding this topology before audit capture.",
+    enabled: false,
+    seed: "active_run_with_unbound_visual_source",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_ok: false,
+      solver_completed: false,
+    },
+  },
+  {
+    id: "live_source_identity_wrong_environment",
+    description: "A fresh visual chunk from the wrong Live Answer environment must remain an identity diagnosis.",
+    enabled: true,
+    seed: "live_source_identity_wrong_environment",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "fresh_source_wrong_environment",
+      live_source_identity_ok: false,
+      solver_completed: false,
+    },
+  },
+  {
+    id: "live_source_identity_missing_environment_source",
+    description: "An active Live Answer environment without a visual source binding cannot answer as if capture identity were reconciled; top-level Ask may attach the source, so the remaining enabled gate is field evaluation availability.",
+    enabled: true,
+    seed: "live_source_identity_missing_environment_source",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "field_evaluations_missing",
+      live_source_identity_ok: false,
+      solver_completed: false,
+    },
+  },
+  {
+    id: "live_source_identity_no_situation_run",
+    description: "A bound visual source without a SituationRun is not visual answer authority; top-level Ask may create the SituationRun, so the remaining enabled gate is field evaluation availability.",
+    enabled: true,
+    seed: "live_source_identity_no_situation_run",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "field_evaluations_missing",
+      live_source_identity_ok: false,
+      solver_completed: false,
+    },
+  },
+  {
+    id: "live_source_identity_no_field_evaluations",
+    description: "A SituationRun without current field evaluations remains non-terminal visual evidence.",
+    enabled: true,
+    seed: "live_source_identity_no_field_evaluations",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "field_evaluations_missing",
+      live_source_identity_ok: false,
+      solver_completed: false,
+    },
+  },
+  {
+    id: "live_source_identity_stale_interpretation",
+    description: "Stale interpretation availability must be visible as missing interpretation authority.",
+    enabled: true,
+    seed: "live_source_identity_stale_interpretation",
+    prompt: "What is happening right now in the visual screen capture?",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
+      live_source_identity_diagnosis: "interpretations_missing",
+      live_source_identity_ok: false,
+      solver_completed: false,
     },
   },
 ];

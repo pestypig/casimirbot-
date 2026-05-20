@@ -18,38 +18,83 @@ Use this workflow when a patch touches:
 Classify the change before editing:
 
 ```txt
-runtime-adapter
-evidence-lane
-retrieval-gate
-proof-policy
-live-source
+prompt interpretation
+intent arbitration
+source admission
+tool admission
+evidence normalization
+evidence re-entry
+follow-up reasoning
+terminal authority
 presentation
 Codex-owned runtime behavior
 ```
 
 Codex owns:
-- model sampling and generic turn loop mechanics
-- generic tool execution, tool-result re-entry, retries, approvals, sandboxing
-- compaction, session lifecycle, subagent orchestration, terminal completion
+- model sampling
+- generic tool execution and tool-result re-entry
+- retries, approvals, sandboxing
+- compaction, session lifecycle, subagent orchestration
+- terminal completion
 
 Helix Ask owns:
+- prompt interpretation policy
+- intent arbitration
 - source-target admission
-- equal-identity evidence observations
-- live-source provenance and freshness
+- tool admission policy
+- evidence identity, provenance, normalization, and re-entry
+- live-source provenance, freshness, and terminal eligibility
 - proof gates, route-product contracts, route authority, terminal eligibility
 - debug traces that prove no shortcut took authority
 
 ## Hard Rules
+- Routes are proposed procedures, not conclusions.
+- Receipts are observations, not answers.
+- Classifiers generate hypotheses, not authority.
+- Only the completed solver path can answer.
 - Lexical cues in user text are not execution.
 - Contextual, negated, historical, future, quoted, or screen-visible tool/control words must not admit mutating tools unless the prompt is an affirmative operator command.
 - Receipts, live-card projections, process graphs, client projections, and panel-generated text are not content answers unless the route-product contract explicitly allows that terminal product.
 - A clean poison audit is not enough. Route authority must also be clean.
 - A hard source-targeted prompt requires a route-product contract.
+- `ask_turn_solver_trace` is required for debug Ask turns.
+- `helix.ask_turn_solver_hard_gate.v1` failures must close as typed failures for hard source-targeted and complex prompts.
+
+Reject or flag changes that implement:
+
+```txt
+private sampling loop
+private tool execution runtime
+sandbox/approval lifecycle
+session compaction
+subagent orchestration
+terminal completion machinery
+```
+
+Every shortcut-like rule must include adversarial tests:
+
+```txt
+contextual cue
+negated cue
+future/conditional cue
+historical cue
+quoted/screen-visible cue
+mixed intent prompt
+```
+
+Standing regression prompt:
+
+```txt
+all right cool can you review what is happening right now in the screen capture I haven't started the interval 10 seconds yet
+```
+
+Expected: primary intent is visual/content question; interval is contextual/negated; no `set_rate`; no `live_pipeline_receipt` terminal answer.
 
 ## Required Tests
 For applicable patches, run:
 
 ```bash
+npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
 npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
 ```
 
@@ -64,6 +109,20 @@ Report disabled or frontier scenarios separately. Do not count them as proof.
 ## Reference Files
 - `AGENTS.md`
 - `docs/helix-ask-codex-loop-discipline.md`
+- `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-api-parity-matrix.md`
+- `server/services/helix-ask/ask-turn-solver.ts`
 - `server/services/helix-ask/api-parity-matrix.ts`
 - `server/services/helix-ask/api-parity-probe.ts`
+
+## Codex Runtime Reference
+When present, use the ignored local checkout at `external/openai-codex-compare` for Codex runtime comparisons. It is sparse-checked to the runtime areas most relevant to Helix Ask discipline:
+
+```txt
+codex-rs/core/src
+codex-rs/mcp-server/src
+docs
+README.md
+```
+
+Do not commit or mutate that checkout as part of a Helix Ask patch. Treat it as a local reference source for grep/diff only.

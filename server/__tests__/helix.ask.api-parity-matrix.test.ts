@@ -11,16 +11,19 @@ import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/
 import { resetClientCapabilityActionsForTest } from "../services/client-capabilities/client-action-queue";
 import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabilities/client-adoption-store";
 import { resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
-import { resetLiveFieldEvaluationsForTest } from "../services/situation-room/live-field-evaluation-store";
+import { createLiveAnswerEnvironment } from "../services/situation-room/live-answer-environment-store";
+import { recordLiveFieldEvaluation, resetLiveFieldEvaluationsForTest } from "../services/situation-room/live-field-evaluation-store";
 import { resetLiveFieldWorkerRunsForTest } from "../services/situation-room/live-field-worker-run-store";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
 import { resetLivePipelineLifecycleForTest } from "../services/situation-room/live-pipeline-lifecycle-store";
-import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
-import { resetLiveSourceChunkBufferForTest } from "../services/situation-room/live-source-chunk-buffer";
+import { ensureLiveSituationRunForEnvironment, resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
+import { appendLiveSourceChunk, queueLiveSourceAnalysisJob, resetLiveSourceChunkBufferForTest } from "../services/situation-room/live-source-chunk-buffer";
 import { resetLiveSourceProducerBindingsForTest } from "../services/situation-room/live-source-producer-binding";
 import { resetLiveSourceProducerLifecycleForTest } from "../services/situation-room/live-source-producer-lifecycle-store";
 import { resetLiveWorkerLanesForTest } from "../services/situation-room/live-worker-lane-store";
 import { resetObservationJournalForTest } from "../services/situation-room/observation-journal-store";
+import { appendObservationJournalEntry } from "../services/situation-room/observation-journal-store";
+import { appendInterpretationCard, resetInterpretationCardsForTest } from "../services/situation-room/interpretation-card-store";
 import { resetProcedureEpochClosuresForTest } from "../services/situation-room/procedure-epoch-closure";
 import { resetProcedureEpochLedgerForTest } from "../services/situation-room/procedure-epoch-ledger-store";
 import { resetProcedureReasoningSnapshotsForTest } from "../services/situation-room/procedure-reasoning-snapshot-store";
@@ -64,6 +67,76 @@ const resetAll = (): void => {
   resetClientCapabilityActionsForTest();
   resetClientCapabilityAdoptionsForTest();
   resetReceiptPresentationSnapshotsForTest();
+  resetInterpretationCardsForTest();
+};
+
+const seedIdentitySource = (input: {
+  threadId: string;
+  sourceId: string;
+  environmentId?: string | null;
+  observationId?: string;
+}) => {
+  const now = new Date().toISOString();
+  const chunk = appendLiveSourceChunk({
+    source_id: input.sourceId,
+    thread_id: input.threadId,
+    environment_id: input.environmentId,
+    modality: "visual_frame",
+    ts: now,
+    compact_summary: "A parity-seeded visual frame is available.",
+    evidence_refs: ["visual_evidence:api-parity"],
+  }).chunk;
+  const job = queueLiveSourceAnalysisJob({
+    chunk,
+    status: "completed",
+    outputRefs: ["visual_evidence:api-parity"],
+  });
+  const observation = appendObservationJournalEntry({
+    thread_id: input.threadId,
+    observation_id: input.observationId ?? `observation:api-parity:${input.sourceId.replace(/[^a-z0-9]+/gi, "-")}`,
+    role: "model_perception_observation",
+    modality: "visual_frame",
+    source_id: input.sourceId,
+    text: "A parity-seeded visual frame is available.",
+    evidence_refs: [chunk.chunk_id, job.job_id],
+    model_invoked: true,
+    confidence: 0.8,
+    created_at: now,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  return { now, chunk, observation };
+};
+
+const recordIdentityField = (input: {
+  threadId: string;
+  environmentId: string;
+  situationRunId: string;
+  observationId: string;
+}): void => {
+  const now = new Date().toISOString();
+  recordLiveFieldEvaluation({
+    schema: "helix.live_field_evaluation.v1",
+    evaluation_id: `field_eval:api-parity:${input.situationRunId}:activity`,
+    worker_run_id: `field_worker_run:api-parity:${input.situationRunId}:activity`,
+    worker_id: "field_worker:api_parity_identity",
+    situation_run_id: input.situationRunId,
+    thread_id: input.threadId,
+    environment_id: input.environmentId,
+    field_key: "activity",
+    value: "Reviewing parity-seeded visual evidence.",
+    status: "supported",
+    confidence: 0.8,
+    evidence_refs: [input.observationId],
+    missing_evidence: [],
+    corroboration_state: { visual: "present" },
+    next_check: "Compare the next frame.",
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    created_at: now,
+    role: "ui_projection",
+    assistant_answer: false,
+    raw_content_included: false,
+  });
 };
 
 const seedScenario = async (
@@ -85,6 +158,95 @@ const seedScenario = async (
         confidence: 0.82,
       })
       .expect(200);
+    return;
+  }
+  if (scenario.seed === "live_source_identity_missing_environment_source") {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: `seed:${scenario.id}`,
+      objective: "Answer from visual evidence.",
+      preset: "custom",
+      source_ids: [],
+    });
+    seedIdentitySource({ threadId, sourceId: `visual_source:${scenario.id}:fresh`, environmentId: environment.environment_id });
+    return;
+  }
+  if (scenario.seed === "live_source_identity_no_situation_run") {
+    const sourceId = `visual_source:${scenario.id}:bound`;
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: `seed:${scenario.id}`,
+      objective: "Answer from visual evidence.",
+      preset: "custom",
+      source_ids: [sourceId],
+    });
+    seedIdentitySource({ threadId, sourceId, environmentId: environment.environment_id });
+    return;
+  }
+  if (scenario.seed === "live_source_identity_no_field_evaluations") {
+    const sourceId = `visual_source:${scenario.id}:bound`;
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: `seed:${scenario.id}`,
+      objective: "Answer from visual evidence.",
+      preset: "custom",
+      source_ids: [sourceId],
+    });
+    const { observation } = seedIdentitySource({ threadId, sourceId, environmentId: environment.environment_id });
+    ensureLiveSituationRunForEnvironment({ environment, observation, advanceEpoch: true });
+    return;
+  }
+  if (scenario.seed === "live_source_identity_stale_interpretation") {
+    const sourceId = `visual_source:${scenario.id}:bound`;
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: `seed:${scenario.id}`,
+      objective: "Answer from visual evidence.",
+      preset: "custom",
+      source_ids: [sourceId],
+    });
+    const { observation } = seedIdentitySource({ threadId, sourceId, environmentId: environment.environment_id });
+    const run = ensureLiveSituationRunForEnvironment({ environment, observation, advanceEpoch: true });
+    recordIdentityField({ threadId, environmentId: environment.environment_id, situationRunId: run.situation_run_id, observationId: observation.observation_id });
+    appendInterpretationCard({
+      thread_id: threadId,
+      title: "Expired visual interpretation",
+      summary: "This interpretation is stale.",
+      evidence_refs: [observation.observation_id],
+      confidence: 0.8,
+      expires_at: "2000-01-01T00:00:00.000Z",
+    });
+    return;
+  }
+  if (scenario.seed === "live_source_identity_wrong_environment") {
+    const sourceId = `visual_source:${scenario.id}:bound`;
+    const { environment: wrongEnvironment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: `seed:${scenario.id}:wrong`,
+      objective: "Other visual environment.",
+      preset: "custom",
+      source_ids: [sourceId],
+      now: "2026-05-20T00:00:00.000Z",
+    });
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: `seed:${scenario.id}:active`,
+      objective: "Answer from visual evidence.",
+      preset: "custom",
+      source_ids: [sourceId],
+      now: "2026-05-20T00:01:00.000Z",
+    });
+    const { observation } = seedIdentitySource({ threadId, sourceId, environmentId: wrongEnvironment.environment_id });
+    const run = ensureLiveSituationRunForEnvironment({ environment, observation, advanceEpoch: true });
+    recordIdentityField({ threadId, environmentId: environment.environment_id, situationRunId: run.situation_run_id, observationId: observation.observation_id });
+    appendInterpretationCard({
+      thread_id: threadId,
+      title: "Visual interpretation",
+      summary: "The current visual frame has been interpreted.",
+      evidence_refs: [observation.observation_id],
+      confidence: 0.8,
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
     return;
   }
   await request(app)
@@ -148,7 +310,10 @@ describe("Helix Ask API parity matrix", () => {
     });
     expect(probe.route_authority.ok).toBe(true);
     expect(probe.loop_parity_trace.unexpected_tool_calls).toEqual([]);
-    expect(probe.loop_parity_trace.short_circuit_risk_flags).toEqual([]);
+    if (scenario.expected.live_source_identity_ok !== false) {
+      expect(probe.loop_parity_trace.short_circuit_risk_flags).toEqual([]);
+      expect(probe.ask_turn_solver_trace.solver_short_circuit_flags).toEqual([]);
+    }
     expect(probe.poison_audit_ok && !probe.route_authority.ok).toBe(false);
   }, 60_000);
 });

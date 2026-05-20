@@ -74,6 +74,19 @@ const isVisualContentPrompt = (promptText: string): boolean =>
 const isProcedureMemoryPrompt = (promptText: string): boolean =>
   /\b(?:what\s+changed|since\s+(?:the\s+)?(?:previous|last)|compare\s+(?:this|current)|replay|earlier|last\s+turn|previous\s+(?:visual|capture|frame|scene))\b/i.test(promptText);
 
+const isLivePipelineProcedurePrompt = (promptText: string, selectedRoute: string): boolean =>
+  /^live_(?:source_continuation|pipeline_control|pipeline_inspect|pipeline_repair|runtime_repair|answer_environment_setup)$/i.test(selectedRoute) &&
+  (
+    !isVisualContentPrompt(promptText) ||
+    /\b(?:keep|continue|watch|monitor|track|checking)\b/i.test(promptText)
+  ) &&
+  (
+    /\b(?:keep|continue|watch|monitor|track|checking|check)\b[\s\S]{0,120}\b(?:screen|visual|capture|frame|live\s+answer|live\s+source)\b/i.test(promptText) ||
+    /\b(?:set|change|update|start|enable|turn\s+on)\b[\s\S]{0,120}\b(?:interval|cadence|rate|live\s+answer|live\s+source|pipeline|screen|visual)\b/i.test(promptText) ||
+    /\b(?:fix|repair|recover|not\s+updating|stale|blocked|status|inspect|ready|readiness)\b[\s\S]{0,120}\b(?:pipeline|visual\s+source|live\s+source|live\s+answer|screen|capture|frame)\b/i.test(promptText) ||
+    /\b(?:visual\s+source|live\s+source|live\s+answer|pipeline)\b[\s\S]{0,120}\b(?:not\s+updating|stale|blocked|status|inspect|ready|readiness)\b/i.test(promptText)
+  );
+
 const classifyViolations = (input: {
   sourceTarget: string;
   targetKind: string;
@@ -92,14 +105,17 @@ const classifyViolations = (input: {
   const codes: HelixRouteAuthorityViolationCode[] = [];
   const visualContentPrompt = isVisualContentPrompt(input.promptText);
   const procedureMemoryPrompt = isProcedureMemoryPrompt(input.promptText);
+  const livePipelineProcedureReceipt =
+    terminal === "live_pipeline_receipt" &&
+    isLivePipelineProcedurePrompt(input.promptText, route);
 
   if ((sourceTarget === "visual_capture" || visualContentPrompt || /visual|screen|capture/i.test(route)) && terminal === "process_graph_overview") {
     codes.push("process_graph_used_as_visual_evidence");
   }
-  if ((sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && terminal === "live_pipeline_receipt") {
+  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && terminal === "live_pipeline_receipt") {
     codes.push("receipt_used_as_content_answer");
   }
-  if ((sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && route === "live_pipeline_control") {
+  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && route === "live_pipeline_control") {
     codes.push("pipeline_status_used_as_live_cognition");
   }
   if ((sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || procedureMemoryPrompt) && terminal !== "procedure_epoch_replay" && terminal !== "visual_scene_comparison_result" && terminal !== "typed_failure") {
@@ -108,7 +124,7 @@ const classifyViolations = (input: {
   if ((sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") && terminal !== "repo_code_evidence_answer" && terminal !== "repo_entity_definition" && terminal !== "typed_failure") {
     codes.push("repo_evidence_bypassed");
   }
-  if ((sourceTarget === "visual_capture" || visualContentPrompt) && terminal === "live_pipeline_receipt") codes.push("visual_evidence_bypassed");
+  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || visualContentPrompt) && terminal === "live_pipeline_receipt") codes.push("visual_evidence_bypassed");
   if (input.hardSourceTarget && input.routeProductContractMissing) codes.push("route_contract_missing");
   if (!input.terminalArtifactAllowed) codes.push("terminal_product_authority_mismatch");
   if (terminal === "client_projection" || input.finalAnswerSource === "client_projection") codes.push("client_projection_used_as_answer");
@@ -144,12 +160,18 @@ export function auditRouteAuthority(input: {
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
   const allowedTerminalArtifactKinds = readStringArray(contract?.allowed_terminal_artifact_kinds);
   const forbiddenTerminalArtifactKinds = readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  const livePipelineProcedureReceipt =
+    terminalArtifactKind === "live_pipeline_receipt" &&
+    isLivePipelineProcedurePrompt(input.promptText, input.selectedRoute);
   const terminalArtifactAllowed =
-    !(hardSourceTarget && routeProductContractMissing) &&
-    selectionGuard?.allowed !== false &&
-    productGuard?.allowed !== false &&
-    !forbiddenTerminalArtifactKinds.includes(terminalArtifactKind) &&
-    (allowedTerminalArtifactKinds.length === 0 || allowedTerminalArtifactKinds.includes(terminalArtifactKind));
+    livePipelineProcedureReceipt ||
+    (
+      !(hardSourceTarget && routeProductContractMissing) &&
+      selectionGuard?.allowed !== false &&
+      productGuard?.allowed !== false &&
+      !forbiddenTerminalArtifactKinds.includes(terminalArtifactKind) &&
+      (allowedTerminalArtifactKinds.length === 0 || allowedTerminalArtifactKinds.includes(terminalArtifactKind))
+    );
   const violationCodes = classifyViolations({
     sourceTarget,
     targetKind,

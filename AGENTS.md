@@ -69,25 +69,46 @@ When touching Helix Ask agent-loop, source-target, route admission,
 tool-admission, live-source, workstation-action, route-product, terminal
 authority, loop-parity, debug-export, or Ask API behavior, also read and follow:
 - `docs/helix-ask-codex-loop-discipline.md`
+- `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-api-parity-matrix.md`
 
 Patch-time contract:
-- Classify the change as `runtime-adapter`, `evidence-lane`,
-  `retrieval-gate`, `proof-policy`, `live-source`, `presentation`, or
-  Codex-owned runtime behavior before editing.
-- Codex owns generic sampling loops, tool execution, retries, approval,
-  sandboxing, compaction, session lifecycle, subagent orchestration, and
-  terminal turn completion. Do not recreate those in Helix Ask.
-- Helix Ask may add source-target admission, evidence identity, provenance,
-  proof gates, route/product contracts, terminal eligibility, and debug traces.
+- Classify the change before editing as `prompt interpretation`, `intent
+  arbitration`, `source admission`, `tool admission`, `evidence normalization`,
+  `evidence re-entry`, `follow-up reasoning`, `terminal authority`,
+  `presentation`, or Codex-owned runtime behavior.
+- Codex owns model sampling, generic tool execution, tool-result re-entry,
+  retries, approvals, sandboxing, compaction, session lifecycle, subagent
+  orchestration, and terminal completion. Do not recreate those in Helix Ask.
+- Helix Ask owns prompt interpretation policy, intent arbitration,
+  source-target admission, evidence identity, provenance, proof gates,
+  route/product contracts, route authority, terminal eligibility, and debug
+  traces.
+- Routes are proposed procedures, not conclusions. Receipts are observations,
+  not answers. Classifiers generate hypotheses, not authority. Only the
+  completed solver path can answer.
+- Every debug Ask turn must expose `ask_turn_solver_trace` and route-first hard
+  gates must fail closed as typed failures for hard source-targeted or complex
+  prompts.
+- If present, use the ignored local Codex reference checkout at
+  `external/openai-codex-compare` for grep/diff comparisons. Do not commit or
+  mutate it as part of Helix Ask patches.
 - Lexical cues in user text are not execution. Contextual, negated, historical,
   future, quoted, or screen-visible tool/control words must not admit mutating
   tools unless the prompt is an affirmative operator command.
 - Receipts, live-card projections, process graphs, client projections, and
   panel-generated text are not answer authority unless the route-product
   contract explicitly allows that terminal product.
-- For applicable Helix Ask changes, run the API parity test or live-server
-  parity probe and report any disabled/frontier scenarios separately:
+- Reject or flag changes that implement a private sampling loop, private tool
+  execution runtime, sandbox/approval lifecycle, session compaction, subagent
+  orchestration, or terminal completion machinery.
+- Every shortcut-like rule must include adversarial tests for contextual,
+  negated, future/conditional, historical, quoted/screen-visible, and mixed
+  intent prompts.
+- For applicable Helix Ask changes, run the prompt-solving benchmark plus the
+  API parity test or live-server parity probe and report any disabled/frontier
+  scenarios separately:
+  `npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks`
   `npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks`
   or `npm run helix:ask:api-parity`.
 

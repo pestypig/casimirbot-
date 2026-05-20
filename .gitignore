@@ -116,6 +116,7 @@ client/public/originals/*
 sunpy_out/
 external/ollama/
 external/RayTracingMIS/
+external/openai-codex-compare/
 # Large model weights (prevent accidental commits)
 *.gguf
 *.safetensors

@@ -1,7 +1,10 @@
 export {
   buildAskTurnSolverTrace,
+  evaluateAskTurnSolverHardGate,
   type HelixAskTurnSolverTrace,
   type HelixAskTurnSolverRiskFlag,
+  type HelixAskTurnSolverHardFailureCode,
+  type HelixAskTurnSolverHardGate,
   type HelixAskTurnIntentKind,
 } from "./ask-turn-solver";
 export {
@@ -29,3 +32,9 @@ export {
   type HelixFollowupReasoningGate,
   type HelixFollowupReasoningReason,
 } from "./followup-reasoning-gate";
+export {
+  buildLiveSourceIdentityAudit,
+  isLiveSourceIdentityAuditRelevant,
+  type HelixLiveSourceIdentityAudit,
+  type HelixLiveSourceIdentityAuditDiagnosis,
+} from "./live-source-identity-audit";

@@ -3,6 +3,7 @@ import { createLiveAnswerEnvironment } from "./live-answer-environment-store";
 import { ensureLiveSituationRunForEnvironment } from "./live-situation-run-store";
 import { appendObservationJournalEntry } from "./observation-journal-store";
 import { recordLiveFieldEvaluation } from "./live-field-evaluation-store";
+import { appendInterpretationCard } from "./interpretation-card-store";
 import { recordProcedureEpochClosure } from "./procedure-epoch-closure";
 import { appendLiveSourceChunk, queueLiveSourceAnalysisJob } from "./live-source-chunk-buffer";
 
@@ -32,6 +33,7 @@ export type BackendLiveVisualSourceSeedReceipt = {
   analysis_job_id: string;
   observation_ref: string;
   field_evaluation_refs: string[];
+  interpretation_refs?: string[];
   epoch_closure_ref: string;
   assistant_answer: false;
   raw_content_included: false;
@@ -166,6 +168,15 @@ export function seedBackendLiveVisualSourceForAskTest(body: Record<string, unkno
     assistant_answer: false,
     raw_content_included: false,
   });
+  const interpretation = appendInterpretationCard({
+    thread_id: threadId,
+    title: "Current visual capture",
+    summary: `${activity} ${objects}`,
+    evidence_refs: [observation.observation_id, activityEval.evaluation_id, objectsEval.evaluation_id],
+    confidence,
+    expires_at: new Date(Date.parse(now) + 60 * 60 * 1000).toISOString(),
+    created_at: now,
+  });
   const closure = recordProcedureEpochClosure({
     situation_run_id: boundRun.situation_run_id,
     thread_id: boundRun.thread_id,
@@ -190,6 +201,7 @@ export function seedBackendLiveVisualSourceForAskTest(body: Record<string, unkno
     analysis_job_id: analysisJob.job_id,
     observation_ref: observation.observation_id,
     field_evaluation_refs: [activityEval.evaluation_id, objectsEval.evaluation_id],
+    interpretation_refs: [interpretation.interpretation_id],
     epoch_closure_ref: closure.closure_id,
     assistant_answer: false,
     raw_content_included: false,

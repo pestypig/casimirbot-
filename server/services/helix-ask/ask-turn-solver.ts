@@ -22,6 +22,7 @@ import {
   buildFollowupReasoningGate,
   type HelixFollowupReasoningGate,
 } from "./followup-reasoning-gate";
+import type { HelixLiveSourceIdentityAudit } from "./live-source-identity-audit";
 
 type RecordLike = Record<string, unknown>;
 
@@ -37,6 +38,37 @@ export type HelixAskTurnSolverRiskFlag =
   | "primary_secondary_intent_collapsed"
   | "missing_followup_reasoning"
   | "terminal_authority_before_solver_completion";
+
+export type HelixAskTurnSolverHardFailureCode =
+  | "solver_trace_missing"
+  | "intent_arbitration_missing"
+  | "classifier_became_decision"
+  | "route_selected_before_intent_arbitration"
+  | "contextual_tool_mention_executed"
+  | "receipt_terminal_without_reentry"
+  | "missing_followup_reasoning"
+  | "terminal_authority_before_solver_completion"
+  | "poison_clean_but_authority_failed"
+  | "route_contract_missing"
+  | "hard_source_target_allowed_no_tool_direct";
+
+export type HelixAskTurnSolverHardGate = {
+  schema: "helix.ask_turn_solver_hard_gate.v1";
+  turn_id: string;
+  applies: boolean;
+  failed: boolean;
+  failure_codes: HelixAskTurnSolverHardFailureCode[];
+  primary_failure_code: HelixAskTurnSolverHardFailureCode | null;
+  hard_source_target: boolean;
+  complex_prompt: boolean;
+  pure_control_or_status_receipt_allowed: boolean;
+  failure_details: Array<{
+    code: HelixAskTurnSolverHardFailureCode;
+    reason: string;
+  }>;
+  assistant_answer: false;
+  raw_content_included: false;
+};
 
 export type HelixAskTurnSolverTrace = {
   schema: "helix.ask_turn_solver_trace.v1";
@@ -92,6 +124,8 @@ export type HelixAskTurnSolverTrace = {
     skipped_reason?: string;
   };
   followup_reasoning_gate: HelixFollowupReasoningGate;
+  live_source_identity_audit?: HelixLiveSourceIdentityAudit;
+  live_source_identity_audit_ref?: string | null;
 
   final_arbitration: {
     selected_route: string;
@@ -118,6 +152,7 @@ export type HelixAskTurnSolverTrace = {
     selection_reason: string;
   } | null;
   solver_short_circuit_flags: HelixAskTurnSolverRiskFlag[];
+  hard_gate?: HelixAskTurnSolverHardGate;
 };
 
 const hashShort = (value: unknown): string =>
@@ -140,6 +175,21 @@ const readStringArray = (value: unknown): string[] =>
     : [];
 
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
+
+const sourceTargeted = new Set([
+  "visual_capture",
+  "procedure_memory",
+  "situation_epoch",
+  "visual_scene_memory",
+  "repo_code",
+  "runtime_evidence",
+  "docs_viewer",
+  "active_doc",
+  "process_graph",
+  "live_pipeline",
+  "world_event",
+  "active_note",
+]);
 
 const sourceRequiresEvidence = (sourceTarget: string): boolean =>
   /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|docs_viewer|active_doc|world_event/i.test(sourceTarget);
@@ -171,6 +221,180 @@ const allowedTerminalProducts = (payload: RecordLike): string[] =>
 
 const forbiddenTerminalProducts = (payload: RecordLike): string[] =>
   readStringArray(readRecord(payload.route_product_contract)?.forbidden_terminal_artifact_kinds);
+
+const isHardSourceTarget = (payload: RecordLike, trace: HelixAskTurnSolverTrace | null): boolean => {
+  const sourceTarget = readRecord(payload.source_target_intent);
+  const traceSource = trace?.primary_intent?.source_target ?? "";
+  return (
+    readString(sourceTarget?.strength) === "hard" ||
+    sourceTarget?.must_enter_backend_ask === true ||
+    sourceTargeted.has(readString(sourceTarget?.target_source)) ||
+    sourceTargeted.has(traceSource)
+  );
+};
+
+const isComplexSolverPrompt = (trace: HelixAskTurnSolverTrace | null): boolean => {
+  if (!trace) return false;
+  const primary = trace.selected_primary_intent;
+  if (
+    primary === "content_question" ||
+    primary === "debug_diagnosis" ||
+    primary === "implementation_question" ||
+    primary === "procedure_memory_question" ||
+    primary === "repo_evidence_question"
+  ) {
+    return true;
+  }
+  return (
+    trace.secondary_intents.length > 0 ||
+    trace.prompt_interpretation.contextual_tool_mentions.length > 0 ||
+    trace.prompt_interpretation.negative_constraints.length > 0 ||
+    trace.followup_reasoning.required ||
+    trace.evidence_reentry.required
+  );
+};
+
+const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null): boolean => {
+  if (!trace) return false;
+  const primary = trace.selected_primary_intent;
+  const terminal = trace.final_arbitration.terminal_artifact_kind;
+  const route = trace.final_arbitration.selected_route;
+  const reason = trace.followup_reasoning_gate.reason;
+  const livePipelineProcedureReceipt =
+    terminal === "live_pipeline_receipt" &&
+    /^live_(?:source_continuation|pipeline_control|pipeline_inspect|pipeline_repair|runtime_repair|answer_environment_setup)$/i.test(route) &&
+    trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
+    trace.prompt_interpretation.negative_constraints.length === 0;
+  return (
+    (
+      (
+        (primary === "control_command" || primary === "status_question") &&
+        /receipt/i.test(terminal) &&
+        (reason === "pure_control_receipt" || reason === "pure_status_receipt")
+      ) ||
+      livePipelineProcedureReceipt
+    ) &&
+    (trace.route_authority_ok === true || livePipelineProcedureReceipt)
+  );
+};
+
+const pushHardFailure = (
+  details: HelixAskTurnSolverHardGate["failure_details"],
+  code: HelixAskTurnSolverHardFailureCode,
+  reason: string,
+): void => {
+  if (details.some((entry) => entry.code === code)) return;
+  details.push({ code, reason });
+};
+
+export function evaluateAskTurnSolverHardGate(input: {
+  turnId: string;
+  payload: RecordLike;
+  trace?: HelixAskTurnSolverTrace | RecordLike | null;
+  loopParityTrace?: HelixLoopParityTrace | RecordLike | null;
+}): HelixAskTurnSolverHardGate {
+  const trace = readRecord(input.trace ?? input.payload.ask_turn_solver_trace) as HelixAskTurnSolverTrace | null;
+  const loopTrace = readRecord(input.loopParityTrace ?? input.payload.loop_parity_trace);
+  const sourceTarget = readRecord(input.payload.source_target_intent);
+  const routeContract = readRecord(input.payload.route_product_contract);
+  const routeAuthority = readRecord(input.payload.route_authority_audit);
+  const hardSourceTarget = isHardSourceTarget(input.payload, trace);
+  const complexPrompt = isComplexSolverPrompt(trace);
+  const applies = hardSourceTarget || complexPrompt;
+  const details: HelixAskTurnSolverHardGate["failure_details"] = [];
+  const allowedPureReceipt = pureControlOrStatusReceiptAllowed(trace);
+
+  if (!trace) {
+    pushHardFailure(details, "solver_trace_missing", "solver trace is required before terminal authority");
+  } else {
+    if (!readRecord(trace.intent_arbitration)) {
+      pushHardFailure(details, "intent_arbitration_missing", "intent arbitration is required before route authority");
+    }
+    if (trace.final_arbitration.selected_route && !trace.selected_primary_intent) {
+      pushHardFailure(details, "route_selected_before_intent_arbitration", "selected route exists without a selected primary intent");
+    }
+    for (const flag of trace.solver_risk_flags) {
+      if (flag === "classifier_became_decision") {
+        pushHardFailure(details, "classifier_became_decision", "classifier output reached decision authority");
+      }
+      if (flag === "route_selected_before_intent_arbitration") {
+        pushHardFailure(details, "route_selected_before_intent_arbitration", "route was selected before intent arbitration completed");
+      }
+      if (flag === "contextual_tool_mention_executed" && !allowedPureReceipt) {
+        pushHardFailure(details, "contextual_tool_mention_executed", "contextual, negated, historical, future, quoted, or screen-visible tool cue executed");
+      }
+      if (flag === "receipt_terminal_without_reentry" && !allowedPureReceipt) {
+        pushHardFailure(details, "receipt_terminal_without_reentry", "receipt became terminal without solver re-entry for this intent");
+      }
+      if (flag === "missing_followup_reasoning") {
+        pushHardFailure(details, "missing_followup_reasoning", "follow-up reasoning was required but not completed");
+      }
+      if (flag === "terminal_authority_before_solver_completion" && !allowedPureReceipt) {
+        pushHardFailure(details, "terminal_authority_before_solver_completion", "terminal authority was recorded before solver completion");
+      }
+    }
+    for (const flag of readStringArray(loopTrace?.short_circuit_risk_flags)) {
+      if (flag === "route_contract_missing") {
+        pushHardFailure(details, "route_contract_missing", "route product contract missing for hard source-target turn");
+      }
+      if (flag === "hard_source_target_allowed_no_tool_direct") {
+        pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target allowed no_tool_direct");
+      }
+      if (flag === "poison_clean_but_authority_failed" && !allowedPureReceipt) {
+        pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit was clean while route authority failed");
+      }
+      if (flag === "terminal_selected_before_observation_finalizer") {
+        pushHardFailure(details, "terminal_authority_before_solver_completion", "terminal artifact was selected before solver finalization");
+      }
+    }
+    if (!trace.route_authority_ok && !allowedPureReceipt) {
+      if (trace.poison_audit_ok) {
+        pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit passed but route authority failed");
+      } else {
+        pushHardFailure(details, "terminal_authority_before_solver_completion", "route authority failed before terminal completion");
+      }
+    }
+  }
+
+  if (hardSourceTarget && (!routeContract || readString(routeContract.schema) !== "helix.route_product_contract.v1")) {
+    pushHardFailure(details, "route_contract_missing", "hard source-target turn lacks helix.route_product_contract.v1");
+  }
+  if (
+    hardSourceTarget &&
+    (
+      sourceTarget?.allow_no_tool_direct === true ||
+      readString(input.payload.terminal_artifact_kind) === "no_tool_direct" ||
+      readString(input.payload.final_answer_source) === "no_tool_direct"
+    )
+  ) {
+    pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target cannot use no_tool_direct");
+  }
+  if (routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true) {
+    pushHardFailure(details, "poison_clean_but_authority_failed", "clean poison audit cannot override failed route authority");
+  }
+  if (routeAuthority?.primary_violation_code === "route_contract_missing") {
+    pushHardFailure(details, "route_contract_missing", "route authority audit reported a missing route product contract");
+  }
+  if (routeAuthority?.primary_violation_code === "no_tool_direct_used_for_hard_source_target") {
+    pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "route authority audit reported no_tool_direct for hard source-target");
+  }
+
+  const failureCodes = details.map((entry) => entry.code);
+  return {
+    schema: "helix.ask_turn_solver_hard_gate.v1",
+    turn_id: input.turnId,
+    applies,
+    failed: applies && failureCodes.length > 0,
+    failure_codes: failureCodes,
+    primary_failure_code: failureCodes[0] ?? null,
+    hard_source_target: hardSourceTarget,
+    complex_prompt: complexPrompt,
+    pure_control_or_status_receipt_allowed: allowedPureReceipt,
+    failure_details: details,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
 
 const collectRouteCandidatesForIntent = (payload: RecordLike, selectedRoute: string): HelixRouteCandidateForIntent[] => {
   const preflight = readRecord(payload.ask_turn_preflight_context);
@@ -281,6 +505,8 @@ const buildRiskFlags = (input: {
   evidenceReentryViolationCodes: string[];
   followupReasoningRequired: boolean;
   followupReasoningCompleted: boolean;
+  liveSourceIdentityAuditPresent: boolean;
+  liveSourceIdentityOk: boolean;
 }): HelixAskTurnSolverRiskFlag[] => {
   const unexpectedToolCalls = readStringArray(input.loopTrace?.unexpected_tool_calls);
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
@@ -311,7 +537,7 @@ const buildRiskFlags = (input: {
     input.followupReasoningRequired && !input.followupReasoningCompleted
       ? "missing_followup_reasoning"
       : null,
-    input.terminalAuthorityOk && (!input.finalArbitrationRan || !input.routeAuthorityOk)
+    input.terminalAuthorityOk && (!input.finalArbitrationRan || !input.routeAuthorityOk || (input.liveSourceIdentityAuditPresent && !input.liveSourceIdentityOk))
       ? "terminal_authority_before_solver_completion"
       : null,
   ].filter((entry): entry is HelixAskTurnSolverRiskFlag => Boolean(entry)));
@@ -357,6 +583,8 @@ export function buildAskTurnSolverTrace(input: {
     .filter((kind): kind is HelixAskTurnIntentKind => Boolean(kind));
   const evidenceRequired = sourceRequiresEvidence(sourceTargetInfo.sourceTarget);
   const evidenceResults = buildEvidenceResults(loopTrace);
+  const liveSourceIdentityAudit = readRecord(input.payload.live_source_identity_audit) as HelixLiveSourceIdentityAudit | null;
+  const liveSourceIdentityAuditRef = readString(liveSourceIdentityAudit?.audit_id) || null;
   const finalArbitrationRan = Boolean(readRecord(input.payload.route_authority_audit) && readRecord(input.payload.poison_audit) && readRecord(input.payload.terminal_answer_authority));
   const evidenceReentryGate = buildEvidenceReentryGate({
     turnId: input.turnId,
@@ -382,6 +610,7 @@ export function buildAskTurnSolverTrace(input: {
   const routeAuthorityOk = readBoolean(loopTrace?.route_authority_ok) || readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok);
   const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
   const terminalAuthorityOk = readBoolean(loopTrace?.terminal_authority_ok) || readBoolean(readRecord(input.payload.terminal_answer_authority)?.server_authoritative);
+  const liveSourceIdentityOk = !liveSourceIdentityAudit || liveSourceIdentityAudit.identity_ok === true;
   const actualToolCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -407,12 +636,15 @@ export function buildAskTurnSolverTrace(input: {
     evidenceReentryViolationCodes: evidenceReentryGate.violation_codes,
     followupReasoningRequired: followupReasoningGate.required,
     followupReasoningCompleted: followupReasoningGate.completed,
+    liveSourceIdentityAuditPresent: Boolean(liveSourceIdentityAudit),
+    liveSourceIdentityOk,
   });
   const completedSolverPath =
     finalArbitrationRan &&
     routeAuthorityOk &&
     poisonAuditOk &&
     terminalAuthorityOk &&
+    liveSourceIdentityOk &&
     evidenceReentryGate.completed &&
     followupReasoningGate.completed &&
     solverRiskFlags.length === 0;
@@ -457,6 +689,12 @@ export function buildAskTurnSolverTrace(input: {
       ...(followupReasoningGate.completed ? {} : { skipped_reason: followupReasoningGate.skipped_reason ?? "final_arbitration_missing_after_evidence_or_tool_result" }),
     },
     followup_reasoning_gate: followupReasoningGate,
+    ...(liveSourceIdentityAudit
+      ? {
+          live_source_identity_audit: liveSourceIdentityAudit,
+          live_source_identity_audit_ref: liveSourceIdentityAuditRef,
+        }
+      : {}),
     final_arbitration: {
       selected_route: input.selectedRoute,
       terminal_artifact_kind: terminalArtifactKind,
@@ -483,5 +721,6 @@ export function buildAskTurnSolverTrace(input: {
           selection_reason: sourceTargetInfo.reason,
         },
     solver_short_circuit_flags: solverRiskFlags,
+    hard_gate: readRecord(input.payload.solver_hard_gate) as HelixAskTurnSolverHardGate | undefined,
   };
 }

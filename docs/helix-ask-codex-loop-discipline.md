@@ -9,14 +9,38 @@ procedure contract, not a claim that Helix Ask behavior is deterministic.
 ## Comparison Snapshot
 
 - Helix Ask repo context: `pestypig/casimirbot-`, local worktree.
-- Codex comparison target: `external/openai-codex` at
-  `0b08d893042ba0c0d5c2f020b1c78b46af2ebe59`.
+- Local Codex reference checkout: `external/openai-codex-compare` when present.
+  It is intentionally ignored by git and sparse-checked to `codex-rs/core/src`,
+  `codex-rs/mcp-server/src`, `docs`, and `README.md` for agent comparison work.
+  Do not commit this local checkout.
+- Existing tracked gitlink: `external/openai-codex` is a repo gitlink at
+  `0b08d893042ba0c0d5c2f020b1c78b46af2ebe59`; do not use it as a mutable local
+  scratch clone.
 - Public `openai/codex` `main` observed during this comparison:
-  `4ca60ef9fffe76fb4f86d606f7d4a2f727f6cd25`.
+  `5a4202ad909c2918486bbdd911babf636f498990`.
+- Compared files:
+  - `codex-rs/core/src/session/turn.rs`
+  - `codex-rs/mcp-server/src/codex_tool_runner.rs`
+  - `codex-rs/core/src/exec.rs`
 
 Codex and Helix Ask overlap in agent vocabulary, but they should not overlap in
 ownership. Codex owns the generic agent runtime. Helix Ask owns the domain
 evidence loop.
+
+The compared Codex files reinforce that split:
+
+- `turn.rs` runs the sampling loop: prompt/history assembly, model response
+  handling, tool-call follow-up, assistant-message completion, pending input,
+  hooks, and compaction.
+- `codex_tool_runner.rs` bridges MCP `tools/call` into Codex thread/session
+  execution, streams events, handles exec/patch approval requests, and resolves
+  the MCP call only on Codex `TurnComplete` or error.
+- `exec.rs` owns command execution mechanics: sandbox transformation,
+  permission profile application, network policy, Windows/Linux sandbox
+  selection, cancellation, timeout, output caps, and exec result finalization.
+
+None of those are Helix Ask route policy. Helix Ask may observe or wrap their
+outputs, but it must not recreate them.
 
 ## Patch-Time Contract
 
@@ -34,24 +58,56 @@ What test proves a lexical cue did not become execution or answer authority?
 Classify the patch before editing:
 
 ```txt
-runtime-adapter
-evidence-lane
-retrieval-gate
-proof-policy
-live-source
+prompt interpretation
+intent arbitration
+source admission
+tool admission
+evidence normalization
+evidence re-entry
+follow-up reasoning
+terminal authority
 presentation
 Codex-owned runtime behavior
 ```
 
-If the patch manages sampling, generic tool execution, retries, approvals,
-sandboxing, compaction, session lifecycle, subagent orchestration, or terminal
-turn completion, it belongs to Codex or to a thin Codex-compatible adapter. Do
-not implement a parallel private loop in Helix Ask.
+If the patch manages sampling, generic tool execution, tool-result re-entry,
+retries, approvals, sandboxing, compaction, session lifecycle, subagent
+orchestration, or terminal completion, it belongs to Codex or to a thin
+Codex-compatible adapter. Do not implement a parallel private loop in Helix Ask.
 
 If the patch selects, normalizes, ranks, gates, proves, or rejects domain
 evidence, it belongs in Helix Ask and must preserve equal-identity evidence:
-observations are not assistant answers, receipts are not cognition, and
-terminal authority requires the route-product contract.
+observations are not assistant answers, receipts are not answers, classifiers
+are not authority, and terminal authority requires the completed solver path
+plus the route-product contract.
+
+Reject or flag changes that implement:
+
+```txt
+private sampling loop
+private tool execution runtime
+sandbox/approval lifecycle
+session compaction
+subagent orchestration
+terminal completion machinery
+```
+
+Every shortcut-like rule must include adversarial tests:
+
+```txt
+contextual cue
+negated cue
+future/conditional cue
+historical cue
+quoted/screen-visible cue
+mixed intent prompt
+```
+
+The prompt-solving benchmark is the default adversarial battery:
+
+```bash
+npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+```
 
 For applicable patches, run the API parity matrix:
 
@@ -72,12 +128,16 @@ scenario as proof of the current contract.
 
 Do not recreate these in Helix Ask unless Codex cannot expose the capability:
 
+- Model sampling: the turn loop that samples model output, detects function
+  calls, records assistant messages, and decides whether the turn needs another
+  sampling pass.
+- Generic tool execution and tool-result re-entry: tool-call events, tool output
+  recording, and returning results to the model for follow-up sampling.
 - Turn/session lifecycle: one active task per session, interrupt/resume, thread
   context persistence, and compaction.
-- Tool execution semantics: tool registry, tool-call readiness gates,
-  mutating-tool serialization, and tool result events.
 - Shell/file mutation safety: sandbox policy, permission requests, approval
-  events, apply-patch interception, and command process management.
+  events, apply-patch interception, command process management, output caps, and
+  cancellation/timeout behavior.
 - Planning UI primitives: generic checklist/update-plan state.
 - Subagent orchestration: spawn/wait/send/close mechanics and shared turn config.
 - Generic realtime transport: conversation start/audio/text/close plumbing.
@@ -115,6 +175,22 @@ views, not answer authority.
 Keep these first-class in Helix Ask because they are repo/domain policy, not
 generic agent runtime:
 
+- Prompt interpretation policy: distinguish user task, requested output,
+  explicit constraints, negative constraints, contextual tool mentions, and
+  executable operator commands.
+- Intent arbitration: convert classifiers into hypotheses, then choose primary
+  and secondary intents before route/product arbitration.
+- Source-target admission and tool admission policy: decide what source/tool
+  families may be considered without executing them.
+- Evidence normalization and re-entry: convert artifacts, receipts, tool
+  results, source observations, repo hits, docs hits, process graph results,
+  visual evidence, and typed failures into selected or rejected evidence before
+  final arbitration.
+- Follow-up reasoning: require post-evidence reasoning for visual content, repo
+  evidence, procedure memory, debug diagnosis, implementation questions,
+  conflicting hypotheses, and mixed-intent turns.
+- Terminal authority: route authority, poison audit, terminal eligibility, and
+  debug traces proving no deterministic shortcut took authority.
 - Evidence lanes: repo grep/git-tracked scan, Atlas/code lattice, Stage0/Stage05,
   concept cards, docs, artifacts, telemetry, and live source observations.
 - Retrieval contracts: must-read paths, precedence paths, topic must-includes,
@@ -126,8 +202,101 @@ generic agent runtime:
 - Live source identity: screen/audio/browser/workstation sources are observations
   with provenance, freshness, consent, and state. They are never assistant
   answers and never deterministic truth by themselves.
+- Live source identity audit: visual-content, visual-delta, scene-epoch, and
+  Live Answer cognition turns must reconcile the active environment, bound
+  environment source, visual producer, freshest visual source, freshest
+  observation, selected SituationRun, field evaluations, and interpretation
+  availability before visual evidence can be terminal.
 - Domain-specific actions: verification adapters, physics/warp policies,
   panel evidence summaries, and mission callouts.
+
+## Turn Solver Authority Contract
+
+Helix Ask routes are solver hypotheses, not terminal decisions.
+
+```txt
+Routes are proposed procedures, not conclusions.
+Receipts are observations, not answers.
+Classifiers generate hypotheses, not authority.
+Only the completed solver path can answer.
+```
+
+The required solver path is:
+
+```txt
+prompt
+-> prompt interpretation
+-> intent hypotheses
+-> primary / secondary intent arbitration
+-> source and tool admission candidates
+-> evidence requests
+-> evidence results
+-> evidence re-entry
+-> follow-up reasoning / final arbitration
+-> route authority
+-> poison audit
+-> terminal authority
+-> final answer or typed failure
+```
+
+Debug Ask turns must expose `helix.ask_turn_solver_trace.v1` as
+`ask_turn_solver_trace`. Hard source-targeted and complex turns must also pass
+`helix.ask_turn_solver_hard_gate.v1`. Hard-gate failure codes are stable and
+must agree with route authority when the failure concerns route/product
+authority:
+
+```txt
+solver_trace_missing
+intent_arbitration_missing
+classifier_became_decision
+route_selected_before_intent_arbitration
+contextual_tool_mention_executed
+receipt_terminal_without_reentry
+missing_followup_reasoning
+terminal_authority_before_solver_completion
+poison_clean_but_authority_failed
+route_contract_missing
+hard_source_target_allowed_no_tool_direct
+```
+
+If a hard gate fails, Helix Ask must fail closed with `typed_failure` rather
+than presenting a forbidden terminal artifact. Pure control/status receipt turns
+are allowed only when the solver trace explicitly marks the receipt terminal as
+allowed by the primary intent and route/product contract.
+
+Visual/live-source turns may also expose `helix.live_source_identity_audit.v1`
+as `live_source_identity_audit` and as a reference inside
+`ask_turn_solver_trace`. A running screen capture is not sufficient answer
+authority. If source identities do not reconcile, the audit must name the
+diagnosis or repair candidate and the solver path must remain incomplete. That
+repair candidate is evidence for the next step, not a terminal answer and not a
+license to mutate bindings unless the user explicitly requested repair.
+
+Identity diagnoses include:
+
+```txt
+active_environment_missing
+active_environment_source_missing
+producer_source_mismatch
+fresh_source_unbound
+fresh_source_wrong_environment
+fresh_observation_not_in_situation_run
+situation_run_missing
+field_evaluations_missing
+interpretations_missing
+```
+
+The standing visual-source frontier is:
+
+```txt
+screen capture running
+but active Live Answer environment is bound to a missing/default source
+while the real freshest visual source exists elsewhere
+```
+
+That case must not terminate as `live_pipeline_receipt`,
+`process_graph_overview`, `model_only_concept`, `no_tool_direct`, or ambient
+workspace context.
 
 ## Equal-Identity Evidence Rule
 
@@ -482,17 +651,21 @@ second admitted evidence turn runs.
 Before adding backend logic, classify it as one of:
 
 ```txt
-runtime-adapter
-evidence-lane
-retrieval-gate
-proof-policy
-live-source
+prompt interpretation
+intent arbitration
+source admission
+tool admission
+evidence normalization
+evidence re-entry
+follow-up reasoning
+terminal authority
 presentation
+Codex-owned runtime behavior
 ```
 
-If the change manages sampling, tool execution, session lifecycle, retries,
-sandboxing, approvals, patches, compaction, or subagents, it belongs to Codex or
-to a thin Codex-compatible adapter.
+If the change manages sampling, tool execution, tool-result re-entry, session
+lifecycle, retries, sandboxing, approvals, patches, compaction, subagents, or
+terminal completion, it belongs to Codex or to a thin Codex-compatible adapter.
 
 If the change selects, normalizes, ranks, gates, proves, or rejects domain
 evidence, it belongs in Helix Ask.
@@ -643,13 +816,17 @@ Before adding Helix Ask backend logic, answer these questions:
 1. Is this generic session, turn, tool, sandbox, approval, patch, compaction, or
    subagent orchestration?
    - If yes, use Codex-owned structure or expose a thin adapter.
-2. Is this selecting, normalizing, ranking, or gating domain evidence?
+2. Is this model sampling, generic tool-result re-entry, or terminal completion?
+   - If yes, use Codex-owned structure or expose a thin adapter.
+3. Is this prompt interpretation, intent arbitration, source/tool admission,
+   evidence normalization, evidence re-entry, follow-up reasoning, route
+   authority, or terminal eligibility?
    - If yes, it belongs in Helix Ask.
-3. Does this produce a user-visible claim?
+4. Does this produce a user-visible claim?
    - If yes, it must cite proof pointers or emit an UNKNOWN/blocked result.
-4. Does this consume a live source?
+5. Does this consume a live source?
    - If yes, record consent/state/freshness and mark it as observation-only.
-5. Does this trigger execution or verification?
+6. Does this trigger execution or verification?
    - If yes, bind the result to a proof packet or explicit fail reason.
 
 If a proposed change fails this test, it is probably redundant methodology.
@@ -658,33 +835,40 @@ If a proposed change fails this test, it is probably redundant methodology.
 
 Use this sequence for future Helix Ask agent-loop patches:
 
-1. Classify the patch as `runtime-adapter`, `evidence-lane`, `retrieval-gate`,
-   `proof-policy`, `live-source`, or `presentation`.
-2. For `runtime-adapter`, keep the implementation thin and delegate lifecycle,
-   tool execution, and permissions to Codex-compatible primitives.
-3. For `evidence-lane`, return proof shards only. Do not let the lane write the
-   answer.
-4. For `retrieval-gate`, update objective slots, selected files, and debug
-   transcripts so replay can explain why a source was trusted or rejected.
-5. For `proof-policy`, fail closed when required evidence is missing, stale, or
-   outside the allowed source class.
-6. For `live-source`, require explicit source state and preserve
-   observation-only semantics.
-7. For `presentation`, show maturity/gate status without hiding required proof
-   packet fields.
+1. Classify the patch as `prompt interpretation`, `intent arbitration`,
+   `source admission`, `tool admission`, `evidence normalization`,
+   `evidence re-entry`, `follow-up reasoning`, `terminal authority`,
+   `presentation`, or `Codex-owned runtime behavior`.
+2. For `Codex-owned runtime behavior`, stop or keep the implementation as a thin
+   adapter. Do not add private sampling loops, private tool execution runtimes,
+   sandbox/approval lifecycles, session compaction, subagent orchestration, or
+   terminal completion machinery.
+3. For `prompt interpretation`, separate requested output from contextual,
+   negated, historical, future, conditional, quoted, and screen-visible tool
+   words.
+4. For `intent arbitration`, demote route classifiers into hypotheses and record
+   primary/secondary intent.
+5. For `source admission` and `tool admission`, propose candidates and reasons;
+   do not execute tools from lexical cues.
+6. For `evidence normalization`, `evidence re-entry`, and `follow-up reasoning`,
+   return observations and selected/rejected evidence before final arbitration.
+7. For `terminal authority` and `presentation`, require route authority,
+   terminal eligibility, poison audit, and solver hard gates before showing a
+   final answer.
 
 ## Instruction Delta
 
 Future instructions to Helix Ask should use this language:
 
 > Treat Codex as the generic agent loop owner. Helix Ask must not duplicate
-> Codex session, turn, tool, sandbox, approval, patch, compaction, or subagent
-> orchestration. Helix Ask owns evidence retrieval, live-source provenance,
-> objective coverage, proof gates, and domain-specific answer policy. All live
-> sources, repo hits, artifacts, telemetry, and operator text enter as equal
-> evidence observations with provenance and freshness. No observation is an
-> assistant answer. No repo/system claim is emitted without proof pointers or a
-> typed UNKNOWN/fail-closed reason.
+> Codex model sampling, generic tool execution, tool-result re-entry, retries,
+> approvals, sandboxing, compaction, session lifecycle, subagent orchestration,
+> or terminal completion. Helix Ask owns prompt interpretation policy, intent
+> arbitration, source-target admission, evidence identity, provenance, proof
+> gates, route/product contracts, route authority, terminal eligibility, and
+> debug traces. Routes are proposed procedures, not conclusions. Receipts are
+> observations, not answers. Classifiers generate hypotheses, not authority.
+> Only the completed solver path can answer.
 
 ## Regression Prompts
 

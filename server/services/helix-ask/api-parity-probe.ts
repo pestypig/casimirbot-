@@ -30,6 +30,8 @@ export type HelixApiParityProbeResult = {
     prompt_shape: string | null;
     primary_intent_route: string | null;
     solver_short_circuit_flags: string[];
+    live_source_identity_diagnosis: string | null;
+    live_source_identity_ok: boolean | null;
   };
   route_authority: {
     ok: boolean;
@@ -73,6 +75,11 @@ const readLoopTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | 
 
 const readSolverTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.ask_turn_solver_trace) ?? readRecord(debug?.ask_turn_solver_trace);
+
+const readLiveSourceIdentityAudit = (ask: RecordLike, debug: RecordLike | null, solverTrace: RecordLike | null): RecordLike | null =>
+  readRecord(ask.live_source_identity_audit) ??
+  readRecord(debug?.live_source_identity_audit) ??
+  readRecord(solverTrace?.live_source_identity_audit);
 
 const readRouteAuthority = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.route_authority_audit) ?? readRecord(debug?.route_authority_audit);
@@ -163,6 +170,7 @@ export function buildApiParityProbeResult(input: {
   const debug = extractHelixDebugPayload(input.debugExport);
   const loopTrace = readLoopTrace(ask, debug);
   const solverTrace = readSolverTrace(ask, debug);
+  const liveSourceIdentityAudit = readLiveSourceIdentityAudit(ask, debug, solverTrace);
   const routeAuthority = readRouteAuthority(ask, debug);
   const poisonAudit = readPoisonAudit(ask, debug);
   const terminalAuthority = readTerminalAuthority(ask, debug);
@@ -189,17 +197,35 @@ export function buildApiParityProbeResult(input: {
   const shortCircuitRiskFlags = readStringArray(loopTrace?.short_circuit_risk_flags);
   const solverShortCircuitFlags = readStringArray(solverTrace?.solver_short_circuit_flags);
   const failures: string[] = [];
+  const expectedIdentityDiagnosis = typeof input.scenario.expected.live_source_identity_ok === "boolean" && input.scenario.expected.live_source_identity_ok === false;
 
   if (!debug) failures.push("debug_export_missing");
   if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
-  if (solverTrace && solverTrace.completed_solver_path !== true) failures.push("ask_turn_solver_path_incomplete");
+  if (solverTrace) {
+    const expectedSolverCompleted = input.scenario.expected.solver_completed ?? true;
+    if (solverTrace.completed_solver_path !== expectedSolverCompleted) {
+      failures.push(`ask_turn_solver_path_${solverTrace.completed_solver_path === true ? "complete" : "incomplete"}_unexpected`);
+    }
+  }
   if (!input.terminalEventSeen && input.terminalEventSeen !== undefined) failures.push("terminal_event_missing");
   if (!terminalAuthorityOk) failures.push("terminal_authority_not_ok");
   if (!routeAuthorityOk) failures.push("route_authority_not_ok");
   if (unexpectedToolCalls.length > 0) failures.push(`unexpected_tool_calls:${unexpectedToolCalls.join(",")}`);
-  if (shortCircuitRiskFlags.length > 0) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
-  if (solverShortCircuitFlags.length > 0) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
+  if (shortCircuitRiskFlags.length > 0 && !expectedIdentityDiagnosis) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
+  if (solverShortCircuitFlags.length > 0 && !expectedIdentityDiagnosis) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
   if (poisonAuditOk && !routeAuthorityOk) failures.push("poison_clean_but_authority_failed");
+  if (
+    input.scenario.expected.live_source_identity_diagnosis &&
+    readString(liveSourceIdentityAudit?.diagnosis) !== input.scenario.expected.live_source_identity_diagnosis
+  ) {
+    failures.push(`live_source_identity_diagnosis_mismatch:${readString(liveSourceIdentityAudit?.diagnosis) ?? "missing"}!=${input.scenario.expected.live_source_identity_diagnosis}`);
+  }
+  if (
+    typeof input.scenario.expected.live_source_identity_ok === "boolean" &&
+    liveSourceIdentityAudit?.identity_ok !== input.scenario.expected.live_source_identity_ok
+  ) {
+    failures.push(`live_source_identity_ok_mismatch:${String(liveSourceIdentityAudit?.identity_ok)}!=${String(input.scenario.expected.live_source_identity_ok)}`);
+  }
 
   addExpectationFailures({
     failures,
@@ -240,6 +266,8 @@ export function buildApiParityProbeResult(input: {
       prompt_shape: readString(getPath(solverTrace, ["prompt_interpretation", "prompt_shape"])),
       primary_intent_route: readString(getPath(solverTrace, ["primary_intent", "route"])),
       solver_short_circuit_flags: solverShortCircuitFlags,
+      live_source_identity_diagnosis: readString(liveSourceIdentityAudit?.diagnosis),
+      live_source_identity_ok: typeof liveSourceIdentityAudit?.identity_ok === "boolean" ? liveSourceIdentityAudit.identity_ok : null,
     },
     route_authority: {
       ok: routeAuthorityOk,

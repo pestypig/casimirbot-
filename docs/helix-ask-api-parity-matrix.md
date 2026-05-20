@@ -22,6 +22,11 @@ short_circuit_risk_flags = []
 poison_audit.ok = true does not mask route_authority_ok = false
 ```
 
+Identity-split scenarios are the exception to the completed-solver-path
+expectation: they may intentionally require `completed_solver_path = false`
+when `helix.live_source_identity_audit.v1` records a non-ok diagnosis. They must
+still avoid mutating tools and forbidden terminal artifacts.
+
 For hard source-targeted prompts, a missing route product contract is a failure. Contextual tool verbs, screen text, historical tool mentions, negated commands, future commands, and status questions must not create mutating tool calls unless the prompt is an affirmative operator command.
 
 ## Matrix
@@ -34,6 +39,12 @@ visual_content_negated_cadence
 procedure_epoch_interval_status
 affirmative_cadence_control
 contextual_click
+live_source_identity_active_bound
+live_source_identity_wrong_environment
+live_source_identity_missing_environment_source
+live_source_identity_no_situation_run
+live_source_identity_no_field_evaluations
+live_source_identity_stale_interpretation
 ```
 
 Disabled follow-up scenarios:
@@ -41,9 +52,35 @@ Disabled follow-up scenarios:
 ```txt
 screen_text_start_button
 historical_tool_mention
+live_source_identity_fresh_unbound
 ```
 
 `screen_text_start_button` currently needs an input-integrity policy split for screen text that names UI controls. `historical_tool_mention` needs a prior-debug-export seed.
+`live_source_identity_fresh_unbound` is present as a frontier scenario, but the
+current explicit visual route auto-binds that topology before final audit
+capture. The raw audit invariant is covered by
+`server/__tests__/helix.ask.live-source-identity-audit.test.ts` until the route
+stops mutating the topology ahead of audit capture.
+
+The live-source identity group checks:
+
+```txt
+active_environment_id
+active_environment_source_id
+active_visual_producer_id
+active_visual_producer_source_id
+freshest_visual_source_id
+freshest_visual_source_environment_id
+freshest_visual_observation_ref
+freshest_visual_analysis_job_id
+selected_situation_run_id
+selected_observation_refs
+field evaluation availability
+interpretation availability
+```
+
+The expected non-ok diagnoses are not answers. They prove why a visual turn is
+not yet eligible to answer from capture evidence.
 
 ## Running Against A Live Server
 
