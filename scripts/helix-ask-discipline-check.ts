@@ -202,7 +202,7 @@ function scanFiles(files: string[], messages: CheckMessage[]): void {
 
     const terminalAuthorityFile = /^server\/services\/helix-ask\/(?:ask-turn-solver|evidence-reentry-gate)\.ts$/.test(file);
     const receiptTerminalExceptionTouched =
-      /\b(?:doc_open_receipt|workspace_action_receipt|note_update_receipt|live_pipeline_receipt|receipt_terminal_without_reentry)\b/.test(content) ||
+      /\b(?:[a-z0-9_]+_receipt|receipt_terminal_without_reentry|tool_evaluation|workstation_tool_evaluation)\b/i.test(content) ||
       /\/receipt\/i\.test/.test(content);
     const hasGoalAuthorityGuard =
       /\b(?:canonical_goal_frame|universal_goal_frame|required_terminal_kind|goal_kind|goalFrame|GoalFrame)\b/.test(content);
@@ -218,7 +218,7 @@ function scanFiles(files: string[], messages: CheckMessage[]): void {
 
     if (
       terminalAuthorityFile &&
-      /\b(?:doc_open_receipt|workspace_action_receipt|note_update_receipt|live_pipeline_receipt)\b[\s\S]{0,700}\bdispatch:act\b/.test(content)
+      /\b(?:[a-z0-9_]+_receipt|tool_evaluation|workstation_tool_evaluation)\b[\s\S]{0,700}\bdispatch:act\b/i.test(content)
     ) {
       messages.push({
         level: "failure",
@@ -226,6 +226,16 @@ function scanFiles(files: string[], messages: CheckMessage[]): void {
         file,
         message:
           "dispatch:act is a planner route, not terminal receipt authority. Bind receipt eligibility to the canonical goal frame instead.",
+      });
+    }
+
+    if (terminalAuthorityFile && /\b(?:terminal|terminalArtifactKind|terminal_artifact_kind)\s*={0,2}\s*["'][a-z0-9_]+_receipt["']/i.test(content)) {
+      messages.push({
+        level: "failure",
+        code: "receipt_terminal_name_specific_gate",
+        file,
+        message:
+          "Terminal authority gates must not name individual receipt products. Use the canonical goal contract and generic receipt/evidence predicates.",
       });
     }
   }

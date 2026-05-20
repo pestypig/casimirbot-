@@ -28,10 +28,17 @@ export type HelixApiParityProbeResult = {
     present: boolean;
     completed_solver_path: boolean;
     prompt_shape: string | null;
+    selected_primary_intent: string | null;
     primary_intent_route: string | null;
+    contextual_tool_mentions: string[];
+    executable_operator_commands_count: number;
     solver_short_circuit_flags: string[];
     live_source_identity_diagnosis: string | null;
     live_source_identity_ok: boolean | null;
+  };
+  capability_selection: {
+    capability_id: string | null;
+    selected_capabilities: string[];
   };
   route_authority: {
     ok: boolean;
@@ -90,6 +97,18 @@ const readPoisonAudit = (ask: RecordLike, debug: RecordLike | null): RecordLike 
 const readTerminalAuthority = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.terminal_answer_authority) ?? readRecord(debug?.terminal_answer_authority);
 
+const readCapabilitySelectionResult = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+  readRecord(ask.capability_selection_result) ?? readRecord(debug?.capability_selection_result);
+
+const readCapabilitySelectionTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike[] =>
+  (Array.isArray(ask.capability_selection_trace)
+    ? ask.capability_selection_trace
+    : Array.isArray(debug?.capability_selection_trace)
+      ? debug?.capability_selection_trace
+      : [])
+    .map((entry: unknown) => readRecord(entry))
+    .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+
 const readActualToolIds = (loopTrace: RecordLike | null): string[] =>
   (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry: unknown) => readRecord(entry))
@@ -102,6 +121,20 @@ const actualToolCalls = (loopTrace: RecordLike | null): RecordLike[] =>
     .map((entry: unknown) => readRecord(entry))
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 
+const readContextualToolMentionCues = (solverTrace: RecordLike | null): string[] =>
+  (Array.isArray(getPath(solverTrace, ["prompt_interpretation", "contextual_tool_mentions"]))
+    ? (getPath(solverTrace, ["prompt_interpretation", "contextual_tool_mentions"]) as unknown[])
+    : [])
+    .map((entry: unknown) => readRecord(entry))
+    .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
+    .map((entry: RecordLike) => `${readString(entry.verb_or_cue) ?? ""} ${readString(entry.text) ?? ""}`.trim())
+    .filter(Boolean);
+
+const readExecutableOperatorCommandCount = (solverTrace: RecordLike | null): number =>
+  Array.isArray(getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]))
+    ? (getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]) as unknown[]).length
+    : 0;
+
 const addExpectationFailures = (input: {
   failures: string[];
   expected: HelixApiParityExpected;
@@ -111,6 +144,8 @@ const addExpectationFailures = (input: {
   terminalArtifactKind: string | null;
   finalAnswerSource: string | null;
   loopTrace: RecordLike | null;
+  solverTrace: RecordLike | null;
+  selectedCapabilities: string[];
 }): void => {
   const {
     failures,
@@ -121,6 +156,8 @@ const addExpectationFailures = (input: {
     terminalArtifactKind,
     finalAnswerSource,
     loopTrace,
+    solverTrace,
+    selectedCapabilities,
   } = input;
   if (expected.source_target && sourceTarget !== expected.source_target) {
     failures.push(`source_target_mismatch:${sourceTarget ?? "missing"}!=${expected.source_target}`);
@@ -152,6 +189,25 @@ const addExpectationFailures = (input: {
       failures.push(`forbidden_tool_family:${family}`);
     }
   }
+  for (const capabilityId of expected.forbidden_capability_ids ?? []) {
+    if (selectedCapabilities.includes(capabilityId)) failures.push(`forbidden_capability_selected:${capabilityId}`);
+  }
+  const selectedPrimaryIntent = readString(solverTrace?.selected_primary_intent);
+  if (expected.selected_primary_intent && selectedPrimaryIntent !== expected.selected_primary_intent) {
+    failures.push(`selected_primary_intent_mismatch:${selectedPrimaryIntent ?? "missing"}!=${expected.selected_primary_intent}`);
+  }
+  const contextualMentions = readContextualToolMentionCues(solverTrace);
+  for (const cue of expected.required_contextual_tool_mentions ?? []) {
+    if (!contextualMentions.some((mention) => mention.toLowerCase().includes(cue.toLowerCase()))) {
+      failures.push(`contextual_tool_mention_missing:${cue}`);
+    }
+  }
+  if (
+    typeof expected.executable_operator_commands_count === "number" &&
+    readExecutableOperatorCommandCount(solverTrace) !== expected.executable_operator_commands_count
+  ) {
+    failures.push(`executable_operator_commands_count_mismatch:${readExecutableOperatorCommandCount(solverTrace)}!=${expected.executable_operator_commands_count}`);
+  }
   const flags = readStringArray(loopTrace?.short_circuit_risk_flags);
   for (const flag of [...(expected.required_trace_flags_absent ?? []), ...(expected.forbidden_trace_flags ?? [])]) {
     if (flags.includes(flag)) failures.push(`forbidden_trace_flag:${flag}`);
@@ -174,6 +230,11 @@ export function buildApiParityProbeResult(input: {
   const routeAuthority = readRouteAuthority(ask, debug);
   const poisonAudit = readPoisonAudit(ask, debug);
   const terminalAuthority = readTerminalAuthority(ask, debug);
+  const capabilitySelectionResult = readCapabilitySelectionResult(ask, debug);
+  const selectedCapabilities = [
+    readString(capabilitySelectionResult?.capability_id),
+    ...readCapabilitySelectionTrace(ask, debug).map((entry) => readString(entry.selected_capability)),
+  ].filter((entry: string | null): entry is string => Boolean(entry));
   const sourceTargetIntent = readSourceTarget(ask, debug);
   const terminalArtifactKind =
     readString(ask.terminal_artifact_kind) ??
@@ -236,6 +297,8 @@ export function buildApiParityProbeResult(input: {
     terminalArtifactKind,
     finalAnswerSource,
     loopTrace,
+    solverTrace,
+    selectedCapabilities,
   });
 
   return {
@@ -264,10 +327,17 @@ export function buildApiParityProbeResult(input: {
       present: Boolean(solverTrace),
       completed_solver_path: solverTrace?.completed_solver_path === true,
       prompt_shape: readString(getPath(solverTrace, ["prompt_interpretation", "prompt_shape"])),
+      selected_primary_intent: readString(solverTrace?.selected_primary_intent),
       primary_intent_route: readString(getPath(solverTrace, ["primary_intent", "route"])),
+      contextual_tool_mentions: readContextualToolMentionCues(solverTrace),
+      executable_operator_commands_count: readExecutableOperatorCommandCount(solverTrace),
       solver_short_circuit_flags: solverShortCircuitFlags,
       live_source_identity_diagnosis: readString(liveSourceIdentityAudit?.diagnosis),
       live_source_identity_ok: typeof liveSourceIdentityAudit?.identity_ok === "boolean" ? liveSourceIdentityAudit.identity_ok : null,
+    },
+    capability_selection: {
+      capability_id: readString(capabilitySelectionResult?.capability_id),
+      selected_capabilities: selectedCapabilities,
     },
     route_authority: {
       ok: routeAuthorityOk,

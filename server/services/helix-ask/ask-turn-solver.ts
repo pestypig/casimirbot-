@@ -194,13 +194,13 @@ const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; require
   };
 };
 
-const terminalMatchesCanonicalGoal = (
-  payload: RecordLike,
-  terminalArtifactKind: string,
-  allowedGoalKinds: RegExp,
-): boolean => {
+const terminalMatchesCanonicalGoalContract = (payload: RecordLike, terminalArtifactKind: string): boolean => {
   const goalFrame = readTerminalGoalFrame(payload);
-  return goalFrame.requiredTerminalKind === terminalArtifactKind && allowedGoalKinds.test(goalFrame.goalKind);
+  return (
+    goalFrame.requiredTerminalKind === terminalArtifactKind &&
+    Boolean(goalFrame.goalKind) &&
+    !/^(?:unknown|ambiguous)$/i.test(goalFrame.goalKind)
+  );
 };
 
 const sourceTargeted = new Set([
@@ -285,21 +285,9 @@ const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null
   if (!trace) return false;
   const primary = trace.selected_primary_intent;
   const terminal = trace.final_arbitration.terminal_artifact_kind;
-  const route = trace.final_arbitration.selected_route;
   const reason = trace.followup_reasoning_gate.reason;
-  const livePipelineProcedureReceipt =
-    terminal === "live_pipeline_receipt" &&
-    /^live_(?:source_continuation|pipeline_control|pipeline_inspect|pipeline_repair|runtime_repair|answer_environment_setup)$/i.test(route) &&
-    trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
-    trace.prompt_interpretation.negative_constraints.length === 0;
-  const docOpenReceipt =
-    terminal === "doc_open_receipt" &&
-    terminalMatchesCanonicalGoal(payload, terminal, /^(?:doc_open_best|latest_doc_navigation)$/i) &&
-    trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
-    trace.prompt_interpretation.negative_constraints.length === 0;
-  const activeDocIdentityTerminal =
-    terminal === "active_doc_identity" &&
-    terminalMatchesCanonicalGoal(payload, terminal, /^active_doc_identity$/i) &&
+  const canonicalTerminal =
+    terminalMatchesCanonicalGoalContract(payload, terminal) &&
     trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
     trace.prompt_interpretation.negative_constraints.length === 0;
   return (
@@ -307,13 +295,12 @@ const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null
       (
         (primary === "control_command" || primary === "status_question") &&
         /receipt/i.test(terminal) &&
+        canonicalTerminal &&
         (reason === "pure_control_receipt" || reason === "pure_status_receipt")
       ) ||
-      livePipelineProcedureReceipt ||
-      docOpenReceipt ||
-      activeDocIdentityTerminal
+      canonicalTerminal
     ) &&
-    (trace.route_authority_ok === true || livePipelineProcedureReceipt || docOpenReceipt || activeDocIdentityTerminal)
+    (trace.route_authority_ok === true || canonicalTerminal)
   );
 };
 
@@ -552,14 +539,8 @@ const buildRiskFlags = (input: {
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
   const mutatingToolExecuted = input.actualToolCalls.some((entry) => entry.mutating === true);
   const routeCandidates = readStringArray(readRecord(input.payload.ask_turn_preflight_context)?.route_candidate_labels);
-  const docOpenReceiptAllowed =
-    input.terminalArtifactKind === "doc_open_receipt" &&
-    terminalMatchesCanonicalGoal(input.payload, input.terminalArtifactKind, /^(?:doc_open_best|latest_doc_navigation)$/i) &&
-    input.contextualToolMentions.length === 0 &&
-    input.negativeConstraints.length === 0;
-  const activeDocIdentityAllowed =
-    input.terminalArtifactKind === "active_doc_identity" &&
-    terminalMatchesCanonicalGoal(input.payload, input.terminalArtifactKind, /^active_doc_identity$/i) &&
+  const canonicalTerminalAllowed =
+    terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind) &&
     input.contextualToolMentions.length === 0 &&
     input.negativeConstraints.length === 0;
   return unique([
@@ -588,8 +569,7 @@ const buildRiskFlags = (input: {
       ? "missing_followup_reasoning"
       : null,
     input.terminalAuthorityOk &&
-    !docOpenReceiptAllowed &&
-    !activeDocIdentityAllowed &&
+    !canonicalTerminalAllowed &&
     (
       !input.finalArbitrationRan ||
       !input.routeAuthorityOk ||

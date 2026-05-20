@@ -62,13 +62,11 @@ const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; require
 
 const receiptTerminalMatchesCanonicalGoal = (payload: RecordLike, terminalArtifactKind: string): boolean => {
   const goalFrame = readTerminalGoalFrame(payload);
-  if (terminalArtifactKind === "doc_open_receipt") {
-    return (
-      goalFrame.requiredTerminalKind === "doc_open_receipt" &&
-      /^(?:doc_open_best|latest_doc_navigation)$/i.test(goalFrame.goalKind)
-    );
-  }
-  return goalFrame.requiredTerminalKind === terminalArtifactKind;
+  return (
+    goalFrame.requiredTerminalKind === terminalArtifactKind &&
+    Boolean(goalFrame.goalKind) &&
+    !/^(?:unknown|ambiguous)$/i.test(goalFrame.goalKind)
+  );
 };
 
 const primaryAllowsReceiptTerminal = (
@@ -78,13 +76,11 @@ const primaryAllowsReceiptTerminal = (
   payload: RecordLike,
 ): boolean => {
   if (!isReceiptKind(terminalArtifactKind)) return false;
-  if (terminalArtifactKind === "doc_open_receipt") {
-    return receiptTerminalMatchesCanonicalGoal(payload, terminalArtifactKind);
-  }
+  if (!receiptTerminalMatchesCanonicalGoal(payload, terminalArtifactKind)) return false;
   return (
-    (primaryIntent === "control_command" || primaryIntent === "status_question") &&
-    allowedTerminalProducts.includes(terminalArtifactKind) &&
-    receiptTerminalMatchesCanonicalGoal(payload, terminalArtifactKind)
+    allowedTerminalProducts.includes(terminalArtifactKind) ||
+    primaryIntent === "control_command" ||
+    primaryIntent === "status_question"
   );
 };
 
@@ -164,7 +160,7 @@ export function buildEvidenceReentryGate(input: {
   const receiptsReentered = receiptRefs.filter((ref) =>
     evidenceRefSet.has(ref) ||
     (allowedReceiptTerminal &&
-      (input.finalArbitrationRan || input.terminalArtifactKind === "doc_open_receipt") &&
+      input.finalArbitrationRan &&
       (ref === input.terminalArtifactKind || ref === input.finalAnswerSource || isReceiptKind(ref)))
   );
   const receiptsNotReentered = receiptRefs.filter((ref) => !receiptsReentered.includes(ref));

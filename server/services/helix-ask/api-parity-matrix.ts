@@ -19,6 +19,10 @@ export type HelixApiParityExpected = {
   forbidden_terminal_artifacts?: string[];
   forbidden_tool_calls?: string[];
   forbidden_tool_families?: string[];
+  forbidden_capability_ids?: string[];
+  selected_primary_intent?: string;
+  required_contextual_tool_mentions?: string[];
+  executable_operator_commands_count?: number;
   required_trace_flags_absent?: string[];
   forbidden_trace_flags?: string[];
   solver_completed?: boolean;
@@ -59,9 +63,32 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
     expected: {
       source_target: "visual_capture",
       target_kind: "visual_capture",
+      selected_primary_intent: "content_question",
+      required_contextual_tool_mentions: ["interval"],
+      executable_operator_commands_count: 0,
       forbidden_routes: ["live_pipeline_control"],
       forbidden_terminal_artifacts: ["live_pipeline_receipt", "visual_producer_cadence_receipt"],
       forbidden_tool_calls: ["situation-room.live-source.set_rate"],
+      forbidden_capability_ids: ["situation-room.live-source.set_rate"],
+      required_trace_flags_absent: ["receipt_promoted_to_answer", "tool_called_without_admission"],
+    },
+  },
+  {
+    id: "visual_content_original_interval_regression",
+    description: "The original interval-10s screen-review regression must stay on the visual evidence path.",
+    enabled: true,
+    seed: "active_visual_situation_run",
+    prompt: "all right cool can you review what is happening right now in the screen capture I haven't started the interval 10 seconds yet",
+    expected: {
+      source_target: "visual_capture",
+      target_kind: "visual_capture",
+      selected_primary_intent: "content_question",
+      required_contextual_tool_mentions: ["interval"],
+      executable_operator_commands_count: 0,
+      forbidden_routes: ["live_pipeline_control"],
+      forbidden_terminal_artifacts: ["live_pipeline_receipt", "visual_producer_cadence_receipt"],
+      forbidden_tool_calls: ["situation-room.live-source.set_rate"],
+      forbidden_capability_ids: ["situation-room.live-source.set_rate"],
       required_trace_flags_absent: ["receipt_promoted_to_answer", "tool_called_without_admission"],
     },
   },
