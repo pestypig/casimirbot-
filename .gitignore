@@ -22,6 +22,14 @@ data/noisegen/*
 data/noisegen/originals/*
 !client/src/data/
 !client/src/data/**
+
+# Local runtime state and generated dependency/build payloads
+data/noisegen/store.json
+server/data/
+external/audiocraft/tests/data/
+external/sunpy/sunpy/**/data/
+minecraft/helix-paper-sensor/.gradle/
+minecraft/helix-paper-sensor/build/
 # Simulation output artifacts (large, reproducible)
 simulations/*/output.log
 simulations/*/output.Energy
