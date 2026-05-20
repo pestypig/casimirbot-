@@ -1,13 +1,15 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
+import { useWorkstationWorkflowTimelineStore } from "@/store/useWorkstationWorkflowTimelineStore";
 
 describe("workstation stores", () => {
   beforeEach(() => {
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
     useWorkstationSessionMemoryStore.setState({ panelScroll: {}, drafts: {} });
+    useWorkstationWorkflowTimelineStore.setState({ entries: [] });
   });
 
   it("creates and activates notes via upsertWorkflowNote", () => {
@@ -64,6 +66,52 @@ describe("workstation stores", () => {
     expect(state.receipts).toHaveLength(2);
     clipboard.clearReceipts();
     expect(useWorkstationClipboardStore.getState().receipts).toHaveLength(0);
+  });
+
+  it("keeps clipboard receipts in memory when localStorage quota is exceeded", () => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        removeItem: (key: string) => {
+          storage.delete(key);
+        },
+        setItem: (key: string, value: string) => {
+          if (key === "workstation-clipboard-history:v1") {
+            throw new Error("Quota exceeded");
+          }
+          storage.set(key, value);
+        },
+      },
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      useWorkstationClipboardStore.getState().addReceipt({
+        id: "clip:quota",
+        direction: "write",
+        text: "x".repeat(10_000),
+        source: "quota-spec",
+        meta: { large: "y".repeat(10_000) },
+      });
+
+      const receipt = useWorkstationClipboardStore.getState().receipts[0];
+      expect(receipt?.id).toBe("clip:quota");
+      expect(receipt?.text.length).toBeLessThan(4100);
+      expect(receipt?.meta).toMatchObject({ truncated: true });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[workstation-clipboard] localStorage write skipped after quota pressure"),
+        expect.anything(),
+      );
+    } finally {
+      warnSpy.mockRestore();
+      if (originalWindow === undefined) {
+        vi.unstubAllGlobals();
+      } else {
+        vi.stubGlobal("window", originalWindow);
+      }
+    }
   });
 
   it("remembers workstation scroll positions and drafts for the browser session", () => {

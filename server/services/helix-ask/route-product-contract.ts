@@ -155,7 +155,8 @@ const isExplicitLiveBindingDiagnosisPrompt = (promptText: string): boolean =>
 
 const isVisualContentRequestPrompt = (promptText: string): boolean =>
   /\b(?:review|describe|explain|summari[sz]e|what|compare|answer)\b[\s\S]{0,140}\b(?:happening|visible|shown|showing|see|seeing|looking\s+at|screen|capture|frame|image|picture|window|visual)\b/i.test(promptText) ||
-  /\b(?:current|latest|right\s+now)\s+(?:screen|capture|frame|image|picture|window|visual)\b/i.test(promptText);
+  /\b(?:current|latest|right\s+now)\s+(?:screen|capture|frame|image|picture|window|visual)\b/i.test(promptText) ||
+  /\blive\s+(?:capture|screen|visual)\b/i.test(promptText);
 
 export function buildRouteProductContract(input: {
   turnId: string;

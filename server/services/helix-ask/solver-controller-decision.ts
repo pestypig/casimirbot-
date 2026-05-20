@@ -129,6 +129,11 @@ export function buildFinalRouteReconciliation(input: {
   const terminalAuthorityRoute = readString(terminalAuthority?.route);
   const terminalAuthorityRouteBase = normalizeHelixRouteBase(terminalAuthorityRoute);
   const terminalArtifactKind = readString(input.payload.terminal_artifact_kind) ?? readString(terminalAuthority?.terminal_artifact_kind);
+  const nonAnswerTerminal =
+    terminalArtifactKind === "typed_failure" ||
+    terminalArtifactKind === "request_user_input" ||
+    readString(input.payload.final_answer_source) === "typed_failure" ||
+    readString(input.payload.final_answer_source) === "request_user_input";
   const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
   const canonicalGoalKind = readString(canonicalGoal?.goal_kind);
   const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
@@ -138,11 +143,13 @@ export function buildFinalRouteReconciliation(input: {
   const terminalGuard = readRecord(input.payload.terminal_artifact_selection_guard);
   const productGuard = readRecord(input.payload.product_authority_guard);
   const routeMismatch = Boolean(
+    !nonAnswerTerminal &&
     finalRouteBase &&
     terminalAuthorityRouteBase &&
     finalRouteBase !== terminalAuthorityRouteBase
   );
   const routeProductRejected =
+    !nonAnswerTerminal &&
     !canonicalTerminal &&
     (readBoolean(terminalGuard?.allowed) === false ||
       readBoolean(productGuard?.allowed) === false);
@@ -241,6 +248,19 @@ export function buildSolverControllerDecision(input: {
   if (hasPromptObjectExtractionProblem(payload)) pushUnique(blockingReasons, "prompt_object_extraction_invalid");
 
   const sourceTarget = readRecord(payload.source_target_intent);
+  const sourceTargetName = readString(sourceTarget?.target_source);
+  if (
+    !nonAnswerTerminal &&
+    (sourceTargetName === "live_pipeline" || sourceTargetName === "visual_capture") &&
+    (
+      terminalArtifactKind === "direct_answer_text" ||
+      terminalArtifactKind === "no_tool_direct" ||
+      terminalArtifactKind === "model_only_concept" ||
+      readString(payload.final_answer_source) === "no_tool_direct"
+    )
+  ) {
+    pushUnique(blockingReasons, sourceTargetName === "visual_capture" ? "visual_evidence_missing" : "route_product_contract_rejected_terminal");
+  }
   const activeSituationContext = readRecord(payload.active_situation_context);
   const situationEvidenceSelection = readRecord(payload.situation_evidence_selection);
   const deicticReference = readRecord(payload.deictic_reference);
@@ -248,9 +268,21 @@ export function buildSolverControllerDecision(input: {
     readString(sourceTarget?.target_source) === "visual_capture" ||
     readString(deicticReference?.reference_type) === "current_screen" ||
     readString(deicticReference?.reference_type) === "selected_visible_file" ||
-    /\b(?:screen\s*capture|visual\s*capture|screenshot|visual|visible)\b/i.test(
+    /\b(?:live\s+capture|screen\s*capture|visual\s*capture|screenshot|visual|visible)\b/i.test(
       readString(payload.active_prompt) ?? readString(payload.prompt) ?? readString(payload.question) ?? "",
     );
+  if (
+    !nonAnswerTerminal &&
+    visualSourceRequired &&
+    (
+      terminalArtifactKind === "direct_answer_text" ||
+      terminalArtifactKind === "no_tool_direct" ||
+      terminalArtifactKind === "model_only_concept" ||
+      readString(payload.final_answer_source) === "no_tool_direct"
+    )
+  ) {
+    pushUnique(blockingReasons, "visual_evidence_missing");
+  }
   const liveSourceIdentityDiagnosis = readString(liveSourceIdentity?.diagnosis);
   const liveSourceIdentityHardFailure =
     liveSourceIdentity &&

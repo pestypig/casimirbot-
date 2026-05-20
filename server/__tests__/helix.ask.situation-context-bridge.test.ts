@@ -1540,6 +1540,42 @@ describe("thread-bound situation context bridge", () => {
     expect(recall.answer_text).not.toMatch(/raw logs|raw image|raw audio|process graph/i);
   });
 
+  it("routes polite docs-panel open prompts to docs viewer identity instead of doc search topic text", () => {
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:open-docs-panel",
+      threadId: "helix-ask:desktop",
+      promptText: "Okay, open the docs for me.",
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "docs_viewer",
+      target_kind: "docs_viewer",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.explicit_cues).toContain("docs_panel_open");
+    expect(sourceTarget.suppressed_routes).toEqual(expect.arrayContaining(["doc_open_best", "model_only_concept"]));
+  });
+
+  it("routes live-capture content prompts to visual evidence instead of model-only answers", () => {
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:live-capture-content",
+      threadId: "helix-ask:desktop",
+      promptText: "Describe what you see in the live capture.",
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.explicit_cues).toContain("live_capture_content");
+    expect(sourceTarget.suppressed_routes).toEqual(expect.arrayContaining(["live_pipeline_control", "model_only_concept", "no_tool_direct"]));
+  });
+
   it("prefers active SituationRun refs over legacy context packs for recall", () => {
     seedVisualSituationRun();
     routeSituationContextTurn({

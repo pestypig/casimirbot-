@@ -19,6 +19,17 @@ describe("helix ask pill E68 debug export envelope", () => {
           selected_final_answer: "Opening panel: Scientific Calculator.",
           terminal_artifact_kind: "workspace_action_receipt",
           canonical_goal_frame: { goal_kind: "panel_control" },
+          solver_controller_decision: {
+            decision: "allow_terminal",
+            blocking_reasons: [],
+            final_route: "panel_control",
+            required_terminal_kind: "workspace_action_receipt",
+            selected_terminal_artifact_kind: "workspace_action_receipt",
+          },
+          poison_audit: { ok: true },
+          route_authority_audit: { route_authority_ok: true },
+          turn_id_integrity_audit: { ok: true },
+          final_route_reconciliation: { ok: true },
         },
         agentLoop: {
           selected_final_answer: "Opening panel: Scientific Calculator.",
@@ -54,6 +65,16 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.active_prompt).toBe("Open Scientific Calculator");
     expect(parsed.selected_final_answer).toBe("Opening panel: Scientific Calculator.");
     expect(parsed.resolved_turn_summary.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(parsed.solver_controller_summary).toMatchObject({
+      decision: "allow_terminal",
+      final_route: "panel_control",
+      required_terminal_kind: "workspace_action_receipt",
+      selected_terminal_artifact_kind: "workspace_action_receipt",
+      poison_ok: true,
+      route_authority_ok: true,
+      turn_id_integrity_ok: true,
+      final_route_reconciliation_ok: true,
+    });
     expect(parsed.workspace_action_debug.workspace_action_receipt.target_id).toBe("scientific-calculator");
     expect(parsed.workspace_action_debug.workspace_action_debug_proof.final_answer_receipt_backed).toBe(true);
     expect(parsed.payload_hash).toEqual(expect.any(String));

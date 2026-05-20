@@ -47,6 +47,33 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const buildSolverControllerSummary = (payload: Record<string, unknown>) => {
+  const debug = asRecord(payload.debug);
+  const agentLoop = asRecord(payload.agentLoop);
+  const controller = asRecord(payload.solver_controller_decision ?? debug?.solver_controller_decision ?? agentLoop?.solver_controller_decision);
+  const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
+  const poisonAudit = asRecord(payload.poison_audit ?? debug?.poison_audit ?? agentLoop?.poison_audit);
+  const routeAuthority = asRecord(payload.route_authority_audit ?? debug?.route_authority_audit ?? agentLoop?.route_authority_audit);
+  const turnIdIntegrity = asRecord(payload.turn_id_integrity_audit ?? debug?.turn_id_integrity_audit ?? agentLoop?.turn_id_integrity_audit);
+  const finalRouteReconciliation = asRecord(payload.final_route_reconciliation ?? debug?.final_route_reconciliation ?? agentLoop?.final_route_reconciliation);
+  return {
+    decision: readString(controller?.decision),
+    blocking_reasons: Array.isArray(controller?.blocking_reasons) ? controller.blocking_reasons : [],
+    final_route: readString(controller?.final_route) ?? readString(payload.route_reason_code),
+    required_terminal_kind: readString(controller?.required_terminal_kind),
+    selected_terminal_artifact_kind:
+      readString(controller?.selected_terminal_artifact_kind) ?? readString(payload.terminal_artifact_kind),
+    poison_ok: readBoolean(poisonAudit?.ok),
+    route_authority_ok: readBoolean(routeAuthority?.route_authority_ok),
+    terminal_authority_route: readString(terminalAuthority?.route),
+    turn_id_integrity_ok: readBoolean(turnIdIntegrity?.ok),
+    final_route_reconciliation_ok: readBoolean(finalRouteReconciliation?.ok),
+  };
+};
+
 export function buildDebugExportDrawerFallbackResult(args: {
   attemptedPayloadHash: string;
   copiedTextLength: number;
@@ -158,6 +185,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       terminal_error_code: terminalErrorCode,
       pending_server_request_present: Boolean(agentLoop?.pending_request),
     },
+    solver_controller_summary: buildSolverControllerSummary(payload),
     canonical_goal_frame: canonicalGoalFrame,
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],

@@ -64,6 +64,7 @@ function addMismatchViolation(input: {
 
 function terminalArtifactForbiddenByContract(payload: Record<string, unknown>): boolean {
   const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  if (terminalArtifactKind === "typed_failure" || terminalArtifactKind === "request_user_input") return false;
   const contract = asRecord(payload.route_product_contract);
   const selectionGuard = asRecord(payload.terminal_artifact_selection_guard);
   const productGuard = asRecord(payload.product_authority_guard);
@@ -260,7 +261,13 @@ export function auditHelixAskContextForPoison(input: {
 
   let assistantHistoryProjectionCount = 0;
   for (const item of input.assistant_history_items ?? []) {
-    const normalized = quarantineHelixArtifact(item.artifact ?? { assistant_answer: true }, item.role);
+    const normalized = quarantineHelixArtifact(
+      item.artifact ?? {
+        schema: "helix.present_state_card.v1",
+        context_role: "projection_not_assistant_answer",
+      },
+      item.role,
+    );
     if (normalized.role === "ui_projection") {
       assistantHistoryProjectionCount += 1;
       violations.push({

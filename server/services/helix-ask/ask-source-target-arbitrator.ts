@@ -63,11 +63,28 @@ const isDeicticDocsIdentityPrompt = (prompt: string): boolean => {
   );
 };
 
+const isDocsPanelOpenPrompt = (prompt: string): boolean => {
+  const normalized = prompt
+    .trim()
+    .replace(/^[\s,]*(?:ok|okay|all\s+right|alright|hello|hey)[\s,]+/i, "")
+    .replace(/\b(?:please|for\s+me|for\s+us)\b/gi, " ")
+    .replace(/[.?!]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  return /(?:^|[.?!]\s+)(?:(?:can|could|would)\s+you\s+)?(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:the\s+)?(?:docs?|documents?)(?:\s+(?:viewer|panel|dock))?(?:\s|[.?!,]|$)/i.test(normalized) &&
+    !/\b(?:docs?|documents?)\s+(?:about|on|regarding|for|named|called|matching)\b/i.test(normalized);
+};
+
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
 
 const isGenericSceneEpochPhrase = (prompt: string): boolean =>
   /\b(?:scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|previous\s+(?:scene|frame|visual|screen|capture)|last\s+(?:scene|frame|visual|screen|capture))\b/i.test(prompt);
+
+const isLiveCaptureContentPrompt = (prompt: string): boolean =>
+  /\b(?:describe|review|explain|summari[sz]e|what\s+(?:do\s+you\s+)?see|what\s+is\s+(?:happening|visible|shown|showing))\b[\s\S]{0,140}\blive\s+(?:capture|screen|visual)\b/i.test(prompt) ||
+  /\blive\s+(?:capture|screen|visual)\b[\s\S]{0,140}\b(?:visible|shown|showing|see|happening)\b/i.test(prompt);
 
 const rules: CueRule[] = [
   {
@@ -188,6 +205,7 @@ const rules: CueRule[] = [
     cues: [
       { label: "visual_capture", pattern: /\bvisual\s+(?:screen\s+)?capture\b/i },
       { label: "screen_capture", pattern: /\bscreen\s+capture\b/i },
+      { label: "live_capture", pattern: /\blive\s+(?:capture|screen|visual)\b/i },
       { label: "visual_source", pattern: /\bvisual\s+(?:source|frame|screen)\b/i },
       { label: "visuals_plural", pattern: /\b(?:the\s+)?visuals\b/i },
       { label: "describe_visuals", pattern: /\b(?:describe|explain|summari[sz]e)\s+(?:what\s+)?(?:the\s+)?visuals\s+(?:are|show|contain|depict)\b/i },
@@ -420,6 +438,40 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isDocsPanelOpenPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["docs_panel_open"],
+      reasons: ["docs_panel_open_source_target", "open_docs_panel_phrase"],
+      requestedOutputs: ["file_path"],
+      suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "doc_open_best", "model_only_concept"],
+      precedenceReason: "docs_panel_open_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isLiveCaptureContentPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "visual_capture",
+      targetKind: "visual_capture",
+      strength: "hard",
+      explicitCues: ["live_capture_content"],
+      reasons: ["explicit_live_capture_content_source_target", "live_capture_content"],
+      requestedOutputs: ["current_visual_state", "field_evaluation_refs", "interpretation_refs", "typed_failure"],
+      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_control", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_live_capture_content_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isStructuredDocsViewerPrompt(prompt)) {
     const docsRule = rules.find((rule: CueRule) => rule.target === "docs_viewer");
     if (docsRule) {
