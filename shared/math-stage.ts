@@ -2956,7 +2956,9 @@ export const mathStageRegistry: MathStageEntry[] = [
     conceptualWaypoints: [
       "body-density leverage reduces to compactness",
       "quantum and raw Casimir fixtures expose microscopic gravity leverage floors",
+      "marginKind separates identity checks, constant anchors, model self references, and empirical references",
       "NHM2 regions are compared against the ladder without changing source-closure gates",
+      "sweep artifacts verify expected log-log scaling for fixed-curvature lever length changes",
       "promotionAllowed remains false for benchmark and NHM2 comparison records",
     ],
     checks: [
@@ -2969,9 +2971,11 @@ export const mathStageRegistry: MathStageEntry[] = [
       referenceLeverage: "1",
       relativeError: "1",
       sigmaMargin: "1",
+      marginKind: "1",
       ordersFromReference: "1",
       ordersAboveRawCasimir1km: "1",
       ordersBelowBlackHoleHorizon: "1",
+      expectedLogLogSlope: "1",
     },
   },
 ];

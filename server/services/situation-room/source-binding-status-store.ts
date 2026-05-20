@@ -163,6 +163,7 @@ export function upsertSourceBindingStatus(input: {
     environment_id: cleanString(input.environment_id),
     binding_id: cleanString(input.binding_id),
     state,
+    status: state,
     replay_policy: input.replay_policy ?? existing?.replay_policy ?? "future_only",
     latest_descriptor_refs: unique([...(existing?.latest_descriptor_refs ?? []), ...(input.latest_descriptor_refs ?? [])]).slice(-24),
     latest_observation_refs: unique([...(existing?.latest_observation_refs ?? []), ...(input.latest_observation_refs ?? [])]).slice(-48),

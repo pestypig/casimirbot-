@@ -285,6 +285,47 @@ describe("live source continuation Ask routing", () => {
       source_target: "visual_capture",
       route_authority_ok: true,
     });
+    expect(response.body?.ask_turn_solver_trace).toMatchObject({
+      schema: "helix.ask_turn_solver_trace.v1",
+      selected_primary_intent: "content_question",
+      route_authority_ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      intent_arbitration: {
+        schema: "helix.intent_arbitration.v1",
+        selected_primary_intent_kind: "content_question",
+      },
+      final_arbitration: {
+        selected_route: "situation_context_question",
+      },
+    });
+    expect(response.body?.ask_turn_solver_trace?.intent_hypotheses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          schema: "helix.intent_hypothesis.v1",
+          kind: "content_question",
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
+    expect(response.body?.ask_turn_solver_trace?.prompt_interpretation?.contextual_tool_mentions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          verb_or_cue: "interval_cadence",
+          reason: "negated",
+        }),
+      ]),
+    );
+    expect(response.body?.ask_turn_solver_trace?.prompt_interpretation?.executable_operator_commands).toEqual([]);
+    expect(response.body?.ask_turn_solver_trace?.final_arbitration?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
+    expect(response.body?.ask_turn_solver_trace?.solver_risk_flags ?? []).not.toContain("contextual_tool_mention_executed");
+    expect(JSON.stringify(response.body?.loop_parity_trace?.actual_tool_calls ?? [])).not.toContain("situation-room.live-source.set_rate");
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)
+      .expect(200);
+    expect(debugExport.body?.payload?.ask_turn_solver_trace?.trace_id).toBe(response.body?.ask_turn_solver_trace?.trace_id);
   }, 20_000);
 
   it("treats future/contextual cadence language in visual questions as visual evidence context", async () => {

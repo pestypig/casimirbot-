@@ -7,6 +7,7 @@ import {
   writeCurvatureLeverageBenchmarkLadder,
   type CurvatureLeverageBenchmarkLadderReport,
 } from "../scripts/curvature-leverage-benchmark-ladder";
+import { writeCurvatureLeverageBenchmarkSweep } from "../scripts/curvature-leverage-benchmark-sweep";
 import { kappa_body } from "../shared/curvature-proxy";
 import { C, G } from "../shared/physics-const";
 
@@ -34,6 +35,8 @@ function makeNhm2Fixture(): { root: string; nhm2Path: string; outPath: string } 
         lane: "nhm2_full_solve",
         region: "wall",
         leverage: 1e-28,
+        tensorNorm_m2: 1e-34,
+        leverLength_m: 1000,
         sourceRegionStatus: "review",
         observerClosureStatus: "review",
         qeiStatus: "missing",
@@ -44,6 +47,8 @@ function makeNhm2Fixture(): { root: string; nhm2Path: string; outPath: string } 
         lane: "nhm2_full_solve",
         region: "hull",
         leverage: 1e-9,
+        tensorNorm_m2: 1e-15,
+        leverLength_m: 1000,
         sourceRegionStatus: "fail",
         observerClosureStatus: "review",
         qeiStatus: "missing",
@@ -85,6 +90,8 @@ describe("curvature leverage benchmark ladder", () => {
       const record = report.benchmarks.find((entry) => entry.id === id);
       expect(record).toBeTruthy();
       expect(record?.lane).toBe("compactness_identity");
+      expect(record?.marginKind).toBe("identity_check");
+      expect(record?.referenceNote).toContain("exact by convention");
       expect(record?.relativeError).toBeLessThan(1e-14);
       expect(record?.promotionAllowed).toBe(false);
     }
@@ -124,15 +131,24 @@ describe("curvature leverage benchmark ladder", () => {
     const casimirGap = byId.get("casimir_1nm_gap_scale");
     expect(casimirGap?.leverage).toBeGreaterThan(1e-54);
     expect(casimirGap?.leverage).toBeLessThan(1e-51);
+    expect(casimirGap?.marginKind).toBe("model_self_reference");
+    expect(casimirGap?.marginBand).toBe("sub_quantum_gravity_floor");
 
     const casimirKm = byId.get("casimir_1nm_1km_scale");
     expect(casimirKm?.leverage).toBeGreaterThan(1e-30);
     expect(casimirKm?.leverage).toBeLessThan(1e-27);
+    expect(casimirKm?.marginBand).toBe("laboratory_macro_floor");
 
     expect(byId.get("earth_nominal_iau_b3")?.leverage).toBeGreaterThan(1e-10);
     expect(byId.get("earth_nominal_iau_b3")?.leverage).toBeLessThan(1e-8);
     expect(byId.get("sun_nominal_iau_b3")?.leverage).toBeGreaterThan(1e-6);
     expect(byId.get("sun_nominal_iau_b3")?.leverage).toBeLessThan(1e-5);
+    expect(byId.get("moon_compactness")?.empiricalGravityBenchmark).toBe(true);
+    expect(byId.get("saturn_compactness")?.empiricalGravityBenchmark).toBe(true);
+    expect(byId.get("mimas_compactness")?.marginKind).toBe("model_self_reference");
+    expect(byId.get("saturn_b_ring_density_wave_tidal_100km")?.lane).toBe(
+      "ring_response_calibration",
+    );
   });
 
   it("emits NHM2 comparisons without allowing benchmark promotion", () => {
@@ -154,6 +170,10 @@ describe("curvature leverage benchmark ladder", () => {
     for (const comparison of written.nhm2Comparisons) {
       expect(comparison.promotionAllowed).toBe(false);
       expect(comparison.nearestBenchmark.id).toBeTruthy();
+      expect(comparison.nearestEmpiricalGravityBenchmark?.id).toBeTruthy();
+      expect(comparison.nearestEmpiricalGravityBenchmark?.lane).toBe(
+        "external_observable_calibration",
+      );
       expect(comparison.ordersAboveRawCasimir1km).not.toBeNull();
       expect(comparison.ordersBelowBlackHoleHorizon).not.toBeNull();
       expect(["missing", "present"]).toContain(comparison.qeiStatus);
@@ -162,7 +182,49 @@ describe("curvature leverage benchmark ladder", () => {
 
     const wall = written.nhm2Comparisons.find((entry) => entry.region === "wall");
     expect(wall?.sourceClosureStatus).toBe("review");
+    expect(wall?.nearestBenchmark.id).toBe("casimir_1nm_1km_scale");
+    expect(wall?.nearestEmpiricalGravityBenchmark?.id).toBe("mimas_compactness");
     expect(wall?.ordersAboveRawCasimir1km).toBeGreaterThan(0);
     expect(JSON.stringify(written)).not.toContain("\"promotionAllowed\":true");
   });
+
+  it("writes diagnostic sweep artifacts with expected log-log slopes", () => {
+    const { nhm2Path, root } = makeNhm2Fixture();
+    const outDir = path.join(root, "sweeps");
+    const sweep = writeCurvatureLeverageBenchmarkSweep({
+      constantsPath,
+      nhm2ReportPath: nhm2Path,
+      outDir,
+      generatedAt: "2026-05-19T00:00:00.000Z",
+    });
+
+    expect(fs.existsSync(path.join(outDir, "gap-scale-sweep-latest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outDir, "lever-length-sweep-latest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outDir, "nhm2-region-scale-sweep-latest.json"))).toBe(true);
+    expect(sweep.gapScaleSweep.promotionAllowed).toBe(false);
+    expect(sweep.leverLengthSweep.sweep.expectedLogLogSlope).toBe(2);
+    expect(sweep.nhm2RegionScaleSweep.samples.length).toBe(8);
+
+    expect(logLogSlope(
+      sweep.leverLengthSweep.samples[0].leverLength_m,
+      sweep.leverLengthSweep.samples[0].leverage,
+      sweep.leverLengthSweep.samples.at(-1)?.leverLength_m ?? Number.NaN,
+      sweep.leverLengthSweep.samples.at(-1)?.leverage ?? Number.NaN,
+    )).toBeCloseTo(2, 12);
+
+    const wallSamples = sweep.nhm2RegionScaleSweep.samples.filter(
+      (entry) => entry.region === "wall",
+    );
+    expect(wallSamples.length).toBe(4);
+    expect(logLogSlope(
+      wallSamples[0].leverLength_m,
+      wallSamples[0].leverage,
+      wallSamples.at(-1)?.leverLength_m ?? Number.NaN,
+      wallSamples.at(-1)?.leverage ?? Number.NaN,
+    )).toBeCloseTo(2, 12);
+  });
 });
+
+function logLogSlope(x0: number, y0: number, x1: number, y1: number): number {
+  return (Math.log10(y1) - Math.log10(y0)) / (Math.log10(x1) - Math.log10(x0));
+}

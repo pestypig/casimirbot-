@@ -1,7 +1,7 @@
 {
   "artifactId": "curvature_leverage_benchmark_ladder",
   "schemaVersion": "v1",
-  "generatedAt": "2026-05-19T23:47:08.847Z",
+  "generatedAt": "2026-05-20T01:11:26.743Z",
   "source": {
     "constantsRef": "configs/constants/codata-2022.v1.json",
     "benchmarksRef": "configs/curvature-leverage-benchmarks.v1.json",
@@ -29,8 +29,14 @@
       "relativeError": 1.486980795739028e-16,
       "referenceUncertaintyRel": 0,
       "sigmaMargin": null,
-      "marginBand": "planetary",
+      "marginKind": "identity_check",
+      "marginBand": "planetary_compactness",
       "ordersFromHorizon": -8.856765004119437,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
+      "sourceIds": [
+        "iau-2015-b3"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "massParameterKey": "nominal_terrestrial_GM_m3_s2",
@@ -50,8 +56,14 @@
       "relativeError": 5.986091318581719e-16,
       "referenceUncertaintyRel": 0,
       "sigmaMargin": null,
-      "marginBand": "stellar",
+      "marginKind": "identity_check",
+      "marginBand": "stellar_compactness",
       "ordersFromHorizon": -5.37212177953109,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
+      "sourceIds": [
+        "iau-2015-b3"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "massParameterKey": "nominal_solar_GM_m3_s2",
@@ -71,8 +83,14 @@
       "relativeError": 1.6781421663641966e-16,
       "referenceUncertaintyRel": 0,
       "sigmaMargin": null,
-      "marginBand": "planetary",
+      "marginKind": "identity_check",
+      "marginBand": "planetary_compactness",
       "ordersFromHorizon": -7.404138416094873,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
+      "sourceIds": [
+        "iau-2015-b3"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "massParameterKey": "nominal_jovian_GM_m3_s2",
@@ -92,8 +110,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022000002273308975,
       "sigmaMargin": 0,
-      "marginBand": "quantum_floor",
+      "marginKind": "model_self_reference",
+      "marginBand": "quantum_particle_floor",
       "ordersFromHorizon": -43.328166180782844,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "Reference leverage is computed from the same mass/radius compactness formula; zero residual is a unit-scale self check.",
+      "sourceIds": [
+        "nist-codata-2022"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "massKey": "hydrogen_atom_mass_kg",
@@ -112,8 +136,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.0010002419707251322,
       "sigmaMargin": 0,
-      "marginBand": "quantum_floor",
+      "marginKind": "model_self_reference",
+      "marginBand": "quantum_particle_floor",
       "ordersFromHorizon": -38.52955225347867,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "Reference leverage is computed from the same mass/radius compactness formula; zero residual is a unit-scale self check.",
+      "sourceIds": [
+        "nist-codata-2022"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "massKey": "proton_mass_kg",
@@ -132,8 +162,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022,
       "sigmaMargin": 0,
+      "marginKind": "constant_anchor",
       "marginBand": "horizon_order",
       "ordersFromHorizon": 0.3010299956639812,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": null,
+      "sourceIds": [
+        "nist-codata-2022"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "planckMass_kg": 2.1764343427178984e-8,
@@ -150,8 +186,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022,
       "sigmaMargin": 0,
-      "marginBand": "raw_casimir_or_below",
+      "marginKind": "model_self_reference",
+      "marginBand": "sub_quantum_gravity_floor",
       "ordersFromHorizon": -52.045773115408515,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "Raw Casimir leverage is generated from the same ideal parallel-plate model used for the displayed value; zero residual is not an empirical accuracy margin.",
+      "sourceIds": [
+        "nist-codata-2022"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "gap_m": 1e-9,
@@ -171,8 +213,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022,
       "sigmaMargin": 0,
-      "marginBand": "small_body",
+      "marginKind": "model_self_reference",
+      "marginBand": "laboratory_macro_floor",
       "ordersFromHorizon": -28.045773115408515,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "Raw Casimir leverage is generated from the same ideal parallel-plate model used for the displayed value; zero residual is not an empirical accuracy margin.",
+      "sourceIds": [
+        "nist-codata-2022"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "gap_m": 1e-9,
@@ -180,6 +228,60 @@
         "energyPerAreaAbs_J_m2": 0.43337525774812174,
         "energyDensityAbs_J_m3": 433375257.74812174,
         "kappa_m2": 8.999676207949175e-35
+      }
+    },
+    {
+      "id": "moon_compactness",
+      "label": "Moon compactness",
+      "lane": "external_observable_calibration",
+      "formula": "2*G*M/(R*c^2)",
+      "leverage": 6.27726521338769e-11,
+      "referenceLeverage": 6.27726521338769e-11,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginKind": "model_self_reference",
+      "marginBand": "small_body_compactness",
+      "ordersFromHorizon": -10.20222952209366,
+      "empiricalGravityBenchmark": true,
+      "referenceNote": "Empirical body calibrator from NASA/NSSDC mass and radius; compactness is computed from those inputs rather than independently observed.",
+      "sourceIds": [
+        "nist-codata-2022",
+        "nasa-nssdc-planetary-fact-sheets"
+      ],
+      "promotionAllowed": false,
+      "inputs": {
+        "massKey": "moon_mass_kg",
+        "radiusKey": "moon_equatorial_radius_m",
+        "mass_kg": 7.346e+22,
+        "radius_m": 1738100
+      }
+    },
+    {
+      "id": "saturn_compactness",
+      "label": "Saturn compactness",
+      "lane": "external_observable_calibration",
+      "formula": "2*G*M/(R*c^2)",
+      "leverage": 1.4495244553322981e-8,
+      "referenceLeverage": 1.4495244553322981e-8,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginKind": "model_self_reference",
+      "marginBand": "planetary_compactness",
+      "ordersFromHorizon": -7.8387744531435635,
+      "empiricalGravityBenchmark": true,
+      "referenceNote": "Empirical body calibrator from NASA/NSSDC mass and mean radius; compactness is computed from those inputs rather than independently observed.",
+      "sourceIds": [
+        "nist-codata-2022",
+        "nasa-nssdc-planetary-fact-sheets"
+      ],
+      "promotionAllowed": false,
+      "inputs": {
+        "massKey": "saturn_mass_kg",
+        "radiusKey": "saturn_mean_radius_m",
+        "mass_kg": 5.6832e+26,
+        "radius_m": 58232000
       }
     },
     {
@@ -192,8 +294,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022,
       "sigmaMargin": 0,
-      "marginBand": "small_body",
+      "marginKind": "model_self_reference",
+      "marginBand": "small_body_compactness",
       "ordersFromHorizon": -12.551359144826257,
+      "empiricalGravityBenchmark": true,
+      "referenceNote": "Empirical small-body calibrator; compactness is computed from the listed mass/radius rather than independently observed.",
+      "sourceIds": [
+        "nasa-nssdc-planetary-fact-sheets"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "mass_kg": 37493000000000000000,
@@ -210,8 +318,14 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022,
       "sigmaMargin": 0,
-      "marginBand": "small_body",
+      "marginKind": "model_self_reference",
+      "marginBand": "small_body_compactness",
       "ordersFromHorizon": -11.527661388384209,
+      "empiricalGravityBenchmark": true,
+      "referenceNote": "Empirical dwarf-planet calibrator; compactness is computed from the listed Dawn-era mass/radius rather than independently observed.",
+      "sourceIds": [
+        "nasa-science-ceres-facts"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "mass_kg": 938350000000000000000,
@@ -228,13 +342,48 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0.000022,
       "sigmaMargin": 0,
-      "marginBand": "small_body",
+      "marginKind": "model_self_reference",
+      "marginBand": "small_body_compactness",
       "ordersFromHorizon": -12.410237059887605,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "Self-gravity shape threshold scale generated from a reduced-order density/radius model.",
+      "sourceIds": [
+        "nist-codata-2022"
+      ],
       "promotionAllowed": false,
       "inputs": {
         "density_kg_m3": 1000,
         "radius_m": 250000,
         "observable": "self_gravity_shape"
+      }
+    },
+    {
+      "id": "saturn_b_ring_density_wave_tidal_100km",
+      "label": "Saturn B-ring density-wave tidal scale",
+      "lane": "ring_response_calibration",
+      "formula": "abs(2*G*M/(r^3*c^2))*lambda_wave^2",
+      "leverage": 8.440870808291038e-15,
+      "referenceLeverage": 8.440870808291038e-15,
+      "relativeError": 0,
+      "referenceUncertaintyRel": 0.000022,
+      "sigmaMargin": 0,
+      "marginKind": "model_self_reference",
+      "marginBand": "small_body_compactness",
+      "ordersFromHorizon": -14.073612746771627,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": "Reduced-order ring-wave lane using Saturn central mass, representative B-ring radius, and 100 km wave lever length; not a precision ring-seismology fit.",
+      "sourceIds": [
+        "nist-codata-2022",
+        "nasa-nssdc-planetary-fact-sheets"
+      ],
+      "promotionAllowed": false,
+      "inputs": {
+        "centralMassKey": "saturn_mass_kg",
+        "centralMass_kg": 5.6832e+26,
+        "orbitalRadius_m": 100000000,
+        "waveLength_m": 100000,
+        "tidalCurvature_m2": 8.440870808291038e-25,
+        "observable": "saturn_b_ring_density_wave"
       }
     },
     {
@@ -247,8 +396,12 @@
       "relativeError": 0,
       "referenceUncertaintyRel": 0,
       "sigmaMargin": null,
+      "marginKind": "constant_anchor",
       "marginBand": "horizon_order",
       "ordersFromHorizon": 0,
+      "empiricalGravityBenchmark": false,
+      "referenceNote": null,
+      "sourceIds": [],
       "promotionAllowed": false,
       "inputs": {}
     }
@@ -264,64 +417,17 @@
         "leverage": 8.999676207949175e-29,
         "ordersFromReference": -0.7130756013217996
       },
+      "nearestEmpiricalGravityBenchmark": {
+        "id": "mimas_compactness",
+        "label": "Mimas compactness",
+        "lane": "external_observable_calibration",
+        "leverage": 2.809576457821051e-13,
+        "ordersFromReference": -16.20748957190406
+      },
       "ordersAboveRawCasimir1km": -0.7130756013217996,
       "ordersBelowBlackHoleHorizon": 28.758848716730316,
       "sourceClosureStatus": "review",
       "observerClosureStatus": "review",
-      "qeiStatus": "missing",
-      "conservationStatus": "missing",
-      "promotionAllowed": false
-    },
-    {
-      "region": "hull",
-      "leverage": 2.19359928410875e-28,
-      "nearestBenchmark": {
-        "id": "casimir_1nm_1km_scale",
-        "label": "Raw 1 nm Casimir leverage over 1 km",
-        "lane": "casimir_raw_energy",
-        "leverage": 8.999676207949175e-29,
-        "ordersFromReference": 0.38693041111996873
-      },
-      "ordersAboveRawCasimir1km": 0.38693041111996873,
-      "ordersBelowBlackHoleHorizon": 27.65884270428855,
-      "sourceClosureStatus": "fail",
-      "observerClosureStatus": "fail",
-      "qeiStatus": "missing",
-      "conservationStatus": "missing",
-      "promotionAllowed": false
-    },
-    {
-      "region": "wall",
-      "leverage": 5.082254980266378e-28,
-      "nearestBenchmark": {
-        "id": "casimir_1nm_1km_scale",
-        "label": "Raw 1 nm Casimir leverage over 1 km",
-        "lane": "casimir_raw_energy",
-        "leverage": 8.999676207949175e-29,
-        "ordersFromReference": 0.7518295655256164
-      },
-      "ordersAboveRawCasimir1km": 0.7518295655256164,
-      "ordersBelowBlackHoleHorizon": 27.2939435498829,
-      "sourceClosureStatus": "fail",
-      "observerClosureStatus": "fail",
-      "qeiStatus": "missing",
-      "conservationStatus": "missing",
-      "promotionAllowed": false
-    },
-    {
-      "region": "exterior_shell",
-      "leverage": 5.081114445830644e-28,
-      "nearestBenchmark": {
-        "id": "casimir_1nm_1km_scale",
-        "label": "Raw 1 nm Casimir leverage over 1 km",
-        "lane": "casimir_raw_energy",
-        "leverage": 8.999676207949175e-29,
-        "ordersFromReference": 0.7517320923760785
-      },
-      "ordersAboveRawCasimir1km": 0.7517320923760785,
-      "ordersBelowBlackHoleHorizon": 27.294041023032438,
-      "sourceClosureStatus": "fail",
-      "observerClosureStatus": "fail",
       "qeiStatus": "missing",
       "conservationStatus": "missing",
       "promotionAllowed": false

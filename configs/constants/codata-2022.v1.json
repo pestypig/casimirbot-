@@ -13,6 +13,16 @@
       "id": "iau-2015-b3",
       "citation": "IAU 2015 Resolution B3 nominal conversion constants for selected solar and planetary properties.",
       "url": "https://www.iau.org/static/resolutions/IAU2015_English.pdf"
+    },
+    {
+      "id": "nasa-nssdc-planetary-fact-sheets",
+      "citation": "NASA NSSDC planetary fact sheets for empirical body mass and radius calibrators.",
+      "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+    },
+    {
+      "id": "nasa-science-ceres-facts",
+      "citation": "NASA Science Ceres facts page for dwarf-planet radius context.",
+      "url": "https://science.nasa.gov/dwarf-planets/ceres/facts/"
     }
   ],
   "constants": {
@@ -80,6 +90,26 @@
       "value": 71492000,
       "relativeUncertainty": 0,
       "sourceId": "iau-2015-b3"
+    },
+    "moon_mass_kg": {
+      "value": 7.346e22,
+      "relativeUncertainty": 0,
+      "sourceId": "nasa-nssdc-planetary-fact-sheets"
+    },
+    "moon_equatorial_radius_m": {
+      "value": 1738100,
+      "relativeUncertainty": 0,
+      "sourceId": "nasa-nssdc-planetary-fact-sheets"
+    },
+    "saturn_mass_kg": {
+      "value": 5.6832e26,
+      "relativeUncertainty": 0,
+      "sourceId": "nasa-nssdc-planetary-fact-sheets"
+    },
+    "saturn_mean_radius_m": {
+      "value": 58232000,
+      "relativeUncertainty": 0,
+      "sourceId": "nasa-nssdc-planetary-fact-sheets"
     }
   }
 }

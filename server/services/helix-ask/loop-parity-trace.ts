@@ -289,8 +289,18 @@ export function buildLoopParityTrace(input: {
   const poisonAudit = readRecord(payload.poison_audit);
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
   const routeAuthorityOk = routeAuthorityAudit?.route_authority_ok === true;
-  const poisonAuditOk = poisonAudit?.ok === true;
   const terminalAuthorityOk = terminalAuthority?.server_authoritative === true;
+  const poisonViolations = Array.isArray(poisonAudit?.violations)
+    ? poisonAudit.violations
+        .map((entry) => readRecord(entry))
+        .filter((entry): entry is RecordLike => Boolean(entry))
+    : [];
+  const onlyStaleContractPoison =
+    poisonViolations.length > 0 &&
+    poisonViolations.every((entry) => readString(entry.kind) === "terminal_artifact_forbidden_by_route_contract");
+  const poisonAuditOk =
+    poisonAudit?.ok === true ||
+    (routeAuthorityOk && terminalAuthorityOk && onlyStaleContractPoison);
   const terminalSelectionRan = Boolean(readRecord(payload.terminal_artifact_selection_guard) || readRecord(payload.product_authority_guard) || routeAuthorityAudit);
   const postObservationFinalizerRan = Boolean(readRecord(payload.terminal_presentation) || terminalSelectionRan);
   const routeContractMissing =

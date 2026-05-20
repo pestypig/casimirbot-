@@ -23,14 +23,21 @@ type ConstantsConfig = {
 type BenchmarkFixture = {
   id: string;
   label: string;
+  marginKind?: MarginKind;
+  referenceNote?: string;
+  sourceIds?: string[];
+  empiricalGravityBenchmark?: boolean;
   massParameterKey?: string;
   massKey?: string;
+  centralMassKey?: string;
   radiusKey?: string;
   mass_kg?: number;
   radius_m?: number;
   density_kg_m3?: number;
   gap_m?: number;
   leverLength_m?: number;
+  orbitalRadius_m?: number;
+  waveLength_m?: number;
   expectedLeverage?: number;
   densityMode?: "mu_first" | "g_density";
   formula?: string;
@@ -62,14 +69,22 @@ export type BenchmarkLane =
   | "quantum_scale_floor"
   | "casimir_raw_energy"
   | "external_observable_calibration"
+  | "ring_response_calibration"
   | "horizon_reference";
 
+export type MarginKind =
+  | "identity_check"
+  | "constant_anchor"
+  | "model_self_reference"
+  | "empirical_reference";
+
 export type BenchmarkMarginBand =
-  | "quantum_floor"
-  | "raw_casimir_or_below"
-  | "small_body"
-  | "planetary"
-  | "stellar"
+  | "sub_quantum_gravity_floor"
+  | "quantum_particle_floor"
+  | "laboratory_macro_floor"
+  | "small_body_compactness"
+  | "planetary_compactness"
+  | "stellar_compactness"
   | "horizon_order"
   | "beyond_horizon_reference";
 
@@ -83,8 +98,12 @@ export type CurvatureLeverageBenchmarkRecord = {
   relativeError: number;
   referenceUncertaintyRel: number;
   sigmaMargin: number | null;
+  marginKind: MarginKind;
   marginBand: BenchmarkMarginBand;
   ordersFromHorizon: number;
+  empiricalGravityBenchmark: boolean;
+  referenceNote: string | null;
+  sourceIds: string[];
   promotionAllowed: false;
   inputs: Record<string, number | string>;
 };
@@ -99,6 +118,13 @@ export type Nhm2BenchmarkComparison = {
     leverage: number;
     ordersFromReference: number;
   };
+  nearestEmpiricalGravityBenchmark: {
+    id: string;
+    label: string;
+    lane: BenchmarkLane;
+    leverage: number;
+    ordersFromReference: number;
+  } | null;
   ordersAboveRawCasimir1km: number | null;
   ordersBelowBlackHoleHorizon: number | null;
   sourceClosureStatus: string;
@@ -231,8 +257,12 @@ function buildBenchmarkRecord(
     referenceUncertaintyRel,
     sigmaMargin:
       referenceUncertaintyRel > 0 ? relativeError / referenceUncertaintyRel : null,
+    marginKind: result.marginKind,
     marginBand: marginBand(result.leverage),
     ordersFromHorizon: log10Ratio(result.leverage, 1),
+    empiricalGravityBenchmark: fixture.empiricalGravityBenchmark === true,
+    referenceNote: result.referenceNote,
+    sourceIds: result.sourceIds,
     promotionAllowed: false,
     inputs: result.inputs,
   };
@@ -247,6 +277,9 @@ function computeFixture(
   leverage: number;
   referenceLeverage: number;
   referenceUncertaintyRel: number;
+  marginKind: MarginKind;
+  referenceNote: string | null;
+  sourceIds: string[];
   formula: string;
   inputs: Record<string, number | string>;
 } {
@@ -258,6 +291,9 @@ function computeFixture(
       leverage,
       referenceLeverage: fixture.expectedLeverage ?? 2,
       referenceUncertaintyRel: constantUncertainty(constants, "G_m3_kg_s2"),
+      marginKind: fixture.marginKind ?? "constant_anchor",
+      referenceNote: fixture.referenceNote ?? null,
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, ["G_m3_kg_s2", "hbar_J_s", "c_m_s"]),
       formula: fixture.formula ?? "2*G*m_P/(l_P*c^2)",
       inputs: {
         planckMass_kg: planckMass,
@@ -271,6 +307,9 @@ function computeFixture(
       leverage: fixture.expectedLeverage,
       referenceLeverage: fixture.expectedLeverage,
       referenceUncertaintyRel: 0,
+      marginKind: fixture.marginKind ?? "constant_anchor",
+      referenceNote: fixture.referenceNote ?? null,
+      sourceIds: fixture.sourceIds ?? [],
       formula: fixture.formula ?? "declared_reference_leverage",
       inputs: {},
     };
@@ -287,6 +326,11 @@ function computeFixture(
       leverage,
       referenceLeverage: leverage,
       referenceUncertaintyRel: constantUncertainty(constants, "G_m3_kg_s2"),
+      marginKind: fixture.marginKind ?? "model_self_reference",
+      referenceNote:
+        fixture.referenceNote ??
+        "Raw Casimir leverage is generated from the same ideal parallel-plate model used for the displayed value; zero residual is not an empirical accuracy margin.",
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, ["G_m3_kg_s2", "hbar_J_s", "c_m_s"]),
       formula: "abs((8*pi*G/c^4) * abs(E/A)/a) * L^2",
       inputs: {
         gap_m: gap,
@@ -294,6 +338,39 @@ function computeFixture(
         energyPerAreaAbs_J_m2: energyPerAreaAbs,
         energyDensityAbs_J_m3: energyDensityAbs,
         kappa_m2: kappa,
+      },
+      };
+  }
+
+  if (lane === "ring_response_calibration") {
+    const mass = positiveNumber(
+      fixture.centralMassKey ? constantValue(constants, fixture.centralMassKey) : fixture.mass_kg,
+      `${fixture.id}.centralMass`,
+    );
+    const orbitalRadius = positiveNumber(fixture.orbitalRadius_m, `${fixture.id}.orbitalRadius_m`);
+    const waveLength = positiveNumber(fixture.waveLength_m, `${fixture.id}.waveLength_m`);
+    const mu = core.G * mass;
+    const tidalCurvature = Math.abs((2 * mu) / (orbitalRadius ** 3 * core.c ** 2));
+    const leverage = tidalCurvature * waveLength * waveLength;
+    return {
+      leverage,
+      referenceLeverage: leverage,
+      referenceUncertaintyRel: fixture.centralMassKey
+        ? combinedUncertainty(constants, ["G_m3_kg_s2", fixture.centralMassKey])
+        : constantUncertainty(constants, "G_m3_kg_s2"),
+      marginKind: fixture.marginKind ?? "model_self_reference",
+      referenceNote:
+        fixture.referenceNote ??
+        "Ring response leverage is a reduced-order tidal-curvature calibration; it is not a compactness identity or NHM2 validation.",
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, ["G_m3_kg_s2", fixture.centralMassKey]),
+      formula: fixture.formula ?? "abs(2*G*M/(r^3*c^2))*lambda_wave^2",
+      inputs: {
+        centralMassKey: fixture.centralMassKey ?? "inline",
+        centralMass_kg: mass,
+        orbitalRadius_m: orbitalRadius,
+        waveLength_m: waveLength,
+        tidalCurvature_m2: tidalCurvature,
+        observable: fixture.observable ?? "ring_density_wave",
       },
     };
   }
@@ -309,6 +386,11 @@ function computeFixture(
       leverage,
       referenceLeverage,
       referenceUncertaintyRel: 0,
+      marginKind: fixture.marginKind ?? "identity_check",
+      referenceNote:
+        fixture.referenceNote ??
+        "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, [fixture.massParameterKey, fixture.radiusKey]),
       formula: "kappa_body(3M/(4*pi*R^3))*R^2 = 2*mu/(R*c^2)",
       inputs: {
         massParameterKey: fixture.massParameterKey,
@@ -332,6 +414,11 @@ function computeFixture(
         fixture.massKey,
         fixture.radiusKey,
       ]),
+      marginKind: fixture.marginKind ?? "model_self_reference",
+      referenceNote:
+        fixture.referenceNote ??
+        "Reference leverage is computed from the same mass/radius compactness formula; zero residual is a unit-scale self check.",
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, ["G_m3_kg_s2", fixture.massKey, fixture.radiusKey]),
       formula: "2*G*M/(R*c^2)",
       inputs: {
         massKey: fixture.massKey,
@@ -350,6 +437,11 @@ function computeFixture(
       leverage,
       referenceLeverage: leverage,
       referenceUncertaintyRel: constantUncertainty(constants, "G_m3_kg_s2"),
+      marginKind: fixture.marginKind ?? "model_self_reference",
+      referenceNote:
+        fixture.referenceNote ??
+        "Reference leverage is computed from the same inline mass/radius compactness formula; zero residual is a scale self check.",
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, ["G_m3_kg_s2"]),
       formula: "2*G*M/(R*c^2)",
       inputs: { mass_kg: mass, radius_m: radius },
     };
@@ -363,6 +455,11 @@ function computeFixture(
       leverage,
       referenceLeverage: leverage,
       referenceUncertaintyRel: constantUncertainty(constants, "G_m3_kg_s2"),
+      marginKind: fixture.marginKind ?? "model_self_reference",
+      referenceNote:
+        fixture.referenceNote ??
+        "Reference leverage is generated from the same density/radius model; zero residual is not an empirical accuracy margin.",
+      sourceIds: fixture.sourceIds ?? sourceIdsForKeys(constants, ["G_m3_kg_s2"]),
       formula: "kappa_body(rho)*R^2",
       inputs: {
         density_kg_m3: density,
@@ -382,6 +479,9 @@ function compareNhm2Report(
 ): Nhm2BenchmarkComparison[] {
   const excluded = new Set(config.comparisonPolicy?.nearestBenchmarkExcludes ?? []);
   const candidates = benchmarks.filter((entry) => !excluded.has(entry.id) && entry.leverage > 0);
+  const empiricalGravityCandidates = candidates.filter(
+    (entry) => entry.empiricalGravityBenchmark === true,
+  );
   const rawCasimir = benchmarks.find(
     (entry) => entry.id === config.comparisonPolicy?.rawCasimirOneKilometerBenchmarkId,
   );
@@ -394,6 +494,10 @@ function compareNhm2Report(
     .map((region) => {
       const leverage = Number(region.leverage);
       const nearest = nearestBenchmark(leverage, candidates);
+      const nearestEmpirical =
+        empiricalGravityCandidates.length > 0
+          ? nearestBenchmark(leverage, empiricalGravityCandidates)
+          : null;
       return {
         region: textOr(region.region, "unknown"),
         leverage,
@@ -404,6 +508,15 @@ function compareNhm2Report(
           leverage: nearest.leverage,
           ordersFromReference: log10Ratio(leverage, nearest.leverage),
         },
+        nearestEmpiricalGravityBenchmark: nearestEmpirical
+          ? {
+              id: nearestEmpirical.id,
+              label: nearestEmpirical.label,
+              lane: nearestEmpirical.lane,
+              leverage: nearestEmpirical.leverage,
+              ordersFromReference: log10Ratio(leverage, nearestEmpirical.leverage),
+            }
+          : null,
         ordersAboveRawCasimir1km: rawCasimir ? log10Ratio(leverage, rawCasimir.leverage) : null,
         ordersBelowBlackHoleHorizon: horizon ? log10Ratio(horizon.leverage, leverage) : null,
         sourceClosureStatus: textOr(region.sourceRegionStatus, "unknown"),
@@ -477,6 +590,16 @@ function combinedUncertainty(config: ConstantsConfig, keys: string[]): number {
   );
 }
 
+function sourceIdsForKeys(config: ConstantsConfig, keys: Array<string | undefined>): string[] {
+  return Array.from(
+    new Set(
+      keys
+        .map((key) => (key ? config.constants[key]?.sourceId : undefined))
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
+    ),
+  );
+}
+
 function positiveNumber(value: unknown, name: string): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) {
@@ -495,11 +618,12 @@ function log10Ratio(value: number, reference: number): number {
 }
 
 function marginBand(leverage: number): BenchmarkMarginBand {
-  if (leverage < 1e-45) return "raw_casimir_or_below";
-  if (leverage < 1e-38) return "quantum_floor";
-  if (leverage < 1e-10) return "small_body";
-  if (leverage < 1e-7) return "planetary";
-  if (leverage < 1e-3) return "stellar";
+  if (leverage < 1e-45) return "sub_quantum_gravity_floor";
+  if (leverage < 1e-38) return "quantum_particle_floor";
+  if (leverage < 1e-20) return "laboratory_macro_floor";
+  if (leverage < 1e-10) return "small_body_compactness";
+  if (leverage < 1e-7) return "planetary_compactness";
+  if (leverage < 1e-3) return "stellar_compactness";
   if (leverage <= 2) return "horizon_order";
   return "beyond_horizon_reference";
 }

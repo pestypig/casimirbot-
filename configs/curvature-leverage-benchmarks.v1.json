@@ -13,6 +13,8 @@
         {
           "id": "earth_nominal_iau_b3",
           "label": "Earth nominal compactness",
+          "marginKind": "identity_check",
+          "referenceNote": "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
           "massParameterKey": "nominal_terrestrial_GM_m3_s2",
           "radiusKey": "nominal_terrestrial_equatorial_radius_m",
           "densityMode": "mu_first"
@@ -20,6 +22,8 @@
         {
           "id": "sun_nominal_iau_b3",
           "label": "Sun nominal compactness",
+          "marginKind": "identity_check",
+          "referenceNote": "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
           "massParameterKey": "nominal_solar_GM_m3_s2",
           "radiusKey": "nominal_solar_radius_m",
           "densityMode": "mu_first"
@@ -27,6 +31,8 @@
         {
           "id": "jupiter_nominal_iau_b3",
           "label": "Jupiter nominal compactness",
+          "marginKind": "identity_check",
+          "referenceNote": "IAU nominal conversion constant; exact by convention, not an empirical current-best-estimate.",
           "massParameterKey": "nominal_jovian_GM_m3_s2",
           "radiusKey": "nominal_jovian_equatorial_radius_m",
           "densityMode": "mu_first"
@@ -40,18 +46,23 @@
         {
           "id": "hydrogen_bohr_radius",
           "label": "Hydrogen atom at Bohr radius",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Reference leverage is computed from the same mass/radius compactness formula; zero residual is a unit-scale self check.",
           "massKey": "hydrogen_atom_mass_kg",
           "radiusKey": "bohr_radius_m"
         },
         {
           "id": "proton_charge_radius",
           "label": "Proton at charge radius",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Reference leverage is computed from the same mass/radius compactness formula; zero residual is a unit-scale self check.",
           "massKey": "proton_mass_kg",
           "radiusKey": "proton_charge_radius_m"
         },
         {
           "id": "planck_mass_planck_length",
           "label": "Planck mass at Planck length",
+          "marginKind": "constant_anchor",
           "formula": "2Gm_P/(l_P c^2)",
           "expectedLeverage": 2
         }
@@ -64,12 +75,16 @@
         {
           "id": "casimir_1nm_gap_scale",
           "label": "Raw 1 nm Casimir leverage at gap scale",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Raw Casimir leverage is generated from the same ideal parallel-plate model used for the displayed value; zero residual is not an empirical accuracy margin.",
           "gap_m": 1e-9,
           "leverLength_m": 1e-9
         },
         {
           "id": "casimir_1nm_1km_scale",
           "label": "Raw 1 nm Casimir leverage over 1 km",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Raw Casimir leverage is generated from the same ideal parallel-plate model used for the displayed value; zero residual is not an empirical accuracy margin.",
           "gap_m": 1e-9,
           "leverLength_m": 1000
         }
@@ -80,23 +95,67 @@
       "description": "External gravity observables used as dimensional calibrators, not NHM2 validators.",
       "fixtures": [
         {
+          "id": "moon_compactness",
+          "label": "Moon compactness",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Empirical body calibrator from NASA/NSSDC mass and radius; compactness is computed from those inputs rather than independently observed.",
+          "massKey": "moon_mass_kg",
+          "radiusKey": "moon_equatorial_radius_m",
+          "empiricalGravityBenchmark": true
+        },
+        {
+          "id": "saturn_compactness",
+          "label": "Saturn compactness",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Empirical body calibrator from NASA/NSSDC mass and mean radius; compactness is computed from those inputs rather than independently observed.",
+          "massKey": "saturn_mass_kg",
+          "radiusKey": "saturn_mean_radius_m",
+          "empiricalGravityBenchmark": true
+        },
+        {
           "id": "mimas_compactness",
           "label": "Mimas compactness",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Empirical small-body calibrator; compactness is computed from the listed mass/radius rather than independently observed.",
+          "sourceIds": ["nasa-nssdc-planetary-fact-sheets"],
           "mass_kg": 3.7493e19,
-          "radius_m": 198200
+          "radius_m": 198200,
+          "empiricalGravityBenchmark": true
         },
         {
           "id": "ceres_compactness",
           "label": "Ceres compactness",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Empirical dwarf-planet calibrator; compactness is computed from the listed Dawn-era mass/radius rather than independently observed.",
+          "sourceIds": ["nasa-science-ceres-facts"],
           "mass_kg": 9.3835e20,
-          "radius_m": 469700
+          "radius_m": 469700,
+          "empiricalGravityBenchmark": true
         },
         {
           "id": "potato_radius_ice_250km_density_1000",
           "label": "Potato-radius ice-body scale",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Self-gravity shape threshold scale generated from a reduced-order density/radius model.",
           "density_kg_m3": 1000,
           "radius_m": 250000,
           "observable": "self_gravity_shape"
+        }
+      ]
+    },
+    {
+      "lane": "ring_response_calibration",
+      "description": "Reduced-order tidal-curvature calibration for Saturn ring density-wave response; diagnostic only.",
+      "fixtures": [
+        {
+          "id": "saturn_b_ring_density_wave_tidal_100km",
+          "label": "Saturn B-ring density-wave tidal scale",
+          "marginKind": "model_self_reference",
+          "referenceNote": "Reduced-order ring-wave lane using Saturn central mass, representative B-ring radius, and 100 km wave lever length; not a precision ring-seismology fit.",
+          "centralMassKey": "saturn_mass_kg",
+          "orbitalRadius_m": 100000000,
+          "waveLength_m": 100000,
+          "observable": "saturn_b_ring_density_wave"
         }
       ]
     },
@@ -107,6 +166,7 @@
         {
           "id": "schwarzschild_horizon",
           "label": "Schwarzschild horizon compactness",
+          "marginKind": "constant_anchor",
           "expectedLeverage": 1
         }
       ]

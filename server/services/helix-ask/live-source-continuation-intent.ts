@@ -96,6 +96,13 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
     /\b(?:screen|screenshare|screen share|tab|window|visual|camera|frame|frames|source|live answer|live source|pipeline|share)\b/.test(text);
   const continuation =
     /\b(?:keep|continue|watch|checking|check|monitor|track|look at|observe|process|analyze|analyse|use)\b/.test(text);
+  const screenVisibleControlText =
+    /\b(?:text|label|button|page|screen|ui)\b[\s\S]{0,80}\b(?:says|shows|reads|contains|labeled|labelled|called|named|start(?:\s+capture)?|click|press|open|run)\b/.test(text) ||
+    /\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,80}\b(?:start(?:\s+capture)?|click|press|open|run)\b/.test(text);
+  const explicitlyNonAction =
+    /\b(?:without|do\s+not|don\s+t|not|never)\b[\s\S]{0,60}\b(?:press|click|start|open|run|change|execute)\b/.test(text) ||
+    /\b(?:what\s+does\s+that\s+imply|what\s+it\s+implies|describe|explain)\b/.test(text);
+  if (screenVisibleControlText && explicitlyNonAction && !cadenceControl) return null;
   const contentQuestion =
     /\b(?:review|describe|explain|summari[sz]e|what)\b[\s\S]{0,100}\b(?:happening|see|seeing|visuals?|screen|capture|frame|image|picture|window)\b/.test(text) &&
     !cadenceControl &&

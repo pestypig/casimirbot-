@@ -32,6 +32,7 @@ export type HelixSourceBindingStatus = {
   environment_id?: string | null;
   binding_id?: string | null;
   state: HelixSourceBindingState;
+  status?: HelixSourceBindingState;
   replay_policy: HelixSourceReplayPolicy;
   latest_descriptor_refs: string[];
   latest_observation_refs: string[];

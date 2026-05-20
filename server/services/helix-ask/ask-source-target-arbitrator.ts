@@ -96,7 +96,10 @@ const rules: CueRule[] = [
     cues: [
       { label: "set_interval", pattern: /\bset\s+(?:the\s+)?(?:interval|cadence|rate)\b/i },
       { label: "capture_cadence", pattern: /\b(?:capture|visual|screen|frame)\b[\s\S]{0,80}\b(?:cadence|interval|every\s+\d{1,3}\s*(?:seconds?|sec|s))\b/i },
+      { label: "keep_live_answer", pattern: /\b(?:keep|continue)\b[\s\S]{0,80}\b(?:checking|watching|monitoring|using|looking\s+at)\b[\s\S]{0,80}\b(?:screen|visual|capture|frame|live\s+answer|live\s+source)\b/i },
+      { label: "watch_live_source", pattern: /\b(?:watch|monitor|track|observe|check)\b[\s\S]{0,80}\b(?:screen|visual|capture|frame|live\s+answer|live\s+source)\b[\s\S]{0,80}\b(?:as\s+a\s+)?live\s+answer\b/i },
       { label: "start_live_source", pattern: /\bstart\b[\s\S]{0,80}\b(?:live\s+source|visual\s+capture|screen\s+capture)\b/i },
+      { label: "repair_live_source", pattern: /\b(?:fix|repair|recover)\b[\s\S]{0,80}\b(?:live\s+)?(?:screen|visual|capture|frame|source|producer)\b/i },
       { label: "attach_source", pattern: /\battach\b[\s\S]{0,80}\b(?:source|visual|capture|producer)\b/i },
       { label: "adopt_producer", pattern: /\badopt\b[\s\S]{0,80}\b(?:producer|visual\s+producer|capture)\b/i },
     ],

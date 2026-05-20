@@ -163,13 +163,20 @@
           "kind": "repo-code",
           "citation": "scripts/curvature-leverage-benchmark-ladder.ts",
           "equation": "kappa_body(3M/(4*pi*R^3))*R^2 = 2GM/(Rc^2)",
-          "note": "Benchmark ladder implementation and NHM2 comparison rail."
+          "note": "Benchmark ladder implementation and NHM2 comparison rail, with margin-kind labels separating identity checks from model self references."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "scripts/curvature-leverage-benchmark-sweep.ts",
+          "equation": "Lambda(L) = abs(kappa) * L^2",
+          "note": "Sweep artifacts verify expected log-log scaling without changing promotion gates."
         }
       ],
       "repoBindings": [
         "configs/curvature-leverage-benchmarks.v1.json",
         "configs/constants/codata-2022.v1.json",
         "scripts/curvature-leverage-benchmark-ladder.ts",
+        "scripts/curvature-leverage-benchmark-sweep.ts",
         "tests/curvature-leverage-benchmark-ladder.spec.ts"
       ],
       "clCeiling": "CL0",
