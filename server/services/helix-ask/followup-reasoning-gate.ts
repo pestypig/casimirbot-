@@ -42,6 +42,12 @@ const reasonFor = (input: {
   if (input.primaryIntent === "status_question" && isReceiptKind(input.terminalArtifactKind) && input.secondaryIntentKinds.length === 0) {
     return "pure_status_receipt";
   }
+  if (
+    /active_doc|docs_viewer/i.test(input.sourceTarget) &&
+    /active_doc_identity|doc_open_receipt|typed_failure/i.test(input.terminalArtifactKind)
+  ) {
+    return "simple_no_source_turn";
+  }
   if (input.primaryIntent === "content_question" || /visual_capture|visual_scene/i.test(input.sourceTarget)) {
     return "visual_content_requires_post_evidence_reasoning";
   }

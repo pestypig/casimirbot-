@@ -40,6 +40,63 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("model_only_concept");
   }, 90000);
 
+  it("lets docs source nouns outrank generic right-now visual deictics", async () => {
+    const app = createApp();
+    const sessionId = `e65-docs-right-now-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "OK, what docs are we looking at right now?",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          docContextPath: activePath,
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent?.target_source).toBe("active_doc");
+    expect(response.body?.source_target_intent?.precedence_reason).toBe("deictic_docs_identity_source_target");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("active_doc_identity");
+    expect(response.body?.terminal_artifact_kind).toBe("active_doc_identity");
+    expect(response.body?.deictic_reference?.reference_type ?? "unknown").not.toBe("current_screen");
+    expect(response.body?.procedure_evidence_retrieval_plan?.source_targets ?? []).not.toEqual(["visual_capture"]);
+    expect(String(response.body?.selected_final_answer ?? "")).toContain(activePath);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/active visual SituationRun/i);
+  }, 90000);
+
+  it("fails missing docs identity as missing doc context, not missing visual context", async () => {
+    const app = createApp();
+    const sessionId = `e65-docs-right-now-missing-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "OK, what docs are we looking at right now?",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          hasDocContext: false,
+          docContextValid: false,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent?.target_source).toBe("active_doc");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("active_doc_identity");
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/active.*document|active_doc|doc/i);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/active visual SituationRun/i);
+  }, 90000);
+
   it("keeps best-doc open requests on doc_open_receipt instead of locations", async () => {
     const app = createApp();
     const response = await request(app)

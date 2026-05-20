@@ -105,6 +105,26 @@ const collectObservationRefs = (loopTrace: RecordLike | null): string[] =>
     .map((entry) => readString(entry.observation_id))
     .filter(Boolean);
 
+const collectWorkspaceSourceEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const workspaceSnapshot = readRecord(input.payload.workspace_context_snapshot);
+  const activeDocPath =
+    readString(workspaceSnapshot?.activeDocPath) ||
+    readString(workspaceSnapshot?.docContextPath) ||
+    readString(readRecord(input.payload.active_doc_identity)?.path) ||
+    readString(readRecord(input.payload.active_doc_identity)?.activeDocPath);
+  const terminalUsesActiveDoc =
+    /active_doc_identity|doc_summary|doc_open_receipt|doc_location/i.test(input.terminalArtifactKind) ||
+    /active_doc_identity|doc_summary|doc_open_receipt|doc_location/i.test(input.finalAnswerSource);
+  if (activeDocPath && terminalUsesActiveDoc) {
+    return [`workspace_snapshot:active_doc_path:${activeDocPath}`];
+  }
+  return [];
+};
+
 const collectReceiptRefs = (input: {
   payload: RecordLike;
   loopTrace: RecordLike | null;
@@ -139,7 +159,14 @@ export function buildEvidenceReentryGate(input: {
   allowedTerminalProducts?: string[];
 }): HelixEvidenceReentryGate {
   const loopTrace = input.loopTrace ?? null;
-  const selectedEvidenceRefs = readStringArray(loopTrace?.evidence_selected_for_answer);
+  const selectedEvidenceRefs = unique([
+    ...readStringArray(loopTrace?.evidence_selected_for_answer),
+    ...collectWorkspaceSourceEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+  ]);
   const rejectedEvidenceRefs = collectRejectedEvidence(loopTrace);
   const rejectedRefSet = new Set(rejectedEvidenceRefs.map((entry) => entry.ref));
   const evidenceRefSet = new Set([...selectedEvidenceRefs, ...rejectedEvidenceRefs.map((entry) => entry.ref)]);

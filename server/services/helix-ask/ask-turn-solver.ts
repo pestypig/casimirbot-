@@ -57,6 +57,7 @@ export type HelixAskTurnSolverHardFailureCode =
   | "receipt_terminal_without_reentry"
   | "missing_followup_reasoning"
   | "terminal_authority_before_solver_completion"
+  | "solver_path_incomplete_before_terminal"
   | "poison_clean_but_authority_failed"
   | "route_contract_missing"
   | "hard_source_target_allowed_no_tool_direct";
@@ -220,6 +221,29 @@ const terminalMatchesCanonicalGoalContract = (payload: RecordLike, terminalArtif
   );
 };
 
+const terminalMatchesEvidenceProductContract = (payload: RecordLike, terminalArtifactKind: string): boolean => {
+  if (/receipt/i.test(terminalArtifactKind)) return false;
+  const contract = readRecord(payload.route_product_contract);
+  if (readString(contract?.schema) !== "helix.route_product_contract.v1") return false;
+  const allowed = readStringArray(contract?.allowed_terminal_artifact_kinds);
+  const forbidden = readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  const evidenceTerminals = new Set([
+    "active_doc_identity",
+    "doc_location_result",
+    "doc_location_matches",
+    "doc_evidence_location",
+    "doc_summary",
+    "repo_code_evidence_answer",
+    "procedure_evidence_retrieval_result",
+    "situation_context_pack",
+    "visual_context_pack",
+    "visual_frame_evidence",
+    "audio_transcript_context_pack",
+    "note_context_pack",
+  ]);
+  return evidenceTerminals.has(terminalArtifactKind) && allowed.includes(terminalArtifactKind) && !forbidden.includes(terminalArtifactKind);
+};
+
 const sourceTargeted = new Set([
   "visual_capture",
   "procedure_memory",
@@ -303,10 +327,14 @@ const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null
   const primary = trace.selected_primary_intent;
   const terminal = trace.final_arbitration.terminal_artifact_kind;
   const reason = trace.followup_reasoning_gate.reason;
-  const canonicalTerminal =
+  const canonicalGoalTerminal =
     terminalMatchesCanonicalGoalContract(payload, terminal) &&
     trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
     trace.prompt_interpretation.negative_constraints.length === 0;
+  const evidenceProductTerminal =
+    terminalMatchesEvidenceProductContract(payload, terminal) &&
+    trace.prompt_interpretation.negative_constraints.length === 0;
+  const canonicalTerminal = canonicalGoalTerminal || evidenceProductTerminal;
   return (
     (
       (
@@ -341,6 +369,20 @@ export function evaluateAskTurnSolverHardGate(input: {
   const sourceTarget = readRecord(input.payload.source_target_intent);
   const routeContract = readRecord(input.payload.route_product_contract);
   const routeAuthority = readRecord(input.payload.route_authority_audit);
+  const terminalAuthorityPresent = Boolean(readRecord(input.payload.terminal_answer_authority));
+  const traceTerminalArtifactKind = readString(trace?.final_arbitration?.terminal_artifact_kind);
+  const traceFinalAnswerSource = readString(trace?.final_arbitration?.final_answer_source);
+  const typedFailureTerminal =
+    traceTerminalArtifactKind === "typed_failure" ||
+    traceFinalAnswerSource === "typed_failure" ||
+    readString(input.payload.terminal_artifact_kind) === "typed_failure" ||
+    readString(input.payload.final_answer_source) === "typed_failure";
+  const requestUserInputTerminal =
+    traceTerminalArtifactKind === "request_user_input" ||
+    readString(input.payload.terminal_artifact_kind) === "request_user_input" ||
+    traceFinalAnswerSource === "request_user_input" ||
+    readString(input.payload.final_answer_source) === "request_user_input";
+  const nonAnswerTerminal = typedFailureTerminal || requestUserInputTerminal;
   const hardSourceTarget = isHardSourceTarget(input.payload, trace);
   const complexPrompt = isComplexSolverPrompt(trace);
   const applies = hardSourceTarget || complexPrompt;
@@ -352,6 +394,15 @@ export function evaluateAskTurnSolverHardGate(input: {
   } else {
     if (!readRecord(trace.intent_arbitration)) {
       pushHardFailure(details, "intent_arbitration_missing", "intent arbitration is required before route authority");
+    }
+    if (
+      terminalAuthorityPresent &&
+      trace.completed_solver_path === false &&
+      trace.final_arbitration.terminal_artifact_kind !== "typed_failure" &&
+      trace.final_arbitration.terminal_artifact_kind !== "request_user_input" &&
+      !allowedPureReceipt
+    ) {
+      pushHardFailure(details, "solver_path_incomplete_before_terminal", "solver path was incomplete before successful terminal selection");
     }
     if (trace.final_arbitration.selected_route && !trace.selected_primary_intent) {
       pushHardFailure(details, "route_selected_before_intent_arbitration", "selected route exists without a selected primary intent");
@@ -369,7 +420,7 @@ export function evaluateAskTurnSolverHardGate(input: {
       if (flag === "receipt_terminal_without_reentry" && !allowedPureReceipt) {
         pushHardFailure(details, "receipt_terminal_without_reentry", "receipt became terminal without solver re-entry for this intent");
       }
-      if (flag === "missing_followup_reasoning") {
+      if (flag === "missing_followup_reasoning" && !allowedPureReceipt && !nonAnswerTerminal) {
         pushHardFailure(details, "missing_followup_reasoning", "follow-up reasoning was required but not completed");
       }
       if (flag === "terminal_authority_before_solver_completion" && !allowedPureReceipt) {
@@ -390,7 +441,7 @@ export function evaluateAskTurnSolverHardGate(input: {
         pushHardFailure(details, "terminal_authority_before_solver_completion", "terminal artifact was selected before solver finalization");
       }
     }
-    if (!trace.route_authority_ok && !allowedPureReceipt) {
+    if (!trace.route_authority_ok && !allowedPureReceipt && !nonAnswerTerminal) {
       if (trace.poison_audit_ok) {
         pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit passed but route authority failed");
       } else {
@@ -412,13 +463,13 @@ export function evaluateAskTurnSolverHardGate(input: {
   ) {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target cannot use no_tool_direct");
   }
-  if (routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true) {
+  if (!typedFailureTerminal && routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true) {
     pushHardFailure(details, "poison_clean_but_authority_failed", "clean poison audit cannot override failed route authority");
   }
-  if (routeAuthority?.primary_violation_code === "route_contract_missing") {
+  if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "route_contract_missing") {
     pushHardFailure(details, "route_contract_missing", "route authority audit reported a missing route product contract");
   }
-  if (routeAuthority?.primary_violation_code === "no_tool_direct_used_for_hard_source_target") {
+  if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "no_tool_direct_used_for_hard_source_target") {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "route authority audit reported no_tool_direct for hard source-target");
   }
 
@@ -557,9 +608,15 @@ const buildRiskFlags = (input: {
   const mutatingToolExecuted = input.actualToolCalls.some((entry) => entry.mutating === true);
   const routeCandidates = readStringArray(readRecord(input.payload.ask_turn_preflight_context)?.route_candidate_labels);
   const canonicalTerminalAllowed =
-    terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind) &&
-    input.contextualToolMentions.length === 0 &&
-    input.negativeConstraints.length === 0;
+    (
+      terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind) &&
+      input.contextualToolMentions.length === 0 &&
+      input.negativeConstraints.length === 0
+    ) ||
+    (
+      terminalMatchesEvidenceProductContract(input.payload, input.terminalArtifactKind) &&
+      input.negativeConstraints.length === 0
+    );
   return unique([
     !readRecord(input.payload.source_target_intent) && routeCandidates.length > 0
       ? "classifier_became_decision"
@@ -586,6 +643,10 @@ const buildRiskFlags = (input: {
       ? "missing_followup_reasoning"
       : null,
     input.terminalAuthorityOk &&
+    input.terminalArtifactKind !== "typed_failure" &&
+    input.terminalArtifactKind !== "request_user_input" &&
+    input.finalAnswerSource !== "typed_failure" &&
+    input.finalAnswerSource !== "request_user_input" &&
     !canonicalTerminalAllowed &&
     (
       !input.finalArbitrationRan ||
@@ -668,6 +729,16 @@ export function buildAskTurnSolverTrace(input: {
   const routeAuthorityOk = readBoolean(loopTrace?.route_authority_ok) || readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok);
   const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
   const terminalAuthorityOk = readBoolean(loopTrace?.terminal_authority_ok) || readBoolean(readRecord(input.payload.terminal_answer_authority)?.server_authoritative);
+  const canonicalTerminalAllowed =
+    (
+      terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind) &&
+      promptInterpretation.contextual_tool_mentions.length === 0 &&
+      promptInterpretation.negative_constraints.length === 0
+    ) ||
+    (
+      terminalMatchesEvidenceProductContract(input.payload, terminalArtifactKind) &&
+      promptInterpretation.negative_constraints.length === 0
+    );
   const liveSourceIdentityOk = !liveSourceIdentityAudit || liveSourceIdentityAudit.identity_ok === true;
   const liveSourceIdentityTerminalAllowed =
     terminalArtifactKind === "live_environment_binding_diagnosis" ||
@@ -707,7 +778,7 @@ export function buildAskTurnSolverTrace(input: {
   });
   const completedSolverPath =
     finalArbitrationRan &&
-    routeAuthorityOk &&
+    (routeAuthorityOk || canonicalTerminalAllowed) &&
     poisonAuditOk &&
     terminalAuthorityOk &&
     (liveSourceIdentityOk || liveSourceIdentityTerminalAllowed) &&

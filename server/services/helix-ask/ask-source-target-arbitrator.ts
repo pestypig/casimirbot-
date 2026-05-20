@@ -52,6 +52,16 @@ const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
     (structuredPathCue && locateQueryCue && locationsListCue);
 };
 
+const isDeicticDocsIdentityPrompt = (prompt: string): boolean => {
+  const explicitVisualCue = /\b(?:screen|visual|capture|frame|visible|screenshot)\b/i.test(prompt);
+  if (explicitVisualCue) return false;
+  return (
+    /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:am\s+i|are\s+we)\s+(?:looking\s+at|viewing|reading|on|open)(?:\s+(?:now|right\s+now|currently))?\b/i.test(prompt) ||
+    /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:is|are)\s+(?:open|active|current|in\s+(?:the\s+)?viewer)(?:\s+(?:now|right\s+now|currently))?\b/i.test(prompt) ||
+    /\b(?:docs?|documents?|papers?|white\s*papers?)\b[\s\S]{0,80}\b(?:looking\s+at|viewing|reading|open|active|current|right\s+now|currently)\b/i.test(prompt)
+  );
+};
+
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
 
@@ -248,12 +258,12 @@ const rules: CueRule[] = [
     requestedOutputs: ["file_path"],
     allowClientShortcut: false,
     allowNoToolDirect: false,
-    suppressedRoutes: ["situation_context_question"],
+    suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence"],
     cues: [
-      { label: "active_doc", pattern: /\b(?:active|current|open)\s+(?:doc|document|paper)\b/i },
-      { label: "what_paper_viewing", pattern: /\bwhat\s+(?:paper|doc|document)\s+(?:am\s+i|are\s+we)\s+(?:viewing|reading|looking\s+at)\b/i },
-      { label: "open_document", pattern: /\b(?:what|which)\s+(?:doc|document|paper)\s+is\s+(?:open|currently\s+open)\b/i },
-      { label: "this_doc", pattern: /\b(?:this|that)\s+(?:doc|document|paper)\b/i },
+      { label: "active_doc", pattern: /\b(?:active|current|open)\s+(?:docs?|documents?|papers?)\b/i },
+      { label: "what_paper_viewing", pattern: /\bwhat\s+(?:papers?|docs?|documents?)\s+(?:am\s+i|are\s+we)\s+(?:viewing|reading|looking\s+at|on)\b/i },
+      { label: "open_document", pattern: /\b(?:what|which)\s+(?:docs?|documents?|papers?)\s+(?:is|are)\s+(?:open|currently\s+open|active|current)\b/i },
+      { label: "this_doc", pattern: /\b(?:this|that|these|those)\s+(?:docs?|documents?|papers?)\b/i },
     ],
   },
   {
@@ -446,6 +456,25 @@ export function arbitrateAskSourceTarget(input: {
         allowNoToolDirect: docsRule.allowNoToolDirect,
       });
     }
+  }
+  if (isDeicticDocsIdentityPrompt(prompt)) {
+    const activeDocRule = rules.find((rule: CueRule) => rule.target === "active_doc");
+    const explicitCues = activeDocRule ? matches(prompt, activeDocRule.cues) : [];
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "active_doc",
+      targetKind: "active_doc",
+      strength: "hard",
+      explicitCues: explicitCues.length > 0 ? explicitCues : ["deictic_docs_identity"],
+      reasons: ["deictic_docs_identity_source_target", ...(explicitCues.length > 0 ? explicitCues : ["source_noun_docs"])],
+      requestedOutputs: ["file_path"],
+      suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence"],
+      precedenceReason: "deictic_docs_identity_source_target",
+      confidence: 0.95,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
   }
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
   if (repoIntent.repoEvidenceRequested) {

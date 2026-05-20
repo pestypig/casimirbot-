@@ -20,6 +20,12 @@ const repoCodeContextRe =
 const explicitScreenContextRe =
   /\b(?:my screen|current screen|current window|current tab|visual capture|screen capture|visual source|visual frame|visual screen|visuals|looking at right now|clicking|clicked|selected|selected visible file|visible selected file|window i am viewing|screen i am viewing)\b/i;
 
+const docsIdentityContextRe =
+  /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:am\s+i|are\s+we)\s+(?:looking\s+at|viewing|reading|on|open)(?:\s+(?:now|right\s+now|currently))?\b/i;
+
+const explicitVisualContextRe =
+  /\b(?:screen|visual|capture|frame|screenshot|visible)\b/i;
+
 export function detectDeicticReference(input: {
   threadId: string;
   promptText: string;
@@ -30,10 +36,11 @@ export function detectDeicticReference(input: {
   const prompt = input.promptText.trim();
   const text = normalize(prompt);
   const repoCodeContextWithoutScreen = repoCodeContextRe.test(prompt) && !explicitScreenContextRe.test(prompt);
+  const docsIdentityWithoutVisual = docsIdentityContextRe.test(prompt) && !explicitVisualContextRe.test(prompt);
   const epochChangeRe =
     /\b(?:changed|last\s+step|card\s+update|confidence\s+change|why\s+did)\b/;
   const referenceType: HelixDeicticReferenceType =
-    repoCodeContextWithoutScreen
+    repoCodeContextWithoutScreen || docsIdentityWithoutVisual
       ? "unknown"
       : isSceneEpochReplayPrompt(prompt) || epochChangeRe.test(text)
       ? "latest_epoch_change"
