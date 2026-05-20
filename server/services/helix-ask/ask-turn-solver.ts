@@ -4,6 +4,7 @@ import type { HelixCapabilityPlan } from "@shared/helix-capability-plan";
 import type { HelixCapabilityResult } from "@shared/helix-capability-result";
 import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
 import type { HelixProcedureEvidenceRetrievalResult } from "@shared/helix-procedure-evidence-retrieval-result";
+import type { HelixSolverInstructionFrame } from "@shared/helix-solver-instruction-frame";
 import type { HelixSolverArtifactReentryAudit } from "@shared/helix-solver-artifact-reentry-audit";
 import type { HelixSolverSubgoalLedger } from "@shared/helix-solver-subgoal";
 import type { HelixSolverRetryPolicy } from "@shared/helix-solver-retry-policy";
@@ -137,6 +138,7 @@ export type HelixAskTurnSolverTrace = {
   capability_result?: HelixCapabilityResult;
   procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan;
   procedure_evidence_retrieval_result?: HelixProcedureEvidenceRetrievalResult;
+  solver_instruction_frame?: HelixSolverInstructionFrame;
   solver_artifact_reentry_audit?: HelixSolverArtifactReentryAudit;
   solver_subgoal_ledger?: HelixSolverSubgoalLedger;
   solver_retry_policy?: HelixSolverRetryPolicy;
@@ -775,6 +777,11 @@ export function buildAskTurnSolverTrace(input: {
     ...(readRecord(input.payload.procedure_evidence_retrieval_result)?.schema === "helix.procedure_evidence_retrieval_result.v1"
       ? {
           procedure_evidence_retrieval_result: input.payload.procedure_evidence_retrieval_result as HelixProcedureEvidenceRetrievalResult,
+        }
+      : {}),
+    ...(readRecord(input.payload.solver_instruction_frame)?.schema === "helix.solver_instruction_frame.v1"
+      ? {
+          solver_instruction_frame: input.payload.solver_instruction_frame as HelixSolverInstructionFrame,
         }
       : {}),
     ...(readRecord(input.payload.solver_artifact_reentry_audit)?.schema === "helix.solver_artifact_reentry_audit.v1"
