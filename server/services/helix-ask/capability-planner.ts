@@ -85,6 +85,9 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
   return "diagnose_debug_or_runtime_evidence";
 };
 
+const instructionRules = (instructionFrame?: RecordLike | null): string[] =>
+  readStringArray(readRecord(instructionFrame)?.capability_permission_rules);
+
 const isMutatingCapability = (family: HelixCapabilityFamily, requestedAction: string, promptText: string): boolean => {
   if (family === "workstation_action" || family === "subagent_runtime_adapter") return true;
   if (family === "live_source" && requestedAction === "control_live_source") return true;
@@ -174,7 +177,12 @@ export const buildCapabilityPlan = (input: {
     targetKind,
     admittedFamilies,
   });
-  const requestedAction = requestedActionFor(family, input.promptText);
+  const rules = instructionRules(instructionFrame);
+  const requestedAction =
+    family === "live_source" &&
+    rules.includes("do_not_change_cadence_without_affirmative_operator_command")
+      ? "inspect_live_source"
+      : requestedActionFor(family, input.promptText);
   const operatorCommandPresent = hasOperatorCommand(input.promptText);
   const mutating = isMutatingCapability(family, requestedAction, input.promptText);
   const operatorCommandRequired = mutating;
