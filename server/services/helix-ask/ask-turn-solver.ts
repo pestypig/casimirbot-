@@ -5,6 +5,8 @@ import type { HelixCapabilityResult } from "@shared/helix-capability-result";
 import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
 import type { HelixProcedureEvidenceRetrievalResult } from "@shared/helix-procedure-evidence-retrieval-result";
 import type { HelixSolverArtifactReentryAudit } from "@shared/helix-solver-artifact-reentry-audit";
+import type { HelixSolverSubgoalLedger } from "@shared/helix-solver-subgoal";
+import type { HelixSolverRetryPolicy } from "@shared/helix-solver-retry-policy";
 import {
   interpretHelixAskPrompt,
   type HelixPromptInterpretation,
@@ -136,6 +138,9 @@ export type HelixAskTurnSolverTrace = {
   procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan;
   procedure_evidence_retrieval_result?: HelixProcedureEvidenceRetrievalResult;
   solver_artifact_reentry_audit?: HelixSolverArtifactReentryAudit;
+  solver_subgoal_ledger?: HelixSolverSubgoalLedger;
+  solver_retry_policy?: HelixSolverRetryPolicy;
+  solver_retry_policies?: HelixSolverRetryPolicy[];
 
   final_arbitration: {
     selected_route: string;
@@ -775,6 +780,23 @@ export function buildAskTurnSolverTrace(input: {
     ...(readRecord(input.payload.solver_artifact_reentry_audit)?.schema === "helix.solver_artifact_reentry_audit.v1"
       ? {
           solver_artifact_reentry_audit: input.payload.solver_artifact_reentry_audit as HelixSolverArtifactReentryAudit,
+        }
+      : {}),
+    ...(readRecord(input.payload.solver_subgoal_ledger)?.schema === "helix.solver_subgoal_ledger.v1"
+      ? {
+          solver_subgoal_ledger: input.payload.solver_subgoal_ledger as HelixSolverSubgoalLedger,
+        }
+      : {}),
+    ...(readRecord(input.payload.solver_retry_policy)?.schema === "helix.solver_retry_policy.v1"
+      ? {
+          solver_retry_policy: input.payload.solver_retry_policy as HelixSolverRetryPolicy,
+        }
+      : {}),
+    ...(Array.isArray(input.payload.solver_retry_policies)
+      ? {
+          solver_retry_policies: input.payload.solver_retry_policies
+            .map((entry: unknown) => readRecord(entry))
+            .filter((entry): entry is RecordLike => entry?.schema === "helix.solver_retry_policy.v1") as HelixSolverRetryPolicy[],
         }
       : {}),
     final_arbitration: {

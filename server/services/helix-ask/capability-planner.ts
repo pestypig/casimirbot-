@@ -112,7 +112,23 @@ const admissionFor = (input: {
   operatorCommandPresent: boolean;
   admittedFamilies: string[];
   sourceTarget: string;
+  instructionFrame?: RecordLike | null;
 }): { status: HelixCapabilityAdmissionStatus; rejectionReason?: string } => {
+  const instructionFrame = readRecord(input.instructionFrame);
+  const negativeConstraints = readStringArray(instructionFrame?.negative_user_constraints);
+  const capabilityRules = readStringArray(instructionFrame?.capability_permission_rules);
+  const negativeExecutionBlocked =
+    input.mutating &&
+    (
+      capabilityRules.includes("negative_user_constraints_block_mutating_capabilities") ||
+      negativeConstraints.some((constraint) =>
+        /\b(?:run|open|click|start|stop|set|change|update|repair|refresh|execute)\s+nothing\b/i.test(constraint) ||
+        /\b(?:do\s+not|don't|without|never)\b[\s\S]{0,80}\b(?:run|open|click|start|stop|set|change|update|repair|refresh|execute|call)\b/i.test(constraint),
+      )
+    );
+  if (negativeExecutionBlocked) {
+    return { status: "rejected", rejectionReason: "negative_user_constraint_blocks_mutating_capability" };
+  }
   if (!allowedFamilyByToolAdmission(input.family, input.admittedFamilies)) {
     return { status: "rejected", rejectionReason: "capability_family_not_admitted_by_tool_policy" };
   }
@@ -138,11 +154,13 @@ export const buildCapabilityPlan = (input: {
   routeProductContract?: RecordLike | null;
   toolCallAdmissionDecision?: RecordLike | null;
   canonicalGoalFrame?: RecordLike | null;
+  instructionFrame?: RecordLike | null;
 }): HelixCapabilityPlan => {
   const sourceTargetIntent = readRecord(input.sourceTargetIntent);
   const routeProductContract = readRecord(input.routeProductContract);
   const toolCallAdmissionDecision = readRecord(input.toolCallAdmissionDecision);
   const canonicalGoalFrame = readRecord(input.canonicalGoalFrame);
+  const instructionFrame = readRecord(input.instructionFrame);
   const sourceTarget =
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
@@ -167,6 +185,7 @@ export const buildCapabilityPlan = (input: {
     operatorCommandPresent,
     admittedFamilies,
     sourceTarget,
+    instructionFrame,
   });
   return {
     schema: HELIX_CAPABILITY_PLAN_SCHEMA,
