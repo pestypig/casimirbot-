@@ -44,14 +44,49 @@ const isReceiptKind = (value: string): boolean =>
 const isProjectionKind = (value: string): boolean =>
   /projection|panel_generated_answer|client_projection|live_card_projection|no_tool_direct/i.test(value);
 
+const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; requiredTerminalKind: string } => {
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const universalGoalFrame = readRecord(payload.universal_goal_frame);
+  const universalUserGoal = readRecord(universalGoalFrame?.user_goal);
+  return {
+    goalKind:
+      readString(canonicalGoalFrame?.goal_kind) ||
+      readString(universalGoalFrame?.goal_kind) ||
+      readString(universalUserGoal?.goal_kind),
+    requiredTerminalKind:
+      readString(canonicalGoalFrame?.required_terminal_kind) ||
+      readString(universalGoalFrame?.required_terminal_kind) ||
+      readString(universalUserGoal?.required_terminal_kind),
+  };
+};
+
+const receiptTerminalMatchesCanonicalGoal = (payload: RecordLike, terminalArtifactKind: string): boolean => {
+  const goalFrame = readTerminalGoalFrame(payload);
+  if (terminalArtifactKind === "doc_open_receipt") {
+    return (
+      goalFrame.requiredTerminalKind === "doc_open_receipt" &&
+      /^(?:doc_open_best|latest_doc_navigation)$/i.test(goalFrame.goalKind)
+    );
+  }
+  return goalFrame.requiredTerminalKind === terminalArtifactKind;
+};
+
 const primaryAllowsReceiptTerminal = (
   primaryIntent: HelixIntentKind,
   terminalArtifactKind: string,
   allowedTerminalProducts: string[],
-): boolean =>
-  isReceiptKind(terminalArtifactKind) &&
-  (primaryIntent === "control_command" || primaryIntent === "status_question") &&
-  allowedTerminalProducts.includes(terminalArtifactKind);
+  payload: RecordLike,
+): boolean => {
+  if (!isReceiptKind(terminalArtifactKind)) return false;
+  if (terminalArtifactKind === "doc_open_receipt") {
+    return receiptTerminalMatchesCanonicalGoal(payload, terminalArtifactKind);
+  }
+  return (
+    (primaryIntent === "control_command" || primaryIntent === "status_question") &&
+    allowedTerminalProducts.includes(terminalArtifactKind) &&
+    receiptTerminalMatchesCanonicalGoal(payload, terminalArtifactKind)
+  );
+};
 
 const collectRejectedEvidence = (loopTrace: RecordLike | null): Array<{ ref: string; reason: string }> =>
   (Array.isArray(loopTrace?.evidence_rejected_for_answer) ? loopTrace.evidence_rejected_for_answer : [])
@@ -124,10 +159,13 @@ export function buildEvidenceReentryGate(input: {
     input.primaryIntent,
     input.terminalArtifactKind,
     input.allowedTerminalProducts ?? [],
+    input.payload,
   );
   const receiptsReentered = receiptRefs.filter((ref) =>
     evidenceRefSet.has(ref) ||
-    (allowedReceiptTerminal && input.finalArbitrationRan && (ref === input.terminalArtifactKind || ref === input.finalAnswerSource || isReceiptKind(ref)))
+    (allowedReceiptTerminal &&
+      (input.finalArbitrationRan || input.terminalArtifactKind === "doc_open_receipt") &&
+      (ref === input.terminalArtifactKind || ref === input.finalAnswerSource || isReceiptKind(ref)))
   );
   const receiptsNotReentered = receiptRefs.filter((ref) => !receiptsReentered.includes(ref));
   const projectionRefs = unique([

@@ -1606,6 +1606,22 @@ describe("thread-bound situation context bridge", () => {
 
     expect(route.route).toBe("procedure_epoch_replay_question");
     expect(route.deictic_reference.reference_type).toBe("latest_epoch_change");
+    expect(route.procedure_evidence_retrieval_plan).toMatchObject({
+      schema: "helix.procedure_evidence_retrieval_plan.v1",
+      task: "comparison",
+      anchor: "latest_visual_epoch",
+      compare_against: "previous_epoch",
+      evidence_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.procedure_evidence_retrieval_plan?.requested_facets).toEqual(expect.arrayContaining([
+      "scene",
+      "field_evaluations",
+      "interpretations",
+      "probes",
+      "uncertainty",
+    ]));
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain(
       "previous visual observation evidence is unavailable",
@@ -1663,6 +1679,21 @@ describe("thread-bound situation context bridge", () => {
     );
     expect(route.route).toBe("procedure_epoch_replay_question");
     expect(route.deictic_reference.reference_type).toBe("latest_epoch_change");
+    expect(route.procedure_evidence_retrieval_plan).toMatchObject({
+      schema: "helix.procedure_evidence_retrieval_plan.v1",
+      task: "comparison",
+      evidence_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(route.procedure_evidence_retrieval_plan?.requested_facets).toEqual(expect.arrayContaining([
+      "scene",
+      "activity",
+      "objects",
+      "field_evaluations",
+      "interpretations",
+      "uncertainty",
+    ]));
     expect(route.procedure_memory_recall?.recall_type).toBe("epoch_replay");
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
     expect(route.situation_evidence_selection.selected_field_evaluation_refs).toContain("field_eval:activity");

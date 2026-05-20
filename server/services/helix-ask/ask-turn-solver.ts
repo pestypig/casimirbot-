@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { HelixLoopParityTrace } from "./loop-parity-trace";
+import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
 import {
   interpretHelixAskPrompt,
   type HelixPromptInterpretation,
@@ -126,6 +127,7 @@ export type HelixAskTurnSolverTrace = {
   followup_reasoning_gate: HelixFollowupReasoningGate;
   live_source_identity_audit?: HelixLiveSourceIdentityAudit;
   live_source_identity_audit_ref?: string | null;
+  procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan;
 
   final_arbitration: {
     selected_route: string;
@@ -175,6 +177,31 @@ const readStringArray = (value: unknown): string[] =>
     : [];
 
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
+
+const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; requiredTerminalKind: string } => {
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const universalGoalFrame = readRecord(payload.universal_goal_frame);
+  const universalUserGoal = readRecord(universalGoalFrame?.user_goal);
+  return {
+    goalKind:
+      readString(canonicalGoalFrame?.goal_kind) ||
+      readString(universalGoalFrame?.goal_kind) ||
+      readString(universalUserGoal?.goal_kind),
+    requiredTerminalKind:
+      readString(canonicalGoalFrame?.required_terminal_kind) ||
+      readString(universalGoalFrame?.required_terminal_kind) ||
+      readString(universalUserGoal?.required_terminal_kind),
+  };
+};
+
+const terminalMatchesCanonicalGoal = (
+  payload: RecordLike,
+  terminalArtifactKind: string,
+  allowedGoalKinds: RegExp,
+): boolean => {
+  const goalFrame = readTerminalGoalFrame(payload);
+  return goalFrame.requiredTerminalKind === terminalArtifactKind && allowedGoalKinds.test(goalFrame.goalKind);
+};
 
 const sourceTargeted = new Set([
   "visual_capture",
@@ -254,7 +281,7 @@ const isComplexSolverPrompt = (trace: HelixAskTurnSolverTrace | null): boolean =
   );
 };
 
-const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null): boolean => {
+const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null, payload: RecordLike): boolean => {
   if (!trace) return false;
   const primary = trace.selected_primary_intent;
   const terminal = trace.final_arbitration.terminal_artifact_kind;
@@ -265,6 +292,16 @@ const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null
     /^live_(?:source_continuation|pipeline_control|pipeline_inspect|pipeline_repair|runtime_repair|answer_environment_setup)$/i.test(route) &&
     trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
     trace.prompt_interpretation.negative_constraints.length === 0;
+  const docOpenReceipt =
+    terminal === "doc_open_receipt" &&
+    terminalMatchesCanonicalGoal(payload, terminal, /^(?:doc_open_best|latest_doc_navigation)$/i) &&
+    trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
+    trace.prompt_interpretation.negative_constraints.length === 0;
+  const activeDocIdentityTerminal =
+    terminal === "active_doc_identity" &&
+    terminalMatchesCanonicalGoal(payload, terminal, /^active_doc_identity$/i) &&
+    trace.prompt_interpretation.contextual_tool_mentions.length === 0 &&
+    trace.prompt_interpretation.negative_constraints.length === 0;
   return (
     (
       (
@@ -272,9 +309,11 @@ const pureControlOrStatusReceiptAllowed = (trace: HelixAskTurnSolverTrace | null
         /receipt/i.test(terminal) &&
         (reason === "pure_control_receipt" || reason === "pure_status_receipt")
       ) ||
-      livePipelineProcedureReceipt
+      livePipelineProcedureReceipt ||
+      docOpenReceipt ||
+      activeDocIdentityTerminal
     ) &&
-    (trace.route_authority_ok === true || livePipelineProcedureReceipt)
+    (trace.route_authority_ok === true || livePipelineProcedureReceipt || docOpenReceipt || activeDocIdentityTerminal)
   );
 };
 
@@ -302,7 +341,7 @@ export function evaluateAskTurnSolverHardGate(input: {
   const complexPrompt = isComplexSolverPrompt(trace);
   const applies = hardSourceTarget || complexPrompt;
   const details: HelixAskTurnSolverHardGate["failure_details"] = [];
-  const allowedPureReceipt = pureControlOrStatusReceiptAllowed(trace);
+  const allowedPureReceipt = pureControlOrStatusReceiptAllowed(trace, input.payload);
 
   if (!trace) {
     pushHardFailure(details, "solver_trace_missing", "solver trace is required before terminal authority");
@@ -513,6 +552,16 @@ const buildRiskFlags = (input: {
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
   const mutatingToolExecuted = input.actualToolCalls.some((entry) => entry.mutating === true);
   const routeCandidates = readStringArray(readRecord(input.payload.ask_turn_preflight_context)?.route_candidate_labels);
+  const docOpenReceiptAllowed =
+    input.terminalArtifactKind === "doc_open_receipt" &&
+    terminalMatchesCanonicalGoal(input.payload, input.terminalArtifactKind, /^(?:doc_open_best|latest_doc_navigation)$/i) &&
+    input.contextualToolMentions.length === 0 &&
+    input.negativeConstraints.length === 0;
+  const activeDocIdentityAllowed =
+    input.terminalArtifactKind === "active_doc_identity" &&
+    terminalMatchesCanonicalGoal(input.payload, input.terminalArtifactKind, /^active_doc_identity$/i) &&
+    input.contextualToolMentions.length === 0 &&
+    input.negativeConstraints.length === 0;
   return unique([
     !readRecord(input.payload.source_target_intent) && routeCandidates.length > 0
       ? "classifier_became_decision"
@@ -539,6 +588,8 @@ const buildRiskFlags = (input: {
       ? "missing_followup_reasoning"
       : null,
     input.terminalAuthorityOk &&
+    !docOpenReceiptAllowed &&
+    !activeDocIdentityAllowed &&
     (
       !input.finalArbitrationRan ||
       !input.routeAuthorityOk ||
@@ -711,6 +762,11 @@ export function buildAskTurnSolverTrace(input: {
       ? {
           live_source_identity_audit: liveSourceIdentityAudit,
           live_source_identity_audit_ref: liveSourceIdentityAuditRef,
+        }
+      : {}),
+    ...(readRecord(input.payload.procedure_evidence_retrieval_plan)?.schema === "helix.procedure_evidence_retrieval_plan.v1"
+      ? {
+          procedure_evidence_retrieval_plan: input.payload.procedure_evidence_retrieval_plan as HelixProcedureEvidenceRetrievalPlan,
         }
       : {}),
     final_arbitration: {

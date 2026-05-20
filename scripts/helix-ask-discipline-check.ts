@@ -199,6 +199,35 @@ function scanFiles(files: string[], messages: CheckMessage[]): void {
           "Shortcut-like terminal products must be suppressed for hard source-targeted and complex prompts unless route authority explicitly allows them.",
       });
     }
+
+    const terminalAuthorityFile = /^server\/services\/helix-ask\/(?:ask-turn-solver|evidence-reentry-gate)\.ts$/.test(file);
+    const receiptTerminalExceptionTouched =
+      /\b(?:doc_open_receipt|workspace_action_receipt|note_update_receipt|live_pipeline_receipt|receipt_terminal_without_reentry)\b/.test(content) ||
+      /\/receipt\/i\.test/.test(content);
+    const hasGoalAuthorityGuard =
+      /\b(?:canonical_goal_frame|universal_goal_frame|required_terminal_kind|goal_kind|goalFrame|GoalFrame)\b/.test(content);
+    if (terminalAuthorityFile && receiptTerminalExceptionTouched && !hasGoalAuthorityGuard) {
+      messages.push({
+        level: "failure",
+        code: "receipt_terminal_without_goal_authority_guard",
+        file,
+        message:
+          "Receipt terminal exceptions in solver/evidence gates must be bound to canonical goal authority (goal_kind and required_terminal_kind), not only terminal kind or route label.",
+      });
+    }
+
+    if (
+      terminalAuthorityFile &&
+      /\b(?:doc_open_receipt|workspace_action_receipt|note_update_receipt|live_pipeline_receipt)\b[\s\S]{0,700}\bdispatch:act\b/.test(content)
+    ) {
+      messages.push({
+        level: "failure",
+        code: "receipt_terminal_dispatch_shortcut",
+        file,
+        message:
+          "dispatch:act is a planner route, not terminal receipt authority. Bind receipt eligibility to the canonical goal frame instead.",
+      });
+    }
   }
 }
 

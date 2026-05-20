@@ -57,4 +57,24 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/^Locations:/i);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Path:/i);
   }, 90000);
+
+  it("treats NH-M2 white-paper-from-docs wording as document acquisition, not panel open", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open up the NH-M2. White paper from the docks.",
+        mode: "read",
+        debug: true,
+        sessionId: `e65-nhm2-whitepaper-docs-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_open_best");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_open_receipt");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+    expect(response.body?.terminal_error_code ?? null).not.toBe("terminal_consistency_violation");
+    expect(response.body?.execution_trace?.some((step: any) => step?.action?.action_id === "open_doc_by_path")).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Path:/i);
+  }, 90000);
 });

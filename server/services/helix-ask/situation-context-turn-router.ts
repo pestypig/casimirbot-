@@ -63,8 +63,10 @@ import {
   HELIX_PROCEDURE_EPOCH_REPLAY_SCHEMA,
   type HelixProcedureEpochReplay,
 } from "@shared/helix-procedure-epoch-replay";
+import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
 import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 import { matchProcedureRecallPrompt } from "./procedure-memory-recall-router";
+import { buildProcedureEvidenceRetrievalPlan } from "./procedure-evidence-retrieval-planner";
 
 type HelixSituationTypedFailure = {
   schema: "helix.typed_failure.v1";
@@ -152,6 +154,7 @@ export type SituationContextTurnRoute = {
   selected_visual_scene_set?: HelixSelectedVisualSceneSet | null;
   visual_scene_comparison_result?: HelixVisualSceneComparisonResult | null;
   procedure_epoch_replay_delta?: HelixProcedureEpochReplayDelta | null;
+  procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan | null;
   typed_failure?: HelixSituationTypedFailure | null;
   procedure_epoch_replay?: HelixProcedureEpochReplay | null;
   voice_live_handoff?: ReturnType<typeof createVoiceLiveHandoff> | null;
@@ -1462,11 +1465,20 @@ export function routeSituationContextTurn(input: {
         latestDistillation?.distillation_id ?? "",
       ].filter(Boolean),
     };
+    const procedureEvidenceRetrievalPlan = buildProcedureEvidenceRetrievalPlan({
+      turnId,
+      promptText: input.promptText,
+      activeContext,
+      selection,
+      sourceTargets: ["procedure_memory", "situation_epoch"],
+      evidenceRequired: true,
+    });
     return {
       route: "procedure_epoch_replay_question",
       deictic_reference: recallDeicticReference,
       active_situation_context: activeContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
       answer_text: typedFailure
         ? `${typedFailure.message}\nFailure: ${typedFailure.failure_code ?? typedFailure.error_code}`
         : renderProcedureRecallAnswer(procedureMemoryRecall, {
@@ -1512,6 +1524,14 @@ export function routeSituationContextTurn(input: {
       missingEvidence: ["active_situation_run", "procedure_memory"],
       selection,
     });
+    const procedureEvidenceRetrievalPlan = buildProcedureEvidenceRetrievalPlan({
+      turnId,
+      promptText: input.promptText,
+      activeContext,
+      selection,
+      sourceTargets: ["procedure_memory"],
+      evidenceRequired: true,
+    });
     return {
       route: "procedure_epoch_replay_question",
       deictic_reference: {
@@ -1523,6 +1543,7 @@ export function routeSituationContextTurn(input: {
       },
       active_situation_context: activeContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
       answer_text: typedFailure.message,
       reasoning_snapshot: null,
       answer_distillation: null,
@@ -1623,6 +1644,15 @@ export function routeSituationContextTurn(input: {
   const wantsSceneEpochReplay =
     isSceneEpochReplayPrompt(input.promptText) ||
     deicticReference.reference_type === "latest_epoch_change";
+  const procedureEvidenceRetrievalPlan = buildProcedureEvidenceRetrievalPlan({
+    turnId,
+    promptText: input.promptText,
+    activeContext: temporalActiveContext,
+    selection,
+    visualSceneQueryIntent: earlyVisualSceneQueryIntent,
+    sourceTargets: wantsSceneEpochReplay ? ["procedure_memory", "situation_epoch"] : ["visual_capture"],
+    evidenceRequired: true,
+  });
   if (wantsSceneEpochReplay && !selection.answerable) {
     const errorCode = temporalActiveContext.situation_run_id
       ? "procedure_epoch_replay_evidence_unavailable"
@@ -1646,6 +1676,7 @@ export function routeSituationContextTurn(input: {
       deictic_reference: deicticReference,
       active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
       answer_text: renderProcedureEpochFailureAnswer(typedFailure),
       reasoning_snapshot: null,
       answer_distillation: null,
@@ -1665,6 +1696,7 @@ export function routeSituationContextTurn(input: {
       deictic_reference: deicticReference,
       active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
       answer_text: [
         "I resolved this as a live situation-context question, but there is no server-bound active SituationRun evidence to answer from yet.",
         bindingRepair
@@ -1716,6 +1748,15 @@ export function routeSituationContextTurn(input: {
       environmentId: temporalActiveContext.environment_id ?? null,
       currentEpoch: temporalActiveContext.latest_epoch ?? null,
     });
+    const visualProcedureEvidenceRetrievalPlan = buildProcedureEvidenceRetrievalPlan({
+      turnId,
+      promptText: input.promptText,
+      activeContext: temporalActiveContext,
+      selection,
+      visualSceneQueryIntent: boundVisualSceneQueryIntent,
+      sourceTargets: ["procedure_memory", "visual_scene_memory"],
+      evidenceRequired: true,
+    });
     if (!boundVisualSceneQueryIntent.compare_to_current) {
       const selected = selectedVisualSceneSet.selected_scenes[0]?.scene_memory ?? null;
       const fullReasoning = selected
@@ -1762,6 +1803,7 @@ export function routeSituationContextTurn(input: {
         deictic_reference: deicticReference,
         active_situation_context: temporalActiveContext,
         situation_evidence_selection: selection,
+        procedure_evidence_retrieval_plan: visualProcedureEvidenceRetrievalPlan,
         answer_text: fullReasoning,
         reasoning_snapshot: distillationBundle.snapshot,
         answer_distillation: distillationBundle.distillation,
@@ -1823,6 +1865,7 @@ export function routeSituationContextTurn(input: {
           deictic_reference: deicticReference,
           active_situation_context: temporalActiveContext,
           situation_evidence_selection: selection,
+          procedure_evidence_retrieval_plan: visualProcedureEvidenceRetrievalPlan,
           answer_text: replayText,
           reasoning_snapshot: distillationBundle.snapshot,
           answer_distillation: distillationBundle.distillation,
@@ -1870,6 +1913,7 @@ export function routeSituationContextTurn(input: {
         deictic_reference: deicticReference,
         active_situation_context: temporalActiveContext,
         situation_evidence_selection: selection,
+        procedure_evidence_retrieval_plan: visualProcedureEvidenceRetrievalPlan,
         answer_text: fullReasoning,
         reasoning_snapshot: distillationBundle.snapshot,
         answer_distillation: distillationBundle.distillation,
@@ -1929,6 +1973,7 @@ export function routeSituationContextTurn(input: {
       deictic_reference: deicticReference,
       active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: visualProcedureEvidenceRetrievalPlan,
       answer_text: fullReasoning,
       reasoning_snapshot: distillationBundle.snapshot,
       answer_distillation: distillationBundle.distillation,
@@ -1965,6 +2010,7 @@ export function routeSituationContextTurn(input: {
       deictic_reference: deicticReference,
       active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
       answer_text: [
         "I saved the current visual SituationRun observation as the comparison baseline.",
         `Baseline: ${comparisonSession.baseline_observation_ref} at epoch ${comparisonSession.baseline_epoch}.`,
@@ -2011,6 +2057,7 @@ export function routeSituationContextTurn(input: {
       deictic_reference: deicticReference,
       active_situation_context: temporalActiveContext,
       situation_evidence_selection: selection,
+      procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
       answer_text: replayText,
       reasoning_snapshot: distillationBundle.snapshot,
       answer_distillation: distillationBundle.distillation,
@@ -2063,6 +2110,7 @@ export function routeSituationContextTurn(input: {
     deictic_reference: deicticReference,
     active_situation_context: temporalActiveContext,
     situation_evidence_selection: selection,
+    procedure_evidence_retrieval_plan: procedureEvidenceRetrievalPlan,
     answer_text: distillationBundle.terminalText,
     reasoning_snapshot: distillationBundle.snapshot,
     answer_distillation: distillationBundle.distillation,
