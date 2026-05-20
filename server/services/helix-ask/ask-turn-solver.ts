@@ -507,6 +507,7 @@ const buildRiskFlags = (input: {
   followupReasoningCompleted: boolean;
   liveSourceIdentityAuditPresent: boolean;
   liveSourceIdentityOk: boolean;
+  liveSourceIdentityTerminalAllowed: boolean;
 }): HelixAskTurnSolverRiskFlag[] => {
   const unexpectedToolCalls = readStringArray(input.loopTrace?.unexpected_tool_calls);
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
@@ -537,7 +538,16 @@ const buildRiskFlags = (input: {
     input.followupReasoningRequired && !input.followupReasoningCompleted
       ? "missing_followup_reasoning"
       : null,
-    input.terminalAuthorityOk && (!input.finalArbitrationRan || !input.routeAuthorityOk || (input.liveSourceIdentityAuditPresent && !input.liveSourceIdentityOk))
+    input.terminalAuthorityOk &&
+    (
+      !input.finalArbitrationRan ||
+      !input.routeAuthorityOk ||
+      (
+        input.liveSourceIdentityAuditPresent &&
+        !input.liveSourceIdentityOk &&
+        !input.liveSourceIdentityTerminalAllowed
+      )
+    )
       ? "terminal_authority_before_solver_completion"
       : null,
   ].filter((entry): entry is HelixAskTurnSolverRiskFlag => Boolean(entry)));
@@ -611,6 +621,13 @@ export function buildAskTurnSolverTrace(input: {
   const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
   const terminalAuthorityOk = readBoolean(loopTrace?.terminal_authority_ok) || readBoolean(readRecord(input.payload.terminal_answer_authority)?.server_authoritative);
   const liveSourceIdentityOk = !liveSourceIdentityAudit || liveSourceIdentityAudit.identity_ok === true;
+  const liveSourceIdentityTerminalAllowed =
+    terminalArtifactKind === "live_environment_binding_diagnosis" ||
+    terminalArtifactKind === "live_source_typed_failure" ||
+    terminalArtifactKind === "source_binding_status" ||
+    terminalArtifactKind === "source_binding_repair_candidate" ||
+    terminalArtifactKind === "typed_failure" ||
+    finalAnswerSource === "typed_failure";
   const actualToolCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -638,13 +655,14 @@ export function buildAskTurnSolverTrace(input: {
     followupReasoningCompleted: followupReasoningGate.completed,
     liveSourceIdentityAuditPresent: Boolean(liveSourceIdentityAudit),
     liveSourceIdentityOk,
+    liveSourceIdentityTerminalAllowed,
   });
   const completedSolverPath =
     finalArbitrationRan &&
     routeAuthorityOk &&
     poisonAuditOk &&
     terminalAuthorityOk &&
-    liveSourceIdentityOk &&
+    (liveSourceIdentityOk || liveSourceIdentityTerminalAllowed) &&
     evidenceReentryGate.completed &&
     followupReasoningGate.completed &&
     solverRiskFlags.length === 0;

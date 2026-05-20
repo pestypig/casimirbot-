@@ -91,7 +91,21 @@ all right cool can you review what is happening right now in the screen capture 
 Expected: primary intent is visual/content question; interval is contextual/negated; no `set_rate`; no `live_pipeline_receipt` terminal answer.
 
 ## Required Tests
-For applicable patches, run:
+For applicable patches, run the discipline guard. It checks the ignored Codex
+reference checkout, scans changed Helix Ask surfaces for shortcut/poison risks,
+then runs the prompt-solving benchmark, API parity matrix, and server build:
+
+```bash
+npm run helix:ask:discipline
+```
+
+For edit-loop feedback without the test battery, use:
+
+```bash
+npm run helix:ask:discipline:quick
+```
+
+The underlying required tests are:
 
 ```bash
 npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks

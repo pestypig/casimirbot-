@@ -14,17 +14,38 @@ export function chooseLiveAnswerStyle(input: {
   return "brief";
 }
 
+const normalizeLine = (value: string): string =>
+  value.replace(/\s+/g, " ").trim();
+
+const ensureTerminalPunctuation = (value: string): string => {
+  const text = normalizeLine(value);
+  if (!text) return text;
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+};
+
+const stripDuplicateCaveatLead = (value: string): string =>
+  value.replace(/^caveat:\s*/i, "").trim();
+
+const joinAuthorizedAnswerParts = (input: {
+  answer: string;
+  caveat?: string | null;
+}): string => {
+  const answer = ensureTerminalPunctuation(input.answer);
+  const caveat = stripDuplicateCaveatLead(normalizeLine(input.caveat ?? ""));
+  if (!caveat || answer.toLowerCase().includes(caveat.toLowerCase())) return answer;
+  return `${answer} Caveat: ${ensureTerminalPunctuation(caveat)}`;
+};
+
 export function formatDistilledAnswer(input: {
   conciseAnswer: string;
   caveat?: string | null;
   style: HelixConversationalAnswerStyle;
   expansionAvailable: boolean;
 }): string {
-  const answer = input.conciseAnswer.trim();
-  const caveat = input.caveat?.trim();
-  const withCaveat = caveat && !answer.includes(caveat) ? `${answer} ${caveat}` : answer;
-  if (input.style === "voice") return withCaveat.split(/\s+/).slice(0, 34).join(" ").replace(/[,:;]$/, ".");
+  const withCaveat = joinAuthorizedAnswerParts({
+    answer: input.conciseAnswer,
+    caveat: input.caveat,
+  });
   if (input.style === "debug") return withCaveat;
-  if (input.expansionAvailable) return `${withCaveat} Details are saved in the procedure log.`;
   return withCaveat;
 }

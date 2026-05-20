@@ -181,7 +181,7 @@ const replayWindowForPrompt = (input: {
 };
 
 const isProcedureReplayPrompt = (prompt: string): boolean =>
-  /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epoch)|previous\s+(?:scene|frame|visual|screen|capture)|compare\s+(?:the\s+)?current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epoch)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
+  /\b(?:why\s+did|what\s+changed|changed\s+since|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epochs?|scene\s+epochs?|visual\s+epochs?|screen\s+epochs?|live\s+epochs?|since\s+(?:the\s+)?last\s+(?:seen|visual|capture|scene|frame|screen|epochs?)|previous\s+(?:scene|frame|visual|screen|capture|epochs?)|compare\s+(?:the\s+)?current\s+scene|compare\b[\s\S]{0,80}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epochs?)|(?:different|difference)\b[\s\S]{0,100}\b(?:last|previous)\s+(?:scene|frame|visual|screen|capture|epochs?)|last\s+(?:scene|frame|visual|screen|capture)\b[\s\S]{0,100}\b(?:current|now|looking\s+at|this\s+(?:scene|frame|visual|screen))|confidence\s+change|stay\s+silent|interject|replay\s+the\s+last|procedure\s+memory)\b/i.test(prompt);
 
 const isProcedureMemoryPrompt = (prompt: string): boolean =>
   /\bprocedure\s+memory\b/i.test(prompt);
@@ -265,13 +265,13 @@ const renderProcedureEpochReplayAnswer = (replay: HelixProcedureEpochReplay): st
     "Previous observation",
     replay.previous_observation ?? "Unavailable",
     "",
-    "Changed elements",
+    "Changed elements since previous epoch",
     ...(replay.changed_elements.length ? replay.changed_elements.map((entry) => `- ${entry}`) : ["- none confidently selected"]),
     "",
-    "Unchanged elements",
+    "Unchanged elements / stable",
     ...(replay.unchanged_elements.length ? replay.unchanged_elements.map((entry) => `- ${entry}`) : ["- none confidently selected"]),
     "",
-    "Uncertainty",
+    "Uncertainty / unclear",
     ...(replay.uncertainty.length ? replay.uncertainty.map((entry) => `- ${entry}`) : ["- comparison confidence unavailable"]),
     "",
     "Evidence refs",
@@ -290,13 +290,13 @@ const renderProcedureEpochFailureAnswer = (failure: HelixSituationTypedFailure):
     "Previous observation",
     failure.error_code === "procedure_epoch_previous_unavailable" ? "Unavailable" : "Unavailable or insufficiently selected",
     "",
-    "Changed elements",
+    "Changed elements since previous epoch",
     "- none confidently selected",
     "",
-    "Unchanged elements",
+    "Unchanged elements / stable",
     "- none confidently selected",
     "",
-    "Uncertainty",
+    "Uncertainty / unclear",
     ...uniqueStrings([
       ...failure.missing_evidence,
       failure.message,
@@ -685,14 +685,13 @@ const buildSituationFullReasoning = (input: {
 const summarizeVisibleContext = (value: string | null | undefined): string => {
   const trimmed = value?.replace(/\s+/g, " ").trim() ?? "";
   if (!trimmed) return "the active visual workspace";
-  const firstSentence = trimmed.split(/(?<=[.!?])\s+/)[0] ?? trimmed;
-  return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trim()}...` : firstSentence;
+  return trimmed;
 };
 
 const stripSceneLeadIn = (value: string): string => {
   const cleaned = value.replace(/\s+/g, " ").trim();
   return cleaned
-    .replace(/^(?:a\s+|the\s+)?(?:visible\s+scene|current\s+live\s+frame|live\s+frame|current\s+frame|visual\s+capture\s+frame|current\s+visual\s+capture\s+frame|image|screen)\s+(?:showcases|shows|depicts|displays|features|contains)\s+/i, "")
+    .replace(/^(?:a\s+|the\s+)?(?:visible\s+scene|current\s+live\s+frame|live\s+frame|current\s+frame|visual\s+capture\s+frame|current\s+visual\s+capture\s+frame|image|screen)\s+(?:captures|showcases|shows|depicts|displays|features|contains)\s+/i, "")
     .replace(/^(?:the\s+)?(?:active\s+context|ui)\s+(?:appears\s+to\s+be|suggests)\s+/i, "")
     .trim();
 };
@@ -752,6 +751,26 @@ const summarizeVisibleWorkspace = (input: {
   return stripped.replace(/\.$/, "");
 };
 
+const normalizeBriefPart = (value: string | null | undefined): string | null => {
+  const text = value?.replace(/\s+/g, " ").trim() ?? "";
+  if (!text) return null;
+  return text.replace(/\.$/, "");
+};
+
+const composeOperatorBrief = (input: {
+  visible: string;
+  activity?: string | null;
+  objects?: string | null;
+}): string => {
+  const visible = normalizeBriefPart(input.visible) ?? "the active visual workspace";
+  const activity = normalizeBriefPart(input.activity);
+  const objects = normalizeBriefPart(input.objects);
+  const lines = [`I'm seeing ${visible.replace(/^\s*(?:you're\s+viewing|i'?m\s+seeing)\s+/i, "")}.`];
+  if (activity) lines.push(`The useful signal is ${activity.replace(/\.$/, "")}.`);
+  if (objects) lines.push(`Visible objects include ${objects.replace(/\.$/, "")}.`);
+  return lines.join(" ");
+};
+
 const buildConciseSituationAnswer = (input: {
   prompt: string;
   activeContext: HelixActiveSituationContext;
@@ -785,15 +804,22 @@ const buildConciseSituationAnswer = (input: {
     };
   }
   if (/\b(?:file|folder|looking at|screen|this|now)\b/i.test(prompt)) {
-    const action = activity?.value ? ` ${activity.value}` : "";
     return {
-      concise: `You're viewing ${visible}.${action ? ` ${action}` : ""}`,
-      caveat: uncertainty?.value ? `Caveat: ${uncertainty.value}` : null,
+      concise: composeOperatorBrief({
+        visible,
+        activity: activity?.value,
+        objects: objects?.value,
+      }),
+      caveat: uncertainty?.value ?? null,
     };
   }
   return {
-    concise: summarizeVisibleContext(scene?.value ?? activity?.value ?? objects?.value),
-    caveat: uncertainty?.value ? `Caveat: ${uncertainty.value}` : null,
+    concise: composeOperatorBrief({
+      visible: summarizeVisibleContext(scene?.value ?? observationSummary ?? objects?.value),
+      activity: activity?.value,
+      objects: objects?.value,
+    }),
+    caveat: uncertainty?.value ?? null,
   };
 };
 
@@ -860,18 +886,21 @@ const recordReasoningAndDistillation = (input: {
     assistant_answer: false,
     raw_content_included: false,
   });
-  return {
-    snapshot,
-    distillation,
-    terminalText: [
-      formatDistilledAnswer({
+  const terminalTextLines = [
+    formatDistilledAnswer({
       conciseAnswer: distillation.concise_answer,
       caveat: distillation.caveat,
       style: distillation.style,
       expansionAvailable: distillation.expansion_available,
-      }),
-      `Source refs: ${selectedSourceRefs(input.selection).join(", ") || "none selected"}.`,
-    ].join("\n"),
+    }),
+  ];
+  if (distillation.style === "debug") {
+    terminalTextLines.push(`Source refs: ${selectedSourceRefs(input.selection).join(", ") || "none selected"}.`);
+  }
+  return {
+    snapshot,
+    distillation,
+    terminalText: terminalTextLines.join("\n"),
   };
 };
 
@@ -1564,7 +1593,9 @@ export function routeSituationContextTurn(input: {
   const deicticReference = {
     ...initialReference,
     candidate_signal: initialReference.candidate_signal || Boolean(earlyVisualSceneQueryIntent),
-    reference_type: earlyVisualSceneQueryIntent ? "latest_epoch_change" as const : initialReference.reference_type,
+    reference_type: earlyVisualSceneQueryIntent || isSceneEpochReplayPrompt(input.promptText)
+      ? "latest_epoch_change" as const
+      : initialReference.reference_type,
     resolved_context_refs: [
       resolvedActiveContext.context_id,
       resolvedActiveContext.situation_run_id ?? "",
@@ -1579,7 +1610,7 @@ export function routeSituationContextTurn(input: {
     threadId: input.threadId,
     activeContext: temporalActiveContext,
     deicticReference,
-    askingHistory: isProcedureReplayPrompt(input.promptText),
+    askingHistory: isSceneEpochReplayPrompt(input.promptText) || isProcedureReplayPrompt(input.promptText),
   });
   const voiceLiveHandoff = input.inputModality === "voice"
     ? createVoiceLiveHandoff({

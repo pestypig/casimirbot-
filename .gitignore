@@ -4,7 +4,10 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
-data/
+data/*
+!data/starsim/
+!data/starsim/solar-reference-pack.v1.json
+!data/starsim/solar-product-registry.v1.json
 !docs/specs/data/
 !docs/specs/data/qcd-hepdata-record-159491.v1.json
 !docs/specs/data/qcd-hepdata-table-159491-t3.v1.json

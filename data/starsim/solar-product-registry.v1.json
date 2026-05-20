@@ -1,0 +1,434 @@
+{
+  "id": "solar_product_registry",
+  "version": "solar-product-registry/1",
+  "products": {
+    "solar_assimilation_interior_profile_v1": {
+      "id": "solar_assimilation_interior_profile_v1",
+      "product_family": "helioseismic_closure",
+      "supported_sections": [
+        "solar_interior_profile"
+      ],
+      "reference_doc_ids": [
+        "basu_antia_2004",
+        "hmi_products"
+      ],
+      "instrument": "solar-assimilation+SDO/HMI",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "day",
+        "snapshot"
+      ]
+    },
+    "solar_assimilation_layer_boundaries_v1": {
+      "id": "solar_assimilation_layer_boundaries_v1",
+      "product_family": "helioseismic_closure",
+      "supported_sections": [
+        "solar_layer_boundaries"
+      ],
+      "reference_doc_ids": [
+        "basu_antia_2004",
+        "hmi_products"
+      ],
+      "instrument": "solar-assimilation+SDO/HMI",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "day",
+        "snapshot"
+      ]
+    },
+    "gong_hmi_global_modes_v1": {
+      "id": "gong_hmi_global_modes_v1",
+      "product_family": "global_helioseismology_products",
+      "supported_sections": [
+        "solar_global_modes"
+      ],
+      "reference_doc_ids": [
+        "gong_products",
+        "hmi_products",
+        "basu_antia_2004"
+      ],
+      "instrument": "GONG+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "day",
+        "snapshot"
+      ]
+    },
+    "borexino_neutrino_vector_v1": {
+      "id": "borexino_neutrino_vector_v1",
+      "product_family": "solar_neutrino_constraints",
+      "supported_sections": [
+        "solar_neutrino_constraints"
+      ],
+      "reference_doc_ids": [
+        "borexino_2018"
+      ],
+      "instrument": "Borexino",
+      "observed_mode": "observed",
+      "cadence_units": [
+        "day",
+        "snapshot"
+      ]
+    },
+    "solar_assimilation_structural_residual_context_v1": {
+      "id": "solar_assimilation_structural_residual_context_v1",
+      "product_family": "structural_residual_products",
+      "supported_sections": [
+        "solar_structural_residuals"
+      ],
+      "reference_doc_ids": [
+        "basu_antia_2004",
+        "hmi_products",
+        "gong_products",
+        "borexino_2018"
+      ],
+      "instrument": "solar-assimilation+SDO/HMI+GONG+Borexino",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "day",
+        "snapshot"
+      ]
+    },
+    "hmi_gong_local_helio_context_v1": {
+      "id": "hmi_gong_local_helio_context_v1",
+      "product_family": "local_helioseismology_products",
+      "supported_sections": [
+        "solar_local_helio"
+      ],
+      "reference_doc_ids": [
+        "hmi_products",
+        "gong_products"
+      ],
+      "instrument": "SDO/HMI+GONG",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "s",
+        "min",
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "noaa_swpc_cycle_indices_v1": {
+      "id": "noaa_swpc_cycle_indices_v1",
+      "product_family": "cycle_index_products",
+      "supported_sections": [
+        "solar_cycle_indices"
+      ],
+      "reference_doc_ids": [
+        "goes_xray"
+      ],
+      "instrument": "NOAA/SWPC",
+      "observed_mode": "observed",
+      "cadence_units": [
+        "day",
+        "snapshot"
+      ]
+    },
+    "hmi_full_disk_magnetogram_v1": {
+      "id": "hmi_full_disk_magnetogram_v1",
+      "product_family": "magnetogram_products",
+      "supported_sections": [
+        "solar_magnetogram"
+      ],
+      "reference_doc_ids": [
+        "hmi_products"
+      ],
+      "instrument": "SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "s",
+        "min",
+        "hour",
+        "day",
+        "carrington_rotation",
+        "snapshot"
+      ]
+    },
+    "noaa_active_region_catalog_v1": {
+      "id": "noaa_active_region_catalog_v1",
+      "product_family": "active_region_products",
+      "supported_sections": [
+        "solar_active_regions"
+      ],
+      "reference_doc_ids": [
+        "hmi_products"
+      ],
+      "instrument": "NOAA+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "tsis_tim_tsi_continuity_v1": {
+      "id": "tsis_tim_tsi_continuity_v1",
+      "product_family": "solar_irradiance_products",
+      "supported_sections": [
+        "solar_irradiance_series"
+      ],
+      "reference_doc_ids": [
+        "tsis_tim"
+      ],
+      "instrument": "TSIS/TIM",
+      "observed_mode": "observed",
+      "cadence_units": [
+        "s",
+        "min",
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "hale_cycle_history_context_v1": {
+      "id": "hale_cycle_history_context_v1",
+      "product_family": "cycle_history_products",
+      "supported_sections": [
+        "solar_cycle_history"
+      ],
+      "reference_doc_ids": [
+        "sft_review_2023",
+        "hmi_products"
+      ],
+      "instrument": "NOAA/SWPC+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "day",
+        "carrington_rotation",
+        "snapshot"
+      ]
+    },
+    "hmi_gong_surface_flow_context_v1": {
+      "id": "hmi_gong_surface_flow_context_v1",
+      "product_family": "surface_flow_products",
+      "supported_sections": [
+        "solar_surface_flows"
+      ],
+      "reference_doc_ids": [
+        "hmi_products",
+        "gong_products",
+        "sft_review_2023"
+      ],
+      "instrument": "SDO/HMI+GONG",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "carrington_rotation",
+        "snapshot"
+      ]
+    },
+    "hmi_noaa_active_region_geometry_v1": {
+      "id": "hmi_noaa_active_region_geometry_v1",
+      "product_family": "active_region_geometry_products",
+      "supported_sections": [
+        "solar_active_regions",
+        "solar_surface_flows"
+      ],
+      "reference_doc_ids": [
+        "hmi_products",
+        "sft_review_2023"
+      ],
+      "instrument": "SDO/HMI+NOAA",
+      "observed_mode": "assimilated",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "pfss_coronal_field_context_v1": {
+      "id": "pfss_coronal_field_context_v1",
+      "product_family": "coronal_field_proxy_products",
+      "supported_sections": [
+        "solar_coronal_field"
+      ],
+      "reference_doc_ids": [
+        "nso_pfss",
+        "hmi_products",
+        "aia_corona"
+      ],
+      "instrument": "NSO/PFSS+SDO/HMI+SDO/AIA",
+      "observed_mode": "modeled",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "carrington_rotation",
+        "snapshot"
+      ]
+    },
+    "hmi_noaa_magnetic_memory_history_v1": {
+      "id": "hmi_noaa_magnetic_memory_history_v1",
+      "product_family": "magnetic_memory_products",
+      "supported_sections": [
+        "solar_magnetic_memory"
+      ],
+      "reference_doc_ids": [
+        "sft_review_2023",
+        "hmi_products"
+      ],
+      "instrument": "NOAA/SWPC+SDO/HMI",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "day",
+        "carrington_rotation",
+        "snapshot"
+      ]
+    },
+    "hmi_noaa_bipolar_active_region_context_v1": {
+      "id": "hmi_noaa_bipolar_active_region_context_v1",
+      "product_family": "bipolar_active_region_products",
+      "supported_sections": [
+        "solar_active_regions",
+        "solar_magnetic_memory"
+      ],
+      "reference_doc_ids": [
+        "hmi_products",
+        "sft_review_2023"
+      ],
+      "instrument": "NOAA+SDO/HMI/HARP",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "hmi_noaa_sunspot_catalog_v1": {
+      "id": "hmi_noaa_sunspot_catalog_v1",
+      "product_family": "sunspot_catalog_products",
+      "supported_sections": [
+        "solar_sunspot_catalog"
+      ],
+      "reference_doc_ids": [
+        "hmi_products",
+        "sft_review_2023"
+      ],
+      "instrument": "NOAA+SDO/HMI/HARP",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "solar_cross_phase_event_linkage_context_v1": {
+      "id": "solar_cross_phase_event_linkage_context_v1",
+      "product_family": "cross_phase_event_linkage",
+      "supported_sections": [
+        "solar_event_linkage"
+      ],
+      "reference_doc_ids": [
+        "goes_xray",
+        "lasco_docs",
+        "hmi_products",
+        "gong_products"
+      ],
+      "instrument": "GOES/SWPC+SOHO/LASCO+SDO/HMI+GONG",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "s",
+        "min",
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "solar_cross_layer_topology_linkage_context_v1": {
+      "id": "solar_cross_layer_topology_linkage_context_v1",
+      "product_family": "topology_linkage_products",
+      "supported_sections": [
+        "solar_topology_linkage"
+      ],
+      "reference_doc_ids": [
+        "nso_pfss",
+        "hmi_products",
+        "sft_review_2023",
+        "goes_xray",
+        "lasco_docs"
+      ],
+      "instrument": "NSO/PFSS+SDO/HMI+NOAA+GOES/LASCO",
+      "observed_mode": "observed",
+      "coordinate_frame": "Carrington",
+      "cadence_units": [
+        "hour",
+        "day",
+        "carrington_rotation",
+        "snapshot"
+      ]
+    },
+    "goes_flare_catalog_v1": {
+      "id": "goes_flare_catalog_v1",
+      "product_family": "flare_catalog_products",
+      "supported_sections": [
+        "solar_flare_catalog"
+      ],
+      "reference_doc_ids": [
+        "goes_xray"
+      ],
+      "instrument": "GOES",
+      "observed_mode": "observed",
+      "cadence_units": [
+        "s",
+        "min",
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "lasco_cme_catalog_v1": {
+      "id": "lasco_cme_catalog_v1",
+      "product_family": "cme_catalog_products",
+      "supported_sections": [
+        "solar_cme_catalog"
+      ],
+      "reference_doc_ids": [
+        "lasco_docs"
+      ],
+      "instrument": "SOHO/LASCO",
+      "observed_mode": "observed",
+      "cadence_units": [
+        "min",
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    },
+    "eve_goes_irradiance_context_v1": {
+      "id": "eve_goes_irradiance_context_v1",
+      "product_family": "solar_irradiance_products",
+      "supported_sections": [
+        "solar_irradiance_series"
+      ],
+      "reference_doc_ids": [
+        "eve_docs",
+        "goes_xray"
+      ],
+      "instrument": "SDO/EVE+GOES",
+      "observed_mode": "observed",
+      "cadence_units": [
+        "s",
+        "min",
+        "hour",
+        "day",
+        "snapshot"
+      ]
+    }
+  }
+}

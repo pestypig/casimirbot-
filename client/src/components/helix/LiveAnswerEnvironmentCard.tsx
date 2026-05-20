@@ -28,20 +28,22 @@ const lineValue = (lines: LiveAnswerLineState[], key: string): string =>
   cleanLine(lines.find((line: LiveAnswerLineState) => line.key === key) ?? { key, label: key, value: "" } as LiveAnswerLineState).toLowerCase();
 
 const environmentPolicyBadges = (environment: LiveAnswerEnvironment): Array<{ label: string; value: string }> => {
+  const lines = Array.isArray(environment.lines) ? environment.lines : [];
+  const sourceIds = Array.isArray(environment.source_ids) ? environment.source_ids : [];
   const sourceKinds = new Set<string>();
-  if (environment.lines.some((line: LiveAnswerLineState) => ["situation", "actor_state", "resources", "affordances"].includes(line.key))) {
+  if (lines.some((line: LiveAnswerLineState) => ["situation", "actor_state", "resources", "affordances"].includes(line.key))) {
     sourceKinds.add("environment_state");
   }
-  if (environment.lines.some((line: LiveAnswerLineState) => ["possibilities", "rehearsal", "recommendation"].includes(line.key))) {
+  if (lines.some((line: LiveAnswerLineState) => ["possibilities", "rehearsal", "recommendation"].includes(line.key))) {
     sourceKinds.add("procedure_graph");
   }
-  if (environment.source_ids.some((sourceId: string) => /visual|frame|screen/i.test(sourceId))) sourceKinds.add("visual_frame");
-  if (environment.source_ids.some((sourceId: string) => /audio|voice|transcript/i.test(sourceId))) sourceKinds.add("audio");
-  if (environment.source_ids.some((sourceId: string) => /simulation|sim/i.test(sourceId))) sourceKinds.add("simulation");
+  if (sourceIds.some((sourceId: string) => /visual|frame|screen/i.test(sourceId))) sourceKinds.add("visual_frame");
+  if (sourceIds.some((sourceId: string) => /audio|voice|transcript/i.test(sourceId))) sourceKinds.add("audio");
+  if (sourceIds.some((sourceId: string) => /simulation|sim/i.test(sourceId))) sourceKinds.add("simulation");
 
-  const possibility = lineValue(environment.lines, "possibilities");
-  const rehearsal = lineValue(environment.lines, "rehearsal");
-  const recommendation = lineValue(environment.lines, "recommendation");
+  const possibility = lineValue(lines, "possibilities");
+  const rehearsal = lineValue(lines, "rehearsal");
+  const recommendation = lineValue(lines, "recommendation");
   return [
     { label: "Source", value: Array.from(sourceKinds).join(" / ") || "none" },
     {
@@ -60,6 +62,7 @@ const environmentPolicyBadges = (environment: LiveAnswerEnvironment): Array<{ la
 };
 
 const copyDebugSummary = (environment: LiveAnswerEnvironment, deltas: LiveAnswerEnvironmentDelta[]) => {
+  const lines = Array.isArray(environment.lines) ? environment.lines : [];
   const text = JSON.stringify({
     environment_id: environment.environment_id,
     status: environment.status,
@@ -67,7 +70,7 @@ const copyDebugSummary = (environment: LiveAnswerEnvironment, deltas: LiveAnswer
     objective: environment.objective,
     latest_summary: environment.latest_summary,
     latest_evaluation: environment.latest_evaluation ?? null,
-    lines: environment.lines.map((line: LiveAnswerLineState) => ({
+    lines: lines.map((line: LiveAnswerLineState) => ({
       key: line.key,
       value: line.value,
       updated_at: line.updated_at,
@@ -107,12 +110,14 @@ export function LiveAnswerEnvironmentCard({
 }) {
   const [traceOpen, setTraceOpen] = useState(false);
   const [presentStateCard, setPresentStateCard] = useState<HelixPresentStateCard | null>(null);
+  const sourceIds = Array.isArray(environment.source_ids) ? environment.source_ids : [];
+  const lines = Array.isArray(environment.lines) ? environment.lines : [];
   const rehearsalCatalog = useMemo(() => buildRehearsalSpaceCatalog({
-    sourceIds: environment.source_ids,
-    lineKeys: environment.lines.map((line: LiveAnswerLineState) => line.key),
+    sourceIds,
+    lineKeys: lines.map((line: LiveAnswerLineState) => line.key),
     objective: environment.objective,
     preset: environment.preset,
-  }), [environment.lines, environment.objective, environment.preset, environment.source_ids]);
+  }), [environment.objective, environment.preset, lines, sourceIds]);
   const [selectedRehearsalSpaceId, setSelectedRehearsalSpaceId] = useState<HelixRehearsalSpaceId | null>(
     rehearsalCatalog.selected_space_id,
   );
@@ -136,7 +141,7 @@ export function LiveAnswerEnvironmentCard({
       cancelled = true;
     };
   }, [environment.environment_id, environment.room_id, environment.thread_id, environment.updated_at]);
-  const answerLines = environment.lines.filter((line: LiveAnswerLineState) => line.visibility === "answer_card");
+  const answerLines = lines.filter((line: LiveAnswerLineState) => line.visibility === "answer_card");
   const presentLines = presentStateCard?.lines ?? [];
   const visibleLines = presentLines.length > 0
     ? presentLines
@@ -148,14 +153,14 @@ export function LiveAnswerEnvironmentCard({
         confidence: null,
         updated_at: entry.updated_at,
       }));
-  const procedureLines = environment.lines.filter((line: LiveAnswerLineState) =>
+  const procedureLines = lines.filter((line: LiveAnswerLineState) =>
     line.key === "possibilities" ||
     line.key === "rehearsal" ||
     line.key === "recommendation" ||
     line.key === "unknowns"
   );
   const sourceSummary = [
-    environment.source_ids.length ? `Sources ${environment.source_ids.length}` : "No bound source",
+    sourceIds.length ? `Sources ${sourceIds.length}` : "No bound source",
     environment.context_policy,
     "raw payloads excluded",
   ].join(" / ");

@@ -209,11 +209,11 @@ export function buildApiParityProbeResult(input: {
   }
   if (!input.terminalEventSeen && input.terminalEventSeen !== undefined) failures.push("terminal_event_missing");
   if (!terminalAuthorityOk) failures.push("terminal_authority_not_ok");
-  if (!routeAuthorityOk) failures.push("route_authority_not_ok");
+  if (!routeAuthorityOk && !expectedIdentityDiagnosis) failures.push("route_authority_not_ok");
   if (unexpectedToolCalls.length > 0) failures.push(`unexpected_tool_calls:${unexpectedToolCalls.join(",")}`);
   if (shortCircuitRiskFlags.length > 0 && !expectedIdentityDiagnosis) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
   if (solverShortCircuitFlags.length > 0 && !expectedIdentityDiagnosis) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
-  if (poisonAuditOk && !routeAuthorityOk) failures.push("poison_clean_but_authority_failed");
+  if (poisonAuditOk && !routeAuthorityOk && !expectedIdentityDiagnosis) failures.push("poison_clean_but_authority_failed");
   if (
     input.scenario.expected.live_source_identity_diagnosis &&
     readString(liveSourceIdentityAudit?.diagnosis) !== input.scenario.expected.live_source_identity_diagnosis

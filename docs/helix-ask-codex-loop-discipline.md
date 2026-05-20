@@ -106,6 +106,18 @@ mixed intent prompt
 The prompt-solving benchmark is the default adversarial battery:
 
 ```bash
+npm run helix:ask:discipline
+```
+
+This top-level guard verifies the ignored Codex runtime reference checkout,
+scans Helix Ask-sensitive changed files for poison/shortcut risks, runs the
+prompt-solving benchmark and API parity matrix, and builds the server. For fast
+edit-loop feedback, use `npm run helix:ask:discipline:quick`; for live-source
+identity or continuation changes, use `npm run helix:ask:discipline:full`.
+
+The underlying adversarial benchmark remains:
+
+```bash
 npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
 ```
 

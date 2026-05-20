@@ -93,6 +93,10 @@ Patch-time contract:
 - If present, use the ignored local Codex reference checkout at
   `external/openai-codex-compare` for grep/diff comparisons. Do not commit or
   mutate it as part of Helix Ask patches.
+- Run `npm run helix:ask:discipline:quick` during edit loops when touching
+  Helix Ask-sensitive surfaces. Before handoff, run
+  `npm run helix:ask:discipline`; use `npm run helix:ask:discipline:full` when
+  live-source identity or continuation behavior changed.
 - Lexical cues in user text are not execution. Contextual, negated, historical,
   future, quoted, or screen-visible tool/control words must not admit mutating
   tools unless the prompt is an affirmative operator command.
@@ -105,9 +109,10 @@ Patch-time contract:
 - Every shortcut-like rule must include adversarial tests for contextual,
   negated, future/conditional, historical, quoted/screen-visible, and mixed
   intent prompts.
-- For applicable Helix Ask changes, run the prompt-solving benchmark plus the
-  API parity test or live-server parity probe and report any disabled/frontier
-  scenarios separately:
+- For applicable Helix Ask changes, run the discipline guard, or at minimum the
+  prompt-solving benchmark plus the API parity test or live-server parity probe
+  and report any disabled/frontier scenarios separately:
+  `npm run helix:ask:discipline`
   `npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks`
   `npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks`
   or `npm run helix:ask:api-parity`.

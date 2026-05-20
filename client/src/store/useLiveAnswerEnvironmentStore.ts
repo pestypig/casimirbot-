@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type {
   LiveAnswerEnvironment,
   LiveAnswerEnvironmentDelta,
@@ -48,6 +48,34 @@ const uniqueDeltas = (deltas: LiveAnswerEnvironmentDelta[]): LiveAnswerEnvironme
   for (const delta of deltas) byId.set(delta.delta_id, delta);
   return Array.from(byId.values()).sort((a, b) => a.ts.localeCompare(b.ts)).slice(-80);
 };
+
+const LIVE_ANSWER_STORAGE_KEY = "helix-live-answer-environment-v1";
+const MAX_PERSISTED_DIAGNOSTIC_THREADS = 12;
+
+const trimDiagnostics = (
+  diagnostics: Record<string, LiveAnswerEnvironmentDiagnostics> | undefined,
+): Record<string, LiveAnswerEnvironmentDiagnostics> => {
+  const entries = Object.entries(diagnostics ?? {})
+    .sort(([, left], [, right]) => String(right.last_loaded_at ?? "").localeCompare(String(left.last_loaded_at ?? "")))
+    .slice(0, MAX_PERSISTED_DIAGNOSTIC_THREADS);
+  return Object.fromEntries(entries);
+};
+
+const liveAnswerEnvironmentStorage = createJSONStorage<Partial<LiveAnswerEnvironmentState>>(() => ({
+  getItem: (name) => window.localStorage.getItem(name),
+  removeItem: (name) => window.localStorage.removeItem(name),
+  setItem: (name, value) => {
+    try {
+      window.localStorage.setItem(name, value);
+    } catch (error) {
+      if (name === LIVE_ANSWER_STORAGE_KEY) {
+        window.localStorage.removeItem(name);
+        return;
+      }
+      throw error;
+    }
+  },
+}));
 
 export const selectActiveLiveAnswerEnvironment = (
   state: LiveAnswerEnvironmentState,
@@ -172,25 +200,27 @@ export const useLiveAnswerEnvironmentStore = create<LiveAnswerEnvironmentState>(
       },
     }),
     {
-      name: "helix-live-answer-environment-v1",
-      version: 2,
+      name: LIVE_ANSWER_STORAGE_KEY,
+      version: 3,
+      storage: liveAnswerEnvironmentStorage,
       migrate: (persisted) => {
         const state = persisted && typeof persisted === "object"
           ? persisted as Partial<LiveAnswerEnvironmentState>
           : {};
         return {
-          environmentByThread: state.environmentByThread ?? {},
-          environmentById: state.environmentById ?? {},
+          environmentByThread: {},
+          environmentById: {},
           deltasByEnvironment: {},
           latestReadByThread: {},
-          diagnosticsByThread: state.diagnosticsByThread ?? {},
+          diagnosticsByThread: trimDiagnostics(state.diagnosticsByThread),
         } as LiveAnswerEnvironmentState;
       },
       partialize: (state) => ({
-        environmentByThread: state.environmentByThread,
-        environmentById: state.environmentById,
+        environmentByThread: {},
+        environmentById: {},
         deltasByEnvironment: {},
-        diagnosticsByThread: state.diagnosticsByThread,
+        latestReadByThread: {},
+        diagnosticsByThread: trimDiagnostics(state.diagnosticsByThread),
       }),
     },
   ),

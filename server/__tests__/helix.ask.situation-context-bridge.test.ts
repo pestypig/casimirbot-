@@ -550,6 +550,9 @@ describe("thread-bound situation context bridge", () => {
       quick_response_suppressed: true,
       assistant_answer: false,
     });
+    expect(route.answer_distillation?.style).toBe("voice");
+    expect(route.answer_text).not.toContain("Source refs:");
+    expect(route.answer_text).not.toContain("Details are saved in the procedure log");
   });
 
   it("sets up a visual comparison session from the current observation", () => {
@@ -684,6 +687,9 @@ describe("thread-bound situation context bridge", () => {
     });
     expect(response.body?.terminal_artifact_kind).toBe("situation_context_pack");
     expect(finalAnswer).toMatch(/browsing|reviewing|organizing|File Explorer/i);
+    expect(finalAnswer).toContain("The useful signal is");
+    expect(finalAnswer).not.toContain("Details are saved in the procedure log");
+    expect(finalAnswer).not.toContain("Source refs:");
     expect(finalAnswer).not.toContain("McGurk");
     expect(finalAnswer).not.toContain("phenomenon where visual information");
     expect(finalAnswer).not.toContain("Explained the active document");
@@ -1184,6 +1190,68 @@ describe("thread-bound situation context bridge", () => {
     expect(String(route.answer_text ?? "")).not.toContain("Evidence refs:");
   });
 
+  it("does not truncate visual object descriptions mid-word in the final answer", () => {
+    const { run, observation } = seedVisualSituationRun();
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:scene:ide",
+      worker_run_id: "field_worker_run:scene",
+      worker_id: "field_worker:scene",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "scene",
+      value: "A programming environment focused on a project titled \"Fix Helix Ask route authority.\"",
+      status: "supported",
+      confidence: 0.74,
+      evidence_refs: [observation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Watch for changed files or terminal output.",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString(),
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:objects:ide",
+      worker_run_id: "field_worker_run:objects",
+      worker_id: "field_worker:objects",
+      situation_run_id: run.situation_run_id,
+      thread_id: run.thread_id,
+      environment_id: run.environment_id,
+      field_key: "objects",
+      value:
+        "A sidebar with project management options, the CasimirBot project, recent chat context, changed files, terminal output, and recent file edits connected to the Helix Ask route-authority work.",
+      status: "supported",
+      confidence: 0.76,
+      evidence_refs: [observation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Watch for the next selected file or command output.",
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString(),
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const route = routeSituationContextTurn({
+      threadId: "helix-ask:desktop",
+      promptText: "Okay, can you explain what you're seeing in the visual screen capture?",
+      inputModality: "typed",
+    });
+
+    const answer = String(route.answer_text ?? "");
+    expect(answer).toContain("project management options");
+    expect(answer).toContain("recent file edits");
+    expect(answer).not.toMatch(/\boptio(?:\.\.|\.\.\.)/i);
+    expect(answer).not.toContain("Details are saved in the procedure log");
+    expect(answer).not.toContain("Source refs:");
+  });
+
   it("streaming ask turn handles explicit UUID deictic prompts without retrieval initialization errors", async () => {
     const { app } = await createApp();
     const turnId = "3450f3b2-9bb3-4ed1-9be4-d50273209029";
@@ -1318,7 +1386,9 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.selected_source_refs).toContain("visual_source:desktop-active");
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
     expect(route.answer_text).toContain("file management workspace");
-    expect(route.answer_text).toContain("Source refs:");
+    expect(route.answer_text).toContain("I'm seeing");
+    expect(route.answer_text).not.toContain("Source refs:");
+    expect(route.answer_text).not.toContain("Details are saved in the procedure log");
   });
 
   it("auto-accepts a fresh visual capture repair into an existing SituationRun", () => {
@@ -1366,7 +1436,9 @@ describe("thread-bound situation context bridge", () => {
     expect(route.situation_evidence_selection.rejected_unbound_source_refs).not.toContain("visual_source:chrome-current");
     expect(route.situation_evidence_selection.selected_observation_refs.length).toBeGreaterThan(0);
     expect(route.answer_text).toContain("Helix Ask test UI");
-    expect(route.answer_text).toContain("Source refs:");
+    expect(route.answer_text).toContain("I'm seeing");
+    expect(route.answer_text).not.toContain("Source refs:");
+    expect(route.answer_text).not.toContain("Details are saved in the procedure log");
   });
 
   it("recalls saved evidence through a snapshot expansion prompt", () => {
@@ -1554,6 +1626,7 @@ describe("thread-bound situation context bridge", () => {
   });
 
   it.each([
+    "okay what is it visual screen capture see now and how does it compare to last epochs",
     "Okay, what changed since last seen epoch?",
     "What changed since the previous visual?",
     "Compare current scene to last capture.",
@@ -1598,6 +1671,9 @@ describe("thread-bound situation context bridge", () => {
     expect(route.reasoning_snapshot?.full_reasoning_summary).toContain("previous visual observation evidence is unavailable");
     expect(route.answer_text).toContain("Current observation");
     expect(route.answer_text).toContain("Previous observation");
+    expect(route.answer_text).toContain("Changed elements since previous epoch");
+    expect(route.answer_text).toContain("Unchanged elements / stable");
+    expect(route.answer_text).toContain("Uncertainty / unclear");
     expect(route.answer_text).not.toContain("The attached image shows");
     expect(route.typed_failure).toMatchObject({
       schema: "helix.typed_failure.v1",

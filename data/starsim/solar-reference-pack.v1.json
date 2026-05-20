@@ -1,0 +1,1647 @@
+{
+  "id": "solar_reference_pack",
+  "version": "solar-reference-pack/1",
+  "docs": {
+    "solar_reference_overview": {
+      "id": "solar_reference_overview",
+      "title": "Solar reference overview",
+      "url": "https://example.com/starsim/solar-reference-overview",
+      "note": "Local development reference placeholder for StarSim solar diagnostics."
+    },
+    "basu_antia_2004": {
+      "id": "basu_antia_2004",
+      "title": "Helioseismic solar interior reference",
+      "url": "https://example.com/starsim/basu-antia-2004",
+      "note": "Reference key used by local solar interior fixtures."
+    },
+    "hmi_products": {
+      "id": "hmi_products",
+      "title": "SDO/HMI product reference",
+      "url": "https://example.com/starsim/hmi-products",
+      "note": "Reference key used by HMI-derived local fixtures."
+    },
+    "gong_products": {
+      "id": "gong_products",
+      "title": "GONG product reference",
+      "url": "https://example.com/starsim/gong-products",
+      "note": "Reference key used by GONG-derived local fixtures."
+    },
+    "borexino_2018": {
+      "id": "borexino_2018",
+      "title": "Borexino solar neutrino reference",
+      "url": "https://example.com/starsim/borexino-2018",
+      "note": "Reference key used by solar neutrino local fixtures."
+    },
+    "goes_xray": {
+      "id": "goes_xray",
+      "title": "GOES X-ray product reference",
+      "url": "https://example.com/starsim/goes-xray",
+      "note": "Reference key used by GOES flare and cycle fixtures."
+    },
+    "sft_review_2023": {
+      "id": "sft_review_2023",
+      "title": "Surface flux transport review reference",
+      "url": "https://example.com/starsim/sft-review-2023",
+      "note": "Reference key used by cycle and magnetic-memory fixtures."
+    },
+    "nso_pfss": {
+      "id": "nso_pfss",
+      "title": "PFSS coronal field reference",
+      "url": "https://example.com/starsim/nso-pfss",
+      "note": "Reference key used by PFSS local fixtures."
+    },
+    "aia_corona": {
+      "id": "aia_corona",
+      "title": "AIA coronal imagery reference",
+      "url": "https://example.com/starsim/aia-corona",
+      "note": "Reference key used by coronal-field local fixtures."
+    },
+    "lasco_docs": {
+      "id": "lasco_docs",
+      "title": "LASCO CME product reference",
+      "url": "https://example.com/starsim/lasco-docs",
+      "note": "Reference key used by CME local fixtures."
+    },
+    "eve_docs": {
+      "id": "eve_docs",
+      "title": "EVE irradiance product reference",
+      "url": "https://example.com/starsim/eve-docs",
+      "note": "Reference key used by irradiance local fixtures."
+    },
+    "tsis_tim": {
+      "id": "tsis_tim",
+      "title": "TSIS TIM irradiance reference",
+      "url": "https://example.com/starsim/tsis-tim",
+      "note": "Reference key used by TSI continuity local fixtures."
+    },
+    "dkist_visp_ribbon_blobs_2025": {
+      "id": "dkist_visp_ribbon_blobs_2025",
+      "title": "DKIST ViSP ribbon blob reference",
+      "url": "https://example.com/starsim/dkist-visp-ribbon-blobs-2025",
+      "note": "Reference key used by event-congruence diagnostics."
+    },
+    "high_entropy_quantum_limit_2026": {
+      "id": "high_entropy_quantum_limit_2026",
+      "title": "High-entropy quantum limit reference",
+      "url": "https://example.com/starsim/high-entropy-quantum-limit-2026",
+      "note": "Reference key used by speculative entropy-aliasing diagnostics."
+    }
+  },
+  "product_semantics": {
+    "coordinate_frame": "Carrington",
+    "carrington_rotation_spread_max": 1,
+    "require_overlapping_time_ranges": true,
+    "section_instrument_keywords": {
+      "solar_interior_profile": [
+        "solar",
+        "HMI"
+      ],
+      "solar_layer_boundaries": [
+        "solar",
+        "HMI"
+      ],
+      "solar_global_modes": [
+        "GONG",
+        "HMI"
+      ],
+      "solar_structural_residuals": [
+        "solar",
+        "HMI",
+        "GONG",
+        "Borexino"
+      ],
+      "solar_local_helio": [
+        "HMI",
+        "GONG"
+      ],
+      "solar_magnetogram": [
+        "HMI"
+      ],
+      "solar_surface_flows": [
+        "HMI",
+        "GONG"
+      ],
+      "solar_coronal_field": [
+        "PFSS",
+        "HMI",
+        "AIA",
+        "NSO"
+      ],
+      "solar_cycle_indices": [
+        "NOAA",
+        "SWPC",
+        "GOES"
+      ],
+      "solar_cycle_history": [
+        "NOAA",
+        "SWPC",
+        "HMI"
+      ],
+      "solar_magnetic_memory": [
+        "HMI",
+        "NOAA"
+      ],
+      "solar_active_regions": [
+        "NOAA",
+        "HMI"
+      ],
+      "solar_sunspot_catalog": [
+        "NOAA",
+        "HMI"
+      ],
+      "solar_event_linkage": [
+        "GOES",
+        "LASCO",
+        "HMI",
+        "GONG"
+      ],
+      "solar_topology_linkage": [
+        "PFSS",
+        "HMI",
+        "NSO",
+        "GOES",
+        "LASCO"
+      ],
+      "solar_flare_catalog": [
+        "GOES"
+      ],
+      "solar_cme_catalog": [
+        "LASCO"
+      ],
+      "solar_irradiance_series": [
+        "EVE",
+        "TSIS",
+        "TIM",
+        "GOES"
+      ],
+      "solar_neutrino_constraints": [
+        "Borexino"
+      ],
+      "solar_granulation_stats": [
+        "solar"
+      ]
+    },
+    "section_cadence_expectations": {
+      "solar_interior_profile": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_layer_boundaries": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_global_modes": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_structural_residuals": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_local_helio": {
+        "required": false,
+        "allowed_units": [
+          "s",
+          "min",
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_magnetogram": {
+        "required": false,
+        "allowed_units": [
+          "s",
+          "min",
+          "hour",
+          "day",
+          "carrington_rotation",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_surface_flows": {
+        "required": false,
+        "allowed_units": [
+          "hour",
+          "day",
+          "carrington_rotation",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_coronal_field": {
+        "required": false,
+        "allowed_units": [
+          "hour",
+          "day",
+          "carrington_rotation",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_cycle_indices": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_cycle_history": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "carrington_rotation",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_magnetic_memory": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "carrington_rotation",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_active_regions": {
+        "required": false,
+        "allowed_units": [
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_sunspot_catalog": {
+        "required": false,
+        "allowed_units": [
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_event_linkage": {
+        "required": false,
+        "allowed_units": [
+          "s",
+          "min",
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_topology_linkage": {
+        "required": false,
+        "allowed_units": [
+          "hour",
+          "day",
+          "carrington_rotation",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_flare_catalog": {
+        "required": false,
+        "allowed_units": [
+          "s",
+          "min",
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_cme_catalog": {
+        "required": false,
+        "allowed_units": [
+          "min",
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_irradiance_series": {
+        "required": false,
+        "allowed_units": [
+          "s",
+          "min",
+          "hour",
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_neutrino_constraints": {
+        "required": false,
+        "allowed_units": [
+          "day",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      },
+      "solar_granulation_stats": {
+        "required": false,
+        "allowed_units": [
+          "s",
+          "min",
+          "hour",
+          "snapshot"
+        ],
+        "note": "Local development cadence expectation."
+      }
+    }
+  },
+  "anchors": {
+    "interior": {
+      "convection_zone_depth": {
+        "id": "solar.interior.convection_zone_depth.v1",
+        "reference_basis": "helioseismic convection-zone base",
+        "product_family": "helioseismic_closure",
+        "expected_summary": {
+          "pass_range": {
+            "min": 0.712,
+            "max": 0.714
+          },
+          "warn_range": {
+            "min": 0.7,
+            "max": 0.73
+          },
+          "max_section_delta_rsun": 0.005
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004"
+        ]
+      },
+      "envelope_helium_fraction": {
+        "id": "solar.interior.envelope_helium_fraction.v1",
+        "reference_basis": "helioseismic envelope helium fraction",
+        "product_family": "helioseismic_closure",
+        "expected_summary": {
+          "pass_range": {
+            "min": 0.24,
+            "max": 0.252
+          },
+          "warn_range": {
+            "min": 0.22,
+            "max": 0.28
+          }
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004"
+        ]
+      },
+      "low_degree_mode_support": {
+        "id": "solar.interior.low_degree_mode_support.v1",
+        "reference_basis": "global helioseismic mode support",
+        "product_family": "global_helioseismology_products",
+        "expected_summary": {
+          "required_ref": "mode_table_ref",
+          "minimum_mode_count": 1,
+          "minimum_mode_count_pass": 40,
+          "minimum_mode_count_warn": 12,
+          "preferred_supporting_refs": [
+            "detail_ref",
+            "splitting_ref"
+          ]
+        },
+        "reference_doc_ids": [
+          "gong_products",
+          "hmi_products"
+        ]
+      },
+      "neutrino_constraint_vector": {
+        "id": "solar.interior.neutrino_constraint_vector.v1",
+        "reference_basis": "solar neutrino flux vector",
+        "product_family": "solar_neutrino_constraints",
+        "expected_summary": {
+          "required_components": [
+            "pp_flux",
+            "be7_flux",
+            "pep_flux",
+            "b8_flux",
+            "cno_flux"
+          ]
+        },
+        "reference_doc_ids": [
+          "borexino_2018"
+        ]
+      }
+    },
+    "structural_residuals": {
+      "hydrostatic_balance_context": {
+        "id": "solar.structural_residuals.hydrostatic_balance_context.v1",
+        "reference_basis": "hydrostatic residual context",
+        "product_family": "structural_residual_products",
+        "expected_summary": {
+          "required_ref": "hydrostatic_residual_ref"
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004"
+        ]
+      },
+      "sound_speed_residual_context": {
+        "id": "solar.structural_residuals.sound_speed_residual_context.v1",
+        "reference_basis": "sound-speed residual context",
+        "product_family": "structural_residual_products",
+        "expected_summary": {
+          "required_ref": "sound_speed_residual_ref"
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004"
+        ]
+      },
+      "rotation_residual_context": {
+        "id": "solar.structural_residuals.rotation_residual_context.v1",
+        "reference_basis": "rotation residual context",
+        "product_family": "structural_residual_products",
+        "expected_summary": {
+          "required_ref": "rotation_residual_ref"
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "gong_products"
+        ]
+      },
+      "pressure_scale_height_continuity_context": {
+        "id": "solar.structural_residuals.pressure_scale_height_continuity_context.v1",
+        "reference_basis": "pressure scale-height continuity",
+        "product_family": "structural_residual_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "pressure_scale_height_continuity_score"
+          ]
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004"
+        ]
+      },
+      "neutrino_seismic_consistency_context": {
+        "id": "solar.structural_residuals.neutrino_seismic_consistency_context.v1",
+        "reference_basis": "neutrino and seismic consistency",
+        "product_family": "structural_residual_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "neutrino_seismic_consistency_score"
+          ]
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004",
+          "borexino_2018"
+        ]
+      },
+      "residual_metadata_coherence_context": {
+        "id": "solar.structural_residuals.residual_metadata_coherence_context.v1",
+        "reference_basis": "residual metadata coherence",
+        "product_family": "structural_residual_products",
+        "expected_summary": {
+          "required_fields": [
+            "instrument",
+            "coordinate_frame",
+            "observed_mode"
+          ],
+          "preferred_coordinate_frame": "Carrington",
+          "preferred_instrument_keywords": [
+            "solar",
+            "HMI",
+            "GONG",
+            "Borexino"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "gong_products"
+        ]
+      }
+    },
+    "local_helio": {
+      "dopplergram_context": {
+        "id": "solar.local_helio.dopplergram_context.v1",
+        "reference_basis": "local helioseismic dopplergram context",
+        "product_family": "local_helioseismology_products",
+        "expected_summary": {
+          "required_ref": "dopplergram_ref",
+          "preferred_instrument_keywords": [
+            "HMI",
+            "GONG"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "travel_time_or_holography_context": {
+        "id": "solar.local_helio.travel_time_or_holography_context.v1",
+        "reference_basis": "travel-time or holography context",
+        "product_family": "local_helioseismology_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "travel_time_ref",
+            "holography_ref"
+          ],
+          "preferred_instrument_keywords": [
+            "HMI",
+            "GONG"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "gong_products"
+        ]
+      },
+      "sunquake_event_context": {
+        "id": "solar.local_helio.sunquake_event_context.v1",
+        "reference_basis": "sunquake event context",
+        "product_family": "local_helioseismology_products",
+        "expected_summary": {
+          "required_any_field": [
+            "sunquake_event_refs"
+          ],
+          "minimum_event_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "goes_xray"
+        ]
+      }
+    },
+    "cycle": {
+      "cycle_indices": {
+        "id": "solar.cycle.cycle_indices.v1",
+        "reference_basis": "solar cycle indices",
+        "product_family": "cycle_index_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "sunspot_number"
+          ],
+          "required_fields": [
+            "sunspot_number",
+            "f10_7_sfu",
+            "cycle_label",
+            "polarity_label"
+          ],
+          "preferred_instrument_keywords": [
+            "NOAA",
+            "SWPC",
+            "GOES"
+          ]
+        },
+        "reference_doc_ids": [
+          "goes_xray"
+        ]
+      },
+      "chronology_window": {
+        "id": "solar.cycle.chronology_window.v1",
+        "reference_basis": "cycle chronology window",
+        "product_family": "cycle_history_products",
+        "expected_summary": {
+          "required_fields": [
+            "history_start_iso",
+            "history_end_iso"
+          ],
+          "minimum_coverage_days": 365,
+          "minimum_cycle_labels": 2,
+          "preferred_cycle_labels": [
+            "Cycle 24",
+            "Cycle 25"
+          ]
+        },
+        "reference_doc_ids": [
+          "sft_review_2023"
+        ]
+      },
+      "polarity_reversal_context": {
+        "id": "solar.cycle.polarity_reversal_context.v1",
+        "reference_basis": "polarity reversal context",
+        "product_family": "cycle_history_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "polarity_reversal_refs"
+          ],
+          "minimum_marker_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      },
+      "butterfly_history": {
+        "id": "solar.cycle.butterfly_history.v1",
+        "reference_basis": "butterfly diagram history",
+        "product_family": "cycle_history_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "butterfly_ref"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "axial_dipole_history": {
+        "id": "solar.cycle.axial_dipole_history.v1",
+        "reference_basis": "axial dipole history",
+        "product_family": "magnetic_memory_products",
+        "expected_summary": {
+          "required_ref": "axial_dipole_history_ref"
+        },
+        "reference_doc_ids": [
+          "sft_review_2023",
+          "hmi_products"
+        ]
+      },
+      "magnetogram_context": {
+        "id": "solar.cycle.magnetogram_context.v1",
+        "reference_basis": "magnetogram cycle context",
+        "product_family": "magnetogram_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "line_of_sight_ref",
+            "vector_field_ref",
+            "synoptic_radial_map_ref"
+          ],
+          "preferred_supporting_ref": "synoptic_radial_map_ref",
+          "preferred_instrument_keywords": [
+            "HMI"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "active_region_context": {
+        "id": "solar.cycle.active_region_context.v1",
+        "reference_basis": "active region context",
+        "product_family": "active_region_products",
+        "expected_summary": {
+          "required_any_field": [
+            "region_refs",
+            "regions"
+          ],
+          "minimum_region_count": 1,
+          "preferred_instrument_keywords": [
+            "NOAA",
+            "HMI"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "irradiance_continuity": {
+        "id": "solar.cycle.irradiance_continuity.v1",
+        "reference_basis": "irradiance continuity",
+        "product_family": "solar_irradiance_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "tsi_ref",
+            "xray_ref",
+            "euv_ref"
+          ],
+          "preferred_instrument_keywords": [
+            "TSIS",
+            "TIM",
+            "EVE",
+            "GOES"
+          ]
+        },
+        "reference_doc_ids": [
+          "tsis_tim",
+          "eve_docs"
+        ]
+      }
+    },
+    "surface_flow": {
+      "differential_rotation_context": {
+        "id": "solar.surface_flow.differential_rotation_context.v1",
+        "reference_basis": "differential rotation",
+        "product_family": "surface_flow_products",
+        "expected_summary": {
+          "required_ref": "differential_rotation_ref",
+          "required_summary_fields": [
+            "equatorial_rotation_deg_per_day",
+            "rotation_shear_deg_per_day"
+          ],
+          "preferred_instrument_keywords": [
+            "HMI",
+            "GONG"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "gong_products"
+        ]
+      },
+      "meridional_flow_context": {
+        "id": "solar.surface_flow.meridional_flow_context.v1",
+        "reference_basis": "meridional flow",
+        "product_family": "surface_flow_products",
+        "expected_summary": {
+          "required_ref": "meridional_flow_ref",
+          "preferred_summary_field": "meridional_flow_peak_ms",
+          "preferred_instrument_keywords": [
+            "HMI",
+            "GONG"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "gong_products"
+        ]
+      },
+      "surface_transport_proxy_context": {
+        "id": "solar.surface_flow.surface_transport_proxy_context.v1",
+        "reference_basis": "surface transport proxy",
+        "product_family": "surface_flow_products",
+        "expected_summary": {
+          "required_any_field": [
+            "surface_transport_proxy_ref",
+            "summary"
+          ],
+          "preferred_any_ref": [
+            "surface_transport_proxy_ref",
+            "supergranular_diffusion_ref"
+          ]
+        },
+        "reference_doc_ids": [
+          "sft_review_2023"
+        ]
+      },
+      "active_region_geometry_context": {
+        "id": "solar.surface_flow.active_region_geometry_context.v1",
+        "reference_basis": "active region geometry",
+        "product_family": "active_region_geometry_products",
+        "expected_summary": {
+          "required_fields_per_region": [
+            "region_id",
+            "hemisphere",
+            "heliographic_latitude_deg",
+            "carrington_longitude_deg",
+            "area_msh",
+            "tilt_deg",
+            "leading_polarity",
+            "following_polarity",
+            "polarity_ordering_class"
+          ],
+          "minimum_region_count": 1,
+          "preferred_instrument_keywords": [
+            "NOAA",
+            "HMI"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      }
+    },
+    "coronal_field": {
+      "pfss_context": {
+        "id": "solar.coronal_field.pfss_context.v1",
+        "reference_basis": "PFSS field context",
+        "product_family": "coronal_field_proxy_products",
+        "expected_summary": {
+          "required_ref": "pfss_solution_ref",
+          "required_summary_field": "source_surface_rsun",
+          "preferred_instrument_keywords": [
+            "PFSS",
+            "NSO",
+            "HMI",
+            "AIA"
+          ]
+        },
+        "reference_doc_ids": [
+          "nso_pfss"
+        ]
+      },
+      "synoptic_boundary_context": {
+        "id": "solar.coronal_field.synoptic_boundary_context.v1",
+        "reference_basis": "synoptic boundary context",
+        "product_family": "coronal_field_proxy_products",
+        "expected_summary": {
+          "required_ref": "synoptic_boundary_ref",
+          "preferred_instrument_keywords": [
+            "PFSS",
+            "NSO",
+            "HMI"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "open_field_topology_context": {
+        "id": "solar.coronal_field.open_field_topology_context.v1",
+        "reference_basis": "open field topology",
+        "product_family": "coronal_field_proxy_products",
+        "expected_summary": {
+          "required_any_field": [
+            "open_field_map_ref",
+            "coronal_hole_refs"
+          ],
+          "required_summary_fields": [
+            "dominant_topology",
+            "coronal_hole_count"
+          ],
+          "minimum_coronal_hole_count": 1
+        },
+        "reference_doc_ids": [
+          "nso_pfss"
+        ]
+      },
+      "source_region_linkage_context": {
+        "id": "solar.coronal_field.source_region_linkage_context.v1",
+        "reference_basis": "coronal source-region linkage",
+        "product_family": "coronal_field_proxy_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "source_region_link_count"
+          ],
+          "preferred_context_fields": [
+            "solar_magnetogram.synoptic_radial_map_ref",
+            "solar_active_regions.region_refs",
+            "solar_event_linkage.link_refs"
+          ],
+          "minimum_linked_contexts": 2
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "metadata_coherence_context": {
+        "id": "solar.coronal_field.metadata_coherence_context.v1",
+        "reference_basis": "coronal metadata coherence",
+        "product_family": "coronal_field_proxy_products",
+        "expected_summary": {
+          "required_fields": [
+            "instrument",
+            "coordinate_frame",
+            "observed_mode"
+          ],
+          "required_summary_fields": [
+            "source_surface_rsun",
+            "dominant_topology"
+          ],
+          "preferred_instrument_keywords": [
+            "PFSS",
+            "NSO",
+            "HMI",
+            "AIA"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "euv_coronal_context": {
+        "id": "solar.coronal_field.euv_coronal_context.v1",
+        "reference_basis": "EUV coronal context",
+        "product_family": "coronal_field_proxy_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "euv_context_ref",
+            "euv_ref"
+          ],
+          "preferred_ref": "euv_coronal_context_ref",
+          "preferred_instrument_keywords": [
+            "AIA",
+            "EUV",
+            "SDO"
+          ]
+        },
+        "reference_doc_ids": [
+          "aia_corona"
+        ]
+      }
+    },
+    "magnetic_memory": {
+      "axial_dipole_continuity_context": {
+        "id": "solar.magnetic_memory.axial_dipole_continuity_context.v1",
+        "reference_basis": "axial dipole continuity",
+        "product_family": "magnetic_memory_products",
+        "expected_summary": {
+          "required_ref": "axial_dipole_history_ref",
+          "required_summary_field": "latest_axial_dipole_sign",
+          "minimum_cycle_labels": 2
+        },
+        "reference_doc_ids": [
+          "sft_review_2023",
+          "hmi_products"
+        ]
+      },
+      "polar_field_continuity_context": {
+        "id": "solar.magnetic_memory.polar_field_continuity_context.v1",
+        "reference_basis": "polar field continuity",
+        "product_family": "magnetic_memory_products",
+        "expected_summary": {
+          "required_ref": "polar_field_history_ref",
+          "required_summary_fields": [
+            "north_polarity_state",
+            "south_polarity_state"
+          ]
+        },
+        "reference_doc_ids": [
+          "sft_review_2023",
+          "hmi_products"
+        ]
+      },
+      "reversal_linkage_context": {
+        "id": "solar.magnetic_memory.reversal_linkage_context.v1",
+        "reference_basis": "reversal linkage",
+        "product_family": "magnetic_memory_products",
+        "expected_summary": {
+          "required_ref": "polarity_reversal_refs",
+          "required_summary_field": "reversal_marker_count",
+          "minimum_marker_count": 1
+        },
+        "reference_doc_ids": [
+          "sft_review_2023"
+        ]
+      },
+      "active_region_polarity_ordering_context": {
+        "id": "solar.magnetic_memory.active_region_polarity_ordering_context.v1",
+        "reference_basis": "active region polarity ordering",
+        "product_family": "bipolar_active_region_products",
+        "expected_summary": {
+          "required_fields_per_region": [
+            "region_id",
+            "hemisphere",
+            "tilt_deg",
+            "leading_polarity",
+            "following_polarity",
+            "polarity_ordering_class"
+          ],
+          "minimum_region_count": 1,
+          "preferred_instrument_keywords": [
+            "NOAA",
+            "HMI"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      },
+      "hemisphere_bipolar_coverage_context": {
+        "id": "solar.magnetic_memory.hemisphere_bipolar_coverage_context.v1",
+        "reference_basis": "hemisphere bipolar coverage",
+        "product_family": "bipolar_active_region_products",
+        "expected_summary": {
+          "required_hemispheres": [
+            "north",
+            "south"
+          ],
+          "minimum_hemisphere_count": 2
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      },
+      "bipolar_region_proxy_context": {
+        "id": "solar.magnetic_memory.bipolar_region_proxy_context.v1",
+        "reference_basis": "bipolar region proxy",
+        "product_family": "bipolar_active_region_products",
+        "expected_summary": {
+          "required_any_field": [
+            "regions",
+            "region_refs"
+          ],
+          "preferred_ref": "bipolar_region_proxy_ref"
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      }
+    },
+    "spot_region": {
+      "sunspot_catalog_context": {
+        "id": "solar.spot_region.sunspot_catalog_context.v1",
+        "reference_basis": "sunspot catalog context",
+        "product_family": "sunspot_catalog_products",
+        "expected_summary": {
+          "required_fields_per_spot": [
+            "spot_id",
+            "polarity"
+          ],
+          "minimum_spot_count": 1,
+          "preferred_instrument_keywords": [
+            "NOAA",
+            "HMI"
+          ]
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      },
+      "spot_geometry_context": {
+        "id": "solar.spot_region.spot_geometry_context.v1",
+        "reference_basis": "sunspot geometry context",
+        "product_family": "sunspot_catalog_products",
+        "expected_summary": {
+          "required_fields_per_spot": [
+            "spot_id",
+            "hemisphere",
+            "heliographic_latitude_deg",
+            "carrington_longitude_deg",
+            "area_msh",
+            "polarity"
+          ],
+          "minimum_rich_spot_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "spot_region_linkage_context": {
+        "id": "solar.spot_region.spot_region_linkage_context.v1",
+        "reference_basis": "spot to region linkage",
+        "product_family": "sunspot_catalog_products",
+        "expected_summary": {
+          "required_fields_per_spot": [
+            "active_region_ref"
+          ],
+          "minimum_linked_spot_count": 1,
+          "require_active_region_reverse_linkage": true
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "bipolar_grouping_context": {
+        "id": "solar.spot_region.bipolar_grouping_context.v1",
+        "reference_basis": "bipolar grouping context",
+        "product_family": "sunspot_catalog_products",
+        "expected_summary": {
+          "required_any_field": [
+            "bipolar_group_refs",
+            "groups"
+          ],
+          "minimum_grouped_spot_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      },
+      "polarity_tilt_context": {
+        "id": "solar.spot_region.polarity_tilt_context.v1",
+        "reference_basis": "polarity tilt context",
+        "product_family": "sunspot_catalog_products",
+        "expected_summary": {
+          "required_fields_per_spot": [
+            "polarity",
+            "tilt_deg"
+          ],
+          "minimum_polarity_spot_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      }
+    },
+    "event_linkage": {
+      "flare_region_linkage_context": {
+        "id": "solar.event_linkage.flare_region_linkage_context.v1",
+        "reference_basis": "flare to active-region linkage",
+        "product_family": "cross_phase_event_linkage",
+        "expected_summary": {
+          "required_any_field": [
+            "links",
+            "flare_region_links"
+          ],
+          "minimum_link_count": 1
+        },
+        "reference_doc_ids": [
+          "goes_xray",
+          "hmi_products"
+        ]
+      },
+      "cme_region_linkage_context": {
+        "id": "solar.event_linkage.cme_region_linkage_context.v1",
+        "reference_basis": "CME to active-region linkage",
+        "product_family": "cross_phase_event_linkage",
+        "expected_summary": {
+          "required_any_field": [
+            "links",
+            "cme_region_links"
+          ],
+          "minimum_link_count": 1
+        },
+        "reference_doc_ids": [
+          "lasco_docs",
+          "hmi_products"
+        ]
+      },
+      "sunquake_flare_region_linkage_context": {
+        "id": "solar.event_linkage.sunquake_flare_region_linkage_context.v1",
+        "reference_basis": "sunquake flare linkage",
+        "product_family": "cross_phase_event_linkage",
+        "expected_summary": {
+          "required_any_field": [
+            "links",
+            "sunquake_links"
+          ]
+        },
+        "reference_doc_ids": [
+          "goes_xray",
+          "hmi_products"
+        ]
+      },
+      "event_chronology_alignment_context": {
+        "id": "solar.event_linkage.event_chronology_alignment_context.v1",
+        "reference_basis": "event chronology alignment",
+        "product_family": "cross_phase_event_linkage",
+        "expected_summary": {
+          "required_summary_fields": [
+            "chronology_alignment_score"
+          ],
+          "max_sunquake_time_offset_minutes": 30
+        },
+        "reference_doc_ids": [
+          "goes_xray",
+          "lasco_docs"
+        ]
+      },
+      "region_identifier_consistency_context": {
+        "id": "solar.event_linkage.region_identifier_consistency_context.v1",
+        "reference_basis": "region identifier consistency",
+        "product_family": "cross_phase_event_linkage",
+        "expected_summary": {
+          "required_summary_fields": [
+            "region_identifier_consistency_score"
+          ],
+          "minimum_consistent_link_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      }
+    },
+    "topology_linkage": {
+      "spot_region_corona_context": {
+        "id": "solar.topology_linkage.spot_region_corona_context.v1",
+        "reference_basis": "spot-region-corona topology linkage",
+        "product_family": "topology_linkage_products",
+        "expected_summary": {
+          "allowed_roles": [
+            "active_region_open_flux_source",
+            "closed_arcade_source",
+            "coronal_hole_boundary",
+            "unknown"
+          ]
+        },
+        "reference_doc_ids": [
+          "nso_pfss",
+          "hmi_products"
+        ]
+      },
+      "open_flux_polar_field_continuity_context": {
+        "id": "solar.topology_linkage.open_flux_polar_field_continuity_context.v1",
+        "reference_basis": "open flux and polar field continuity",
+        "product_family": "topology_linkage_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "open_flux_polar_continuity_score"
+          ]
+        },
+        "reference_doc_ids": [
+          "nso_pfss",
+          "sft_review_2023"
+        ]
+      },
+      "event_topology_context": {
+        "id": "solar.topology_linkage.event_topology_context.v1",
+        "reference_basis": "event topology context",
+        "product_family": "topology_linkage_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "event_topology_ref",
+            "links"
+          ]
+        },
+        "reference_doc_ids": [
+          "goes_xray",
+          "lasco_docs",
+          "nso_pfss"
+        ]
+      },
+      "topology_role_context": {
+        "id": "solar.topology_linkage.topology_role_context.v1",
+        "reference_basis": "topology role context",
+        "product_family": "topology_linkage_products",
+        "expected_summary": {
+          "allowed_roles": [
+            "active_region_open_flux_source",
+            "closed_arcade_source",
+            "coronal_hole_boundary",
+            "open_flux_continuity",
+            "bipolar_memory_continuity"
+          ],
+          "minimum_role_count": 1
+        },
+        "reference_doc_ids": [
+          "nso_pfss"
+        ]
+      },
+      "chronology_alignment_context": {
+        "id": "solar.topology_linkage.chronology_alignment_context.v1",
+        "reference_basis": "topology chronology alignment",
+        "product_family": "topology_linkage_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "chronology_alignment_score"
+          ]
+        },
+        "reference_doc_ids": [
+          "sft_review_2023"
+        ]
+      },
+      "identifier_consistency_context": {
+        "id": "solar.topology_linkage.identifier_consistency_context.v1",
+        "reference_basis": "topology identifier consistency",
+        "product_family": "topology_linkage_products",
+        "expected_summary": {
+          "required_summary_fields": [
+            "identifier_consistency_score"
+          ],
+          "minimum_consistent_link_count": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      }
+    },
+    "cross_layer_consistency": {
+      "interior_residual_coherence": {
+        "id": "solar.cross_layer_consistency.interior_residual_coherence.v1",
+        "reference_basis": "interior residual coherence",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "report_missing_required_refs": true,
+          "preferred_max_mean_hydrostatic_fractional_residual": 0.001,
+          "preferred_max_sound_speed_fractional_residual": 0.003
+        },
+        "reference_doc_ids": [
+          "basu_antia_2004"
+        ]
+      },
+      "mode_residual_coherence": {
+        "id": "solar.cross_layer_consistency.mode_residual_coherence.v1",
+        "reference_basis": "mode residual coherence",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "report_missing_required_refs": true,
+          "minimum_mode_count": 40
+        },
+        "reference_doc_ids": [
+          "gong_products",
+          "hmi_products"
+        ]
+      },
+      "rotation_residual_coherence": {
+        "id": "solar.cross_layer_consistency.rotation_residual_coherence.v1",
+        "reference_basis": "rotation residual coherence",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "report_missing_required_refs": true,
+          "preferred_max_rotation_residual_nhz": 15
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "gong_products"
+        ]
+      },
+      "cycle_memory_topology_coherence": {
+        "id": "solar.cross_layer_consistency.cycle_memory_topology_coherence.v1",
+        "reference_basis": "cycle memory topology coherence",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "report_missing_required_refs": true,
+          "minimum_open_flux_links": 1,
+          "minimum_memory_topology_links": 1,
+          "require_exact_history_memory_ref_equality": false,
+          "report_conflicting_ref_pairs": true,
+          "report_topology_link_ids_in_conflict": true
+        },
+        "reference_doc_ids": [
+          "sft_review_2023",
+          "nso_pfss"
+        ]
+      },
+      "event_topology_identifier_coherence": {
+        "id": "solar.cross_layer_consistency.event_topology_identifier_coherence.v1",
+        "reference_basis": "event topology identifier coherence",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "report_missing_required_refs": false,
+          "minimum_identifier_overlap_links": 1,
+          "require_linked_event_overlap": true,
+          "report_conflicting_region_ids": true,
+          "report_conflicting_noaa_ids": true,
+          "report_conflicting_harp_ids": true,
+          "report_event_refs_in_conflict": true,
+          "report_topology_link_ids_in_conflict": true
+        },
+        "reference_doc_ids": [
+          "goes_xray",
+          "lasco_docs",
+          "hmi_products"
+        ]
+      },
+      "chronology_metadata_alignment": {
+        "id": "solar.cross_layer_consistency.chronology_metadata_alignment.v1",
+        "reference_basis": "chronology metadata alignment",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "report_missing_required_refs": false,
+          "coordinate_frame": "Carrington",
+          "carrington_rotation_spread_max": 1,
+          "overlapping_time_ranges": true,
+          "require_topology_event_window_overlap": true,
+          "report_non_carrington_sections": true,
+          "report_missing_time_range_sections": true,
+          "report_out_of_window_event_refs": true,
+          "report_topology_link_ids_in_conflict": true
+        },
+        "reference_doc_ids": [
+          "sft_review_2023"
+        ]
+      }
+    },
+    "eruptive": {
+      "flare_catalog": {
+        "id": "solar.eruptive.flare_catalog.v1",
+        "reference_basis": "flare catalog",
+        "product_family": "flare_catalog_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "event_refs",
+            "flare_refs"
+          ],
+          "minimum_flare_count": 1,
+          "preferred_instrument_keywords": [
+            "GOES"
+          ]
+        },
+        "reference_doc_ids": [
+          "goes_xray"
+        ]
+      },
+      "cme_catalog": {
+        "id": "solar.eruptive.cme_catalog.v1",
+        "reference_basis": "CME catalog",
+        "product_family": "cme_catalog_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "event_refs",
+            "cme_refs"
+          ],
+          "minimum_cme_count": 1,
+          "preferred_instrument_keywords": [
+            "LASCO"
+          ]
+        },
+        "reference_doc_ids": [
+          "lasco_docs"
+        ]
+      },
+      "irradiance_continuity": {
+        "id": "solar.eruptive.irradiance_continuity.v1",
+        "reference_basis": "eruptive irradiance continuity",
+        "product_family": "solar_irradiance_products",
+        "expected_summary": {
+          "required_any_ref": [
+            "euv_ref",
+            "xray_ref",
+            "tsi_ref"
+          ],
+          "preferred_eruptive_refs": [
+            "euv_ref",
+            "xray_ref"
+          ],
+          "fallback_ref": "tsi_ref",
+          "preferred_instrument_keywords": [
+            "EVE",
+            "GOES",
+            "TSIS",
+            "TIM"
+          ]
+        },
+        "reference_doc_ids": [
+          "eve_docs",
+          "goes_xray"
+        ]
+      },
+      "source_region_linkage": {
+        "id": "solar.eruptive.source_region_linkage.v1",
+        "reference_basis": "eruptive source-region linkage",
+        "product_family": "cross_phase_event_linkage",
+        "expected_summary": {
+          "required_any_ref": [
+            "source_region_refs"
+          ]
+        },
+        "reference_doc_ids": [
+          "goes_xray",
+          "lasco_docs",
+          "hmi_products"
+        ]
+      }
+    },
+    "event_congruence": {
+      "reconnection_null": {
+        "id": "solar.eruptive.reconnection_null.v1",
+        "reference_basis": "reconnection null context",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "nso_pfss"
+        ]
+      },
+      "pmode_phase_modulation": {
+        "id": "solar.eruptive.pmode_phase_modulation.v1",
+        "reference_basis": "p-mode phase modulation context",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "gong_products"
+        ]
+      },
+      "ribbon_blob_tearing_context": {
+        "id": "solar.eruptive.ribbon_blob_tearing_context.v1",
+        "reference_basis": "ribbon blob tearing context",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "dkist_visp_ribbon_blobs_2025"
+        ]
+      },
+      "photospheric_field_backreaction": {
+        "id": "solar.eruptive.photospheric_field_backreaction.v1",
+        "reference_basis": "photospheric field backreaction",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "sunquake_flare_alignment": {
+        "id": "solar.eruptive.sunquake_flare_alignment.v1",
+        "reference_basis": "sunquake flare alignment",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "goes_xray",
+          "hmi_products"
+        ]
+      },
+      "transition_region_nanoflare_brightening_context": {
+        "id": "solar.eruptive.transition_region_nanoflare_brightening_context.v1",
+        "reference_basis": "transition region nanoflare brightening context",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "aia_corona"
+        ]
+      },
+      "multifractal_flare_memory_proxy": {
+        "id": "solar.temporal.multifractal_flare_memory_proxy.v1",
+        "reference_basis": "multifractal flare memory proxy",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "goes_xray"
+        ]
+      },
+      "faraday_path_context": {
+        "id": "solar.eruptive.faraday_path_context.v1",
+        "reference_basis": "Faraday path context",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "solar_reference_overview"
+        ]
+      },
+      "packet_energy_closure": {
+        "id": "solar.eruptive.packet_energy_closure.v1",
+        "reference_basis": "packet energy closure",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "solar_reference_overview"
+        ]
+      },
+      "entropy_aliasing_context": {
+        "id": "solar.temporal.entropy_aliasing_context.v1",
+        "reference_basis": "entropy aliasing context",
+        "product_family": "event_congruence",
+        "expected_summary": {},
+        "reference_doc_ids": [
+          "high_entropy_quantum_limit_2026"
+        ]
+      }
+    },
+    "speculative": {
+      "collapse_residual_context": {
+        "id": "solar.speculative.collapse_residual_context.v1",
+        "reference_basis": "collapse residual context",
+        "product_family": "speculative_context",
+        "expected_summary": {
+          "source_power_allowed": false
+        },
+        "reference_doc_ids": [
+          "solar_reference_overview"
+        ]
+      }
+    },
+    "consistency": {
+      "source_region_overlap": {
+        "id": "solar.consistency.source_region_overlap.v1",
+        "reference_basis": "source region overlap",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "minimum_overlap_refs": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "goes_xray",
+          "lasco_docs"
+        ]
+      },
+      "magnetogram_active_region_linkage": {
+        "id": "solar.consistency.magnetogram_active_region_linkage.v1",
+        "reference_basis": "magnetogram active region linkage",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "minimum_patch_refs": 1,
+          "minimum_active_region_refs": 1
+        },
+        "reference_doc_ids": [
+          "hmi_products"
+        ]
+      },
+      "irradiance_context_consistency": {
+        "id": "solar.consistency.irradiance_context.v1",
+        "reference_basis": "irradiance context consistency",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "cycle_ref": "tsi_ref",
+          "eruptive_refs": [
+            "euv_ref",
+            "xray_ref"
+          ],
+          "preferred_instrument_keywords": [
+            "EVE",
+            "GOES",
+            "TSIS",
+            "TIM"
+          ]
+        },
+        "reference_doc_ids": [
+          "eve_docs",
+          "goes_xray",
+          "tsis_tim"
+        ]
+      },
+      "phase_metadata_coherence": {
+        "id": "solar.consistency.phase_metadata_coherence.v1",
+        "reference_basis": "phase metadata coherence",
+        "product_family": "cross_layer_consistency",
+        "expected_summary": {
+          "coordinate_frame_count_max": 1,
+          "carrington_rotation_spread_max": 1,
+          "overlapping_time_ranges": true
+        },
+        "reference_doc_ids": [
+          "hmi_products",
+          "sft_review_2023"
+        ]
+      }
+    }
+  }
+}

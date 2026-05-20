@@ -6594,13 +6594,15 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     (terminalErrorCode ? "typed_failure" : "unknown");
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
+  const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
   const selectedFinalAnswerCandidate =
-    coerceText(replyRecord?.selected_final_answer).trim() ||
-    coerceText(debugRecord?.selected_final_answer).trim() ||
-    coerceText(reply.assistant_answer).trim() ||
-    (isTypedFailure
-      ? renderTypedFailureFallback(terminalErrorCode)
-      : coerceText(reply.text).trim() || coerceText(reply.content).trim());
+    isTypedFailure
+      ? terminalAuthorityText || liveFinalAnswer || renderTypedFailureFallback(terminalErrorCode)
+      : coerceText(replyRecord?.selected_final_answer).trim() ||
+        coerceText(debugRecord?.selected_final_answer).trim() ||
+        coerceText(reply.assistant_answer).trim() ||
+        coerceText(reply.text).trim() ||
+        coerceText(reply.content).trim();
   const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
   const terminalArtifactKind =
     coerceText(summary?.terminal_artifact_kind).trim() ||
@@ -10310,26 +10312,14 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     readAgentLoopAuditRecord(liveEnvironmentRelevanceForDebug)?.artifact_synthesis_allowed === true
       ? renderLiveAnswerEnvironmentContextPackAnswer(situationContextPackForDebug)
       : null;
-  const selectedFinalAnswerCandidate =
-    coerceText(payload.selectedDebugFinalAnswer).trim() ||
-    coerceText(payload.finalAnswer).trim() ||
-    coerceText(agentLoop?.selected_final_answer).trim() ||
-    coerceText(debug?.selected_final_answer).trim() ||
-    reply.content ||
-    null;
-  const liveEnvironmentAnswerApplied =
-    Boolean(liveEnvironmentAnswerForDebug) &&
-    (isInvalidTerminalAnswerText(selectedFinalAnswerCandidate) ||
-      normalizeTerminalAnswerText(selectedFinalAnswerCandidate) === normalizeTerminalAnswerText(liveEnvironmentAnswerForDebug));
-  const selectedFinalAnswer =
-    liveEnvironmentAnswerForDebug && liveEnvironmentAnswerApplied
-      ? liveEnvironmentAnswerForDebug
-      : selectedFinalAnswerCandidate;
+  const terminalAuthorityForDebug = readAgentLoopAuditRecord(
+    payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
+  );
   const terminalArtifactKind =
     coerceText(agentLoop?.terminal_artifact_kind).trim() ||
     coerceText(debug?.terminal_artifact_kind).trim() ||
     coerceText(resolvedTurnSummary?.terminal_artifact_kind).trim() ||
-    (liveEnvironmentAnswerApplied ? "situation_context_pack" : null) ||
+    coerceText(terminalAuthorityForDebug?.terminal_artifact_kind).trim() ||
     null;
   const terminalErrorCode =
     coerceText(agentLoop?.terminal_error_code).trim() ||
@@ -10337,6 +10327,41 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     coerceText(typedFailure?.terminal_error_code).trim() ||
     coerceText(typedFailure?.error_code).trim() ||
     null;
+  const finalAnswerSource =
+    coerceText(agentLoop?.final_answer_source).trim() ||
+    coerceText(debug?.final_answer_source).trim() ||
+    coerceText(payload.final_answer_source).trim() ||
+    coerceText(terminalAuthorityForDebug?.final_answer_source).trim() ||
+    (terminalErrorCode ? "typed_failure" : null);
+  const terminalAuthorityText = coerceText(terminalAuthorityForDebug?.terminal_text_preview).trim();
+  const terminalIsTypedFailure =
+    terminalArtifactKind === "typed_failure" ||
+    finalAnswerSource === "typed_failure" ||
+    Boolean(terminalErrorCode);
+  const typedFailureText =
+    coerceText(payload.terminal_failure_text).trim() ||
+    coerceText(typedFailure?.message).trim() ||
+    terminalAuthorityText ||
+    renderTypedFailureFallback(terminalErrorCode);
+  const selectedFinalAnswerCandidate =
+    terminalIsTypedFailure
+      ? typedFailureText
+      : coerceText(payload.selectedDebugFinalAnswer).trim() ||
+        coerceText(payload.finalAnswer).trim() ||
+        coerceText(agentLoop?.selected_final_answer).trim() ||
+        coerceText(debug?.selected_final_answer).trim() ||
+        reply.content ||
+        null;
+  const liveEnvironmentAnswerApplied =
+    Boolean(liveEnvironmentAnswerForDebug) &&
+    (isInvalidTerminalAnswerText(selectedFinalAnswerCandidate) ||
+      normalizeTerminalAnswerText(selectedFinalAnswerCandidate) === normalizeTerminalAnswerText(liveEnvironmentAnswerForDebug));
+  const selectedFinalAnswer =
+    terminalIsTypedFailure
+      ? typedFailureText
+      : liveEnvironmentAnswerForDebug && liveEnvironmentAnswerApplied
+      ? liveEnvironmentAnswerForDebug
+      : selectedFinalAnswerCandidate;
   const canonicalGoalFrame = readAgentLoopAuditRecord(debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame);
   const activeTurnId =
     coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() ||
@@ -10344,9 +10369,6 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     coerceText(canonicalGoalFrame?.turn_id).trim() ||
     coerceText(turnTruthTable?.turn_id).trim() ||
     reply.id;
-  const terminalAuthorityForDebug = readAgentLoopAuditRecord(
-    payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority,
-  );
   const canonicalActiveTurnId = coerceText(terminalAuthorityForDebug?.turn_id).trim() || activeTurnId;
   const clientActiveTurnId = reply.id && reply.id !== canonicalActiveTurnId ? reply.id : null;
   const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
@@ -10365,10 +10387,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     active_prompt: activePrompt,
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
     selected_final_answer: selectedFinalAnswer,
-    final_answer_source:
-      coerceText(agentLoop?.final_answer_source).trim() ||
-      coerceText(debug?.final_answer_source).trim() ||
-      null,
+    final_answer_source: finalAnswerSource,
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
     resolved_turn_summary: {

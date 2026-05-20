@@ -89,20 +89,22 @@ export function resolveTerminalAnswerEnvelope(
   const sourceTarget = readSourceTarget(payload);
   let terminalArtifactKind = readTerminalArtifactKind(payload);
   let finalAnswerSource = readFinalAnswerSource(payload);
-  let terminalText: string | null = readTerminalPresentationText(payload);
+  let terminalText: string | null = null;
   let authorityOrigin: HelixTerminalAnswerEnvelope["authority_origin"] = "terminal_presentation";
 
+  if (terminalArtifactKind === "typed_failure") {
+    terminalText = typedFailureText(payload);
+    finalAnswerSource = "typed_failure";
+    authorityOrigin = "typed_failure";
+  } else if (terminalArtifactKind === "request_user_input") {
+    terminalText = requestUserInputText(payload);
+    authorityOrigin = "request_user_input";
+  } else {
+    terminalText = readTerminalPresentationText(payload);
+  }
   if (!terminalText) {
     terminalText = readString(payload.selected_final_answer);
     authorityOrigin = "selected_final_answer";
-  }
-  if (!terminalText && terminalArtifactKind === "request_user_input") {
-    terminalText = requestUserInputText(payload);
-    authorityOrigin = "request_user_input";
-  }
-  if (!terminalText && terminalArtifactKind === "typed_failure") {
-    terminalText = typedFailureText(payload);
-    authorityOrigin = "typed_failure";
   }
   if (!terminalText) {
     terminalArtifactKind = "typed_failure";

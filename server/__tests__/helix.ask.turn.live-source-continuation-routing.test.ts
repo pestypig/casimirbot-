@@ -90,14 +90,16 @@ const freshProducer = (overrides: Partial<HelixLiveSourceProducerFreshness> = {}
 
 const seedSituationRun = (input: {
   sourceId?: string;
+  threadId?: string;
   withObservation?: boolean;
   withFieldEvaluation?: boolean;
   withInterpretation?: boolean;
 } = {}) => {
   const now = new Date().toISOString();
   const sourceId = input.sourceId ?? "visual_source:diagnosis-unit";
+  const situationThreadId = input.threadId ?? "helix-ask:desktop";
   const { environment } = createLiveAnswerEnvironment({
-    thread_id: "helix-ask:desktop",
+    thread_id: situationThreadId,
     created_turn_id: "ask:diagnosis-seed",
     objective: "Use visual SituationRun evidence for live diagnosis tests.",
     preset: "custom",
@@ -112,7 +114,7 @@ const seedSituationRun = (input: {
   const observation = input.withObservation === false
     ? null
     : appendObservationJournalEntry({
-        thread_id: "helix-ask:desktop",
+        thread_id: situationThreadId,
         observation_id: "observation:diagnosis-unit",
         kind: "model_perception_observation",
         modality: "visual_frame",
@@ -172,6 +174,20 @@ const seedSituationRun = (input: {
     });
   }
   return { environment, run, observation };
+};
+
+const seedBackendVisualSource = async (app: express.Express, targetThreadId = threadId) => {
+  await request(app)
+    .post("/api/agi/situation/test-harness/live-visual-source")
+    .send({
+      thread_id: targetThreadId,
+      source_id: "visual_source:diagnosis-unit",
+      scene_text: "A backend-seeded visual capture shows a workstation screen available for route tests.",
+      activity: "Reviewing the current screen without changing live capture controls.",
+      objects: "Workstation window, visible screen content, route-test controls",
+      confidence: 0.82,
+    })
+    .expect(200);
 };
 
 describe("live source continuation Ask routing", () => {
@@ -257,6 +273,7 @@ describe("live source continuation Ask routing", () => {
     const question =
       "all right cool can you review what is happening right now in the screen capture I haven't started the interval 10 seconds yet";
     const app = await createApp();
+    await seedBackendVisualSource(app);
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
@@ -331,6 +348,7 @@ describe("live source continuation Ask routing", () => {
   it("treats future/contextual cadence language in visual questions as visual evidence context", async () => {
     const question = "review the current screen before I start the 10 second interval";
     const app = await createApp();
+    await seedBackendVisualSource(app);
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
@@ -356,6 +374,7 @@ describe("live source continuation Ask routing", () => {
   it("keeps procedure-epoch visual questions out of live pipeline receipts even when asking about interval state", async () => {
     const question = "what changed since the previous visual capture, and was the 10 second interval running?";
     const app = await createApp();
+    await seedBackendVisualSource(app);
     const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({

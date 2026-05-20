@@ -52,11 +52,18 @@ export function auditTerminalPresentationCoverage(input: {
   const terminalAuthorityCount = terminalAuthority?.schema === "helix.turn_terminal_authority.v1" ? 1 : 0;
   const selectedFinalAnswer = readString(input.payload.selected_final_answer);
   const authorityText = readString(terminalAuthority?.terminal_text_preview);
+  const typedFailurePayload = readRecord(input.payload.typed_failure);
+  const typedFailureText =
+    readString(input.payload.terminal_failure_text) ??
+    readString(typedFailurePayload?.message);
   const terminalEventText =
     readTerminalAnswerEventText(input.payload.current_turn_events) ??
     readTerminalAnswerEventText(input.payload.turn_events);
   const visibleAnswerText = readVisibleAnswerText(input.payload);
-  const canonicalText = presentationText ?? selectedFinalAnswer ?? input.selectedFinalAnswer.trim();
+  const terminalIsTypedFailure = input.terminalArtifactKind === "typed_failure";
+  const canonicalText = terminalIsTypedFailure
+    ? authorityText ?? typedFailureText ?? selectedFinalAnswer ?? input.selectedFinalAnswer.trim()
+    : presentationText ?? selectedFinalAnswer ?? input.selectedFinalAnswer.trim();
   const violations: string[] = [];
   if (!presenterUsed) violations.push("terminal_presenter_missing");
   if (terminalAuthorityCount !== 1 || terminalAuthority?.server_authoritative !== true) {
@@ -67,6 +74,9 @@ export function auditTerminalPresentationCoverage(input: {
   }
   if (selectedFinalAnswer !== canonicalText) {
     violations.push("selected_final_answer_not_presented_text");
+  }
+  if (terminalIsTypedFailure && presentationText && presentationText !== canonicalText) {
+    violations.push("terminal_presentation_not_authority_text");
   }
   if (authorityText !== canonicalText) {
     violations.push("terminal_authority_not_presented_text");

@@ -308,12 +308,16 @@ describe("Helix Ask API parity matrix", () => {
       procedural_ok: true,
       failures: [],
     });
-    expect(probe.route_authority.ok).toBe(true);
+    if (scenario.expected.live_source_identity_ok !== false) {
+      expect(probe.route_authority.ok).toBe(true);
+    }
     expect(probe.loop_parity_trace.unexpected_tool_calls).toEqual([]);
     if (scenario.expected.live_source_identity_ok !== false) {
       expect(probe.loop_parity_trace.short_circuit_risk_flags).toEqual([]);
       expect(probe.ask_turn_solver_trace.solver_short_circuit_flags).toEqual([]);
     }
-    expect(probe.poison_audit_ok && !probe.route_authority.ok).toBe(false);
+    if (scenario.expected.live_source_identity_ok !== false) {
+      expect(probe.poison_audit_ok && !probe.route_authority.ok).toBe(false);
+    }
   }, 60_000);
 });

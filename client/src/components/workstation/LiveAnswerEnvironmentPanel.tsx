@@ -387,19 +387,21 @@ const liveLineText = (lines: LiveAnswerLineState[], key: string): string =>
   String(lines.find((line: LiveAnswerLineState) => line.key === key)?.value ?? "").trim().toLowerCase();
 
 const liveSourcePolicyBadges = (lines: LiveAnswerLineState[], sourceIds: string[]): Array<{ label: string; value: string }> => {
+  const safeLines = Array.isArray(lines) ? lines : [];
+  const safeSourceIds = Array.isArray(sourceIds) ? sourceIds : [];
   const sourceKinds = new Set<string>();
-  if (lines.some((line: LiveAnswerLineState) => ["situation", "actor_state", "resources", "affordances"].includes(line.key))) {
+  if (safeLines.some((line: LiveAnswerLineState) => ["situation", "actor_state", "resources", "affordances"].includes(line.key))) {
     sourceKinds.add("environment_state");
   }
-  if (lines.some((line: LiveAnswerLineState) => ["possibilities", "rehearsal", "recommendation"].includes(line.key))) {
+  if (safeLines.some((line: LiveAnswerLineState) => ["possibilities", "rehearsal", "recommendation"].includes(line.key))) {
     sourceKinds.add("procedure_graph");
   }
-  if (sourceIds.some((sourceId: string) => /visual|frame|screen/i.test(sourceId))) sourceKinds.add("visual_frame");
-  if (sourceIds.some((sourceId: string) => /audio|voice|transcript/i.test(sourceId))) sourceKinds.add("audio");
-  if (sourceIds.some((sourceId: string) => /simulation|sim/i.test(sourceId))) sourceKinds.add("simulation");
-  const possibility = liveLineText(lines, "possibilities");
-  const rehearsal = liveLineText(lines, "rehearsal");
-  const recommendation = liveLineText(lines, "recommendation");
+  if (safeSourceIds.some((sourceId: string) => /visual|frame|screen/i.test(sourceId))) sourceKinds.add("visual_frame");
+  if (safeSourceIds.some((sourceId: string) => /audio|voice|transcript/i.test(sourceId))) sourceKinds.add("audio");
+  if (safeSourceIds.some((sourceId: string) => /simulation|sim/i.test(sourceId))) sourceKinds.add("simulation");
+  const possibility = liveLineText(safeLines, "possibilities");
+  const rehearsal = liveLineText(safeLines, "rehearsal");
+  const recommendation = liveLineText(safeLines, "recommendation");
   return [
     { label: "Source", value: Array.from(sourceKinds).join(" / ") || "none" },
     { label: "Possibility", value: /stale/.test(possibility) ? "stale" : /candidate|possible|retrieve|visible affordance/.test(possibility) ? "candidate exists" : "none" },
@@ -491,7 +493,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     ? latestReadResponse.schema_compatibility
     : null;
   const loadEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment);
-  const sourceIds = useMemo(() => new Set(environment?.source_ids ?? []), [environment?.source_ids]);
+  const environmentSourceIds = Array.isArray(environment?.source_ids) ? environment.source_ids : [];
+  const environmentLines = Array.isArray(environment?.lines) ? environment.lines : [];
+  const sourceIds = useMemo(() => new Set(environmentSourceIds), [environmentSourceIds]);
   const relevantSources = useMemo(
     () => sources.filter((source: WorkstationLiveSource) => sourceIds.size === 0 || sourceIds.has(source.source_id) || source.environment_id === environment?.environment_id),
     [environment?.environment_id, sourceIds, sources],
@@ -523,16 +527,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     return Array.from(bestByModality.values()).slice(0, 8);
   }, [presentStateCard?.fidelity_profile?.capabilities]);
   const environmentPolicyBadges = useMemo(
-    () => environment ? liveSourcePolicyBadges(environment.lines, environment.source_ids) : [],
-    [environment],
+    () => environment ? liveSourcePolicyBadges(environmentLines, environmentSourceIds) : [],
+    [environment, environmentLines, environmentSourceIds],
   );
   const rehearsalCatalog = useMemo(() => buildRehearsalSpaceCatalog({
-    sourceIds: environment?.source_ids ?? [],
+    sourceIds: environmentSourceIds,
     modalities: sourceHealthEntries.map((entry: HelixSituationSourceCapability) => entry.modality),
-    lineKeys: environment?.lines.map((line: LiveAnswerLineState) => line.key) ?? [],
+    lineKeys: environmentLines.map((line: LiveAnswerLineState) => line.key),
     objective: environment?.objective ?? null,
     preset: environment?.preset ?? null,
-  }), [environment, sourceHealthEntries]);
+  }), [environment?.objective, environment?.preset, environmentLines, environmentSourceIds, sourceHealthEntries]);
   useEffect(() => {
     if (!selectedRehearsalSpaceId || !rehearsalCatalog.spaces.some((space: HelixRehearsalSpace) => space.space_id === selectedRehearsalSpaceId)) {
       setSelectedRehearsalSpaceId(rehearsalCatalog.selected_space_id);
@@ -1431,7 +1435,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     </span>
                   </div>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {presentStateCard.lines.map((entry: HelixPresentStateCard["lines"][number]) => {
+                    {(Array.isArray(presentStateCard.lines) ? presentStateCard.lines : []).map((entry: HelixPresentStateCard["lines"][number]) => {
                       const lineState = liveCardLineStateByKey.get(entry.key);
                       const matchingRequest = lineToolRequests.find((request: HelixLiveLineToolRequest) => request.line_key === entry.key && request.status !== "evaluated");
                       return (
@@ -1772,8 +1776,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 ["Objective", environment.objective],
                 ["Thread", environment.thread_id],
                 ["Status", `${environment.status} / ${environment.mode}`],
-                ["Sources", String(environment.source_ids.length)],
-                ["Lines", String(environment.lines.length)],
+                ["Sources", String(environmentSourceIds.length)],
+                ["Lines", String(environmentLines.length)],
                 ["Last update", formatTime(environment.updated_at)],
                 ["Last evaluation", environment.latest_evaluation?.summary ?? environment.latest_summary],
               ] as Array<[string, string]>).map(([label, value]: [string, string]) => (
@@ -2163,7 +2167,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 </div>
               </div>
               <div className="grid gap-2 md:grid-cols-2">
-                {environment.lines.map((line: LiveAnswerLineState) => (
+                {environmentLines.map((line: LiveAnswerLineState) => (
                   <div key={line.key} className="rounded border border-white/10 bg-slate-950/70 p-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs font-semibold text-slate-100">{line.label}</p>

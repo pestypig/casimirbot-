@@ -96,14 +96,39 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     : [];
   const terminalPresentation = asRecord(payload.terminal_presentation ?? debug?.terminal_presentation ?? agentLoop?.terminal_presentation);
   const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
+  const terminalArtifactKind =
+    readString(agentLoop?.terminal_artifact_kind) ??
+    readString(debug?.terminal_artifact_kind) ??
+    readString(payload.terminal_artifact_kind) ??
+    readString(terminalAuthority?.terminal_artifact_kind) ??
+    null;
+  const finalAnswerSource =
+    readString(agentLoop?.final_answer_source) ??
+    readString(debug?.final_answer_source) ??
+    readString(payload.final_answer_source) ??
+    readString(terminalAuthority?.final_answer_source);
+  const terminalErrorCode =
+    readString(agentLoop?.terminal_error_code) ??
+    readString(debug?.terminal_error_code) ??
+    readString(payload.terminal_error_code);
+  const typedFailure = asRecord(payload.typed_failure ?? debug?.typed_failure ?? agentLoop?.typed_failure);
+  const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
+  const terminalIsTypedFailure =
+    terminalArtifactKind === "typed_failure" ||
+    finalAnswerSource === "typed_failure" ||
+    Boolean(terminalErrorCode);
   const selectedFinalAnswer =
-    readString(terminalPresentation?.concise_text) ??
-    readString(payload.selected_final_answer) ??
-    readString(agentLoop?.selected_final_answer) ??
-    readString(debug?.selected_final_answer) ??
-    readString(terminalAuthority?.terminal_text_preview) ??
-    readString(payload.selectedDebugFinalAnswer) ??
-    readString(payload.finalAnswer);
+    terminalIsTypedFailure
+      ? readString(payload.terminal_failure_text) ??
+        readString(typedFailure?.message) ??
+        terminalAuthorityText
+      : readString(terminalPresentation?.concise_text) ??
+        readString(payload.selected_final_answer) ??
+        readString(agentLoop?.selected_final_answer) ??
+        readString(debug?.selected_final_answer) ??
+        terminalAuthorityText ??
+        readString(payload.selectedDebugFinalAnswer) ??
+        readString(payload.finalAnswer);
   const canonicalGoalFrame = asRecord(debug?.canonical_goal_frame ?? agentLoop?.canonical_goal_frame);
   const activeTurnId =
     readString(debug?.turn_id) ??
@@ -111,10 +136,6 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(asRecord(payload.turnTruthTable)?.turn_id) ??
     readString(reply.id) ??
     "unknown-turn";
-  const terminalArtifactKind =
-    readString(agentLoop?.terminal_artifact_kind) ??
-    readString(debug?.terminal_artifact_kind) ??
-    null;
   const canonicalActiveTurnId = readString(terminalAuthority?.turn_id) ?? activeTurnId;
   const clientActiveTurnId = readString(reply.id);
   const envelopeWithoutHash = {
@@ -128,13 +149,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     active_prompt: readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
     active_prompt_hash: hashDebugExportText(readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? ""),
     selected_final_answer: selectedFinalAnswer,
-    final_answer_source: readString(agentLoop?.final_answer_source) ?? readString(debug?.final_answer_source),
+    final_answer_source: finalAnswerSource,
     resolved_turn_summary: {
       turn_id: canonicalActiveTurnId,
       final_status: "final_answer",
       resolved_route_label: "unknown",
       terminal_artifact_kind: terminalArtifactKind,
-      terminal_error_code: readString(agentLoop?.terminal_error_code) ?? readString(debug?.terminal_error_code),
+      terminal_error_code: terminalErrorCode,
       pending_server_request_present: Boolean(agentLoop?.pending_request),
     },
     canonical_goal_frame: canonicalGoalFrame,
