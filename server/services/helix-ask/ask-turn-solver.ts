@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { HelixLoopParityTrace } from "./loop-parity-trace";
 import type { HelixCapabilityPlan } from "@shared/helix-capability-plan";
 import type { HelixCapabilityResult } from "@shared/helix-capability-result";
+import type { HelixCapabilityLifecycleLedger } from "@shared/helix-capability-lifecycle-ledger";
 import type { HelixProcedureEvidenceRetrievalPlan } from "@shared/helix-procedure-evidence-retrieval-plan";
 import type { HelixProcedureEvidenceRetrievalResult } from "@shared/helix-procedure-evidence-retrieval-result";
 import type { HelixSolverInstructionFrame } from "@shared/helix-solver-instruction-frame";
@@ -136,6 +137,7 @@ export type HelixAskTurnSolverTrace = {
   live_source_identity_audit_ref?: string | null;
   capability_plan?: HelixCapabilityPlan;
   capability_result?: HelixCapabilityResult;
+  capability_lifecycle_ledger?: HelixCapabilityLifecycleLedger;
   procedure_evidence_retrieval_plan?: HelixProcedureEvidenceRetrievalPlan;
   procedure_evidence_retrieval_result?: HelixProcedureEvidenceRetrievalResult;
   solver_instruction_frame?: HelixSolverInstructionFrame;
@@ -769,6 +771,11 @@ export function buildAskTurnSolverTrace(input: {
           capability_result: input.payload.capability_result as HelixCapabilityResult,
         }
       : {}),
+    ...(readRecord(input.payload.capability_lifecycle_ledger)?.schema === "helix.capability_lifecycle_ledger.v1"
+      ? {
+          capability_lifecycle_ledger: input.payload.capability_lifecycle_ledger as HelixCapabilityLifecycleLedger,
+        }
+      : {}),
     ...(readRecord(input.payload.procedure_evidence_retrieval_plan)?.schema === "helix.procedure_evidence_retrieval_plan.v1"
       ? {
           procedure_evidence_retrieval_plan: input.payload.procedure_evidence_retrieval_plan as HelixProcedureEvidenceRetrievalPlan,
@@ -803,7 +810,7 @@ export function buildAskTurnSolverTrace(input: {
       ? {
           solver_retry_policies: input.payload.solver_retry_policies
             .map((entry: unknown) => readRecord(entry))
-            .filter((entry): entry is RecordLike => entry?.schema === "helix.solver_retry_policy.v1") as HelixSolverRetryPolicy[],
+            .filter((entry: RecordLike | null): entry is RecordLike => entry?.schema === "helix.solver_retry_policy.v1") as HelixSolverRetryPolicy[],
         }
       : {}),
     final_arbitration: {

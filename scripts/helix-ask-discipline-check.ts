@@ -12,6 +12,15 @@ type CheckMessage = {
   file?: string;
 };
 
+type DisciplinePatchFileReport = {
+  changed_file: string;
+  discipline_category: string;
+  closest_codex_analog: string;
+  helix_owned_policy_or_runtime_duplication: string;
+  required_tests: string[];
+  shortcut_risks: string[];
+};
+
 const args = new Set(process.argv.slice(2));
 const checkOnly = args.has("--check-only");
 const runFull = args.has("--run-full");
@@ -56,6 +65,31 @@ const classificationKeywords: Array<[string, RegExp]> = [
   ["terminal authority", /terminal_authority|route-authority|route_authority|route_product|terminal_artifact_kind|typed_failure/i],
   ["presentation", /presentation|finalAnswer|LiveAnswerEnvironment|visibleAnswerState/i],
   ["Codex-owned runtime behavior", /sampling|sandbox|approval|subagent|compaction|session lifecycle|tool execution runtime/i],
+];
+
+const requiredTestByCategory: Array<[RegExp, string[]]> = [
+  [/terminal_authority|presentation|stream_ui_backend_equivalence/i, [
+    "npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks",
+  ]],
+  [/capability_admission|capability_lifecycle|runtime_adapter/i, [
+    "npx vitest run server/__tests__/helix.ask.capability-plan-contract.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.capability-lifecycle-ledger.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks",
+  ]],
+  [/evidence_retrieval|procedure_memory|debug_diagnosis/i, [
+    "npx vitest run server/__tests__/helix.ask.procedure-evidence-retriever.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks",
+  ]],
+  [/subgoal|retry|instruction/i, [
+    "npx vitest run server/__tests__/helix.ask.solver-subgoal-ledger.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.solver-retry-policy.test.ts --pool=forks",
+    "npx vitest run server/__tests__/helix.ask.solver-instruction-frame.test.ts --pool=forks",
+  ]],
+  [/test_harness|discipline_guard/i, [
+    "npm run helix:ask:discipline:quick",
+  ]],
 ];
 
 function normalizePath(value: string): string {
@@ -117,6 +151,132 @@ function inferClassifications(files: string[]): string[] {
     }
   }
   return [...labels];
+}
+
+function inferDisciplineCategory(file: string, content: string): string {
+  const haystack = `${file}\n${content}`;
+  if (/scripts\/helix-ask-discipline-check\.ts$/.test(file)) return "discipline_guard";
+  if (/__tests__\//.test(file)) return "test_harness";
+  if (/^server\/routes\/agi\.plan\.ts$/.test(file)) return "route_authority / terminal_authority / presentation";
+  if (/ask-turn-solver\.ts$/.test(file)) return "intent_arbitration / route_authority / terminal_authority";
+  if (/terminal-equivalence|visibleAnswerState|client_server_terminal_match|stream_terminal/i.test(haystack)) {
+    return "stream_ui_backend_equivalence / terminal_authority / presentation";
+  }
+  if (/procedure-evidence-retriever|procedure_evidence_retrieval/i.test(haystack)) return "evidence_retrieval";
+  if (/capability-lifecycle|capability_lifecycle/i.test(haystack)) {
+    return "capability_lifecycle / capability_admission / evidence_reentry";
+  }
+  if (/capability-result-gate|capability_result|reentered_solver/i.test(haystack)) {
+    return "capability_admission / evidence_reentry";
+  }
+  if (/capability-planner|capability_plan|operator_command_required/i.test(haystack)) return "capability_admission";
+  if (/solver-subgoal|solver_subgoal/i.test(haystack)) return "subgoal_evaluation";
+  if (/solver-retry|solver_retry/i.test(haystack)) return "retry_policy";
+  if (/solver-instruction|solver_instruction/i.test(haystack)) return "instruction_reinstallation";
+  if (/workstation-action|workspace_action|client-capabilit|adapter_acknowledged/i.test(haystack)) return "runtime_adapter";
+  if (/ask-turn-solver|route_authority|terminal_authority|terminal_artifact_kind|typed_failure/i.test(haystack)) {
+    return "intent_arbitration / route_authority / terminal_authority";
+  }
+  if (/source_target|visual_capture|live-source-identity/i.test(haystack)) return "source_admission";
+  if (/presentation|finalAnswer|LiveAnswerEnvironment/i.test(haystack)) return "presentation";
+  return "helix_policy";
+}
+
+function closestCodexAnalogForCategory(category: string): string {
+  if (/stream_ui_backend_equivalence|terminal_authority|presentation/i.test(category)) {
+    return "turn.rs terminal item completion / final assistant message";
+  }
+  if (/capability_admission|capability_lifecycle/i.test(category)) {
+    return "codex_tool_runner.rs tool result events";
+  }
+  if (/evidence_retrieval|evidence_reentry|procedure_memory/i.test(category)) {
+    return "tool result re-entry / turn continuation";
+  }
+  if (/runtime_adapter/i.test(category)) return "exec.rs / tool execution";
+  if (/subgoal|retry|instruction/i.test(category)) return "turn.rs task progression and continuation policy";
+  if (/prompt_interpretation|intent_arbitration|source_admission|route_authority/i.test(category)) {
+    return "turn.rs model/tool arbitration boundary";
+  }
+  if (/test_harness|discipline_guard/i.test(category)) return "Codex regression tests / runtime invariant checks";
+  return "turn.rs procedural turn lifecycle";
+}
+
+function verdictForCategory(category: string, file: string, content: string): string {
+  if (/runtime_adapter/i.test(category)) return "allowed only as thin adapter";
+  if (/test_harness|discipline_guard/i.test(category)) return "Helix-owned verification policy";
+  if (/Codex-owned runtime behavior|sampling|sandbox|approval|subagent orchestration|private execution queue/i.test(content)) {
+    return "review for unsafe Codex-owned runtime duplication";
+  }
+  if (/shared\//.test(file)) return "Helix-owned data contract";
+  return "Helix-owned policy";
+}
+
+function shortcutRisksForFile(file: string, content: string): string[] {
+  if (/scripts\/helix-ask-discipline-check\.ts$/.test(file)) {
+    return ["discipline_report_can_mask_runtime_duplication_if_codex_analog_missing"];
+  }
+  const risks = new Set<string>();
+  const haystack = `${file}\n${content}`;
+  if (/receipt|workspace_action_receipt|doc_open_receipt|live_pipeline_receipt/i.test(haystack)) {
+    risks.add("receipt_becomes_answer_without_goal_authority");
+  }
+  if (/projection|visibleAnswerState|finalAnswer|LiveAnswerEnvironment/i.test(haystack)) {
+    risks.add("projection_or_visible_state_overrides_terminal_authority");
+  }
+  if (/typed_failure|terminal_error_code|final_failure/i.test(haystack)) {
+    risks.add("typed_failure_hidden_by_stale_presentation");
+  }
+  if (/actual_tool_calls|set_rate|mutating|operator_command/i.test(haystack)) {
+    risks.add("contextual_tool_mention_becomes_executable_action");
+  }
+  if (/retrieval_plan|procedure_evidence_retrieval/i.test(haystack)) {
+    risks.add("retrieval_plan_used_without_result");
+  }
+  if (/capability_plan|capability_result|capability_lifecycle/i.test(haystack)) {
+    risks.add("capability_result_not_reentered_before_terminal");
+  }
+  if (/route_authority|route_reason_code|terminal_artifact_kind/i.test(haystack)) {
+    risks.add("route_label_or_terminal_kind_used_as_authority");
+  }
+  if (/stream|turn_final|terminal_answer_authority|poison_audit/i.test(haystack)) {
+    risks.add("stream_debug_ui_terminal_mismatch");
+  }
+  return [...risks];
+}
+
+function requiredTestsForCategory(category: string): string[] {
+  const tests = new Set<string>();
+  for (const [pattern, commands] of requiredTestByCategory) {
+    if (pattern.test(category)) commands.forEach((command) => tests.add(command));
+  }
+  if (tests.size === 0) tests.add("npm run helix:ask:discipline:quick");
+  return [...tests];
+}
+
+function buildPatchFileReport(file: string): DisciplinePatchFileReport {
+  const content = readUtf8(file) ?? "";
+  const disciplineCategory = inferDisciplineCategory(file, content);
+  return {
+    changed_file: file,
+    discipline_category: disciplineCategory,
+    closest_codex_analog: closestCodexAnalogForCategory(disciplineCategory),
+    helix_owned_policy_or_runtime_duplication: verdictForCategory(disciplineCategory, file, content),
+    required_tests: requiredTestsForCategory(disciplineCategory),
+    shortcut_risks: shortcutRisksForFile(file, content),
+  };
+}
+
+function printPatchFileReports(reports: DisciplinePatchFileReport[]): void {
+  if (reports.length === 0) return;
+  console.log("[helix:ask:discipline] per-file Codex comparison report");
+  for (const report of reports) {
+    console.log(`- changed_file: ${report.changed_file}`);
+    console.log(`  discipline_category: ${report.discipline_category}`);
+    console.log(`  closest_codex_analog: ${report.closest_codex_analog}`);
+    console.log(`  helix_owned_policy_or_runtime_duplication: ${report.helix_owned_policy_or_runtime_duplication}`);
+    console.log(`  required_tests: ${report.required_tests.length ? report.required_tests.join("; ") : "none"}`);
+    console.log(`  shortcut_risks: ${report.shortcut_risks.length ? report.shortcut_risks.join("; ") : "none_detected"}`);
+  }
 }
 
 function checkCodexReference(messages: CheckMessage[], hasSensitiveChanges: boolean): void {
@@ -283,6 +443,7 @@ const changedFiles = unique([
 ]).sort();
 const sensitiveFiles = changedFiles.filter(isSensitive);
 const classificationFiles = sensitiveFiles.filter((file) => file !== "scripts/helix-ask-discipline-check.ts");
+const patchFileReports = sensitiveFiles.map(buildPatchFileReport);
 const messages: CheckMessage[] = [];
 
 checkCodexReference(messages, sensitiveFiles.length > 0);
@@ -309,6 +470,7 @@ console.log(`sensitive_helix_ask_files: ${sensitiveFiles.length}`);
 if (sensitiveFiles.length > 0) {
   for (const file of sensitiveFiles) console.log(`  - ${file}`);
 }
+printPatchFileReports(patchFileReports);
 console.log(
   `classification: ${
     declaredClassification || (inferredClassifications.length ? inferredClassifications.join(", ") : "none inferred")

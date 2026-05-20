@@ -124,7 +124,7 @@ const admissionFor = (input: {
     input.mutating &&
     (
       capabilityRules.includes("negative_user_constraints_block_mutating_capabilities") ||
-      negativeConstraints.some((constraint) =>
+      negativeConstraints.some((constraint: string) =>
         /\b(?:run|open|click|start|stop|set|change|update|repair|refresh|execute)\s+nothing\b/i.test(constraint) ||
         /\b(?:do\s+not|don't|without|never)\b[\s\S]{0,80}\b(?:run|open|click|start|stop|set|change|update|repair|refresh|execute|call)\b/i.test(constraint),
       )
