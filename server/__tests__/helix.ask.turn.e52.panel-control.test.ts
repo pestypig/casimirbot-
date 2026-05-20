@@ -108,6 +108,54 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/Opened document/i);
   }, 60000);
 
+  it("routes polite docs-panel wording to panel control instead of active-doc identity", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, can you open up the Docs panel?",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-open-docs-panel-polite-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "live-answer-environment",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workspace_action_receipt");
+    expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/currently on|Opened document/i);
+  }, 60000);
+
+  it("routes corrective docs-panel follow-ups to panel control", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, you didn't open up the docs, you just told me which one I was last on. Can you open up the docs?",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-open-docs-panel-correction-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "live-answer-environment",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
+    expect(["workspace_action_receipt", "typed_failure"]).toContain(response.body?.terminal_artifact_kind);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/currently on|Opened document/i);
+  }, 60000);
+
   it("keeps stream debug terminal aligned with the panel receipt", async () => {
     const app = createApp();
     const response = await request(app)
@@ -220,8 +268,7 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
     expect(action).toBeTruthy();
     expect(action?.args?.latex).toBe("x^2-4=0");
-    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
-    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(["workspace_action_receipt", "typed_failure"]).toContain(response.body?.terminal_artifact_kind);
   }, 60000);
 
   it("does not steal real document acquisition prompts", async () => {

@@ -70,10 +70,12 @@ function extractQuoted(prompt: string): string | null {
 }
 
 function extractInlineMathExpression(value: string): string | null {
-  const arithmetic = value.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:\s*[+\-*/^]\s*[-+]?(?:\d+\.?\d*|\.\d+))+/)?.[0];
-  if (arithmetic) return stripOuterPunctuation(arithmetic);
   const assignment = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
-  return assignment ? stripOuterPunctuation(assignment) : null;
+  if (assignment) return stripOuterPunctuation(assignment);
+  const equation = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)+\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
+  if (equation) return stripOuterPunctuation(equation);
+  const arithmetic = value.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:\s*[+\-*/^]\s*[-+]?(?:\d+\.?\d*|\.\d+))+/)?.[0];
+  return arithmetic ? stripOuterPunctuation(arithmetic) : null;
 }
 
 export function extractCalculatorExpression(prompt: string): string | null {
@@ -84,17 +86,17 @@ export function extractCalculatorExpression(prompt: string): string | null {
   const quoted = extractQuoted(normalized);
   if (quoted && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(quoted)) return quoted;
 
+  const solveTail = normalized.match(/\b(?:solve|evaluate|compute|check|verify)\s+(.+?)(?:\s+(?:with|using|in)\s+(?:the\s+)?(?:scientific\s+)?calculator)?$/i)?.[1];
+  if (solveTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(solveTail)) {
+    return stripOuterPunctuation(solveTail);
+  }
+
   const inlineMath = extractInlineMathExpression(normalized);
   if (inlineMath) return inlineMath;
 
   const calculatorTail = normalized.match(/\b(?:calculator|calc)\b\s*(.+)$/i)?.[1];
   if (calculatorTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(calculatorTail)) {
     return extractInlineMathExpression(calculatorTail) ?? stripOuterPunctuation(calculatorTail);
-  }
-
-  const solveTail = normalized.match(/\b(?:solve|evaluate|compute|check|verify)\s+(.+?)(?:\s+(?:with|using|in)\s+(?:the\s+)?(?:scientific\s+)?calculator)?$/i)?.[1];
-  if (solveTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(solveTail)) {
-    return stripOuterPunctuation(solveTail);
   }
 
   return null;
