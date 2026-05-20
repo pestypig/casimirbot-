@@ -30,6 +30,11 @@ import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-he
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
 import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
 import {
+  buildRehearsalSpaceCatalog,
+  type HelixRehearsalSpace,
+  type HelixRehearsalSpaceId,
+} from "@shared/helix-rehearsal-space";
+import {
   adoptServerVisualProducerPolicies,
   getActiveVisualFrameStream,
   getLatestActiveVisualFrameStream,
@@ -378,6 +383,31 @@ const sourceCoverageSummary = (coverage?: HelixLiveCardLineSourceCoverage): stri
   return entries;
 };
 
+const liveLineText = (lines: LiveAnswerLineState[], key: string): string =>
+  String(lines.find((line: LiveAnswerLineState) => line.key === key)?.value ?? "").trim().toLowerCase();
+
+const liveSourcePolicyBadges = (lines: LiveAnswerLineState[], sourceIds: string[]): Array<{ label: string; value: string }> => {
+  const sourceKinds = new Set<string>();
+  if (lines.some((line: LiveAnswerLineState) => ["situation", "actor_state", "resources", "affordances"].includes(line.key))) {
+    sourceKinds.add("environment_state");
+  }
+  if (lines.some((line: LiveAnswerLineState) => ["possibilities", "rehearsal", "recommendation"].includes(line.key))) {
+    sourceKinds.add("procedure_graph");
+  }
+  if (sourceIds.some((sourceId: string) => /visual|frame|screen/i.test(sourceId))) sourceKinds.add("visual_frame");
+  if (sourceIds.some((sourceId: string) => /audio|voice|transcript/i.test(sourceId))) sourceKinds.add("audio");
+  if (sourceIds.some((sourceId: string) => /simulation|sim/i.test(sourceId))) sourceKinds.add("simulation");
+  const possibility = liveLineText(lines, "possibilities");
+  const rehearsal = liveLineText(lines, "rehearsal");
+  const recommendation = liveLineText(lines, "recommendation");
+  return [
+    { label: "Source", value: Array.from(sourceKinds).join(" / ") || "none" },
+    { label: "Possibility", value: /stale/.test(possibility) ? "stale" : /candidate|possible|retrieve|visible affordance/.test(possibility) ? "candidate exists" : "none" },
+    { label: "Rehearsal", value: /blocked/.test(rehearsal) ? "blocked" : /partial|caveat/.test(rehearsal) ? "partial" : /risky/.test(rehearsal) ? "risky" : /passed|feasible/.test(rehearsal) ? "feasible" : "not run" },
+    { label: "Recommendation", value: /confirmation/.test(recommendation) ? "needs confirmation" : /caveat|recheck/.test(recommendation) ? "suggested with caveat" : recommendation ? "safe to suggest" : "hidden" },
+  ];
+};
+
 export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: { threadId?: string }) {
   const [activeTab, setActiveTab] = useState<LiveEnvironmentTab>("present_state");
   const [sources, setSources] = useState<WorkstationLiveSource[]>([]);
@@ -436,6 +466,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     if (typeof window === "undefined") return "World-event source";
     return window.localStorage.getItem("helix.worldEventSourceLabel") ?? "World-event source";
   });
+  const [selectedRehearsalSpaceId, setSelectedRehearsalSpaceId] = useState<HelixRehearsalSpaceId | null>(null);
   const [lastFetchError, setLastFetchError] = useState<string | null>(null);
   const [lastActionStatus, setLastActionStatus] = useState<string | null>(null);
   const environment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) =>
@@ -491,6 +522,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
     return Array.from(bestByModality.values()).slice(0, 8);
   }, [presentStateCard?.fidelity_profile?.capabilities]);
+  const environmentPolicyBadges = useMemo(
+    () => environment ? liveSourcePolicyBadges(environment.lines, environment.source_ids) : [],
+    [environment],
+  );
+  const rehearsalCatalog = useMemo(() => buildRehearsalSpaceCatalog({
+    sourceIds: environment?.source_ids ?? [],
+    modalities: sourceHealthEntries.map((entry: HelixSituationSourceCapability) => entry.modality),
+    lineKeys: environment?.lines.map((line: LiveAnswerLineState) => line.key) ?? [],
+    objective: environment?.objective ?? null,
+    preset: environment?.preset ?? null,
+  }), [environment, sourceHealthEntries]);
+  useEffect(() => {
+    if (!selectedRehearsalSpaceId || !rehearsalCatalog.spaces.some((space: HelixRehearsalSpace) => space.space_id === selectedRehearsalSpaceId)) {
+      setSelectedRehearsalSpaceId(rehearsalCatalog.selected_space_id);
+    }
+  }, [rehearsalCatalog.selected_space_id, rehearsalCatalog.spaces, selectedRehearsalSpaceId]);
+  const selectedRehearsalSpace = rehearsalCatalog.spaces.find((space: HelixRehearsalSpace) => space.space_id === selectedRehearsalSpaceId) ??
+    rehearsalCatalog.spaces.find((space: HelixRehearsalSpace) => space.space_id === rehearsalCatalog.selected_space_id) ??
+    null;
   const visualSourceCapability = useMemo(
     () => sourceHealthEntries.find((entry: HelixSituationSourceCapability) => entry.modality === "visual_frame") ?? null,
     [sourceHealthEntries],
@@ -1106,6 +1156,52 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               {modalityLabel(capability.modality)}: {sourceStatusLabel(capability)}
             </span>
           ))}
+        </div>
+        {environmentPolicyBadges.length ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {environmentPolicyBadges.map((badge: { label: string; value: string }) => (
+              <span key={badge.label} className="rounded border border-cyan-300/20 px-2 py-1 text-[10px] text-cyan-100">
+                {badge.label}: {badge.value}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-3 rounded border border-cyan-300/15 bg-cyan-950/10 p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-200">Supported rehearsal spaces</p>
+            {selectedRehearsalSpace ? (
+              <span className="rounded border border-cyan-300/20 px-2 py-0.5 text-[10px] text-cyan-100">
+                selected {selectedRehearsalSpace.label} / fidelity +{Math.round(selectedRehearsalSpace.additive_fidelity_hint * 100)}%
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {rehearsalCatalog.spaces.map((space: HelixRehearsalSpace) => (
+              <button
+                key={space.space_id}
+                type="button"
+                onClick={() => setSelectedRehearsalSpaceId(space.space_id)}
+                disabled={space.status === "future"}
+                title={`${space.summary} Adapter: ${space.domain_adapter}. Execution disabled.`}
+                className={`rounded border px-2 py-1 text-[10px] ${
+                  selectedRehearsalSpaceId === space.space_id
+                    ? "border-cyan-200/50 bg-cyan-300/15 text-cyan-50"
+                    : space.status === "available"
+                      ? "border-emerald-300/25 text-emerald-100 hover:bg-emerald-400/10"
+                      : space.status === "partial"
+                        ? "border-amber-300/25 text-amber-100 hover:bg-amber-400/10"
+                        : "border-white/10 text-slate-500"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {space.label} / {space.status}
+              </button>
+            ))}
+          </div>
+          {selectedRehearsalSpace ? (
+            <p className="mt-2 text-[11px] leading-5 text-slate-400">
+              {selectedRehearsalSpace.summary} Modes: {selectedRehearsalSpace.supported_rehearsal_modes.join(", ")}. Live actions disabled.
+            </p>
+          ) : null}
         </div>
         {presentStateCard?.fidelity_profile?.next_actions?.length ? (
           <p className="mt-2 text-[11px] text-amber-100">

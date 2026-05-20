@@ -49,6 +49,7 @@ export function rehearsePossibilityGraph(input: {
         graph_id: input.graph.graph_id,
         feasibility: "blocked",
         confidence: 0.2,
+        evidence_refs: input.graph.evidence_refs,
         checked_nodes: input.graph.nodes.map((node) => ({
           node_id: node.node_id,
           status: node.kind === "start" ? "passed" : "skipped",
@@ -64,6 +65,7 @@ export function rehearsePossibilityGraph(input: {
         recommendation_gate: "do_not_suggest",
         tested_in: request.rehearsal_mode,
         side_effects_performed: false,
+        require_human_approval_for_execution: true,
         model_invoked: false,
         deterministic: true,
         assistant_answer: false,
@@ -78,4 +80,3 @@ export function rehearsePossibilityGraph(input: {
     : rehearseMinecraftGraph({ graph: input.graph, request, environmentState: input.environmentState, now: input.now });
   return { request, result };
 }
-

@@ -32,6 +32,7 @@ export type HelixActionRehearsalResult = {
   graph_id: string;
   feasibility: "feasible" | "blocked" | "risky" | "partial" | "unknown";
   confidence: number;
+  evidence_refs: string[];
   checked_nodes: Array<{
     node_id: string;
     status: "passed" | "failed" | "risky" | "skipped" | "unknown";
@@ -52,6 +53,7 @@ export type HelixActionRehearsalResult = {
     | "needs_user_confirmation";
   tested_in: HelixActionRehearsalMode;
   side_effects_performed: false;
+  require_human_approval_for_execution: true;
   model_invoked: boolean;
   deterministic?: boolean;
   assistant_answer: false;
@@ -59,4 +61,3 @@ export type HelixActionRehearsalResult = {
   context_policy: "compact_context_pack_only";
   created_at: string;
 };
-

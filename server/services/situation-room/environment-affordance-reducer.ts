@@ -16,6 +16,7 @@ export type HelixEnvironmentAffordanceContext = {
   model_invoked: false;
   assistant_answer: false;
   raw_content_included: false;
+  context_policy: "compact_context_pack_only";
 };
 
 export function reduceEnvironmentAffordances(snapshot: HelixEnvironmentStateSnapshot): HelixEnvironmentAffordanceContext {
@@ -48,6 +49,6 @@ export function reduceEnvironmentAffordances(snapshot: HelixEnvironmentStateSnap
     model_invoked: false,
     assistant_answer: false,
     raw_content_included: false,
+    context_policy: "compact_context_pack_only",
   };
 }
-

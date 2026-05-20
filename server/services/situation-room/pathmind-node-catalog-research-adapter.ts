@@ -17,6 +17,8 @@ export const PATHMIND_RESEARCH_NODE_CATALOG: PathmindResearchNodeMapping[] = [
 
 export const PATHMIND_INTEROP_POLICY = {
   schema: "helix.pathmind_interop_policy.v1",
+  imports_pathmind_code: false,
+  execution_enabled: false,
   may_execute_live_actions: false,
   requires_explicit_client_install: true,
   requires_server_permission: true,
@@ -25,4 +27,3 @@ export const PATHMIND_INTEROP_POLICY = {
   assistant_answer: false,
   raw_content_included: false,
 } as const;
-

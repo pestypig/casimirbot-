@@ -50,6 +50,7 @@ export function buildPossibilityGraph(input: {
     environment_id: input.environmentId ?? null,
     room_id: snapshot.room_id,
     source_snapshot_refs: [snapshot.snapshot_id],
+    evidence_refs: evidenceRefs,
     objective: input.objective,
     graph_status: "rehearsal_ready",
     nodes: [

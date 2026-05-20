@@ -1,0 +1,38 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo.environment-rehearsal",
+    "types": ["node", "vite/client", "vitest/globals"],
+    "jsx": "preserve"
+  },
+  "include": [
+    "shared/helix-environment-state-snapshot.ts",
+    "shared/helix-environment-possibility-graph.ts",
+    "shared/helix-action-rehearsal.ts",
+    "shared/helix-recommendation-gate.ts",
+    "shared/helix-rehearsal-space.ts",
+    "shared/helix-environment-live-lines.ts",
+    "shared/helix-live-answer-environment.ts",
+    "shared/helix-situation-source-capability.ts",
+    "server/services/situation-room/environment-*.ts",
+    "server/services/situation-room/*rehearsal*.ts",
+    "server/services/situation-room/*possibility*.ts",
+    "server/services/situation-room/live-recommendation-gate-reducer.ts",
+    "server/services/situation-room/live-environment-state-line-reducer.ts",
+    "server/services/situation-room/live-answer-environment-store.ts",
+    "server/services/situation-room/pathmind-node-catalog-research-adapter.ts",
+    "server/__tests__/environment-*.test.ts",
+    "server/__tests__/live-answer.environment-state-e2e.test.ts",
+    "server/__tests__/minecraft-plugin-state-contract.test.ts",
+    "server/__tests__/pathmind-research-mapping-guard.test.ts",
+    "server/__tests__/rehearsal-space-catalog.test.ts",
+    "server/__tests__/situation-room.environment-rehearsal.test.ts",
+    "client/src/components/helix/LiveAnswerEnvironmentCard.tsx",
+    "client/src/components/workstation/LiveAnswerEnvironmentPanel.tsx",
+    "fixtures/environment-state/**/*.json",
+    "fixtures/environment-rehearsal/**/*.json"
+  ],
+  "exclude": []
+}

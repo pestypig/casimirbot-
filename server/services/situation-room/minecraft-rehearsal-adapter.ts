@@ -76,6 +76,10 @@ export function rehearseMinecraftGraph(input: {
     graph_id: input.graph.graph_id,
     feasibility,
     confidence: feasibility === "feasible" ? 0.82 : feasibility === "partial" ? 0.58 : 0.24,
+    evidence_refs: Array.from(new Set([
+      ...input.graph.evidence_refs,
+      ...input.environmentState.evidence_refs,
+    ])),
     checked_nodes: input.graph.nodes.map((node) => ({
       node_id: node.node_id,
       status: blockers.some((blocker) => blocker.severity === "critical") && node.kind === "inventory_action"
@@ -97,6 +101,7 @@ export function rehearseMinecraftGraph(input: {
     recommendation_gate: recommendationGate,
     tested_in: input.request.rehearsal_mode,
     side_effects_performed: false,
+    require_human_approval_for_execution: true,
     model_invoked: false,
     deterministic: true,
     assistant_answer: false,

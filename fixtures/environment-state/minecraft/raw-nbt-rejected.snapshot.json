@@ -1,0 +1,47 @@
+{
+  "schema": "helix.environment_state_snapshot.v1",
+  "snapshot_id": "snapshot:minecraft:raw-nbt-rejected",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "room_id": "room:minecraft",
+  "world_id": "minecraft:server",
+  "source_id": "source:minecraft-paper-plugin",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "ts": "2026-05-19T18:32:00.000Z",
+  "source_tick": 123600,
+  "actor_state": {
+    "health": 18,
+    "food_level": 5,
+    "mode": "survival"
+  },
+  "inventory_state": {
+    "selected_item": { "item_type": "minecraft:iron_pickaxe", "count": 1 },
+    "carried_items": [],
+    "inventory_hash": "inventory:raw:v1",
+    "changed_since_last_snapshot": true
+  },
+  "object_state": {
+    "nearby_entities": [],
+    "nearby_containers": [],
+    "resources": [],
+    "hazards": []
+  },
+  "section_hashes": {
+    "actor_state": "actor:raw:v1",
+    "inventory_state": "inventory:raw:v1"
+  },
+  "changed_sections": ["actor_state", "inventory_state"],
+  "domain_specific": {
+    "minecraft": {
+      "raw_nbt_included": true,
+      "nbt_component_keys_seen": ["minecraft:custom_data"]
+    }
+  },
+  "evidence_refs": ["minecraft:snapshot:server_tick:123600"],
+  "deterministic": true,
+  "model_invoked": false,
+  "assistant_answer": false,
+  "raw_payload_included": true,
+  "context_policy": "compact_context_pack_only"
+}

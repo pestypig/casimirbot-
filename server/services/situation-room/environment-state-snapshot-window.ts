@@ -232,6 +232,9 @@ export function extractEnvironmentStateSnapshotFromWorldEvent(event: HelixWorldE
   if (event.event_type !== "environment_state_snapshot") return null;
   const meta = asRecord(event.meta);
   const snapshot = meta?.snapshot ?? meta?.environment_state_snapshot ?? null;
+  const snapshotRecord = asRecord(snapshot);
+  const minecraft = asRecord(asRecord(snapshotRecord?.domain_specific)?.minecraft);
+  if (snapshotRecord?.raw_payload_included === true || minecraft?.raw_nbt_included === true) return null;
   return normalizeEnvironmentStateSnapshot({ snapshot, event });
 }
 
@@ -255,7 +258,27 @@ export function getLatestEnvironmentStateSnapshot(roomId: string): HelixEnvironm
   return listEnvironmentStateSnapshots({ roomId, limit: 1 }).at(-1) ?? null;
 }
 
+export function getPreviousEnvironmentStateSnapshot(input: {
+  roomId: string;
+  snapshotId: string;
+}): HelixEnvironmentStateSnapshot | null {
+  const list = snapshotsByRoom.get(input.roomId) ?? [];
+  const index = list.findIndex((entry) => entry.snapshot_id === input.snapshotId);
+  if (index > 0) return list[index - 1] ?? null;
+  if (index < 0 && list.length > 0) return list.at(-1) ?? null;
+  return null;
+}
+
+export function isRedundantEnvironmentStateSnapshot(snapshot: HelixEnvironmentStateSnapshot): boolean {
+  const previous = getPreviousEnvironmentStateSnapshot({
+    roomId: snapshot.room_id,
+    snapshotId: snapshot.snapshot_id,
+  });
+  if (!previous) return false;
+  if (snapshot.changed_sections.length > 0) return false;
+  return stableJson(previous.section_hashes) === stableJson(snapshot.section_hashes);
+}
+
 export function resetEnvironmentStateSnapshotWindowsForTest(): void {
   snapshotsByRoom.clear();
 }
-

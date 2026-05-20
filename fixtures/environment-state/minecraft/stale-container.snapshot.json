@@ -1,0 +1,73 @@
+{
+  "schema": "helix.environment_state_snapshot.v1",
+  "snapshot_id": "snapshot:minecraft:stale-container",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "room_id": "room:minecraft",
+  "world_id": "minecraft:server",
+  "source_id": "source:minecraft-paper-plugin",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "ts": "2026-05-19T18:30:05.000Z",
+  "source_tick": 123461,
+  "actor_state": {
+    "health": 18,
+    "food_level": 5,
+    "saturation": 1,
+    "mode": "survival",
+    "status_flags": ["preparing_to_mine"]
+  },
+  "inventory_state": {
+    "selected_item": { "item_type": "minecraft:iron_pickaxe", "count": 1, "slot": 0 },
+    "carried_items": [
+      { "item_type": "minecraft:torch", "count": 12, "slot": 1 }
+    ],
+    "equipped_items": [],
+    "inventory_hash": "inventory:no-food:v2",
+    "changed_since_last_snapshot": true
+  },
+  "object_state": {
+    "nearby_entities": [],
+    "nearby_containers": [
+      {
+        "container_ref": "container:house_chest",
+        "container_type": "minecraft:chest",
+        "contents_known": true,
+        "contents_summary": [
+          { "item_type": "minecraft:cooked_porkchop", "count": 12, "slot": 4 }
+        ],
+        "contents_hash": "chest:food:old",
+        "last_verified_at": "2026-05-19T17:30:00.000Z"
+      }
+    ],
+    "resources": [],
+    "hazards": []
+  },
+  "focus": {
+    "target_kind": "unknown",
+    "target_type": null,
+    "distance": null,
+    "line_of_sight": null,
+    "reachable": null
+  },
+  "section_hashes": {
+    "actor_state": "actor:low-food:v2",
+    "inventory_state": "inventory:no-food:v2",
+    "object_state": "objects:house-chest-stale:v1",
+    "focus": "focus:unknown:v1"
+  },
+  "changed_sections": ["actor_state", "inventory_state", "object_state"],
+  "domain_specific": {
+    "minecraft": {
+      "raw_nbt_included": false,
+      "nbt_component_keys_seen": ["minecraft:food"],
+      "paper_api_fields_seen": ["getNearbyEntities"]
+    }
+  },
+  "evidence_refs": ["minecraft:snapshot:server_tick:123461", "minecraft:container:house_chest:hash:old"],
+  "deterministic": true,
+  "model_invoked": false,
+  "assistant_answer": false,
+  "raw_payload_included": false,
+  "context_policy": "compact_context_pack_only"
+}

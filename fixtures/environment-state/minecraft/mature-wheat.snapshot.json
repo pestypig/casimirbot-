@@ -1,0 +1,62 @@
+{
+  "schema": "helix.environment_state_snapshot.v1",
+  "snapshot_id": "snapshot:minecraft:mature-wheat",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "room_id": "room:minecraft",
+  "world_id": "minecraft:server",
+  "source_id": "source:minecraft-paper-plugin",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "ts": "2026-05-19T18:31:00.000Z",
+  "source_tick": 123520,
+  "actor_state": {
+    "health": 20,
+    "food_level": 10,
+    "saturation": 2,
+    "mode": "survival",
+    "status_flags": ["near_farm"]
+  },
+  "inventory_state": {
+    "selected_item": { "item_type": "minecraft:stone_hoe", "count": 1, "slot": 0 },
+    "carried_items": [],
+    "equipped_items": [],
+    "inventory_hash": "inventory:farm:v1",
+    "changed_since_last_snapshot": true
+  },
+  "object_state": {
+    "nearby_entities": [],
+    "nearby_containers": [],
+    "resources": [
+      { "resource_ref": "crop:wheat:1", "resource_type": "minecraft:wheat", "state": "available", "amount": 8, "tags": ["mature", "reachable"] }
+    ],
+    "hazards": []
+  },
+  "focus": {
+    "target_kind": "block",
+    "target_ref": "block:wheat:104:64:-41",
+    "target_type": "minecraft:wheat",
+    "distance": 2,
+    "line_of_sight": true,
+    "reachable": true
+  },
+  "section_hashes": {
+    "actor_state": "actor:farm:v1",
+    "inventory_state": "inventory:farm:v1",
+    "object_state": "objects:mature-wheat:v1",
+    "focus": "focus:wheat:v1"
+  },
+  "changed_sections": ["object_state", "focus"],
+  "domain_specific": {
+    "minecraft": {
+      "raw_nbt_included": false,
+      "block_data_fields_seen": ["age"]
+    }
+  },
+  "evidence_refs": ["minecraft:snapshot:server_tick:123520"],
+  "deterministic": true,
+  "model_invoked": false,
+  "assistant_answer": false,
+  "raw_payload_included": false,
+  "context_policy": "compact_context_pack_only"
+}

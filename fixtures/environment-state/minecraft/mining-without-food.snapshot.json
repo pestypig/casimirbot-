@@ -1,0 +1,77 @@
+{
+  "schema": "helix.environment_state_snapshot.v1",
+  "snapshot_id": "snapshot:minecraft:mining-without-food",
+  "domain": "minecraft",
+  "domain_adapter": "minecraft.paper_plugin.v1",
+  "room_id": "room:minecraft",
+  "world_id": "minecraft:server",
+  "source_id": "source:minecraft-paper-plugin",
+  "actor_id": "minecraft:player:DatDamPig",
+  "actor_label": "DatDamPig",
+  "ts": "2026-05-19T18:30:00.000Z",
+  "source_tick": 123456,
+  "coordinate_frame": {
+    "kind": "world_xyz",
+    "dimension": "minecraft:overworld",
+    "units": "blocks"
+  },
+  "actor_state": {
+    "pose": {
+      "position": { "x": 120, "y": 64, "z": -48 },
+      "yaw": 92,
+      "pitch": 12,
+      "facing": "east"
+    },
+    "health": 18,
+    "food_level": 5,
+    "saturation": 1,
+    "mode": "survival",
+    "status_flags": ["entering_cave"]
+  },
+  "inventory_state": {
+    "selected_item": { "item_type": "minecraft:iron_pickaxe", "count": 1, "slot": 0 },
+    "carried_items": [
+      { "item_type": "minecraft:torch", "count": 12, "slot": 1 },
+      { "item_type": "minecraft:cobblestone", "count": 22, "slot": 2 }
+    ],
+    "equipped_items": [],
+    "inventory_hash": "inventory:no-food:v1",
+    "changed_since_last_snapshot": true
+  },
+  "object_state": {
+    "nearby_entities": [],
+    "nearby_containers": [],
+    "resources": [
+      { "resource_ref": "resource:visible_coal", "resource_type": "minecraft:coal_ore", "state": "available", "amount": 3 }
+    ],
+    "hazards": []
+  },
+  "focus": {
+    "target_kind": "block",
+    "target_ref": "block:coal_ore:120:63:-45",
+    "target_type": "minecraft:coal_ore",
+    "distance": 4,
+    "line_of_sight": true,
+    "reachable": false
+  },
+  "section_hashes": {
+    "actor_state": "actor:low-food:v1",
+    "inventory_state": "inventory:no-food:v1",
+    "object_state": "objects:coal:v1",
+    "focus": "focus:coal:v1"
+  },
+  "changed_sections": ["actor_state", "inventory_state", "object_state", "focus"],
+  "domain_specific": {
+    "minecraft": {
+      "raw_nbt_included": false,
+      "nbt_component_keys_seen": ["minecraft:tool", "minecraft:damage"],
+      "paper_api_fields_seen": ["getEyeLocation", "rayTraceBlocks"]
+    }
+  },
+  "evidence_refs": ["minecraft:snapshot:server_tick:123456"],
+  "deterministic": true,
+  "model_invoked": false,
+  "assistant_answer": false,
+  "raw_payload_included": false,
+  "context_policy": "compact_context_pack_only"
+}

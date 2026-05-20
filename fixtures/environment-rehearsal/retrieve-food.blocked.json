@@ -1,0 +1,36 @@
+{
+  "schema": "helix.action_rehearsal_result.v1",
+  "result_id": "action_rehearsal_result:retrieve-food:blocked",
+  "request_id": "action_rehearsal_request:retrieve-food",
+  "graph_id": "possibility_graph:retrieve-food",
+  "feasibility": "blocked",
+  "confidence": 0.24,
+  "evidence_refs": ["minecraft:snapshot:server_tick:123461"],
+  "checked_nodes": [
+    {
+      "node_id": "take_food",
+      "status": "failed",
+      "summary": "Container food state is not verified.",
+      "evidence_refs": ["minecraft:snapshot:server_tick:123461"]
+    }
+  ],
+  "blockers": [
+    {
+      "code": "container_food_not_verified",
+      "summary": "No fresh structured container state confirms available food.",
+      "severity": "critical",
+      "evidence_refs": ["minecraft:snapshot:server_tick:123461"]
+    }
+  ],
+  "expected_outcome": null,
+  "recommendation_gate": "do_not_suggest",
+  "tested_in": "state_snapshot_only",
+  "side_effects_performed": false,
+  "require_human_approval_for_execution": true,
+  "model_invoked": false,
+  "deterministic": true,
+  "assistant_answer": false,
+  "raw_content_included": false,
+  "context_policy": "compact_context_pack_only",
+  "created_at": "2026-05-19T18:30:05.000Z"
+}

@@ -24,6 +24,7 @@ export type HelixPossibilityGraph = {
   environment_id?: string | null;
   room_id?: string | null;
   source_snapshot_refs: string[];
+  evidence_refs: string[];
   objective: string;
   graph_status: "draft" | "rehearsal_ready" | "rehearsed" | "rejected" | "stale";
   nodes: Array<{
@@ -55,4 +56,3 @@ export type HelixPossibilityGraph = {
   context_policy: "compact_context_pack_only";
   created_at: string;
 };
-
