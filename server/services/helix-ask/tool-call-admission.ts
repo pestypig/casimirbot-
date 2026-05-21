@@ -21,6 +21,9 @@ const HARD_SOURCE_TARGETS = new Set([
   "live_pipeline",
   "world_event",
   "active_note",
+  "workspace_panel",
+  "workstation_panel",
+  "workspace_action",
 ]);
 
 export function buildToolCallAdmissionDecision(input: {
@@ -43,6 +46,7 @@ export function buildToolCallAdmissionDecision(input: {
   const sourceForbiddenRoutes = Array.isArray((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.suppressed_routes)
     ? (input.sourceTargetIntent as Record<string, unknown>).suppressed_routes as string[]
     : [];
+  const promptText = String(input.promptText ?? "");
 
   let required = HARD_SOURCE_TARGETS.has(sourceTarget);
   let admittedToolFamilies: HelixToolCallAdmissionFamily[] = [];
@@ -55,6 +59,20 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];
     reason = "docs_viewer_requires_document_tool_path";
+  } else if (
+    sourceTarget === "unknown" &&
+    /\b(?:open|show|pull\s+up|bring\s+up)\b[\s\S]{0,120}\b(?:docs?|docks|document|white\s*paper|whitepaper|paper)\b/i.test(promptText)
+  ) {
+    required = true;
+    admittedToolFamilies = ["docs_viewer"];
+    extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
+    extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];
+    reason = "document_open_prompt_requires_docs_viewer_path";
+  } else if (sourceTarget === "workspace_panel" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_action") {
+    admittedToolFamilies = ["workstation_action"];
+    extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept"];
+    extraForbiddenRoutes = ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "active_doc_summary", "doc_open_best", "model_only_concept", "no_tool_direct"];
+    reason = "workspace_panel_requires_workstation_action_path";
   } else if (sourceTarget === "visual_capture") {
     admittedToolFamilies = ["situation_run"];
     extraForbiddenTerminalKinds = ["active_doc_identity", "doc_summary", "doc_location_matches", "live_pipeline_receipt", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer"];

@@ -11,7 +11,14 @@ export type HelixSolverControllerBlockingReason =
   | "turn_id_integrity_failed"
   | "visual_evidence_missing"
   | "workspace_context_missing"
-  | "prompt_object_extraction_invalid";
+  | "prompt_object_extraction_invalid"
+  | "goal_satisfaction_missing"
+  | "goal_not_satisfied"
+  | "required_artifact_contract_missing"
+  | "terminal_kind_not_required"
+  | "terminal_equivalence_missing"
+  | "terminal_equivalence_failed"
+  | "subgoals_observed_not_satisfied";
 
 export type HelixSolverControllerDecision = {
   schema: typeof HELIX_SOLVER_CONTROLLER_DECISION_SCHEMA;
@@ -20,7 +27,7 @@ export type HelixSolverControllerDecision = {
   canonical_goal_kind: string | null;
   required_terminal_kind: string | null;
   selected_terminal_artifact_kind: string | null;
-  decision: "allow_terminal" | "retry" | "request_user_input" | "fail_closed";
+  decision: "allow_terminal" | "continue" | "retry" | "request_user_input" | "typed_failure" | "fail_closed";
   blocking_reasons: HelixSolverControllerBlockingReason[];
   consumed_artifact_refs: string[];
   retry_policy_ref?: string;

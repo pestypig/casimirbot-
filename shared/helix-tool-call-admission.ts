@@ -13,6 +13,7 @@ export type HelixToolCallAdmissionFamily =
   | "world_event"
   | "calculator"
   | "notes"
+  | "workstation_action"
   | "model_only";
 
 export type HelixToolCallAdmissionDecision = {

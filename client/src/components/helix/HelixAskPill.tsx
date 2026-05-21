@@ -28754,10 +28754,14 @@ export function HelixAskPill({
             const chosenVisibleFinalIsTypedFailureBoundary =
               /\bCause:\s*(?:equation_source_unavailable|calculator_evidence_unavailable|synthesis_unavailable)\b/i.test(chosenVisibleFinalText) ||
               /^I looked for an NHM2 paper\/document with equation-bearing snippets/i.test(chosenVisibleFinalText);
-            const transcriptAnswer = clipForDisplay(
+            const finalAnswerRawText =
               transcriptFinalRowText && (visibleResolvedTurn.terminal_error_code || chosenVisibleFinalIsTypedFailureBoundary)
                 ? transcriptFinalRowText
-                : chosenVisibleFinalText,
+                : chosenVisibleFinalText;
+            const finalAnswerIsLong = hasLongText(finalAnswerRawText, HELIX_ASK_MAX_RENDER_CHARS);
+            const finalAnswerIsCollapsedPreview = finalAnswerIsLong && !expanded;
+            const transcriptAnswer = clipForDisplay(
+              finalAnswerRawText,
               HELIX_ASK_MAX_RENDER_CHARS,
               expanded,
             );
@@ -28919,6 +28923,14 @@ export function HelixAskPill({
                             : `source: ${transcriptTerminal.source}`}
                       </span>
                     </div>
+                    {finalAnswerIsCollapsedPreview ? (
+                      <div
+                        className="mt-2 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-cyan-100"
+                        data-testid={isLatestReply ? "helix-ask-latest-final-answer-collapsed" : undefined}
+                      >
+                        Preview collapsed. Full backend answer is available.
+                      </div>
+                    ) : null}
                     {renderHelixAskFinalAnswerContent(transcriptAnswer)}
                     {(() => {
                       const trace = (replyDebugRecord as Record<string, any> | null | undefined)?.workstation_reasoning_trace;
@@ -28982,10 +28994,11 @@ export function HelixAskPill({
                         })}
                       </div>
                     ) : null}
-                    {hasLongText(transcriptTerminal.text || reply.content || "", HELIX_ASK_MAX_RENDER_CHARS) ? (
+                    {finalAnswerIsLong ? (
                       <button
                         type="button"
-                        className="mt-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200 hover:text-cyan-100"
+                        className="mt-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-200 hover:border-cyan-200/60 hover:text-cyan-100"
+                        aria-expanded={expanded}
                         onClick={() =>
                           setAskExpandedByReply((prev) => ({
                             ...prev,
@@ -28993,7 +29006,7 @@ export function HelixAskPill({
                           }))
                         }
                       >
-                        {expanded ? "Show Less" : "Show Full Answer"}
+                        {expanded ? "Collapse Answer" : "Show Full Answer"}
                       </button>
                     ) : null}
                   </div>

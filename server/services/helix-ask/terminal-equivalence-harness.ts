@@ -3,8 +3,14 @@ import { hashHelixTerminalText } from "./turn-terminal-authority";
 type RecordLike = Record<string, unknown>;
 
 export type HelixTerminalEquivalenceFailureCode =
+  | "controller_decision_missing"
+  | "controller_decision_not_terminal"
+  | "controller_goal_terminal_mismatch"
   | "debug_terminal_differs_from_turn_terminal"
+  | "goal_satisfaction_missing"
+  | "goal_satisfaction_not_terminal"
   | "poison_hashes_hidden_terminal_while_ui_stale"
+  | "required_artifact_contract_missing"
   | "route_authority_missing"
   | "solver_trace_missing"
   | "stream_terminal_differs_from_turn_terminal"
@@ -27,6 +33,11 @@ export type HelixTerminalEquivalenceHarnessResult = {
     terminal_authority_hash: string | null;
     poison_server_terminal_hash: string | null;
     poison_client_visible_hash: string | null;
+    goal_satisfaction: string | null;
+    goal_next_decision: string | null;
+    controller_decision: string | null;
+    controller_blocking_reasons: string[];
+    discipline_guard_required: boolean;
   };
   assistant_answer: false;
   raw_content_included: false;
@@ -100,12 +111,42 @@ const textDiffers = (left: string | null, right: string | null): boolean =>
 const visibleDiffersFromAuthority = (visible: string | null, authority: string | null): boolean =>
   textDiffers(visible, authority);
 
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map((entry) => readString(entry)).filter((entry): entry is string => Boolean(entry)) : [];
+
+const isSourceTargetedOrCapabilityTurn = (value: RecordLike | null): boolean => {
+  const sourceTarget = readRecord(value?.source_target_intent);
+  const targetSource = firstText(sourceTarget?.target_source);
+  const targetKind = firstText(sourceTarget?.target_kind);
+  const strength = firstText(sourceTarget?.strength);
+  return Boolean(
+    (targetSource && targetSource !== "unknown") ||
+      (targetKind && targetKind !== "unknown") ||
+      strength === "hard" ||
+      sourceTarget?.must_enter_backend_ask === true ||
+      sourceTarget?.allow_no_tool_direct === false ||
+      (Array.isArray(sourceTarget?.requested_outputs) && sourceTarget.requested_outputs.length > 0) ||
+      readRecord(value?.capability_plan) ||
+      readRecord(value?.capability_result) ||
+      readRecord(value?.capability_lifecycle_ledger) ||
+      readRecord(value?.tool_call_admission_decision) ||
+      readRecord(value?.active_workspace_source_resolution),
+  );
+};
+
+const hasRequiredArtifactContract = (goalSatisfaction: RecordLike | null): boolean => {
+  const contract = readRecord(goalSatisfaction?.terminal_contract);
+  return Boolean(contract && firstText(contract.goal_kind) && readStringArray(contract.required_terminal_kinds).length > 0);
+};
+
 export function buildTerminalEquivalenceHarnessResult(input: {
   nonStreamResponse: unknown;
   streamFinal?: unknown;
   streamTerminalEvent?: unknown;
   debugExport?: unknown;
   visibleUiAnswerState?: unknown;
+  requireControllerParity?: boolean;
+  suppressDisciplineAutoRequire?: boolean;
 }): HelixTerminalEquivalenceHarnessResult {
   const nonStream = readRecord(input.nonStreamResponse) ?? {};
   const streamFinal = readRecord(input.streamFinal);
@@ -125,6 +166,20 @@ export function buildTerminalEquivalenceHarnessResult(input: {
   const poisonServerHash = firstText(poisonAuthority?.server_terminal_text_hash);
   const poisonClientHash = firstText(poisonAuthority?.client_visible_text_hash);
   const streamAuthorityText = authorityText(streamFinal);
+  const goalSatisfaction = readRecord(nonStream.goal_satisfaction_evaluation) ?? readRecord(debug?.goal_satisfaction_evaluation);
+  const controller = readRecord(nonStream.solver_controller_decision) ?? readRecord(debug?.solver_controller_decision);
+  const controllerBlockingReasons = Array.isArray(controller?.blocking_reasons)
+    ? controller.blocking_reasons.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+  const terminalArtifactKind = terminalKind(nonStream) ?? terminalKind(debug);
+  const controllerTerminalArtifactKind = firstText(controller?.selected_terminal_artifact_kind);
+  const normalFinalTerminal =
+    !isTypedFailureTerminal(nonStream) &&
+    !["final_failure", "pending_input"].includes(firstText(nonStream.final_status, nonStream.response_type) ?? "");
+  const disciplineGuardRequired =
+    Boolean(input.requireControllerParity) ||
+    (!input.suppressDisciplineAutoRequire &&
+      (isSourceTargetedOrCapabilityTurn(nonStream) || isSourceTargetedOrCapabilityTurn(debug)));
 
   const failures: HelixTerminalEquivalenceFailureCode[] = [];
   pushIf(failures, Boolean(terminalText && terminalHash && hashHelixTerminalText(terminalText) !== terminalHash), "terminal_authority_hash_mismatch");
@@ -148,6 +203,27 @@ export function buildTerminalEquivalenceHarnessResult(input: {
   pushIf(failures, Boolean(streamFinal && textDiffers(streamText, nonStreamText)), "stream_terminal_differs_from_turn_terminal");
   pushIf(failures, !readRecord(nonStream.route_authority_audit) && !readRecord(debug?.route_authority_audit), "route_authority_missing");
   pushIf(failures, !readRecord(nonStream.ask_turn_solver_trace) && !readRecord(debug?.ask_turn_solver_trace), "solver_trace_missing");
+  if (disciplineGuardRequired && normalFinalTerminal) {
+    pushIf(failures, !goalSatisfaction, "goal_satisfaction_missing");
+    pushIf(failures, !controller, "controller_decision_missing");
+    pushIf(failures, !hasRequiredArtifactContract(goalSatisfaction), "required_artifact_contract_missing");
+  }
+  if (goalSatisfaction && normalFinalTerminal) {
+    pushIf(
+      failures,
+      firstText(goalSatisfaction.satisfaction) !== "satisfied" || firstText(goalSatisfaction.next_decision) !== "allow_terminal",
+      "goal_satisfaction_not_terminal",
+    );
+  }
+  if (controller && normalFinalTerminal) {
+    pushIf(failures, firstText(controller.decision) !== "allow_terminal", "controller_decision_not_terminal");
+    pushIf(failures, controllerBlockingReasons.length > 0, "controller_decision_not_terminal");
+    pushIf(
+      failures,
+      Boolean(controllerTerminalArtifactKind && terminalArtifactKind && controllerTerminalArtifactKind !== terminalArtifactKind),
+      "controller_goal_terminal_mismatch",
+    );
+  }
 
   return {
     schema: "helix.terminal_equivalence_harness_result.v1",
@@ -164,6 +240,11 @@ export function buildTerminalEquivalenceHarnessResult(input: {
       terminal_authority_hash: terminalHash,
       poison_server_terminal_hash: poisonServerHash,
       poison_client_visible_hash: poisonClientHash,
+      goal_satisfaction: firstText(goalSatisfaction?.satisfaction),
+      goal_next_decision: firstText(goalSatisfaction?.next_decision),
+      controller_decision: firstText(controller?.decision),
+      controller_blocking_reasons: controllerBlockingReasons,
+      discipline_guard_required: disciplineGuardRequired,
     },
     assistant_answer: false,
     raw_content_included: false,

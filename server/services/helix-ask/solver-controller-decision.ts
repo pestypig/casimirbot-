@@ -15,6 +15,9 @@ const readBoolean = (value: unknown): boolean | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const readStringArray = (value: unknown): string[] =>
+  readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
+
 export const normalizeHelixRouteBase = (route: string | null | undefined): string | null => {
   const trimmed = readString(route);
   if (!trimmed) return null;
@@ -56,6 +59,62 @@ const hasPromptObjectExtractionProblem = (payload: RecordLike): boolean => {
     ...ledger.map((entry) => readRecord(readRecord(entry)?.payload)?.query),
   ].map(readString).filter(Boolean);
   return queryValues.some((query) => query?.toLowerCase() === "me");
+};
+
+const isSourceTargetedOrCapabilityTurn = (payload: RecordLike): boolean => {
+  const sourceTarget = readRecord(payload.source_target_intent);
+  const targetSource = readString(sourceTarget?.target_source);
+  const targetKind = readString(sourceTarget?.target_kind);
+  const strength = readString(sourceTarget?.strength);
+  const explicitSourceTarget =
+    Boolean(targetSource && targetSource !== "unknown") ||
+    Boolean(targetKind && targetKind !== "unknown") ||
+    strength === "hard" ||
+    readBoolean(sourceTarget?.must_enter_backend_ask) === true ||
+    readBoolean(sourceTarget?.allow_no_tool_direct) === false ||
+    readArray(sourceTarget?.requested_outputs).length > 0;
+  return (
+    explicitSourceTarget ||
+    Boolean(
+      readRecord(payload.capability_plan) ||
+        readRecord(payload.capability_result) ||
+        readRecord(payload.capability_lifecycle_ledger) ||
+        readRecord(payload.tool_call_admission_decision) ||
+        readRecord(payload.active_workspace_source_resolution),
+    )
+  );
+};
+
+const hasRequiredArtifactContract = (terminalContract: RecordLike | null): boolean =>
+  Boolean(
+    terminalContract &&
+      readString(terminalContract.goal_kind) &&
+      readStringArray(terminalContract.required_terminal_kinds).length > 0,
+  );
+
+const isCapabilityTerminalKind = (terminalArtifactKind: string | null): boolean =>
+  Boolean(
+    terminalArtifactKind &&
+      /^(?:workspace_action_receipt|workstation_tool_evaluation|live_pipeline_receipt|live_pipeline_turn_receipt|live_source_pipeline_receipt)$/i.test(
+        terminalArtifactKind,
+      ),
+  );
+
+const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  const plan = readRecord(payload.capability_plan);
+  const result = readRecord(payload.capability_result);
+  const ledger = readRecord(payload.capability_lifecycle_ledger);
+  const adapterRequest = readRecord(payload.capability_adapter_request ?? payload.adapter_request);
+  const adapterResult = readRecord(payload.capability_adapter_result ?? payload.adapter_result);
+  if (!plan || !result || !ledger || !adapterRequest || !adapterResult) return false;
+  if (readBoolean(ledger.ok) !== true) return false;
+  const resultStatus = readString(result.status);
+  if (resultStatus !== "succeeded" && resultStatus !== "not_run") return false;
+  if (isCapabilityTerminalKind(terminalArtifactKind)) {
+    if (readBoolean(result.selected_for_answer) !== true) return false;
+    if (readBoolean(result.reentered_solver) !== true) return false;
+  }
+  return true;
 };
 
 export function buildTurnIdIntegrityAudit(input: {
@@ -198,15 +257,38 @@ export function buildSolverControllerDecision(input: {
   const retrievalResult = readRecord(payload.procedure_evidence_retrieval_result ?? solverTrace?.procedure_evidence_retrieval_result);
   const routeAuthority = readRecord(payload.route_authority_audit);
   const poisonAudit = readRecord(payload.poison_audit);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const terminalEquivalence = readRecord(payload.terminal_equivalence_harness_result);
   const liveSourceIdentity = readRecord(payload.live_source_identity_audit ?? solverTrace?.live_source_identity_audit);
   const terminalArtifactKind = readString(payload.terminal_artifact_kind);
   const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
+  const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
+  const requiredTerminalKinds =
+    requiredTerminalKindsFromContract.length > 0
+      ? requiredTerminalKindsFromContract
+      : requiredTerminalKind
+        ? [requiredTerminalKind]
+        : [];
+  const forbiddenTerminalKinds = readStringArray(terminalContract?.forbidden_terminal_kinds);
+  const goalSatisfactionState = readString(goalSatisfaction?.satisfaction);
+  const goalNextDecision = readString(goalSatisfaction?.next_decision);
+  const terminalContractGoalKind = readString(terminalContract?.goal_kind);
   const finalRoute = readString(input.finalRoute) ?? readString(payload.route_reason_code) ?? readString(payload.route);
   const finalRouteBase = normalizeHelixRouteBase(finalRoute);
   const canonicalTerminal =
     Boolean(readString(canonicalGoal?.goal_kind) && requiredTerminalKind && finalRouteBase === readString(canonicalGoal?.goal_kind) && terminalArtifactKind === requiredTerminalKind);
   const turnIdIntegrityAudit = input.turnIdIntegrityAudit ?? buildTurnIdIntegrityAudit({ turnId: input.turnId, payload });
   const finalRouteReconciliation = input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
+  const disciplineGuardRequired = isSourceTargetedOrCapabilityTurn(payload);
+  const capabilityTerminal = isCapabilityTerminalKind(terminalArtifactKind);
+  const capabilityGuardRequired =
+    capabilityTerminal ||
+    Boolean(
+      readRecord(payload.capability_plan) ||
+        readRecord(payload.capability_result) ||
+        readRecord(payload.capability_lifecycle_ledger),
+    );
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
   const consumedRefs: string[] = [
@@ -217,7 +299,39 @@ export function buildSolverControllerDecision(input: {
     "ask_turn_solver_trace",
     "turn_id_integrity_audit",
     "final_route_reconciliation",
+    "goal_satisfaction_evaluation",
+    "terminal_equivalence_harness_result",
+    "capability_plan",
+    "capability_result",
+    "capability_lifecycle_ledger",
+    "capability_adapter_request",
+    "capability_adapter_result",
   ];
+
+  if (!nonAnswerTerminal) {
+    if (!goalSatisfaction) {
+      pushUnique(blockingReasons, "goal_satisfaction_missing");
+    } else if (goalSatisfactionState !== "satisfied" || goalNextDecision !== "allow_terminal") {
+      pushUnique(blockingReasons, "goal_not_satisfied");
+    }
+    if (disciplineGuardRequired && !hasRequiredArtifactContract(terminalContract)) {
+      pushUnique(blockingReasons, "required_artifact_contract_missing");
+    }
+    if (terminalArtifactKind && requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes(terminalArtifactKind)) {
+      pushUnique(blockingReasons, "terminal_kind_not_required");
+    }
+    if (terminalArtifactKind && forbiddenTerminalKinds.includes(terminalArtifactKind)) {
+      pushUnique(blockingReasons, "terminal_kind_not_required");
+    }
+    if (!terminalEquivalence) {
+      pushUnique(blockingReasons, "terminal_equivalence_missing");
+    } else if (readBoolean(terminalEquivalence.ok) !== true) {
+      pushUnique(blockingReasons, "terminal_equivalence_failed");
+    }
+    if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {
+      pushUnique(blockingReasons, "capability_lifecycle_incomplete");
+    }
+  }
 
   if (!turnIdIntegrityAudit.ok) pushUnique(blockingReasons, "turn_id_integrity_failed");
   if (!finalRouteReconciliation.ok) {
@@ -232,7 +346,11 @@ export function buildSolverControllerDecision(input: {
     canonicalTerminal &&
     poisonViolations.length > 0 &&
     poisonViolations.every((kind) => kind === "terminal_artifact_forbidden_by_route_contract");
+  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true) pushUnique(blockingReasons, "poison_audit_failed");
   if (poisonFailed && !staleRouteOnlyPoisonFailure) pushUnique(blockingReasons, "poison_audit_failed");
+  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true) {
+    pushUnique(blockingReasons, "route_authority_failed");
+  }
   if (
     readBoolean(routeAuthority?.route_authority_ok) === false &&
     (
@@ -247,8 +365,35 @@ export function buildSolverControllerDecision(input: {
   if (readString(retrievalResult?.answerability) === "not_answerable") pushUnique(blockingReasons, "retrieval_not_answerable");
   if (hasPromptObjectExtractionProblem(payload)) pushUnique(blockingReasons, "prompt_object_extraction_invalid");
 
+  const solverFinalArbitration = readRecord(solverTrace?.final_arbitration);
+  const allSubgoalsObservedOnly =
+    readString(solverFinalArbitration?.why_complete) === "all_subgoals_observed" ||
+    readString(solverFinalArbitration?.reason) === "all_subgoals_observed" ||
+    readArray(payload.current_turn_events ?? payload.turn_events).some((event) => {
+      const eventRecord = readRecord(event);
+      const decision = readRecord(eventRecord?.decision);
+      return readString(decision?.reason) === "all_subgoals_observed";
+    });
+  if (!nonAnswerTerminal && allSubgoalsObservedOnly && goalSatisfactionState !== "satisfied") {
+    pushUnique(blockingReasons, "subgoals_observed_not_satisfied");
+  }
+
   const sourceTarget = readRecord(payload.source_target_intent);
   const sourceTargetName = readString(sourceTarget?.target_source);
+  const promptText = readString(payload.active_prompt) ?? readString(payload.prompt) ?? readString(payload.question) ?? "";
+  const visualContentPrompt =
+    /\b(?:describe|review|analy[sz]e|what\s+(?:do\s+you\s+)?see|what(?:'s|\s+is)\s+(?:happening|on|visible))\b[\s\S]{0,140}\b(?:live|screen|visual|display)\s+(?:capture|source|frame|screen)\b/i.test(promptText) ||
+    /\b(?:live|screen|visual|display)\s+(?:capture|source|frame|screen)\b[\s\S]{0,140}\b(?:describe|review|analy[sz]e|see|happening|visible)\b/i.test(promptText);
+  const controlReceiptTerminal =
+    terminalArtifactKind === "live_pipeline_receipt" ||
+    terminalArtifactKind === "visual_producer_cadence_receipt" ||
+    terminalArtifactKind === "live_answer_environment_receipt" ||
+    (terminalArtifactKind === "workspace_action_receipt" &&
+      /\b(?:set_rate|live-source\.set_rate|interval|cadence|rate)\b/i.test(promptText));
+  if (!nonAnswerTerminal && visualContentPrompt && terminalContractGoalKind !== "live_interval_set" && controlReceiptTerminal) {
+    pushUnique(blockingReasons, "terminal_kind_not_required");
+    pushUnique(blockingReasons, "visual_evidence_missing");
+  }
   if (
     !nonAnswerTerminal &&
     (sourceTargetName === "live_pipeline" || sourceTargetName === "visual_capture") &&
@@ -269,7 +414,7 @@ export function buildSolverControllerDecision(input: {
     readString(deicticReference?.reference_type) === "current_screen" ||
     readString(deicticReference?.reference_type) === "selected_visible_file" ||
     /\b(?:live\s+capture|screen\s*capture|visual\s*capture|screenshot|visual|visible)\b/i.test(
-      readString(payload.active_prompt) ?? readString(payload.prompt) ?? readString(payload.question) ?? "",
+      promptText,
     );
   if (
     !nonAnswerTerminal &&
@@ -320,13 +465,42 @@ export function buildSolverControllerDecision(input: {
       reason === "retrieval_not_answerable" ||
       reason === "turn_id_integrity_failed" ||
       reason === "visual_evidence_missing" ||
-      reason === "prompt_object_extraction_invalid"
+      reason === "prompt_object_extraction_invalid" ||
+      reason === "goal_satisfaction_missing" ||
+      reason === "goal_not_satisfied" ||
+      reason === "required_artifact_contract_missing" ||
+      reason === "terminal_kind_not_required" ||
+      reason === "terminal_equivalence_missing" ||
+      reason === "terminal_equivalence_failed" ||
+      reason === "capability_lifecycle_incomplete" ||
+      reason === "subgoals_observed_not_satisfied"
     )
   ) {
     pushUnique(blockingReasons, "solver_path_incomplete");
   }
 
   const effectiveBlockingReasons = nonAnswerTerminal ? [] : blockingReasons;
+  const goalBlocked = effectiveBlockingReasons.some((reason) =>
+    reason === "goal_satisfaction_missing" ||
+    reason === "goal_not_satisfied" ||
+    reason === "required_artifact_contract_missing" ||
+    reason === "terminal_kind_not_required" ||
+    reason === "subgoals_observed_not_satisfied"
+  );
+  const requestedGoalDecision =
+    goalNextDecision === "continue" ||
+    goalNextDecision === "retry" ||
+    goalNextDecision === "request_user_input"
+      ? goalNextDecision
+      : null;
+  const controllerDecision =
+    effectiveBlockingReasons.length === 0
+      ? "allow_terminal"
+      : requestedGoalDecision
+        ? requestedGoalDecision
+        : goalBlocked
+          ? "typed_failure"
+          : "fail_closed";
   const typedFailureCode =
     effectiveBlockingReasons.includes("visual_evidence_missing")
       ? liveSourceIdentityDiagnosis ??
@@ -341,7 +515,7 @@ export function buildSolverControllerDecision(input: {
     canonical_goal_kind: readString(canonicalGoal?.goal_kind),
     required_terminal_kind: requiredTerminalKind,
     selected_terminal_artifact_kind: terminalArtifactKind,
-    decision: effectiveBlockingReasons.length === 0 ? "allow_terminal" : "fail_closed",
+    decision: controllerDecision,
     blocking_reasons: effectiveBlockingReasons,
     consumed_artifact_refs: consumedRefs,
     typed_failure_code: typedFailureCode,

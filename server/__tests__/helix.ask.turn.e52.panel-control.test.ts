@@ -18,6 +18,8 @@ const findAction = (body: Record<string, any>, panelId: string, actionId = "open
     : null;
 };
 
+const readGoalSatisfaction = (body: Record<string, any>) => body?.goal_satisfaction_evaluation ?? null;
+
 const readStreamFinal = (text: string): Record<string, any> => {
   const blocks = text.split(/\n\n+/);
   const finalBlock = blocks.find((block) => /^event:\s*turn_final/m.test(block));
@@ -49,6 +51,27 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
     expect(response.body?.terminal_artifact_subkind).toBe("panel_action_receipt");
     expect(response.body?.terminal_consistency_check?.consistent).toBe(true);
+    expect(response.body?.capability_plan).toMatchObject({
+      schema: "helix.capability_plan.v1",
+      required_terminal_kind: "workspace_action_receipt",
+    });
+    expect(response.body?.capability_adapter_request).toMatchObject({
+      schema: "helix.capability_adapter_request.v1",
+    });
+    expect(response.body?.capability_adapter_result).toMatchObject({
+      schema: "helix.capability_adapter_result.v1",
+      status: "succeeded",
+      selected_for_answer: true,
+      reentered_solver: true,
+    });
+    expect(response.body?.capability_lifecycle_ledger).toMatchObject({
+      schema: "helix.capability_lifecycle_ledger.v1",
+      ok: true,
+    });
+    expect(response.body?.solver_controller_decision).toMatchObject({
+      decision: "allow_terminal",
+      blocking_reasons: [],
+    });
     expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Opening panel: Docs & Papers\./);
   }, 60000);
@@ -129,6 +152,24 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workspace_action_receipt");
     expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
     expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(readGoalSatisfaction(response.body)?.canonical_goal_kind).toBe("panel_control");
+    expect(readGoalSatisfaction(response.body)?.terminal_contract).toEqual(
+      expect.objectContaining({
+        goal_kind: "docs_panel_open",
+        required_terminal_kinds: ["workspace_action_receipt"],
+        required_actions: ["docs-viewer.open"],
+        forbidden_terminal_kinds: expect.arrayContaining(["active_doc_identity", "doc_open_receipt", "doc_summary"]),
+      }),
+    );
+    expect(readGoalSatisfaction(response.body)?.required_actions?.[0]).toEqual(
+      expect.objectContaining({
+        action_key: "docs-viewer.open",
+        required: true,
+        satisfied: true,
+      }),
+    );
+    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
+    expect(readGoalSatisfaction(response.body)?.next_decision).toBe("allow_terminal");
     expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/currently on|Opened document/i);
   }, 60000);
@@ -152,8 +193,55 @@ describe("helix ask E52 panel control terminal contract", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
     expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
-    expect(["workspace_action_receipt", "typed_failure"]).toContain(response.body?.terminal_artifact_kind);
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(readGoalSatisfaction(response.body)?.terminal_contract?.goal_kind).toBe("docs_panel_open");
+    expect(readGoalSatisfaction(response.body)?.required_actions?.[0]).toEqual(
+      expect.objectContaining({
+        action_key: "docs-viewer.open",
+        required: true,
+        satisfied: true,
+      }),
+    );
+    expect(readGoalSatisfaction(response.body)?.required_evidence?.[0]).toEqual(
+      expect.objectContaining({
+        kind: "workspace_action_receipt",
+        required: true,
+        satisfied: true,
+      }),
+    );
+    expect(readGoalSatisfaction(response.body)?.next_decision).toBe("allow_terminal");
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/currently on|Opened document/i);
+  }, 60000);
+
+  it("treats open docs for me as a docs panel action, not a document query for me", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Okay, open the docs for me.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-open-docs-for-me-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "live-answer-environment",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(readGoalSatisfaction(response.body)?.terminal_contract).toEqual(
+      expect.objectContaining({
+        goal_kind: "docs_panel_open",
+        forbidden_terminal_kinds: expect.arrayContaining(["active_doc_identity", "doc_open_receipt"]),
+      }),
+    );
+    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
+    expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/\"me\"|confidently identify a document/i);
   }, 60000);
 
   it("keeps stream debug terminal aligned with the panel receipt", async () => {
@@ -181,6 +269,18 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(body?.terminal_consistency_check?.consistent).toBe(true);
     expect(body?.debug?.turn_truth_table?.terminal?.kind).toBe("final_answer");
     expect(body?.debug?.turn_truth_table?.terminal?.text).toBe("Opening panel: Docs & Papers.");
+    expect(body?.debug?.capability_adapter_request?.schema).toBe("helix.capability_adapter_request.v1");
+    expect(body?.debug?.capability_adapter_result).toMatchObject({
+      schema: "helix.capability_adapter_result.v1",
+      status: "succeeded",
+      selected_for_answer: true,
+      reentered_solver: true,
+    });
+    expect(body?.debug?.capability_lifecycle_ledger).toMatchObject({
+      schema: "helix.capability_lifecycle_ledger.v1",
+      ok: true,
+    });
+    expect(body?.debug?.solver_controller_decision?.decision).toBe("allow_terminal");
     expect(body?.turn_runtime?.missing_required_artifacts ?? []).not.toContain("workspace_action_receipt");
     expect(String(body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
   }, 60000);

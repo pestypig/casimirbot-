@@ -43,6 +43,14 @@ const classifySourceFamily = (input: {
     return "debug_export";
   }
   if (input.sourceTarget === "runtime_evidence") return "debug_export";
+  if (
+    input.sourceTarget === "workstation_panel" ||
+    input.sourceTarget === "workspace_panel" ||
+    input.sourceTarget === "workspace_action" ||
+    input.targetKind === "workstation_panel" ||
+    input.targetKind === "workspace_panel" ||
+    input.targetKind === "panel_control"
+  ) return "workstation_action";
   if (input.sourceTarget === "docs_viewer" || input.sourceTarget === "active_doc" || /\b(?:docs?|document|white paper|whitepaper|paper)\b/.test(prompt)) {
     return "docs";
   }
@@ -55,7 +63,6 @@ const classifySourceFamily = (input: {
   if (input.sourceTarget === "repo_code" || input.admittedFamilies.includes("repo_code")) return "repo_evidence";
   if (input.sourceTarget === "process_graph" || input.admittedFamilies.includes("process_graph")) return "process_graph";
   if (input.sourceTarget === "live_pipeline" || input.admittedFamilies.includes("live_pipeline")) return "live_source";
-  if (input.sourceTarget === "workstation_panel" || input.sourceTarget === "workspace_action") return "workstation_action";
   if (/^(?:please\s+)?(?:click|press|tap|close|start|stop|select|choose|submit)\b/i.test(input.promptText.trim())) {
     return "workstation_action";
   }
@@ -98,7 +105,16 @@ const isMutatingCapability = (family: HelixCapabilityFamily, requestedAction: st
 const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFamilies: string[]): boolean => {
   if (admittedFamilies.length === 0) return true;
   if (family === "docs") return admittedFamilies.includes("docs_viewer");
-  if (family === "workstation_action") return admittedFamilies.includes("workstation_action") || admittedFamilies.includes("docs_viewer");
+  if (family === "workstation_action") {
+    return admittedFamilies.includes("workstation_action") ||
+      admittedFamilies.includes("workspace_action") ||
+      admittedFamilies.includes("workstation_panel") ||
+      admittedFamilies.includes("workspace_panel") ||
+      admittedFamilies.includes("docs_viewer") ||
+      admittedFamilies.includes("calculator") ||
+      admittedFamilies.includes("notes") ||
+      admittedFamilies.some((entry) => /(?:workspace|workstation|panel|docs_viewer)/.test(entry));
+  }
   if (family === "visual_capture") return admittedFamilies.includes("situation_run");
   if (family === "procedure_memory") return admittedFamilies.includes("procedure_memory") || admittedFamilies.includes("situation_run");
   if (family === "repo_evidence") return admittedFamilies.includes("repo_code");
@@ -171,19 +187,28 @@ export const buildCapabilityPlan = (input: {
     "unknown";
   const targetKind = readString(sourceTargetIntent?.target_kind) || sourceTarget;
   const admittedFamilies = readStringArray(toolCallAdmissionDecision?.admitted_tool_families);
-  const family = classifySourceFamily({
+  const canonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
+  const classifiedFamily = classifySourceFamily({
     promptText: input.promptText,
     sourceTarget,
     targetKind,
     admittedFamilies,
   });
+  const family: HelixCapabilityFamily = canonicalGoalKind === "panel_control"
+    ? "workstation_action"
+    : classifiedFamily;
   const rules = instructionRules(instructionFrame);
   const requestedAction =
     family === "live_source" &&
     rules.includes("do_not_change_cadence_without_affirmative_operator_command")
       ? "inspect_live_source"
       : requestedActionFor(family, input.promptText);
-  const operatorCommandPresent = hasOperatorCommand(input.promptText);
+  const operatorCommandPresent =
+    hasOperatorCommand(input.promptText) ||
+    (
+      canonicalGoalKind === "panel_control" &&
+      /\b(?:open|close|show|bring\s+up|pull\s+up|switch\s+to|focus)\b/i.test(input.promptText)
+    );
   const mutating = isMutatingCapability(family, requestedAction, input.promptText);
   const operatorCommandRequired = mutating;
   const admission = admissionFor({
@@ -204,7 +229,7 @@ export const buildCapabilityPlan = (input: {
     operator_command_required: operatorCommandRequired,
     operator_command_present: operatorCommandPresent,
     source_target: sourceTarget,
-    goal_kind: readString(canonicalGoalFrame?.goal_kind) || "unknown",
+    goal_kind: canonicalGoalKind || "unknown",
     required_terminal_kind: readString(canonicalGoalFrame?.required_terminal_kind) || null,
     admission_status: admission.status,
     ...(admission.rejectionReason ? { rejection_reason: admission.rejectionReason } : {}),

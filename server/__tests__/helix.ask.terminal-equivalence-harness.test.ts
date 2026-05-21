@@ -30,59 +30,48 @@ const finalText = (body: Record<string, unknown>): string =>
 describe("Helix stream/UI/backend terminal equivalence harness", () => {
   it("keeps non-stream, stream, debug, terminal authority, poison audit, route authority, and solver trace equivalent", async () => {
     const app = createApp();
-    const question = "what is happening in the visual screen capture?";
+    const question = "Open the NHM-2 white paper from the docs.";
     const sessionId = `terminal-equivalence-${Date.now()}`;
-    await request(app)
-      .post("/api/agi/situation/test-harness/live-visual-source")
-      .send({
-        thread_id: sessionId,
-        source_id: `visual_source:${sessionId}`,
-        scene_text: "A seeded visual capture shows a terminal equivalence test screen.",
-        activity: "Reviewing the terminal equivalence harness output.",
-        objects: "test screen, terminal output, debug panel",
-        confidence: 0.82,
-      })
-      .expect(200);
 
-    const nonStream = await request(app)
-      .post("/api/agi/ask/turn")
-      .send({ question, mode: "read", debug: true, sessionId })
-      .expect(200);
-    const debug = await request(app)
-      .get(`/api/agi/ask/turn/${encodeURIComponent(String(nonStream.body.turn_id))}/debug-export`)
-      .expect(200);
     const stream = await request(app)
       .post("/api/agi/ask/turn/stream")
       .send({ question, mode: "read", debug: true, sessionId })
       .expect(200);
     const streamEvents = parseSse(stream.text);
     const turnFinal = streamEvents.find((entry) => entry.event === "turn_final")?.data;
+    expect(turnFinal).toBeTruthy();
+    const debug = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(turnFinal?.turn_id))}/debug-export`)
+      .expect(200);
     const terminalEvent = streamEvents.find(
       (entry) =>
         entry.event === "turn_transcript_event" &&
         (entry.data.source_event_type === "terminal_answer" || entry.data.type === "final_answer"),
     )?.data;
 
-    expect(turnFinal).toBeTruthy();
     const result = buildTerminalEquivalenceHarnessResult({
-      nonStreamResponse: nonStream.body,
+      nonStreamResponse: turnFinal,
       streamFinal: turnFinal,
       streamTerminalEvent: terminalEvent,
       debugExport: debug.body,
       visibleUiAnswerState: {
         question,
-        finalAnswer: finalText(nonStream.body),
+        finalAnswer: finalText(turnFinal ?? {}),
       },
+      requireControllerParity: true,
     });
     expect(result).toMatchObject({
       schema: "helix.terminal_equivalence_harness_result.v1",
       ok: true,
       failure_codes: [],
     });
-    expect(nonStream.body.terminal_answer_authority?.server_authoritative).toBe(true);
-    expect(nonStream.body.poison_audit?.ok).toBe(true);
-    expect(nonStream.body.route_authority_audit).toBeTruthy();
-    expect(nonStream.body.ask_turn_solver_trace).toBeTruthy();
+    expect(turnFinal?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(turnFinal?.poison_audit?.ok).toBe(true);
+    expect(turnFinal?.route_authority_audit).toBeTruthy();
+    expect(turnFinal?.ask_turn_solver_trace).toBeTruthy();
+    expect(turnFinal?.goal_satisfaction_evaluation).toBeTruthy();
+    expect(turnFinal?.solver_controller_decision).toBeTruthy();
+    expect(turnFinal?.terminal_surface_parity_invariant?.ok).toBe(true);
     expect(turnFinal?.client_server_terminal_match).toBe(true);
   }, 60_000);
 
@@ -168,5 +157,149 @@ describe("Helix stream/UI/backend terminal equivalence harness", () => {
     });
 
     expect(result.failure_codes).toEqual(expect.arrayContaining(["stream_terminal_differs_from_turn_terminal"]));
+  });
+
+  it("requires goal satisfaction and controller parity before normal terminal projection", () => {
+    const terminalText = "Opened document.";
+    const authority = buildHelixTurnTerminalAuthority({
+      thread_id: "helix-ask:test",
+      turn_id: "ask:missing-controller",
+      final_answer_source: "artifact_synthesis",
+      terminal_artifact_kind: "doc_open_receipt",
+      terminal_text: terminalText,
+      route: "doc_open_best / artifact_synthesis",
+    });
+    const result = buildTerminalEquivalenceHarnessResult({
+      nonStreamResponse: {
+        turn_id: "ask:missing-controller",
+        selected_final_answer: terminalText,
+        final_status: "final_answer",
+        final_answer_source: "artifact_synthesis",
+        terminal_artifact_kind: "doc_open_receipt",
+        terminal_answer_authority: authority,
+        poison_audit: {
+          ok: true,
+          terminal_authority: {
+            server_terminal_text_hash: authority.terminal_text_hash,
+            client_visible_text_hash: authority.terminal_text_hash,
+          },
+        },
+        route_authority_audit: { route_authority_ok: true },
+        ask_turn_solver_trace: { completed_solver_path: true },
+      },
+      visibleUiAnswerState: {
+        question: "open the doc",
+        finalAnswer: terminalText,
+      },
+      requireControllerParity: true,
+    });
+
+    expect(result.failure_codes).toEqual(
+      expect.arrayContaining(["goal_satisfaction_missing", "controller_decision_missing"]),
+    );
+  });
+
+  it("automatically applies the discipline guard to source-targeted terminal paths", () => {
+    const terminalText = "Opened the Docs panel.";
+    const authority = buildHelixTurnTerminalAuthority({
+      thread_id: "helix-ask:test",
+      turn_id: "ask:source-target-discipline",
+      final_answer_source: "artifact_synthesis",
+      terminal_artifact_kind: "workspace_action_receipt",
+      terminal_text: terminalText,
+      route: "panel_control / artifact_synthesis",
+    });
+    const result = buildTerminalEquivalenceHarnessResult({
+      nonStreamResponse: {
+        turn_id: "ask:source-target-discipline",
+        selected_final_answer: terminalText,
+        final_status: "final_answer",
+        final_answer_source: "artifact_synthesis",
+        terminal_artifact_kind: "workspace_action_receipt",
+        source_target_intent: {
+          target_source: "docs_viewer",
+          target_kind: "docs_viewer",
+          strength: "hard",
+          requested_outputs: ["workspace_action_receipt"],
+          allow_no_tool_direct: false,
+        },
+        terminal_answer_authority: authority,
+        poison_audit: {
+          ok: true,
+          terminal_authority: {
+            server_terminal_text_hash: authority.terminal_text_hash,
+            client_visible_text_hash: authority.terminal_text_hash,
+          },
+        },
+        route_authority_audit: { route_authority_ok: true },
+        ask_turn_solver_trace: { completed_solver_path: true },
+      },
+      visibleUiAnswerState: {
+        question: "open the docs panel",
+        finalAnswer: terminalText,
+      },
+    });
+
+    expect(result.surfaces.discipline_guard_required).toBe(true);
+    expect(result.failure_codes).toEqual(
+      expect.arrayContaining([
+        "goal_satisfaction_missing",
+        "controller_decision_missing",
+        "required_artifact_contract_missing",
+      ]),
+    );
+  });
+
+  it("flags normal finals whose controller or goal satisfaction says the turn is not terminal-ready", () => {
+    const terminalText = "You are currently on a document.";
+    const authority = buildHelixTurnTerminalAuthority({
+      thread_id: "helix-ask:test",
+      turn_id: "ask:not-satisfied",
+      final_answer_source: "artifact_synthesis",
+      terminal_artifact_kind: "active_doc_identity",
+      terminal_text: terminalText,
+      route: "docs_panel_open / artifact_synthesis",
+    });
+    const result = buildTerminalEquivalenceHarnessResult({
+      nonStreamResponse: {
+        turn_id: "ask:not-satisfied",
+        selected_final_answer: terminalText,
+        final_status: "final_answer",
+        final_answer_source: "artifact_synthesis",
+        terminal_artifact_kind: "active_doc_identity",
+        terminal_answer_authority: authority,
+        poison_audit: {
+          ok: true,
+          terminal_authority: {
+            server_terminal_text_hash: authority.terminal_text_hash,
+            client_visible_text_hash: authority.terminal_text_hash,
+          },
+        },
+        route_authority_audit: { route_authority_ok: true },
+        ask_turn_solver_trace: { completed_solver_path: true },
+        goal_satisfaction_evaluation: {
+          satisfaction: "not_satisfied",
+          next_decision: "continue",
+          terminal_contract: {
+            goal_kind: "docs_panel_open",
+            required_terminal_kinds: ["workspace_action_receipt"],
+          },
+        },
+        solver_controller_decision: {
+          decision: "continue",
+          blocking_reasons: ["goal_not_satisfied"],
+          selected_terminal_artifact_kind: "active_doc_identity",
+        },
+      },
+      visibleUiAnswerState: {
+        question: "open the docs panel",
+        finalAnswer: terminalText,
+      },
+      requireControllerParity: true,
+    });
+
+    expect(result.failure_codes).toEqual(
+      expect.arrayContaining(["goal_satisfaction_not_terminal", "controller_decision_not_terminal"]),
+    );
   });
 });

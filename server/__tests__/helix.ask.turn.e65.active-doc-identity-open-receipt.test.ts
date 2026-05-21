@@ -11,6 +11,8 @@ const createApp = (): express.Express => {
   return app;
 };
 
+const readGoalSatisfaction = (body: Record<string, any>) => body?.goal_satisfaction_evaluation ?? null;
+
 const activePath =
   "/docs/audits/research/selected-family/nhm2-shift-lapse/alpha-sweep/stage1_centerline_alpha_0p7000_v1/warp-nhm2-mission-time-comparison-latest.md";
 
@@ -36,6 +38,14 @@ describe("helix ask E65 active document and open receipt terminals", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("active_doc_identity");
     expect(response.body?.terminal_artifact_kind).toBe("active_doc_identity");
+    expect(readGoalSatisfaction(response.body)?.terminal_contract).toEqual(
+      expect.objectContaining({
+        goal_kind: "active_doc_identity",
+        required_terminal_kinds: ["active_doc_identity"],
+        required_evidence: ["active_doc_path"],
+        forbidden_terminal_kinds: expect.arrayContaining(["workspace_action_receipt", "situation_context_pack"]),
+      }),
+    );
     expect(String(response.body?.selected_final_answer ?? "")).toContain(activePath);
     expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("model_only_concept");
   }, 90000);
@@ -128,6 +138,14 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(response.body?.active_workspace_source_resolution?.reason).toBe("active_doc_location_prompt");
     expect(response.body?.source_target_intent?.target_source).toBe("docs_viewer");
     expect(response.body?.terminal_artifact_kind).toBe("doc_location_result");
+    expect(readGoalSatisfaction(response.body)?.terminal_contract).toEqual(
+      expect.objectContaining({
+        goal_kind: "doc_evidence_location",
+        required_terminal_kinds: ["doc_location_result"],
+        required_evidence: ["line_backed_locations"],
+        forbidden_terminal_kinds: expect.arrayContaining(["model_only_concept", "direct_answer_text"]),
+      }),
+    );
     expect(response.body?.doc_location_result?.doc_path).toBe(activePath);
     expect(response.body?.doc_location_result?.locate_query).toBe("lapse shift");
     expect(response.body?.doc_location_result?.assistant_answer).toBe(false);
@@ -201,10 +219,10 @@ describe("helix ask E65 active document and open receipt terminals", () => {
       })
       .expect(200);
 
-    expect(response.body?.terminal_artifact_kind).toBe("active_doc_identity");
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
     expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
     expect(JSON.stringify(response.body)).not.toContain('"query":"me"');
-    expect(String(response.body?.selected_final_answer ?? "")).toContain("/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
   }, 90000);
 
   it("treats NH-M2 white-paper-from-docs wording as document acquisition, not panel open", async () => {
