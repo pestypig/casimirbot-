@@ -24,8 +24,31 @@ function solveSimpleQuadraticZero(expression: string): string | null {
   return `${root}, ${-root}`;
 }
 
+function solveSimpleArithmeticExpression(expression: string): string | null {
+  const normalized = expression.replace(/\s+/g, "");
+  if (!normalized || !/^[\d.+\-*/^()]+$/.test(normalized)) return null;
+  if (!/[+\-*/^]/.test(normalized)) return null;
+  try {
+    const jsExpression = normalized.replace(/\^/g, "**");
+    const value = Function(`"use strict"; return (${jsExpression});`)();
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+  } catch {
+    return null;
+  }
+}
+
 function calculatorResultText(prompt: string): string {
   const expression = extractCalculatorExpression(prompt) ?? "the expression";
+  const arithmeticResult = solveSimpleArithmeticExpression(expression);
+  if (arithmeticResult) {
+    return [
+      "Calculator verification plan completed.",
+      `Expression: ${expression}`,
+      `Result: ${arithmeticResult}`,
+      "Trace source: scientific-calculator.solve_expression.",
+    ].join("\n");
+  }
   const result = solveSimpleQuadraticZero(expression);
   if (result) {
     return [

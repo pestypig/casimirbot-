@@ -3,6 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -78,6 +79,101 @@ describe("helix ask E50 terminal consistency", () => {
     }
   }, 60000);
 
+  it("answers general concept questions directly despite ambient active-doc context", async () => {
+    const app = createApp();
+    const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Can you tell me what an electron is?",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-electron-model-only-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          docContextPath: activePath,
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(answerText(response.body)).toMatch(/\belectron\b/i);
+    expect(answerText(response.body)).not.toMatch(/Completed reasoning turn|active doc|\/docs\//i);
+  }, 60000);
+
+  it("honors explicit no-workspace constraints before workstation source targeting", async () => {
+    const app = createApp();
+    const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "e50-source-target",
+      threadId: "e50-source-target-thread",
+      promptText: "Without using the workspace, explain the difference between proper time and coordinate time.",
+    });
+    expect(sourceTarget).toMatchObject({
+      target_source: "model_only",
+      target_kind: "general_background",
+      allow_no_tool_direct: true,
+      precedence_reason: "explicit_model_only_target",
+    });
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Without using the workspace, explain the difference between proper time and coordinate time.",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-without-workspace-model-only-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          docContextPath: activePath,
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.canonical_goal_frame?.answer_scope).toBe("model_only");
+    expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(answerText(response.body)).toMatch(/proper time/i);
+    expect(answerText(response.body)).toMatch(/coordinate time/i);
+    expect(answerText(response.body)).not.toMatch(/workspace command|active doc|\/docs\//i);
+  }, 60000);
+
+  it("keeps general Doppler explanations model-only despite ambient document context", async () => {
+    const app = createApp();
+    const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Can you explain the Doppler effect in simple terms?",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-doppler-model-only-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: activePath,
+          docContextPath: activePath,
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(answerText(response.body)).toMatch(/Doppler effect/i);
+    expect(answerText(response.body)).not.toMatch(/Explained\s+\/docs|active doc|\/docs\//i);
+  }, 60000);
+
   it("does not allow doc_summary to satisfy an NHM2 alpha 0p995 numeric request", async () => {
     const app = createApp();
     const response = await request(app)
@@ -95,7 +191,7 @@ describe("helix ask E50 terminal consistency", () => {
     expect(response.body?.terminal_artifact_kind).not.toBe("doc_summary");
     expect(["doc_numeric_answer", "typed_failure", null]).toContain(response.body?.terminal_artifact_kind ?? null);
     if (response.body?.terminal_artifact_kind === "typed_failure") {
-      expect(response.body?.terminal_error_code).toMatch(/numeric_result_unavailable|terminal_consistency_violation|authoritative_terminal_missing/);
+      expect(response.body?.terminal_error_code).toMatch(/numeric_result_unavailable|terminal_consistency_violation|authoritative_terminal_missing|capability_lifecycle_incomplete/);
     }
   }, 90000);
 

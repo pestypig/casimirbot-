@@ -704,7 +704,11 @@ export function buildAskTurnSolverTrace(input: {
   const evidenceResults = buildEvidenceResults(loopTrace);
   const liveSourceIdentityAudit = readRecord(input.payload.live_source_identity_audit) as HelixLiveSourceIdentityAudit | null;
   const liveSourceIdentityAuditRef = readString(liveSourceIdentityAudit?.audit_id) || null;
-  const finalArbitrationRan = Boolean(readRecord(input.payload.route_authority_audit) && readRecord(input.payload.poison_audit) && readRecord(input.payload.terminal_answer_authority));
+  const finalArbitrationRan = Boolean(
+    (readRecord(input.payload.route_authority_audit) || readBoolean(loopTrace?.route_authority_ok)) &&
+    readRecord(input.payload.poison_audit) &&
+    readRecord(input.payload.terminal_answer_authority)
+  );
   const evidenceReentryGate = buildEvidenceReentryGate({
     turnId: input.turnId,
     payload: input.payload,

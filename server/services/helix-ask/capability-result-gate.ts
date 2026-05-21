@@ -94,8 +94,12 @@ export const buildCapabilityResultGate = (input: {
   const terminalKind = readString(input.terminalArtifactKind);
   const terminalArtifactId = readString(input.terminalArtifactId);
   const terminalIsReceipt = isReceiptKind(terminalKind);
+  const calculatorToolTerminalAllowed =
+    input.plan.source_target === "calculator_stream" &&
+    ["workspace_action_receipt", "calculator_receipt", "tool_evaluation", "workstation_tool_evaluation"].includes(terminalKind);
   const receiptTerminalAllowed =
     !terminalIsReceipt ||
+    calculatorToolTerminalAllowed ||
     (input.plan.required_terminal_kind !== null && input.plan.required_terminal_kind === terminalKind);
   const selectedForAnswer =
     Boolean(terminalKind) &&

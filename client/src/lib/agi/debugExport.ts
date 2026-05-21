@@ -103,6 +103,42 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     : Array.isArray(debug?.current_turn_artifact_ledger)
       ? debug.current_turn_artifact_ledger
       : [];
+  const findLedgerPayload = (kind: string): Record<string, unknown> | null =>
+    [...ledger]
+      .reverse()
+      .map(asRecord)
+      .find((artifact) => artifact?.kind === kind)
+      ? asRecord(
+          [...ledger]
+            .reverse()
+            .map(asRecord)
+            .find((artifact) => artifact?.kind === kind)?.payload,
+        )
+      : null;
+  const availableCapabilities =
+    asRecord(payload.available_capabilities ?? debug?.available_capabilities ?? agentLoop?.available_capabilities) ??
+    findLedgerPayload("available_capabilities");
+  const agentStepDecision =
+    asRecord(payload.agent_step_decision ?? debug?.agent_step_decision ?? agentLoop?.agent_step_decision) ??
+    findLedgerPayload("agent_step_decision");
+  const observationReview =
+    asRecord(payload.observation_review ?? debug?.observation_review ?? agentLoop?.observation_review) ??
+    findLedgerPayload("observation_review");
+  const goalSatisfactionEvaluation =
+    asRecord(payload.goal_satisfaction_evaluation ?? debug?.goal_satisfaction_evaluation ?? agentLoop?.goal_satisfaction_evaluation) ??
+    findLedgerPayload("goal_satisfaction_evaluation");
+  const initialAvailableCapabilities =
+    asRecord(
+      payload.initial_available_capabilities ??
+        debug?.initial_available_capabilities ??
+        agentLoop?.initial_available_capabilities,
+    ) ?? availableCapabilities;
+  const initialAgentStepDecision =
+    asRecord(payload.initial_agent_step_decision ?? debug?.initial_agent_step_decision ?? agentLoop?.initial_agent_step_decision) ??
+    agentStepDecision;
+  const agentStepAuthorityCheck =
+    asRecord(payload.agent_step_authority_check ?? debug?.agent_step_authority_check ?? agentLoop?.agent_step_authority_check) ??
+    findLedgerPayload("agent_step_authority_check");
   const receiptArtifact =
     [...ledger]
       .reverse()
@@ -187,6 +223,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     },
     solver_controller_summary: buildSolverControllerSummary(payload),
     canonical_goal_frame: canonicalGoalFrame,
+    available_capabilities: availableCapabilities,
+    agent_step_decision: agentStepDecision,
+    observation_review: observationReview,
+    goal_satisfaction_evaluation: goalSatisfactionEvaluation,
+    initial_available_capabilities: initialAvailableCapabilities,
+    initial_agent_step_decision: initialAgentStepDecision,
+    agent_step_authority_check: agentStepAuthorityCheck,
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],
     workspace_action_debug: receipt

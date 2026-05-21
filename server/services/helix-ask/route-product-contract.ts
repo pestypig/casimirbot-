@@ -150,6 +150,10 @@ export const isStructuredDocsViewerPrompt = (promptText: string): boolean => {
     (structuredPathCue && locateQueryCue && locationsListCue);
 };
 
+const isActiveDocSummaryPrompt = (promptText: string): boolean =>
+  /\b(?:summari[sz]e|explain|what\s+is|what's)\b[\s\S]{0,100}\b(?:this|current)\s+(?:NHM2\s+)?(?:doc|document|paper)\b/i.test(promptText) ||
+  /\bcurrent\s+(?:NHM2\s+)?(?:doc|document|paper)\b[\s\S]{0,80}\b(?:summar|explain|about)\b/i.test(promptText);
+
 const isExplicitLiveBindingDiagnosisPrompt = (promptText: string): boolean =>
   /\b(?:worker\s+lanes?|lanes?\s+(?:not\s+)?updating|not\s+updating|live\s+answer\s+readiness|capture\s+(?:health|bound|binding|adopted|adoption|running)|visual\s+capture\s+(?:health|bound|binding|adopted|adoption|running)|producer\s+(?:stale|fresh|status)|client\s+adoption|scene_procedure_ready|active\s+live\s+answer\s+environment)\b/i.test(promptText);
 
@@ -167,7 +171,9 @@ export function buildRouteProductContract(input: {
   const promptText = input.promptText ?? "";
   const sourceTarget = isStructuredDocsViewerPrompt(promptText)
     ? "docs_viewer"
-    : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
+    : isActiveDocSummaryPrompt(promptText)
+      ? "active_doc"
+      : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
   const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
   const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
     ? sourceTargetRecord.requested_outputs
@@ -366,8 +372,17 @@ export function buildRouteProductContract(input: {
       turnId: input.turnId,
       threadId: input.threadId,
       sourceTarget: "calculator_stream",
-      allowedCore: ["situation_context_pack"],
-      allowedExtra: ["calculator_stream_result", "calculation_trace", "source_binding_status", "source_binding_repair_candidate"],
+      allowedCore: ["situation_context_pack", "workspace_action_receipt", "workstation_tool_evaluation"],
+      allowedExtra: [
+        "calculator_receipt",
+        "calculator_result_trace",
+        "calculator_stream_result",
+        "calculation_trace",
+        "tool_evaluation",
+        "turn_final_text",
+        "source_binding_status",
+        "source_binding_repair_candidate",
+      ],
       forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "process_graph_overview", "no_tool_direct", "model_only_concept"],
       precedenceReason: "calculator_source_target_allows_calculator_stream_products",
     });

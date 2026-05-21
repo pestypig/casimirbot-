@@ -75,6 +75,27 @@ const receiptAcked = (payload: RecordLike): boolean => {
   });
 };
 
+const hasSatisfiedWorkstationToolEvaluation = (payload: RecordLike, terminalArtifactKind?: string | null): boolean => {
+  const terminalKind = readString(terminalArtifactKind ?? payload.terminal_artifact_kind);
+  if (terminalKind !== "workstation_tool_evaluation" && terminalKind !== "tool_evaluation") return false;
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
+    readString(goalSatisfaction?.next_decision) !== "allow_terminal"
+  ) {
+    return false;
+  }
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
+  if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes(terminalKind)) return false;
+  const observationReview = readRecord(payload.observation_review);
+  if (observationReview && observationReview.does_it_satisfy_goal !== true) return false;
+  return artifacts(payload).some((artifact) => {
+    if (readString(artifact.kind) !== "workstation_tool_evaluation") return false;
+    return artifactPayload(artifact)?.supports_goal === true;
+  });
+};
+
 const stage = (
   stageName: HelixCapabilityLifecycleStageName,
   status: HelixCapabilityLifecycleStageStatus,
@@ -102,6 +123,12 @@ const terminalReceiptAllowed = (input: {
 }): boolean => {
   const terminalKind = readString(input.terminalArtifactKind ?? input.payload.terminal_artifact_kind);
   if (!isReceiptKind(terminalKind)) return true;
+  if (
+    input.plan?.source_target === "calculator_stream" &&
+    ["workspace_action_receipt", "calculator_receipt", "tool_evaluation", "workstation_tool_evaluation"].includes(terminalKind)
+  ) {
+    return true;
+  }
   const goal = readRecord(input.payload.canonical_goal_frame);
   const required = readString(input.plan?.required_terminal_kind) || readString(goal?.required_terminal_kind);
   return Boolean(required && required === terminalKind);
@@ -122,13 +149,23 @@ export const buildCapabilityLifecycleLedger = (input: {
   const planId = plan ? capabilityPlanId(plan) : null;
   const resultId = result ? result.capability_plan_id : null;
   const actionRefs = observedActionRefs(input.payload);
+  const satisfiedWorkstationEvaluation = hasSatisfiedWorkstationToolEvaluation(input.payload, input.terminalArtifactKind);
+  const derivedWorkstationRefs = satisfiedWorkstationEvaluation
+    ? artifacts(input.payload)
+        .filter((artifact) => readString(artifact.kind) === "workstation_tool_evaluation")
+        .map((artifact) => readString(artifact.artifact_id))
+    : [];
   const dispatched = actionRefs.length > 0;
-  const admitted = Boolean(plan && (plan.admission_status === "admitted" || plan.admission_status === "needs_evidence"));
-  const resultObserved = Boolean(result) || (Boolean(plan) && hasExplicitNotRunReason(plan, result));
+  const admitted =
+    satisfiedWorkstationEvaluation ||
+    Boolean(plan && (plan.admission_status === "admitted" || plan.admission_status === "needs_evidence"));
+  const resultObserved = satisfiedWorkstationEvaluation || Boolean(result) || (Boolean(plan) && hasExplicitNotRunReason(plan, result));
   const validated =
+    satisfiedWorkstationEvaluation ||
     Boolean(result && (result.status === "succeeded" || result.status === "not_run" || (result.status === "partial" && result.evidence_refs.length > 0))) ||
     (!result && Boolean(plan) && hasExplicitNotRunReason(plan, result));
   const reentered =
+    satisfiedWorkstationEvaluation ||
     Boolean(result?.reentered_solver) ||
     (!result && Boolean(plan) && hasExplicitNotRunReason(plan, result));
   const terminalAllowed = terminalReceiptAllowed({
@@ -138,7 +175,7 @@ export const buildCapabilityLifecycleLedger = (input: {
   });
 
   const failureCodes: HelixCapabilityLifecycleFailureCode[] = [];
-  if (dispatched && !plan) failureCodes.push("capability_dispatched_without_admission");
+  if (dispatched && !plan && !satisfiedWorkstationEvaluation) failureCodes.push("capability_dispatched_without_admission");
   if (dispatched && plan && !admitted) failureCodes.push("capability_dispatched_without_admission");
   if (plan?.mutating && plan.operator_command_required && !plan.operator_command_present) failureCodes.push("mutating_capability_without_operator_command");
   if (plan && !resultObserved) failureCodes.push("capability_result_missing");
@@ -149,13 +186,13 @@ export const buildCapabilityLifecycleLedger = (input: {
   if (!terminalAllowed) failureCodes.push("capability_receipt_terminal_without_goal");
 
   const stages: HelixCapabilityLifecycleStage[] = [
-    stage("planned", plan ? "succeeded" : dispatched ? "failed" : "skipped", planId ? [planId] : [], plan ? "capability_plan_present" : dispatched ? "action_observed_without_capability_plan" : "no_capability_required"),
-    stage("admitted", admitted ? "succeeded" : plan ? "failed" : "skipped", planId ? [planId] : [], admitted ? "capability_admitted_or_needs_evidence" : plan ? plan.rejection_reason ?? "capability_not_admitted" : "no_capability_plan"),
+    stage("planned", plan || satisfiedWorkstationEvaluation ? "succeeded" : dispatched ? "failed" : "skipped", planId ? [planId] : derivedWorkstationRefs, plan ? "capability_plan_present" : satisfiedWorkstationEvaluation ? "workstation_tool_evaluation_present" : dispatched ? "action_observed_without_capability_plan" : "no_capability_required"),
+    stage("admitted", admitted ? "succeeded" : plan ? "failed" : "skipped", planId ? [planId] : derivedWorkstationRefs, admitted ? "capability_admitted_or_workstation_goal_satisfied" : plan ? plan.rejection_reason ?? "capability_not_admitted" : "no_capability_plan"),
     stage("dispatched", dispatched ? admitted || !plan ? "succeeded" : "failed" : "skipped", actionRefs, dispatched ? "action_or_receipt_observed" : "no_action_dispatched"),
     stage("adapter_acknowledged", dispatched ? receiptAcked(input.payload) ? "succeeded" : "failed" : "skipped", actionRefs, dispatched ? receiptAcked(input.payload) ? "adapter_acknowledgement_observed" : "adapter_acknowledgement_missing" : "no_action_dispatched"),
-    stage("result_observed", resultObserved ? "succeeded" : plan ? "failed" : "skipped", resultRefs(result), result ? "capability_result_present" : hasExplicitNotRunReason(plan, result) ? "explicit_not_run_reason_present" : "capability_result_missing"),
-    stage("result_validated", validated ? "succeeded" : result ? "failed" : "skipped", resultRefs(result), validated ? "capability_result_validated_or_explicitly_not_run" : "capability_result_unvalidated"),
-    stage("reentered_solver", reentered ? "succeeded" : result ? "failed" : "skipped", resultRefs(result), reentered ? "capability_result_reentered_solver_or_not_run" : "capability_result_not_reentered"),
+    stage("result_observed", resultObserved ? "succeeded" : plan ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, result ? "capability_result_present" : satisfiedWorkstationEvaluation ? "workstation_tool_evaluation_observed" : hasExplicitNotRunReason(plan, result) ? "explicit_not_run_reason_present" : "capability_result_missing"),
+    stage("result_validated", validated ? "succeeded" : result ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, validated ? "capability_result_validated_or_workstation_goal_satisfied" : "capability_result_unvalidated"),
+    stage("reentered_solver", reentered ? "succeeded" : result ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, reentered ? "capability_result_reentered_solver_or_workstation_goal_satisfied" : "capability_result_not_reentered"),
     stage("terminal_considered", terminalAllowed ? "succeeded" : "failed", [readString(input.terminalArtifactKind ?? input.payload.terminal_artifact_kind)], terminalAllowed ? "terminal_receipt_matches_canonical_goal_or_not_receipt" : "terminal_receipt_without_required_goal_kind"),
   ];
 

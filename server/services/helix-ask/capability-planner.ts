@@ -20,16 +20,17 @@ const readStringArray = (value: unknown): string[] =>
 
 const normalize = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, " ");
 
-const commandVerbPattern = /\b(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit)\b/i;
+const commandVerbPattern = /\b(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i;
 const contextualCommandPattern =
-  /\b(?:before|after|if|when|why|did|last|previous|haven'?t|not\s+yet|without)\b[\s\S]{0,80}\b(?:click|press|tap|open|start|set|change|update|run|repair|attach)\b/i;
+  /\b(?:before|after|if|when|why|did|last|previous|haven'?t|not\s+yet|without)\b[\s\S]{0,80}\b(?:click|press|tap|open|start|set|change|update|run|repair|attach|use|solve|evaluate|compute|calculate|check|verify)\b/i;
 
 const hasOperatorCommand = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!commandVerbPattern.test(prompt)) return false;
   if (contextualCommandPattern.test(prompt)) return false;
-  return /^(?:please\s+)?(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit)\b/i.test(prompt) ||
-    /\b(?:and|then)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit)\b/i.test(prompt);
+  return /^(?:please\s+)?(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt) ||
+    /^(?:please\s+)?(?:you\s+have\s+to|can\s+you|could\s+you|would\s+you)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt) ||
+    /\b(?:and|then)\s+(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i.test(prompt);
 };
 
 const classifySourceFamily = (input: {
@@ -47,8 +48,10 @@ const classifySourceFamily = (input: {
     input.sourceTarget === "workstation_panel" ||
     input.sourceTarget === "workspace_panel" ||
     input.sourceTarget === "workspace_action" ||
+    input.sourceTarget === "calculator_stream" ||
     input.targetKind === "workstation_panel" ||
     input.targetKind === "workspace_panel" ||
+    input.targetKind === "calculator_stream" ||
     input.targetKind === "panel_control"
   ) return "workstation_action";
   if (input.sourceTarget === "docs_viewer" || input.sourceTarget === "active_doc" || /\b(?:docs?|document|white paper|whitepaper|paper)\b/.test(prompt)) {
@@ -208,6 +211,10 @@ export const buildCapabilityPlan = (input: {
     (
       canonicalGoalKind === "panel_control" &&
       /\b(?:open|close|show|bring\s+up|pull\s+up|switch\s+to|focus)\b/i.test(input.promptText)
+    ) ||
+    (
+      canonicalGoalKind === "doc_open_best" &&
+      /\b(?:open|show|view|bring\s+up|pull\s+up|load)\b/i.test(input.promptText)
     );
   const mutating = isMutatingCapability(family, requestedAction, input.promptText);
   const operatorCommandRequired = mutating;

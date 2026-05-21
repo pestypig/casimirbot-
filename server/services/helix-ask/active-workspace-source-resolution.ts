@@ -27,7 +27,7 @@ const genericDeicticRe =
   /\b(?:what|that|this|which)?\s*(?:are|is|am)?\s*(?:we|i|you)?\s*(?:looking\s+at|viewing|reading|on|open)(?:\s+(?:now|right\s+now|currently))?\b/i;
 
 const activeDocLocationRe =
-  /(?:^\s*(?:Locate\s+query|Document\s+path)\s*:|\b(?:find|locate|where|search|show)\b[\s\S]{0,160}\b(?:current\s+(?:doc|dock)|current\s+docs?\s+viewer\s+context|docs?\s+viewer|current\s+document|current\s+paper|this\s+(?:doc|document|paper)|active\s+(?:doc|document|paper))\b)/im;
+  /(?:^\s*Locate\s+query\s*:|\b(?:find|locate|where|search|show)\b[\s\S]{0,160}\b(?:current\s+(?:doc|dock)|current\s+docs?\s+viewer\s+context|docs?\s+viewer|current\s+document|current\s+paper|this\s+(?:doc|document|paper)|active\s+(?:doc|document|paper))\b)/im;
 
 export function buildActiveWorkspaceSourceResolution(input: {
   turnId: string;
@@ -73,12 +73,6 @@ export function buildActiveWorkspaceSourceResolution(input: {
     requestedTerminalKind = "active_doc_identity";
     reason = "generic_deictic_bound_to_active_docs";
     confidence = 0.94;
-  } else if (docsViewerActive) {
-    resolvedSourceTarget = "active_doc";
-    resolvedTargetKind = "active_doc";
-    requestedTerminalKind = "active_doc_identity";
-    reason = "active_docs_viewer_valid_doc";
-    confidence = 0.8;
   } else if (genericDeictic) {
     reason = "ambiguous_without_active_workspace_source";
     confidence = 0.62;

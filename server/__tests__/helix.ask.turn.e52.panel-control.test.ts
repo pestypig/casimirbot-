@@ -113,6 +113,62 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.terminal_artifact_kind).not.toBe("note_update_receipt");
   }, 60000);
 
+  it("routes notes-panel wording to panel control instead of active-doc identity", async () => {
+    const app = createApp();
+    const sessionId = `e52-notes-panel-natural-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open the notes panel.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(findAction(response.body, "workstation-notes")).toBeTruthy();
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Workstation Notes.");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/^Active doc:/i);
+  }, 60000);
+
+  it("routes open-panels status questions to process graph instead of active-doc identity", async () => {
+    const app = createApp();
+    const sessionId = `e52-open-panels-status-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What panels are open right now?",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent?.target_source).toBe("process_graph");
+    expect(response.body?.terminal_artifact_kind).toBe("process_graph_overview");
+    expect(response.body?.final_answer_source).toBe("process_graph_overview");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/^Active doc:/i);
+  }, 60000);
+
   it("routes Docs & Papers wording to panel control without an active doc", async () => {
     const app = createApp();
     const response = await request(app)
@@ -172,6 +228,50 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(readGoalSatisfaction(response.body)?.next_decision).toBe("allow_terminal");
     expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/currently on|Opened document/i);
+  }, 60000);
+
+  it("routes article-qualified docs-panel wording to panel control", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open up a docs panel.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-open-a-docs-panel-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workspace_action_receipt");
+    expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
+    expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(readGoalSatisfaction(response.body)?.terminal_contract?.goal_kind).toBe("docs_panel_open");
+    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.available_capabilities?.schema).toBe("helix.available_capabilities.v1");
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("docs-viewer.open");
+    expect(response.body?.agent_step_decision?.chosen_capability).toBe("docs-viewer.open");
+    expect(response.body?.initial_agent_step_decision?.authority).toBe("agent_step_decision");
+    expect(response.body?.initial_agent_step_decision?.chosen_capability).toBe("docs-viewer.open");
+    expect(response.body?.initial_agent_step_decision?.action).toMatchObject({
+      panel_id: "docs-viewer",
+      action_id: "open",
+    });
+    expect(response.body?.agent_step_authority_check).toMatchObject({
+      expected_capability: "docs-viewer.open",
+      planned_capability: "docs-viewer.open",
+      consistent: true,
+      enforcement: "authoritative",
+    });
+    expect(response.body?.observation_review?.does_it_satisfy_goal).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toBe("Opening panel: Docs & Papers.");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/terminal resolver|Opened document|currently on/i);
   }, 60000);
 
   it("routes corrective docs-panel follow-ups to panel control", async () => {
@@ -365,10 +465,17 @@ describe("helix ask E52 panel control terminal contract", () => {
       .expect(200);
 
     const action = findAction(response.body, "scientific-calculator", "solve_expression");
-    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("calculator_solve");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workstation_tool_evaluation");
     expect(action).toBeTruthy();
     expect(action?.args?.latex).toBe("x^2-4=0");
-    expect(["workspace_action_receipt", "typed_failure"]).toContain(response.body?.terminal_artifact_kind);
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("scientific-calculator.solve_expression");
+    expect(response.body?.agent_step_decision?.candidate_capabilities).toContain("scientific-calculator.solve_expression");
+    expect(response.body?.agent_step_decision?.expected_artifacts).toEqual(
+      expect.arrayContaining(["calculator_receipt", "workstation_tool_evaluation"]),
+    );
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
   }, 60000);
 
   it("does not steal real document acquisition prompts", async () => {

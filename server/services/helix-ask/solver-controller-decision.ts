@@ -100,7 +100,30 @@ const isCapabilityTerminalKind = (terminalArtifactKind: string | null): boolean 
       ),
   );
 
+const hasSatisfiedWorkstationToolEvaluation = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (terminalArtifactKind !== "workstation_tool_evaluation" && terminalArtifactKind !== "tool_evaluation") return false;
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
+    readString(goalSatisfaction?.next_decision) !== "allow_terminal"
+  ) {
+    return false;
+  }
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
+  if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes(terminalArtifactKind)) return false;
+  const observationReview = readRecord(payload.observation_review);
+  if (observationReview && readBoolean(observationReview.does_it_satisfy_goal) !== true) return false;
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "workstation_tool_evaluation") return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    return readBoolean(artifactPayload?.supports_goal) === true;
+  });
+};
+
 const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const ledger = readRecord(payload.capability_lifecycle_ledger);

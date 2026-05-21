@@ -24,6 +24,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "workspace_panel",
   "workstation_panel",
   "workspace_action",
+  "calculator_stream",
 ]);
 
 export function buildToolCallAdmissionDecision(input: {
@@ -73,6 +74,11 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "active_doc_summary", "doc_open_best", "model_only_concept", "no_tool_direct"];
     reason = "workspace_panel_requires_workstation_action_path";
+  } else if (sourceTarget === "calculator_stream") {
+    admittedToolFamilies = ["calculator", "workstation_action"];
+    extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept", "direct_answer_text"];
+    extraForbiddenRoutes = ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "active_doc_summary", "doc_open_best", "model_only_concept", "no_tool_direct"];
+    reason = "calculator_stream_requires_calculator_tool_path";
   } else if (sourceTarget === "visual_capture") {
     admittedToolFamilies = ["situation_run"];
     extraForbiddenTerminalKinds = ["active_doc_identity", "doc_summary", "doc_location_matches", "live_pipeline_receipt", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer"];

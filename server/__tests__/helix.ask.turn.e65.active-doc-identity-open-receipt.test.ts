@@ -248,4 +248,110 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(response.body?.execution_trace?.some((step: any) => step?.action?.action_id === "open_doc_by_path")).toBe(true);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Path:/i);
   }, 90000);
+
+  it("lets mandatory NHM2 white-paper wording override active-doc identity", async () => {
+    const app = createApp();
+    const sessionId = `e65-have-to-open-nhm2-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "You have to Open up a NHM2 white paper from the docks.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-deeper-reformulation-decision-memo-2026-03-31.md",
+          docContextPath: "/docs/research/nhm2-deeper-reformulation-decision-memo-2026-03-31.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_open_best");
+    expect(response.body?.source_target_intent?.target_source).toBe("docs_viewer");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+    expect(response.body?.terminal_error_code ?? null).not.toBe("capability_lifecycle_incomplete");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.initial_available_capabilities?.recommended_capability_key).toBe("docs-viewer.search_docs");
+    expect(response.body?.initial_agent_step_decision).toMatchObject({
+      authority: "agent_step_decision",
+      chosen_capability: "docs-viewer.search_docs",
+      decision: "execute",
+    });
+    expect(response.body?.initial_agent_step_decision?.rejected_capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ capability_key: "docs-viewer.identify_current_doc" }),
+      ]),
+    );
+    expect(response.body?.agent_step_authority_check).toMatchObject({
+      expected_capability: "docs-viewer.search_docs",
+      planned_capability: "docs-viewer.search_docs",
+      consistent: true,
+      enforcement: "authoritative",
+    });
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Opened document:|Path:/i);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/^Active doc:/i);
+  }, 90000);
+
+  it("opens the named NHM2 deeper reformulation decision memo instead of the ambient active doc", async () => {
+    const app = createApp();
+    const sessionId = `e65-open-deeper-reformulation-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open the NHM2 deeper reformulation memo from docs.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_open_best");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+    expect(response.body?.open_doc_selected_path).toMatch(/\/docs\/research\/nhm2-deeper-reformulation-decision-memo-2026-0[34]-\d{2}\.md$/);
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("nhm2-deeper-reformulation-decision-memo");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toContain("nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(String(response.body?.terminal_presentation?.concise_text ?? "")).toContain("nhm2-deeper-reformulation-decision-memo");
+    expect(String(response.body?.terminal_presentation?.concise_text ?? "")).not.toMatch(/^Locations:/i);
+    expect(JSON.stringify(response.body?.current_turn_events ?? [])).not.toContain("workspace_action_locate_variant");
+    expect(JSON.stringify(response.body?.current_turn_events ?? [])).not.toContain("workspace_action_summarize_opened_search_result");
+  }, 90000);
+
+  it("lets mandatory NHM2 white-paper wording override scientific location routing", async () => {
+    const app = createApp();
+    const sessionId = `e65-have-to-open-nhm2-no-doc-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "You have to Open up a NHM2 white paper from the docks.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "live-answer-environment",
+          hasDocContext: false,
+          docContextValid: false,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_open_best");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_open_receipt");
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain("scientific_anchor_suppressed_for_open_command");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+    expect(response.body?.route_reason_code).toMatch(/doc_open_best/);
+    expect(response.body?.terminal_error_code ?? null).not.toBe("pending_request_missing");
+  }, 90000);
 });

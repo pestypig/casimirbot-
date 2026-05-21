@@ -187,7 +187,6 @@ export function buildEvidenceReentryGate(input: {
   const receiptsReentered = receiptRefs.filter((ref) =>
     evidenceRefSet.has(ref) ||
     (allowedReceiptTerminal &&
-      input.finalArbitrationRan &&
       (ref === input.terminalArtifactKind || ref === input.finalAnswerSource || isReceiptKind(ref)))
   );
   const receiptsNotReentered = receiptRefs.filter((ref) => !receiptsReentered.includes(ref));

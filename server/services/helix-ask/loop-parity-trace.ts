@@ -286,9 +286,22 @@ export function buildLoopParityTrace(input: {
   const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
   const routeAuthorityAudit = readRecord(payload.route_authority_audit);
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const terminalSelectionGuard = readRecord(payload.terminal_artifact_selection_guard);
+  const productAuthorityGuard = readRecord(payload.product_authority_guard);
   const poisonAudit = readRecord(payload.poison_audit);
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
-  const routeAuthorityOk = routeAuthorityAudit?.route_authority_ok === true;
+  const allowedTerminalKinds = readStringArray(routeProductContract?.allowed_terminal_artifact_kinds);
+  const forbiddenTerminalKinds = readStringArray(routeProductContract?.forbidden_terminal_artifact_kinds);
+  const calculatorContractAuthorityOk =
+    !routeAuthorityAudit &&
+    sourceTargetIntent?.target_source === "calculator_stream" &&
+    readString(routeProductContract?.schema) === "helix.route_product_contract.v1" &&
+    terminalSelectionGuard?.allowed !== false &&
+    productAuthorityGuard?.allowed !== false &&
+    !forbiddenTerminalKinds.includes(terminalArtifactKind) &&
+    (allowedTerminalKinds.length === 0 || allowedTerminalKinds.includes(terminalArtifactKind));
+  const routeAuthorityOk = routeAuthorityAudit?.route_authority_ok === true || calculatorContractAuthorityOk;
   const terminalAuthorityOk = terminalAuthority?.server_authoritative === true;
   const poisonViolations = Array.isArray(poisonAudit?.violations)
     ? poisonAudit.violations
@@ -308,7 +321,7 @@ export function buildLoopParityTrace(input: {
     !readRecord(payload.route_product_contract);
   const violationCodes = readStringArray(routeAuthorityAudit?.violation_codes);
   const shortCircuitRiskFlags = unique([
-    sourceTargetIntent && sourceTargetIntent.strength === "hard" && evidence.selected.length === 0 && !/typed_failure|receipt/i.test(terminalArtifactKind)
+    sourceTargetIntent && sourceTargetIntent.strength === "hard" && evidence.selected.length === 0 && !/typed_failure|receipt|tool_evaluation|workstation_tool_evaluation/i.test(terminalArtifactKind)
       ? "classifier_selected_terminal_without_evidence"
       : "",
     violationCodes.includes("receipt_used_as_content_answer") ? "receipt_promoted_to_answer" : "",
@@ -318,7 +331,7 @@ export function buildLoopParityTrace(input: {
       ? "hard_source_target_allowed_no_tool_direct"
       : "",
     routeContractMissing ? "route_contract_missing" : "",
-    !routeAuthorityAudit ? "route_authority_missing" : "",
+    !routeAuthorityAudit && !calculatorContractAuthorityOk ? "route_authority_missing" : "",
     poisonAuditOk && routeAuthorityAudit && !routeAuthorityOk ? "poison_clean_but_authority_failed" : "",
     observationsCreated.length > 0 && !postObservationFinalizerRan ? "observations_created_but_not_reentered" : "",
     terminalArtifactKind !== "unknown" && !terminalSelectionRan ? "terminal_selected_before_observation_finalizer" : "",

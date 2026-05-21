@@ -39,6 +39,12 @@ const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
     .filter((cue: CueRule["cues"][number]) => cue.pattern.test(prompt))
     .map((cue: CueRule["cues"][number]) => cue.label);
 
+const isExplicitModelOnlyPrompt = (prompt: string): boolean =>
+  /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
+  /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
+  /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(prompt) ||
+  /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(prompt);
+
 const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
   const docsViewerCue =
     /\bcurrent\s+docs?\s+viewer\s+context\b/i.test(prompt) ||
@@ -72,12 +78,20 @@ const isDocsPanelOpenPrompt = (prompt: string): boolean => {
     .replace(/\s+/g, " ")
     .trim();
   if (!normalized) return false;
-  return /(?:^|[.?!]\s+)(?:(?:can|could|would)\s+you\s+)?(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:the\s+)?(?:docs?|documents?)(?:\s+(?:viewer|panel|dock))?(?:\s|[.?!,]|$)/i.test(normalized) &&
+  return /(?:^|[.?!]\s+)(?:(?:can|could|would)\s+you\s+)?(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:(?:the|a)\s+)?(?:docs?|documents?)(?:\s+(?:viewer|panel|dock))?(?:\s|[.?!,]|$)/i.test(normalized) &&
     !/\b(?:docs?|documents?)\s+(?:about|on|regarding|for|named|called|matching)\b/i.test(normalized);
 };
 
+const isExplicitDocumentAcquisitionPrompt = (prompt: string): boolean =>
+  !isDocsPanelOpenPrompt(prompt) &&
+  /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|load)\b[\s\S]{0,140}\b(?:NHM[-\s]?2|white\s*paper|whitepaper|paper|document|doc)\b[\s\S]{0,100}\b(?:docs?|docks?|documents?|viewer)\b/i.test(prompt);
+
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
+
+const isCalculatorSolvePrompt = (prompt: string): boolean =>
+  /\b(?:scientific\s+)?calculator\b/i.test(prompt) &&
+  /\b(?:solve|evaluate|compute|calculate|check|verify)\b[\s\S]{0,160}(?:\d|[=+\-*/^()]|\\frac|\\sqrt|\bequation\b|\bexpression\b|\bformula\b)/i.test(prompt);
 
 const isGenericSceneEpochPhrase = (prompt: string): boolean =>
   /\b(?:scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|previous\s+(?:scene|frame|visual|screen|capture)|last\s+(?:scene|frame|visual|screen|capture))\b/i.test(prompt);
@@ -313,6 +327,7 @@ const rules: CueRule[] = [
       { label: "workstation_process_graph", pattern: /\bworkstation\s+(?:process\s+)?graph\b/i },
       { label: "workstation_state", pattern: /\bworkstation\s+state\b/i },
       { label: "panels_open", pattern: /\b(?:what|which)\s+panels\s+are\s+open\b/i },
+      { label: "panels_open_status", pattern: /\b(?:what|which|show|list)\b[\s\S]{0,40}\b(?:open|active|visible)\s+panels\b/i },
       { label: "show_workstation_process_graph", pattern: /\bshow\b[\s\S]{0,80}\bworkstation\s+(?:process\s+)?graph\b/i },
     ],
   },
@@ -342,7 +357,8 @@ const rules: CueRule[] = [
     allowNoToolDirect: true,
     suppressedRoutes: ["active_doc_identity", "active_doc_summary", "situation_context_question"],
     cues: [
-      { label: "no_workspace", pattern: /\b(?:don't|do\s+not)\s+(?:use|look\s+at|check)\s+(?:workspace|docs|screen|visual|sources?)\b/i },
+      { label: "no_workspace", pattern: /\b(?:don't|do\s+not)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i },
+      { label: "without_workspace", pattern: /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i },
       { label: "general_question", pattern: /\bgeneral\s+(?:knowledge|reasoning)\b/i },
     ],
   },
@@ -438,6 +454,23 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isExplicitModelOnlyPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "model_only",
+      targetKind: "general_background",
+      strength: "hard",
+      explicitCues: ["explicit_model_only"],
+      reasons: ["explicit_model_only_target", "negative_workspace_scope"],
+      requestedOutputs: [],
+      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "situation_context_question", "visual_deictic", "visual_frame_evidence"],
+      precedenceReason: "explicit_model_only_target",
+      confidence: 0.9,
+      allowClientShortcut: false,
+      allowNoToolDirect: true,
+    });
+  }
   if (isDocsPanelOpenPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -490,6 +523,61 @@ export function arbitrateAskSourceTarget(input: {
         confidence: docsRule.confidence,
         allowClientShortcut: docsRule.allowClientShortcut,
         allowNoToolDirect: docsRule.allowNoToolDirect,
+      });
+    }
+  }
+  if (isExplicitDocumentAcquisitionPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["doc_open_best"],
+      reasons: ["explicit_document_acquisition_source_target", "open_document_from_docs_phrase"],
+      requestedOutputs: ["file_path"],
+      suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept"],
+      precedenceReason: "explicit_document_acquisition_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isCalculatorSolvePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "calculator_stream",
+      targetKind: "calculator_stream",
+      strength: "hard",
+      explicitCues: ["scientific_calculator_solve"],
+      reasons: ["calculator_tool_source_target", "scientific_calculator_solve_phrase"],
+      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "calculator_tool_source_target",
+      confidence: 0.95,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isExplicitProcessGraphPrompt(prompt)) {
+    const processGraphRule = rules.find((rule: CueRule) => rule.target === "process_graph");
+    if (processGraphRule) {
+      const explicitCues = matches(prompt, processGraphRule.cues);
+      return toSourceTargetIntent({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        target: processGraphRule.target,
+        targetKind: processGraphRule.targetKind,
+        strength: processGraphRule.strength,
+        explicitCues: explicitCues.length > 0 ? explicitCues : ["process_graph"],
+        reasons: [processGraphRule.reason, ...(explicitCues.length > 0 ? explicitCues : ["process_graph"])],
+        requestedOutputs: processGraphRule.requestedOutputs,
+        suppressedRoutes: processGraphRule.suppressedRoutes,
+        precedenceReason: processGraphRule.reason,
+        confidence: processGraphRule.confidence,
+        allowClientShortcut: processGraphRule.allowClientShortcut,
+        allowNoToolDirect: processGraphRule.allowNoToolDirect,
       });
     }
   }

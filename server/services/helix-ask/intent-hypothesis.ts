@@ -85,7 +85,7 @@ const confidenceFor = (
 
 const sourceTargetForKind = (kind: HelixIntentKind, fallback: string): string => {
   if (kind === "content_question") return /unknown/i.test(fallback) ? "visual_capture" : fallback;
-  if (kind === "control_command") return "live_pipeline";
+  if (kind === "control_command") return /^(?:calculator_stream|workspace_panel|workstation_state)$/i.test(fallback) ? fallback : "live_pipeline";
   if (kind === "debug_diagnosis") return "runtime_evidence";
   if (kind === "repo_evidence_question" || kind === "implementation_question") return "repo_code";
   if (kind === "procedure_memory_question") return "procedure_memory";
@@ -122,9 +122,10 @@ export function buildHelixIntentHypotheses(input: {
   const procedureSpans = spanMatches(input.promptText, procedurePatterns);
   const repoSpans = spanMatches(input.promptText, repoPatterns);
   const kinds: HelixIntentKind[] = [];
+  const sourceTargetToolCommand = /^(?:calculator_stream|workspace_panel|workstation_state)$/i.test(sourceTarget);
 
   if (promptInterpretation.content_question_detected) kinds.push("content_question");
-  if (promptInterpretation.executable_operator_commands.length > 0) kinds.push("control_command");
+  if (promptInterpretation.executable_operator_commands.length > 0 || sourceTargetToolCommand) kinds.push("control_command");
   if (promptInterpretation.status_question_detected) kinds.push("status_question");
   if (promptInterpretation.debug_or_history_question_detected || promptInterpretation.contextual_tool_mentions.length > 0) kinds.push("debug_diagnosis");
   if (promptInterpretation.implementation_question_detected) kinds.push("implementation_question");

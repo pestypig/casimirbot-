@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planWorkstationToolUse } from "../services/helix-ask/workstation-tool-planner";
+import { extractCalculatorExpression, planWorkstationToolUse } from "../services/helix-ask/workstation-tool-planner";
 
 describe("Helix Ask workstation tool planner", () => {
   it("routes equation verification to scientific calculator solve-with-steps", () => {
@@ -30,6 +30,20 @@ describe("Helix Ask workstation tool planner", () => {
       action_id: "solve_with_steps",
       args: { latex: "x^2 - 4 = 0" },
     });
+  });
+
+  it("strips explanatory follow-up text from calculator expressions", () => {
+    const prompt = "Use the scientific calculator to check 12*7 and explain the result.";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBe("12*7");
+    expect(plan.intent).toBe("calculator_verify");
+    expect(plan.action).toEqual({
+      panel_id: "scientific-calculator",
+      action_id: "solve_with_steps",
+      args: { latex: "12*7" },
+    });
+    expect(plan.missing_required_args).toEqual([]);
   });
 
   it("routes note creation to workstation notes with title and body", () => {

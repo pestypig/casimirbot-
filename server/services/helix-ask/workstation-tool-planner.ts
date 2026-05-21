@@ -64,6 +64,16 @@ function stripOuterPunctuation(value: string): string {
     .trim();
 }
 
+function stripCalculatorInstructionTail(value: string): string {
+  return value
+    .replace(/\s+(?:and\s+)?(?:tell|show|give|report)\s+(?:me|us)?\s*(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:and\s+)?(?:return|provide)\s+(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:and\s+)?(?:explain|describe|summari[sz]e)\s+(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
+    .replace(/\s+\band\s+(?:explain|describe|summari[sz]e)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:in|with|using)\s+(?:the\s+)?(?:scientific\s+)?calculator\b[\s\S]*$/i, "")
+    .trim();
+}
+
 function extractQuoted(prompt: string): string | null {
   const match = prompt.match(/["“](.+?)["”]/);
   return stripOuterPunctuation(match?.[1] ?? "") || null;
@@ -81,14 +91,17 @@ function extractInlineMathExpression(value: string): string | null {
 export function extractCalculatorExpression(prompt: string): string | null {
   const normalized = normalizePrompt(prompt);
   const colonTail = normalized.match(/(?:equation|expression|claim|calculator|solve|evaluate|compute|check|verify)[^:]{0,120}:\s*(.+)$/i)?.[1];
-  if (colonTail) return stripOuterPunctuation(colonTail);
+  if (colonTail) return stripOuterPunctuation(stripCalculatorInstructionTail(colonTail));
 
   const quoted = extractQuoted(normalized);
   if (quoted && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(quoted)) return quoted;
 
-  const solveTail = normalized.match(/\b(?:solve|evaluate|compute|check|verify)\s+(.+?)(?:\s+(?:with|using|in)\s+(?:the\s+)?(?:scientific\s+)?calculator)?$/i)?.[1];
-  if (solveTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(solveTail)) {
-    return stripOuterPunctuation(solveTail);
+  const solveTail = normalized.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i)?.[1];
+  if (solveTail) {
+    const cleaned = stripCalculatorInstructionTail(solveTail);
+    if (/[=+\-*/^]|\\frac|\\sqrt|\d/.test(cleaned)) {
+      return stripOuterPunctuation(cleaned);
+    }
   }
 
   const inlineMath = extractInlineMathExpression(normalized);
@@ -96,7 +109,8 @@ export function extractCalculatorExpression(prompt: string): string | null {
 
   const calculatorTail = normalized.match(/\b(?:calculator|calc)\b\s*(.+)$/i)?.[1];
   if (calculatorTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(calculatorTail)) {
-    return extractInlineMathExpression(calculatorTail) ?? stripOuterPunctuation(calculatorTail);
+    const cleaned = stripCalculatorInstructionTail(calculatorTail);
+    return extractInlineMathExpression(cleaned) ?? stripOuterPunctuation(cleaned);
   }
 
   return null;

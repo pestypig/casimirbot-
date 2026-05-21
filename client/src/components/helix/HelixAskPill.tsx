@@ -551,7 +551,7 @@ export type HelixPlannerContract = {
 };
 
 const HELIX_EXPLICIT_WORKSTATION_VERB_RE =
-  /\b(?:open|close|copy|append|create|delete|rename|list|switch|set|focus|clear|read|view|show|pull\s+up|bring\s+up)\b/i;
+  /\b(?:open|close|copy|append|create|delete|rename|list|switch|set|focus|clear|read|view|show|pull\s+up|bring\s+up|use|solve|evaluate|compute|calculate|check|verify)\b/i;
 const HELIX_HARD_EVIDENCE_REQUIREMENT_RE =
   /\b(?:verify|prove|proof|audit|compare|contrast|difference|tradeoff|synthesi[sz]e|integrity|evidence|claim)\b/i;
 const HELIX_DOCS_EXPLAIN_ACTION_IDS = new Set<string>(["explain_paper", "summarize_doc", "summarize_section"]);
@@ -650,6 +650,13 @@ export function resolveHelixDispatchPolicyAtTurnStart(args: {
   if (!question) return null;
   if (hasExplicitReasoningOnlyCue(question)) {
     return "reasoning_only";
+  }
+  if (
+    args.workstationAction?.action === "run_panel_action" &&
+    args.workstationAction.panel_id === "scientific-calculator" &&
+    (args.workstationAction.action_id === "solve_expression" || args.workstationAction.action_id === "solve_with_steps")
+  ) {
+    return "workspace_then_reasoning";
   }
   if (args.workstationAction || args.explicitPanelCommand === true) {
     return hasExplicitWorkspaceThenReasoningCue(question) ? "workspace_then_reasoning" : "workspace_only";
@@ -2601,11 +2608,15 @@ const readWorkstationActionArgText = (
 const extractCalculatorFastPathExpressionFromPrompt = (prompt: string | null | undefined): string | null => {
   const text = String(prompt ?? "").trim();
   if (!text) return null;
-  const match = text.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+?)(?:\s+(?:with\s+)?(?:step|steps|step-by-step|work)\b|$)/i);
+  const match = text.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i);
   const raw = match?.[1]?.trim();
   if (!raw) return null;
   const cleaned = raw
     .replace(/^(?:the\s+)?(?:equation|expression|latex|formula)\s+/i, "")
+    .replace(/\s+(?:and\s+)?(?:tell|show|give|report)\s+(?:me|us)?\s*(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:and\s+)?(?:return|provide)\s+(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:in|with|using)\s+(?:the\s+)?(?:scientific\s+)?calculator\b[\s\S]*$/i, "")
+    .replace(/\s+(?:with\s+)?(?:step|steps|step-by-step|work)\b[\s\S]*$/i, "")
     .replace(/[.?!,;:]+$/g, "")
     .trim();
   return cleaned && /[=^*/+\-()_\\]|\d/.test(cleaned) ? cleaned : null;
@@ -14602,6 +14613,39 @@ export function HelixAskPill({
     [onRunWorkstationAction],
   );
 
+  const shouldSuppressPayloadActionsAfterDocOpen = useCallback((args: {
+    question: string;
+    debug: unknown;
+    envelope: unknown;
+  }): boolean => {
+    const question = args.question.trim();
+    if (!/\b(?:open|show|view|pull\s+up|bring\s+up|load)\b[\s\S]{0,140}\b(?:doc|docs|document|paper|white\s*paper|whitepaper|NHM[-\s]?2)\b/i.test(question)) {
+      return false;
+    }
+    const debug = readAgentLoopAuditRecord(args.debug);
+    const envelope = readAgentLoopAuditRecord(args.envelope);
+    const resolved = readAgentLoopAuditRecord(debug?.resolved_turn_summary ?? envelope?.resolved_turn_summary);
+    const goal = readAgentLoopAuditRecord(debug?.canonical_goal_frame ?? envelope?.canonical_goal_frame);
+    const route = coerceText(debug?.route_reason_code ?? envelope?.route_reason_code).trim();
+    const terminalArtifact = coerceText(
+      debug?.terminal_artifact_kind ??
+        envelope?.terminal_artifact_kind ??
+        resolved?.terminal_artifact_kind,
+    ).trim();
+    const goalKind = coerceText(goal?.goal_kind).trim();
+    return (
+      terminalArtifact === "doc_open_receipt" ||
+      goalKind === "doc_open_best" ||
+      /doc_open_best/i.test(route)
+    );
+  }, []);
+
+  const isSecondaryDocsReasoningAction = useCallback((action: HelixWorkstationAction): boolean => (
+    action.action === "run_panel_action" &&
+    action.panel_id === "docs-viewer" &&
+    ["summarize_doc", "summarize_section", "explain_paper", "locate_in_doc"].includes(action.action_id)
+  ), []);
+
   const launchAtomicViewer = useCallback(
     (
       payload: AtomicViewerLaunch | undefined,
@@ -14631,7 +14675,11 @@ export function HelixAskPill({
   const applyGovernedActionEnvelope = useCallback(
     (
       envelope: HelixActionEnvelope | undefined,
-      context?: { question?: string | null; mode?: "read" | "observe" | "act" | "verify" },
+      context?: {
+        question?: string | null;
+        mode?: "read" | "observe" | "act" | "verify";
+        suppressSecondaryDocsActions?: boolean;
+      },
     ): boolean => {
       if (!envelope || envelope.schema !== "helix.ask.action_envelope.v1") {
         return false;
@@ -14639,7 +14687,9 @@ export function HelixAskPill({
       const dispatch = envelope.governance?.dispatch ?? "allow";
       const suppressed = dispatch === "suppress";
       if (!suppressed) {
-        const candidates = coerceHelixWorkstationActions(envelope.workstation_actions ?? []);
+        const candidates = coerceHelixWorkstationActions(envelope.workstation_actions ?? []).filter(
+          (action) => !(context?.suppressSecondaryDocsActions === true && isSecondaryDocsReasoningAction(action)),
+        );
         const deduped: HelixWorkstationAction[] = [];
         const seen = new Set<string>();
         candidates.forEach((action) => {
@@ -14660,7 +14710,7 @@ export function HelixAskPill({
       }
       return true;
     },
-    [launchAtomicViewer, onRunWorkstationAction],
+    [isSecondaryDocsReasoningAction, launchAtomicViewer, onRunWorkstationAction],
   );
 
   const runJobReadyLink = useCallback(
@@ -24816,11 +24866,17 @@ export function HelixAskPill({
               responseText = actionBlock.cleanedText;
             }
           }
+          const suppressPayloadActionsAfterDocOpen = shouldSuppressPayloadActionsAfterDocOpen({
+            question: questionText,
+            debug: responseDebug,
+            envelope: responseEnvelope,
+          });
           const actionEnvelopeHandled = applyGovernedActionEnvelope(responseActionEnvelope, {
             question: questionText,
             mode: responseMode,
+            suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen,
           });
-          if (!actionEnvelopeHandled) {
+          if (!actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
             applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
           }
           if (responseContextCapsule) {
@@ -25993,11 +26049,17 @@ export function HelixAskPill({
               responseText = actionBlock.cleanedText;
             }
           }
+          const suppressPayloadActionsAfterDocOpen = shouldSuppressPayloadActionsAfterDocOpen({
+            question: trimmed,
+            debug: responseDebug,
+            envelope: responseEnvelope,
+          });
           const actionEnvelopeHandled = applyGovernedActionEnvelope(responseActionEnvelope, {
             question: trimmed,
             mode: responseMode,
+            suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen,
           });
-          if (!suppressWorkstationPayloadActions && !actionEnvelopeHandled) {
+          if (!suppressWorkstationPayloadActions && !actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
             applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
           }
           if (responseContextCapsule) {

@@ -624,4 +624,71 @@ describe("helix ask solver controller decision", () => {
     expect(decision.decision).toBe("typed_failure");
     expect(decision.blocking_reasons).toContain("required_artifact_contract_missing");
   });
+
+  it("allows a satisfied workstation tool evaluation without generic adapter envelope", () => {
+    const payload = {
+      active_prompt: "Use the scientific calculator to solve 2+2.",
+      canonical_goal_frame: {
+        turn_id: "ask:calculator-tool-eval",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_reason_code: "calculator_solve",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: "ask:calculator-tool-eval",
+        route: "calculator_solve",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: "ask:calculator-tool-eval", completed_solver_path: true },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("calculator_solve", "workstation_tool_evaluation"),
+        terminal_contract: {
+          goal_kind: "calculator_solve",
+          required_terminal_kinds: ["workstation_tool_evaluation"],
+          acceptable_fallbacks: ["typed_failure"],
+          forbidden_terminal_kinds: ["direct_answer_text"],
+          required_actions: ["scientific-calculator.solve"],
+          required_evidence: ["calculator_receipt", "workstation_tool_evaluation"],
+        },
+      },
+      observation_review: {
+        schema: "helix.observation_review.v1",
+        does_it_satisfy_goal: true,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:calculator-tool-eval:workstation_tool_evaluation",
+          turn_id: "ask:calculator-tool-eval",
+          kind: "workstation_tool_evaluation",
+          payload: {
+            schema: "helix.workstation_tool_evaluation.v1",
+            supports_goal: true,
+          },
+        },
+      ],
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId: "ask:calculator-tool-eval",
+      finalRoute: "calculator_solve",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId: "ask:calculator-tool-eval", payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId: "ask:calculator-tool-eval",
+        finalRoute: "calculator_solve",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.blocking_reasons).not.toContain("capability_lifecycle_incomplete");
+  });
 });
