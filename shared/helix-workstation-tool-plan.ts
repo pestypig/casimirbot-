@@ -3,6 +3,7 @@ export const HELIX_WORKSTATION_TOOL_PLAN_SCHEMA = "helix.workstation_tool_plan.v
 export type HelixWorkstationToolPlanIntent =
   | "calculator_verify"
   | "calculator_solve"
+  | "calculator_live_source"
   | "notes_create"
   | "notes_append"
   | "notes_store_large_text"

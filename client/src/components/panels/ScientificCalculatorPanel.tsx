@@ -78,8 +78,14 @@ function resolveSolveTrace(lastSolve: { trace?: ScientificSolveTrace; input_late
   };
 }
 
+function setupVariableText(variable: { symbol: string; value: string; unit?: string | null; meaning?: string | null }): string {
+  const unit = variable.unit ? ` ${variable.unit}` : "";
+  const meaning = variable.meaning ? ` (${variable.meaning})` : "";
+  return `${variable.symbol} = ${variable.value}${unit}${meaning}`;
+}
+
 export default function ScientificCalculatorPanel() {
-  const { currentLatex, history, lastSolve, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
+  const { currentLatex, history, lastSolve, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
     useScientificCalculatorStore();
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
@@ -235,6 +241,23 @@ export default function ScientificCalculatorPanel() {
             </div>
           </div>
         </div>
+        {lastSetup ? (
+          <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-xs">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Setup</div>
+            <div className="text-slate-200">{lastSetup.subgoal}</div>
+            {lastSetup.equation ? <div className="mt-1 font-mono text-slate-300">{lastSetup.equation}</div> : null}
+            {lastSetup.variables?.length ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {lastSetup.variables.map((variable) => (
+                  <Badge key={`${variable.symbol}:${variable.value}`} variant="outline" className="border-slate-600 text-slate-200">
+                    {setupVariableText(variable)}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+            {lastSetup.result_unit ? <div className="mt-2 text-slate-400">Result unit: {lastSetup.result_unit}</div> : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={handlePasteClipboard}>
             Paste from Clipboard
@@ -372,6 +395,11 @@ export default function ScientificCalculatorPanel() {
               <div className="mt-1 break-all font-mono text-slate-400">
                 {entry.trace_id ?? entry.source_path ?? entry.message ?? entry.id}
               </div>
+              {entry.calculator_setup ? (
+                <div className="mt-1 text-slate-400">
+                  setup: {entry.calculator_setup.subgoal}
+                </div>
+              ) : null}
             </div>
           ))}
           {debugEvents.length === 0 ? <div className="text-xs text-slate-500">No calculator events yet.</div> : null}

@@ -82,4 +82,12 @@ describe("scientific calculator live prime series", () => {
     ]);
     expect(steps[0]?.value).toBe("x^2 - 4 = 0");
   });
+
+  it("preserves tiny scientific-notation arithmetic instead of rounding to zero", () => {
+    const result = runScientificSolve("6.62607015e-34*5e14", false);
+
+    expect(result.ok).toBe(true);
+    expect(result.result_text).toBe("3.313035e-19");
+    expect(result.result_text).not.toBe("0.000000000000000000");
+  });
 });

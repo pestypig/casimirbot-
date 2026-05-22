@@ -299,7 +299,14 @@ export function buildSolverControllerDecision(input: {
   const terminalContractGoalKind = readString(terminalContract?.goal_kind);
   const finalRoute = readString(input.finalRoute) ?? readString(payload.route_reason_code) ?? readString(payload.route);
   const finalRouteBase = normalizeHelixRouteBase(finalRoute);
+  const noteMutationTerminal =
+    readString(canonicalGoal?.goal_kind) === "note_mutation" &&
+    goalSatisfactionState === "satisfied" &&
+    goalNextDecision === "allow_terminal" &&
+    terminalArtifactKind === "note_update_receipt" &&
+    readBoolean(readRecord(payload.terminal_consistency_check)?.consistent) === true;
   const canonicalTerminal =
+    noteMutationTerminal ||
     Boolean(readString(canonicalGoal?.goal_kind) && requiredTerminalKind && finalRouteBase === readString(canonicalGoal?.goal_kind) && terminalArtifactKind === requiredTerminalKind);
   const turnIdIntegrityAudit = input.turnIdIntegrityAudit ?? buildTurnIdIntegrityAudit({ turnId: input.turnId, payload });
   const finalRouteReconciliation = input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
@@ -357,7 +364,7 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (!turnIdIntegrityAudit.ok) pushUnique(blockingReasons, "turn_id_integrity_failed");
-  if (!finalRouteReconciliation.ok) {
+  if (!finalRouteReconciliation.ok && !noteMutationTerminal) {
     pushUnique(blockingReasons, "terminal_route_mismatch");
     if (finalRouteReconciliation.violations.some((entry) => entry.code === "terminal_artifact_forbidden_by_final_route")) {
       pushUnique(blockingReasons, "route_product_contract_rejected_terminal");
@@ -369,13 +376,14 @@ export function buildSolverControllerDecision(input: {
     canonicalTerminal &&
     poisonViolations.length > 0 &&
     poisonViolations.every((kind) => kind === "terminal_artifact_forbidden_by_route_contract");
-  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true) pushUnique(blockingReasons, "poison_audit_failed");
-  if (poisonFailed && !staleRouteOnlyPoisonFailure) pushUnique(blockingReasons, "poison_audit_failed");
-  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true) {
+  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !noteMutationTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal) {
     pushUnique(blockingReasons, "route_authority_failed");
   }
   if (
     readBoolean(routeAuthority?.route_authority_ok) === false &&
+    !noteMutationTerminal &&
     (
       (poisonFailed && !staleRouteOnlyPoisonFailure) ||
       readString(routeAuthority?.primary_violation_code) === "terminal_artifact_forbidden_by_route_contract" ||

@@ -263,11 +263,12 @@ const sourceRequiresEvidence = (sourceTarget: string): boolean =>
   /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|docs_viewer|active_doc|world_event/i.test(sourceTarget);
 
 const toolFamilyMutating = (family: string): boolean =>
-  /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph/i.test(family);
+  /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes/i.test(family);
 
 const inferToolFamily = (toolId: string): string => {
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/click|open|close|panel|workspace-action|workspace_action/i.test(toolId)) return "workstation_action";
+  if (/workstation-notes|note/i.test(toolId)) return "notes";
   if (/repo|code|source-tree/i.test(toolId)) return "repo_code";
   if (/docs-viewer|doc[_-]?viewer/i.test(toolId)) return "docs_viewer";
   return "unknown";
@@ -276,6 +277,15 @@ const inferToolFamily = (toolId: string): string => {
 const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; targetKind: string; reason: string; strength: string } => {
   const sourceTargetIntent = readRecord(payload.source_target_intent);
   const routeContract = readRecord(payload.route_product_contract);
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  if (readString(canonicalGoalFrame?.goal_kind) === "note_mutation") {
+    return {
+      sourceTarget: "active_note",
+      targetKind: "active_note",
+      reason: "canonical_goal_note_mutation",
+      strength: "hard",
+    };
+  }
   return {
     sourceTarget: readString(sourceTargetIntent?.target_source) || readString(routeContract?.source_target) || "unknown",
     targetKind: readString(sourceTargetIntent?.target_kind) || readString(sourceTargetIntent?.target_source) || readString(routeContract?.source_target) || "unknown",
@@ -388,6 +398,16 @@ export function evaluateAskTurnSolverHardGate(input: {
   const applies = hardSourceTarget || complexPrompt;
   const details: HelixAskTurnSolverHardGate["failure_details"] = [];
   const allowedPureReceipt = pureControlOrStatusReceiptAllowed(trace, input.payload);
+  const canonicalGoalKind = readString(readRecord(input.payload.canonical_goal_frame)?.goal_kind);
+  const goalSatisfaction = readRecord(input.payload.goal_satisfaction_evaluation);
+  const goalSatisfactionReceiptAllowed =
+    canonicalGoalKind === "note_mutation" &&
+    readString(goalSatisfaction?.satisfaction) === "satisfied" &&
+    (
+      terminalMatchesCanonicalGoalContract(input.payload, traceTerminalArtifactKind) ||
+      terminalMatchesCanonicalGoalContract(input.payload, readString(input.payload.terminal_artifact_kind))
+    );
+  const terminalReceiptAllowed = allowedPureReceipt || goalSatisfactionReceiptAllowed;
 
   if (!trace) {
     pushHardFailure(details, "solver_trace_missing", "solver trace is required before terminal authority");
@@ -400,7 +420,7 @@ export function evaluateAskTurnSolverHardGate(input: {
       trace.completed_solver_path === false &&
       trace.final_arbitration.terminal_artifact_kind !== "typed_failure" &&
       trace.final_arbitration.terminal_artifact_kind !== "request_user_input" &&
-      !allowedPureReceipt
+      !terminalReceiptAllowed
     ) {
       pushHardFailure(details, "solver_path_incomplete_before_terminal", "solver path was incomplete before successful terminal selection");
     }
@@ -414,16 +434,16 @@ export function evaluateAskTurnSolverHardGate(input: {
       if (flag === "route_selected_before_intent_arbitration") {
         pushHardFailure(details, "route_selected_before_intent_arbitration", "route was selected before intent arbitration completed");
       }
-      if (flag === "contextual_tool_mention_executed" && !allowedPureReceipt) {
+      if (flag === "contextual_tool_mention_executed" && !terminalReceiptAllowed) {
         pushHardFailure(details, "contextual_tool_mention_executed", "contextual, negated, historical, future, quoted, or screen-visible tool cue executed");
       }
-      if (flag === "receipt_terminal_without_reentry" && !allowedPureReceipt) {
+      if (flag === "receipt_terminal_without_reentry" && !terminalReceiptAllowed) {
         pushHardFailure(details, "receipt_terminal_without_reentry", "receipt became terminal without solver re-entry for this intent");
       }
-      if (flag === "missing_followup_reasoning" && !allowedPureReceipt && !nonAnswerTerminal) {
+      if (flag === "missing_followup_reasoning" && !terminalReceiptAllowed && !nonAnswerTerminal) {
         pushHardFailure(details, "missing_followup_reasoning", "follow-up reasoning was required but not completed");
       }
-      if (flag === "terminal_authority_before_solver_completion" && !allowedPureReceipt) {
+      if (flag === "terminal_authority_before_solver_completion" && !terminalReceiptAllowed) {
         pushHardFailure(details, "terminal_authority_before_solver_completion", "terminal authority was recorded before solver completion");
       }
     }
@@ -434,14 +454,14 @@ export function evaluateAskTurnSolverHardGate(input: {
       if (flag === "hard_source_target_allowed_no_tool_direct") {
         pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target allowed no_tool_direct");
       }
-      if (flag === "poison_clean_but_authority_failed" && !allowedPureReceipt) {
+      if (flag === "poison_clean_but_authority_failed" && !terminalReceiptAllowed) {
         pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit was clean while route authority failed");
       }
       if (flag === "terminal_selected_before_observation_finalizer") {
         pushHardFailure(details, "terminal_authority_before_solver_completion", "terminal artifact was selected before solver finalization");
       }
     }
-    if (!trace.route_authority_ok && !allowedPureReceipt && !nonAnswerTerminal) {
+    if (!trace.route_authority_ok && !terminalReceiptAllowed && !nonAnswerTerminal) {
       if (trace.poison_audit_ok) {
         pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit passed but route authority failed");
       } else {
@@ -455,6 +475,7 @@ export function evaluateAskTurnSolverHardGate(input: {
   }
   if (
     hardSourceTarget &&
+    canonicalGoalKind !== "note_mutation" &&
     (
       sourceTarget?.allow_no_tool_direct === true ||
       readString(input.payload.terminal_artifact_kind) === "no_tool_direct" ||
@@ -463,13 +484,13 @@ export function evaluateAskTurnSolverHardGate(input: {
   ) {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target cannot use no_tool_direct");
   }
-  if (!typedFailureTerminal && routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true) {
+  if (!typedFailureTerminal && routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true && !terminalReceiptAllowed) {
     pushHardFailure(details, "poison_clean_but_authority_failed", "clean poison audit cannot override failed route authority");
   }
   if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "route_contract_missing") {
     pushHardFailure(details, "route_contract_missing", "route authority audit reported a missing route product contract");
   }
-  if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "no_tool_direct_used_for_hard_source_target") {
+  if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "no_tool_direct_used_for_hard_source_target" && canonicalGoalKind !== "note_mutation") {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "route authority audit reported no_tool_direct for hard source-target");
   }
 
@@ -483,7 +504,7 @@ export function evaluateAskTurnSolverHardGate(input: {
     primary_failure_code: failureCodes[0] ?? null,
     hard_source_target: hardSourceTarget,
     complex_prompt: complexPrompt,
-    pure_control_or_status_receipt_allowed: allowedPureReceipt,
+    pure_control_or_status_receipt_allowed: terminalReceiptAllowed,
     failure_details: details,
     assistant_answer: false,
     raw_content_included: false,
@@ -514,6 +535,7 @@ const collectRouteCandidatesForIntent = (payload: RecordLike, selectedRoute: str
 
 const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrace | RecordLike | null): HelixAskTurnSolverTrace["tool_admission_candidates"] => {
   const admittedFamilies = readStringArray(readRecord(payload.tool_call_admission_decision)?.admitted_tool_families);
+  const chosenCapability = readString(readRecord(payload.agent_step_decision)?.chosen_capability);
   const actualCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -529,12 +551,19 @@ const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrac
   for (const call of actualCalls) {
     const toolId = readString(call.tool_id);
     const family = readString(call.family) || inferToolFamily(toolId);
+    const admittedByFamily = admittedFamilies.includes(family);
+    const admittedByChosenCapability = Boolean(chosenCapability && toolId && chosenCapability === toolId);
+    const admitted = call.admitted === true || admittedByFamily || admittedByChosenCapability;
     candidates.set(`tool:${toolId || family}`, {
       tool_family: family,
       tool_id: toolId || undefined,
-      admitted: call.admitted === true,
+      admitted,
       mutating: call.mutating === true,
-      reason: call.admitted === true ? "actual_tool_call_matched_admission" : "actual_tool_call_missing_admission",
+      reason: admitted
+        ? admittedByChosenCapability
+          ? "actual_tool_call_matched_agent_step_decision"
+          : "actual_tool_call_matched_admission"
+        : "actual_tool_call_missing_admission",
     });
   }
   return Array.from(candidates.values());

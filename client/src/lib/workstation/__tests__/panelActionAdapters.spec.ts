@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
 
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
@@ -44,7 +45,21 @@ describe("panelActionAdapters", () => {
     hoisted.launchHelixAskPromptMock.mockClear();
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
-    useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, steps: [], debugEvents: [] });
+    useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, lastSetup: null, steps: [], debugEvents: [] });
+    useScientificCalculatorLiveSourceStore.getState().stopPrimeStream();
+    useScientificCalculatorLiveSourceStore.setState({
+      status: "idle",
+      sourceId: "source:calculator-prime-stream",
+      environmentId: null,
+      sourceEquation: "",
+      equationContext: "",
+      calculatorSetup: null,
+      latestTick: null,
+      liveWorkbenchExpression: "",
+      liveSolveSteps: [],
+      activeLiveStepId: null,
+      debugLog: [],
+    });
     useSituationRoomStore.getState().reset();
     useSituationRoomJobStore.getState().reset();
     useSituationRoomGraphStore.getState().reset();
@@ -365,7 +380,18 @@ describe("panelActionAdapters", () => {
       {
         panel_id: "scientific-calculator",
         action_id: "ingest_latex",
-        args: { latex: "x^2-4=0", source_path: "/docs/papers.md" },
+        args: {
+          latex: "x^2-4=0",
+          source_path: "/docs/papers.md",
+          calculator_setup: {
+            schema: "helix.calculator_setup_context.v1",
+            expression: "x^2-4=0",
+            display_latex: "x^2-4=0",
+            subgoal: "Solve the quadratic equation.",
+            domain: "generic",
+            variables: [],
+          },
+        },
       },
       {
         openPanel: () => undefined,
@@ -376,11 +402,22 @@ describe("panelActionAdapters", () => {
     );
     expect(ingest.ok).toBe(true);
     expect(ingest.artifact?.latex).toBe("x^2-4=0");
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("x^2-4=0");
+    expect(useScientificCalculatorStore.getState().currentLatex).not.toContain("Solve the quadratic equation");
+    expect(ingest.artifact?.calculator_setup).toEqual(
+      expect.objectContaining({
+        subgoal: "Solve the quadratic equation.",
+        expression: "x^2-4=0",
+      }),
+    );
     expect(ingest.artifact?.debug_event).toEqual(
       expect.objectContaining({
         panel_id: "scientific-calculator",
         action_id: "ingest_latex",
         source: "workstation_action",
+        calculator_setup: expect.objectContaining({
+          subgoal: "Solve the quadratic equation.",
+        }),
       }),
     );
 
@@ -454,6 +491,88 @@ describe("panelActionAdapters", () => {
       }),
     );
     expect(String(copyDebugLog.artifact?.text)).toContain("scientific_calculator_debug_log");
+  });
+
+  it("starts a scientific calculator equation live source with setup context", () => {
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: vi.fn(),
+      openSettings: vi.fn(),
+    };
+
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "start_equation_live_source",
+        args: {
+          equation: "3*x+9=0",
+          environment_id: "env:test",
+          max_ticks: 1,
+          calculator_setup: {
+            schema: "helix.calculator_setup_context.v1",
+            expression: "3*x+9=0",
+            display_latex: "3*x+9=0",
+            subgoal: "Solve a linear root as a live calculator source.",
+            domain: "generic",
+            variables: [],
+          },
+        },
+      },
+      context,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toEqual(
+      expect.objectContaining({
+        kind: "workstation_live_source_receipt",
+        mode: "current_equation",
+        source_equation: "3*x+9=0",
+        equation_context: "Solve a linear root as a live calculator source.",
+        calculator_setup: expect.objectContaining({
+          expression: "3*x+9=0",
+        }),
+      }),
+    );
+    expect(context.openPanel).toHaveBeenCalledWith("scientific-calculator", undefined);
+    expect(context.focusPanel).toHaveBeenCalledWith("scientific-calculator", undefined);
+    expect(useScientificCalculatorLiveSourceStore.getState().sourceEquation).toBe("3*x+9=0");
+    expect(useScientificCalculatorStore.getState().lastSetup).toEqual(
+      expect.objectContaining({
+        expression: "3*x+9=0",
+      }),
+    );
+  });
+
+  it("strips prompt prose before scientific calculator workstation solves", () => {
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
+        args: {
+          latex: "1.602e-19*5 with the scientific calculator, then explain what that energy means in joules",
+          calculator_setup: {
+            schema: "helix.calculator_setup_context.v1",
+            expression: "1.602e-19*5",
+            display_latex: "1.602e-19*5",
+            subgoal: "Evaluate the supplied calculator expression.",
+            domain: "generic",
+            variables: [],
+          },
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(solve.ok).toBe(true);
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("1.602e-19*5");
+    expect(solve.artifact?.result_text).toBe("8.01e-19");
+    expect(String(solve.artifact?.normalized_expression)).not.toContain("with the scientific calculator");
   });
 
   it("delegates Situation Room source and pipeline actions", () => {

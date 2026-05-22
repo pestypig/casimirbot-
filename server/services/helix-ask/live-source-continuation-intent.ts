@@ -112,6 +112,11 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
     !contentQuestion &&
     /\b(?:start|setup|set up|create|make|turn on|enable)\b/.test(text) &&
     /\b(?:live answer|live source|pipeline|visual source|screen|tab|window)\b/.test(text);
+  const workstationCalculatorLiveSource =
+    /\bcalculator\b/.test(text) &&
+    /\b(?:live\s+source|equation\s+stream|first\s+tick|ticks?)\b/.test(text) &&
+    !/\blive\s+answer\s+environment\b/.test(text);
+  if (workstationCalculatorLiveSource) return null;
   const inspect =
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
     /\b(?:pipeline|visual source|screen|live answer|analysis|frame|minecraft events|world events|minehut|world event)\b/.test(text);

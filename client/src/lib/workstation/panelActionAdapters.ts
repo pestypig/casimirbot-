@@ -42,6 +42,7 @@ import type {
   SituationGraphNodeType,
   TranslationPairNodeConfig,
 } from "@shared/helix-situation-graph";
+import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -73,6 +74,51 @@ function asNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function parensBalanced(value: string): boolean {
+  let depth = 0;
+  for (const char of value) {
+    if (char === "(") depth += 1;
+    if (char === ")") depth -= 1;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}
+
+function stripCalculatorProseTail(value: string): string {
+  return value
+    .replace(/\s*,?\s*(?:then|and)\s+(?:explain|describe|interpret|summari[sz]e|tell|show|give|report)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:with|using|in)\s+(?:the\s+)?(?:scientific\s+)?calculator\b[\s\S]*$/i, "")
+    .replace(/\s+(?:with\s+)?(?:steps?|show\s+work|trace)$/i, "")
+    .trim();
+}
+
+function normalizeCalculatorActionLatex(value: string): string {
+  const cleaned = stripCalculatorProseTail(value);
+  const directiveTail = cleaned.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i)?.[1];
+  const candidate = directiveTail ? stripCalculatorProseTail(directiveTail) : cleaned;
+  const equation = candidate.match(/(?:[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*\*\s*)?[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)*\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/i)?.[0];
+  if (equation) return equation.trim();
+  if (candidate.includes("=")) return candidate;
+  const arithmeticMatches = candidate.match(/[()+\-*/^\d.eE\s]+/g) ?? [];
+  for (const match of arithmeticMatches) {
+    const candidate = match.replace(/\s+/g, "").replace(/[.!?,"'`\]\)}]+$/g, "");
+    if (!candidate || !/\d/.test(candidate) || !/[+\-*/^]/.test(candidate)) continue;
+    if (!parensBalanced(candidate)) continue;
+    if (/^[()+\-*/^\d.eE]+$/.test(candidate)) return candidate;
+  }
+  return candidate;
+}
+
+function asCalculatorSetupContext(value: unknown): HelixCalculatorSetupContext | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const expression = asNonEmptyString(record.expression);
+  const displayLatex = asNonEmptyString(record.display_latex) ?? expression;
+  const subgoal = asNonEmptyString(record.subgoal);
+  if (!expression || !displayLatex || !subgoal) return null;
+  return record as HelixCalculatorSetupContext;
 }
 
 function asBoolean(value: unknown): boolean | null {
@@ -2641,10 +2687,11 @@ export function executeHelixPanelAction(
   if (panelId === "scientific-calculator") {
     const args = asRecord(request.args) ?? {};
     const scientificState = useScientificCalculatorStore.getState();
+    const calculatorSetup = asCalculatorSetupContext(args.calculator_setup ?? args.setup_context ?? args.setup);
 
     if (actionId === "ingest_latex") {
       const rawLatex = asNonEmptyString(args.latex ?? args.expression ?? args.text);
-      let latex = rawLatex;
+      let latex = rawLatex ? normalizeCalculatorActionLatex(rawLatex) : rawLatex;
       if (rawLatex === "$clipboard" && typeof navigator !== "undefined" && navigator.clipboard?.readText) {
         // Non-blocking clipboard fallback for deterministic action calls.
         void navigator.clipboard.readText().then((clipboardText) => {
@@ -2654,6 +2701,7 @@ export function executeHelixPanelAction(
             sourcePath: "clipboard",
             anchor: null,
             source: "clipboard",
+            calculatorSetup,
           });
           dispatchScientificCalculatorMathPicked({
             latex: trimmed,
@@ -2678,6 +2726,7 @@ export function executeHelixPanelAction(
         sourcePath,
         anchor,
         source: "workstation_action",
+        calculatorSetup,
       });
       dispatchScientificCalculatorMathPicked({
         latex: entry.latex,
@@ -2699,6 +2748,7 @@ export function executeHelixPanelAction(
           latex: entry.latex,
           source_path: entry.sourcePath,
           anchor: entry.anchor,
+          calculator_setup: entry.calculatorSetup ?? null,
           history_id: entry.id,
           debug_event: ingestDebugEvent,
           debug_log_tail: buildScientificCalculatorDebugSnapshot(latestDebugEvents, 8),
@@ -2707,7 +2757,8 @@ export function executeHelixPanelAction(
     }
 
     if (actionId === "solve_expression" || actionId === "solve_with_steps") {
-      const latexArg = asNonEmptyString(args.latex ?? args.expression ?? args.text);
+      const rawLatexArg = asNonEmptyString(args.latex ?? args.expression ?? args.text);
+      const latexArg = rawLatexArg ? normalizeCalculatorActionLatex(rawLatexArg) : rawLatexArg;
       const latex = latexArg ?? scientificState.currentLatex;
       if (!latex.trim()) {
         return {
@@ -2722,12 +2773,14 @@ export function executeHelixPanelAction(
           sourcePath: asNonEmptyString(args.source_path ?? args.path ?? args.source),
           anchor: asNonEmptyString(args.anchor),
           source: "workstation_action",
+          calculatorSetup,
         });
       }
       const solveResult = runScientificSolve(latex, actionId === "solve_with_steps");
       scientificState.setSolveResult(solveResult, {
         actionId: actionId === "solve_with_steps" ? "solve_with_steps" : "solve_expression",
         source: "workstation_action",
+        calculatorSetup,
       });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
@@ -2742,6 +2795,7 @@ export function executeHelixPanelAction(
           normalized_expression: solveResult.normalized_expression,
           result_text: solveResult.result_text,
           result_latex: solveResult.result_latex ?? "",
+          calculator_setup: calculatorSetup,
           variable: solveResult.variable,
           steps_count: solveResult.steps.length,
           steps: solveResult.steps,
@@ -2847,12 +2901,19 @@ export function executeHelixPanelAction(
     }
 
     if (
+      actionId === "start_equation_live_source" ||
       actionId === "start_prime_stream" ||
       actionId === "restart_live_source" ||
       actionId === "stop_live_source" ||
       actionId === "emit_live_tick"
     ) {
       const liveSource = useScientificCalculatorLiveSourceStore.getState();
+      const requestedEquation = asNonEmptyString(args.equation ?? args.latex ?? args.expression ?? args.text);
+      const calculatorSetup = asCalculatorSetupContext(args.calculator_setup ?? args.setup_context ?? args.setup);
+      const requestedEquationContext =
+        asNonEmptyString(args.equation_context ?? args.equationContext ?? args.context) ??
+        calculatorSetup?.subgoal ??
+        null;
       const streamInput = {
         environmentId: asNonEmptyString(args.environment_id ?? args.environmentId),
         sourceId: asNonEmptyString(args.source_id ?? args.sourceId),
@@ -2860,10 +2921,18 @@ export function executeHelixPanelAction(
         maxTicks: typeof args.max_ticks === "number" ? args.max_ticks : undefined,
         start: typeof args.start === "number" ? args.start : undefined,
       };
-      if (actionId === "start_prime_stream") {
+      if (actionId === "start_equation_live_source") {
+        void liveSource.startEquationLiveSource({
+          ...streamInput,
+          equation: requestedEquation ? normalizeCalculatorActionLatex(requestedEquation) : undefined,
+          equationContext: requestedEquationContext,
+          calculatorSetup,
+          mode: "current_equation",
+        });
+      } else if (actionId === "start_prime_stream") {
         void liveSource.startPrimeStream(streamInput);
       } else if (actionId === "restart_live_source") {
-        void liveSource.startPrimeStream(streamInput);
+        void liveSource.restartPrimeStream();
       } else if (actionId === "stop_live_source") {
         liveSource.stopPrimeStream();
       } else {
@@ -2872,17 +2941,35 @@ export function executeHelixPanelAction(
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       const latestLiveSource = useScientificCalculatorLiveSourceStore.getState();
+      const latestPayload =
+        latestLiveSource.latestTick?.payload && typeof latestLiveSource.latestTick.payload === "object"
+          ? latestLiveSource.latestTick.payload as Record<string, unknown>
+          : null;
       return {
         ok: latestLiveSource.status !== "error",
         panel_id: panelId,
         action_id: actionId,
         artifact: {
           kind: "workstation_live_source_receipt",
-          source_id: latestLiveSource.sourceId,
-          environment_id: latestLiveSource.environmentId,
+          mode: actionId === "start_equation_live_source" ? "current_equation" : latestLiveSource.mode,
+          source_id: latestLiveSource.sourceId || streamInput.sourceId || null,
+          environment_id: latestLiveSource.environmentId || streamInput.environmentId || null,
           status: latestLiveSource.status,
-          seq: latestLiveSource.state.seq,
+          seq: latestLiveSource.mode === "current_equation" ? latestLiveSource.equationState.seq : latestLiveSource.state.seq,
+          requested_equation: requestedEquation ? normalizeCalculatorActionLatex(requestedEquation) : null,
+          source_equation: latestLiveSource.sourceEquation || (requestedEquation ? normalizeCalculatorActionLatex(requestedEquation) : null),
+          equation_context: latestLiveSource.equationContext || requestedEquationContext || null,
+          latest_result_text: typeof latestPayload?.result_text === "string" ? latestPayload.result_text : null,
           latest_tick: latestLiveSource.latestTick,
+          live_workbench_expression: latestLiveSource.liveWorkbenchExpression,
+          live_solve_steps: latestLiveSource.liveSolveSteps,
+          active_live_step_id: latestLiveSource.activeLiveStepId,
+          calculator_setup: latestLiveSource.calculatorSetup ?? calculatorSetup ?? null,
+          evidence_refs: latestLiveSource.latestTick
+            ? [`calculator:live:${latestLiveSource.latestTick.trace.calculator_trace_id}`]
+            : requestedEquation
+              ? [`calculator:requested:${normalizeCalculatorActionLatex(requestedEquation)}`]
+              : [],
           deterministic: true,
           model_invoked: false,
           context_role: "observation_not_assistant_answer",

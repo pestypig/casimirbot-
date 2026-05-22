@@ -15,6 +15,7 @@ import {
 } from "@/lib/scientific-calculator/liveSeries";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 
 type CalculatorLiveSourceMode = "current_equation" | "prime_trial_division";
 
@@ -33,6 +34,7 @@ type StartEquationLiveSourceInput = {
   maxTicks?: number;
   equation?: string;
   equationContext?: string | null;
+  calculatorSetup?: HelixCalculatorSetupContext | null;
   mode?: CalculatorLiveSourceMode;
   start?: number;
 };
@@ -48,6 +50,7 @@ type CalculatorLiveSourceState = {
   equationState: EquationLiveSeriesState;
   sourceEquation: string;
   equationContext: string;
+  calculatorSetup: HelixCalculatorSetupContext | null;
   latestTick: CalculatorLiveSeriesTick | null;
   liveWorkbenchExpression: string;
   liveSolveSteps: PrimeSeriesWorkbenchStep[];
@@ -145,6 +148,7 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
   equationState: createEquationLiveSeriesState(),
   sourceEquation: "",
   equationContext: "",
+  calculatorSetup: null,
   latestTick: null,
   liveWorkbenchExpression: "",
   liveSolveSteps: [],
@@ -187,6 +191,7 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
       equationState: createEquationLiveSeriesState(),
       sourceEquation,
       equationContext,
+      calculatorSetup: input.calculatorSetup ?? null,
       latestTick: null,
       liveWorkbenchExpression: sourceEquation,
       liveSolveSteps: [],
@@ -244,10 +249,12 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
         traceId: tick.trace.calculator_trace_id,
         message: `live_equation_tick_${tick.state.seq}`,
         source: "workstation_action",
+        calculatorSetup: current.calculatorSetup,
       });
       calculator.setSolveResult(result, {
         actionId: "solve_with_steps",
         source: "workstation_action",
+        calculatorSetup: current.calculatorSetup,
       });
       for (const step of liveSolveSteps) {
         calculator.recordDebugEvent({
@@ -260,6 +267,7 @@ const createCalculatorLiveSourceState: StateCreator<CalculatorLiveSourceState> =
           trace_id: tick.trace.calculator_trace_id,
           route: `scientific-calculator/live-workbench/${step.kind}`,
           engine: "scientific_solver",
+          calculator_setup: current.calculatorSetup,
           message: step.id,
         });
       }

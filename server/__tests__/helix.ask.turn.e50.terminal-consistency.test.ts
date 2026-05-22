@@ -106,6 +106,73 @@ describe("helix ask E50 terminal consistency", () => {
     expect(answerText(response.body)).not.toMatch(/Completed reasoning turn|active doc|\/docs\//i);
   }, 60000);
 
+  it("keeps ambient visual context available as a tool without forcing it into model-only answers", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Can you tell me what an electron is?",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-electron-ambient-visual-${Date.now()}`,
+        workspace_context_snapshot: {
+          sessionId: "e50-electron-ambient-visual",
+          activePanel: "scientific-calculator",
+          activeDocPath: null,
+          hasDocContext: false,
+          hasNoteContext: false,
+          hasClipboardContext: false,
+          lastWorkspaceAction: null,
+          lastUpdatedAtMs: Date.now(),
+          visual_context_capability: {
+            schema: "helix.visual_context_capability.v1",
+            source_id: "src:visual-test",
+            status: "active",
+            evidence_available: true,
+            latest_evidence_ref: "visual:test-frame",
+            requires_agent_step_selection: true,
+            promotion_policy: "available_tool_not_forced_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          attached_visual_evidence: {
+            evidence: {
+              evidence_id: "visual:test-frame",
+              frame_id: "frame:test",
+              summary: "a scientific calculator panel showing x+9=0",
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    const visualCapability = response.body?.available_capabilities?.capabilities?.find(
+      (capability: any) => capability?.capability_key === "situation-room.describe_visual_capture",
+    );
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.agent_step_decision?.chosen_capability).toBe("model.direct_answer");
+    expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(response.body?.visual_evidence_refs ?? []).toEqual([]);
+    expect(response.body?.artifact_promotion_audit?.blocked_artifact_promotions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifact_kind: "visual_frame_evidence",
+          reason: expect.stringMatching(/normal_ask_cannot_promote_visual_artifact/),
+        }),
+      ]),
+    );
+    expect(visualCapability).toEqual(
+      expect.objectContaining({
+        capability_key: "situation-room.describe_visual_capture",
+        availability: "available",
+        tool_context_ref: "visual:test-frame",
+      }),
+    );
+    expect(answerText(response.body)).toMatch(/\belectron\b/i);
+    expect(answerText(response.body)).not.toMatch(/calculator panel|x\+9|attached image/i);
+  }, 60000);
+
   it("honors explicit no-workspace constraints before workstation source targeting", async () => {
     const app = createApp();
     const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";

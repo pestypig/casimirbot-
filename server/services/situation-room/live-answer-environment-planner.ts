@@ -20,6 +20,13 @@ export function isLiveAnswerEnvironmentIntent(transcript: string): boolean {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
   if (
+    /\bcalculator\b/.test(normalized) &&
+    /\b(?:live\s+source|equation\s+stream|first\s+tick|ticks?)\b/.test(normalized) &&
+    !/\blive\s+answer\s+environment\b/.test(normalized)
+  ) {
+    return false;
+  }
+  if (
     /\b(?:interval|cadence|rate|every\s+\d{1,3}\s*(?:second|seconds|sec|secs|s|minute|minutes|min|mins|m))\b/.test(normalized) &&
     /\b(?:visual|screen|frame|frames|capture|source|tab|window)\b/.test(normalized) &&
     !/\b(?:create|start|set\s+up|setup|make|open|enable|turn\s+on)\b[\s\S]{0,80}\blive\s+answer\s+environment\b/.test(normalized)

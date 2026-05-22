@@ -478,6 +478,101 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
   }, 60000);
 
+  it("uses calculator output as a subgoal before answering compound photon prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Explain photon energy using E=hf and calculate it for f=5e14 Hz.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-compound-${Date.now()}`,
+      })
+      .expect(200);
+
+    const action = findAction(response.body, "scientific-calculator", "solve_expression");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("calculator_solve");
+    expect(action).toBeTruthy();
+    expect(action?.args?.latex).toBe("6.62607015e-34*5e14");
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.route_reason_code).toBe("calculator_solve");
+    expect(response.body?.source_target_intent?.target_source).toBe("calculator_stream");
+    expect(response.body?.terminal_answer_authority?.route).toBe("calculator_solve");
+    expect(response.body?.poison_audit?.ok).toBe(true);
+    expect(response.body?.tool_observation_continuation).toMatchObject({
+      schema: "helix.tool_observation_continuation.v1",
+      expression: "6.62607015e-34*5e14",
+      result: "3.313035e-19",
+      continuation_required: true,
+    });
+    expect(response.body?.reasoning_continuation_result).toMatchObject({
+      schema: "helix.reasoning_continuation_result.v1",
+      final_answer_kind: "calculator_grounded_explanation",
+    });
+    expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+      artifact.kind === "tool_observation_continuation" &&
+      artifact.payload?.expression === "6.62607015e-34*5e14"
+    )).toBe(true);
+    expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+      artifact.kind === "reasoning_continuation_result" &&
+      artifact.payload?.final_answer_kind === "calculator_grounded_explanation"
+    )).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("A photon is a single quantum of electromagnetic radiation.");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("Result: E = 3.313035e-19 J");
+  }, 60000);
+
+  it("routes calculator live-source prompts through the workstation tool loop", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Start the calculator as a live source for 3*x+9=0 and explain the first tick.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-live-source-${Date.now()}`,
+      })
+      .expect(200);
+
+    const action = findAction(response.body, "scientific-calculator", "start_equation_live_source");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("calculator_live_source");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workstation_tool_evaluation");
+    expect(action).toBeTruthy();
+    expect(action?.args?.latex).toBe("3*x+9=0");
+    expect(action?.args?.equation).toBe("3*x+9=0");
+    expect(response.body?.route_reason_code).toBe("calculator_live_source");
+    expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.source_target_intent?.target_source).toBe("calculator_stream");
+    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
+    expect(readGoalSatisfaction(response.body)?.next_decision).toBe("allow_terminal");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/live answer environment|capability_lifecycle_incomplete/i);
+  }, 60000);
+
+  it("keeps note creation in the workstation tool loop even when note body mentions reasoning policy", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Create a workstation note titled Tool Loop Test with body Calculator tools should inform the answer without hijacking general reasoning.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-note-tool-loop-${Date.now()}`,
+      })
+      .expect(200);
+
+    const action = findAction(response.body, "workstation-notes", "create_note");
+    expect(action).toBeTruthy();
+    expect(action?.args?.title).toBe("Tool Loop Test");
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("workstation-notes.create_note");
+    expect(response.body?.agent_step_decision?.candidate_capabilities).toContain("workstation-notes.create_note");
+    expect(response.body?.agent_step_decision?.chosen_capability).toBe("workstation-notes.create_note");
+    expect(response.body?.final_answer_source).not.toBe("typed_failure");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(response.body?.terminal_artifact_kind).toBe("note_update_receipt");
+  }, 60000);
+
   it("does not steal real document acquisition prompts", async () => {
     const app = createApp();
     const response = await request(app)

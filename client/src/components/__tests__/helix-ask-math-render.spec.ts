@@ -53,6 +53,16 @@ describe("tokenizeHelixAskMathTokens", () => {
     expect(hasHelixAskRenderableMath("tau = hbar / DeltaE")).toBe(true);
   });
 
+  it("does not absorb result prose into bare equation math tokens", () => {
+    const tokens = tokenizeHelixAskMathTokens("Result: E = 3.313035e-19 J for f = 5e14 Hz.");
+    const mathTokens = tokens.filter((token) => token.kind === "math");
+
+    expect(mathTokens.length).toBeGreaterThanOrEqual(1);
+    expect(mathTokens[0]).toMatchObject({ text: "E = 3.313035e-19 J", displayMode: false });
+    expect(mathTokens.every((token) => !/\bfor\b/i.test(token.text))).toBe(true);
+    expect(tokens.map((token) => token.text).join("")).toContain("for f = 5e14 Hz.");
+  });
+
   it("does not treat config-style assignments as equations", () => {
     const text = 'profile = "equation_focus_compact"';
     const tokens = tokenizeHelixAskMathTokens(text);

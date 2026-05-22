@@ -5,10 +5,16 @@ import {
   type HelixWorkstationToolPlanStep,
 } from "../../../shared/helix-workstation-tool-plan";
 import type { HelixDerivedEquation } from "../../../shared/helix-derived-equation";
+import {
+  HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+  type HelixCalculatorSetupContext,
+  type HelixCalculatorSetupVariable,
+} from "../../../shared/helix-calculator-setup-context";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
   | "calculator_solve"
+  | "calculator_live_source"
   | "notes_create"
   | "notes_append"
   | "notes_store_large_text"
@@ -64,6 +70,37 @@ function stripOuterPunctuation(value: string): string {
     .trim();
 }
 
+function stripExpressionPunctuation(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+(?:with\s+)?(?:steps?|show\s+work|trace)$/i, "")
+    .replace(/^[:"'`{\[]+/g, "")
+    .replace(/[.!?,"'`\]}]+$/g, "")
+    .trim();
+}
+
+function parensBalanced(value: string): boolean {
+  let depth = 0;
+  for (const char of value) {
+    if (char === "(") depth += 1;
+    if (char === ")") depth -= 1;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}
+
+function extractArithmeticCandidate(value: string): string | null {
+  const matches = value.match(/[()+\-*/^\d.eE\s]+/g) ?? [];
+  for (const match of matches) {
+    const candidate = stripExpressionPunctuation(match).replace(/\s+/g, "");
+    if (!candidate || !/\d/.test(candidate) || !/[+\-*/^]/.test(candidate)) continue;
+    if (!parensBalanced(candidate)) continue;
+    if (!/^[()+\-*/^\d.eE]+$/.test(candidate)) continue;
+    return candidate;
+  }
+  return null;
+}
+
 function stripCalculatorInstructionTail(value: string): string {
   return value
     .replace(/\s+(?:and\s+)?(?:tell|show|give|report)\s+(?:me|us)?\s*(?:the\s+)?(?:result|answer|value|output)\b[\s\S]*$/i, "")
@@ -74,43 +111,181 @@ function stripCalculatorInstructionTail(value: string): string {
     .trim();
 }
 
+function stripCalculatorInstructionHead(value: string): string {
+  return value
+    .replace(
+      /^\s*(?:use\s+(?:the\s+)?(?:scientific\s+)?calculator\s+to|with\s+(?:the\s+)?(?:scientific\s+)?calculator\s*,?\s*)\s*/i,
+      "",
+    )
+    .replace(/^\s*(?:please|can\s+you|could\s+you|would\s+you)\s+/i, "")
+    .trim();
+}
+
+function isCalculatorLiveSourcePrompt(normalized: string): boolean {
+  if (!isCalculatorPrompt(normalized)) return false;
+  return /\b(?:live\s+source|stream|monitor|watch|tick|ticks|continuous|continuously|start\s+live|as\s+a\s+live\s+source)\b/i.test(
+    normalized,
+  );
+}
+
 function extractQuoted(prompt: string): string | null {
   const match = prompt.match(/["“](.+?)["”]/);
   return stripOuterPunctuation(match?.[1] ?? "") || null;
 }
 
 function extractInlineMathExpression(value: string): string | null {
+  const coefficientEquation = value.match(/(?:[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*\*\s*)?[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)+\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/i)?.[0];
+  if (coefficientEquation) return stripOuterPunctuation(coefficientEquation);
   const assignment = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
   if (assignment) return stripOuterPunctuation(assignment);
   const equation = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)+\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
   if (equation) return stripOuterPunctuation(equation);
-  const arithmetic = value.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:\s*[+\-*/^]\s*[-+]?(?:\d+\.?\d*|\.\d+))+/)?.[0];
-  return arithmetic ? stripOuterPunctuation(arithmetic) : null;
+  return extractArithmeticCandidate(value);
+}
+
+function extractPhotonEnergyExpression(value: string): string | null {
+  if (!/\b(?:photon|e\s*=\s*h\s*f|e\s*=\s*h\n?f|planck|frequency)\b/i.test(value)) return null;
+  const frequencyMatch =
+    value.match(/\bf(?:requency)?\s*(?:=|is|of)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)(?:\s*(?:hz|hertz))?\b/i) ??
+    value.match(/([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*(?:hz|hertz)\b/i);
+  const rawFrequency = frequencyMatch?.[1];
+  if (!rawFrequency) return null;
+  const frequency = Number(rawFrequency);
+  if (!Number.isFinite(frequency) || frequency <= 0) return null;
+  return `6.62607015e-34*${rawFrequency}`;
+}
+
+function extractFrequencyValue(value: string): string | null {
+  return (
+    value.match(/\bf(?:requency)?\s*(?:=|is|of)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)(?:\s*(?:hz|hertz))?\b/i)?.[1] ??
+    value.match(/([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*(?:hz|hertz)\b/i)?.[1] ??
+    null
+  );
+}
+
+function parseKineticEnergyVariables(expression: string): HelixCalculatorSetupVariable[] {
+  const normalized = expression.replace(/\s+/g, "");
+  const match = normalized.match(/^0\.5\*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\^2$/i);
+  if (!match) return [];
+  return [
+    { symbol: "m", value: match[1], unit: "kg", meaning: "mass" },
+    { symbol: "v", value: match[2], unit: "m/s", meaning: "speed" },
+  ];
+}
+
+function buildCalculatorSetupContext(prompt: string, expression: string | null): HelixCalculatorSetupContext | null {
+  if (!expression) return null;
+  const normalized = normalizePrompt(prompt);
+  const frequency = extractFrequencyValue(normalized);
+  if (/\bphoton\b|\be\s*=\s*h\s*f\b|planck/i.test(normalized) && frequency) {
+    return {
+      schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+      expression,
+      display_latex: expression,
+      domain: "photon_energy",
+      subgoal: "Compute photon energy from E = hf.",
+      equation: "E = h f",
+      variables: [
+        { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
+        { symbol: "f", value: frequency, unit: "Hz", meaning: "frequency" },
+      ],
+      result_unit: "J",
+      interpretation_prompt: "Use the calculator result as the energy of one photon at the supplied frequency.",
+    };
+  }
+  if (/\bwavelength\b|\blambda\b|\\lambda|c\s*\/\s*f/i.test(normalized)) {
+    const divisor = expression.replace(/\s+/g, "").match(/^\(?3e8\)?\/\(?([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\)?$/i)?.[1];
+    return {
+      schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+      expression,
+      display_latex: expression,
+      domain: "wavelength",
+      subgoal: "Compute wavelength from lambda = c/f.",
+      equation: "lambda = c / f",
+      variables: [
+        { symbol: "c", value: "3e8", unit: "m/s", meaning: "speed of light" },
+        ...(frequency || divisor ? [{ symbol: "f", value: frequency ?? divisor ?? "", unit: "Hz", meaning: "frequency" }] : []),
+      ],
+      result_unit: "m",
+      interpretation_prompt: "Use the calculator result as the wavelength for the supplied light frequency.",
+    };
+  }
+  if (/\bkinetic\s+energy\b|\bke\s*=|\b1\/2\s*m\s*v/i.test(normalized)) {
+    return {
+      schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+      expression,
+      display_latex: expression,
+      domain: "kinetic_energy",
+      subgoal: "Compute kinetic energy from KE = 1/2 m v^2.",
+      equation: "KE = 1/2 m v^2",
+      variables: parseKineticEnergyVariables(expression),
+      result_unit: "J",
+      interpretation_prompt: "Use the calculator result as the non-relativistic kinetic energy for the supplied values.",
+    };
+  }
+  return {
+    schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+    expression,
+    display_latex: expression,
+    domain: "generic",
+    subgoal: "Evaluate the supplied calculator expression.",
+    equation: null,
+    variables: [],
+    result_unit: null,
+    interpretation_prompt: null,
+  };
+}
+
+function calculatorArgs(latex: string | null, setup: HelixCalculatorSetupContext | null): Record<string, unknown> {
+  return latex
+    ? {
+        latex,
+        ...(setup ? { calculator_setup: setup } : {}),
+      }
+    : {};
 }
 
 export function extractCalculatorExpression(prompt: string): string | null {
   const normalized = normalizePrompt(prompt);
+  const photonEnergyExpression = extractPhotonEnergyExpression(normalized);
+  if (photonEnergyExpression) return photonEnergyExpression;
+
   const colonTail = normalized.match(/(?:equation|expression|claim|calculator|solve|evaluate|compute|check|verify)[^:]{0,120}:\s*(.+)$/i)?.[1];
-  if (colonTail) return stripOuterPunctuation(stripCalculatorInstructionTail(colonTail));
+  if (colonTail) {
+    const cleaned = stripCalculatorInstructionTail(stripCalculatorInstructionHead(colonTail));
+    const nestedSolveTail = cleaned.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i)?.[1];
+    const candidate = nestedSolveTail
+      ? stripCalculatorInstructionTail(stripCalculatorInstructionHead(nestedSolveTail))
+      : cleaned;
+    const inlineMath = extractInlineMathExpression(candidate);
+    if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
+    const arithmetic = extractArithmeticCandidate(candidate);
+    if (arithmetic) return arithmetic;
+    if (/[=+\-*/^]|\\frac|\\sqrt|\d/.test(candidate)) return stripOuterPunctuation(candidate);
+  }
 
   const quoted = extractQuoted(normalized);
   if (quoted && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(quoted)) return quoted;
 
   const solveTail = normalized.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i)?.[1];
   if (solveTail) {
-    const cleaned = stripCalculatorInstructionTail(solveTail);
+    const cleaned = stripCalculatorInstructionTail(stripCalculatorInstructionHead(solveTail));
+    const inlineMath = extractInlineMathExpression(cleaned);
+    if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
+    const arithmetic = extractArithmeticCandidate(cleaned);
+    if (arithmetic) return arithmetic;
     if (/[=+\-*/^]|\\frac|\\sqrt|\d/.test(cleaned)) {
       return stripOuterPunctuation(cleaned);
     }
   }
 
   const inlineMath = extractInlineMathExpression(normalized);
-  if (inlineMath) return inlineMath;
+  if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
 
   const calculatorTail = normalized.match(/\b(?:calculator|calc)\b\s*(.+)$/i)?.[1];
   if (calculatorTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(calculatorTail)) {
     const cleaned = stripCalculatorInstructionTail(calculatorTail);
-    return extractInlineMathExpression(cleaned) ?? stripOuterPunctuation(cleaned);
+    return extractInlineMathExpression(cleaned) ?? extractArithmeticCandidate(cleaned) ?? stripOuterPunctuation(cleaned);
   }
 
   return null;
@@ -138,7 +313,7 @@ function extractNoteBody(prompt: string): string | null {
 }
 
 function isCalculatorPrompt(prompt: string): boolean {
-  return /\b(?:calculator|solve|evaluate|compute|verify|check)\b/i.test(prompt) &&
+  return /\b(?:calculator|solve|evaluate|compute|calculate|verify|check)\b/i.test(prompt) &&
     (/\b(?:equation|expression|math|numeric|calculation|with\s+steps|show\s+work)\b/i.test(prompt) || Boolean(extractCalculatorExpression(prompt)));
 }
 
@@ -323,8 +498,78 @@ export function planWorkstationToolUse(
     };
   }
 
+  if (isCalculatorLiveSourcePrompt(normalized)) {
+    const latex = extractCalculatorExpression(normalized);
+    const calculatorSetup = buildCalculatorSetupContext(normalized, latex);
+    const actionId = "start_equation_live_source";
+    pushScore({
+      affordance_id: `scientific-calculator.${actionId}`,
+      panel_id: "scientific-calculator",
+      action_id: actionId,
+      score: latex ? 0.96 : 0.66,
+      reason: latex
+        ? "calculator prompt asks for a live/streamed equation source with a candidate expression"
+        : "calculator live-source prompt lacks a concrete expression",
+      required_args_missing: latex ? [] : ["equation"],
+    });
+    const liveSourceArgs = {
+      ...calculatorArgs(latex, calculatorSetup),
+      equation: latex,
+      equation_context: calculatorSetup?.subgoal ?? normalized,
+      max_ticks: 1,
+    };
+    const toolPlan = buildToolPlan({
+      prompt: normalized,
+      intent: "calculator_live_source",
+      missing: latex ? [] : ["equation"],
+      options,
+      steps: [
+        makeOpenStep("scientific-calculator"),
+        {
+          step_id: "ingest_expression",
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "ingest_latex",
+          args: calculatorArgs(latex, calculatorSetup),
+          depends_on: ["open_scientific_calculator"],
+          expected_receipt_kind: "workspace_action_receipt",
+          expected_state_change: { store: "scientific-calculator", proof_key: "input_latex" },
+          required: true,
+        },
+        {
+          step_id: actionId,
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: actionId,
+          args: liveSourceArgs,
+          depends_on: ["ingest_expression"],
+          expected_receipt_kind: "workstation_live_source_receipt",
+          expected_state_change: { store: "useScientificCalculatorLiveSourceStore", proof_key: "latestTick/status" },
+          required: true,
+        },
+        {
+          step_id: "evaluate_calculator_live_source",
+          kind: "evaluate_result",
+          depends_on: [actionId],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ],
+    });
+    return {
+      intent: "calculator_live_source",
+      action: latex ? { panel_id: "scientific-calculator", action_id: actionId, args: liveSourceArgs } : null,
+      tool_plan: toolPlan,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt asks to use the calculator as a live source; start the equation stream and observe it before answering.",
+      missing_required_args: latex ? [] : ["equation"],
+    };
+  }
+
   if (isCalculatorPrompt(normalized)) {
     const latex = extractCalculatorExpression(normalized);
+    const calculatorSetup = buildCalculatorSetupContext(normalized, latex);
     const wantsSteps = /\b(?:steps?|show\s+work|trace|verify|check)\b/i.test(normalized);
     const actionId = wantsSteps ? "solve_with_steps" : "solve_expression";
     pushScore({
@@ -348,7 +593,7 @@ export function planWorkstationToolUse(
           kind: "run_panel_action",
           panel_id: "scientific-calculator",
           action_id: "ingest_latex",
-          args: latex ? { latex } : {},
+          args: calculatorArgs(latex, calculatorSetup),
           depends_on: ["open_scientific_calculator"],
           expected_receipt_kind: "workspace_action_receipt",
           expected_state_change: { store: "scientific-calculator", proof_key: "input_latex" },
@@ -359,7 +604,7 @@ export function planWorkstationToolUse(
           kind: "run_panel_action",
           panel_id: "scientific-calculator",
           action_id: actionId,
-          args: latex ? { latex } : {},
+          args: calculatorArgs(latex, calculatorSetup),
           depends_on: ["ingest_expression"],
           expected_receipt_kind: "calculator_receipt",
           expected_state_change: { store: "scientific-calculator", proof_key: "result_text" },
@@ -376,7 +621,7 @@ export function planWorkstationToolUse(
     });
     return {
       intent: wantsSteps ? "calculator_verify" : "calculator_solve",
-      action: latex ? { panel_id: "scientific-calculator", action_id: actionId, args: { latex } } : null,
+      action: latex ? { panel_id: "scientific-calculator", action_id: actionId, args: calculatorArgs(latex, calculatorSetup) } : null,
       tool_plan: toolPlan,
       scores,
       should_use_tool: true,
@@ -455,6 +700,7 @@ export function planWorkstationToolUseFromDerivedEquation(input: {
 }): WorkstationToolPlannerResult {
   const actionId = input.wantsSteps === false ? "solve_expression" : "solve_with_steps";
   const prompt = `Derived calculator expression: ${input.equation.expression}`;
+  const calculatorSetup = buildCalculatorSetupContext(prompt, input.equation.expression);
   const steps: HelixWorkstationToolPlanStep[] = [
     makeOpenStep("scientific-calculator"),
     {
@@ -462,7 +708,7 @@ export function planWorkstationToolUseFromDerivedEquation(input: {
       kind: "run_panel_action",
       panel_id: "scientific-calculator",
       action_id: "ingest_latex",
-      args: { latex: input.equation.expression },
+      args: calculatorArgs(input.equation.expression, calculatorSetup),
       depends_on: ["open_scientific_calculator"],
       expected_receipt_kind: "workspace_action_receipt",
       expected_state_change: { store: "scientific-calculator", proof_key: "input_latex" },
@@ -473,7 +719,7 @@ export function planWorkstationToolUseFromDerivedEquation(input: {
       kind: "run_panel_action",
       panel_id: "scientific-calculator",
       action_id: actionId,
-      args: { latex: input.equation.expression },
+      args: calculatorArgs(input.equation.expression, calculatorSetup),
       depends_on: ["ingest_expression"],
       expected_receipt_kind: "calculator_receipt",
       expected_state_change: { store: "scientific-calculator", proof_key: "result_text" },
@@ -499,7 +745,7 @@ export function planWorkstationToolUseFromDerivedEquation(input: {
     action: {
       panel_id: "scientific-calculator",
       action_id: actionId,
-      args: { latex: input.equation.expression },
+      args: calculatorArgs(input.equation.expression, calculatorSetup),
     },
     tool_plan: toolPlan,
     scores: [

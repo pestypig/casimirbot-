@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ScientificSolveResult } from "@/lib/scientific-calculator/solver";
+import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 
 const SCIENTIFIC_CALCULATOR_STORAGE_KEY = "scientific-calculator:v1";
 
@@ -9,6 +10,7 @@ export type ScientificCalculatorHistoryEntry = {
   latex: string;
   sourcePath: string | null;
   anchor: string | null;
+  calculatorSetup?: HelixCalculatorSetupContext | null;
   ts: string;
 };
 
@@ -38,12 +40,14 @@ export type ScientificCalculatorDebugEvent = {
   route?: string | null;
   engine?: string | null;
   message?: string;
+  calculator_setup?: HelixCalculatorSetupContext | null;
 };
 
 type ScientificCalculatorState = {
   currentLatex: string;
   history: ScientificCalculatorHistoryEntry[];
   lastSolve: ScientificSolveResult | null;
+  lastSetup: HelixCalculatorSetupContext | null;
   steps: ScientificSolveResult["steps"];
   debugEvents: ScientificCalculatorDebugEvent[];
   ingestLatex: (
@@ -52,11 +56,16 @@ type ScientificCalculatorState = {
       sourcePath?: string | null;
       anchor?: string | null;
       source?: ScientificCalculatorDebugEvent["source"];
+      calculatorSetup?: HelixCalculatorSetupContext | null;
     },
   ) => ScientificCalculatorHistoryEntry;
   setSolveResult: (
     result: ScientificSolveResult,
-    meta?: { actionId?: Extract<ScientificCalculatorDebugAction, "solve_expression" | "solve_with_steps">; source?: ScientificCalculatorDebugEvent["source"] },
+    meta?: {
+      actionId?: Extract<ScientificCalculatorDebugAction, "solve_expression" | "solve_with_steps">;
+      source?: ScientificCalculatorDebugEvent["source"];
+      calculatorSetup?: HelixCalculatorSetupContext | null;
+    },
   ) => void;
   recordDebugEvent: (
     event: Omit<ScientificCalculatorDebugEvent, "id" | "ts" | "panel_id">,
@@ -67,6 +76,7 @@ type ScientificCalculatorState = {
       traceId?: string | null;
       message?: string;
       source?: ScientificCalculatorDebugEvent["source"];
+      calculatorSetup?: HelixCalculatorSetupContext | null;
     },
   ) => void;
   clear: (meta?: { source?: ScientificCalculatorDebugEvent["source"] }) => void;
@@ -93,6 +103,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
       currentLatex: "",
       history: [],
       lastSolve: null,
+      lastSetup: null,
       steps: [],
       debugEvents: [],
       ingestLatex: (latex, meta) => {
@@ -102,6 +113,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           latex: trimmed,
           sourcePath: meta?.sourcePath ?? null,
           anchor: meta?.anchor ?? null,
+          calculatorSetup: meta?.calculatorSetup ?? null,
           ts: new Date().toISOString(),
         };
         const debugEvent = makeDebugEvent({
@@ -111,10 +123,12 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           input_latex: trimmed,
           source_path: entry.sourcePath,
           anchor: entry.anchor,
+          calculator_setup: entry.calculatorSetup,
           message: trimmed ? "latex_ingested" : "empty_latex",
         });
         set((state) => ({
           currentLatex: trimmed,
+          lastSetup: entry.calculatorSetup ?? null,
           history: [entry, ...state.history].slice(0, MAX_HISTORY),
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
@@ -131,10 +145,12 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           trace_id: result.trace.traceId,
           route: result.trace.route,
           engine: result.trace.engine,
+          calculator_setup: meta?.calculatorSetup ?? null,
           message: result.ok ? "solve_completed" : result.error ?? "solve_failed",
         });
         set((state) => ({
           lastSolve: result,
+          lastSetup: meta && "calculatorSetup" in meta ? (meta.calculatorSetup ?? null) : state.lastSetup,
           steps: result.steps,
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
@@ -157,10 +173,12 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           trace_id: meta?.traceId ?? null,
           route: "scientific-calculator/live-workbench",
           engine: "trial_division",
+          calculator_setup: meta?.calculatorSetup ?? null,
           message: meta?.message ?? "live_workbench_expression_updated",
         });
         set((state) => ({
           currentLatex: trimmed,
+          lastSetup: meta?.calculatorSetup ?? null,
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
       },
@@ -168,6 +186,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         set((state) => ({
           currentLatex: "",
           lastSolve: null,
+          lastSetup: null,
           steps: [],
           debugEvents: [
             makeDebugEvent({
@@ -186,6 +205,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         currentLatex: state.currentLatex,
         history: state.history,
         lastSolve: state.lastSolve,
+        lastSetup: state.lastSetup,
         steps: state.steps,
         debugEvents: state.debugEvents,
       }),

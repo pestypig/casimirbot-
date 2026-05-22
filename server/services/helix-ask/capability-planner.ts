@@ -48,9 +48,11 @@ const classifySourceFamily = (input: {
     input.sourceTarget === "workstation_panel" ||
     input.sourceTarget === "workspace_panel" ||
     input.sourceTarget === "workspace_action" ||
+    input.sourceTarget === "active_note" ||
     input.sourceTarget === "calculator_stream" ||
     input.targetKind === "workstation_panel" ||
     input.targetKind === "workspace_panel" ||
+    input.targetKind === "active_note" ||
     input.targetKind === "calculator_stream" ||
     input.targetKind === "panel_control"
   ) return "workstation_action";
@@ -197,7 +199,7 @@ export const buildCapabilityPlan = (input: {
     targetKind,
     admittedFamilies,
   });
-  const family: HelixCapabilityFamily = canonicalGoalKind === "panel_control"
+  const family: HelixCapabilityFamily = canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
     ? "workstation_action"
     : classifiedFamily;
   const rules = instructionRules(instructionFrame);
@@ -215,6 +217,11 @@ export const buildCapabilityPlan = (input: {
     (
       canonicalGoalKind === "doc_open_best" &&
       /\b(?:open|show|view|bring\s+up|pull\s+up|load)\b/i.test(input.promptText)
+    ) ||
+    (
+      canonicalGoalKind === "note_mutation" &&
+      /\b(?:create|add|append|store|save|write)\b/i.test(input.promptText) &&
+      /\b(?:workstation\s+)?notes?\b/i.test(input.promptText)
     );
   const mutating = isMutatingCapability(family, requestedAction, input.promptText);
   const operatorCommandRequired = mutating;

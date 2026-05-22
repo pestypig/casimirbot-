@@ -5236,6 +5236,7 @@ type RunAskOptions = {
   answerContract?: HelixAskAnswerContract;
   contextMode?: "attached" | "isolated";
   skipContextChooser?: boolean;
+  visualCapability?: Record<string, unknown>;
   visualEvidence?: Record<string, unknown>;
   imageAttachment?: HelixAskImageAttachment;
 };
@@ -5262,8 +5263,19 @@ type HelixAskImageAttachment = {
   error?: string | null;
 };
 
-const HELIX_ASK_VISUAL_PROMPT_PATTERN =
-  /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|live\s+(?:source|answer)|hotbar|inventory|chest|container)\b/i;
+const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN =
+  /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
+const HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN = /\blive\s+(?:source|answer)\b/i;
+const HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN =
+  /\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b[\s\S]{0,80}\blive\s+(?:source|stream|answer)\b|\blive\s+(?:source|stream|answer)\b[\s\S]{0,80}\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b/i;
+
+const isHelixAskVisualPrompt = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  if (HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN.test(normalized)) return true;
+  if (!HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized)) return false;
+  return !HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized);
+};
 
 const HELIX_ASK_REPO_CODE_EVIDENCE_PROMPT_PATTERN =
   /\b(?:repo(?:sitory)?|code|source\s+(?:file|path|tree)|file\s+paths?|line-backed|line\s+(?:number|numbers|source|sources)|cite\s+(?:exact\s+)?(?:file|path|source)|where\s+is\s+(?:that\s+)?(?:enforced|defined|declared|implemented|wired)|contract|schema|module|endpoint|route|symbol|export(?:s|ed)?|import(?:s|ed)?|requestedLaneSchema|server\/|client\/|shared\/|docs\/|[A-Za-z0-9_-]+\.(?:ts|tsx|js|jsx|md|json|py))\b/i;
@@ -5278,7 +5290,7 @@ const resolveAskContextChooserAutoMode = (question: string): {
   const normalized = question.trim();
   if (
     isRepoCodeEvidencePrompt(normalized) &&
-    !HELIX_ASK_VISUAL_PROMPT_PATTERN.test(normalized)
+    !isHelixAskVisualPrompt(normalized)
   ) {
     return {
       mode: "isolated",
@@ -7168,7 +7180,10 @@ function normalizeBareEquationCandidate(value: string): string {
   const compact = value.replace(/\s+/g, " ").trim();
   if (!compact) return "";
   const cutPatterns = [
+    /,\s+/,
     /,\s*(?:with|where|and|but|which|that)\b/i,
+    /\s+\bfor\b/i,
+    /\s+\b(?:variables?|interpretation|trace source)\b/i,
     /\s+-\s+(?:Keep|This|In|The|Term-to-implementation|Sources)\b/i,
     /\.\s+(?:Keep|This|In|The|Term-to-implementation|Sources)\b/i,
     /\s+Sources:\s*/i,
@@ -24981,6 +24996,8 @@ export function HelixAskPill({
       if (!trimmed) return;
       const visualEvidenceForTurn =
         options?.visualEvidence && typeof options.visualEvidence === "object" ? options.visualEvidence : null;
+      const visualCapabilityForTurn =
+        options?.visualCapability && typeof options.visualCapability === "object" ? options.visualCapability : null;
       const visualEvidenceRecord =
         visualEvidenceForTurn?.evidence && typeof visualEvidenceForTurn.evidence === "object"
           ? (visualEvidenceForTurn.evidence as Record<string, unknown>)
@@ -25695,9 +25712,38 @@ export function HelixAskPill({
             manualDispatchHint || backgroundWorkspaceReasoningLane || preliminaryDispatchPlan.should_dispatch_reasoning
               ? useWorkstationProcessGraphStore.getState().getContextPack()
               : null;
-          const workspaceContextSnapshotForTurn = visualEvidenceForTurn
+          const ambientVisualCapability =
+            visualCapabilityForTurn ??
+            (visualSituationSourceStatus !== "idle" || visualSituationSourceIdRef.current || visualSituationEvidenceForTurn
+              ? {
+                  schema: "helix.visual_context_capability.v1",
+                  source_id: visualSituationSourceIdRef.current,
+                  label: visualSituationSourceLabel ?? "Visual screen capture",
+                  status: visualSituationSourceStatus,
+                  evidence_available: Boolean(
+                    visualSituationEvidenceForTurn && !isDiagnosticVisualEvidence(visualSituationEvidenceForTurn),
+                  ),
+                  latest_evidence_ref:
+                    typeof visualSituationEvidenceForTurn?.evidence === "object" &&
+                    visualSituationEvidenceForTurn.evidence &&
+                    typeof (visualSituationEvidenceForTurn.evidence as Record<string, unknown>).evidence_id === "string"
+                      ? (visualSituationEvidenceForTurn.evidence as Record<string, string>).evidence_id
+                      : null,
+                  requires_agent_step_selection: true,
+                  promotion_policy: "available_tool_not_forced_context",
+                  assistant_answer: false,
+                  raw_content_included: false,
+                }
+              : null);
+          const workspaceContextWithAmbientVisualCapability = ambientVisualCapability
             ? {
                 ...workspaceContextSnapshot,
+                visual_context_capability: ambientVisualCapability,
+              }
+            : workspaceContextSnapshot;
+          const workspaceContextSnapshotForTurn = visualEvidenceForTurn
+            ? {
+                ...workspaceContextWithAmbientVisualCapability,
                 ...(processGraphContextPackForTurn
                   ? { process_graph_context_pack: processGraphContextPackForTurn }
                   : {}),
@@ -25713,10 +25759,10 @@ export function HelixAskPill({
               }
             : processGraphContextPackForTurn
               ? {
-                  ...workspaceContextSnapshot,
+                  ...workspaceContextWithAmbientVisualCapability,
                   process_graph_context_pack: processGraphContextPackForTurn,
                 }
-              : workspaceContextSnapshot;
+              : workspaceContextWithAmbientVisualCapability;
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
           if (HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
@@ -26621,6 +26667,9 @@ export function HelixAskPill({
       missionContextControls.voiceMode,
       preferredResponseLanguage,
       userSettings.showHelixAskDebug,
+      visualSituationEvidenceForTurn,
+      visualSituationSourceLabel,
+      visualSituationSourceStatus,
     ],
   );
   runAskRef.current = runAsk;
@@ -27051,8 +27100,20 @@ export function HelixAskPill({
       }
       const submittedImageAttachment = askImageAttachmentRef.current ?? askImageAttachment;
       const submittedImageCommitCheck = validateHelixAskImageAttachmentForSubmit(submittedImageAttachment);
-      const expectsVisualInput = HELIX_ASK_VISUAL_PROMPT_PATTERN.test(first);
+      const expectsVisualInput = isHelixAskVisualPrompt(first);
       let submittedVisualEvidence = visualSituationEvidenceForTurn;
+      let submittedVisualCapability: Record<string, unknown> | null = null;
+      if (!expectsVisualInput) {
+        if (submittedVisualEvidence && isDiagnosticVisualEvidence(submittedVisualEvidence)) {
+          submittedVisualEvidence = null;
+        }
+        setAskError((current) =>
+          current?.startsWith("Visual capture failed:") ||
+          current?.includes("diagnostic-only visual evidence")
+            ? null
+            : current,
+        );
+      }
       if (submittedImageAttachment && !submittedImageCommitCheck?.can_submit) {
         setAskError(submittedImageCommitCheck?.reason ?? "Image attachment is stale. Reattach the image before sending.");
         setAskStatus(null);
@@ -27091,16 +27152,24 @@ export function HelixAskPill({
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+          submittedVisualCapability = {
+            schema: "helix.visual_context_capability.v1",
+            source_id: visualSituationSourceIdRef.current,
+            label: visualSituationSourceLabel ?? "Visual screen capture",
+            status: "error",
+            error: message,
+            evidence_available: false,
+            latest_evidence_ref: null,
+            requires_agent_step_selection: true,
+            promotion_policy: "available_tool_not_forced_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          };
+          submittedVisualEvidence = null;
           setVisualSituationSourceStatus("error");
           setVisualSituationSourceError(message);
           setAskError(`Visual capture failed: ${message}`);
           setAskStatus(null);
-          if (askInputRef.current) {
-            askInputRef.current.value = first;
-            resizeTextarea();
-          }
-          askDraftRef.current = first;
-          return;
         }
         if (!submittedVisualEvidence || isDiagnosticVisualEvidence(submittedVisualEvidence)) {
           const summary = readVisualEvidenceSummary(submittedVisualEvidence);
@@ -27122,17 +27191,25 @@ export function HelixAskPill({
           const detail = lastError
             ? `Vision provider ${provider ?? "unknown"}${model ? ` / ${model}` : ""} failed: ${lastError}.`
             : summary ?? "Vision provider did not return an image description.";
+          submittedVisualCapability = {
+            schema: "helix.visual_context_capability.v1",
+            source_id: visualSituationSourceIdRef.current,
+            label: visualSituationSourceLabel ?? "Visual screen capture",
+            status: "error",
+            error: detail,
+            evidence_available: false,
+            latest_evidence_ref: null,
+            requires_agent_step_selection: true,
+            promotion_policy: "available_tool_not_forced_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          };
+          submittedVisualEvidence = null;
           setAskError(`${detail} The Ask turn was not submitted with diagnostic-only visual evidence.`);
           setAskStatus(null);
-          if (askInputRef.current) {
-            askInputRef.current.value = first;
-            resizeTextarea();
-          }
-          askDraftRef.current = first;
-          return;
         }
       }
-      if (!submittedImageAttachment && expectsVisualInput && !submittedVisualEvidence) {
+      if (!submittedImageAttachment && expectsVisualInput && !submittedVisualEvidence && !submittedVisualCapability) {
         setAskError("No usable visual evidence is available for this turn. Capture and analyze a frame, then send again.");
         setAskStatus(null);
         if (askInputRef.current) {
@@ -27147,8 +27224,10 @@ export function HelixAskPill({
       }
       const runOptions: RunAskOptions | undefined = submittedImageAttachment
         ? { imageAttachment: submittedImageAttachment }
-        : submittedVisualEvidence
+        : expectsVisualInput && submittedVisualEvidence && !isDiagnosticVisualEvidence(submittedVisualEvidence)
           ? { visualEvidence: submittedVisualEvidence }
+          : submittedVisualCapability
+            ? { visualCapability: submittedVisualCapability }
           : undefined;
       void runAsk(first, selectedCapsuleIds, runOptions);
     },

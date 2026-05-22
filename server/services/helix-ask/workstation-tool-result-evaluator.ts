@@ -11,6 +11,7 @@ import type {
   HelixSyntheticEvidenceProducer,
   HelixSyntheticEvidenceSupportStatus,
 } from "../../../shared/helix-synthetic-evidence";
+import type { HelixCalculatorSetupContext } from "../../../shared/helix-calculator-setup-context";
 import { planContextEconomy } from "./context-economy-planner";
 import { recordSubgoalEvaluation } from "./subgoal-evaluator";
 import { recordCategorizationEvent } from "../situation-room/categorization-bus";
@@ -34,7 +35,7 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
   category: HelixCategorizationCategory;
   produced_by: HelixSyntheticEvidenceProducer;
 } {
-  if (intent === "calculator_verify" || intent === "calculator_solve") {
+  if (intent === "calculator_verify" || intent === "calculator_solve" || intent === "calculator_live_source") {
     return {
       source_family: "calculator",
       category: "equation_result",
@@ -71,6 +72,22 @@ function mapSupportStatus(
   return "unknown";
 }
 
+function calculatorSetupFromPlan(plan: HelixWorkstationToolPlan): HelixCalculatorSetupContext | null {
+  const solveStep = plan.steps.find(
+    (step) =>
+      step.panel_id === "scientific-calculator" &&
+      (step.action_id === "solve_expression" ||
+        step.action_id === "solve_with_steps" ||
+        step.action_id === "start_equation_live_source"),
+  );
+  const setup = solveStep?.args?.calculator_setup;
+  if (!setup || typeof setup !== "object" || Array.isArray(setup)) return null;
+  const record = setup as Partial<HelixCalculatorSetupContext>;
+  return typeof record.expression === "string" && typeof record.subgoal === "string"
+    ? (record as HelixCalculatorSetupContext)
+    : null;
+}
+
 export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanInput): HelixWorkstationToolEvaluation {
   const receiptIds = Array.from(new Set((input.receipt_ids ?? []).map((entry) => String(entry).trim()).filter(Boolean)));
   const evidenceRefs = Array.from(new Set((input.evidence_refs ?? receiptIds).map((entry) => String(entry).trim()).filter(Boolean)));
@@ -82,6 +99,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
       ? "Verify the equation with the Scientific Calculator."
       : input.plan.intent === "calculator_solve"
         ? "Solve the expression with the Scientific Calculator."
+      : input.plan.intent === "calculator_live_source"
+        ? "Start a Scientific Calculator equation live source and observe its current tick."
       : input.plan.intent === "notes_create"
         ? "Create a workstation note and preserve the body outside raw Ask context."
       : input.plan.intent === "notes_append" || input.plan.intent === "notes_store_large_text"
@@ -91,8 +110,12 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
       : "Evaluate workstation tool result.";
 
   const supportValue = input.supports_goal ?? (receiptIds.length > 0 || lastActionStep ? true : "unknown");
+  const calculatorSetup = calculatorSetupFromPlan(input.plan);
   const summary =
     input.summary?.trim() ||
+    (calculatorSetup
+      ? `${lastActionStep?.panel_id ?? "workstation"}.${lastActionStep?.action_id ?? "action"} produced ${calculatorSetup.domain} evidence for ${input.plan.intent}: ${calculatorSetup.subgoal}`
+      : "") ||
     `${lastActionStep?.panel_id ?? "workstation"}.${lastActionStep?.action_id ?? "action"} produced evidence for ${input.plan.intent}.`;
   const mapped = mapIntentToCategorization(input.plan.intent);
   const categorization = recordCategorizationEvent({
@@ -156,6 +179,7 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
     supports_goal: supportValue,
     summary,
     evidence_refs: evidenceRefs,
+    calculator_setup: calculatorSetup,
     categorization_event_ids: [categorization.event_id],
     synthetic_evidence_ids: [syntheticEvidence.evidence_id],
     subgoal_evaluation_ids: [subgoalEvaluation.evaluation_id],

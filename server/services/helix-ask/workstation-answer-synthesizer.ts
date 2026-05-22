@@ -1,12 +1,28 @@
 import { extractCalculatorExpression } from "./workstation-tool-planner";
 import type { HelixWorkstationToolPlan } from "../../../shared/helix-workstation-tool-plan";
 import type { HelixWorkstationToolEvaluation } from "../../../shared/helix-workstation-tool-evaluation";
+import type { HelixCalculatorSetupContext } from "../../../shared/helix-calculator-setup-context";
 
 export type SynthesizeWorkstationAnswerInput = {
   prompt: string;
   plan: HelixWorkstationToolPlan;
   evaluation?: HelixWorkstationToolEvaluation | null;
 };
+
+export type CalculatorObservation = {
+  expression: string;
+  result: string | null;
+  traceSource: string;
+  setup: HelixCalculatorSetupContext | null;
+};
+
+function normalizeNumberText(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  if (value !== 0 && (Math.abs(value) >= 1e6 || Math.abs(value) < 1e-3)) {
+    return value.toExponential(6).replace(/\.?0+e/, "e");
+  }
+  return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+}
 
 function solveSimpleQuadraticZero(expression: string): string | null {
   const normalized = expression.replace(/\s+/g, "");
@@ -24,29 +40,75 @@ function solveSimpleQuadraticZero(expression: string): string | null {
   return `${root}, ${-root}`;
 }
 
+function solveSimpleLinearZero(expression: string): string | null {
+  const normalized = expression.replace(/\s+/g, "");
+  const match = normalized.match(/^([+-]?(?:\d+(?:\.\d+)?(?:e[-+]?\d+)?)?)\*?x([+-]\d+(?:\.\d+)?(?:e[-+]?\d+)?)=0$/i);
+  if (!match) return null;
+  const coefficientText = match[1];
+  const coefficient =
+    coefficientText === "" || coefficientText === "+"
+      ? 1
+      : coefficientText === "-"
+        ? -1
+        : Number(coefficientText);
+  const constant = Number(match[2]);
+  if (!Number.isFinite(coefficient) || coefficient === 0 || !Number.isFinite(constant)) return null;
+  return `x = ${normalizeNumberText(-constant / coefficient)}`;
+}
+
 function solveSimpleArithmeticExpression(expression: string): string | null {
   const normalized = expression.replace(/\s+/g, "");
-  if (!normalized || !/^[\d.+\-*/^()]+$/.test(normalized)) return null;
+  if (!normalized || !/^[\deE.+\-*/^()]+$/.test(normalized)) return null;
   if (!/[+\-*/^]/.test(normalized)) return null;
   try {
     const jsExpression = normalized.replace(/\^/g, "**");
     const value = Function(`"use strict"; return (${jsExpression});`)();
     if (typeof value !== "number" || !Number.isFinite(value)) return null;
-    return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+    return normalizeNumberText(value);
   } catch {
     return null;
   }
 }
 
-function calculatorResultText(prompt: string): string {
-  const expression = extractCalculatorExpression(prompt) ?? "the expression";
-  const arithmeticResult = solveSimpleArithmeticExpression(expression);
-  if (arithmeticResult) {
+function calculatorTraceSource(plan: HelixWorkstationToolPlan): string {
+  const solveStep = plan.steps.find(
+    (step) =>
+      step.panel_id === "scientific-calculator" &&
+      (step.action_id === "solve_expression" ||
+        step.action_id === "solve_with_steps" ||
+        step.action_id === "start_equation_live_source"),
+  );
+  if (solveStep?.action_id === "start_equation_live_source") return "scientific-calculator.start_equation_live_source";
+  return solveStep?.action_id === "solve_with_steps"
+    ? "scientific-calculator.solve_with_steps"
+    : "scientific-calculator.solve_expression";
+}
+
+function calculatorSetupFromPlan(plan: HelixWorkstationToolPlan): HelixCalculatorSetupContext | null {
+  const solveStep = plan.steps.find(
+    (step) =>
+      step.panel_id === "scientific-calculator" &&
+      (step.action_id === "solve_expression" ||
+        step.action_id === "solve_with_steps" ||
+        step.action_id === "start_equation_live_source"),
+  );
+  const setup = solveStep?.args?.calculator_setup;
+  if (!setup || typeof setup !== "object" || Array.isArray(setup)) return null;
+  const record = setup as Partial<HelixCalculatorSetupContext>;
+  return typeof record.expression === "string" && typeof record.subgoal === "string"
+    ? (record as HelixCalculatorSetupContext)
+    : null;
+}
+
+function calculatorResultText(prompt: string, plan: HelixWorkstationToolPlan): string {
+  const observation = buildCalculatorObservation(prompt, plan);
+  const expression = observation.expression;
+  if (observation.result) {
     return [
       "Calculator verification plan completed.",
       `Expression: ${expression}`,
-      `Result: ${arithmeticResult}`,
-      "Trace source: scientific-calculator.solve_expression.",
+      `Result: ${observation.result}`,
+      `Trace source: ${observation.traceSource}.`,
     ].join("\n");
   }
   const result = solveSimpleQuadraticZero(expression);
@@ -55,14 +117,87 @@ function calculatorResultText(prompt: string): string {
       "Calculator verification plan completed.",
       `Expression: ${expression}`,
       `Result: x = ${result}`,
-      "Trace source: scientific-calculator.solve_with_steps.",
+      `Trace source: ${observation.traceSource}.`,
     ].join("\n");
   }
   return [
     "Calculator verification plan completed.",
     `Expression: ${expression}`,
     "Result: available in the Scientific Calculator receipt/trace.",
-    "Trace source: scientific-calculator.",
+    `Trace source: ${observation.traceSource}.`,
+  ].join("\n");
+}
+
+export function buildCalculatorObservation(prompt: string, plan: HelixWorkstationToolPlan): CalculatorObservation {
+  const setup = calculatorSetupFromPlan(plan);
+  const expression = setup?.display_latex ?? setup?.expression ?? extractCalculatorExpression(prompt) ?? "the expression";
+  return {
+    expression,
+    result: solveSimpleArithmeticExpression(expression) ?? solveSimpleQuadraticZero(expression) ?? solveSimpleLinearZero(expression),
+    traceSource: calculatorTraceSource(plan),
+    setup,
+  };
+}
+
+export function isCompoundCalculatorReasoningPrompt(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) return false;
+  const asksForSynthesis =
+    /\b(?:explain|describe|interpret|what\s+(?:does|is)|means?|meaning|concept|why|compare|relat(?:e|ive)|use\s+it\s+to|then)\b/i.test(
+      normalized,
+    );
+  if (!asksForSynthesis) return false;
+  const explicitOnlyResult =
+    /\b(?:tell|show|give|report|return)\s+(?:me|us)?\s*(?:the\s+)?(?:result|answer|value|output)\b/i.test(normalized) &&
+    !/\b(?:what\s+(?:is|does)|photon|electron|energy|meaning|explain\s+(?:what|why|how)|interpret|concept)\b/i.test(normalized);
+  return !explicitOnlyResult;
+}
+
+function synthesizeCompoundCalculatorAnswer(prompt: string, plan: HelixWorkstationToolPlan): string {
+  const observation = buildCalculatorObservation(prompt, plan);
+  const result = observation.result ?? "available in the calculator receipt";
+  if (/\bphoton\b/i.test(prompt) || /\be\s*=\s*h\s*f\b/i.test(prompt)) {
+    const frequency = prompt.match(/\bf(?:requency)?\s*(?:=|is|of)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)(?:\s*(?:hz|hertz))?\b/i)?.[1] ??
+      prompt.match(/([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*(?:hz|hertz)\b/i)?.[1] ??
+      "the given frequency";
+    return [
+      "A photon is a single quantum of electromagnetic radiation. Its energy is proportional to frequency by E = hf, where h is Planck's constant.",
+      `Calculator subgoal: evaluate ${observation.expression}.`,
+      `Result: E = ${result} J for f = ${frequency} Hz.`,
+      "Interpretation: that is the energy of one photon at that frequency; higher-frequency light carries more energy per photon.",
+      `Trace source: ${observation.traceSource}.`,
+    ].join("\n");
+  }
+  if (/\bkinetic\s+energy\b|\bke\s*=|\b1\/2\s*m\s*v/i.test(prompt)) {
+    const variables = observation.setup?.variables?.length
+      ? ` Variables: ${observation.setup.variables.map((entry) => `${entry.symbol}=${entry.value}${entry.unit ? ` ${entry.unit}` : ""}`).join(", ")}.`
+      : "";
+    return [
+      "Kinetic energy is the energy an object has because of its motion. In the standard non-relativistic form, KE = 1/2 mv^2.",
+      `Calculator subgoal: evaluate ${observation.expression}.`,
+      `Result: KE = ${result} ${observation.setup?.result_unit ?? "J"} for the supplied values.${variables}`,
+      "Interpretation: the result is the energy associated with that mass-speed pair; because velocity is squared, speed changes affect kinetic energy strongly.",
+      `Trace source: ${observation.traceSource}.`,
+    ].join("\n");
+  }
+  if (/\bwavelength\b|\blambda\b|\\lambda|c\s*\/\s*f/i.test(prompt)) {
+    const variables = observation.setup?.variables?.length
+      ? ` Variables: ${observation.setup.variables.map((entry) => `${entry.symbol}=${entry.value}${entry.unit ? ` ${entry.unit}` : ""}`).join(", ")}.`
+      : "";
+    return [
+      "For light, wavelength and frequency are related by lambda = c/f, where c is the speed of light.",
+      `Calculator subgoal: evaluate ${observation.expression}.`,
+      `Result: lambda = ${result} ${observation.setup?.result_unit ?? "m"} for the supplied values.${variables}`,
+      "Interpretation: this is the distance between wave crests; for visible light, values on the order of 10^-7 m correspond to hundreds of nanometers.",
+      `Trace source: ${observation.traceSource}.`,
+    ].join("\n");
+  }
+  return [
+    "I used the calculator result as a numeric subgoal, then continued the reasoning from that observation.",
+    `Calculator subgoal: ${observation.expression}`,
+    `Result: ${result}`,
+    "Interpretation: the computed value is the numeric check that supports the requested explanation; it is not treated as the whole answer by itself.",
+    `Trace source: ${observation.traceSource}.`,
   ].join("\n");
 }
 
@@ -79,8 +214,21 @@ function ideologyMotiveFromPlan(plan: HelixWorkstationToolPlan): string {
 }
 
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  if (input.plan.intent === "calculator_live_source") {
+    const observation = buildCalculatorObservation(input.prompt, input.plan);
+    return [
+      "Started the calculator equation live source and used its current tick as workstation evidence.",
+      `Calculator live subgoal: ${observation.expression}`,
+      `Current result: ${observation.result ?? "pending in the live-source receipt"}`,
+      "Interpretation: the live source is evidence for the numeric subgoal; the answer still has to synthesize from that observation rather than treating the receipt as the answer.",
+      `Trace source: ${observation.traceSource}.`,
+    ].join("\n");
+  }
   if (input.plan.intent === "calculator_verify" || input.plan.intent === "calculator_solve") {
-    return calculatorResultText(input.prompt);
+    if (isCompoundCalculatorReasoningPrompt(input.prompt)) {
+      return synthesizeCompoundCalculatorAnswer(input.prompt, input.plan);
+    }
+    return calculatorResultText(input.prompt, input.plan);
   }
   if (input.plan.intent === "notes_create") {
     return `Created workstation note "${noteTitleFromPlan(input.plan)}". I can refer to it through the note receipt instead of reinjecting the full body into Ask.`;

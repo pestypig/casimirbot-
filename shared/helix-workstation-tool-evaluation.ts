@@ -1,3 +1,5 @@
+import type { HelixCalculatorSetupContext } from "./helix-calculator-setup-context";
+
 export const HELIX_WORKSTATION_TOOL_EVALUATION_SCHEMA = "helix.workstation_tool_evaluation.v1" as const;
 
 export type HelixWorkstationToolEvaluation = {
@@ -12,6 +14,7 @@ export type HelixWorkstationToolEvaluation = {
   supports_goal: true | false | "partial" | "unknown";
   summary: string;
   evidence_refs: string[];
+  calculator_setup?: HelixCalculatorSetupContext | null;
   categorization_event_ids?: string[];
   synthetic_evidence_ids?: string[];
   subgoal_evaluation_ids?: string[];

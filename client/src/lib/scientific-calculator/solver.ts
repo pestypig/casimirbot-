@@ -146,6 +146,27 @@ function toLatexEquation(equation: string): string {
   return `${toLatexExpression(lhs)} = ${toLatexExpression(rhs)}`;
 }
 
+function formatNumericResult(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  if (value !== 0 && (Math.abs(value) >= 1e6 || Math.abs(value) < 1e-6)) {
+    return value.toExponential(6).replace(/\.?0+e/, "e");
+  }
+  return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+}
+
+function evaluateSafeArithmeticExpression(expression: string): string | null {
+  const normalized = expression.replace(/\s+/g, "");
+  if (!normalized || !/^[\deE.+\-*/^()]+$/.test(normalized)) return null;
+  if (!/[+\-*/^]/.test(normalized)) return null;
+  try {
+    const jsExpression = normalized.replace(/\^/g, "**");
+    const value = Function(`"use strict"; return (${jsExpression});`)();
+    return typeof value === "number" && Number.isFinite(value) ? formatNumericResult(value) : null;
+  } catch {
+    return null;
+  }
+}
+
 function chooseSolveVariable(expressionText: string): string | null {
   try {
     const vars = nerdamer(expressionText).variables();
@@ -303,6 +324,14 @@ export function runScientificSolve(inputLatex: string, withSteps: boolean): Scie
     let evaluatedLatex = toLatexExpression(simplified);
     try {
       evaluated = nerdamer(simplified).evaluate().text("decimals");
+      const safeArithmeticResult = evaluateSafeArithmeticExpression(normalizedExpression);
+      if (
+        safeArithmeticResult &&
+        (/[eE]/.test(normalizedExpression) || /^-?0(?:\.0+)?$/.test(evaluated.trim())) &&
+        safeArithmeticResult !== "0"
+      ) {
+        evaluated = safeArithmeticResult;
+      }
       evaluatedLatex = toLatexExpression(evaluated);
       pushStep("evaluated", "Evaluated", evaluated, evaluatedLatex);
     } catch (error) {

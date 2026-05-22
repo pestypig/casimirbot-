@@ -701,21 +701,39 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     panel_id: "scientific-calculator",
     action_id: "ingest_latex",
     required_args: ["latex"],
-    optional_args: ["source_path", "anchor"],
+    optional_args: ["source_path", "anchor", "calculator_setup"],
     returns_artifact: true,
   },
   {
     panel_id: "scientific-calculator",
     action_id: "solve_expression",
     required_args: ["latex"],
-    optional_args: ["source_path", "anchor"],
+    optional_args: ["source_path", "anchor", "calculator_setup"],
     returns_artifact: true,
   },
   {
     panel_id: "scientific-calculator",
     action_id: "solve_with_steps",
     required_args: ["latex"],
-    optional_args: ["source_path", "anchor"],
+    optional_args: ["source_path", "anchor", "calculator_setup"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "scientific-calculator",
+    action_id: "start_equation_live_source",
+    required_args: [],
+    optional_args: [
+      "equation",
+      "latex",
+      "expression",
+      "equation_context",
+      "environment_id",
+      "source_id",
+      "tick_rate_ms",
+      "max_ticks",
+      "calculator_setup",
+    ],
+    risk: "medium",
     returns_artifact: true,
   },
   {
@@ -1034,6 +1052,22 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "status") return { enum: ["active", "paused", "stopped"] };
   if (arg === "voice_mode") return { enum: ["text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
   if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
+  if (arg === "calculator_setup") {
+    return {
+      type: "object",
+      additionalProperties: true,
+      properties: {
+        schema: { const: "helix.calculator_setup_context.v1" },
+        expression: { type: "string" },
+        display_latex: { type: "string" },
+        subgoal: { type: "string" },
+        domain: { enum: ["photon_energy", "kinetic_energy", "wavelength", "generic"] },
+        equation: { type: "string" },
+        result_unit: { type: "string" },
+      },
+      required: ["schema", "expression", "display_latex", "subgoal", "domain"],
+    };
+  }
   if (arg === "tick_rate_ms" || arg === "max_ticks" || arg === "start" || arg === "cadence_ms") return { type: "number" };
   return { type: "string" };
 }
@@ -1080,7 +1114,10 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "live-source.set_rate") return "visual_producer_cadence_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "scientific-calculator" && ["ingest_latex", "solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
-  if (panelId === "scientific-calculator" && ["start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)) return "workstation_live_source_receipt";
+  if (
+    panelId === "scientific-calculator" &&
+    ["start_equation_live_source", "start_prime_stream", "stop_live_source", "restart_live_source", "emit_live_tick"].includes(actionId)
+  ) return "workstation_live_source_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "mission_memory.refresh") return "mission_memory_update";
   if (panelId === "situation-room-pipelines" && actionId === "interjection_investigator.review_latest") return "interjection_decision";
   if (panelId === "situation-room-pipelines" && actionId === "situation_context.attach_to_ask") return "situation_context_pack";
