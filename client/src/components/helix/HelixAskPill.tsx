@@ -12895,6 +12895,7 @@ export function HelixAskPill({
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
+  const latestAskReplyId = askReplies[askReplies.length - 1]?.id ?? null;
   const debugCopyInFlightRef = useRef(false);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
@@ -12925,6 +12926,11 @@ export function HelixAskPill({
       prev.room_id === situationRoomId ? prev : createSituationRoomState(situationRoomId),
     );
   }, [situationRoomId]);
+  useEffect(() => {
+    setDebugExportDrawer((current) =>
+      current && current.replyId !== latestAskReplyId ? null : current,
+    );
+  }, [latestAskReplyId]);
   useEffect(() => {
     return () => {
       if (askImageAttachment?.previewUrl) {
@@ -15154,18 +15160,33 @@ export function HelixAskPill({
         }
         const copyResult = await copyDebugPayloadToClipboard(exportPayload);
         let finalCopyResult: DebugClipboardCopyResult = copyResult;
+        const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__?: DebugClipboardCopyResult }).__HELIX_LAST_UNIFIED_DEBUG_COPY_RESULT__ =
             copyResult;
         }
         if (copyResult.ok) {
-          setDebugExportDrawer(null);
+          const drawerResult: DebugExportUiResult = {
+            ok: true,
+            attempted_payload_hash: payloadHash,
+            copied_payload_hash: copyResult.copied_payload_hash,
+            copied_text_length: copyResult.copied_text_length,
+            method: copyResult.method,
+            readback_match: copyResult.readback_match ?? "unavailable",
+            fallback_presented: false,
+            error: copyResult.error,
+          };
+          setDebugExportDrawer({
+            replyId: reply.id,
+            payload: exportPayload,
+            payloadHash,
+            result: drawerResult,
+          });
           setCopiedReplyMasterDebugId(reply.id);
           window.setTimeout(() => {
             setCopiedReplyMasterDebugId((current) => (current === reply.id ? null : current));
           }, 1400);
         } else {
-          const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);
           const fallbackResult = buildDebugExportDrawerFallbackResult({
             attemptedPayloadHash: payloadHash,
             copiedTextLength: exportPayload.length,

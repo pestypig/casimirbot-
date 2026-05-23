@@ -469,13 +469,142 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workstation_tool_evaluation");
     expect(action).toBeTruthy();
     expect(action?.args?.latex).toBe("x^2-4=0");
+    expect(response.body?.available_capabilities?.manifest_role).toBe("model_visible_tool_menu");
+    expect(response.body?.available_capabilities?.tool_manifest_version).toBe("helix.ask.capability_manifest.v1");
+    expect(response.body?.available_capabilities?.model_visible_capability_keys).toEqual(
+      expect.arrayContaining([
+        "scientific-calculator.solve_expression",
+        "docs-viewer.search_docs",
+        "workstation-notes.create_note",
+      ]),
+    );
     expect(response.body?.available_capabilities?.recommended_capability_key).toBe("scientific-calculator.solve_expression");
+    expect(response.body?.agent_step_decision?.decision_role).toBe("agent_step_sampling_pass");
+    expect(response.body?.agent_step_decision?.sampling).toMatchObject({
+      mode: "deterministic_policy_fallback",
+      llm_used: false,
+    });
+    expect(response.body?.agent_step_decision?.next_step).toBe("answer");
+    expect(response.body?.initial_agent_step_decision?.next_step).toBe("next_action");
     expect(response.body?.agent_step_decision?.candidate_capabilities).toContain("scientific-calculator.solve_expression");
     expect(response.body?.agent_step_decision?.expected_artifacts).toEqual(
       expect.arrayContaining(["calculator_receipt", "workstation_tool_evaluation"]),
     );
     expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
     expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
+  }, 60000);
+
+  it("can promote the initial agent-step decision through the model-visible capability manifest", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify({
+      next_step: "next_action",
+      chosen_capability: "scientific-calculator.solve_expression",
+      reason: "The prompt asks for a calculator solve, so the calculator tool is the best next action.",
+      args: { latex: "x^2-4=0" },
+      expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+      commentary: {
+        turn_purpose: "Use the calculator as the numeric subgoal tool before answering.",
+        why_this_capability: "The prompt explicitly asks for scientific calculator work.",
+        expected_artifacts: "calculator_receipt and workstation_tool_evaluation",
+        what_would_make_this_done: "The calculator evaluation satisfies the goal contract.",
+        observation_summary: "No observation before the first tool call.",
+        next_step_reason: "Call the calculator next.",
+      },
+      confidence: 0.93,
+    });
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "A photon has frequency 6e14 Hz. Use the scientific calculator to find its wavelength and photon energy in joules and eV, then explain the result.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-agent-step-llm-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.initial_agent_step_decision).toMatchObject({
+        schema: "helix.agent_step_decision.v1",
+        decision_role: "agent_step_sampling_pass",
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        sampling: {
+          mode: "llm",
+          llm_used: true,
+          error_code: null,
+        },
+      });
+      expect(response.body?.initial_agent_step_decision?.model_decision).toMatchObject({
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        raw_text_included: false,
+      });
+      expect(response.body?.available_capabilities?.manifest_role).toBe("model_visible_tool_menu");
+      expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+    }
+  }, 60000);
+
+  it("records a post-observation agent-step loop for panel-control turns", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify({
+      next_step: "next_action",
+      chosen_capability: "docs-viewer.open",
+      reason: "The user asked to open the Docs panel.",
+      args: {},
+      expected_artifacts: ["workspace_action_receipt"],
+      commentary: {
+        turn_purpose: "Open the Docs panel.",
+        why_this_capability: "docs-viewer.open is the matching workstation action.",
+        expected_artifacts: "workspace_action_receipt",
+        what_would_make_this_done: "A completed docs-viewer.open receipt.",
+        observation_summary: "No observation before the first tool call.",
+        next_step_reason: "Call the Docs panel open action.",
+      },
+      confidence: 0.94,
+    });
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Open up a docs panel.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-agent-step-loop-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.initial_agent_step_decision?.sampling).toMatchObject({
+        mode: "llm",
+        llm_used: true,
+      });
+      expect(response.body?.agent_step_decision).toMatchObject({
+        schema: "helix.agent_step_decision.v1",
+        next_step: "answer",
+      });
+      expect(response.body?.agent_step_loop).toMatchObject({
+        schema: "helix.agent_step_loop.v1",
+      });
+      expect(response.body?.agent_step_commentary).toMatchObject({
+        schema: "helix.agent_step_commentary.v1",
+        raw_content_included: false,
+      });
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+    }
   }, 60000);
 
   it("uses calculator output as a subgoal before answering compound photon prompts", async () => {
@@ -519,6 +648,60 @@ describe("helix ask E52 panel control terminal contract", () => {
     )).toBe(true);
     expect(String(response.body?.selected_final_answer ?? "")).toContain("A photon is a single quantum of electromagnetic radiation.");
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Result: E = 3.313035e-19 J");
+  }, 60000);
+
+  it("routes multi-step calculator prompts through the compound chain on /ask/turn", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "A photon has frequency 6e14 Hz. Use the scientific calculator to find its wavelength and photon energy in joules and eV, then explain the result.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-compound-chain-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("calculator_solve / calculator_compound_chain");
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual([
+      "wavelength",
+      "photon_energy_j",
+      "photon_energy_ev",
+    ]);
+    expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
+    expect(response.body?.available_capabilities?.manifest_role).toBe("model_visible_tool_menu");
+    expect(response.body?.available_capabilities?.model_visible_capability_keys).toEqual(
+      expect.arrayContaining([
+        "scientific-calculator.solve_expression",
+        "docs-viewer.open",
+        "workstation-notes.open",
+        "situation-room.describe_visual_capture",
+        "live-source.set_rate",
+      ]),
+    );
+    expect(response.body?.initial_agent_step_decision).toMatchObject({
+      schema: "helix.agent_step_decision.v1",
+      decision_role: "agent_step_sampling_pass",
+      chosen_capability: "scientific-calculator.solve_expression",
+      next_step: "next_action",
+    });
+    expect(response.body?.agent_step_decision).toMatchObject({
+      schema: "helix.agent_step_decision.v1",
+      decision_role: "agent_step_sampling_pass",
+      chosen_capability: "scientific-calculator.solve_expression",
+      next_step: "answer",
+    });
+    expect(response.body?.agent_step_decision?.current_observations?.length).toBeGreaterThan(0);
+    expect(response.body?.observation_review).toMatchObject({
+      schema: "helix.observation_review.v1",
+      does_it_satisfy_goal: true,
+      next_action: "final",
+    });
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("Wavelength:");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("Photon energy:");
   }, 60000);
 
   it("routes calculator live-source prompts through the workstation tool loop", async () => {
